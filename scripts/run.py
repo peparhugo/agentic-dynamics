@@ -29,7 +29,7 @@ def make_deepseek_invoke(key: str):
             "https://api.deepseek.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 800, "temperature": 0.7},
+                  "max_tokens": 3000, "temperature": 0.7},
             timeout=timeout + 15,
         )
         d = resp.json()

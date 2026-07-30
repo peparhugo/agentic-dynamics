@@ -261,11 +261,14 @@ def run_experiment(
             traj.total_tokens = tokens
             traj.total_output_tokens = tokens
 
-            # Basin escape
+            # Basin escape — pass perturbation class from operator definition
+            op_def = operators.get(op_name)
+            pert_class = op_def.perturbation_class if op_def else "semantic"
             basin = measure_basin_escape(
                 baseline_traj, traj,
                 perturbation_strength=strength,
                 perturbation_operator=op_name,
+                perturbation_class=pert_class,
             )
 
             # Recovery classification

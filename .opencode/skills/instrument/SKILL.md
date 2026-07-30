@@ -1,58 +1,55 @@
 # Reasoning Topology Instrument
 
-Run perturbation experiments to measure how language models explore
-unfamiliar reasoning trajectories.
+Run perturbation experiments through opencode to measure how
+language models explore unfamiliar reasoning trajectories.
 
-## Quick start
+## Usage
 
-```bash
-# Install
-pip install -e .
+```
+# Run any experiment config through opencode
+python scripts/run.py experiments/configs/twitter_timeline.yaml --model deepseek
 
-# Set API key
-export DEEPSEEK_API_KEY="sk-..."
+# Quick 4-operator comparison
+python scripts/run.py experiments/configs/comparative.yaml --model deepseek
 
-# Run baseline experiment
-python scripts/run.py experiments/configs/baseline.yaml
+# All available configs
+ls experiments/configs/*.yaml
 ```
 
-## Configuration
+## Experiment Configs (12 total)
 
-Experiments are defined in `experiments/configs/*.yaml`:
+### Backend Systems
+| Config | Problem |
+|---|---|
+| `baseline` | URL shortener (warmup) |
+| `twitter_timeline` | Twitter timeline + search |
+| `web_crawler` | Web-scale distributed crawler |
+| `search_kv_store` | Search engine KV store |
+| `mint_financial` | Mint.com financial aggregator |
+| `social_graph` | Social network graph infrastructure |
 
-```yaml
-name: baseline
-task: "Design a URL shortener..."
-turns:
-  - [analyze, "Analyze requirements..."]
-  - [design, "Design architecture..."]
-  - [implement, "Write implementation..."]
-  - [review, "Review design..."]
-operators:
-  - inject_alien_vocab  # manifold — forces off-manifold exploration
-  - inject_phantom_success  # semantic — tests truth-seeking
-strengths: [0.5, 0.8]
-model: deepseek
-model_id: deepseek-v4-pro
-```
+### UI/UX Frontend
+| Config | Problem |
+|---|---|
+| `collaborative_editor` | Google Docs real-time collab |
+| `data_table` | 100K-row virtual data grid |
+| `form_wizard` | Multi-step enterprise form wizard |
+| `notification_system` | Real-time notification delivery |
+| `autocomplete_search` | Instant search widget |
 
-## Operators
+### Multi-Model
+| Config | Problem |
+|---|---|
+| `comparative` | 4-operator cross-model comparison |
 
-| Operator | Class | Purpose |
-|---|---|---|
-| inject_alien_vocab | manifold | Cross-domain vocabulary injection |
-| shift_framing | manifold | Construction → falsification stance shift |
-| reverse_causality | manifold | Effect-before-cause ordering |
-| force_abandonment | manifold | Generate-then-discard solutions |
-| inject_false_premise | semantic | Plausible incorrect assumptions |
-| inject_phantom_success | semantic | False intermediate results |
-| remove_critical_constraint | semantic | Silent constraint removal |
-| invert_constraint | semantic | Expected paradigm inversion |
-| insert_contradiction | semantic | Irreconcilable premises |
-| inject_competing_goal | semantic | Conflicting requirements |
+## How it works
 
-## Output
+1. Opencode runs `python scripts/run.py <config>` via Bash
+2. The script calls the model through httpx with API key from env
+3. Results written to `experiments/results/<name>.md` + `.json`
+4. Opencode reads the results and summarizes
 
-Results are written to:
-- `experiments/results/{name}.md` — lab book with YAML frontmatter
-- `experiments/results/{name}_{model}.json` — machine-readable results
+## Models
+- `deepseek` — DeepSeek v4 Pro (set `DEEPSEEK_API_KEY`)
+- `codex` — Codex CLI (requires `which codex`)
+- Add more in `scripts/run.py` INVOKE_BUILDERS
