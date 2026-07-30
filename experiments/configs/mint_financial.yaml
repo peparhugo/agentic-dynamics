@@ -1,0 +1,28 @@
+# Experiment: Mint.com financial data aggregator
+name: mint_financial
+task: >
+  Design Mint.com — a personal financial data aggregator. Users connect
+  bank accounts, credit cards, investments. System pulls transactions
+  daily, categorizes them, provides budgets and alerts. Must handle
+  sensitive financial data securely, deal with bank API inconsistencies,
+  and provide real-time net worth calculations.
+
+turns:
+  - [analyze, "Analyze requirements. What are the unique challenges of financial data aggregation vs other systems? 3-4 sentences."]
+  - [design, "Design the architecture. How do you handle bank authentication (OAuth, screen scraping), transaction categorization, and data security? Choose specific technologies."]
+  - [implement, "Write the data model for users, accounts, transactions, and categories. Include security controls."]
+  - [review, "Review your design. What are the security vulnerabilities? What fails when a major bank changes their API?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro

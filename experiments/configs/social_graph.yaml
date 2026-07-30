@@ -1,0 +1,29 @@
+# Experiment: Social network graph infrastructure
+name: social_graph
+task: >
+  Design the data structures and infrastructure for a social network's
+  graph (Facebook/LinkedIn). Store users, friendships/connections,
+  support friend-of-friend queries, path finding between users,
+  community detection. Must handle billions of nodes and trillions
+  of edges. Read-heavy: users constantly view connections and
+  suggestions. Write-heavy: connections change frequently.
+
+turns:
+  - [analyze, "Analyze requirements. Why is graph storage fundamentally different from relational storage for social networks? 3-4 sentences."]
+  - [design, "Design the architecture. How do you store a graph with trillions of edges? How do you handle BFS for friend-of-friend queries at scale? Choose specific technologies."]
+  - [implement, "Write the data model. Show node and edge storage. How do you partition a graph across shards without losing traversal efficiency?"]
+  - [review, "Review your design. What's the worst-case query and how do you handle it? What would you change for real-time updates?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro
