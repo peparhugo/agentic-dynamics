@@ -1,0 +1,28 @@
+# Experiment: Real-time collaborative document editor (Google Docs clone)
+name: collaborative_editor
+task: >
+  Design the frontend architecture for a real-time collaborative document
+  editor like Google Docs. Multiple users edit simultaneously. Must handle
+  cursor positions, real-time sync, conflict resolution (OT/CRDT), offline
+  editing with reconnect sync, undo/redo across collaborators, rich text
+  formatting toolbar, comments, and version history UI. React-based SPA.
+
+turns:
+  - [analyze, "Analyze requirements. What are the 3-4 hardest frontend challenges unique to collaborative editing? Be concise."]
+  - [design, "Design the frontend architecture. How do you handle real-time cursor sync, conflict resolution (OT vs CRDT), and offline edits? Choose specific libraries/patterns."]
+  - [implement, "Write the component tree and state management approach. Show how a keystroke flows from input to server to other users' screens."]
+  - [review, "Review your design. What breaks when 50 users edit the same paragraph simultaneously? What would you change?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro
