@@ -1,46 +1,35 @@
-"""Experiment runner — executes perturbation experiments and produces reports.
+"""Experiment runner — measures solution quality under perturbation.
 
-Wires the instrument modules together with an LLM adapter to run
-controlled experiments: baseline → perturbed → measure → report.
+The dependent variable is correctness-per-unit-cost, not text similarity.
+Each run: perturb problem → model builds solution → evaluate correctness →
+measure token/energy cost → compare to baseline.
 
-Designed to be model-agnostic and self-contained. Every experiment
-produces a structured result that can be persisted to a lab book.
+The research question: does perturbation class predict correctness/cost variance?
 """
 
 from __future__ import annotations
 
 import json
+import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
 from .perturb import Perturbation, build_operators, perturb_prompt
-from .trajectory import ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance
 from .basin import BasinMetrics, measure_basin_escape
-from .recovery import classify_trajectory_segments, recovery_token_ratio
 from .solution import SolutionMetrics, evaluate_solution
 from .efficiency import EfficiencyMetrics, compute_efficiency
-from .strategy import StrategyReport, classify_strategy
-from .game_report import GameReport
+from .strategy import StrategyReport, StrategyType, classify_strategy
 
 
 @dataclass
 class ExperimentConfig:
-    """Configuration for a perturbation experiment.
-
-    Args:
-        name: Experiment name for reporting.
-        task: The task prompt to perturb and measure.
-        operators: Which perturbation operators to test.
-        strengths: Perturbation strengths to test per operator.
-        model: Model identifier passed to the LLM adapter.
-        rng_seed: Seed for reproducible perturbations.
-        output_dir: Where to write result files (None = no persistence).
-    """
+    """Configuration for a perturbation experiment."""
 
     name: str = "unnamed"
     task: str = ""
+    constraints: list[str] = field(default_factory=list)
     operators: list[str] = field(default_factory=lambda: [
         "inject_alien_vocab", "invert_constraint", "shift_framing",
         "inject_false_premise", "remove_critical_constraint",
@@ -49,144 +38,125 @@ class ExperimentConfig:
     ])
     strengths: list[float] = field(default_factory=lambda: [0.5, 0.8])
     model: str = ""
+    model_id: str = ""
     rng_seed: int = 42
-    repetitions: int = 1  # number of times to repeat each operator×strength combo
+    repetitions: int = 1
     output_dir: Path | None = None
 
 
 @dataclass
 class ExperimentRun:
-    """Result of a single perturbation run."""
+    """Single perturbed run result — all three measurement dimensions."""
 
     operator: str
     strength: float
     perturbation: Perturbation
-    trajectory: ReasoningTrajectory
     basin: BasinMetrics
-    recovery_ratio: float
-    exploration_tokens: int
-    recovery_tokens: int
+    solution: SolutionMetrics
+    efficiency: EfficiencyMetrics
+    strategy: StrategyReport
     response_text: str = ""
-    response_tokens: int = 0
-    cost_usd: float = 0.0
-    duration_s: float = 0.0
     error: str = ""
-    efficiency: EfficiencyMetrics | None = None
-    solution: SolutionMetrics | None = None
-    strategy: StrategyReport | None = None
 
 
 @dataclass
 class ExperimentResult:
-    """Complete result of a perturbation experiment."""
+    """Complete experiment result."""
 
     config: ExperimentConfig
     baseline: ExperimentRun | None = None
     runs: list[ExperimentRun] = field(default_factory=list)
-    game_reports: list[dict[str, Any]] = field(default_factory=list)
     started_at: str = ""
     completed_at: str = ""
     total_tokens: int = 0
     total_cost_usd: float = 0.0
+    total_energy_j: float = 0.0
     total_duration_s: float = 0.0
 
     def summary(self) -> str:
-        """Generate a human-readable summary table."""
-        lines = ["", "=" * 80, f"Experiment: {self.config.name}", "=" * 80, ""]
+        lines = ["", "=" * 100, f"Experiment: {self.config.name}", "=" * 100, ""]
+
         if self.baseline:
-            lines.append(f"Baseline: {self.baseline.response_tokens} tokens, "
-                         f"${self.baseline.cost_usd:.4f}")
+            b = self.baseline
+            lines.append(
+                f"Baseline: correctness={b.solution.correctness_score:.0%} "
+                f"constraints={b.solution.constraints_met}/{b.solution.constraints_total} "
+                f"tokens={b.efficiency.total_tokens:,} ${b.efficiency.total_cost_usd:.4f} "
+                f"energy=~{b.efficiency.total_energy_j:.0f}J "
+                f"LOC={b.solution.lines_of_code}"
+            )
             lines.append("")
 
-        header = f"{'Operator':<25} {'Str':>4} {'Escape':>7} {'Recov':>6} {'Tokens':>8} {'$':>8} {'Think%':>6} {'Strategy':>12}"
+        header = f"{'Operator':<25} {'S':>3} {'Escape':>6} {'Correct':>6} {'Tok':>8} {'Think%':>6} {'$':>8} {'Strategy':>13}"
         lines.append(header)
-        lines.append("-" * 95)
+        lines.append("-" * 100)
 
         for r in self.runs:
-            think_pct = ""
-            eff = None
-            if hasattr(r, 'efficiency') and r.efficiency:
-                eff = r.efficiency
-                think_pct = f"{eff.thinking_ratio:.0%}"
-
-            strat = ""
-            if hasattr(r, 'strategy') and r.strategy:
-                strat = r.strategy.strategy.value[:12]
-
             lines.append(
-                f"{r.operator:<25} {r.strength:>4.1f} "
-                f"{r.basin.escape_score:>7.3f} {r.recovery_ratio:>6.3f} "
-                f"{r.response_tokens:>8} {r.cost_usd:>8.5f} "
-                f"{think_pct:>6}  {strat:<12}"
+                f"{r.operator:<25} {r.strength:>3.1f} "
+                f"{r.basin.escape_score:>6.3f} "
+                f"{r.solution.correctness_score:>6.0%} "
+                f"{r.efficiency.total_tokens:>8,} "
+                f"{r.efficiency.thinking_ratio:>6.0%} "
+                f"{r.efficiency.total_cost_usd:>8.4f} "
+                f"{r.strategy.strategy.value:>13}"
             )
 
-        lines.append("-" * 85)
-        lines.append(f"Total: {self.total_tokens} tokens, ${self.total_cost_usd:.4f}, "
-                     f"{self.total_duration_s:.1f}s")
-        lines.append("")
-
-        # Per-operator averages
-        lines.append("Per-operator averages:")
-        lines.append(f"{'Operator':<28} {'Avg Escape':>11} {'Avg Recovery':>13}")
-        lines.append("-" * 55)
-        by_op: dict[str, list[ExperimentRun]] = {}
-        for r in self.runs:
-            by_op.setdefault(r.operator, []).append(r)
-        for op, runs in sorted(by_op.items()):
-            avg_esc = sum(r.basin.escape_score for r in runs) / len(runs)
-            avg_rec = sum(r.recovery_ratio for r in runs) / len(runs)
-            lines.append(f"{op:<28} {avg_esc:>11.3f} {avg_rec:>13.3f}")
+        lines.extend([
+            "-" * 100,
+            f"Total: {self.total_tokens:,} tokens, ${self.total_cost_usd:.4f}, ~{self.total_energy_j:.0f}J, {self.total_duration_s:.0f}s",
+        ])
 
         return "\n".join(lines)
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "name": self.config.name,
-            "task": self.config.task[:200],
-            "model": self.config.model,
-            "baseline_tokens": self.baseline.response_tokens if self.baseline else 0,
+            "name": self.config.name, "task": self.config.task[:200],
+            "model": self.config.model_id,
+            "baseline": self.baseline.basin.to_dict() if self.baseline else None,
             "runs": [
                 {
                     "operator": r.operator, "strength": r.strength,
-                    "escape_score": round(r.basin.escape_score, 4),
-                    "recovery_ratio": round(r.recovery_ratio, 4),
-                    "exploration_tokens": r.exploration_tokens,
-                    "recovery_tokens": r.recovery_tokens,
-                    "response_tokens": r.response_tokens,
-                    "cost_usd": r.cost_usd, "duration_s": r.duration_s,
-                    "verdict": r.basin.get_verdict(), "error": r.error,
+                    "basin": r.basin.to_dict(),
+                    "solution": r.solution.to_dict(),
+                    "efficiency": r.efficiency.to_dict(),
+                    "strategy": r.strategy.to_dict(),
+                    "error": r.error,
                 }
                 for r in self.runs
             ],
-            "game_reports": self.game_reports,
             "total_tokens": self.total_tokens,
             "total_cost_usd": self.total_cost_usd,
+            "total_energy_j": self.total_energy_j,
             "total_duration_s": self.total_duration_s,
         }
 
 
 def run_experiment(
     config: ExperimentConfig,
-    llm_invoke: Callable[[str], tuple[str, int, float]],
+    llm_invoke: Callable[[str], Any],
     *,
     on_progress: Callable[[str], None] | None = None,
 ) -> ExperimentResult:
-    """Run a complete perturbation experiment.
+    """Run a perturbation experiment measuring solution quality.
 
-    Args:
-        config: Experiment configuration.
-        llm_invoke: Function that takes a prompt string and returns
-                    (response_text, tokens_used, cost_usd).
-        on_progress: Optional callback for progress updates.
-
-    Returns:
-        ExperimentResult with baseline + all perturbation runs.
+    llm_invoke must accept a prompt string and return an object with:
+    - .text: the response text
+    - .completion_tokens (or .total_tokens)
+    - .prompt_tokens (optional)
+    - .reasoning_tokens (optional)
+    - .estimated_cost_usd (optional)
     """
     from datetime import datetime, timezone
 
+    def _get(obj: Any, attr: str, default: Any = 0) -> Any:
+        if isinstance(obj, dict):
+            return obj.get(attr, default)
+        return getattr(obj, attr, default)
+
     now = datetime.now(timezone.utc).isoformat()
     result = ExperimentResult(config=config, started_at=now)
-    operators = build_operators()
+    ops = build_operators()
 
     def log(msg: str) -> None:
         if on_progress:
@@ -195,165 +165,137 @@ def run_experiment(
     # ── Baseline ──
     log("Running baseline...")
     t0 = time.monotonic()
-    baseline_result = llm_invoke(config.task)
-    if isinstance(baseline_result, tuple):
-        baseline_text, baseline_tokens, baseline_cost = baseline_result
-    else:
-        baseline_text = getattr(baseline_result, "text", "")
-        baseline_tokens = getattr(baseline_result, "completion_tokens", 0) or getattr(baseline_result, "total_tokens", 0) or 0
-        baseline_cost = getattr(baseline_result, "estimated_cost_usd", 0.0)
+    baseline_obj = llm_invoke(config.task)
+    baseline_text = _get(baseline_obj, "text", "")
     baseline_duration = time.monotonic() - t0
 
-    baseline_traj = ReasoningTrajectory(
-        run_id="baseline",
-        model=config.model,
-        task=config.task,
+    baseline_sol = evaluate_solution(baseline_text, config.constraints)
+    baseline_eff = compute_efficiency(
+        prompt_tokens=_get(baseline_obj, "prompt_tokens"),
+        completion_tokens=_get(baseline_obj, "completion_tokens"),
+        reasoning_tokens=_get(baseline_obj, "reasoning_tokens"),
+        total_tokens=_get(baseline_obj, "total_tokens"),
+        solution=baseline_sol,
     )
-    baseline_traj.add_step(TrajectoryStep(
-        step_index=0,
-        thought="generating response to unperturbed prompt",
-        action=baseline_text,
-        tool_name="llm_invoke",
-        tokens_used=baseline_tokens,
-    ))
-    baseline_traj.total_tokens = baseline_tokens
-    baseline_traj.total_output_tokens = baseline_tokens
+
+    # Baseline basin: perfect match with itself, max correctness
+    baseline_basin = BasinMetrics(
+        escape_score=0.0, correctness=baseline_sol.correctness_score,
+        constraints_met=baseline_sol.constraints_met,
+        constraints_total=baseline_sol.constraints_total,
+        total_tokens=baseline_eff.total_tokens,
+        reasoning_tokens=baseline_eff.reasoning_tokens,
+        thinking_ratio=baseline_eff.thinking_ratio,
+        cost_usd=baseline_eff.total_cost_usd,
+        estimated_energy_j=baseline_eff.total_energy_j,
+        lines_of_code=baseline_sol.lines_of_code,
+        model=config.model_id, task=config.task, run_id="baseline",
+    )
+
+    baseline_strat = classify_strategy(baseline_basin, baseline_sol, baseline_eff, "baseline")
 
     result.baseline = ExperimentRun(
-        operator="baseline",
-        strength=0.0,
-        perturbation=Perturbation(operator="baseline", description="unperturbed baseline"),
-        trajectory=baseline_traj,
-        basin=BasinMetrics(escape_score=1.0, recovery_ratio=0.0),
-        recovery_ratio=0.0,
-        exploration_tokens=baseline_tokens,
-        recovery_tokens=0,
+        operator="baseline", strength=0.0,
+        perturbation=Perturbation(operator="baseline"),
+        basin=baseline_basin, solution=baseline_sol,
+        efficiency=baseline_eff, strategy=baseline_strat,
         response_text=baseline_text,
-        response_tokens=baseline_tokens,
-        cost_usd=baseline_cost,
-        duration_s=baseline_duration,
     )
-    result.total_tokens += baseline_tokens
-    result.total_cost_usd += baseline_cost
+    result.total_tokens += baseline_eff.total_tokens
+    result.total_cost_usd += baseline_eff.total_cost_usd
+    result.total_energy_j += baseline_eff.total_energy_j
     result.total_duration_s += baseline_duration
-    log(f"Baseline: {baseline_tokens} tokens, ${baseline_cost:.4f}")
+    log(f"  correctness={baseline_sol.correctness_score:.0%} tokens={baseline_eff.total_tokens:,} ${baseline_eff.total_cost_usd:.4f}")
 
     # ── Perturbation runs ──
-    total_runs = len(config.operators) * len(config.strengths)
+    total_runs = len(config.operators) * len(config.strengths) * config.repetitions
     run_idx = 0
 
     for op_name in config.operators:
         for strength in config.strengths:
-            run_idx += 1
-            log(f"[{run_idx}/{total_runs}] {op_name} (strength={strength})...")
+            for rep in range(config.repetitions):
+                run_idx += 1
+                rep_str = f" (rep {rep+1}/{config.repetitions})" if config.repetitions > 1 else ""
+                log(f"[{run_idx}/{total_runs}] {op_name} s={strength}{rep_str}...")
 
-            perturbed_prompt, record = perturb_prompt(
-                config.task, op_name,
-                strength=strength,
-                rng_seed=config.rng_seed + run_idx,
-            )
+                op_def = ops.get(op_name)
+                pert_class = op_def.perturbation_class if op_def else "semantic"
 
-            t0 = time.monotonic()
-            try:
-                result_obj = llm_invoke(perturbed_prompt)
-                if isinstance(result_obj, tuple):
-                    response_text, tokens, cost = result_obj
-                    prompt_tokens = 0
-                    reasoning_tokens = 0
-                else:
-                    response_text = getattr(result_obj, "text", "")
-                    tokens = getattr(result_obj, "completion_tokens", 0) or getattr(result_obj, "total_tokens", 0) or 0
-                    cost = getattr(result_obj, "estimated_cost_usd", 0.0)
-                    prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
-                    reasoning_tokens = getattr(result_obj, "reasoning_tokens", 0)
+                perturbed_prompt, record = perturb_prompt(
+                    config.task, op_name, strength=strength,
+                    rng_seed=config.rng_seed + run_idx,
+                )
+
+                t0 = time.monotonic()
+                try:
+                    obj = llm_invoke(perturbed_prompt)
+                    response_text = _get(obj, "text", "")
+                    error = ""
+                except Exception as e:
+                    response_text = ""
+                    obj = {}
+                    error = str(e)
                 duration = time.monotonic() - t0
-                error = ""
-            except Exception as e:
-                response_text = ""
-                tokens = prompt_tokens = reasoning_tokens = 0
-                cost = 0.0
-                duration = time.monotonic() - t0
-                error = str(e)
 
-            # Build trajectory
-            traj = ReasoningTrajectory(
-                run_id=f"{op_name}_{strength}",
-                model=config.model,
-                task=config.task,
-                perturbation_applied=op_name,
-                perturbation_strength=strength,
-            )
-            if response_text:
-                traj.add_step(TrajectoryStep(
-                    step_index=0,
-                    thought="responding to perturbed prompt",
-                    action=response_text,
-                    tool_name="llm_invoke",
-                    tokens_used=tokens,
-                ))
-            traj.total_tokens = tokens
-            traj.total_output_tokens = tokens
+                # Solution quality
+                sol = evaluate_solution(response_text, config.constraints,
+                                        baseline_code=baseline_text)
 
-            # Basin escape — pass perturbation class from operator definition
-            op_def = operators.get(op_name)
-            pert_class = op_def.perturbation_class if op_def else "semantic"
-            basin = measure_basin_escape(
-                baseline_traj, traj,
-                perturbation_strength=strength,
-                perturbation_operator=op_name,
-                perturbation_class=pert_class,
-            )
+                # Efficiency
+                eff = compute_efficiency(
+                    prompt_tokens=_get(obj, "prompt_tokens"),
+                    completion_tokens=_get(obj, "completion_tokens"),
+                    reasoning_tokens=_get(obj, "reasoning_tokens"),
+                    total_tokens=_get(obj, "total_tokens"),
+                    solution=sol,
+                )
 
-            # Recovery classification
-            classifications = classify_trajectory_segments(baseline_traj, traj)
-            expl_tokens, rec_tokens, rec_ratio = recovery_token_ratio(classifications)
+                # Basin escape (output-based)
+                basin = measure_basin_escape(
+                    baseline_text, response_text,
+                    baseline_correctness=baseline_sol.correctness_score,
+                    perturbed_correctness=sol.correctness_score,
+                    baseline_constraints_met=baseline_sol.constraints_met,
+                    perturbed_constraints_met=sol.constraints_met,
+                    baseline_loc=baseline_sol.lines_of_code,
+                    perturbed_loc=sol.lines_of_code,
+                    prompt_tokens=_get(obj, "prompt_tokens"),
+                    completion_tokens=_get(obj, "completion_tokens"),
+                    reasoning_tokens=_get(obj, "reasoning_tokens"),
+                    perturbation_strength=strength,
+                    perturbation_operator=op_name,
+                    perturbation_class=pert_class,
+                    model=config.model_id,
+                    task=config.task,
+                    run_id=f"{op_name}_{strength}",
+                )
 
-            # Compute solution metrics from response text
-            sol = evaluate_solution(response_text, constraints=[])
-            # Compute efficiency with full token breakdown
-            eff = compute_efficiency(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=tokens,
-                reasoning_tokens=reasoning_tokens,
-                solution=sol,
-            )
-            # Classify strategy
-            strat = classify_strategy(basin, sol, eff, perturbation_class=pert_class)
+                # Strategy
+                strat = classify_strategy(basin, sol, eff, pert_class)
 
-            run = ExperimentRun(
-                operator=op_name,
-                strength=strength,
-                perturbation=record,
-                trajectory=traj,
-                basin=basin,
-                recovery_ratio=rec_ratio,
-                exploration_tokens=expl_tokens,
-                recovery_tokens=rec_tokens,
-                response_text=response_text,
-                response_tokens=tokens,
-                cost_usd=cost,
-                duration_s=duration,
-                error=error,
-                efficiency=eff,
-                solution=sol,
-                strategy=strat,
-            )
-            result.runs.append(run)
-            result.total_tokens += tokens
-            result.total_cost_usd += cost
-            result.total_duration_s += duration
+                run = ExperimentRun(
+                    operator=op_name, strength=strength,
+                    perturbation=record, basin=basin,
+                    solution=sol, efficiency=eff,
+                    strategy=strat, response_text=response_text,
+                    error=error,
+                )
+                result.runs.append(run)
+                result.total_tokens += eff.total_tokens
+                result.total_cost_usd += eff.total_cost_usd
+                result.total_energy_j += eff.total_energy_j
+                result.total_duration_s += duration
 
-            log(f"  escape={basin.escape_score:.3f} recovery={rec_ratio:.3f} "
-                f"tokens={tokens} cost=${cost:.4f} "
-                f"think={eff.thinking_ratio:.0%} strat={strat.strategy.value} "
-                f"correct={sol.correctness_score:.0%}")
+                log(f"  escape={basin.escape_score:.3f} correct={sol.correctness_score:.0%} "
+                    f"tok={eff.total_tokens:,} think={eff.thinking_ratio:.0%} "
+                    f"${eff.total_cost_usd:.4f} strat={strat.strategy.value}")
 
     result.completed_at = datetime.now(timezone.utc).isoformat()
 
-    # Persist if output dir specified
     if config.output_dir:
         config.output_dir.mkdir(parents=True, exist_ok=True)
-        result_path = config.output_dir / "experiment_result.json"
-        result_path.write_text(json.dumps(result.to_dict(), indent=2, default=str))
+        (config.output_dir / f"{config.name}_{config.model_id}.json").write_text(
+            json.dumps(result.to_dict(), indent=2, default=str)
+        )
 
     return result

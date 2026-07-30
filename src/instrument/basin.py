@@ -1,13 +1,11 @@
-"""Basin escape measurement — did the model escape or return?
+"""Solution divergence measurement — did the model produce a different answer?
 
-The central question: when a model's reasoning is perturbed into
-unfamiliar territory, does it continue exploring or converge back
-to familiar patterns?
+Replaces text-similarity-based escape with output-based divergence:
+did the model build a structurally different solution from baseline?
 
-BasinMetrics quantifies this as a single pass/fail score:
-- escape_score > 0.5: model preserved novelty (escaped the attractor)
-- escape_score < 0.3: model returned to familiar territory (captured)
-- escape_score 0.3-0.5: inconclusive
+A "high escape" now means: the model chose a genuinely different
+architecture, technology stack, or design pattern — not just
+different words to describe the same thing.
 """
 
 from __future__ import annotations
@@ -15,203 +13,242 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
-from .trajectory import ReasoningTrajectory, compute_trajectory_distance
-
 
 @dataclass
 class BasinMetrics:
-    """Metrics describing a model's exploration behavior under perturbation.
+    """How did the model's output diverge from baseline under perturbation?
 
-    H₀: There is no systematic difference in escape behavior between models.
-    H₁: RL-trained models show higher escape rates than SFT-dominant models.
-
-    Interpretation:
-    - High escape_score + low recovery_ratio: model explored novel territory
-    - Low escape_score + high recovery_ratio: model was captured by attractor
-    - Inconclusive: perturbation too weak or measurement too noisy
+    H0: Perturbation class has no effect on solution divergence or cost.
+    H1: Manifold perturbations produce more divergent solutions at
+        comparable cost than semantic perturbations.
     """
 
     perturbation_strength: float = 0.0
     perturbation_operator: str = ""
     perturbation_class: str = "semantic"
-    initial_distance: float = 0.0
-    final_distance: float = 0.0
-    escape_score: float = 0.0
-    recovery_ratio: float = 0.0
-    exploration_tokens: int = 0
-    recovery_tokens: int = 0
+
+    # Solution divergence (output-based, not text-based)
+    architecture_divergence: float = 0.0   # different tech choices?
+    structure_divergence: float = 0.0      # different code structure?
+    novelty_score: float = 0.0             # overall novelty vs baseline
+    escape_score: float = 0.0              # composite divergence
+
+    # Resource cost
+    total_tokens: int = 0
+    reasoning_tokens: int = 0
+    thinking_ratio: float = 0.0
+    cost_usd: float = 0.0
+    estimated_energy_j: float = 0.0
+
+    # Outcome
+    correctness: float = 0.0
+    constraints_met: int = 0
+    constraints_total: int = 0
+    lines_of_code: int = 0
+
+    # Quality metric — the one that matters
+    quality_per_dollar: float = 0.0
+    quality_per_joule: float = 0.0
+
+    # Verdict
     converged_back: bool | None = None
-    convergence_step: int | None = None
     verdict: str = ""
 
     model: str = ""
     task: str = ""
     run_id: str = ""
-    baseline_run_id: str = ""
 
     def get_verdict(self) -> str:
-        """Class-aware verdict on whether the model escaped its basin.
-
-        Interpretation depends on perturbation type:
-
-        SEMANTIC perturbations (false premises, missing constraints, etc.):
-            Low escape = GOOD — model correctly handled the in-manifold perturbation
-            High escape = model over-reacted to a known pattern (potentially bad)
-
-        MANIFOLD perturbations (alien vocab, reverse causality, etc.):
-            High escape = GOOD — model explored novel territory
-            Low escape = model was captured by attractor (returned from unfamiliar space)
-        """
         c = self.perturbation_class
-
-        if self.escape_score > 0.7:
+        if self.escape_score > 0.5:
             if c == "semantic":
-                return "over-escaped — model over-reacted to a known pattern (semantic perturbation, should have stayed in-manifold)"
-            return "escaped — model explored novel territory and preserved it (manifold class expected this)"
-        elif self.escape_score > 0.5:
-            if c == "semantic":
-                return "inflated — semantic perturbation produced unnecessary deviation"
-            return "partial_escape — model deviated from baseline but partially returned"
-        elif self.escape_score > 0.3:
-            if c == "semantic":
-                return "stable — semantic perturbation handled in-manifold (within expected reasoning range)"
-            return "tentative — model entered unfamiliar territory briefly but returned"
+                return "diverged — semantic perturbation caused unnecessary output variance"
+            return "escaped — model produced genuinely novel solution (expected for manifold class)"
+        elif self.escape_score > 0.2:
+            return "partial — slight output divergence, approach similar to baseline"
         else:
             if c == "semantic":
-                return "competent — model rejected perturbation and maintained sound reasoning (semantic class, truth-seeking)"
-            return "captured — model returned from unfamiliar space back to attractor basin"
+                return "stable — semantic perturbation handled correctly, output matches baseline"
+            return "captured — model returned to baseline output despite unfamiliar perturbation"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "perturbation_strength": self.perturbation_strength,
             "perturbation_operator": self.perturbation_operator,
             "perturbation_class": self.perturbation_class,
-            "initial_distance": round(self.initial_distance, 4),
-            "final_distance": round(self.final_distance, 4),
+            "architecture_divergence": round(self.architecture_divergence, 4),
+            "structure_divergence": round(self.structure_divergence, 4),
+            "novelty_score": round(self.novelty_score, 4),
             "escape_score": round(self.escape_score, 4),
-            "recovery_ratio": round(self.recovery_ratio, 4),
-            "exploration_tokens": self.exploration_tokens,
-            "recovery_tokens": self.recovery_tokens,
+            "total_tokens": self.total_tokens,
+            "reasoning_tokens": self.reasoning_tokens,
+            "thinking_ratio": round(self.thinking_ratio, 4),
+            "cost_usd": self.cost_usd,
+            "estimated_energy_j": round(self.estimated_energy_j, 2),
+            "correctness": round(self.correctness, 4),
+            "constraints_met": self.constraints_met,
+            "constraints_total": self.constraints_total,
+            "lines_of_code": self.lines_of_code,
+            "quality_per_dollar": round(self.quality_per_dollar, 2),
+            "quality_per_joule": round(self.quality_per_joule, 4),
             "converged_back": self.converged_back,
-            "convergence_step": self.convergence_step,
             "verdict": self.get_verdict(),
             "model": self.model,
             "task": self.task,
             "run_id": self.run_id,
-            "baseline_run_id": self.baseline_run_id,
         }
 
 
 def measure_basin_escape(
-    baseline: ReasoningTrajectory,
-    perturbed: ReasoningTrajectory,
+    baseline_code: str,
+    perturbed_code: str,
+    baseline_correctness: float,
+    perturbed_correctness: float,
+    baseline_constraints_met: int,
+    perturbed_constraints_met: int,
+    baseline_loc: int,
+    perturbed_loc: int,
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    reasoning_tokens: int = 0,
     perturbation_strength: float = 0.5,
     perturbation_operator: str = "",
     perturbation_class: str = "semantic",
+    model: str = "",
+    task: str = "",
+    run_id: str = "",
 ) -> BasinMetrics:
-    """Measure whether the model escaped its attractor basin.
+    """Measure how much the model's output diverged from baseline.
+
+    Uses output-based metrics instead of text similarity:
+    - Architecture divergence: did the model choose different technologies?
+    - Structure divergence: is the code organized differently?
+    - Novelty: overall structural difference from baseline output
 
     Args:
-        baseline: The model's reasoning trajectory on the unperturbed task.
-        perturbed: The model's reasoning trajectory after perturbation.
-        perturbation_strength: How hard the perturbation pushed (0.0-1.0).
-        perturbation_operator: Which perturbation operator was applied.
-
-    Returns:
-        BasinMetrics with escape score and supporting diagnostics.
-
-    The escape score is computed as:
-        escape_score = final_distance / max(initial_distance, 0.01)
-
-    Where:
-    - initial_distance is an estimate of perturbation magnitude
-      (based on the difference between the first step of the perturbed
-      trajectory and the baseline trajectory).
-    - final_distance is the similarity between the full baseline and
-      perturbed trajectories.
-
-    If final_distance ≈ 0 (model converged back to baseline patterns):
-        escape_score ≈ 0 → captured by attractor basin.
-    If final_distance ≈ initial_distance (model stayed in novel territory):
-        escape_score ≈ 1 → escaped the attractor basin.
+        baseline_code: The unperturbed model's code output.
+        perturbed_code: The perturbed model's code output.
+        baseline_correctness: Correctness score for baseline.
+        perturbed_correctness: Correctness score for perturbed run.
+        baseline_constraints_met: Number of constraints baseline satisfied.
+        perturbed_constraints_met: Number of constraints perturbed satisfied.
+        baseline_loc: Lines of code in baseline.
+        perturbed_loc: Lines of code in perturbed run.
+        prompt_tokens: Input tokens consumed.
+        completion_tokens: Output tokens produced.
+        reasoning_tokens: Hidden reasoning tokens.
+        perturbation_strength: Perturbation magnitude.
+        perturbation_operator: Which operator was applied.
+        perturbation_class: "manifold" or "semantic".
+        model: Model identifier.
+        task: Task description.
+        run_id: Run identifier.
     """
-    # Initial distance: compare first steps as a proxy for perturbation magnitude
-    initial = 0.0
-    if baseline.steps and perturbed.steps:
-        baseline_first = ReasoningTrajectory(
-            run_id="baseline_first",
-            steps=[baseline.steps[0]],
-            total_tokens=baseline.steps[0].tokens_used,
-        )
-        perturbed_first = ReasoningTrajectory(
-            run_id="perturbed_first",
-            steps=[perturbed.steps[0]],
-            total_tokens=perturbed.steps[0].tokens_used,
-        )
-        initial = compute_trajectory_distance(baseline_first, perturbed_first)
+    m = BasinMetrics()
+    m.perturbation_strength = perturbation_strength
+    m.perturbation_operator = perturbation_operator
+    m.perturbation_class = perturbation_class
+    m.model = model
+    m.task = task
+    m.run_id = run_id
 
-    # If no steps, fall back to perturbation_strength as initial distance estimate
-    if initial < 0.01:
-        initial = perturbation_strength * 0.5
+    # Architecture divergence: detect technology stack differences
+    m.architecture_divergence = _architecture_divergence(baseline_code, perturbed_code)
 
-    # Final distance: full trajectory comparison
-    final = compute_trajectory_distance(baseline, perturbed)
+    # Structure divergence: detect code organization differences
+    m.structure_divergence = _structure_divergence(baseline_loc, perturbed_loc, baseline_code, perturbed_code)
 
-    # Escape score: how much of the initial perturbation was preserved?
-    # Clamp to [0, 1]
-    escape_score = min(max(final / max(initial, 0.01), 0.0), 1.0)
+    # Overall novelty
+    m.novelty_score = _compute_novelty(baseline_code, perturbed_code)
 
-    # Recovery ratio: what fraction of tokens look like recovery?
-    # v1: if trajectory returned close to baseline, most tokens were recovery
-    recovery_ratio = 1.0 - escape_score
+    # Composite escape: how much did the output diverge?
+    m.escape_score = 0.4 * m.architecture_divergence + 0.3 * m.structure_divergence + 0.3 * m.novelty_score
 
-    # Token classification
-    total_tokens = max(perturbed.total_tokens, 1)
-    exploration_tokens = int(total_tokens * escape_score)
-    recovery_tokens = total_tokens - exploration_tokens
-
-    # Convergence detection
-    converged_back = escape_score < 0.3
-
-    # Estimate convergence step
-    convergence_step = None
-    if converged_back and len(perturbed.steps) > 0:
-        convergence_step = _estimate_convergence_step(baseline, perturbed)
-
-    return BasinMetrics(
-        perturbation_strength=perturbation_strength,
-        perturbation_operator=perturbation_operator,
-        perturbation_class=perturbation_class,
-        initial_distance=initial,
-        final_distance=final,
-        escape_score=escape_score,
-        recovery_ratio=recovery_ratio,
-        exploration_tokens=exploration_tokens,
-        recovery_tokens=recovery_tokens,
-        converged_back=converged_back,
-        convergence_step=convergence_step,
-        model=perturbed.model,
-        task=perturbed.task,
-        run_id=perturbed.run_id,
-        baseline_run_id=baseline.run_id,
+    # Resource tracking
+    m.total_tokens = prompt_tokens + completion_tokens + reasoning_tokens
+    m.reasoning_tokens = reasoning_tokens
+    m.thinking_ratio = reasoning_tokens / max(m.total_tokens, 1)
+    m.cost_usd = (
+        prompt_tokens * 0.27 / 1_000_000
+        + completion_tokens * 1.10 / 1_000_000
+        + reasoning_tokens * 0.14 / 1_000_000
+    )
+    m.estimated_energy_j = (
+        prompt_tokens * 0.08 + completion_tokens * 0.23 + reasoning_tokens * 0.47
     )
 
+    m.correctness = perturbed_correctness
+    m.constraints_met = perturbed_constraints_met
+    m.constraints_total = max(baseline_constraints_met, perturbed_constraints_met)
+    m.lines_of_code = perturbed_loc
 
-def _estimate_convergence_step(
-    baseline: ReasoningTrajectory,
-    perturbed: ReasoningTrajectory,
-) -> int | None:
-    """Estimate the step at which the perturbed trajectory converged back.
+    # Quality metric — the one that matters
+    correctness_ratio = perturbed_correctness / max(baseline_correctness, 0.01)
+    m.quality_per_dollar = correctness_ratio / max(m.cost_usd, 0.000001)
+    m.quality_per_joule = correctness_ratio / max(m.estimated_energy_j, 0.01)
 
-    Compares each step of the perturbed trajectory against the baseline,
-    looking for the point where tool call patterns start matching.
-    """
-    baseline_tools = set(baseline.tool_call_sequence())
-    if not baseline_tools:
-        return None
+    m.converged_back = m.escape_score < 0.2
 
-    for step in perturbed.steps:
-        if step.tool_name in baseline_tools:
-            return step.step_index
+    return m
 
-    return None
+
+def _architecture_divergence(baseline: str, perturbed: str) -> float:
+    """Detect technology stack differences between two solutions."""
+    tech_terms = [
+        "react", "vue", "angular", "svelte", "next.js", "nuxt",
+        "flask", "django", "fastapi", "express", "spring", "rails",
+        "postgresql", "mysql", "mongodb", "redis", "sqlite",
+        "docker", "kubernetes", "aws", "gcp", "azure",
+        "graphql", "rest", "grpc", "websocket",
+        "reddis", "kafka", "rabbitmq", "celery",
+        "typescript", "javascript", "python", "rust", "go", "java",
+        "crdt", "ot", "raft", "paxos",
+    ]
+    baseline_tech = {t for t in tech_terms if t in baseline.lower()}
+    perturbed_tech = {t for t in tech_terms if t in perturbed.lower()}
+    union = len(baseline_tech | perturbed_tech)
+    if union == 0:
+        return 0.0
+    intersection = len(baseline_tech & perturbed_tech)
+    return 1.0 - (intersection / union)
+
+
+def _structure_divergence(
+    baseline_loc: int, perturbed_loc: int,
+    baseline_code: str, perturbed_code: str,
+) -> float:
+    """Detect code organization differences."""
+    scores = []
+
+    # LOC ratio
+    if max(baseline_loc, perturbed_loc) > 0:
+        loc_ratio = abs(perturbed_loc - baseline_loc) / max(baseline_loc, perturbed_loc, 1)
+        scores.append(loc_ratio)
+
+    # Function/class count difference
+    def count_defs(code: str) -> int:
+        import re
+        return len(re.findall(r'^\s*(def |class |func |fn |const |export )', code, re.MULTILINE))
+    b_defs = count_defs(baseline_code)
+    p_defs = count_defs(perturbed_code)
+    if max(b_defs, p_defs) > 0:
+        def_ratio = abs(p_defs - b_defs) / max(b_defs, p_defs, 1)
+        scores.append(def_ratio)
+
+    if not scores:
+        return 0.0
+    return sum(scores) / len(scores)
+
+
+def _compute_novelty(baseline: str, perturbed: str) -> float:
+    """Structural novelty via trigram distance."""
+    def trigrams(text: str) -> set[str]:
+        t = text.lower()
+        return {t[i:i + 5] for i in range(len(t) - 4)}
+    bt = trigrams(baseline)
+    pt = trigrams(perturbed)
+    union = len(bt | pt)
+    if union == 0:
+        return 0.5
+    return 1.0 - (len(bt & pt) / union)

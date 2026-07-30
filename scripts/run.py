@@ -29,7 +29,7 @@ def make_deepseek_invoke(key: str):
             "https://api.deepseek.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
             json={"model": model, "messages": [{"role": "user", "content": prompt}],
-                  "max_tokens": 3000, "temperature": 0.7},
+                  "temperature": 0.7},
             timeout=timeout + 15,
         )
         d = resp.json()
@@ -102,10 +102,13 @@ def main():
     config = ExperimentConfig(
         name=cfg["name"],
         task=cfg["task"].strip(),
+        constraints=cfg.get("constraints", []),
         operators=operators,
         strengths=cfg["strengths"],
-        model=model_id,
+        model=cfg["model"],
+        model_id=model_id,
         rng_seed=cfg.get("rng_seed", 42),
+        repetitions=cfg.get("repetitions", 1),
         output_dir=Path("experiments/results"),
     )
 
