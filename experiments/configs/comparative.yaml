@@ -1,0 +1,23 @@
+# Experiment: Multi-model comparison
+name: comparative
+task: >
+  Build a URL shortener: REST API, collision-resistant codes,
+  storage, rate limiting, click analytics.
+
+turns:
+  - [analyze, "Analyze requirements. 3 key design decisions. 2-3 sentences."]
+  - [design, "Design architecture. Specific technologies. 2-3 sentences."]
+  - [implement, "Data model and core API. Python/Flask. Under 30 lines."]
+  - [review, "Review your design. Weaknesses? 2 sentences."]
+
+operators:
+  - inject_alien_vocab
+  - inject_phantom_success
+  - remove_critical_constraint
+  - reverse_causality
+
+strengths: [0.5]
+
+models:
+  - [deepseek, deepseek-v4-pro]
+  - [codex, gpt-5-mini]

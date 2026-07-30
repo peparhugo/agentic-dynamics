@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reasoning Topology — Probing How Language Models Explore</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg: #090a0f; --surface-1: #111318; --surface-2: #161920; --surface-3: #1c1f28;
+  --border: rgba(255,255,255,0.06); --border-strong: rgba(255,255,255,0.12);
+  --text: #e3e6ed; --text-secondary: #9599a6; --text-tertiary: #6b6f7b;
+  --accent: #4e8cff; --accent-glow: rgba(78,140,255,0.15);
+  --green: #3ecf8e; --green-glow: rgba(62,207,142,0.15);
+  --amber: #f0b34b; --amber-glow: rgba(240,179,75,0.15);
+  --red: #f25c5c; --red-glow: rgba(242,92,92,0.15);
+  --purple: #9b6dff; --purple-glow: rgba(155,109,255,0.15);
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.2);
+  --shadow-lg: 0 4px 24px rgba(0,0,0,0.5);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(78,140,255,0.08), transparent),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(62,207,142,0.05), transparent);
+}
+
+.container { max-width: 1040px; margin: 0 auto; padding: 0 2rem; }
+
+/* ── Hero ── */
+.hero {
+  padding: 5rem 0 3rem;
+  text-align: center;
+  position: relative;
+}
+.hero::after {
+  content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 200px; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+}
+.hero .badge {
+  display: inline-block; padding: 0.35rem 1rem;
+  background: var(--accent-glow); border: 1px solid rgba(78,140,255,0.2);
+  border-radius: 100px; font-size: 0.8rem; font-weight: 600; letter-spacing: 0.5px;
+  color: var(--accent); margin-bottom: 1.5rem; text-transform: uppercase;
+}
+.hero h1 {
+  font-size: 3.2rem; font-weight: 800; letter-spacing: -1.5px; line-height: 1.1;
+  background: linear-gradient(135deg, #e3e6ed 0%, #9599a6 50%, #c9d1d9 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-bottom: 1.2rem;
+}
+.hero .subtitle {
+  font-size: 1.15rem; color: var(--text-secondary); font-weight: 400;
+  max-width: 600px; margin: 0 auto; line-height: 1.6;
+}
+.hero .meta {
+  margin-top: 1.5rem; font-size: 0.85rem; color: var(--text-tertiary);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* ── Navigation ── */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(9,10,15,0.85); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border); padding: 0.75rem 0;
+}
+.nav-inner { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
+.nav a { color: var(--text-secondary); text-decoration: none; font-size: 0.82rem; font-weight: 500;
+  transition: color 0.2s; }
+.nav a:hover { color: var(--accent); }
+
+/* ── Section ── */
+.section { padding: 4rem 0; }
+.section-title {
+  font-size: 1.55rem; font-weight: 700; letter-spacing: -0.5px;
+  margin-bottom: 0.5rem; color: #fff;
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.section-title .num {
+  font-size: 0.85rem; color: var(--accent); font-weight: 600;
+  font-family: 'JetBrains Mono', monospace;
+  padding: 0.25rem 0.6rem; background: var(--accent-glow);
+  border-radius: 6px;
+}
+.section-subtitle { color: var(--text-secondary); font-size: 0.95rem; margin-bottom: 2rem; }
+
+/* ── Cards ── */
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 2rem;
+  box-shadow: var(--shadow); transition: border-color 0.3s;
+}
+.card:hover { border-color: var(--border-strong); }
+.card-accent { border-left: 3px solid var(--accent); }
+.card-green { border-left: 3px solid var(--green); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.2rem; }
+
+/* ── Metrics ── */
+.metric-card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.5rem;
+  box-shadow: var(--shadow); text-align: center;
+  position: relative; overflow: hidden;
+}
+.metric-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+}
+.metric-card.accent::before { background: var(--accent); }
+.metric-card.green::before { background: var(--green); }
+.metric-card.amber::before { background: var(--amber); }
+.metric-card.purple::before { background: var(--purple); }
+
+.metric-value {
+  font-size: 2.4rem; font-weight: 800; letter-spacing: -1px;
+  font-family: 'JetBrains Mono', monospace;
+}
+.metric-value.accent { color: var(--accent); }
+.metric-value.green { color: var(--green); }
+.metric-value.amber { color: var(--amber); }
+.metric-label { font-size: 0.8rem; color: var(--text-tertiary); margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 1px; }
+.metric-sub { font-size: 0.78rem; color: var(--text-secondary); margin-top: 0.5rem; }
+
+/* ── Tables ── */
+.table-wrap { overflow-x: auto; margin: 1.5rem 0; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+thead th {
+  text-align: left; padding: 0.85rem 1rem;
+  color: var(--text-secondary); font-weight: 600; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.8px;
+  border-bottom: 2px solid var(--border-strong);
+  background: var(--surface-2);
+}
+tbody td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); color: var(--text); }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ── Tags ── */
+.tag {
+  display: inline-block; padding: 0.3rem 0.7rem; border-radius: 100px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 0.3px;
+}
+.tag-manifold { background: var(--green-glow); color: var(--green); }
+.tag-semantic { background: var(--amber-glow); color: var(--amber); }
+
+/* ── Bars ── */
+.bar-row { display: flex; align-items: center; margin: 0.55rem 0; }
+.bar-label { width: 240px; text-align: right; padding-right: 1rem;
+  font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
+.bar-track { flex: 1; height: 10px; background: var(--surface-2);
+  border-radius: 100px; overflow: hidden; position: relative; }
+.bar-fill { height: 100%; border-radius: 100px; transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
+.bar-val { margin-left: 0.75rem; font-size: 0.78rem; font-weight: 600;
+  font-family: 'JetBrains Mono', monospace; min-width: 45px; }
+
+/* ── Paper refs ── */
+.paper {
+  padding: 1.2rem 0; border-bottom: 1px solid var(--border);
+  display: flex; gap: 1rem; align-items: flex-start;
+}
+.paper:last-child { border-bottom: none; }
+.paper .venue {
+  font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  padding: 0.2rem 0.6rem; border-radius: 4px; white-space: nowrap;
+  margin-top: 0.15rem;
+}
+.venue-acl { background: var(--purple-glow); color: var(--purple); }
+.venue-arxiv { background: var(--accent-glow); color: var(--accent); }
+.venue-iclr { background: var(--green-glow); color: var(--green); }
+.paper-body { flex: 1; }
+.paper-title { font-weight: 600; color: var(--text); font-size: 0.9rem; }
+.paper-title a { color: inherit; text-decoration: none; }
+.paper-title a:hover { color: var(--accent); }
+.paper-desc { color: var(--text-secondary); font-size: 0.82rem; margin-top: 0.25rem; }
+
+/* ── Code block ── */
+.code-block {
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 1.2rem;
+  font-family: 'JetBrains Mono', monospace; font-size: 0.82rem;
+  color: var(--green); overflow-x: auto; line-height: 1.8;
+}
+
+/* ── Footer ── */
+.footer {
+  padding: 2rem 0; text-align: center;
+  border-top: 1px solid var(--border);
+  color: var(--text-tertiary); font-size: 0.8rem;
+}
+
+/* ── Hypothesis Box ── */
+.hypothesis-box {
+  background: var(--surface-2); border-radius: var(--radius-sm);
+  padding: 1.5rem; margin: 1rem 0;
+  position: relative;
+}
+.hypothesis-box::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 3px 0 0 3px;
+}
+.hypothesis-box.h0::before { background: var(--amber); }
+.hypothesis-box.h1::before { background: var(--accent); }
+.hypothesis-box .label {
+  font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 0.5rem;
+}
+.hypothesis-box.h0 .label { color: var(--amber); }
+.hypothesis-box.h1 .label { color: var(--accent); }
+.hypothesis-box p { color: var(--text-secondary); font-size: 0.9rem; }
+
+@media (max-width: 768px) {
+  .hero h1 { font-size: 2rem; }
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .bar-label { width: 130px; font-size: 0.7rem; }
+  .container { padding: 0 1rem; }
+  .nav-inner { gap: 0.75rem; }
+  .nav a { font-size: 0.7rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="container nav-inner">
+    <a href="#problem">Problem</a>
+    <a href="#hypothesis">Hypothesis</a>
+    <a href="#taxonomy">Taxonomy</a>
+    <a href="#metrics">Metrics</a>
+    <a href="#results">Results</a>
+    <a href="#why">Why</a>
+    <a href="#research">Research</a>
+    <a href="#gap">Gap</a>
+    <a href="#run">Run</a>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<section class="hero">
+  <div class="badge">Research Preview · July 2026</div>
+  <h1>Reasoning Topology</h1>
+  <p class="subtitle">
+    Probing how language models explore unfamiliar reasoning trajectories
+    through calibrated stochastic perturbation — measuring attractor basin
+    depth, recovery dynamics, and thermodynamic reasoning efficiency.
+  </p>
+  <p class="meta">instrument v0.1 · DeepSeek v4 Pro · 10 perturbation operators · 4-turn trajectories</p>
+</section>
+
+<div class="container">
+
+<!-- ── 1. PROBLEM ── -->
+<section id="problem" class="section">
+  <h2 class="section-title"><span class="num">01</span> The Problem</h2>
+  <p class="section-subtitle">Benchmarks measure outputs. They ignore search dynamics.</p>
+
+  <div class="grid-2">
+    <div class="card card-accent">
+      <p style="font-weight:600;margin-bottom:0.5rem">What benchmarks measure</p>
+      <p style="color:var(--text-secondary)">Output correctness. Did the model get the right answer? MMLU, GSM8K, HumanEval all answer this question — and all ignore the path taken to arrive at the answer.</p>
+    </div>
+    <div class="card card-green">
+      <p style="font-weight:600;margin-bottom:0.5rem">What this instrument measures</p>
+      <p style="color:var(--text-secondary)">Search dynamics. How did the model arrive at its answer? How many tokens were productive exploration versus recovery? Did it genuinely explore, or rationalize back to familiar patterns?</p>
+    </div>
+  </div>
+
+  <p style="margin-top:1.5rem;color:var(--text-secondary);font-size:0.9rem">
+    A model that achieves 90% accuracy by burning 15,000 tokens per query is
+    <strong style="color:var(--text)">thermodynamically inferior</strong> to one that achieves the same accuracy
+    in 500 tokens — even if both look identical on a leaderboard. This instrument
+    reveals the difference by measuring the trajectory, not just the destination.
+  </p>
+</section>
+
+<!-- ── 2. HYPOTHESIS ── -->
+<section id="hypothesis" class="section">
+  <h2 class="section-title"><span class="num">02</span> Hypothesis</h2>
+  <p class="section-subtitle">The trained policy determines whether context functions as compressed state or material for discursive processing.</p>
+
+  <div class="hypothesis-box h0">
+    <div class="label">H₀ · Null Hypothesis</div>
+    <p>Perturbation type has no systematic effect on reasoning trajectory deviation or recovery rate. All models exhibit the same exploration dynamics regardless of operator class.</p>
+  </div>
+  <div class="hypothesis-box h1">
+    <div class="label">H₁ · Alternative Hypothesis</div>
+    <p>Manifold perturbations (alien vocabulary, framing shifts, causality inversion) produce systematically higher trajectory deviation and slower recovery than semantic perturbations (false premises, missing constraints, constraint inversion) — measurable as higher escape scores, sustained deviation over multiple turns, and lower recovery ratios.</p>
+  </div>
+</section>
+
+<!-- ── 3. TAXONOMY ── -->
+<section id="taxonomy" class="section">
+  <h2 class="section-title"><span class="num">03</span> Perturbation Taxonomy</h2>
+  <p class="section-subtitle">10 calibrated operators classified by whether they operate inside or outside the model's learned concept manifold.</p>
+
+  <div class="grid-2" style="margin-bottom:2rem">
+    <div class="card card-green" style="background:linear-gradient(135deg,var(--surface-1),rgba(62,207,142,0.03))">
+      <h3 style="color:var(--green);font-size:1rem;margin-bottom:0.5rem">Manifold Perturbations</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        Push the model's input embedding into regions of the latent space with
+        <strong style="color:var(--green)">no pre-existing engineering association</strong>.
+        Terms like "mycelial," "cantilever," "fugue" have no sensible mapping to
+        a URL shortener. The model must genuinely navigate unfamiliar territory.
+        <strong style="color:var(--green);font-size:0.82rem;display:block;margin-top:0.5rem">High escape → genuine exploration.</strong>
+      </p>
+    </div>
+    <div class="card" style="background:linear-gradient(135deg,var(--surface-1),rgba(240,179,75,0.03))">
+      <h3 style="color:var(--amber);font-size:1rem;margin-bottom:0.5rem">Semantic Perturbations</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        Operate <strong style="color:var(--amber)">within the model's existing concept manifold</strong>.
+        The model has learned representations for handling false premises, missing
+        constraints, and contradictions from its training data. These are recognized
+        problems, not novel territory.
+        <strong style="color:var(--amber);font-size:0.82rem;display:block;margin-top:0.5rem">Low escape → competent reasoning.</strong>
+      </p>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Operator</th><th>Class</th><th>Strength Range</th><th>What it Probes</th></tr></thead>
+    <tbody>
+      <tr><td style="font-weight:600">inject_alien_vocab</td><td><span class="tag tag-manifold">manifold</span></td><td style="color:var(--text-tertiary)">0.2–0.8</td><td>Cross-domain vocabulary as directional noise — pushes embeddings off the typical linguistic manifold</td></tr>
+      <tr><td style="font-weight:600">shift_framing</td><td><span class="tag tag-manifold">manifold</span></td><td style="color:var(--text-tertiary)">0.3–0.8</td><td>Construction → falsification stance shift — tests epistemic flexibility</td></tr>
+      <tr><td style="font-weight:600">reverse_causality</td><td><span class="tag tag-manifold">manifold</span></td><td style="color:var(--text-tertiary)">0.3–0.8</td><td>Solution before problem, effect before cause — tests non-linear reasoning</td></tr>
+      <tr><td style="font-weight:600">force_abandonment</td><td><span class="tag tag-manifold">manifold</span></td><td style="color:var(--text-tertiary)">0.3–0.8</td><td>Generate N solutions, discard all, produce N+1 — directly measures attractor basin depth</td></tr>
+      <tr><td style="font-weight:600">inject_false_premise</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.4–0.8</td><td>Plausible incorrect assumption — tests rationalization vs rejection</td></tr>
+      <tr><td style="font-weight:600">inject_phantom_success</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.5–0.8</td><td>False intermediate result — tests truth-seeking vs coherence-prioritizing</td></tr>
+      <tr><td style="font-weight:600">remove_critical_constraint</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.3–0.8</td><td>Silent constraint removal — tests epistemic vigilance</td></tr>
+      <tr><td style="font-weight:600">invert_constraint</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.5–0.8</td><td>Expected paradigm inversion — tests unconventional path finding</td></tr>
+      <tr><td style="font-weight:600">insert_contradiction</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.4–0.8</td><td>Irreconcilable premises — tests resolution strategy</td></tr>
+      <tr><td style="font-weight:600">inject_competing_goal</td><td><span class="tag tag-semantic">semantic</span></td><td style="color:var(--text-tertiary)">0.5–0.8</td><td>Conflicting requirements — tests trade-off recognition vs hedging</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- ── 4. METRICS ── -->
+<section id="metrics" class="section">
+  <h2 class="section-title"><span class="num">04</span> Metrics</h2>
+  <p class="section-subtitle">Four dimensions of reasoning dynamics, measured per-operator and per-trajectory.</p>
+
+  <div class="grid-2" style="margin-bottom:2rem">
+    <div class="metric-card green">
+      <div class="metric-value green">0.690</div>
+      <div class="metric-label">Manifold Escape Score</div>
+      <div class="metric-sub">Avg deviation from baseline for manifold-class operators</div>
+    </div>
+    <div class="metric-card amber">
+      <div class="metric-value amber">0.307</div>
+      <div class="metric-label">Semantic Escape Score</div>
+      <div class="metric-sub">Avg deviation from baseline for semantic-class operators</div>
+    </div>
+    <div class="metric-card accent">
+      <div class="metric-value accent">+0.383</div>
+      <div class="metric-label">Class Separation Delta</div>
+      <div class="metric-sub">Manifold − Semantic escape score differential</div>
+    </div>
+    <div class="metric-card green">
+      <div class="metric-value green">~$0.008</div>
+      <div class="metric-label">Full Matrix Cost</div>
+      <div class="metric-sub">27 runs × 4 turns @ DeepSeek pricing</div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Escape Score</h3>
+      <p style="color:var(--text-secondary);font-size:0.85rem">
+        <code style="background:var(--surface-2);padding:0.1rem 0.4rem;border-radius:3px;color:var(--accent);font-size:0.8rem">final_distance / max(initial_distance, 0.01)</code>
+        — How much of the initial perturbation was preserved? Computed via content-based
+        trajectory comparison (trigram overlap, length ratio, structural code/prose similarity).
+        <strong>0.0 = captured by attractor. 1.0 = escaped into novel territory.</strong>
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Recovery Ratio</h3>
+      <p style="color:var(--text-secondary);font-size:0.85rem">
+        Classifies each trajectory step as exploration or recovery using six signal types:
+        rationalization markers, tool convergence, qualification/hedging, technology term
+        matching, step length convergence, and structural pattern matching.
+        <strong>High recovery on semantic = competence. High recovery on manifold = captured.</strong>
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 5. RESULTS ── -->
+<section id="results" class="section">
+  <h2 class="section-title"><span class="num">05</span> Experimental Results</h2>
+  <p class="section-subtitle">DeepSeek v4 Pro · 4-turn trajectories · strength 0.5 · July 2026</p>
+
+  <div class="card">
+    <p style="font-weight:600;margin-bottom:0.75rem;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px">Escape Score by Operator</p>
+    <div class="bar-row"><div class="bar-label">inject_alien_vocab</div><div class="bar-track"><div class="bar-fill" style="width:81%;background:var(--green)"></div></div><div class="bar-val" style="color:var(--green)">0.811</div></div>
+    <div class="bar-row"><div class="bar-label">inject_competing_goal</div><div class="bar-track"><div class="bar-fill" style="width:69%;background:var(--green)"></div></div><div class="bar-val" style="color:var(--green)">0.690</div></div>
+    <div class="bar-row"><div class="bar-label">invert_constraint</div><div class="bar-track"><div class="bar-fill" style="width:55%;background:var(--amber)"></div></div><div class="bar-val" style="color:var(--amber)">0.550</div></div>
+    <div class="bar-row"><div class="bar-label">insert_contradiction</div><div class="bar-track"><div class="bar-fill" style="width:47%;background:var(--amber)"></div></div><div class="bar-val" style="color:var(--amber)">0.468</div></div>
+    <div class="bar-row"><div class="bar-label">inject_phantom_success</div><div class="bar-track"><div class="bar-fill" style="width:44%;background:var(--amber)"></div></div><div class="bar-val" style="color:var(--amber)">0.444</div></div>
+    <div class="bar-row"><div class="bar-label">shift_framing</div><div class="bar-track"><div class="bar-fill" style="width:37%;background:var(--amber)"></div></div><div class="bar-val" style="color:var(--amber)">0.370</div></div>
+    <div class="bar-row"><div class="bar-label">inject_false_premise</div><div class="bar-track"><div class="bar-fill" style="width:26%;background:var(--text-tertiary)"></div></div><div class="bar-val" style="color:var(--text-tertiary)">0.261</div></div>
+    <div class="bar-row"><div class="bar-label">reverse_causality</div><div class="bar-track"><div class="bar-fill" style="width:20%;background:var(--text-tertiary)"></div></div><div class="bar-val" style="color:var(--text-tertiary)">0.198</div></div>
+    <div class="bar-row"><div class="bar-label">remove_critical_constraint</div><div class="bar-track"><div class="bar-fill" style="width:19%;background:var(--text-tertiary)"></div></div><div class="bar-val" style="color:var(--text-tertiary)">0.188</div></div>
+  </div>
+
+  <div class="card" style="margin-top:1.5rem;background:linear-gradient(135deg,var(--surface-1),rgba(62,207,142,0.03))">
+    <p style="font-weight:600;color:var(--green)">Key Finding</p>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-top:0.3rem">
+      DeepSeek v4 Pro <strong style="color:var(--text)">cannot be bullshitted</strong> on facts, missing
+      constraints, or inverted constraints — its RL training taught it to reject false premises
+      and re-derive constraints. But alien vocabulary genuinely pushes it off-manifold because
+      terms like "mycelial" and "cantilever" have <strong style="color:var(--text)">no pre-existing embedding
+      association</strong>. The attractor basins are learned concepts, not imitation patterns.
+    </p>
+  </div>
+</section>
+
+<!-- ── 6. WHY ── -->
+<section id="why" class="section">
+  <h2 class="section-title"><span class="num">06</span> Why This Matters</h2>
+  <p class="section-subtitle">From computational complexity to thermodynamic complexity.</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">The Benchmark Fallacy</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        All correct answers are treated equally regardless of whether the model arrived via a
+        500-token geodesic or a 15,000-token backtracking nightmare. <strong>Constraint satisfaction
+        is the true ground state</strong> — but without a cost function over trajectory length, we
+        reward energy-wasteful overthinking.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">Heat Pollution &gt; Carbon Emissions</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        At inference scale, global AI clusters dissipate megawatts of thermal load. <strong>This isn't
+        an atmospheric CO₂ problem — it's a second-law thermodynamics problem on a planetary
+        scale.</strong> Every wasted recovery token is heat that doesn't need to exist.
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">DeepSeek's Thermodynamic Advantage</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        DeepSeek R1's pure RL (GRPO) compresses reasoning pathways into the weight geometry
+        during training. It doesn't burn inference-time tokens on brute-force search like
+        imitation-heavy counterparts. <strong>Latent-space reasoning is inherently more
+        energy-efficient than explicit chain-of-thought.</strong>
+      </p>
+    </div>
+    <div class="card">
+      <h3 style="font-size:0.95rem;margin-bottom:0.5rem">The New Objective Function</h3>
+      <p style="color:var(--text-secondary);font-size:0.88rem">
+        <code style="background:var(--surface-2);padding:0.1rem 0.4rem;border-radius:3px;color:var(--accent);font-size:0.8rem">Minimize ($/Correct Constrained Solution)</code>
+        — not accuracy, not latency. This instrument provides the per-trajectory cost breakdown
+        needed to optimize for thermodynamic efficiency rather than benchmark scores.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ── 7. RESEARCH ── -->
+<section id="research" class="section">
+  <h2 class="section-title"><span class="num">07</span> Research Landscape</h2>
+  <p class="section-subtitle">Adjacent work — each related but distinct from calibrated perturbation measurement.</p>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <h3 style="font-size:0.95rem;color:var(--amber);margin-bottom:1rem">Constraint Awareness</h3>
+    <div class="paper"><span class="venue venue-acl">ACL 2026</span><div class="paper-body"><div class="paper-title"><a href="https://aclanthology.org/2026.findings-acl.1069/">CARL: Constraint-Aware Reinforcement Learning for Planning with LLMs</a></div><p class="paper-desc">Compares output distributions under constrained vs unconstrained inputs. Rewards constraint focus. <em>Adjacent: measures constraint awareness; we measure what happens when constraints are perturbed.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2603.29025">HOB: Heuristic Override Benchmark</a></div><p class="paper-desc">500 instances where surface cues conflict with unstated feasibility constraints. <em>Adjacent: measures accuracy under conflict; we measure trajectory dynamics under perturbation.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2512.14474">MFR: Model-First Reasoning</a></div><p class="paper-desc">Requires LLM to explicitly model entities, variables, constraints before reasoning. <em>Adjacent: enforces constraints; we probe them.</em></p></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <h3 style="font-size:0.95rem;color:var(--green);margin-bottom:1rem">Attractor Dynamics</h3>
+    <div class="paper"><span class="venue venue-iclr">ICLR 2026</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2606.20015">Reasoning as Attractor Dynamics: Latent Memory Retrieval via Gibbs-Weighted Energy Minimization</a></div><p class="paper-desc">Correct reasoning = deep, wide attractor basins. Hallucinations = sharp, unstable local minima. <em>Adjacent: studies energy landscapes theoretically; we probe them through calibrated perturbation.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2607.10243">Closed-Loop Knowledge Dynamics: An Operational Framework for Saturation and Escape</a></div><p class="paper-desc">Escape characterized through attractor displacement metrics and KL lower bounds. <em>Adjacent: models attractors theoretically; we measure them experimentally.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2603.10384">TRACED: Topological Reasoning Assessment via Curvature Evolution and Displacement Dynamics</a></div><p class="paper-desc">Geometric kinematics of reasoning traces — Progress (displacement) and Stability (curvature). <em>Adjacent: measures internal geometry; we perturb and measure behavioral response.</em></p></div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <h3 style="font-size:0.95rem;color:var(--purple);margin-bottom:1rem">Error Compounding in Agents</h3>
+    <div class="paper"><span class="venue venue-acl">EMNLP 2025</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2505.15182">ReflAct: World-Grounded Decision Making in LLM Agents via Goal-State Reflection</a></div><p class="paper-desc">Shifts reasoning from planning next actions to reflecting on goal-state alignment. 27.7% improvement over ReAct. <em>Adjacent: fixes compounding errors; we measure which perturbations trigger them.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title">Compounding Error Resilience in Multi-Agent Pipelines</div><p class="paper-desc">Error compounding is not solved by better models — it's solved by better systems. 5-agent chains compound errors exponentially (0.80⁵ = 33%). <em>Adjacent: documents the problem; we measure its perturbation-level causes.</em></p></div></div>
+    <div class="paper"><span class="venue venue-acl">ACL 2026</span><div class="paper-body"><div class="paper-title"><a href="https://arxiv.org/abs/2602.01288">EDIS: Entropy Dynamics Instability Score for Reasoning Assessment</a></div><p class="paper-desc">Entropy dynamics distinguish correct from incorrect reasoning trajectories. <em>Adjacent: internal entropy metrics; we measure external behavioral response to perturbation.</em></p></div></div>
+  </div>
+
+  <div class="card">
+    <h3 style="font-size:0.95rem;color:var(--accent);margin-bottom:1rem">Thermodynamics of Inference</h3>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title">Thermodynamic Bounds on Energy and Negentropy Costs of Inference in Deep Neural Networks</div><p class="paper-desc">Linear ops can be performed reversibly (zero energy); non-linear activations impose unavoidable cost. <em>Adjacent: derives physical bounds; we measure the behavioral energy cost of reasoning paths.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title">Information Physics of Intelligence: Unifying Logical Depth and Entropy under Thermodynamic Constraints</div><p class="paper-desc">Derivation Entropy quantifies total physical cost of ontological-to-carrier mapping. Energy-Time-Space Triality Bound. <em>Adjacent: theorizes; we instrument.</em></p></div></div>
+    <div class="paper"><span class="venue venue-arxiv">arXiv</span><div class="paper-body"><div class="paper-title">The Planetary Cost of AI Acceleration: A Thermodynamic Outlook</div><p class="paper-desc">Waste heat from inference is a second-law thermodynamics problem on a planetary scale. The future metric is joules per correct constrained solution. <em>Aligned: this is the metric this instrument is designed to optimize.</em></p></div></div>
+  </div>
+</section>
+
+<!-- ── 8. GAP ── -->
+<section id="gap" class="section">
+  <h2 class="section-title"><span class="num">08</span> The Gap This Instrument Fills</h2>
+  <p class="section-subtitle">Trained policy determines whether context functions as compressed state or discursive material.</p>
+
+  <div class="card card-accent">
+    <p style="font-weight:600;margin-bottom:0.8rem">No existing framework measures reasoning topology through calibrated perturbation.</p>
+    <p style="color:var(--text-secondary);font-size:0.88rem">
+      Current approaches either measure <strong>output correctness</strong> (benchmarks — entropy-agnostic),
+      analyze <strong>internal geometry</strong> (TRACED, activation patching — require model internals),
+      study <strong>energy landscapes theoretically</strong> (attractor dynamics papers — not operationalized),
+      or <strong>document error compounding</strong> (ReflAct, multi-agent studies — descriptive, not diagnostic).
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.88rem;margin-top:0.8rem">
+      <strong style="color:var(--text)">This instrument is different.</strong> It treats perturbation as a
+      measurement apparatus, not an optimization tool. Each operator is a calibrated probe. Each run
+      produces a trajectory. Each trajectory yields measurements — escape score, recovery ratio,
+      per-turn distance — that reveal the geometry of the model's reasoning search space.
+    </p>
+  </div>
+</section>
+
+<!-- ── 9. RUN ── -->
+<section id="run" class="section">
+  <h2 class="section-title"><span class="num">09</span> How to Run</h2>
+  <p class="section-subtitle">One command. Configurable. Model-agnostic. Reproducible.</p>
+
+  <div class="code-block">
+$ <span style="color:var(--text-secondary)">cd</span> reasoning-instrument<br>
+$ <span style="color:var(--text-secondary)">export</span> DEEPSEEK_API_KEY=<span style="color:var(--amber)">"sk-..."</span><br>
+$ python scripts/run.py experiments/configs/baseline.yaml<br><br>
+<span style="color:var(--text-tertiary)"># → experiments/results/baseline.md   (lab book)</span><br>
+<span style="color:var(--text-tertiary)"># → experiments/results/baseline_deepseek.json  (machine-readable)</span>
+  </div>
+</section>
+
+</div>
+
+<footer class="footer">
+  <div class="container">
+    <p>Reasoning Topology Instrument — v0.1 — July 2026</p>
+    <p style="margin-top:0.3rem">Standalone pip package · Decoupled from dreamlab · Opencode-skilled</p>
+  </div>
+</footer>
+
+</body>
+</html>
