@@ -1,0 +1,279 @@
+"""Opencode agentic invoke — spawn automode sessions and capture full traces.
+
+Replaces raw API calls with real agentic execution: opencode thinks,
+writes files, runs tests, iterates on failures. Captures the complete
+tool-call trace, token usage, and test results.
+
+This is the measurement layer the instrument was designed for.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import tempfile
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+@dataclass
+class AgenticResult:
+    """Complete result of an agentic opencode session."""
+
+    # Session
+    run_id: str = ""
+    task: str = ""
+    model: str = ""
+    exit_code: int = 0
+    duration_s: float = 0.0
+    error: str = ""
+
+    # Output
+    final_response: str = ""
+    files_created: list[str] = field(default_factory=list)
+    files_modified: list[str] = field(default_factory=list)
+
+    # Tool call trace
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    total_tool_calls: int = 0
+    thinking_steps: int = 0
+
+    # Compounding effects
+    retry_loops: int = 0           # how many times did it retry?
+    iteration_depth: int = 0       # max depth of tool call chains
+    error_count: int = 0           # tool call errors encountered
+
+    # Test results
+    tests_passed: int = 0
+    tests_total: int = 0
+    test_output: str = ""
+
+    # Token usage
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    reasoning_tokens: int = 0
+    total_tokens: int = 0
+
+    # Cost
+    estimated_cost_usd: float = 0.0
+
+    @property
+    def correctness(self) -> float:
+        if self.tests_total == 0:
+            return 0.0
+        return self.tests_passed / self.tests_total
+
+    @property
+    def text(self) -> str:
+        return self.final_response
+
+    @property
+    def ok(self) -> bool:
+        return self.exit_code == 0 and len(self.error) == 0
+
+
+def run_opencode_agentic(
+    prompt: str,
+    *,
+    model: str = "deepseek-v4-pro",
+    workdir: str | None = None,
+    timeout: int = 300,
+    session_name: str = "",
+) -> AgenticResult:
+    """Spawn an opencode automode session and capture its full execution trace.
+
+    Args:
+        prompt: The task prompt (with or without perturbation).
+        model: Model to use (opencode will select based on config).
+        workdir: Working directory for the session.
+        timeout: Maximum session duration in seconds.
+        session_name: Name for the session (logging).
+
+    Returns:
+        AgenticResult with complete execution trace.
+    """
+    t0 = time.monotonic()
+    result = AgenticResult(run_id=session_name or f"opencode_{int(t0)}",
+                           task=prompt, model=model)
+
+    # Create a temp workdir for isolation
+    if workdir is None:
+        workdir = tempfile.mkdtemp(prefix="opencode_exp_")
+
+    # Store git state for file change detection
+    files_before = _list_files(workdir)
+
+    cmd = [
+        "/root/.opencode/bin/opencode", "run",
+        "--model", model,
+        "--format", "json",
+        "--auto",
+        "--dir", workdir,
+    ]
+    if prompt:
+        cmd.append(prompt)
+
+    try:
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=workdir,
+            stdin=subprocess.DEVNULL,
+        )
+        result.exit_code = proc.returncode
+        result.error = proc.stderr.strip()
+
+        # Parse JSONL output to extract tool calls, thinking, test results
+        _parse_session_output(proc.stdout, result)
+
+    except subprocess.TimeoutExpired:
+        result.error = f"Session timed out after {timeout}s"
+        result.exit_code = -1
+    except Exception as e:
+        result.error = str(e)
+        result.exit_code = -2
+
+    result.duration_s = time.monotonic() - t0
+
+    # Detect file changes
+    files_after = _list_files(workdir)
+    result.files_created = sorted(files_after - files_before)
+    result.files_modified = sorted(files_after & files_before)
+
+    # Extract final response from the last assistant message
+    # (already set during parsing)
+
+    return result
+
+
+def _list_files(dirpath: str) -> set[str]:
+    """List files in a directory, relative to dirpath."""
+    try:
+        root = Path(dirpath)
+        return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()}
+    except Exception:
+        return set()
+
+
+def _parse_session_output(stdout: str, result: AgenticResult) -> None:
+    """Parse opencode JSONL output to extract structured trace data.
+
+    Opencode output format (v2):
+    - {"type":"step_start", "sessionID":..., "part":{"type":"step-start"}}
+    - {"type":"tool_use", "part":{"type":"tool","tool":"write|bash|read|edit|grep...",
+        "state":{"status":"completed","input":{...},"output":"..."}}}
+    - {"type":"text", "part":{"type":"text","text":"..."}}
+    - {"type":"step_finish", "part":{"tokens":{"total":...,"input":...,"output":...,"reasoning":...}}}
+    """
+    tool_calls = []
+    final_texts = []
+    iteration_depth = 0
+    current_depth = 0
+    retry_count = 0
+    last_was_error = False
+
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+
+        if not isinstance(obj, dict):
+            continue
+
+        etype = obj.get("type", "")
+        part = obj.get("part", {})
+        if not isinstance(part, dict):
+            part = {}
+
+        # Tool calls
+        if etype == "tool_use":
+            tool_name = part.get("tool", "")
+            state = part.get("state", {})
+            if not isinstance(state, dict):
+                state = {}
+            status = state.get("status", "?")
+            tool_input = state.get("input", "")
+            tool_output = state.get("output", "")
+            is_error = status not in ("completed", "success") or ("error" in str(tool_output).lower() if tool_output else False)
+
+            tool_calls.append({
+                "type": "tool_use",
+                "tool": tool_name,
+                "input": str(tool_input)[:300],
+                "output": str(tool_output)[:300],
+                "status": status,
+                "is_error": is_error,
+            })
+            current_depth += 1
+            iteration_depth = max(iteration_depth, current_depth)
+            result.total_tool_calls += 1
+
+            if is_error:
+                result.error_count += 1
+                if last_was_error:
+                    retry_count += 1
+                last_was_error = True
+            else:
+                last_was_error = False
+
+        # Tool result (step_follow variant)
+        elif etype in ("tool_result", "step_follow"):
+            current_depth = max(0, current_depth - 1)
+
+        # Model text response
+        elif etype == "text":
+            text_content = part.get("text", "")
+            if text_content:
+                final_texts.append(str(text_content))
+
+        # Step finish — extract token usage
+        elif etype == "step_finish":
+            current_depth = max(0, current_depth - 1)
+            tokens = part.get("tokens", {})
+            if isinstance(tokens, dict):
+                result.prompt_tokens += tokens.get("input", 0) or 0
+                result.completion_tokens += tokens.get("output", 0) or 0
+                reasoning = tokens.get("reasoning", 0) or 0
+                result.reasoning_tokens += reasoning
+                result.total_tokens += tokens.get("total", 0) or 0
+            cost = part.get("cost", 0)
+            if isinstance(cost, (int, float)):
+                result.estimated_cost_usd += float(cost)
+
+        # Parse test output from bash tool results
+        if etype == "tool_use" and part.get("tool") == "bash":
+            state = part.get("state", {})
+            output = state.get("output", "") if isinstance(state, dict) else ""
+            if output and ("test" in str(output).lower() or "pass" in str(output).lower() or "fail" in str(output).lower()):
+                import re
+                if "passed" in str(output).lower():
+                    # pytest output: X passed, Y failed
+                    m = re.search(r'(\d+)\s+passed', str(output))
+                    if m:
+                        result.tests_passed = int(m.group(1))
+                    mf = re.search(r'(\d+)\s+failed', str(output))
+                    if mf:
+                        result.tests_total += int(mf.group(1))
+                    result.tests_total += result.tests_passed
+                result.test_output = str(output)[-500:]
+
+    result.tool_calls = tool_calls
+    result.retry_loops = retry_count
+    result.iteration_depth = iteration_depth
+    result.final_response = "\n".join(final_texts[-3:]) if final_texts else ""
+
+    # Estimate correctness from test results if not directly parsed
+    if result.tests_total == 0 and result.tools_run:
+        if "passed" in str(result.test_output).lower():
+            result.tests_total = max(result.tests_total, 1)
+            result.tests_passed = max(result.tests_passed, 1)

@@ -63,9 +63,19 @@ def make_codex_invoke():
     return invoke
 
 
+def make_opencode_invoke():
+    """Build an invoke function for agentic opencode sessions."""
+    from instrument.opencode import run_opencode_agentic
+
+    def invoke(prompt, *, model="deepseek/deepseek-v4-pro", timeout=300):
+        return run_opencode_agentic(prompt, model=model, timeout=timeout)
+    return invoke
+
+
 INVOKE_BUILDERS = {
     "deepseek": lambda: make_deepseek_invoke(os.environ.get("DEEPSEEK_API_KEY", "")),
     "codex": make_codex_invoke,
+    "opencode": make_opencode_invoke,
 }
 
 
