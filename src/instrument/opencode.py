@@ -78,32 +78,49 @@ class AgenticResult:
 def run_opencode_agentic(
     prompt: str,
     *,
-    model: str = "deepseek-v4-pro",
+    model: str = "deepseek/deepseek-v4-pro",
     workdir: str | None = None,
     timeout: int = 300,
     session_name: str = "",
+    init_git: bool = True,
 ) -> AgenticResult:
-    """Spawn an opencode automode session and capture its full execution trace.
+    """Spawn an opencode agentic session in an isolated worktree.
+
+    Each run gets its own temp directory with git initialized so the
+    model can use version control, branches, and commits. This
+    provides full isolation between experiment runs and enables
+    measurement of file changes, commits, and branching behavior.
 
     Args:
         prompt: The task prompt (with or without perturbation).
-        model: Model to use (opencode will select based on config).
-        workdir: Working directory for the session.
+        model: Model identifier (opencode format: provider/model).
+        workdir: Working directory. Created if None.
         timeout: Maximum session duration in seconds.
         session_name: Name for the session (logging).
+        init_git: Whether to initialize a git repo in the workdir.
 
     Returns:
         AgenticResult with complete execution trace.
     """
+    import tempfile
+
     t0 = time.monotonic()
     result = AgenticResult(run_id=session_name or f"opencode_{int(t0)}",
                            task=prompt, model=model)
 
-    # Create a temp workdir for isolation
+    # Create an isolated worktree per run
     if workdir is None:
-        workdir = tempfile.mkdtemp(prefix="opencode_exp_")
+        workdir = tempfile.mkdtemp(prefix="exp_")
 
-    # Store git state for file change detection
+    # Initialize git for version control tracking
+    if init_git:
+        subprocess.run(["git", "init"], cwd=workdir, capture_output=True)
+        subprocess.run(["git", "config", "user.email", "experiment@instrument.local"], cwd=workdir, capture_output=True)
+        subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True)
+        subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True)
+        subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
+
+    # Store files before for change detection
     files_before = _list_files(workdir)
 
     cmd = [
