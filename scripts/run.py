@@ -34,9 +34,17 @@ def make_deepseek_invoke(key: str):
         )
         d = resp.json()
         tok = d.get("usage", {}).get("completion_tokens", 0) or 0
+        reasoning_tok = d.get("usage", {}).get("completion_tokens_details", {}).get("reasoning_tokens", 0) or 0
+        prompt_tok = d.get("usage", {}).get("prompt_tokens", 0) or 0
+        total_tok = d.get("usage", {}).get("total_tokens", 0) or 0
         text = d["choices"][0]["message"]["content"] if d.get("choices") else ""
-        cost = tok * 0.27 / 1_000_000  # DeepSeek output pricing
-        return type("Result", (), {"text": text, "completion_tokens": tok, "total_tokens": tok, "estimated_cost_usd": cost, "ok": resp.status_code == 200})
+        # DeepSeek pricing: $0.27/M input, $1.10/M output, $0.14/M reasoning
+        cost = (prompt_tok * 0.27 + tok * 1.10 + reasoning_tok * 0.14) / 1_000_000
+        return type("Result", (), {
+            "text": text, "completion_tokens": tok, "total_tokens": total_tok,
+            "prompt_tokens": prompt_tok, "reasoning_tokens": reasoning_tok,
+            "estimated_cost_usd": cost, "ok": resp.status_code == 200
+        })
     return invoke
 
 
@@ -103,7 +111,8 @@ def main():
 
     def llm_fn(prompt):
         result = invoke_fn(prompt, model=model_id, timeout=60)
-        return result.text, result.completion_tokens, result.estimated_cost_usd
+        # Return the rich result object directly — experiment.py handles both tuples and objects
+        return result
 
     print(f"Experiment: {config.name}")
     print(f"Model: {model_override}/{model_id}")

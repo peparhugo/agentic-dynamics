@@ -17,6 +17,10 @@ from .recovery import SegmentClassification, classify_trajectory_segments, recov
 from .adapter import InstrumentedAdapter, InvokeTimeoutError
 from .experiment import ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment
 from .lab_book import build_hypothesis, build_methodology, persist_to_lab_book
+from .solution import SolutionMetrics, evaluate_solution
+from .efficiency import EfficiencyMetrics, compute_efficiency
+from .strategy import StrategyReport, StrategyType, classify_strategy
+from .game_report import GameReport
 
 __all__ = [
     "Perturbation", "PerturbationOperator", "build_operators", "perturb_prompt",
@@ -26,4 +30,8 @@ __all__ = [
     "InstrumentedAdapter", "InvokeTimeoutError",
     "ExperimentConfig", "ExperimentRun", "ExperimentResult", "run_experiment",
     "build_hypothesis", "build_methodology", "persist_to_lab_book",
+    "SolutionMetrics", "evaluate_solution",
+    "EfficiencyMetrics", "compute_efficiency",
+    "StrategyReport", "StrategyType", "classify_strategy",
+    "GameReport",
 ]

@@ -19,6 +19,10 @@ from .perturb import Perturbation, build_operators, perturb_prompt
 from .trajectory import ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance
 from .basin import BasinMetrics, measure_basin_escape
 from .recovery import classify_trajectory_segments, recovery_token_ratio
+from .solution import SolutionMetrics, evaluate_solution
+from .efficiency import EfficiencyMetrics, compute_efficiency
+from .strategy import StrategyReport, classify_strategy
+from .game_report import GameReport
 
 
 @dataclass
@@ -46,6 +50,7 @@ class ExperimentConfig:
     strengths: list[float] = field(default_factory=lambda: [0.5, 0.8])
     model: str = ""
     rng_seed: int = 42
+    repetitions: int = 1  # number of times to repeat each operator×strength combo
     output_dir: Path | None = None
 
 
@@ -66,6 +71,9 @@ class ExperimentRun:
     cost_usd: float = 0.0
     duration_s: float = 0.0
     error: str = ""
+    efficiency: EfficiencyMetrics | None = None
+    solution: SolutionMetrics | None = None
+    strategy: StrategyReport | None = None
 
 
 @dataclass
@@ -75,6 +83,7 @@ class ExperimentResult:
     config: ExperimentConfig
     baseline: ExperimentRun | None = None
     runs: list[ExperimentRun] = field(default_factory=list)
+    game_reports: list[dict[str, Any]] = field(default_factory=list)
     started_at: str = ""
     completed_at: str = ""
     total_tokens: int = 0
@@ -89,16 +98,26 @@ class ExperimentResult:
                          f"${self.baseline.cost_usd:.4f}")
             lines.append("")
 
-        header = f"{'Operator':<28} {'Str':>4} {'Escape':>7} {'Recov':>6} {'Tokens':>7} {'$':>7} {'Verdict'}"
+        header = f"{'Operator':<25} {'Str':>4} {'Escape':>7} {'Recov':>6} {'Tokens':>8} {'$':>8} {'Think%':>6} {'Strategy':>12}"
         lines.append(header)
-        lines.append("-" * 85)
+        lines.append("-" * 95)
 
         for r in self.runs:
+            think_pct = ""
+            eff = None
+            if hasattr(r, 'efficiency') and r.efficiency:
+                eff = r.efficiency
+                think_pct = f"{eff.thinking_ratio:.0%}"
+
+            strat = ""
+            if hasattr(r, 'strategy') and r.strategy:
+                strat = r.strategy.strategy.value[:12]
+
             lines.append(
-                f"{r.operator:<28} {r.strength:>4.1f} "
+                f"{r.operator:<25} {r.strength:>4.1f} "
                 f"{r.basin.escape_score:>7.3f} {r.recovery_ratio:>6.3f} "
-                f"{r.response_tokens:>7} {r.cost_usd:>7.4f}  "
-                f"{r.basin.get_verdict()[:40]}"
+                f"{r.response_tokens:>8} {r.cost_usd:>8.5f} "
+                f"{think_pct:>6}  {strat:<12}"
             )
 
         lines.append("-" * 85)
@@ -128,20 +147,18 @@ class ExperimentResult:
             "baseline_tokens": self.baseline.response_tokens if self.baseline else 0,
             "runs": [
                 {
-                    "operator": r.operator,
-                    "strength": r.strength,
+                    "operator": r.operator, "strength": r.strength,
                     "escape_score": round(r.basin.escape_score, 4),
                     "recovery_ratio": round(r.recovery_ratio, 4),
                     "exploration_tokens": r.exploration_tokens,
                     "recovery_tokens": r.recovery_tokens,
                     "response_tokens": r.response_tokens,
-                    "cost_usd": r.cost_usd,
-                    "duration_s": r.duration_s,
-                    "verdict": r.basin.get_verdict(),
-                    "error": r.error,
+                    "cost_usd": r.cost_usd, "duration_s": r.duration_s,
+                    "verdict": r.basin.get_verdict(), "error": r.error,
                 }
                 for r in self.runs
             ],
+            "game_reports": self.game_reports,
             "total_tokens": self.total_tokens,
             "total_cost_usd": self.total_cost_usd,
             "total_duration_s": self.total_duration_s,
@@ -178,7 +195,13 @@ def run_experiment(
     # ── Baseline ──
     log("Running baseline...")
     t0 = time.monotonic()
-    baseline_text, baseline_tokens, baseline_cost = llm_invoke(config.task)
+    baseline_result = llm_invoke(config.task)
+    if isinstance(baseline_result, tuple):
+        baseline_text, baseline_tokens, baseline_cost = baseline_result
+    else:
+        baseline_text = getattr(baseline_result, "text", "")
+        baseline_tokens = getattr(baseline_result, "completion_tokens", 0) or getattr(baseline_result, "total_tokens", 0) or 0
+        baseline_cost = getattr(baseline_result, "estimated_cost_usd", 0.0)
     baseline_duration = time.monotonic() - t0
 
     baseline_traj = ReasoningTrajectory(
@@ -232,12 +255,22 @@ def run_experiment(
 
             t0 = time.monotonic()
             try:
-                response_text, tokens, cost = llm_invoke(perturbed_prompt)
+                result_obj = llm_invoke(perturbed_prompt)
+                if isinstance(result_obj, tuple):
+                    response_text, tokens, cost = result_obj
+                    prompt_tokens = 0
+                    reasoning_tokens = 0
+                else:
+                    response_text = getattr(result_obj, "text", "")
+                    tokens = getattr(result_obj, "completion_tokens", 0) or getattr(result_obj, "total_tokens", 0) or 0
+                    cost = getattr(result_obj, "estimated_cost_usd", 0.0)
+                    prompt_tokens = getattr(result_obj, "prompt_tokens", 0)
+                    reasoning_tokens = getattr(result_obj, "reasoning_tokens", 0)
                 duration = time.monotonic() - t0
                 error = ""
             except Exception as e:
                 response_text = ""
-                tokens = 0
+                tokens = prompt_tokens = reasoning_tokens = 0
                 cost = 0.0
                 duration = time.monotonic() - t0
                 error = str(e)
@@ -275,6 +308,18 @@ def run_experiment(
             classifications = classify_trajectory_segments(baseline_traj, traj)
             expl_tokens, rec_tokens, rec_ratio = recovery_token_ratio(classifications)
 
+            # Compute solution metrics from response text
+            sol = evaluate_solution(response_text, constraints=[])
+            # Compute efficiency with full token breakdown
+            eff = compute_efficiency(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=tokens,
+                reasoning_tokens=reasoning_tokens,
+                solution=sol,
+            )
+            # Classify strategy
+            strat = classify_strategy(basin, sol, eff, perturbation_class=pert_class)
+
             run = ExperimentRun(
                 operator=op_name,
                 strength=strength,
@@ -289,6 +334,9 @@ def run_experiment(
                 cost_usd=cost,
                 duration_s=duration,
                 error=error,
+                efficiency=eff,
+                solution=sol,
+                strategy=strat,
             )
             result.runs.append(run)
             result.total_tokens += tokens
@@ -296,7 +344,9 @@ def run_experiment(
             result.total_duration_s += duration
 
             log(f"  escape={basin.escape_score:.3f} recovery={rec_ratio:.3f} "
-                f"tokens={tokens} cost=${cost:.4f} {basin.get_verdict()}")
+                f"tokens={tokens} cost=${cost:.4f} "
+                f"think={eff.thinking_ratio:.0%} strat={strat.strategy.value} "
+                f"correct={sol.correctness_score:.0%}")
 
     result.completed_at = datetime.now(timezone.utc).isoformat()
 
