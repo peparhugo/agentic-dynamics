@@ -143,14 +143,18 @@ def run_opencode_agentic(
             stdin=subprocess.DEVNULL,
         )
         result.exit_code = proc.returncode
-        result.error = proc.stderr.strip()
+        result.error = proc.stderr.strip() if proc.returncode != 0 else ""
 
-        # Parse JSONL output to extract tool calls, thinking, test results
-        _parse_session_output(proc.stdout, result)
+        # Parse JSONL output even on non-zero exit (partial output)
+        if proc.stdout:
+            _parse_session_output(proc.stdout, result)
 
-    except subprocess.TimeoutExpired:
-        result.error = f"Session timed out after {timeout}s"
+    except subprocess.TimeoutExpired as e:
+        result.error = f"Timeout after {timeout}s"
         result.exit_code = -1
+        # Try to parse any partial output
+        if e.stdout:
+            _parse_session_output(e.stdout.decode() if isinstance(e.stdout, bytes) else str(e.stdout), result)
     except Exception as e:
         result.error = str(e)
         result.exit_code = -2
@@ -290,7 +294,7 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     result.final_response = "\n".join(final_texts[-3:]) if final_texts else ""
 
     # Estimate correctness from test results if not directly parsed
-    if result.tests_total == 0 and result.tools_run:
+    if result.tests_total == 0:
         if "passed" in str(result.test_output).lower():
             result.tests_total = max(result.tests_total, 1)
             result.tests_passed = max(result.tests_passed, 1)
