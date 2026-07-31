@@ -249,20 +249,28 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
   </div>
 
   <div class="card" style="border-left:3px solid var(--amber)">
-    <h3 style="color:var(--amber)">Why Token Counts Understate the Gap</h3>
+    <h3 style="color:var(--amber)">Physicist's Bounded Estimate</h3>
     <p style="color:var(--text-secondary);font-size:0.85rem">
-      <strong>1 token ≠ 1 token.</strong> The energy cost of producing a token depends on how many parameters activate to produce it:
+      We don't estimate a single energy ratio. We compute a <strong>bounded range</strong>
+      from observables (tokens) and disclosed parameters (architecture, hardware TDP).
+      The true value lies between the lower and upper bound.
     </p>
     <table style="margin-top:0.5rem">
-      <thead><tr><th>Factor</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>Energy Ratio</th></tr></thead>
+      <thead><tr><th>Bound</th><th>Source</th><th>Ratio</th><th>How computed</th></tr></thead>
       <tbody>
-        <tr><td>Active parameters per token</td><td class="n win">~37B (MoE)</td><td class="n lose">Full dense (est. 500B+)</td><td class="n lose">~14x more active params</td></tr>
-        <tr><td>Reasoning mechanism</td><td class="n win">Latent GRPO navigation</td><td class="n lose">Explicit chain-of-thought</td><td class="n">CoT tokens activate full model</td></tr>
-        <tr><td>Hardware</td><td class="n win">H800 (lower TDP)</td><td class="n lose">H100+ (higher TDP)</td><td class="n lose">~1.5x TDP gap</td></tr>
-        <tr><td>Tokens per successful build</td><td class="n win">~21,000</td><td class="n">~28,000 (paid, excl. cache reads)</td><td class="n">1.3x more tokens</td></tr>
-        <tr><td><strong>Combined energy factor (est.)</strong></td><td class="n win"><strong>1x</strong></td><td class="n lose"><strong>~25–200x</strong></td><td class="n"><strong>Active params × tokens × hardware</strong></td></tr>
+        <tr><td><strong>Lower</strong></td><td>Observable</td><td class="n">1.3x</td><td>Token count ratio: Claude 28K / DeepSeek 21K paid tokens per build</td></tr>
+        <tr><td><strong>Mid (incl. cache)</strong></td><td>Observable + disclosed</td><td class="n">9x</td><td>All tokens ratio: Claude 198K / DeepSeek 21K per build (includes cache reads)</td></tr>
+        <tr><td><strong>Architectural</strong></td><td>Disclosed parameters</td><td class="n">14x</td><td>Active param ratio: Claude dense (~500B) / DeepSeek MoE (37B active)</td></tr>
+        <tr><td><strong>Hardware</strong></td><td>Known GPU TDP</td><td class="n">2x</td><td>GPU TDP ratio: H100 (700W) / H800 (350W)</td></tr>
+        <tr><td><strong>Combined lower</strong></td><td>tokens × params</td><td class="n">18x</td><td>1.3 × 14 = minimum energy ratio for equivalent hardware</td></tr>
+        <tr><td><strong>Combined mid</strong></td><td>all tokens × params</td><td class="n">126x</td><td>9 × 14 = realistic range including cache re-processing</td></tr>
+        <tr><td><strong>Combined upper</strong></td><td>all × params × TDP</td><td class="n">252x</td><td>9 × 14 × 2 = upper bound including hardware gap</td></tr>
+        <tr style="font-weight:700"><td><strong>Realistic range</strong></td><td colspan="2"><strong>18–250x</strong> more energy per build</td><td>Excluding GRPO compression and cooling overhead</td></tr>
       </tbody>
     </table>
+    <p style="color:var(--text-tertiary);font-size:0.75rem;margin-top:0.5rem">
+      Bounds methodology: lower bound = observables only (conservative, no assumptions). Upper bound = observables × disclosed architecture × known hardware specs. True value lies between. GRPO reasoning compression (latent vs explicit CoT), batch size differences, and PUE would push toward the upper end but are not included — making this a <em>conservative</em> upper bound.
+    </p>
   </div>
 
   <div class="card" style="border-left:3px solid var(--accent)">

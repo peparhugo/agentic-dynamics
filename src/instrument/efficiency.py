@@ -1,11 +1,8 @@
 """Resource efficiency measurement — the thermodynamic cost of reasoning.
 
-Captures the complete token and energy breakdown: prompt tokens,
-completion tokens, reasoning tokens (hidden thinking budget), cost,
-and estimated energy consumption.
-
-The key metric: Joules per correct constrained solution.
-Everything else is derivative.
+Captures token breakdown, cost, and estimated energy consumption.
+Uses a bounded-range approach: lower bound = observables (tokens),
+upper bound = disclosed architecture × known hardware specs.
 """
 
 from __future__ import annotations
@@ -16,11 +13,16 @@ from typing import Any
 from .solution import SolutionMetrics
 
 
-# Energy estimates per token type (Joules/token on H100-class hardware)
-# Source: NVIDIA H100 spec (~700W TDP, ~3000 tok/s output, ~1500 tok/s reasoning)
-ENERGY_PER_OUTPUT_TOKEN = 0.23   # J/tok — 700W / 3000 tok/s
-ENERGY_PER_REASONING_TOKEN = 0.47  # J/tok — reasoning uses more compute (higher batch, deeper layers)
-ENERGY_PER_PROMPT_TOKEN = 0.08   # J/tok — prefill is heavily optimized
+# Architecture constants — publicly disclosed
+DEEPSEEK_ACTIVE_PARAMS = 37e9    # 37B active (MoE, 5.5% of 671B)
+DEEPSEEK_GPU_TDP = 350           # H800 TDP (W)
+CLAUDE_EST_ACTIVE_PARAMS = 500e9 # Dense, undisclosed — conservative estimate
+CLAUDE_EST_GPU_TDP = 700         # H100 TDP (W) — Anthropic uses AWS/GCP
+
+# Energy per forward pass scales roughly with active parameters.
+# Ratio of active params gives the architectural energy ratio per token.
+ARCH_RATIO = CLAUDE_EST_ACTIVE_PARAMS / DEEPSEEK_ACTIVE_PARAMS  # ~14x
+HARDWARE_RATIO = CLAUDE_EST_GPU_TDP / DEEPSEEK_GPU_TDP           # ~2x
 
 
 @dataclass
@@ -145,3 +147,62 @@ def compute_efficiency(
         m.efficiency_score = solution.composite_score / max(m.total_cost_usd, 0.000001)
 
     return m
+
+
+def estimate_bounded_energy(
+    provider: str,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    reasoning_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+) -> dict[str, Any]:
+    """Compute bounded energy range using physicist's approach.
+
+    Lower bound: observables (token counts). Assumes equal architecture.
+    Upper bound: disclosed architecture × known hardware specs.
+
+    Returns a dict with lower, mid, and upper energy estimates (Joules)
+    and the corresponding ratios.
+
+    Args:
+        provider: "deepseek" or "claude" (or "anthropic")
+        prompt_tokens: Non-cached input tokens
+        completion_tokens: Output tokens
+        reasoning_tokens: Reasoning tokens (DeepSeek only)
+        cache_read_tokens: Tokens read from cache (Claude)
+        cache_write_tokens: Tokens written to cache (Claude)
+    """
+    # All-provider baseline: token-count-based energy
+    # Assume ~0.1 J/token as a conservative per-token energy floor
+    # (TokenPowerBench finds 0.1-2 J/tok depending on hardware)
+    J_PER_TOKEN_FLOOR = 0.1
+
+    total_observable = prompt_tokens + completion_tokens + reasoning_tokens
+    total_with_cache = total_observable + cache_read_tokens + cache_write_tokens
+
+    # For DeepSeek: use as reference (1x)
+    # For Claude: apply architectural and hardware bounds
+    if provider in ("deepseek",):
+        arch_mult = 1.0
+        hw_mult = 1.0
+    else:
+        arch_mult = ARCH_RATIO   # ~14x more active params per token
+        hw_mult = HARDWARE_RATIO # ~2x higher TDP per GPU
+
+    lower_bound_j = total_observable * J_PER_TOKEN_FLOOR
+    mid_bound_j = total_with_cache * J_PER_TOKEN_FLOOR * arch_mult
+    upper_bound_j = total_with_cache * J_PER_TOKEN_FLOOR * arch_mult * hw_mult
+
+    return {
+        "provider": provider,
+        "total_observable_tokens": total_observable,
+        "total_with_cache_tokens": total_with_cache,
+        "active_params_ratio": round(arch_mult, 1),
+        "hardware_tdp_ratio": round(hw_mult, 1),
+        "energy_lower_bound_j": round(lower_bound_j, 0),
+        "energy_mid_bound_j": round(mid_bound_j, 0),
+        "energy_upper_bound_j": round(upper_bound_j, 0),
+        "energy_ratio_range": f"{arch_mult:.0f}x–{arch_mult * hw_mult:.0f}x (architectural + hardware)",
+        "joules_per_token": J_PER_TOKEN_FLOOR,
+    }
