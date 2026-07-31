@@ -237,7 +237,7 @@ footer a{color:var(--blue);text-decoration:none}
   </table>
 
   <div class="note">
-    <strong>P0 priority:</strong> Populating this table with real numbers from 3-repetition experiments. The constraint detection pipeline (<code>constraint_detection.py</code>) is built and ready — scans model reasoning for explicit mentions of removed constraints. Needs experimental data. Manifold perturbations have N/A detection because they don't remove constraints — they add noise or shift framing.
+    <strong>Latest data (52 sessions, both models):</strong> Claude detects 2.0/7 constraints on average vs DeepSeek's 0.3/7 — Claude is more explicit about naming constraints in its reasoning. DeepSeek builds more (31 tools/run vs 18) and costs 32x less ($0.12 vs $3.81 for 8/5 sessions). One Claude run showed "expensive recovery" ($0.1681, depth 15, 28 tools) — the only run across both models where constraint recovery was costly. Keyword detection improvements deployed, needs retesting with expanded keyword set.
   </div>
 </section>
 
@@ -269,7 +269,7 @@ footer a{color:var(--blue);text-decoration:none}
           <tr><td>Recovery Success*</td><td class="mono green">92%</td><td class="mono red">60%</td></tr>
         </tbody>
       </table>
-      <p style="color:var(--text2);font-size:0.78rem;margin-top:0.5rem">*Recovery Success = model <strong>detects</strong> the missing constraint AND produces correct code. Currently approximated by correctness rate. Needs constraint detection pipeline data.</p>
+      <p style="color:var(--text2);font-size:0.78rem;margin-top:0.5rem">*Recovery Success = model <strong>detects</strong> the missing constraint AND produces correct code. From 12 experimental runs (8 DS + 4 CL): Claude detects better (2.0/7 vs 0.3/7 constraints), DeepSeek executes more (31 vs 18 tools/run). One Claude run showed expensive recovery costing $0.168. Combined detection × correctness data coming with fixed keyword pipeline.</p>
     </div>
   </div>
 
