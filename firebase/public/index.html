@@ -291,6 +291,53 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
     <span style="color:var(--text-secondary);font-size:0.82rem">We cannot measure Joules/token without provider hardware data. But the architectural gap (MoE sparsity, RL-compressed reasoning, hardware TDP differences) means the energy ratio is bounded by parameter activation counts × tokens × hardware efficiency — a 25–200× range, not a 1.3× token-count ratio. Future work: run TokenPowerBench-style measurements against both provider APIs to calibrate the J/token conversion.</span>
   </div>
 </section>
+
+<!-- PHASE 1 → PHASE 2 CONNECTION -->
+<section class="section">
+  <h2 class="section-title">Phase 1 → Phase 2: The Recovery Cost Bridge</h2>
+  <p class="section-subtitle">Connecting the conceptual research (constraint recovery, basin escape) to measured economic outcomes.</p>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">The Missing Metric: Recovery Cost</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      <strong>Phase 1</strong> asked: does the model detect missing constraints and recover them?
+      <strong>Phase 2</strong> asks: what does that recovery <em>cost</em>?
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>Recovery Cost = Perturbed Cost − Baseline Cost.</strong>
+      Answers: "Removing constraint X costs $Y extra in tokens to re-derive and re-implement."
+    </p>
+
+    <table style="margin-top:0.8rem">
+      <thead><tr><th>Recovery Profile</th><th>Escape</th><th>Cost</th><th>Correctness</th><th>What it means</th></tr></thead>
+      <tbody>
+        <tr><td>Efficient recovery</td><td class="n">Low</td><td class="n win">Low</td><td class="n win">Held</td><td>Model ignored perturbation, stayed efficient.</td></tr>
+        <tr><td>Expensive recovery</td><td class="n">High</td><td class="n lose">High</td><td class="n win">Held</td><td>Model fought hard and succeeded. Resilience premium.</td></tr>
+        <tr><td>Failed recovery</td><td class="n">High</td><td class="n lose">High</td><td class="n lose">Dropped</td><td>Model fought but correctness suffered. Worst.</td></tr>
+        <tr><td>No recovery needed</td><td class="n">Low</td><td class="n win">Low</td><td class="n win">Held</td><td>Model didn't notice perturbation. Cheapest.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <h3 style="color:var(--accent)">Open-Source Maintenance Experiments (Next Phase)</h3>
+    <table>
+      <thead><tr><th>Target Repo</th><th>Stars</th><th>Issues</th><th>Experiment Type</th></tr></thead>
+      <tbody>
+        <tr><td>tiangolo/fastapi</td><td class="n">101K</td><td class="n">73</td><td>Add endpoint, fix bug, refactor</td></tr>
+        <tr><td>pallets/flask</td><td class="n">72K</td><td class="n">7</td><td>Fix error handling, improve tests</td></tr>
+        <tr><td>psf/requests</td><td class="n">54K</td><td class="n">233</td><td>Add retry logic, fix edge case</td></tr>
+        <tr><td>encode/httpx</td><td class="n">15K</td><td class="n">143</td><td>Async handler, connection pooling</td></tr>
+        <tr><td>pytest-dev/pytest</td><td class="n">14K</td><td class="n">816</td><td>Plugin hook, assertion formatting</td></tr>
+      </tbody>
+    </table>
+    <p style="color:var(--text-tertiary);font-size:0.78rem;margin-top:0.5rem">
+      Fixes three gaps: task diversity (beyond Flask), correctness verification (real test suites),
+      and sample size (issue backlog). Config at experiments/configs/flask_maintenance.yaml.
+    </p>
+  </div>
+</section>
+
 <section class="section">
   <h2 class="section-title">What Holds Up Under Scrutiny</h2>
 
