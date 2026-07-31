@@ -138,6 +138,10 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
 
     sol = evaluate_solution(r.final_response, constraints,
                             baseline_code=baseline.get("final_response", ""))
+    # Override correctness with actual test results if available
+    actual_correctness = sol.correctness_score
+    if r.tests_total > 0:
+        actual_correctness = r.tests_passed / r.tests_total
     eff = compute_efficiency(
         prompt_tokens=r.prompt_tokens, completion_tokens=r.completion_tokens,
         reasoning_tokens=r.reasoning_tokens, total_tokens=r.total_tokens,
@@ -170,6 +174,9 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
         "correctness": sol.correctness_score,
+        "actual_correctness": actual_correctness,
+        "tests_passed": r.tests_passed,
+        "tests_total": r.tests_total,
         "constraints_met": sol.constraints_met,
         "constraints_total": sol.constraints_total,
         "lines_of_code": sol.lines_of_code,
