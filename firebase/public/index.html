@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reasoning Topology — Outcomes per Joule</title>
+<title>Reasoning Topology Instrument — Preliminary Results</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 :root {
@@ -14,216 +14,272 @@
 }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); line-height:1.7; -webkit-font-smoothing:antialiased;
-  background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(78,140,255,0.06), transparent),
-    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(62,207,142,0.04), transparent); }
-.container { max-width:1040px; margin:0 auto; padding:0 2rem; }
+  background-image: radial-gradient(ellipse 100% 50% at 50% -20%, rgba(78,140,255,0.04), transparent); }
+.container { max-width:960px; margin:0 auto; padding:0 2rem; }
 
-.hero { padding:5rem 0 3rem; text-align:center; }
-.hero .label { display:inline-block; padding:0.3rem 1rem; background:rgba(155,109,255,0.1); border:1px solid rgba(155,109,255,0.2);
-  border-radius:100px; font-size:0.78rem; font-weight:600; letter-spacing:0.5px; color:var(--purple); margin-bottom:1.2rem; text-transform:uppercase; }
-.hero h1 { font-size:3rem; font-weight:800; letter-spacing:-1.5px; line-height:1.15; margin-bottom:1rem; }
+.hero { padding:4rem 0 2rem; text-align:center; }
+.hero .label { display:inline-block; padding:0.3rem 0.9rem; background:rgba(155,109,255,0.1); border:1px solid rgba(155,109,255,0.2);
+  border-radius:100px; font-size:0.75rem; font-weight:600; letter-spacing:0.4px; color:var(--purple); margin-bottom:1rem; text-transform:uppercase; }
+.hero h1 { font-size:2.4rem; font-weight:800; letter-spacing:-1px; line-height:1.2; margin-bottom:0.8rem; }
 .hero h1 .gradient { background:linear-gradient(135deg,#e3e6ed,#9599a6,#c9d1d9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
-.hero h1 .green { color:var(--green); -webkit-text-fill-color:var(--green); }
-.hero .subtitle { font-size:1.1rem; color:var(--text-secondary); max-width:700px; margin:0 auto 1.5rem; }
-.hero .thesis { font-size:0.9rem; color:var(--amber); font-weight:500; max-width:650px; margin:0 auto; padding:0.8rem 1.2rem;
-  background:rgba(240,179,75,0.06); border:1px solid rgba(240,179,75,0.15); border-radius:8px; }
+.hero h1 .amber { color:var(--amber); -webkit-text-fill-color:var(--amber); }
+.hero .subtitle { font-size:0.95rem; color:var(--text-secondary); max-width:650px; margin:0 auto 1.2rem; }
+.hero .caveat { font-size:0.82rem; color:var(--amber); max-width:600px; margin:0 auto; padding:0.7rem 1rem;
+  background:rgba(240,179,75,0.05); border:1px solid rgba(240,179,75,0.12); border-radius:8px; }
 
-.section { padding:3.5rem 0; }
-.section-title { font-size:1.35rem; font-weight:700; margin-bottom:0.3rem; color:#fff; }
-.section-subtitle { color:var(--text-secondary); font-size:0.88rem; margin-bottom:1.5rem; }
+.section { padding:2.5rem 0; }
+.section-title { font-size:1.25rem; font-weight:700; margin-bottom:0.3rem; color:#fff; }
+.section-subtitle { color:var(--text-secondary); font-size:0.85rem; margin-bottom:1.2rem; }
 
-.metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1.5rem 0; }
-.metric { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:1.2rem; text-align:center; position:relative; overflow:hidden; }
+.metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1.2rem 0; }
+.metric { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:1rem; text-align:center; position:relative; overflow:hidden; }
 .metric::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
-.metric.green::before { background:var(--green); }
-.metric.amber::before { background:var(--amber); }
-.metric.red::before { background:var(--red); }
-.metric.accent::before { background:var(--accent); }
-.metric .value { font-size:1.8rem; font-weight:800; font-family:'JetBrains Mono',monospace; margin:0.3rem 0; }
+.metric.green::before { background:var(--green); } .metric.amber::before { background:var(--amber); }
+.metric.red::before { background:var(--red); } .metric.accent::before { background:var(--accent); }
+.metric .value { font-size:1.5rem; font-weight:800; font-family:'JetBrains Mono',monospace; margin:0.2rem 0; }
 .metric .value.green { color:var(--green); } .metric .value.amber { color:var(--amber); }
-.metric .value.red { color:var(--red); } .metric .value.accent { color:var(--accent); }
-.metric .label { font-size:0.72rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.8px; }
-.metric .sub { font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem; }
+.metric .value.red { color:var(--red); }
+.metric .label { font-size:0.7rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.6px; }
+.metric .sub { font-size:0.72rem; color:var(--text-secondary); margin-top:0.2rem; }
 
-table { width:100%; border-collapse:collapse; font-size:0.84rem; margin:1rem 0; }
-thead th { text-align:left; padding:0.65rem 0.9rem; color:var(--text-secondary); font-weight:600; font-size:0.7rem;
-  text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid var(--border-strong); background:var(--surface-2); }
-tbody td { padding:0.55rem 0.9rem; border-bottom:1px solid var(--border); }
+table { width:100%; border-collapse:collapse; font-size:0.82rem; margin:0.8rem 0; }
+thead th { text-align:left; padding:0.6rem 0.8rem; color:var(--text-secondary); font-weight:600; font-size:0.68rem;
+  text-transform:uppercase; letter-spacing:0.4px; border-bottom:2px solid var(--border-strong); background:var(--surface-2); }
+tbody td { padding:0.5rem 0.8rem; border-bottom:1px solid var(--border); }
 tbody tr:hover { background:var(--surface-2); }
 td.n { font-family:'JetBrains Mono',monospace; }
 td.win { color:var(--green); }
 td.lose { color:var(--red); }
 
-.card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:1.5rem; margin-bottom:1.2rem; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
-.card h3 { font-size:0.95rem; margin-bottom:0.8rem; }
+.card { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:1.2rem; margin-bottom:1rem; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+.card h3 { font-size:0.9rem; margin-bottom:0.6rem; }
 
-.finding { padding:1rem 1.2rem; margin:0.6rem 0; border-radius:8px; border:1px solid var(--border); background:var(--surface-1); }
-.finding .icon { font-size:1.1rem; margin-right:0.4rem; }
+.limitation { padding:0.8rem 1rem; margin:0.4rem 0; border-radius:6px; border:1px solid var(--border); background:var(--surface-1); }
+.limitation.critical { border-left:3px solid var(--red); }
+.limitation.major { border-left:3px solid var(--amber); }
+.limitation .tag { display:inline-block; padding:0.15rem 0.5rem; border-radius:3px; font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; margin-right:0.5rem; }
+.limitation .tag.critical { background:rgba(242,92,92,0.1); color:var(--red); }
+.limitation .tag.major { background:rgba(240,179,75,0.1); color:var(--amber); }
 
-.big-number { text-align:center; padding:2rem 0; }
-.big-number .value { font-size:4rem; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--green); }
-.big-number .label { font-size:1rem; color:var(--text-secondary); margin-top:-0.3rem; }
+footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); color:var(--text-tertiary); font-size:0.78rem; }
 
-footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); color:var(--text-tertiary); font-size:0.8rem; }
-
-@media (max-width:768px) { .metric-grid { grid-template-columns:1fr 1fr; } .hero h1 { font-size:1.8rem; } .container { padding:0 1rem; } }
+@media (max-width:768px) { .metric-grid { grid-template-columns:1fr 1fr; } .hero h1 { font-size:1.6rem; } .container { padding:0 1rem; } }
 </style>
 </head>
 <body>
 
 <div class="hero">
-  <div class="label">Measured · Not Estimated</div>
-  <h1><span class="gradient">We pay more for Claude to</span><br><span class="green">do less work.</span></h1>
-  <p class="subtitle">74 experiment sessions · 45 DeepSeek v4 Pro · 17 Claude Fable 5<br>
-    Agentic execution via opencode · Isolated git worktrees</p>
-  <p class="thesis">Claude's pricing model charges for the full context window every session via cache writes.
-    DeepSeek only charges for tokens actually processed. Claude produced 0 tool calls on 40% of
-    perturbed runs — heat without work. The gap isn't physics. It's pricing.</p>
+  <div class="label">Preliminary Findings · Under Active Revision</div>
+  <h1><span class="gradient">Cost efficiency across reasoning policies:</span><br><span class="amber">preliminary evidence, not proof</span></h1>
+  <p class="subtitle">74 agentic experiment sessions · 45 DeepSeek v4 Pro · 17 Claude Fable 5 · 10 Claude Haiku 4.5<br>
+  All code, configs, and results at <a href="https://github.com/peparhugo/reasoning-instrument" style="color:var(--accent)">github.com/peparhugo/reasoning-instrument</a></p>
+  <p class="caveat"><strong>Caveat:</strong> All operator×strength cells are n=1. No confidence intervals. "Correctness" is a heuristic keyword check, not verified test results. Manifold/semantic classification is a <strong>hypothesis</strong>, not validated by embedding analysis.</p>
 </div>
 
 <div class="container">
 
-<!-- THE HEADLINE METRIC -->
-<div class="big-number">
-  <div class="value">52x</div>
-  <div class="label">more successful builds per dollar · dashboard pricing: 455–2,273x</div>
-</div>
-
-<!-- KEY METRICS -->
-<div class="metric-grid">
-  <div class="metric green">
-    <div class="label">Successful builds</div>
-    <div class="value green">67 / $</div>
-    <div class="sub">DeepSeek 67 builds/$ · Claude 1.3 builds/$</div>
-  </div>
-  <div class="metric amber">
-    <div class="label">Cost per build</div>
-    <div class="value amber">$0.015</div>
-    <div class="sub">DeepSeek $0.015 · Claude $0.78 · 52x</div>
-  </div>
-  <div class="metric red">
-    <div class="label">Cache-write tax</div>
-    <div class="value red">75%</div>
-    <div class="sub">of Claude's paid tokens are cached context, not work</div>
-  </div>
-  <div class="metric accent">
-    <div class="label">Perturbation survival</div>
-    <div class="value accent">92%</div>
-    <div class="sub">DeepSeek 92% · Claude 60% · builds code under perturbation</div>
-  </div>
-</div>
-
-<!-- THE RESEARCH QUESTION -->
+<!-- WHAT WE MEASURED -->
 <section class="section">
-  <h2 class="section-title">The Research Question</h2>
-  <p class="section-subtitle">AI inference is a thermodynamic process. Every token is heat. The question isn't which model is smarter — it's which model delivers correct work at lower thermal cost.</p>
+  <h2 class="section-title">What We Measured</h2>
+  <p class="section-subtitle">Real data from the opencode session database. Tokens, costs, and tool calls — no estimates.</p>
 
-  <div class="card" style="border-left:3px solid var(--green)">
-    <h3 style="color:var(--green)">H₁ — The Alternative Hypothesis</h3>
-    <p style="color:var(--text-secondary);font-size:0.88rem">
-      RL-trained reasoning policies compress reasoning into latent-space navigation
-      during training. Imitation-trained policies expand it into explicit token search.
-      The instrument measures whether this produces <strong>more correct solutions per dollar</strong>
-      — and whether the pricing model itself penalizes iterative agentic work.
+  <table>
+    <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>Claude Haiku 4.5</th></tr></thead>
+    <tbody>
+      <tr><td>Sessions</td><td class="n">45</td><td class="n">17</td><td class="n">10</td></tr>
+      <tr><td>Code-producing sessions</td><td class="n win">40 (89%)</td><td class="n">16 (94%)</td><td class="n">10 (100%)</td></tr>
+      <tr><td>Total tokens (input + output)</td><td class="n">823,611</td><td class="n">113,416</td><td class="n">—</td></tr>
+      <tr><td>Tokens paid for (incl. cache)</td><td class="n">823,611</td><td class="n">446,195</td><td class="n">—</td></tr>
+      <tr><td>Total cost</td><td class="n win">$0.60</td><td class="n lose">$12.54</td><td class="n win">$0.09</td></tr>
+      <tr><td>Cost per session</td><td class="n win">$0.013</td><td class="n lose">$0.738</td><td class="n win">$0.009</td></tr>
+      <tr><td>Cost per code-producing session</td><td class="n win">$0.015</td><td class="n lose">$0.784</td><td class="n win">$0.009</td></tr>
+      <tr><td>$/Mtok (dashboard)</td><td class="n win">$0.022</td><td class="n lose">$10–50</td><td class="n">$1–5</td></tr>
+      <tr><td>Effective $/Mtok (our sessions)</td><td class="n win">$0.73</td><td class="n lose">$28.10</td><td class="n">—</td></tr>
+      <tr><td>4-phase iterative cost</td><td class="n win">$0.11</td><td class="n lose">$5.09</td><td class="n">—</td></tr>
+    </tbody>
+  </table>
+
+  <p style="color:var(--text-secondary);font-size:0.8rem;margin-top:0.5rem">
+    <strong>Note on tier comparison:</strong> Claude Fable 5 ($10–50/Mtok) is Anthropic's premium tier.
+    Claude Haiku 4.5 ($1–5/Mtok) produced code on 100% of sessions at $0.009/session —
+    within 1.5x of DeepSeek. Claude Sonnet 5 ($3–15/Mtok, introductory $2–10) would sit between them.
+    The massive cost gap is primarily between DeepSeek and <em>Claude's premium tier</em>,
+    not between DeepSeek and Claude universally.
+  </p>
+</section>
+
+<!-- BASELINE VS PERTURBED -->
+<section class="section">
+  <h2 class="section-title">Baseline vs Perturbed: Not a Simple Story</h2>
+  <p class="section-subtitle">The perturbation survival narrative needs sample size and the baseline tells a different story.</p>
+
+  <table>
+    <thead><tr><th>Condition</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>Interpretation</th></tr></thead>
+    <tbody>
+      <tr><td>Baseline success rate</td><td class="n">89%</td><td class="n win">94%</td><td>Claude was <strong>better</strong> on clean tasks</td></tr>
+      <tr><td>Perturbed success rate</td><td class="n win">92%</td><td class="n lose">60%</td><td>Claude <strong>dropped 34pp</strong> under perturbation</td></tr>
+      <tr><td>Delta (perturbed − baseline)</td><td class="n win">+3pp</td><td class="n lose">−34pp</td><td>DeepSeek was perturbation-resilient</td></tr>
+      <tr><td>0-tool-call rate (perturbed)</td><td class="n win">8%</td><td class="n lose">40%</td><td>Claude abandoned building on 2/5 runs</td></tr>
+    </tbody>
+  </table>
+
+  <p style="color:var(--text-secondary);font-size:0.8rem;margin-top:0.5rem">
+    <strong>Limitation:</strong> Claude's perturbed sample is n=5 (3 URL shortener + 2 task manager).
+    DeepSeek's is n=~25 across more tasks. Sample size imbalance means the 60% Claude number
+    could shift significantly with 2-3 more runs. These are <strong>directional signals, not
+    statistically significant findings.</strong>
+  </p>
+</section>
+
+<!-- CACHE-WRITE: BALANCED VIEW -->
+<section class="section">
+  <h2 class="section-title">The Cache-Write Story: Not What It Seems</h2>
+
+  <div class="card">
+    <h3 style="color:var(--green)">Why Claude caches context</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      Claude's prompt caching is designed to <strong>reduce latency</strong> in multi-turn conversations.
+      Without it, each turn would re-process the full context from scratch — potentially costing
+      <em>more</em> in both time and dollars. Cache writes are the mechanism that makes multi-turn
+      agentic work possible. They are not "waste" — they are infrastructure.
     </p>
   </div>
 
   <div class="card" style="border-left:3px solid var(--amber)">
-    <h3 style="color:var(--amber)">H₀ — The Null Hypothesis</h3>
-    <p style="color:var(--text-secondary);font-size:0.88rem">
-      Training regime has no effect on thermodynamic efficiency. All models produce equivalent
-      useful work per unit of energy consumed. Cost differences are purely pricing artifacts.
+    <h3 style="color:var(--amber)">The real question</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      The question isn't "does Claude waste money on caching?" It's: <strong>does Claude's caching
+      implementation result in higher per-session costs than DeepSeek's context management,
+      for equivalent useful work?</strong> Our preliminary data suggests yes — but we haven't
+      controlled for model tier, task type, or session count. And Claude's baseline success
+      rate was higher, suggesting cache may be buying <em>better performance on clean tasks</em>
+      at the cost of higher per-session pricing.
+    </p>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Major Gap</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">We have not measured whether Claude's cache writes correlate with improved correctness. The hypothesis that "cache is overhead" is untested — it could be that cache buys correctness at a premium price, which would be a legitimate engineering trade-off, not a flaw.</span>
+  </div>
+</section>
+
+<!-- PRICING TIERS -->
+<section class="section">
+  <h2 class="section-title">Pricing Tier Comparison</h2>
+  <p class="section-subtitle">The cost gap collapses when comparing at equivalent price tiers. The real ratio depends on which model you compare against.</p>
+
+  <table>
+    <thead><tr><th>Model</th><th>Input $/Mtok</th><th>Output $/Mtok</th><th>Cost vs DeepSeek</th><th>Builds/$ (est.)</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="n win">$0.27</td><td class="n win">$1.10</td><td class="n">1x</td><td class="n win">67</td></tr>
+      <tr><td>Claude Haiku 4.5</td><td class="n">$1.00</td><td class="n">$5.00</td><td class="n">~5x</td><td class="n">~13</td></tr>
+      <tr><td>Claude Sonnet 5†</td><td class="n">$2.00</td><td class="n">$10.00</td><td class="n">~9x</td><td class="n">~7</td></tr>
+      <tr><td>Claude Sonnet 5 (std)</td><td class="n">$3.00</td><td class="n">$15.00</td><td class="n">~14x</td><td class="n">~5</td></tr>
+      <tr><td>Claude Opus 5</td><td class="n lose">$5.00</td><td class="n lose">$25.00</td><td class="n lose">~23x</td><td class="n lose">~3</td></tr>
+      <tr><td>Claude Fable 5 (our data)</td><td class="n lose">$10.00</td><td class="n lose">$50.00</td><td class="n lose">~45x</td><td class="n lose">~1.3</td></tr>
+    </tbody>
+  </table>
+
+  <p style="color:var(--text-tertiary);font-size:0.75rem;margin-top:0.3rem">† Sonnet 5 introductory pricing through August 31, 2026. Haiku, Sonnet, and Opus estimates are extrapolated from Fable 5 experiment token ratios — not independently measured.</p>
+
+  <div class="limitation major">
+    <span class="tag major">Major Gap</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">We compared DeepSeek v4 Pro (their mid-tier) against Claude Fable 5 (Anthropic's premium tier). The "52x" finding is largely a <strong>pricing tier artifact</strong>. At equivalent tiers (Haiku or Sonnet intro pricing), the gap narrows to 5–14x. Multi-model tier comparison experiments are needed to isolate price from capability.</span>
+  </div>
+</section>
+
+<!-- LIMITATIONS -->
+<section class="section">
+  <h2 class="section-title">Known Limitations</h2>
+  <p class="section-subtitle">Honest accounting of what this preliminary data cannot support.</p>
+
+  <div class="limitation critical">
+    <span class="tag critical">Critical — No Statistics</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">All operator×strength cells are n=1. No means, standard deviations, or confidence intervals reported. All percentages are point estimates from single observations. Multi-repetition support exists in the experiment runner but has not been executed due to time constraints.</span>
+  </div>
+
+  <div class="limitation critical">
+    <span class="tag critical">Critical — Correctness is Heuristic</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">"Successful build" uses output_tokens &gt; 500 and keyword detection — not verified test pass/fail. We did not execute the generated code and check test results in a controlled pipeline. The opencode parser extracts test output from bash invocations, but this data is not yet systematically validated.</span>
+  </div>
+
+  <div class="limitation critical">
+    <span class="tag critical">Critical — Single Task Domain</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">All experiments are Python/Flask web applications (URL shortener, task manager, collaboration platform). No TypeScript, Rust, data analysis, system administration, or other domains tested. Perturbation response may be highly domain-specific.</span>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Major — Unvalidated Classification</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">Manifold vs semantic perturbation classification is a <strong>hypothesis</strong>, not a measurement. We have not performed embedding analysis to verify that "inject_alien_vocab" actually pushes token embeddings off the typical linguistic manifold. The classification is based on design intent, not empirical validation.</span>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Major — Opencode as Intermediary</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">All experiments run through opencode's agent harness, which may handle tool calling, context management, and session state differently per model. Claude's 0-tool-call behavior on perturbed runs could be an artifact of how opencode invokes Claude, not an inherent property of the model. Direct API comparisons would control for this.</span>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Major — No Thermodynamic Data</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">We removed joule/kWh estimates from this report because we do not know the hardware either provider uses. Claims about "thermal cost" or "heat pollution" require wattage measurements at the GPU level, which neither API provides.</span>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Major — Asymmetric Comparison</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">DeepSeek v4 Pro (mid-tier) vs Claude Fable 5 (premium). The RL-vs-imitation research question requires controlling for model capability tier, which this preliminary data does not do. Haiku 4.5 data (10 sessions, 100% success, $0.009/session) suggests the cost gap is primarily a pricing-tier artifact.</span>
+  </div>
+
+  <div class="limitation">
+    <span style="color:var(--text-secondary);font-size:0.82rem"><strong>Minor:</strong> Cache-write impact on correctness is not measured. Claude had higher baseline success (94% vs 89%), suggesting cache may buy performance. The "waste" narrative is unverified. Pricing changes frequently (Sonnet 5 intro pricing expires Aug 2026) and would alter the analysis. Sample size is heavily skewed toward DeepSeek (45 vs 17 vs 10).</span>
+  </div>
+</section>
+
+<!-- WHAT HOLDS UP -->
+<section class="section">
+  <h2 class="section-title">What Holds Up Under Scrutiny</h2>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">Dashboard-verified pricing gap</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      DeepSeek processed 337M tokens for $7.38 ($0.022/Mtok). Claude Fable 5 costs $10–50/Mtok.
+      The 455–2,273x per-token pricing differential is <strong>directly observed from provider dashboards</strong>
+      and does not depend on any experiment methodology.
+    </p>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">Perturbation response asymmetry (directional)</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      Claude Fable 5 showed a 34pp drop in code production under perturbation (94% → 60%)
+      while DeepSeek showed no drop (89% → 92%). The n is too small for statistical confidence,
+      but the <strong>direction</strong> is consistent across both task types tested, and the 0-tool-call
+      pattern (2/5 perturbed Claude runs) is a qualitative difference worth investigating.
+    </p>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">Instrument methodology is sound</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      The experiment pipeline — calibrated perturbation operators, isolated git worktrees per session,
+      opencode agentic execution, cumulative cost accounting from the session database — is
+      well-designed and reproducible. The infrastructure is correct. What's missing is execution
+      (repetitions, multi-tier, multi-domain) and verification (actual test results, not heuristics).
     </p>
   </div>
 </section>
 
-<!-- THE ENERGY MATH -->
+<!-- NEXT STEPS -->
 <section class="section">
-  <h2 class="section-title">What We Measured</h2>
-  <p class="section-subtitle">Real data from the opencode database. No estimates — these are actual tokens and costs.</p>
+  <h2 class="section-title">What's Needed to Move from Preliminary to Publishable</h2>
 
   <table>
-    <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th></tr></thead>
+    <thead><tr><th>Priority</th><th>Action</th><th>Why</th></tr></thead>
     <tbody>
-      <tr><td>Experiment sessions</td><td class="n">45</td><td class="n">17</td></tr>
-      <tr><td>Successful builds</td><td class="n win">40 (89%)</td><td class="n">16 (94%)</td></tr>
-      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Token Accounting —</td></tr>
-      <tr><td>Input + output tokens</td><td class="n">823,611</td><td class="n">113,416</td></tr>
-      <tr><td>Tokens paid for (incl. cache)</td><td class="n">823,611</td><td class="n lose">446,195</td></tr>
-      <tr><td>Tokens per successful build</td><td class="n win">20,590</td><td class="n lose">27,887 (paid)</td></tr>
-      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Cost —</td></tr>
-      <tr><td>Total cost</td><td class="n win">$0.60</td><td class="n lose">$12.54</td></tr>
-      <tr><td>Cost per 1M tokens (dashboard)</td><td class="n win">$0.022</td><td class="n lose">$10–50</td></tr>
-      <tr><td>Effective $/Mtok (our experiments)</td><td class="n win">$0.73</td><td class="n lose">$28.10</td></tr>
-      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— The Metrics That Matter —</td></tr>
-      <tr><td><strong>Successful builds per $</strong></td><td class="n win"><strong>67</strong></td><td class="n lose"><strong>1.3</strong></td></tr>
-      <tr><td><strong>Cost per successful build</strong></td><td class="n win"><strong>$0.015</strong></td><td class="n lose"><strong>$0.78</strong></td></tr>
-      <tr><td><strong>Perturbation survival rate</strong></td><td class="n win"><strong>92%</strong></td><td class="n lose"><strong>60%</strong></td></tr>
-    </tbody>
-  </table>
-</section>
-
-<!-- THE FINDINGS -->
-<section class="section">
-  <h2 class="section-title">Why the Gap Exists</h2>
-  <p class="section-subtitle">Three mechanisms, all verified from experiment data.</p>
-
-  <div class="finding">
-    <span class="icon">📦</span>
-    <strong>Cache-write tax:</strong> Claude charges $10/M input tokens for the full context window every session — whether the token is new or cached. A 30K-token codebase costs $0.30 just to load, before any work begins. Across our 17 Claude sessions, cache writes (332K tokens) accounted for 75% of paid tokens but 0% of productive output. DeepSeek doesn't separately bill for cached context.
-  </div>
-
-  <div class="finding">
-    <span class="icon">💸</span>
-    <strong>Pricing model, not energy:</strong> Claude charges $10–50/Mtok. DeepSeek charges $0.022/Mtok (dashboard-verified: 337M tokens for $7.38). The 455–2,273x per-token price gap dwarfs any plausible hardware efficiency difference. This is a business model difference, not a physics one.
-  </div>
-
-  <div class="finding">
-    <span class="icon">🧠</span>
-    <strong>Perturbation survival:</strong> When given perturbed prompts (alien vocabulary, missing constraints, inverted framing), Claude stopped building entirely on 40% of runs — producing 0 tool calls. DeepSeek built working code on 92% of runs regardless. Claude spent $0.14–1.26 per abandoned session producing nothing. The RL-trained policy pushes through confusion; the imitation-trained policy defaults to explanation.
-  </div>
-</section>
-
-<!-- THE TRUE RATIO -->
-<section class="section">
-  <h2 class="section-title">The Measured Ratio</h2>
-
-  <table>
-    <thead><tr><th>Metric</th><th>DeepSeek</th><th>Claude</th><th>Ratio</th></tr></thead>
-    <tbody>
-      <tr><td>Successful builds per $</td><td class="n win">67</td><td class="n">1.3</td><td class="n">52x</td></tr>
-      <tr><td>Cost per successful build</td><td class="n win">$0.015</td><td class="n lose">$0.78</td><td class="n">52x</td></tr>
-      <tr><td>$/Mtok (dashboard)</td><td class="n win">$0.022</td><td class="n lose">$10–50</td><td class="n">455–2,273x</td></tr>
-      <tr><td>Perturbation survival</td><td class="n win">92%</td><td class="n lose">60%</td><td class="n">1.5x</td></tr>
-      <tr><td>Cache-write overhead</td><td class="n win">0%</td><td class="n lose">75% of paid tokens</td><td class="n">—</td></tr>
-      <tr><td>4-phase iterative cost</td><td class="n win">$0.11</td><td class="n lose">$5.09</td><td class="n">48x</td></tr>
-    </tbody>
-  </table>
-
-  <div class="card" style="margin-top:1.5rem;border:2px solid var(--amber);background:linear-gradient(135deg,var(--surface-1),rgba(240,179,75,0.03))">
-    <p style="font-size:1rem;font-weight:600;color:var(--amber);text-align:center">
-      The 52x experiment-level ratio measures at a 5-file codebase — Claude's session minimum
-      dominates. Modeled at production scale (100–500 files), the cache-write tax compounds
-      to 500–2,600x. Dashboard pricing alone gives 455–2,273x. The asymptotic real-world
-      ratio is <strong>~1,000–5,000x</strong> depending on codebase size and iteration count.
-    </p>
-  </div>
-</section>
-
-<!-- HOW IT WORKS -->
-<section class="section">
-  <h2 class="section-title">How the Instrument Works</h2>
-  <p class="section-subtitle">The measurement pipeline — from perturbation to thermodynamic verdict.</p>
-
-  <table>
-    <thead><tr><th>Step</th><th>What happens</th><th>What's measured</th></tr></thead>
-    <tbody>
-      <tr><td class="n">1</td><td>Perturbation operator applied to task prompt (10 operators, 2 classes, calibrated strengths)</td><td>Operator name, class (manifold/semantic), strength</td></tr>
-      <tr><td class="n">2</td><td>Opencode agentic session spawned in isolated git worktree</td><td>Files created, git diff, tool call trace</td></tr>
-      <tr><td class="n">3</td><td>Model builds solution: writes code, runs tests, iterates on failures</td><td>Tool calls, retry loops, iteration depth, test pass/fail</td></tr>
-      <tr><td class="n">4</td><td>Solution evaluated: correctness, constraints, complexity, novelty vs baseline</td><td>Composite quality score, constraint satisfaction, code metrics</td></tr>
-      <tr><td class="n">5</td><td>Cost and energy computed from opencode's cumulative session accounting</td><td>$ total, $/Mtok, Joules, J/build, builds/$</td></tr>
-      <tr><td class="n">6</td><td>Strategy classified: conservative / exploratory / wasteful / efficient</td><td>Strategy type, thermal efficiency, exploration premium</td></tr>
+      <tr><td class="n" style="color:var(--red)">1</td><td>Run 3–5 repetitions per operator×strength cell with all 10 operators</td><td>Statistical confidence. Currently n=1 everywhere.</td></tr>
+      <tr><td class="n" style="color:var(--red)">2</td><td>Execute generated code and capture actual test pass/fail rates</td><td>Replace heuristic correctness with measured correctness.</td></tr>
+      <tr><td class="n" style="color:var(--red)">3</td><td>Run identical matrix on 2+ non-Flask tasks</td><td>Task diversity. Prove the effect isn't domain-specific.</td></tr>
+      <tr><td class="n" style="color:var(--amber)">4</td><td>Run Claude Haiku, Sonnet, and Opus at the same tiers</td><td>Isolate pricing from capability. Control for model tier.</td></tr>
+      <tr><td class="n" style="color:var(--amber)">5</td><td>Run DeepSeek v4 Flash as a control</td><td>Within-provider comparison. Is the effect model-tier or provider?</td></tr>
+      <tr><td class="n" style="color:var(--amber)">6</td><td>Run direct API comparisons alongside opencode agentic sessions</td><td>Control for harness effects. Is opencode the confound?</td></tr>
     </tbody>
   </table>
 </section>
@@ -232,10 +288,10 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
 
 <footer>
   <div class="container">
-    <p>Reasoning Topology Instrument · v0.2 · July 31, 2026</p>
+    <p>Reasoning Topology Instrument · Preliminary Results · July 31, 2026</p>
     <p style="margin-top:0.2rem">
       <a href="https://github.com/peparhugo/reasoning-instrument" style="color:var(--accent)">GitHub</a> ·
-      74 sessions · DeepSeek v4 Pro vs Claude Fable 5 · Agentic opencode backend
+      This is preliminary data. All operator×strength cells are n=1. Correctness is heuristic.
     </p>
   </div>
 </footer>
