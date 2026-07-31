@@ -222,7 +222,7 @@ def _print_summary(runs, name, model_label):
     by_cls = {"manifold": [], "semantic": []}
     for r in perturbed:
         by_cls[r["perturbation_class"]].append(r)
-    print(f"\nPer-class (avg):")
+    print(f"\nPer-class (avg, n={len(perturbed)} runs):")
     for cls, items in sorted(by_cls.items()):
         if items:
             avg_c = sum(r["correctness"] for r in items) / len(items)
@@ -231,8 +231,16 @@ def _print_summary(runs, name, model_label):
             avg_ret = sum(r["retries"] for r in items) / len(items)
             avg_d = sum(r["iteration_depth"] for r in items) / len(items)
             avg_qpd = sum(r.get("quality_per_dollar", 0) for r in items) / len(items)
-            print(f"  {cls:<10} correct={avg_c:.0%} tok={avg_t:,.0f} ${avg_cost:.4f} "
-                  f"retries={avg_ret:.1f} depth={avg_d:.1f} Q/$={avg_qpd:.0f}")
+            # CI estimate (crude: std err for small n)
+            import math
+            std_c = math.sqrt(sum((r["correctness"] - avg_c)**2 for r in items)/max(len(items)-1, 1)) if len(items) > 1 else 0
+            std_t = math.sqrt(sum((r["total_tokens"] - avg_t)**2 for r in items)/max(len(items)-1, 1)) if len(items) > 1 else 0
+            ci_c = 1.96 * std_c / math.sqrt(len(items)) if len(items) > 1 and std_c > 0 else 0
+            ci_t = 1.96 * std_t / math.sqrt(len(items)) if len(items) > 1 and std_t > 0 else 0
+            ci_str = f" ±{ci_c:.0%}" if ci_c > 0 else " (±?)" if len(items) == 1 else ""
+            tok_str = f" ±{ci_t:,.0f}" if ci_t > 0 else ""
+            print(f"  {cls:<10} correct={avg_c:.0%}{ci_str} tok={avg_t:,.0f}{tok_str} ${avg_cost:.4f} "
+                  f"retries={avg_ret:.1f} depth={avg_d:.1f} Q/$={avg_qpd:.0f} (n={len(items)})")
 
     # Top-line
     total_tok = (base.get("total_tokens", 0) or 0) + sum(r["total_tokens"] for r in perturbed)
