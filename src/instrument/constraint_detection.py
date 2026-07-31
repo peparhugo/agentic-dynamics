@@ -157,24 +157,41 @@ def detect_constraints(
 
 
 def _constraint_keywords(constraint: str) -> list[str]:
-    """Extract search keywords from a constraint description."""
-    # Remove common stop words and extract meaningful terms
+    """Extract search keywords from a constraint description.
+
+    Uses domain-specific keyword expansion to catch different phrasings
+    of the same constraint (e.g., 'rate limiting' → 'rate_limit', 'ratelimit',
+    'throttle', 'limiter').
+    """
+    constraint_lower = constraint.lower()
+
+    # Domain-specific keyword expansions
+    expansions = {
+        "jwt auth": ["jwt", "token", "authenticate", "bearer", "access_token", "refresh"],
+        "refresh token": ["refresh", "refresh_token", "token_refresh"],
+        "rate limit": ["rate_limit", "ratelimit", "ratelimit", "throttle", "limiter", "too many request", "429"],
+        "input validation": ["validate", "validation", "sanitize", "schema", "marshmallow", "pydantic"],
+        "paginated": ["paginate", "pagination", "page", "offset", "limit", "per_page"],
+        "error handling": ["error", "exception", "400", "404", "500", "abort", "http_error"],
+        "audit log": ["audit", "log", "logging", "logger", "trail"],
+        "api version": ["version", "/v1/", "/v2/", "api_version", "versioning", "url_prefix"],
+    }
+
+    keywords = set()
+    for pattern, terms in expansions.items():
+        if pattern in constraint_lower:
+            keywords.update(terms)
+
+    # Also add individual words from the constraint (fallback)
     stop = {"must", "the", "a", "an", "be", "with", "for", "and", "or", "in", "on", "to",
             "is", "of", "all", "that", "this", "has", "have", "should", "can", "will",
             "at", "by", "from", "no", "not", "but", "if", "so"}
+    words = constraint_lower.split()
+    for w in words:
+        if w not in stop and len(w) > 2:
+            keywords.add(w)
 
-    words = constraint.lower().split()
-    keywords = [w for w in words if w not in stop and len(w) > 2]
-
-    # Also generate multi-word phrases from adjacent keywords
-    phrases = []
-    for i in range(len(keywords) - 1):
-        phrases.append(f"{keywords[i]}_{keywords[i + 1]}")
-        phrases.append(f"{keywords[i]} {keywords[i + 1]}")
-
-    # Return individual keywords + phrases, deduplicated
-    all_terms = list(dict.fromkeys(keywords + phrases))  # preserve order, remove dups
-    return all_terms[:10]  # limit to avoid noise
+    return list(keywords)[:12]
 
 
 def _is_code_context(text: str) -> bool:
