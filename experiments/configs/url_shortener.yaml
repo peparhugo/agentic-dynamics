@@ -1,0 +1,26 @@
+# URL shortener experiment — comparison-ready
+name: url_shortener
+task: >
+  Build a Python/Flask URL shortener with REST API, collision-resistant short codes,
+  persistent storage, rate limiting, and click analytics. Write the code and pytest tests.
+  Be thorough but concise.
+
+constraints:
+  - REST API endpoints for create and redirect
+  - Short code generation with collision handling
+  - Persistent storage (SQLite or PostgreSQL)
+  - Rate limiting per IP
+  - Click analytics tracking
+  - Test suite with pytest
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_phantom_success
+  - inject_false_premise
+  - invert_constraint
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
