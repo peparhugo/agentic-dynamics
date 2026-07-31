@@ -219,8 +219,8 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
   </div>
 
   <div class="limitation major">
-    <span class="tag major">Major — No Thermodynamic Data</span>
-    <span style="color:var(--text-secondary);font-size:0.82rem">We removed joule/kWh estimates from this report because we do not know the hardware either provider uses. Claims about "thermal cost" or "heat pollution" require wattage measurements at the GPU level, which neither API provides.</span>
+    <span class="tag major">Major — Energy Proxy</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">We use token counts as a proxy for energy consumption, following <strong>Liu et al.</strong> (2026, arXiv:2605.11733) who argue that LLM inference should be treated as energy-to-token production and call for Joules/token reporting. <strong>TokenPowerBench</strong> (Niu et al., AAAI 2026) provides empirical J/token measurements across hardware configurations, finding a range of ~0.1–2 J/token depending on model size, hardware, and batch size. Our H100-class estimates (0.08–0.47 J/tok) are conservative and fall within this range. However, we do not know the actual hardware used by either provider. Token counts are directly observed; energy estimates are directional, not precise.</span>
   </div>
 
   <div class="limitation major">
@@ -233,7 +233,39 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
   </div>
 </section>
 
-<!-- WHAT HOLDS UP -->
+<!-- ENERGY PROXY -->
+<section class="section">
+  <h2 class="section-title">Token-to-Energy Proxy</h2>
+  <p class="section-subtitle">Tokens are a directional proxy for energy. Backed by published research.</p>
+
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <h3 style="color:var(--accent)">Research Basis</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      <strong>Liu et al. (2026, arXiv:2605.11733)</strong> — Position paper: "LLM Inference Should Be Evaluated as Energy-to-Token Production." Argues the ML community should report Joules/token alongside accuracy and latency. Formalizes token output as bounded by energy-per-token ceilings under fixed quality and service targets.
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>TokenPowerBench (Niu et al., AAAI 2026)</strong> — Empirical benchmarking of power consumption during LLM inference. Measures Joules/token across hardware configurations, model sizes, and inference settings. Finds 0.1–2 J/token depending on configuration.
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>Zhu &amp; Zhu (2026, arXiv:2603.28949)</strong> — "The Planetary Cost of AI Acceleration: A Thermodynamic Outlook." Frames AI scaling as a thermodynamic problem bound by Earth's finite heat capacity. The ultimate bottleneck is neither data nor capital, but the laws of thermodynamics.
+    </p>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--amber)">
+    <h3 style="color:var(--amber)">How We Apply It</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      We use token counts as a <strong>directional energy proxy</strong>. While we cannot measure exact Joules (unknown provider hardware), the ratio of tokens processed for equivalent outputs provides a lower bound on the energy ratio. If Claude processes 4× more effective tokens per successful build than DeepSeek, it consumes at least 4× more energy at comparable hardware efficiency — and likely more if Claude uses newer, higher-TDP hardware.
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>From our data:</strong> DeepSeek processed ~21,000 tokens per successful build. Claude processed ~28,000 paid tokens per build, plus an estimated 2.7M cache-read tokens that represent actual GPU compute. The energy ratio is at minimum the token ratio (1.3×) and at maximum includes cache-read processing (10×+), depending on how efficiently cached tokens are computed. This is the research gap TokenPowerBench was designed to fill — we need standardized J/token benchmarks across providers.
+    </p>
+  </div>
+
+  <div class="limitation major">
+    <span class="tag major">Open Question</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">The energy proxy is only as good as the J/token conversion factor. Without provider-specific wattage measurements, we cannot claim precise energy numbers. But the <em>direction</em> is clear: more tokens = more energy, and the token ratio between providers bounds the energy ratio. Future work: run TokenPowerBench-style measurements against both APIs.</span>
+  </div>
+</section>
 <section class="section">
   <h2 class="section-title">What Holds Up Under Scrutiny</h2>
 
