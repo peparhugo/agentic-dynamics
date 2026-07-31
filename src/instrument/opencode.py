@@ -257,19 +257,20 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
             if text_content:
                 final_texts.append(str(text_content))
 
-        # Step finish — extract token usage
+        # Step finish — extract cumulative token usage and cost
         elif etype == "step_finish":
             current_depth = max(0, current_depth - 1)
             tokens = part.get("tokens", {})
             if isinstance(tokens, dict):
-                result.prompt_tokens += tokens.get("input", 0) or 0
-                result.completion_tokens += tokens.get("output", 0) or 0
-                reasoning = tokens.get("reasoning", 0) or 0
-                result.reasoning_tokens += reasoning
-                result.total_tokens += tokens.get("total", 0) or 0
-            cost = part.get("cost", 0)
-            if isinstance(cost, (int, float)):
-                result.estimated_cost_usd += float(cost)
+                # Use cumulative session totals (each step_finish is cumulative, not incremental)
+                result.prompt_tokens = tokens.get("input", 0) or 0
+                result.completion_tokens = tokens.get("output", 0) or 0
+                result.reasoning_tokens = tokens.get("reasoning", 0) or 0
+                result.total_tokens = tokens.get("total", 0) or 0
+            # Cost is the cumulative session cost from opencode's own accounting
+            cost_val = part.get("cost", 0)
+            if isinstance(cost_val, (int, float)):
+                result.estimated_cost_usd = float(cost_val)
 
         # Parse test output from bash tool results
         if etype == "tool_use" and part.get("tool") == "bash":
