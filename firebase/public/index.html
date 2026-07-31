@@ -371,7 +371,61 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
   </div>
 </section>
 
-<!-- NEXT STEPS -->
+<!-- EXPERIMENT DESIGN -->
+<section class="section">
+  <h2 class="section-title">Experiment Design: Multifactorial Compounding</h2>
+  <p class="section-subtitle">Each session is a game-theoretic round. Perturbation is an intervention. Phase ordering reveals attractor basin depth.</p>
+
+  <div class="card" style="border-left:3px solid var(--purple)">
+    <h3 style="color:var(--purple)">Why One-Shot Experiments Are Insufficient</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      A single build→test session measures first-order effects: does the model produce correct code
+      under perturbation? But real engineering isn't one-shot. It's <strong>understand → build → refactor
+      → extend → maintain.</strong> Errors in Phase 2 compound through Phase 4. The model's policy
+      determines whether errors attenuate (conservative, re-derive constraints) or amplify
+      (exploratory, follow novel paths that diverge).
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>From game theory:</strong> each phase is a round of a repeated game. The model's policy
+      is a strategy. Perturbation is an opponent's move. We measure whether the strategy converges
+      to the correct Nash equilibrium (correct solution) or diverges into compounding error.
+      DeepSeek's RL policy was trained on outcome rewards — it converges toward correct solutions
+      even when perturbed. Claude's imitation policy was trained on coherence rewards — it converges
+      toward coherent explanations, not necessarily correct code.
+    </p>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <h3 style="color:var(--accent)">The Factorial Matrix</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      We isolate six variables in a full factorial design:
+    </p>
+    <table>
+      <thead><tr><th>Factor</th><th>Levels</th><th>What it isolates</th><th>Disciplinary lens</th></tr></thead>
+      <tbody>
+        <tr><td>Model architecture</td><td>DeepSeek MoE, Claude dense</td><td>Active params × token</td><td>Physics/hardware</td></tr>
+        <tr><td>Perturbation class</td><td>Manifold, semantic, none</td><td>Embedding distance from training manifold</td><td>Latent space geometry</td></tr>
+        <tr><td>Perturbation strength</td><td>0.3, 0.5, 0.8</td><td>Magnitude of latent-space push</td><td>Dynamical systems</td></tr>
+        <tr><td>Phase count</td><td>1, 4, 8</td><td>Error compounding over rounds</td><td>Game theory / statistics</td></tr>
+        <tr><td>Codebase size</td><td>5, 50, 500 files</td><td>Context window × cache-write tax</td><td>Economics / scaling</td></tr>
+        <tr><td>Task type</td><td>Build, Refactor, Extend, Redesign</td><td>Different energy landscapes per task</td><td>Software engineering</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">Interaction Effects We're Measuring</h3>
+    <table>
+      <thead><tr><th>Interaction</th><th>Prediction</th><th>What it tests</th></tr></thead>
+      <tbody>
+        <tr><td>Model × Phase</td><td>Claude advantage inverts at Phase 4</td><td>Does imitation policy compound errors?</td></tr>
+        <tr><td>Perturbation × Phase</td><td>Effect amplifies at later phases</td><td>Does attractor basin depth predict compounding?</td></tr>
+        <tr><td>Codebase × Model</td><td>Gap grows with codebase size</td><td>Does cache-write tax dominate at scale?</td></tr>
+        <tr><td>Perturbation × Strength</td><td>Nonlinear threshold effect</td><td>Is there a critical perturbation strength?</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
 <section class="section">
   <h2 class="section-title">What's Needed to Move from Preliminary to Publishable</h2>
 

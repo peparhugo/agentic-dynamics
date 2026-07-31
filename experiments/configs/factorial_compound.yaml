@@ -1,0 +1,70 @@
+# Full-factorial compounding experiment — isolates variables and measures interactions
+name: factorial_compound
+description: >
+  Multi-phase, multi-perturbation, compounding experiment designed to
+  isolate the effects of model architecture, perturbation class, phase
+  order, and codebase growth on strategy, cost, and correctness.
+
+  Game theory framing: each phase is a round. The model's policy is tested
+  by perturbation. Compounding effects reveal attractor basin depth.
+
+  Physics framing: tokens × active_params × hardware_TDP = energy.
+  Architecture determines the energy coefficient per token.
+
+design:
+  type: factorial
+  repetitions: 3
+  factors:
+    - model: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5]
+    - perturbation: [none, remove_critical_constraint, inject_alien_vocab]
+    - phase_count: [1, 4]
+
+phases:
+  - name: UNDERSTAND
+    prompt: >
+      Read this codebase thoroughly. Map the architecture: what are the
+      key modules, their dependencies, the data flow, and the testing
+      strategy. Report your findings in a structured format.
+
+  - name: BUILD
+    prompt: >
+      Build the specified application with all features and tests.
+      Write production-quality code. Run the tests and fix any failures.
+
+  - name: REFACTOR
+    prompt: >
+      The previous session built this application. Refactor one module
+      to improve separation of concerns, reduce coupling, or improve
+      testability. Do not change the external API. Run all tests
+      before and after — no regressions.
+
+  - name: EXTEND
+    prompt: >
+      The previous sessions built and refactored this application.
+      Add a new feature: real-time notifications via WebSocket.
+      Update existing tests. Add new tests for the notification system.
+      Run the full test suite.
+
+task: >
+  Build a team collaboration platform: user auth with JWT, project CRUD,
+  tasks within projects, comments on tasks, file attachments (store paths),
+  team member roles (admin/member/viewer), paginated list endpoints,
+  search/filter, and comprehensive pytest tests. Use Python/Flask + SQLAlchemy.
+
+constraints:
+  - JWT authentication with refresh tokens
+  - Project CRUD with task nesting
+  - Comment threading on tasks
+  - File attachment support
+  - Role-based access (admin/member/viewer)
+  - Pagination on all list endpoints
+  - Search and filter on tasks by status/priority/assignee
+  - Comprehensive test coverage
+
+operators:
+  - remove_critical_constraint
+  - inject_alien_vocab
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
