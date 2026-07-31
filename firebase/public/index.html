@@ -3,249 +3,251 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reasoning Topology — Experimental Results</title>
+<title>Reasoning Topology — Outcomes per Joule</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 :root {
-  --bg: #090a0f; --surface-1: #111318; --surface-2: #161920; --surface-3: #1c1f28;
+  --bg: #090a0f; --surface-1: #111318; --surface-2: #161920;
   --border: rgba(255,255,255,0.06); --border-strong: rgba(255,255,255,0.12);
   --text: #e3e6ed; --text-secondary: #9599a6; --text-tertiary: #6b6f7b;
-  --accent: #4e8cff; --accent-glow: rgba(78,140,255,0.12);
-  --green: #3ecf8e; --green-glow: rgba(62,207,142,0.12);
-  --amber: #f0b34b; --amber-glow: rgba(240,179,75,0.12);
-  --red: #f25c5c; --red-glow: rgba(242,92,92,0.12);
-  --purple: #9b6dff;
+  --accent: #4e8cff; --green: #3ecf8e; --amber: #f0b34b; --red: #f25c5c; --purple: #9b6dff;
 }
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color:var(--text); line-height:1.7; -webkit-font-smoothing:antialiased;
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); line-height:1.7; -webkit-font-smoothing:antialiased;
   background-image: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(78,140,255,0.06), transparent),
     radial-gradient(ellipse 50% 40% at 80% 80%, rgba(62,207,142,0.04), transparent); }
 .container { max-width:1040px; margin:0 auto; padding:0 2rem; }
 
-.hero { padding:4rem 0 2.5rem; text-align:center; position:relative; }
-.hero::after { content:''; position:absolute; bottom:0; left:50%; transform:translateX(-50%);
-  width:200px; height:1px; background:linear-gradient(90deg,transparent,var(--border-strong),transparent); }
-.hero .badge { display:inline-block; padding:0.35rem 1rem; background:var(--green-glow);
-  border:1px solid rgba(62,207,142,0.2); border-radius:100px; font-size:0.8rem; font-weight:600;
-  letter-spacing:0.5px; color:var(--green); margin-bottom:1.2rem; text-transform:uppercase; }
-.hero h1 { font-size:2.8rem; font-weight:800; letter-spacing:-1.5px; line-height:1.1;
-  background:linear-gradient(135deg,#e3e6ed,#9599a6,#c9d1d9); -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent; margin-bottom:0.8rem; }
-.hero .subtitle { font-size:1.05rem; color:var(--text-secondary); font-weight:400; max-width:650px; margin:0 auto; }
-.hero .meta { margin-top:1rem; font-size:0.82rem; color:var(--text-tertiary); font-family:'JetBrains Mono',monospace; }
+.hero { padding:5rem 0 3rem; text-align:center; }
+.hero .label { display:inline-block; padding:0.3rem 1rem; background:rgba(155,109,255,0.1); border:1px solid rgba(155,109,255,0.2);
+  border-radius:100px; font-size:0.78rem; font-weight:600; letter-spacing:0.5px; color:var(--purple); margin-bottom:1.2rem; text-transform:uppercase; }
+.hero h1 { font-size:3rem; font-weight:800; letter-spacing:-1.5px; line-height:1.15; margin-bottom:1rem; }
+.hero h1 .gradient { background:linear-gradient(135deg,#e3e6ed,#9599a6,#c9d1d9); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero h1 .green { color:var(--green); -webkit-text-fill-color:var(--green); }
+.hero .subtitle { font-size:1.1rem; color:var(--text-secondary); max-width:700px; margin:0 auto 1.5rem; }
+.hero .thesis { font-size:0.9rem; color:var(--amber); font-weight:500; max-width:650px; margin:0 auto; padding:0.8rem 1.2rem;
+  background:rgba(240,179,75,0.06); border:1px solid rgba(240,179,75,0.15); border-radius:8px; }
 
-.section { padding:3rem 0; }
-.section-title { font-size:1.4rem; font-weight:700; letter-spacing:-0.3px; margin-bottom:0.4rem; color:#fff; }
-.section-subtitle { color:var(--text-secondary); font-size:0.9rem; margin-bottom:1.5rem; }
+.section { padding:3.5rem 0; }
+.section-title { font-size:1.35rem; font-weight:700; margin-bottom:0.3rem; color:#fff; }
+.section-subtitle { color:var(--text-secondary); font-size:0.88rem; margin-bottom:1.5rem; }
 
-.card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:1.5rem; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
-.card-accent { border-left:3px solid var(--accent); }
-.card-green { border-left:3px solid var(--green); }
-.card-amber { border-left:3px solid var(--amber); }
+.metric-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin:1.5rem 0; }
+.metric { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:1.2rem; text-align:center; position:relative; overflow:hidden; }
+.metric::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.metric.green::before { background:var(--green); }
+.metric.amber::before { background:var(--amber); }
+.metric.red::before { background:var(--red); }
+.metric.accent::before { background:var(--accent); }
+.metric .value { font-size:1.8rem; font-weight:800; font-family:'JetBrains Mono',monospace; margin:0.3rem 0; }
+.metric .value.green { color:var(--green); } .metric .value.amber { color:var(--amber); }
+.metric .value.red { color:var(--red); } .metric .value.accent { color:var(--accent); }
+.metric .label { font-size:0.72rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.8px; }
+.metric .sub { font-size:0.75rem; color:var(--text-secondary); margin-top:0.25rem; }
 
-.stat-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin:1rem 0; }
-.stat { background:var(--surface-1); border:1px solid var(--border); border-radius:10px; padding:1.2rem; text-align:center; position:relative; overflow:hidden; }
-.stat::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
-.stat.accent::before { background:var(--accent); }
-.stat.green::before { background:var(--green); }
-.stat.amber::before { background:var(--amber); }
-.stat.red::before { background:var(--red); }
-.stat-value { font-size:2rem; font-weight:800; font-family:'JetBrains Mono',monospace; }
-.stat-value.green { color:var(--green); }
-.stat-value.amber { color:var(--amber); }
-.stat-value.accent { color:var(--accent); }
-.stat-value.red { color:var(--red); }
-.stat-label { font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:1px; margin-top:0.25rem; }
-.stat-sub { font-size:0.78rem; color:var(--text-secondary); margin-top:0.3rem; }
-
-table { width:100%; border-collapse:collapse; font-size:0.85rem; margin:1rem 0; }
-thead th { text-align:left; padding:0.7rem 1rem; color:var(--text-secondary); font-weight:600; font-size:0.72rem;
-  text-transform:uppercase; letter-spacing:0.6px; border-bottom:2px solid var(--border-strong); background:var(--surface-2); }
-tbody td { padding:0.6rem 1rem; border-bottom:1px solid var(--border); color:var(--text); }
+table { width:100%; border-collapse:collapse; font-size:0.84rem; margin:1rem 0; }
+thead th { text-align:left; padding:0.65rem 0.9rem; color:var(--text-secondary); font-weight:600; font-size:0.7rem;
+  text-transform:uppercase; letter-spacing:0.5px; border-bottom:2px solid var(--border-strong); background:var(--surface-2); }
+tbody td { padding:0.55rem 0.9rem; border-bottom:1px solid var(--border); }
 tbody tr:hover { background:var(--surface-2); }
-td.num { font-family:'JetBrains Mono',monospace; }
+td.n { font-family:'JetBrains Mono',monospace; }
+td.win { color:var(--green); }
+td.lose { color:var(--red); }
 
-.finding { padding:1.2rem; margin:0.8rem 0; background:var(--surface-1); border-radius:10px; border:1px solid var(--border); }
-.finding .tag { display:inline-block; padding:0.2rem 0.6rem; border-radius:4px; font-size:0.7rem; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; margin-right:0.5rem; }
-.finding .text { color:var(--text-secondary); font-size:0.88rem; margin-top:0.4rem; }
+.card { background:var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:1.5rem; margin-bottom:1.2rem; box-shadow:0 1px 3px rgba(0,0,0,0.4); }
+.card h3 { font-size:0.95rem; margin-bottom:0.8rem; }
 
-.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; }
+.finding { padding:1rem 1.2rem; margin:0.6rem 0; border-radius:8px; border:1px solid var(--border); background:var(--surface-1); }
+.finding .icon { font-size:1.1rem; margin-right:0.4rem; }
 
-.chart-row { display:flex; align-items:center; margin:0.4rem 0; }
-.chart-label { width:130px; text-align:right; padding-right:0.8rem; font-size:0.8rem; color:var(--text-secondary); }
-.chart-track { flex:1; height:8px; background:var(--surface-2); border-radius:4px; overflow:hidden; }
-.chart-fill { height:100%; border-radius:4px; }
-.chart-val { margin-left:0.6rem; font-size:0.75rem; font-weight:600; font-family:'JetBrains Mono',monospace; min-width:50px; }
+.big-number { text-align:center; padding:2rem 0; }
+.big-number .value { font-size:4rem; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--green); }
+.big-number .label { font-size:1rem; color:var(--text-secondary); margin-top:-0.3rem; }
 
 footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); color:var(--text-tertiary); font-size:0.8rem; }
 
-@media (max-width:768px) { .hero h1 { font-size:1.8rem; } .grid-2 { grid-template-columns:1fr; } .container { padding:0 1rem; } }
+@media (max-width:768px) { .metric-grid { grid-template-columns:1fr 1fr; } .hero h1 { font-size:1.8rem; } .container { padding:0 1rem; } }
 </style>
 </head>
 <body>
 
 <div class="hero">
-  <div class="badge">Experimental Data · July 31, 2026</div>
-  <h1>Reasoning Topology Instrument</h1>
-  <p class="subtitle">Measuring how language models explore unfamiliar reasoning trajectories — and what it costs. Multi-model, agentic, with worktree isolation.</p>
-  <p class="meta">DeepSeek v4 Pro vs Claude Fable 5 · 74 experiment sessions · 1.3M effective tokens</p>
+  <div class="label">Research Question</div>
+  <h1><span class="gradient">Which model produces more</span><br><span class="green">useful work per joule?</span></h1>
+  <p class="subtitle">74 experiment sessions · 45 DeepSeek v4 Pro · 17 Claude Fable 5
+    <br>Agentic execution via opencode · Isolated git worktrees per session</p>
+  <p class="thesis">We are paying more to heat the planet faster for the same result.
+    The metric that matters isn't benchmark accuracy — it's successful outcomes per unit of energy.</p>
 </div>
 
 <div class="container">
 
-<!-- HEADLINE -->
+<!-- THE HEADLINE METRIC -->
+<div class="big-number">
+  <div class="value">52x</div>
+  <div class="label">more successful builds per dollar · 3x more per joule</div>
+</div>
+
+<!-- KEY METRICS -->
+<div class="metric-grid">
+  <div class="metric green">
+    <div class="label">Successful builds</div>
+    <div class="value green">40 / 16</div>
+    <div class="sub">DeepSeek 40 · Claude 16 · both 89%+ rate</div>
+  </div>
+  <div class="metric amber">
+    <div class="label">Energy per build</div>
+    <div class="value amber">3.9 KJ</div>
+    <div class="sub">DeepSeek 3.9 kJ · Claude 11.8 kJ · 3x gap</div>
+  </div>
+  <div class="metric red">
+    <div class="label">Cost per build</div>
+    <div class="value red">$0.015</div>
+    <div class="sub">DeepSeek $0.015 · Claude $0.74 · 49x gap</div>
+  </div>
+  <div class="metric accent">
+    <div class="label">Cost per kWh</div>
+    <div class="value accent">$14.01</div>
+    <div class="sub">DeepSeek $14 · Claude $239 · 17x pricing markup</div>
+  </div>
+</div>
+
+<!-- THE RESEARCH QUESTION -->
 <section class="section">
-  <div class="stat-grid">
-    <div class="stat green">
-      <div class="stat-value green">$0.022</div>
-      <div class="stat-label">DeepSeek $/M Tokens</div>
-      <div class="stat-sub">Dashboard: $7.38 / 337M</div>
-    </div>
-    <div class="stat amber">
-      <div class="stat-value amber">$10–50</div>
-      <div class="stat-label">Claude $/M Tokens</div>
-      <div class="stat-sub">Dashboard: $13.19 MTD</div>
-    </div>
-    <div class="stat red">
-      <div class="stat-value red">2,600x</div>
-      <div class="stat-label">Cost Factor @ 500 files</div>
-      <div class="stat-sub">Modeled from experiment data</div>
-    </div>
-    <div class="stat accent">
-      <div class="stat-value accent">59x</div>
-      <div class="stat-label">Measured Factor</div>
-      <div class="stat-sub">4-phase iterative build (5 files)</div>
-    </div>
+  <h2 class="section-title">The Research Question</h2>
+  <p class="section-subtitle">AI inference is a thermodynamic process. Every token is heat. The question isn't which model is smarter — it's which model delivers correct work at lower thermal cost.</p>
+
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">H₁ — The Alternative Hypothesis</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem">
+      RL-trained reasoning policies (DeepSeek R1's GRPO) compress reasoning into latent-space navigation
+      during training rather than burning inference-time tokens on explicit chain-of-thought. This produces
+      <strong>more correct solutions per joule</strong> than imitation-trained policies (Claude, OpenAI)
+      because imitation models search the output space while RL models navigate the latent space.
+    </p>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--amber)">
+    <h3 style="color:var(--amber)">H₀ — The Null Hypothesis</h3>
+    <p style="color:var(--text-secondary);font-size:0.88rem">
+      Training regime has no effect on thermodynamic efficiency. All models produce equivalent
+      useful work per unit of energy consumed. Cost differences are purely pricing artifacts.
+    </p>
   </div>
 </section>
 
-<!-- EXPERIMENT RESULTS -->
+<!-- THE ENERGY MATH -->
 <section class="section">
-  <h2 class="section-title">Experiment Results</h2>
-  <p class="section-subtitle">Agentic execution via opencode. Each session in an isolated git worktree. Correctness = heuristic code quality score.</p>
-
-  <div class="card" style="margin-bottom:1.5rem">
-    <h3 style="font-size:0.95rem;color:var(--accent);margin-bottom:0.8rem">4-Phase Iterative Development</h3>
-    <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:1rem">Build a collaboration platform across 4 sessions: initial build → refactor storage → add WebSocket notifications → verify. Each session builds on the previous codebase.</p>
-    <table>
-      <thead><tr><th>Phase</th><th>DeepSeek Cost</th><th>Claude Cost</th><th>DeepSeek Tools</th><th>Claude Tools</th></tr></thead>
-      <tbody>
-        <tr><td>1. Build</td><td class="num" style="color:var(--green)">$0.0245</td><td class="num" style="color:var(--amber)">$1.8914</td><td class="num">25</td><td class="num">18</td></tr>
-        <tr><td>2. Refactor</td><td class="num" style="color:var(--green)">$0.0279</td><td class="num" style="color:var(--amber)">$1.6329</td><td class="num">34</td><td class="num">30</td></tr>
-        <tr><td>3. Add Feature</td><td class="num" style="color:var(--green)">$0.0194</td><td class="num" style="color:var(--amber)">$1.1517</td><td class="num">26</td><td class="num">26</td></tr>
-        <tr><td>4. Verify</td><td class="num" style="color:var(--green)">$0.0334</td><td class="num" style="color:var(--amber)">$0.4131</td><td class="num">39</td><td class="num">9</td></tr>
-        <tr style="font-weight:700"><td>TOTAL</td><td class="num" style="color:var(--green)">$0.1052</td><td class="num" style="color:var(--red)">$5.0891</td><td class="num">124</td><td class="num">83</td></tr>
-      </tbody>
-    </table>
-    <p style="color:var(--red);font-size:0.82rem;margin-top:0.5rem">Factor: 48x. Claude also spawned an explore subagent (+$1.08) that DeepSeek didn't need.</p>
-  </div>
-
-  <div class="card" style="margin-bottom:1.5rem">
-    <h3 style="font-size:0.95rem;color:var(--accent);margin-bottom:0.8rem">URL Shortener (Single Build)</h3>
-    <table>
-      <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th></tr></thead>
-      <tbody>
-        <tr><td>Sessions</td><td class="num">25</td><td class="num">8</td></tr>
-        <tr><td>Total Cost</td><td class="num" style="color:var(--green)">$0.2071</td><td class="num" style="color:var(--amber)">$4.1098</td></tr>
-        <tr><td>Avg Cost/Session</td><td class="num" style="color:var(--green)">$0.008</td><td class="num" style="color:var(--amber)">$0.514</td></tr>
-        <tr><td>Effective Tokens</td><td class="num">314,264</td><td class="num">167,659</td></tr>
-        <tr><td>$/Mtok (effective)</td><td class="num" style="color:var(--green)">$0.66</td><td class="num" style="color:var(--amber)">$24.51</td></tr>
-      </tbody>
-    </table>
-    <p style="color:var(--red);font-size:0.82rem;margin-top:0.5rem">Factor: 20x. Claude's costs dominated by cache writes (130K tokens), not productive output.</p>
-  </div>
-
-  <div class="card">
-    <h3 style="font-size:0.95rem;color:var(--accent);margin-bottom:0.8rem">Task Manager (JWT + CRUD + Tests)</h3>
-    <table>
-      <thead><tr><th>Perturbation</th><th>DeepSeek Cost</th><th>Strategy</th><th>Claude Cost</th><th>Strategy</th></tr></thead>
-      <tbody>
-        <tr><td>Baseline</td><td class="num" style="color:var(--green)">$0.0007</td><td>conservative</td><td class="num" style="color:var(--amber)">$0.6456</td><td>conservative</td></tr>
-        <tr><td>inject_alien_vocab</td><td class="num" style="color:var(--green)">$0.0003</td><td>conservative</td><td class="num" style="color:var(--amber)">$0.1438</td><td style="color:var(--red)">0 tools</td></tr>
-        <tr><td>remove_critical_constraint</td><td class="num" style="color:var(--green)">$0.0003</td><td>conservative</td><td class="num" style="color:var(--amber)">$1.2564</td><td>conservative</td></tr>
-        <tr><td>shift_framing</td><td class="num" style="color:var(--green)">$0.0003</td><td>conservative</td><td class="num" style="color:var(--amber)">$0.2190</td><td style="color:var(--red)">0 tools</td></tr>
-      </tbody>
-    </table>
-    <p style="color:var(--red);font-size:0.82rem;margin-top:0.5rem">Claude produced 0 tool calls on 2/3 perturbed runs — spent money building nothing. DeepSeek built real apps on every run.</p>
-  </div>
-</section>
-
-<!-- KEY FINDINGS -->
-<section class="section">
-  <h2 class="section-title">Key Findings</h2>
-  <p class="section-subtitle">From 74 experiment sessions across 4 experiment types.</p>
-
-  <div class="finding" style="border-left:3px solid var(--red)">
-    <span class="tag" style="background:var(--red-glow);color:var(--red)">STRATEGIC FAILURE</span>
-    <div class="text">Claude Fable 5 produced <strong>0 tool calls</strong> on 40% of perturbed runs. It defaulted to explaining architecture rather than building it. DeepSeek built working code on 92% of all runs regardless of perturbation. The RL-vs-imitation policy difference manifests as agentic behavior: one model abandons the task, the other pushes through.</div>
-  </div>
-
-  <div class="finding" style="border-left:3px solid var(--green)">
-    <span class="tag" style="background:var(--green-glow);color:var(--green)">COST COMPOUNDING</span>
-    <div class="text">The cost factor starts at ~20x on tiny tasks (5 files, URL shortener) and compounds to <strong>59x on iterative development</strong> (4-phase build). Modeled at a 500-file production codebase: <strong>2,600x</strong>. Claude's cache-write tax compounds because every new session re-reads the growing codebase. DeepSeek's cost stays flat — it only processes the tokens it needs.</div>
-  </div>
-
-  <div class="finding" style="border-left:3px solid var(--amber)">
-    <span class="tag" style="background:var(--amber-glow);color:var(--amber)">PERTURBATION RESPONSE</span>
-    <div class="text">When constraints are removed, DeepSeek burns <strong>87% more tokens</strong> re-deriving them (constraint awareness). Claude simplifies — fewer tools, shallower depth. When alien vocabulary is injected, DeepSeek explores with higher depth and the only retry observed. Claude stops building entirely. The models have fundamentally different strategies for handling unexpected inputs.</div>
-  </div>
-</section>
-
-<!-- METHODOLOGY -->
-<section class="section">
-  <h2 class="section-title">Methodology</h2>
-  <p class="section-subtitle">How the instrument works.</p>
-
-  <div class="grid-2">
-    <div class="card card-green">
-      <h3 style="font-size:0.9rem;margin-bottom:0.5rem">Agentic Execution</h3>
-      <p style="color:var(--text-secondary);font-size:0.85rem">Each experiment spawns an isolated <code style="background:var(--surface-2);padding:0.1rem 0.4rem;border-radius:3px;color:var(--green)">opencode run</code> session with git-initialized worktree. The model writes files, runs tests, iterates on failures. No raw API calls — real agentic behavior with tool-call tracing.</p>
-    </div>
-    <div class="card card-accent">
-      <h3 style="font-size:0.9rem;margin-bottom:0.5rem">10 Perturbation Operators</h3>
-      <p style="color:var(--text-secondary);font-size:0.85rem">Calibrated operators at strengths 0.0–1.0. Classified as <strong style="color:var(--green)">manifold</strong> (alien vocab, framing shifts, causality inversion — push embeddings off-manifold) or <strong style="color:var(--amber)">semantic</strong> (false premises, missing constraints, contradictions — test reasoning quality within the learned manifold).</p>
-    </div>
-    <div class="card">
-      <h3 style="font-size:0.9rem;margin-bottom:0.5rem">Output-Based Measurement</h3>
-      <p style="color:var(--text-secondary);font-size:0.85rem">Measures what was <em>built</em>, not what was <em>said</em>. Architecture divergence (different tech choices?), structure divergence (different code organization?), correctness, constraint satisfaction. Escape = did the model produce a structurally different solution?</p>
-    </div>
-    <div class="card">
-      <h3 style="font-size:0.9rem;margin-bottom:0.5rem">Cost Accounting</h3>
-      <p style="color:var(--text-secondary);font-size:0.85rem">Uses opencode's cumulative session cost — not derived token math. Captures cache writes, reasoning tokens, and total session cost. Tracks $/Mtok, $/correct build, and energy estimates per session.</p>
-    </div>
-  </div>
-</section>
-
-<!-- COST MODELING -->
-<section class="section">
-  <h2 class="section-title">Cost Scaling Projection</h2>
-  <p class="section-subtitle">Modeled from experiment data. Claude costs grow linearly with codebase size (cache-write tax). DeepSeek stays flat.</p>
+  <h2 class="section-title">The Energy Math</h2>
+  <p class="section-subtitle">Computed from opencode database. Token counts × energy coefficients (H100-class: 0.08 J/input tok, 0.23 J/output tok, 0.47 J/reasoning tok, 0.05 J/cache tok).</p>
 
   <table>
-    <thead><tr><th>Codebase Size</th><th>DeepSeek/Session</th><th>Claude/Session</th><th>Cost Factor</th></tr></thead>
+    <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th></tr></thead>
     <tbody>
-      <tr><td>5 files (our experiments)</td><td class="num" style="color:var(--green)">$0.0115</td><td class="num">$0.55</td><td class="num" style="color:var(--amber)">48x</td></tr>
-      <tr><td>20 files</td><td class="num" style="color:var(--green)">$0.0115</td><td class="num">$1.45</td><td class="num" style="color:var(--amber)">126x</td></tr>
-      <tr><td>50 files</td><td class="num" style="color:var(--green)">$0.0115</td><td class="num">$3.25</td><td class="num" style="color:var(--amber)">283x</td></tr>
-      <tr><td>100 files (typical repo)</td><td class="num" style="color:var(--green)">$0.0115</td><td class="num">$6.25</td><td class="num" style="color:var(--red)">543x</td></tr>
-      <tr><td>500 files (production)</td><td class="num" style="color:var(--green)">$0.0115</td><td class="num">$30.25</td><td class="num" style="color:var(--red)">2,630x</td></tr>
+      <tr><td>Experiment sessions</td><td class="n">45</td><td class="n">17</td></tr>
+      <tr><td>Code-producing sessions</td><td class="n win">40</td><td class="n win">16</td></tr>
+      <tr><td>Build success rate</td><td class="n win">89%</td><td class="n win">94%</td></tr>
+      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Token Accounting —</td></tr>
+      <tr><td>Input tokens processed</td><td class="n">505,881</td><td class="n">310</td></tr>
+      <tr><td>Output tokens produced</td><td class="n">317,730</td><td class="n">113,106</td></tr>
+      <tr><td>Reasoning tokens</td><td class="n">87,999</td><td class="n">— (internal)</td></tr>
+      <tr><td>Cache reads (context reprocessing)</td><td class="n">—</td><td class="n lose">2,722,702</td></tr>
+      <tr><td>Cache writes (context storage)</td><td class="n">—</td><td class="n lose">332,779</td></tr>
+      <tr><td>Effective tokens (total work)</td><td class="n">911,610</td><td class="n lose">3,168,897</td></tr>
+      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Energy —</td></tr>
+      <tr><td>Total energy consumed</td><td class="n win">154.9 kJ</td><td class="n lose">188.8 kJ</td></tr>
+      <tr><td>kWh equivalent</td><td class="n win">0.043 kWh</td><td class="n lose">0.052 kWh</td></tr>
+      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Cost —</td></tr>
+      <tr><td>Total cost</td><td class="n win">$0.60</td><td class="n lose">$12.54</td></tr>
+      <tr><td>Effective $/Mtok</td><td class="n win">$0.66</td><td class="n lose">$3.96</td></tr>
+      <tr><td>Cost per kWh of compute</td><td class="n win">$14.01</td><td class="n lose">$239.13</td></tr>
+      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— The Metrics That Matter —</td></tr>
+      <tr><td><strong>Successful builds per $</strong></td><td class="n win"><strong>66</strong></td><td class="n lose"><strong>1.3</strong></td></tr>
+      <tr><td><strong>Successful builds per MJ</strong></td><td class="n win"><strong>258</strong></td><td class="n lose"><strong>85</strong></td></tr>
+      <tr><td><strong>Joules per successful build</strong></td><td class="n win"><strong>3,873</strong></td><td class="n lose"><strong>11,800</strong></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- THE FINDINGS -->
+<section class="section">
+  <h2 class="section-title">What the Heat Costs</h2>
+  <p class="section-subtitle">Extrapolated from experiment data to production scale.</p>
+
+  <div class="finding">
+    <span class="icon">⚡</span>
+    <strong>1,000 agentic builds:</strong> DeepSeek uses 1.1 kWh. Claude uses 3.3 kWh. Claude generates 2.2 kWh of additional waste heat — the equivalent of running a microwave for 2+ extra hours. At $0.12/kWh, that's $0.26 in pure electricity waste.
+  </div>
+
+  <div class="finding">
+    <span class="icon">🔥</span>
+    <strong>1,000,000 builds:</strong> DeepSeek uses 1.08 MWh. Claude uses 3.28 MWh. The 2.2 MWh difference is enough to power 2 average US homes for a month. At data-center scale (millions of builds/day), this becomes megawatts of avoidable thermal discharge.
+  </div>
+
+  <div class="finding">
+    <span class="icon">💰</span>
+    <strong>The pricing disconnect:</strong> Claude's infrastructure costs $239 per kWh of compute delivered. DeepSeek's costs $14 per kWh. The 17x markup isn't hardware — it's pricing model. Claude charges for the full context window every session via cache writes ($10/input MTok), while DeepSeek only charges for tokens actually processed ($0.27/input MTok).
+  </div>
+
+  <div class="finding">
+    <span class="icon">🧠</span>
+    <strong>Perturbation survival:</strong> When given perturbed prompts (alien vocabulary, missing constraints, inverted framing), Claude abandoned building entirely on 40% of runs — producing 0 tool calls and text-only responses. DeepSeek built working code on 92% of all runs regardless of perturbation. Claude spent $0.14–0.22 per abandoned session producing nothing. Heat without work.
+  </div>
+</section>
+
+<!-- THE TRUE RATIO -->
+<section class="section">
+  <h2 class="section-title">The True Ratio</h2>
+
+  <table>
+    <thead><tr><th>What we measured</th><th>DeepSeek</th><th>Claude</th><th>Ratio</th></tr></thead>
+    <tbody>
+      <tr><td>Successful builds per dollar</td><td class="n win">66</td><td class="n">1.3</td><td class="n">52x</td></tr>
+      <tr><td>Successful builds per joule</td><td class="n win">258/MJ</td><td class="n">85/MJ</td><td class="n">3x</td></tr>
+      <tr><td>Joules per successful build</td><td class="n win">3,873</td><td class="n lose">11,800</td><td class="n">3x</td></tr>
+      <tr><td>Cost per kWh</td><td class="n win">$14</td><td class="n lose">$239</td><td class="n">17x</td></tr>
+      <tr><td>Heat waste per 1K builds</td><td class="n win">1.1 kWh</td><td class="n lose">3.3 kWh</td><td class="n">3x</td></tr>
+      <tr><td>Perturbation survival</td><td class="n win">92%</td><td class="n lose">60%</td><td class="n">1.5x</td></tr>
     </tbody>
   </table>
 
-  <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:1rem">
-    <strong>Dashboard-verified:</strong> DeepSeek processed 337M tokens for $7.38 ($0.022/Mtok).
-    Claude Fable 5 costs $10–50/Mtok. The asymptotic real-world factor is <strong>700–3,500x</strong>,
-    consistent with the modeled projection above 500 files. The experimental factor of 21–59x
-    measures at the smallest possible codebase where Claude's session minimum dominates.
-  </p>
+  <div class="card" style="margin-top:1.5rem;border:2px solid var(--green);background:linear-gradient(135deg,var(--surface-1),rgba(62,207,142,0.04))">
+    <p style="font-size:1.1rem;font-weight:600;color:var(--green);text-align:center">
+      The experiment-level factor of 3–52x measures at the smallest possible codebase
+      (5 files). As codebase size grows, Claude's cache-write tax compounds — every
+      new session re-reads the full growing context. Modeled at 500 files: 2,600x.
+      Dashboard-verified pricing: $0.022/Mtok vs $10–50/Mtok = 700–3,500x real-world.
+    </p>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section">
+  <h2 class="section-title">How the Instrument Works</h2>
+  <p class="section-subtitle">The measurement pipeline — from perturbation to thermodynamic verdict.</p>
+
+  <table>
+    <thead><tr><th>Step</th><th>What happens</th><th>What's measured</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td>Perturbation operator applied to task prompt (10 operators, 2 classes, calibrated strengths)</td><td>Operator name, class (manifold/semantic), strength</td></tr>
+      <tr><td class="n">2</td><td>Opencode agentic session spawned in isolated git worktree</td><td>Files created, git diff, tool call trace</td></tr>
+      <tr><td class="n">3</td><td>Model builds solution: writes code, runs tests, iterates on failures</td><td>Tool calls, retry loops, iteration depth, test pass/fail</td></tr>
+      <tr><td class="n">4</td><td>Solution evaluated: correctness, constraints, complexity, novelty vs baseline</td><td>Composite quality score, constraint satisfaction, code metrics</td></tr>
+      <tr><td class="n">5</td><td>Cost and energy computed from opencode's cumulative session accounting</td><td>$ total, $/Mtok, Joules, J/build, builds/$</td></tr>
+      <tr><td class="n">6</td><td>Strategy classified: conservative / exploratory / wasteful / efficient</td><td>Strategy type, thermal efficiency, exploration premium</td></tr>
+    </tbody>
+  </table>
 </section>
 
 </div>
 
 <footer>
   <div class="container">
-    <p>Reasoning Topology Instrument · v0.1 · July 2026</p>
-    <p style="margin-top:0.2rem"><a href="https://github.com/peparhugo/reasoning-instrument" style="color:var(--accent)">github.com/peparhugo/reasoning-instrument</a> · Standalone pip package · Decoupled from dreamlab</p>
+    <p>Reasoning Topology Instrument · v0.2 · July 31, 2026</p>
+    <p style="margin-top:0.2rem">
+      <a href="https://github.com/peparhugo/reasoning-instrument" style="color:var(--accent)">GitHub</a> ·
+      74 sessions · DeepSeek v4 Pro vs Claude Fable 5 · Agentic opencode backend
+    </p>
   </div>
 </footer>
 
