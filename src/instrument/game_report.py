@@ -127,9 +127,11 @@ class GameReport:
                 f"| Metric | Value |",
                 f"|--------|-------|",
                 f"| Escape score | {r.escape_score:.3f} |",
-                f"| Recovery ratio | {r.recovery_ratio:.3f} |",
-                f"| Initial distance | {r.initial_distance:.3f} |",
-                f"| Final distance | {r.final_distance:.3f} |",
+                f"| Architecture div | {r.architecture_divergence:.3f} |",
+                f"| Structure div | {r.structure_divergence:.3f} |",
+                f"| Thinking ratio | {r.thinking_ratio:.1%} |",
+                f"| Quality/$ | {r.quality_per_dollar:,.0f} |",
+                f"| Quality/J | {r.quality_per_joule:.4f} |",
                 f"| Converged back | {r.converged_back} |",
             ]
             if self.repetitions > 1:
