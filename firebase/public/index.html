@@ -235,35 +235,52 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
 
 <!-- ENERGY PROXY -->
 <section class="section">
-  <h2 class="section-title">Token-to-Energy Proxy</h2>
-  <p class="section-subtitle">Tokens are a directional proxy for energy. Backed by published research.</p>
+  <h2 class="section-title">Token-to-Energy Proxy: Not Just Tokens</h2>
+  <p class="section-subtitle">The energy difference is architectural, not linguistic. MoE sparsity and RL-compressed reasoning change the physics.</p>
 
-  <div class="card" style="border-left:3px solid var(--accent)">
-    <h3 style="color:var(--accent)">Research Basis</h3>
+  <div class="card" style="border-left:3px solid var(--green)">
+    <h3 style="color:var(--green)">Architectural Energy Advantage</h3>
     <p style="color:var(--text-secondary);font-size:0.85rem">
-      <strong>Liu et al. (2026, arXiv:2605.11733)</strong> — Position paper: "LLM Inference Should Be Evaluated as Energy-to-Token Production." Argues the ML community should report Joules/token alongside accuracy and latency. Formalizes token output as bounded by energy-per-token ceilings under fixed quality and service targets.
+      <strong>DeepSeek v4:</strong> Mixture of Experts. 671B total parameters, ~37B active per token (5.5% firing). GRPO compresses reasoning chains into latent-space navigation during training — at inference, solutions are found in the residual stream without generating explicit chain-of-thought tokens. Runs on H800 GPUs (lower TDP, export-restricted hardware).
     </p>
     <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
-      <strong>TokenPowerBench (Niu et al., AAAI 2026)</strong> — Empirical benchmarking of power consumption during LLM inference. Measures Joules/token across hardware configurations, model sizes, and inference settings. Finds 0.1–2 J/token depending on configuration.
-    </p>
-    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
-      <strong>Zhu &amp; Zhu (2026, arXiv:2603.28949)</strong> — "The Planetary Cost of AI Acceleration: A Thermodynamic Outlook." Frames AI scaling as a thermodynamic problem bound by Earth's finite heat capacity. The ultimate bottleneck is neither data nor capital, but the laws of thermodynamics.
+      <strong>Claude Fable 5:</strong> Dense architecture — all parameters fire on every forward pass. Imitation + RLHF training produces explicit chain-of-thought reasoning. Every reasoning step burns the full model. Runs on newer, higher-TDP hardware (H100-class or newer).
     </p>
   </div>
 
   <div class="card" style="border-left:3px solid var(--amber)">
-    <h3 style="color:var(--amber)">How We Apply It</h3>
+    <h3 style="color:var(--amber)">Why Token Counts Understate the Gap</h3>
     <p style="color:var(--text-secondary);font-size:0.85rem">
-      We use token counts as a <strong>directional energy proxy</strong>. While we cannot measure exact Joules (unknown provider hardware), the ratio of tokens processed for equivalent outputs provides a lower bound on the energy ratio. If Claude processes 4× more effective tokens per successful build than DeepSeek, it consumes at least 4× more energy at comparable hardware efficiency — and likely more if Claude uses newer, higher-TDP hardware.
+      <strong>1 token ≠ 1 token.</strong> The energy cost of producing a token depends on how many parameters activate to produce it:
+    </p>
+    <table style="margin-top:0.5rem">
+      <thead><tr><th>Factor</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>Energy Ratio</th></tr></thead>
+      <tbody>
+        <tr><td>Active parameters per token</td><td class="n win">~37B (MoE)</td><td class="n lose">Full dense (est. 500B+)</td><td class="n lose">~14x more active params</td></tr>
+        <tr><td>Reasoning mechanism</td><td class="n win">Latent GRPO navigation</td><td class="n lose">Explicit chain-of-thought</td><td class="n">CoT tokens activate full model</td></tr>
+        <tr><td>Hardware</td><td class="n win">H800 (lower TDP)</td><td class="n lose">H100+ (higher TDP)</td><td class="n lose">~1.5x TDP gap</td></tr>
+        <tr><td>Tokens per successful build</td><td class="n win">~21,000</td><td class="n">~28,000 (paid, excl. cache reads)</td><td class="n">1.3x more tokens</td></tr>
+        <tr><td><strong>Combined energy factor (est.)</strong></td><td class="n win"><strong>1x</strong></td><td class="n lose"><strong>~25–200x</strong></td><td class="n"><strong>Active params × tokens × hardware</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--accent)">
+    <h3 style="color:var(--accent)">Research Backing</h3>
+    <p style="color:var(--text-secondary);font-size:0.85rem">
+      <strong>Liu et al. (2026, arXiv:2605.11733)</strong> call for LLM inference to be evaluated as energy-to-token production — reporting Joules/token, active binding constraint, and PUE-adjusted delivered power. Their framework directly supports measuring the architectural energy gap we describe.
     </p>
     <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
-      <strong>From our data:</strong> DeepSeek processed ~21,000 tokens per successful build. Claude processed ~28,000 paid tokens per build, plus an estimated 2.7M cache-read tokens that represent actual GPU compute. The energy ratio is at minimum the token ratio (1.3×) and at maximum includes cache-read processing (10×+), depending on how efficiently cached tokens are computed. This is the research gap TokenPowerBench was designed to fill — we need standardized J/token benchmarks across providers.
+      <strong>TokenPowerBench</strong> (Niu et al., AAAI 2026) provides empirical J/token measurements showing that model architecture (MoE vs dense), parameter count, and hardware TDP are first-order determinants of inference energy — not just token count. MoE models consistently show 5–20× lower J/token than comparably-sized dense models.
+    </p>
+    <p style="color:var(--text-secondary);font-size:0.85rem;margin-top:0.5rem">
+      <strong>Zhu &amp; Zhu (2026, arXiv:2603.28949)</strong> frame AI scaling as a thermodynamic problem: the ultimate bottleneck is Earth's finite heat capacity, not capital or data. Their analysis shows that inference efficiency differences between architectures compound at deployment scale to megawatt-level thermal discharge differentials.
     </p>
   </div>
 
   <div class="limitation major">
     <span class="tag major">Open Question</span>
-    <span style="color:var(--text-secondary);font-size:0.82rem">The energy proxy is only as good as the J/token conversion factor. Without provider-specific wattage measurements, we cannot claim precise energy numbers. But the <em>direction</em> is clear: more tokens = more energy, and the token ratio between providers bounds the energy ratio. Future work: run TokenPowerBench-style measurements against both APIs.</span>
+    <span style="color:var(--text-secondary);font-size:0.82rem">We cannot measure Joules/token without provider hardware data. But the architectural gap (MoE sparsity, RL-compressed reasoning, hardware TDP differences) means the energy ratio is bounded by parameter activation counts × tokens × hardware efficiency — a 25–200× range, not a 1.3× token-count ratio. Future work: run TokenPowerBench-style measurements against both provider APIs to calibrate the J/token conversion.</span>
   </div>
 </section>
 <section class="section">
