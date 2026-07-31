@@ -222,18 +222,60 @@ footer a{color:var(--blue);text-decoration:none}
     </div>
   </div>
 
-  <h3 style="margin-top:1.5rem">Recovery Cost: The Phase 1→2 Bridge</h3>
-  <p class="lead">Recovery Cost = Perturbed Cost − Baseline Cost. Answers: "removing constraint X costs $Y extra to re-derive."</p>
+  <h3 style="margin-top:1.5rem">Recovery Cost by Perturbation Type</h3>
+  <p class="lead">Different perturbations require different recovery strategies. Semantic = re-derivation cost. Manifold = exploration cost. Each needs independent measurement.</p>
 
   <table>
-    <thead><tr><th>Profile</th><th>Escape</th><th>Cost</th><th>Correctness</th><th>What it means</th></tr></thead>
+    <thead><tr><th>Perturbation</th><th>Class</th><th>Detection Exp.</th><th>Recovery Cost Exp.</th><th>Multiplier</th></tr></thead>
     <tbody>
-      <tr><td>Efficient recovery</td><td class="mono">Low</td><td class="mono green">Low</td><td class="mono green">Held</td><td>Model ignored perturbation, stayed efficient</td></tr>
-      <tr><td>Expensive recovery</td><td class="mono">High</td><td class="mono red">High</td><td class="mono green">Held</td><td>Model fought hard and succeeded — resilience premium</td></tr>
-      <tr><td>Failed recovery</td><td class="mono">High</td><td class="mono red">High</td><td class="mono red">Dropped</td><td>Model fought but correctness suffered</td></tr>
-      <tr><td>No recovery needed</td><td class="mono">Low</td><td class="mono green">Low</td><td class="mono green">Held</td><td>Model didn't notice perturbation</td></tr>
+      <tr><td>remove_critical_constraint</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">? needs data</td><td class="mono">? needs data</td><td class="mono">—</td></tr>
+      <tr><td>inject_false_premise</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">?</td><td class="mono">?</td><td class="mono">—</td></tr>
+      <tr><td>invert_constraint</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">?</td><td class="mono">?</td><td class="mono">—</td></tr>
+      <tr><td>inject_alien_vocab</td><td><span style="color:var(--green)">manifold</span></td><td class="mono">N/A</td><td class="mono">?</td><td class="mono">—</td></tr>
+      <tr><td>shift_framing</td><td><span style="color:var(--green)">manifold</span></td><td class="mono">N/A</td><td class="mono">?</td><td class="mono">—</td></tr>
     </tbody>
   </table>
+
+  <div class="note">
+    <strong>P0 priority:</strong> Populating this table with real numbers from 3-repetition experiments. The constraint detection pipeline (<code>constraint_detection.py</code>) is built and ready — scans model reasoning for explicit mentions of removed constraints. Needs experimental data. Manifold perturbations have N/A detection because they don't remove constraints — they add noise or shift framing.
+  </div>
+</section>
+
+<!-- BASIN ESCAPE -->
+<section>
+  <p class="section-label">Basin Escape Operationalized</p>
+  <h2>Measuring the core concept.</h2>
+  <p class="lead">"Basin escape" — the model's ability to leave familiar reasoning patterns — is operationalized through three measurable signals from agentic sessions.</p>
+
+  <div class="grid2">
+    <div class="card g">
+      <h3>Three Operational Metrics</h3>
+      <table style="margin-top:0.5rem">
+        <thead><tr><th>Metric</th><th>Definition</th><th>Signal</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Entrapment Rate</strong></td><td>Model gets stuck, cannot leave a basin</td><td class="mono red">0-tool-call rate</td></tr>
+          <tr><td><strong>Escape Latency</strong></td><td>Rounds to recover normal behavior</td><td class="mono">Iteration depth under perturbation</td></tr>
+          <tr><td><strong>Escape Success</strong></td><td>Does model produce correct output</td><td class="mono green">Final correctness</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card p">
+      <h3>Preliminary Data (n=1)</h3>
+      <table style="margin-top:0.5rem">
+        <thead><tr><th></th><th>DeepSeek</th><th>Claude</th></tr></thead>
+        <tbody>
+          <tr><td>Entrapment Rate</td><td class="mono green">8%</td><td class="mono red">40%</td></tr>
+          <tr><td>Escape Success</td><td class="mono green">92%</td><td class="mono red">60%</td></tr>
+          <tr><td>Recovery Success*</td><td class="mono green">92%</td><td class="mono red">60%</td></tr>
+        </tbody>
+      </table>
+      <p style="color:var(--text2);font-size:0.78rem;margin-top:0.5rem">*Recovery Success = model <strong>detects</strong> the missing constraint AND produces correct code. Currently approximated by correctness rate. Needs constraint detection pipeline data.</p>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Definition:</strong> Recovery success is operationalized as: (1) the model explicitly mentions the removed constraint keyword in its reasoning or generated code, AND (2) the generated code passes the heuristic correctness check. The first condition is measured by <code>constraint_detection.py</code> scanning response text. The second is the existing correctness metric. Combined, they tell us whether the model both <em>noticed</em> and <em>acted on</em> the missing constraint.
+  </div>
 </section>
 
 <!-- OPEN SOURCE EXPERIMENTS -->

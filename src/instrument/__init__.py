@@ -22,6 +22,7 @@ from .efficiency import EfficiencyMetrics, compute_efficiency
 from .strategy import StrategyReport, StrategyType, classify_strategy
 from .game_report import GameReport
 from .recovery_cost import RecoveryCost, compute_recovery_cost, recovery_summary_table
+from .constraint_detection import ConstraintDetection, DetectionReport, detect_constraints, detection_summary
 
 __all__ = [
     "Perturbation", "PerturbationOperator", "build_operators", "perturb_prompt",
