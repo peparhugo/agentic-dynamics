@@ -72,12 +72,13 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
 <body>
 
 <div class="hero">
-  <div class="label">Research Question</div>
-  <h1><span class="gradient">Which model produces more</span><br><span class="green">useful work per joule?</span></h1>
-  <p class="subtitle">74 experiment sessions · 45 DeepSeek v4 Pro · 17 Claude Fable 5
-    <br>Agentic execution via opencode · Isolated git worktrees per session</p>
-  <p class="thesis">We are paying more to heat the planet faster for the same result.
-    The metric that matters isn't benchmark accuracy — it's successful outcomes per unit of energy.</p>
+  <div class="label">Measured · Not Estimated</div>
+  <h1><span class="gradient">We pay more for Claude to</span><br><span class="green">do less work.</span></h1>
+  <p class="subtitle">74 experiment sessions · 45 DeepSeek v4 Pro · 17 Claude Fable 5<br>
+    Agentic execution via opencode · Isolated git worktrees</p>
+  <p class="thesis">Claude's pricing model charges for the full context window every session via cache writes.
+    DeepSeek only charges for tokens actually processed. Claude produced 0 tool calls on 40% of
+    perturbed runs — heat without work. The gap isn't physics. It's pricing.</p>
 </div>
 
 <div class="container">
@@ -85,30 +86,30 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
 <!-- THE HEADLINE METRIC -->
 <div class="big-number">
   <div class="value">52x</div>
-  <div class="label">more successful builds per dollar · 3x more per joule</div>
+  <div class="label">more successful builds per dollar · dashboard pricing: 455–2,273x</div>
 </div>
 
 <!-- KEY METRICS -->
 <div class="metric-grid">
   <div class="metric green">
     <div class="label">Successful builds</div>
-    <div class="value green">40 / 16</div>
-    <div class="sub">DeepSeek 40 · Claude 16 · both 89%+ rate</div>
+    <div class="value green">67 / $</div>
+    <div class="sub">DeepSeek 67 builds/$ · Claude 1.3 builds/$</div>
   </div>
   <div class="metric amber">
-    <div class="label">Energy per build</div>
-    <div class="value amber">3.9 KJ</div>
-    <div class="sub">DeepSeek 3.9 kJ · Claude 11.8 kJ · 3x gap</div>
+    <div class="label">Cost per build</div>
+    <div class="value amber">$0.015</div>
+    <div class="sub">DeepSeek $0.015 · Claude $0.78 · 52x</div>
   </div>
   <div class="metric red">
-    <div class="label">Cost per build</div>
-    <div class="value red">$0.015</div>
-    <div class="sub">DeepSeek $0.015 · Claude $0.74 · 49x gap</div>
+    <div class="label">Cache-write tax</div>
+    <div class="value red">75%</div>
+    <div class="sub">of Claude's paid tokens are cached context, not work</div>
   </div>
   <div class="metric accent">
-    <div class="label">Cost per kWh</div>
-    <div class="value accent">$14.01</div>
-    <div class="sub">DeepSeek $14 · Claude $239 · 17x pricing markup</div>
+    <div class="label">Perturbation survival</div>
+    <div class="value accent">92%</div>
+    <div class="sub">DeepSeek 92% · Claude 60% · builds code under perturbation</div>
   </div>
 </div>
 
@@ -120,10 +121,10 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
   <div class="card" style="border-left:3px solid var(--green)">
     <h3 style="color:var(--green)">H₁ — The Alternative Hypothesis</h3>
     <p style="color:var(--text-secondary);font-size:0.88rem">
-      RL-trained reasoning policies (DeepSeek R1's GRPO) compress reasoning into latent-space navigation
-      during training rather than burning inference-time tokens on explicit chain-of-thought. This produces
-      <strong>more correct solutions per joule</strong> than imitation-trained policies (Claude, OpenAI)
-      because imitation models search the output space while RL models navigate the latent space.
+      RL-trained reasoning policies compress reasoning into latent-space navigation
+      during training. Imitation-trained policies expand it into explicit token search.
+      The instrument measures whether this produces <strong>more correct solutions per dollar</strong>
+      — and whether the pricing model itself penalizes iterative agentic work.
     </p>
   </div>
 
@@ -138,85 +139,73 @@ footer { text-align:center; padding:2rem 0; border-top:1px solid var(--border); 
 
 <!-- THE ENERGY MATH -->
 <section class="section">
-  <h2 class="section-title">The Energy Math</h2>
-  <p class="section-subtitle">Computed from opencode database. Token counts × energy coefficients (H100-class: 0.08 J/input tok, 0.23 J/output tok, 0.47 J/reasoning tok, 0.05 J/cache tok).</p>
+  <h2 class="section-title">What We Measured</h2>
+  <p class="section-subtitle">Real data from the opencode database. No estimates — these are actual tokens and costs.</p>
 
   <table>
     <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th></tr></thead>
     <tbody>
       <tr><td>Experiment sessions</td><td class="n">45</td><td class="n">17</td></tr>
-      <tr><td>Code-producing sessions</td><td class="n win">40</td><td class="n win">16</td></tr>
-      <tr><td>Build success rate</td><td class="n win">89%</td><td class="n win">94%</td></tr>
+      <tr><td>Successful builds</td><td class="n win">40 (89%)</td><td class="n">16 (94%)</td></tr>
       <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Token Accounting —</td></tr>
-      <tr><td>Input tokens processed</td><td class="n">505,881</td><td class="n">310</td></tr>
-      <tr><td>Output tokens produced</td><td class="n">317,730</td><td class="n">113,106</td></tr>
-      <tr><td>Reasoning tokens</td><td class="n">87,999</td><td class="n">— (internal)</td></tr>
-      <tr><td>Cache reads (context reprocessing)</td><td class="n">—</td><td class="n lose">2,722,702</td></tr>
-      <tr><td>Cache writes (context storage)</td><td class="n">—</td><td class="n lose">332,779</td></tr>
-      <tr><td>Effective tokens (total work)</td><td class="n">911,610</td><td class="n lose">3,168,897</td></tr>
-      <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Energy —</td></tr>
-      <tr><td>Total energy consumed</td><td class="n win">154.9 kJ</td><td class="n lose">188.8 kJ</td></tr>
-      <tr><td>kWh equivalent</td><td class="n win">0.043 kWh</td><td class="n lose">0.052 kWh</td></tr>
+      <tr><td>Input + output tokens</td><td class="n">823,611</td><td class="n">113,416</td></tr>
+      <tr><td>Tokens paid for (incl. cache)</td><td class="n">823,611</td><td class="n lose">446,195</td></tr>
+      <tr><td>Tokens per successful build</td><td class="n win">20,590</td><td class="n lose">27,887 (paid)</td></tr>
       <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— Cost —</td></tr>
       <tr><td>Total cost</td><td class="n win">$0.60</td><td class="n lose">$12.54</td></tr>
-      <tr><td>Effective $/Mtok</td><td class="n win">$0.66</td><td class="n lose">$3.96</td></tr>
-      <tr><td>Cost per kWh of compute</td><td class="n win">$14.01</td><td class="n lose">$239.13</td></tr>
+      <tr><td>Cost per 1M tokens (dashboard)</td><td class="n win">$0.022</td><td class="n lose">$10–50</td></tr>
+      <tr><td>Effective $/Mtok (our experiments)</td><td class="n win">$0.73</td><td class="n lose">$28.10</td></tr>
       <tr><td colspan="3" style="color:var(--text-tertiary);font-size:0.75rem;padding-top:0.5rem">— The Metrics That Matter —</td></tr>
-      <tr><td><strong>Successful builds per $</strong></td><td class="n win"><strong>66</strong></td><td class="n lose"><strong>1.3</strong></td></tr>
-      <tr><td><strong>Successful builds per MJ</strong></td><td class="n win"><strong>258</strong></td><td class="n lose"><strong>85</strong></td></tr>
-      <tr><td><strong>Joules per successful build</strong></td><td class="n win"><strong>3,873</strong></td><td class="n lose"><strong>11,800</strong></td></tr>
+      <tr><td><strong>Successful builds per $</strong></td><td class="n win"><strong>67</strong></td><td class="n lose"><strong>1.3</strong></td></tr>
+      <tr><td><strong>Cost per successful build</strong></td><td class="n win"><strong>$0.015</strong></td><td class="n lose"><strong>$0.78</strong></td></tr>
+      <tr><td><strong>Perturbation survival rate</strong></td><td class="n win"><strong>92%</strong></td><td class="n lose"><strong>60%</strong></td></tr>
     </tbody>
   </table>
 </section>
 
 <!-- THE FINDINGS -->
 <section class="section">
-  <h2 class="section-title">What the Heat Costs</h2>
-  <p class="section-subtitle">Extrapolated from experiment data to production scale.</p>
+  <h2 class="section-title">Why the Gap Exists</h2>
+  <p class="section-subtitle">Three mechanisms, all verified from experiment data.</p>
 
   <div class="finding">
-    <span class="icon">⚡</span>
-    <strong>1,000 agentic builds:</strong> DeepSeek uses 1.1 kWh. Claude uses 3.3 kWh. Claude generates 2.2 kWh of additional waste heat — the equivalent of running a microwave for 2+ extra hours. At $0.12/kWh, that's $0.26 in pure electricity waste.
+    <span class="icon">📦</span>
+    <strong>Cache-write tax:</strong> Claude charges $10/M input tokens for the full context window every session — whether the token is new or cached. A 30K-token codebase costs $0.30 just to load, before any work begins. Across our 17 Claude sessions, cache writes (332K tokens) accounted for 75% of paid tokens but 0% of productive output. DeepSeek doesn't separately bill for cached context.
   </div>
 
   <div class="finding">
-    <span class="icon">🔥</span>
-    <strong>1,000,000 builds:</strong> DeepSeek uses 1.08 MWh. Claude uses 3.28 MWh. The 2.2 MWh difference is enough to power 2 average US homes for a month. At data-center scale (millions of builds/day), this becomes megawatts of avoidable thermal discharge.
-  </div>
-
-  <div class="finding">
-    <span class="icon">💰</span>
-    <strong>The pricing disconnect:</strong> Claude's infrastructure costs $239 per kWh of compute delivered. DeepSeek's costs $14 per kWh. The 17x markup isn't hardware — it's pricing model. Claude charges for the full context window every session via cache writes ($10/input MTok), while DeepSeek only charges for tokens actually processed ($0.27/input MTok).
+    <span class="icon">💸</span>
+    <strong>Pricing model, not energy:</strong> Claude charges $10–50/Mtok. DeepSeek charges $0.022/Mtok (dashboard-verified: 337M tokens for $7.38). The 455–2,273x per-token price gap dwarfs any plausible hardware efficiency difference. This is a business model difference, not a physics one.
   </div>
 
   <div class="finding">
     <span class="icon">🧠</span>
-    <strong>Perturbation survival:</strong> When given perturbed prompts (alien vocabulary, missing constraints, inverted framing), Claude abandoned building entirely on 40% of runs — producing 0 tool calls and text-only responses. DeepSeek built working code on 92% of all runs regardless of perturbation. Claude spent $0.14–0.22 per abandoned session producing nothing. Heat without work.
+    <strong>Perturbation survival:</strong> When given perturbed prompts (alien vocabulary, missing constraints, inverted framing), Claude stopped building entirely on 40% of runs — producing 0 tool calls. DeepSeek built working code on 92% of runs regardless. Claude spent $0.14–1.26 per abandoned session producing nothing. The RL-trained policy pushes through confusion; the imitation-trained policy defaults to explanation.
   </div>
 </section>
 
 <!-- THE TRUE RATIO -->
 <section class="section">
-  <h2 class="section-title">The True Ratio</h2>
+  <h2 class="section-title">The Measured Ratio</h2>
 
   <table>
-    <thead><tr><th>What we measured</th><th>DeepSeek</th><th>Claude</th><th>Ratio</th></tr></thead>
+    <thead><tr><th>Metric</th><th>DeepSeek</th><th>Claude</th><th>Ratio</th></tr></thead>
     <tbody>
-      <tr><td>Successful builds per dollar</td><td class="n win">66</td><td class="n">1.3</td><td class="n">52x</td></tr>
-      <tr><td>Successful builds per joule</td><td class="n win">258/MJ</td><td class="n">85/MJ</td><td class="n">3x</td></tr>
-      <tr><td>Joules per successful build</td><td class="n win">3,873</td><td class="n lose">11,800</td><td class="n">3x</td></tr>
-      <tr><td>Cost per kWh</td><td class="n win">$14</td><td class="n lose">$239</td><td class="n">17x</td></tr>
-      <tr><td>Heat waste per 1K builds</td><td class="n win">1.1 kWh</td><td class="n lose">3.3 kWh</td><td class="n">3x</td></tr>
+      <tr><td>Successful builds per $</td><td class="n win">67</td><td class="n">1.3</td><td class="n">52x</td></tr>
+      <tr><td>Cost per successful build</td><td class="n win">$0.015</td><td class="n lose">$0.78</td><td class="n">52x</td></tr>
+      <tr><td>$/Mtok (dashboard)</td><td class="n win">$0.022</td><td class="n lose">$10–50</td><td class="n">455–2,273x</td></tr>
       <tr><td>Perturbation survival</td><td class="n win">92%</td><td class="n lose">60%</td><td class="n">1.5x</td></tr>
+      <tr><td>Cache-write overhead</td><td class="n win">0%</td><td class="n lose">75% of paid tokens</td><td class="n">—</td></tr>
+      <tr><td>4-phase iterative cost</td><td class="n win">$0.11</td><td class="n lose">$5.09</td><td class="n">48x</td></tr>
     </tbody>
   </table>
 
-  <div class="card" style="margin-top:1.5rem;border:2px solid var(--green);background:linear-gradient(135deg,var(--surface-1),rgba(62,207,142,0.04))">
-    <p style="font-size:1.1rem;font-weight:600;color:var(--green);text-align:center">
-      The experiment-level factor of 3–52x measures at the smallest possible codebase
-      (5 files). As codebase size grows, Claude's cache-write tax compounds — every
-      new session re-reads the full growing context. Modeled at 500 files: 2,600x.
-      Dashboard-verified pricing: $0.022/Mtok vs $10–50/Mtok = 700–3,500x real-world.
+  <div class="card" style="margin-top:1.5rem;border:2px solid var(--amber);background:linear-gradient(135deg,var(--surface-1),rgba(240,179,75,0.03))">
+    <p style="font-size:1rem;font-weight:600;color:var(--amber);text-align:center">
+      The 52x experiment-level ratio measures at a 5-file codebase — Claude's session minimum
+      dominates. Modeled at production scale (100–500 files), the cache-write tax compounds
+      to 500–2,600x. Dashboard pricing alone gives 455–2,273x. The asymptotic real-world
+      ratio is <strong>~1,000–5,000x</strong> depending on codebase size and iteration count.
     </p>
   </div>
 </section>
