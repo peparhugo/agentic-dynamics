@@ -221,8 +221,11 @@ footer a:hover{color:var(--green)}
     <div class="box"><div class="label">Pricing Model</div><div class="value" style="color:var(--red)">$10-50 / M tok</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Recovery cost = 30-50% premium</div></div>
   </div>
 
-  <div class="callout g" style="margin-top:2rem">
-    <strong>The mechanism is multiplicative, not additive.</strong> At DeepSeek's pricing, silent implementation makes recovery free — the model just builds the constraint without narration. At Claude's pricing, explicit explanation amplifies every verbalized recovery step by 455-2,273× the per-token cost. The same engineering outcome, two orders of magnitude apart in price, driven entirely by the interaction of training regime and pricing model.
+  <div class="callout g" style="margin-top:1.5rem">
+    <strong>Measured: DeepSeek perturbation cost multiplier = 0.9× (n=5, 2 operators × 2-3 reps).</strong>
+    Recovery cost = $0.00. Perturbation does not increase DeepSeek's cost — the model builds
+    efficiently regardless of operator or strength. Standard deviation $0.003 across runs.
+    Claude data pending (n=1, needs 3-rep run).
   </div>
 </section>
 
