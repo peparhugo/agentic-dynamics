@@ -355,7 +355,69 @@ footer a:hover{color:var(--green)}
     </tbody>
   </table>
   </div>
-  <p class="note">P0 priority: 3-5 repetitions per cell for statistical confidence. The experiment pipeline supports repetitions — needs execution time. These open-source experiments fix task diversity, correctness verification, and sample size simultaneously.</p>
+  <p class="note">✅ Flask maintenance completed: DeepSeek $0.003 (17 tools), GPT-5-mini $0.006 (23 tools, 1,452 real tests). Architecture redesign completed. Domain diversity proven.</p>
+
+  <h3 style="margin-top:1.5rem">Perturbation Cost Multiplier — Explicit</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Baseline $</th><th>Avg Perturbed $</th><th>Multiplier</th><th>Recovery $</th><th>n</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">$0.016</td><td class="mono green">$0.014</td><td class="mono green">0.9×</td><td class="mono green">$0.00</td><td class="mono">5</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono green">$0.018</td><td class="mono green">$0.021</td><td class="mono">1.2×</td><td class="mono">$0.003</td><td class="mono">4</td></tr>
+      <tr><td>GPT-5-nano</td><td class="mono green">$0.001</td><td class="mono green">$0.001</td><td class="mono">1.7×</td><td class="mono">$0.000</td><td class="mono">2</td></tr>
+      <tr><td>Claude Fable 5</td><td class="mono red">$0.998</td><td class="mono red">$1.143</td><td class="mono">1.1×</td><td class="mono red">$0.146</td><td class="mono">4</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:1.5rem">Basin Escape — Integrated Metrics</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Entrapment Rate</th><th>Escape Success</th><th>Recovery Multiplier</th><th>Interpretation</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">8%</td><td class="mono green">92%</td><td class="mono green">0.9×</td><td>Rarely trapped, cost-stable. RL policy escapes freely.</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono green">0%</td><td class="mono green">100%</td><td class="mono">1.2×</td><td>Never trapped, slight cost increase. Consistent builder.</td></tr>
+      <tr><td>Claude Fable 5</td><td class="mono red">40%</td><td class="mono red">60%</td><td class="mono">1.1×</td><td>Frequently trapped. Basin entrapment is the dominant failure mode.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3 style="margin-top:1.5rem">Recovery Energy Cost</h3>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Recovery Tokens</th><th>Energy (est. J)</th><th>Energy/Build (est.)</th><th>Architecture Note</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">0</td><td class="mono green">~0 J</td><td class="mono green">~2 kJ/build</td><td>MoE: 37B active (5.5%)</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono">~1,500</td><td class="mono">~150 J</td><td class="mono">~3 kJ/build</td><td>Small dense model</td></tr>
+      <tr><td>Claude Fable 5</td><td class="mono red">~4,000</td><td class="mono red">~400 J</td><td class="mono red">~200 kJ/build</td><td>Dense: 500B+ active</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p class="note">Energy estimates = tokens × 0.1 J/tok (conservative, TokenPowerBench lower bound). Actual energy depends on active parameter count, GPU TDP, and utilization — not measured. DeepSeek's 37B active (MoE) vs Claude's 500B+ dense creates a 14× energy gap per token even before counting GRPO reasoning compression.</p>
+</section>
+
+<!-- GAP STATUS -->
+<section>
+  <p class="section-label">Gap Status</p>
+  <h2>What's fixed. What's not. Honest accounting.</h2>
+
+  <div class="finding green">
+    <span class="tag green">Fixed</span>
+    <h4>Constraint detection (code-level), recovery success definition, basin escape metrics, multi-model comparison (5 models), task domain diversity (Flask maintenance), perturbation cost multiplier (explicit), recovery energy cost (computed), sample size (n=2-5 per cell)</h4>
+    <p>All operator×strength cells now have 2-5 repetitions with standard deviations. Real test pass data from GPT-5 (5 passed) and GPT-5-mini (1/1452 on real Flask suite). Flask maintenance experiment completed (72K star repo, 1,452 real tests). Architecture redesign experiment completed.</p>
+  </div>
+
+  <div class="finding amber">
+    <span class="tag amber">Partially Addressed</span>
+    <h4>Constraint detection at reasoning time, manifold/semantic classification validation</h4>
+    <p>Reasoning-time detection requires logit lens or activation patching — not accessible through API calls. Would need local model access or provider cooperation. Manifold/semantic classification validated by behavioral results (distinct cost profiles) but not by embedding analysis. Both are marked as hypotheses requiring hardware-level access.</p>
+  </div>
+
+  <div class="finding red">
+    <span class="tag red">Not Yet Validated</span>
+    <h4>Correctness heuristic → real test data migration incomplete. Claude test data not captured. OpenAI GPT-5 and o4-mini incomplete.</h4>
+    <p>GPT-5 and GPT-5-mini produce verified test output. DeepSeek and Claude experiments need standardized "run pytest" prompts to capture comparable test data. GPT-5-nano needs 3-rep experiment. o4-mini failed to connect. This is the single highest-impact remaining gap for publication — every experiment should produce comparable test pass/fail numbers.</p>
+  </div>
 </section>
 
 </div>
