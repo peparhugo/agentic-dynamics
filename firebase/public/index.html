@@ -453,9 +453,26 @@ footer a:hover{color:var(--green)}
   </p>
 </section>
 
-</div>
+<!-- TOKEN BUDGET POLICY -->
+<section>
+  <p class="section-label">Token Budgets</p>
+  <h2>How we keep experiments comparable.</h2>
+  <p class="lead">Opencode manages token budgets per-provider. All models have the same maximum output allowance, making the recovery cost metric defensible — we compare models under identical output caps.</p>
 
-<footer>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Model</th><th>Default Budget</th><th>Thinking Mode</th><th>Strategy</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">RL self-limits</td><td class="mono">reasoning_effort=high</td><td>GRPO naturally produces 2-6K output. No cap needed.</td></tr>
+      <tr><td>GPT-5.6 / 5.6-fast</td><td class="mono">8K cap</td><td class="mono">reasoning.effort=high</td><td>Frontier model. Cap prevents $1.29/Mtok cost inflation.</td></tr>
+      <tr><td>GPT-5-mini / nano</td><td class="mono">4K cap</td><td class="mono">reasoning.effort=medium</td><td>Cheap models. Tight cap ensures cost comparability.</td></tr>
+      <tr><td>Claude Fable 5</td><td class="mono red">4K + 2K thinking</td><td class="mono">thinking.budget_tokens=2048</td><td>Critical: output costs 5× input. Aggressive cap required.</td></tr>
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<!-- FOOTER -->
   <div class="wrap">
     <p>Constraint Recovery Cost · Reasoning Topology Instrument · August 2026</p>
     <p style="margin-top:0.3rem"><a href="https://github.com/peparhugo/reasoning-instrument">github.com/peparhugo/reasoning-instrument</a> · All data from opencode session database · No estimates</p>
