@@ -75,11 +75,79 @@ class AgenticResult:
     def ok(self) -> bool:
         return self.exit_code == 0 and len(self.error) == 0
 
+    # Experiment metadata
+    thinking_effort: str = ""
+    thinking_budget_tokens: int = 0
+
+
+def _build_standardized_prompt(
+    prompt: str,
+    thinking_budget_tokens: int = 0,
+    output_token_limit: int = 0,
+    enforce_pytest: bool = True,
+    silent_mode: bool | None = None,
+) -> str:
+    """Inject standardized constraints into the prompt for apples-to-apples comparison.
+
+    This ensures every model gets the same formatting constraints regardless of
+    training regime. The model can still choose how to allocate tokens — but the
+    output format and reporting requirements are standardized.
+
+    Args:
+        prompt: Original task prompt.
+        thinking_budget_tokens: Maximum thinking/reasoning tokens. 0 = no limit.
+        output_token_limit: Maximum output tokens. 0 = no limit.
+        enforce_pytest: Require pytest execution and pass/fail report.
+        silent_mode: If True, suppress docstrings/comments/explanation.
+                     If False, explicitly allow verbosity.
+                     If None (default), model uses natural style — we measure the gap.
+    """
+    header = "[STANDARDIZED CONSTRAINTS — APPLY TO ALL MODELS]\n"
+    if thinking_budget_tokens > 0:
+        header += f"- Reasoning budget: {thinking_budget_tokens} tokens maximum for thinking/planning\n"
+    if output_token_limit > 0:
+        header += f"- Output limit: {output_token_limit} tokens maximum total output\n"
+    if silent_mode is not None:
+        if silent_mode:
+            header += (
+                "- IMPLEMENTATION-ONLY MODE: do NOT generate docstrings, comments, or "
+                "explanatory prose. Output ONLY the working code. Optimize for token efficiency.\n"
+            )
+        else:
+            header += (
+                "- VERBOSE MODE: include docstrings, inline comments, and brief reasoning "
+                "for every design decision. Optimize for readability and maintainability.\n"
+            )
+    if enforce_pytest:
+        header += (
+            "- Write ALL code files. Run pytest. Fix failures until all tests pass.\n"
+            "- At the END of your response, state EXACTLY on one line: "
+            '"TESTS: N passed, M failed"\n'
+        )
+    return header + "\n" + prompt
+
+
+# Thinking effort → opencode --variant mapping
+THINKING_VARIANTS = {
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "max",
+    "default": "default",
+}
+
 
 def run_opencode_agentic(
     prompt: str,
     *,
     model: str = "deepseek/deepseek-v4-pro",
+    thinking_effort: str | None = None,
+    thinking_budget_tokens: int = 0,
+    output_token_limit: int = 0,
+    silent_mode: bool | None = None,
+    standardize: bool = True,
+    enforce_pytest: bool = True,
     workdir: str | None = None,
     timeout: int = 300,
     session_name: str = "",
@@ -95,6 +163,13 @@ def run_opencode_agentic(
     Args:
         prompt: The task prompt (with or without perturbation).
         model: Model identifier (opencode format: provider/model).
+        thinking_effort: Override reasoning effort via --variant (minimal/low/medium/high/max).
+        thinking_budget_tokens: Max thinking tokens injected into prompt. 0 = no limit.
+        output_token_limit: Max output tokens injected into prompt. 0 = no limit.
+        silent_mode: If True, suppress docstrings/comments. If False, require verbosity.
+                     If None (default), model uses natural style — we measure the gap.
+        standardize: Inject STANDARDIZED CONSTRAINTS header into prompt.
+        enforce_pytest: Require pytest execution in standardized header.
         workdir: Working directory. Created if None.
         timeout: Maximum session duration in seconds.
         session_name: Name for the session (logging).
@@ -107,7 +182,19 @@ def run_opencode_agentic(
 
     t0 = time.monotonic()
     result = AgenticResult(run_id=session_name or f"opencode_{int(t0)}",
-                           task=prompt, model=model, workdir=workdir)
+                            task=prompt, model=model, workdir=workdir)
+    result.thinking_effort = thinking_effort or "default"
+    result.thinking_budget_tokens = thinking_budget_tokens
+
+    # Inject standardized constraints for apples-to-apples comparison
+    if standardize and not prompt.startswith("[STANDARDIZED CONSTRAINTS"):
+        prompt = _build_standardized_prompt(
+            prompt,
+            thinking_budget_tokens=thinking_budget_tokens,
+            output_token_limit=output_token_limit,
+            enforce_pytest=enforce_pytest,
+            silent_mode=silent_mode,
+        )
 
     # Create an isolated worktree per run
     if workdir is None:
@@ -131,6 +218,8 @@ def run_opencode_agentic(
         "--auto",
         "--dir", workdir,
     ]
+    if thinking_effort and thinking_effort in THINKING_VARIANTS:
+        cmd.extend(["--variant", THINKING_VARIANTS[thinking_effort]])
     if session_name:
         cmd.extend(["--title", session_name])
     if prompt:

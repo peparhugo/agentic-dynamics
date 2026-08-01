@@ -28,7 +28,8 @@ from instrument.opencode import run_opencode_agentic
 
 
 def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
-                   timeout: int = 200, repetitions: int = 1):
+                   timeout: int = 200, repetitions: int = 1,
+                   thinking_effort: str = ""):
     """Run a complete experiment from a YAML config file."""
     import yaml
 
@@ -46,19 +47,36 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     model_label = cfg.get("model", model_id.split("/")[-1])
     ops = build_operators()
 
+    # Standardized constraints
+    std = cfg.get("standardized", {})
+    thinking_effort = thinking_effort or std.get("thinking_effort", "") or cfg.get("thinking_effort", "")
+    thinking_budget_tokens = std.get("thinking_budget_tokens", 0) or cfg.get("thinking_budget_tokens", 0)
+    output_token_limit = std.get("output_token_limit", 0) or cfg.get("output_token_limit", 0)
+    standardize = std.get("enabled", True)
+    enforce_pytest = std.get("enforce_pytest", True)
+    silent_mode = std.get("silent_mode", None)  # None = natural, True = forced-silent, False = forced-verbose
+
     results_dir = Path("experiments/results")
     results_dir.mkdir(parents=True, exist_ok=True)
 
     total = 1 + (len(operators) * len(strengths) * repetitions)
+    te_str = f" think={thinking_effort}" if thinking_effort else ""
     print(f"\n{'='*80}")
-    print(f"Experiment: {name}  |  Model: {model_id}")
+    print(f"Experiment: {name}  |  Model: {model_id}{te_str}")
     print(f"Task: {task[:100]}...")
     print(f"Constraints: {len(constraints)}  |  Operators: {len(operators)} × {len(strengths)} strengths × {repetitions} reps")
+    if thinking_budget_tokens:
+        print(f"Thinking budget: {thinking_budget_tokens}tok  |  Output limit: {output_token_limit or 'none'}  |  Standardized: {standardize}")
     print(f"Estimated runs: {total}  |  Timeout per run: {timeout}s")
     print(f"{'='*80}\n")
 
     all_runs = []
-    base = _run_baseline(task, constraints, model_id, timeout)
+    base = _run_baseline(task, constraints, model_id, timeout,
+                         thinking_effort=thinking_effort,
+                         thinking_budget_tokens=thinking_budget_tokens,
+                         output_token_limit=output_token_limit,
+                         silent_mode=silent_mode,
+                         standardize=standardize, enforce_pytest=enforce_pytest)
     all_runs.append(base)
 
     run_idx = 0
@@ -68,7 +86,12 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
             for rep in range(repetitions):
                 run_idx += 1
                 r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout)
+                                   ops, model_id, run_idx, total_perturbed, timeout,
+                                   thinking_effort=thinking_effort,
+                                   thinking_budget_tokens=thinking_budget_tokens,
+                                   output_token_limit=output_token_limit,
+                                   silent_mode=silent_mode,
+                                   standardize=standardize, enforce_pytest=enforce_pytest)
                 all_runs.append(r)
                 time.sleep(2)
 
@@ -81,10 +104,18 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     return all_runs
 
 
-def _run_baseline(task, constraints, model_id, timeout):
+def _run_baseline(task, constraints, model_id, timeout,
+                  thinking_effort="", thinking_budget_tokens=0,
+                  output_token_limit=0, silent_mode=None,
+                  standardize=True, enforce_pytest=True):
     print(f"[baseline] Running...", end=" ", flush=True)
     t0 = time.monotonic()
     r = run_opencode_agentic(task, model=model_id, timeout=timeout,
+                             thinking_effort=thinking_effort or None,
+                             thinking_budget_tokens=thinking_budget_tokens,
+                             output_token_limit=output_token_limit,
+                             silent_mode=silent_mode,
+                             standardize=standardize, enforce_pytest=enforce_pytest,
                              session_name=f"[baseline] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
@@ -131,7 +162,10 @@ def _run_baseline(task, constraints, model_id, timeout):
 
 
 def _run_perturbed(task, constraints, op_name, strength, baseline,
-                   ops, model_id, run_idx, total, timeout):
+                   ops, model_id, run_idx, total, timeout,
+                   thinking_effort="", thinking_budget_tokens=0,
+                   output_token_limit=0, silent_mode=None,
+                   standardize=True, enforce_pytest=True):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
     perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=42 + run_idx)
 
@@ -139,6 +173,11 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
           end=" ", flush=True)
     t0 = time.monotonic()
     r = run_opencode_agentic(perturbed, model=model_id, timeout=timeout,
+                             thinking_effort=thinking_effort or None,
+                             thinking_budget_tokens=thinking_budget_tokens,
+                             output_token_limit=output_token_limit,
+                             silent_mode=silent_mode,
+                             standardize=standardize, enforce_pytest=enforce_pytest,
                              session_name=f"[{op_name}_s{strength}] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
