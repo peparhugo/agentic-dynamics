@@ -131,6 +131,8 @@ def run_opencode_agentic(
         "--auto",
         "--dir", workdir,
     ]
+    if session_name:
+        cmd.extend(["--title", session_name])
     if prompt:
         cmd.append(prompt)
 

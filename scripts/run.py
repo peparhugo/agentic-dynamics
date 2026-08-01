@@ -84,7 +84,8 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
 def _run_baseline(task, constraints, model_id, timeout):
     print(f"[baseline] Running...", end=" ", flush=True)
     t0 = time.monotonic()
-    r = run_opencode_agentic(task, model=model_id, timeout=timeout)
+    r = run_opencode_agentic(task, model=model_id, timeout=timeout,
+                             session_name=f"[baseline] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints)
@@ -137,7 +138,8 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     print(f"[{run_idx}/{total}] {op_name} s={strength} ({pert_class})...",
           end=" ", flush=True)
     t0 = time.monotonic()
-    r = run_opencode_agentic(perturbed, model=model_id, timeout=timeout)
+    r = run_opencode_agentic(perturbed, model=model_id, timeout=timeout,
+                             session_name=f"[{op_name}_s{strength}] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints,
