@@ -77,6 +77,7 @@ def detect_constraints(
     final_response: str,
     constraints: list[str],
     *,
+    code_files: dict[str, str] | None = None,
     operator: str = "",
     perturbation_class: str = "",
     strength: float = 0.0,
@@ -84,15 +85,16 @@ def detect_constraints(
     recovery_tokens: int = 0,
     correctness: float = 0.0,
 ) -> DetectionReport:
-    """Scan the model's response for explicit mentions of each constraint.
+    """Scan both the model's closing text AND generated code for constraints.
 
-    A constraint is "detected" if the model mentions related keywords
-    in its reasoning or generated code. This is a behavioral measure
-    — does the model acknowledge the constraint exists?
+    Two signal sources:
+    1. Reasoning text: does the model explicitly MENTION the constraint?
+    2. Generated code: did the model actually IMPLEMENT the constraint?
 
-    The detection is NOT validated against actual implementation.
-    A model might mention "rate limiting" in reasoning but not implement it.
-    The correlation between detection and implementation is itself a signal.
+    The combination tells us whether the model silently implemented
+    (DeepSeek's GRPO pattern — code without narration) or explicitly
+    named but may not have implemented (Claude's pattern — narration
+    without code on perturbed runs).
     """
     report = DetectionReport(
         operator=operator,
@@ -104,39 +106,40 @@ def detect_constraints(
         correctness=correctness,
     )
 
+    # Combine ALL text to search: closing response + all code files
     response_lower = final_response.lower()
+    code_text = ""
+    if code_files:
+        code_text = " ".join(code_files.values()).lower()
 
     for constraint in constraints:
-        # Extract keywords from constraint description
         keywords = _constraint_keywords(constraint)
-
-        # Check for mentions in reasoning vs code
         reasoning_evidence = []
         code_evidence = []
 
         for kw in keywords:
+            # Check reasoning text
             if kw in response_lower:
-                # Simple heuristic: if keyword appears near code markers, it's in code
                 idx = response_lower.find(kw)
                 context_start = max(0, idx - 200)
                 context = response_lower[context_start:idx + len(kw) + 200]
-
-                if _is_code_context(context):
-                    code_evidence.append(kw)
-                else:
+                if not _is_code_context(context):
                     reasoning_evidence.append(kw)
+
+            # Check actual code files
+            if code_text and kw in code_text:
+                code_evidence.append(kw)
 
         mentioned = len(reasoning_evidence) > 0
         implemented = len(code_evidence) > 0
         detected = mentioned or implemented
 
-        # Confidence: higher if both mentioned AND implemented
         if mentioned and implemented:
-            confidence = 0.9
+            confidence = 0.95  # both said and done
         elif implemented:
-            confidence = 0.7  # implemented without explicit mention
+            confidence = 0.85  # silent implementation — DeepSeek's pattern
         elif mentioned:
-            confidence = 0.5  # mentioned but may not be implemented
+            confidence = 0.4   # said but may not have done — Claude's pattern
         else:
             confidence = 0.0
 
@@ -146,7 +149,7 @@ def detect_constraints(
             mentioned_in_reasoning=mentioned,
             mentioned_in_code=implemented,
             detection_confidence=confidence,
-            detection_evidence=reasoning_evidence[:3] + code_evidence[:3],
+            detection_evidence=reasoning_evidence[:2] + code_evidence[:2],
         )
         report.detections.append(cd)
         if detected:

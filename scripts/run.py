@@ -22,6 +22,7 @@ from instrument import (
     evaluate_solution, compute_efficiency,
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
+    detect_constraints, compute_recovery_cost,
 )
 from instrument.opencode import run_opencode_agentic
 
@@ -92,6 +93,9 @@ def _run_baseline(task, constraints, model_id, timeout):
         reasoning_tokens=r.reasoning_tokens, total_tokens=r.total_tokens,
         solution=sol,
     )
+    # Collect code files if workdir available
+    code_files = _collect_code(r)
+    det = detect_constraints(r.final_response, constraints, code_files=code_files)
 
     print(f"correct={sol.correctness_score:.0%} tok={r.total_tokens:,} "
           f"${r.estimated_cost_usd:.4f} tools={r.total_tool_calls} "
@@ -339,6 +343,24 @@ def multi_model_compare(config_path, model_ids, timeout=200):
               f"{avg_tok:>10,.0f} {avg_tools:>10.1f} {avg_ret:>10.1f} {avg_qpd:>10,.0f}")
 
     return all_results
+
+
+def _collect_code(result) -> dict[str, str] | None:
+    """Collect code file contents from an AgenticResult's workdir."""
+    import os, glob
+    wd = getattr(result, 'workdir', '')
+    if not wd or not os.path.isdir(wd):
+        return None
+    code = {}
+    for root, dirs, files in os.walk(wd):
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
+        for f in files:
+            if f.endswith('.py') and not f.startswith('.'):
+                fpath = os.path.join(root, f)
+                try:
+                    code[f] = open(fpath).read()
+                except: pass
+    return code if code else None
 
 
 if __name__ == "__main__":

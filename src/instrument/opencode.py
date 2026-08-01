@@ -27,6 +27,7 @@ class AgenticResult:
     run_id: str = ""
     task: str = ""
     model: str = ""
+    workdir: str = ""
     exit_code: int = 0
     duration_s: float = 0.0
     error: str = ""
@@ -106,7 +107,7 @@ def run_opencode_agentic(
 
     t0 = time.monotonic()
     result = AgenticResult(run_id=session_name or f"opencode_{int(t0)}",
-                           task=prompt, model=model)
+                           task=prompt, model=model, workdir=workdir)
 
     # Create an isolated worktree per run
     if workdir is None:
