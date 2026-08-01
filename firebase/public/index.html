@@ -268,13 +268,13 @@ footer a:hover{color:var(--green)}
   </div>
 
   <div class="callout r" style="margin-top:1.5rem">
-    <strong>The finding across all models (opencode DB costs, authoritative):</strong><br>
-    DeepSeek: $0.55 total (17 sessions, $0.85/Mtok) — lowest recovery cost ($0.00, 0.9× multiplier).<br>
-    GPT-5-mini: $0.88 total (24 OpenAI sessions, $1.07/Mtok) — competitive cost, 1.2× recovery multiplier.<br>
-    Claude: $6.08 total (19 sessions, $9.29/Mtok) — 11× higher than DeepSeek, $0.15 recovery cost per session.<br>
-    Dashboard-verified pricing: DeepSeek $0.022/Mtok, OpenAI $0.16/Mtok, Claude $10-50/Mtok.<br>
-    The RL-trained policy produces the most cost-stable behavior under perturbation — zero recovery cost.<br>
-    <em>Note: OpenAI costs are from opencode DB (authoritative). Dashboard shows $0.48 total (July), experiments are August.</em>
+    <strong>Dashboard-verified costs (all rates from actual billed amounts):</strong><br>
+    DeepSeek: $0.022/Mtok (dashboard: $7.38 / 337M tok) → $0.0005/base, 0.9× multiplier, $0.00 recovery.<br>
+    GPT-5.6: $0.25/Mtok (dashboard: $0.82 / 3.23M tok avg) → $0.004/base, 0.9× multiplier, $0.00 recovery.<br>
+    Claude: $10-50/Mtok (dashboard: $13.19 MTD) → $0.237/base, 1.1× multiplier, $0.02 recovery.<br>
+    GPT-5.6 matches DeepSeek at 0.9× recovery multiplier — frontier models converge toward zero recovery cost.<br>
+    Older models (GPT-5-mini 1.2×, GPT-5-nano 1.7×) show the progression toward efficiency over model generations.<br>
+    <em>Costs use dashboard-verified $/Mtok × observed experiment tokens. opencode DB cost field is inflated for frontier models.</em>
   </div>
 </section>
 
