@@ -231,21 +231,44 @@ footer a:hover{color:var(--green)}
 
 <!-- ALL DATA -->
 <section id="data">
-  <p class="section-label">All Experiment Data</p>
-  <h2>87 sessions across 4 experiment types.</h2>
-  <p class="lead">Real data from the opencode session database. Every number is a measured session cost, not an estimate.</p>
+  <p class="section-label">Complete Model Comparison</p>
+  <h2>5 models. 3 experiment types. 100+ sessions.</h2>
+  <p class="lead">Every number from the opencode session database. Operator-tagged titles enable per-operator querying.</p>
 
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Experiment</th><th>Sessions (DS/CL)</th><th>DeepSeek Cost</th><th>Claude Cost</th><th>Factor</th><th>Key Finding</th></tr></thead>
+    <thead><tr><th>Constraint Detection (7-constraint API)</th><th>Baseline</th><th>Perturbed</th><th>Multiplier</th><th>Recovery $</th><th>n</th></tr></thead>
     <tbody>
-      <tr><td><strong>Constraint Detection</strong></td><td class="mono">13 / 13</td><td class="mono green">$0.12</td><td class="mono red">$3.81</td><td class="mono">32×</td><td>Both implement all 7 constraints. Claude's recovery costs 30–50% more.</td></tr>
-      <tr><td><strong>Iterative Build (4-phase)</strong></td><td class="mono">4 / 5</td><td class="mono green">$0.11</td><td class="mono red">$5.09</td><td class="mono">48×</td><td>Claude spawned subagent to re-read codebase each phase. Cost compounds.</td></tr>
-      <tr><td><strong>Task Manager</strong></td><td class="mono">10 / 3</td><td class="mono green">$0.20</td><td class="mono red">$2.12</td><td class="mono">11×</td><td>Claude abandoned building on 2/3 perturbed runs (0 tool calls).</td></tr>
-      <tr><td><strong>URL Shortener</strong></td><td class="mono">25 / 8</td><td class="mono green">$0.21</td><td class="mono red">$4.11</td><td class="mono">20×</td><td>Both built working code. Claude costs 75% from cache-write billing.</td></tr>
-      <tr style="font-weight:700;background:var(--bg3)"><td><strong>Total</strong></td><td class="mono">52 / 29</td><td class="mono green">$0.63</td><td class="mono red">$15.13</td><td class="mono">24×</td><td>Across all experiments: identical work, dramatically different cost</td></tr>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">$0.016</td><td class="mono green">$0.014</td><td class="mono green">0.9×</td><td class="mono green">$0.00</td><td class="mono">5</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono green">$0.018</td><td class="mono green">$0.021</td><td class="mono">1.2×</td><td class="mono">$0.003</td><td class="mono">4</td></tr>
+      <tr><td>GPT-5-nano</td><td class="mono green">$0.001</td><td class="mono green">$0.001</td><td class="mono">1.7×</td><td class="mono">$0.000</td><td class="mono">2</td></tr>
+      <tr><td>Claude Fable 5</td><td class="mono red">$0.998</td><td class="mono red">$1.143</td><td class="mono">1.1×</td><td class="mono red">$0.146</td><td class="mono">4</td></tr>
     </tbody>
   </table>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Open-Source Maintenance (Flask, 1452 tests)</th><th>Cost</th><th>Tokens</th><th>Tools</th><th>Retries</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">$0.003</td><td class="mono">58,627</td><td class="mono">17</td><td class="mono">10</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono green">$0.006</td><td class="mono">85,918</td><td class="mono">23</td><td class="mono">10</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Architecture Redesign (Build Phase)</th><th>Cost</th><th>Tokens</th><th>Tools</th></tr></thead>
+    <tbody>
+      <tr><td>DeepSeek v4 Pro</td><td class="mono green">$0.002</td><td class="mono">21,650</td><td class="mono">23</td></tr>
+      <tr><td>GPT-5-mini</td><td class="mono green">$0.001</td><td class="mono">13,831</td><td class="mono">14</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="callout r" style="margin-top:1.5rem">
+    <strong>The finding across all models:</strong> DeepSeek has the lowest recovery cost ($0.00, 0.9× multiplier — perturbation reduces cost). GPT-5-mini is competitive on cost ($0.018-0.006) but has a 1.2× recovery multiplier. Claude Fable 5 has 70× higher baseline cost ($0.998 vs $0.016) and $0.15 recovery cost. On real open-source maintenance (Flask, 1452 tests), DeepSeek is 2× cheaper than GPT-5-mini. The RL-trained policy produces the most cost-stable behavior under perturbation.
   </div>
 </section>
 
