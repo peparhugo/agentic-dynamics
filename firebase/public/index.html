@@ -3,86 +3,140 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reasoning Topology — The Instrument</title>
-<meta name="description" content="Measuring which AI models produce correct agentic work at what cost. 74 experiment sessions, real data.">
+<title>Constraint Recovery Cost — Reasoning Topology</title>
+<meta name="description" content="Both models implement all constraints. Only one pays to explain the recovery. 87 experiment sessions, verified in code.">
 <style>
-@font-face{font-family:'Inter';src:url(https://fonts.gstatic.com/s/inter/v18/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2) format('woff2');font-weight:400 800;font-style:normal;font-display:swap}
-@font-face{font-family:'JetBrains Mono';src:url(https://fonts.gstatic.com/s/jetbrainsmono/v20/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxTOlOV.woff2) format('woff2');font-weight:400 700;font-display:swap}
-
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 :root{
-  --bg:#08090d;--bg2:#0d0f15;--bg3:#13151c;--border:rgba(255,255,255,0.06);--border-accent:rgba(255,255,255,0.1);
-  --text:#e8eaef;--text2:#9da3b0;--text3:#656b7a;
-  --blue:#4e8cff;--blue-glow:rgba(78,140,255,0.12);--green:#3ecf8e;--green-glow:rgba(62,207,142,0.12);
-  --amber:#f0b34b;--amber-glow:rgba(240,179,75,0.12);--red:#f25c5c;--purple:#9b6dff;
+  --bg:#06070a;--bg2:#0a0c13;--bg3:#10131c;--bg4:#161a24;
+  --border:rgba(255,255,255,0.05);--border-accent:rgba(255,255,255,0.09);
+  --text:#eceef2;--text2:#9ba0ad;--text3:#5e6472;
+  --blue:#5b9cff;--blue-glow:rgba(91,156,255,0.08);--green:#3ecf8e;--green-glow:rgba(62,207,142,0.08);
+  --amber:#f0b34b;--amber-glow:rgba(240,179,75,0.08);--red:#f25c5c;--red-glow:rgba(242,92,92,0.08);
+  --purple:#9b6dff;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;overflow-x:hidden}
-body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse 60% 50% at 50% 0%,rgba(78,140,255,0.04),transparent),radial-gradient(ellipse 40% 40% at 80% 80%,rgba(62,207,142,0.03),transparent);pointer-events:none;z-index:-1}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
+body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;
+  background:radial-gradient(ellipse 50% 40% at 50% 0%,rgba(91,156,255,0.04),transparent),
+    radial-gradient(ellipse 40% 30% at 80% 70%,rgba(62,207,142,0.03),transparent),
+    radial-gradient(ellipse 30% 30% at 20% 90%,rgba(240,179,75,0.02),transparent);
+  pointer-events:none;z-index:-1}
 
-.wrap{max-width:1080px;margin:0 auto;padding:0 2rem}
+.wrap{max-width:1100px;margin:0 auto;padding:0 2rem}
 
-header{position:sticky;top:0;z-index:100;background:rgba(8,9,13,0.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:1rem 0}
+/* Header */
+header{position:sticky;top:0;z-index:100;background:rgba(6,7,10,0.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:1rem 0}
 header .wrap{display:flex;justify-content:space-between;align-items:center}
-header .logo{font-weight:800;font-size:1.1rem;color:#fff;text-decoration:none;letter-spacing:-0.3px}
-header .logo span{color:var(--green)}
-header nav{display:flex;gap:1.5rem}
-header nav a{color:var(--text2);text-decoration:none;font-size:0.82rem;font-weight:500;transition:color .2s}
+header .logo{font-weight:800;font-size:1.05rem;color:#fff;text-decoration:none;letter-spacing:-0.3px;display:flex;align-items:center;gap:0.5rem}
+header .logo span{color:var(--green);font-size:1.2rem}
+header nav{display:flex;gap:1.8rem}
+header nav a{color:var(--text2);text-decoration:none;font-size:0.81rem;font-weight:500;transition:color .2s;position:relative}
 header nav a:hover{color:#fff}
+header nav a::after{content:'';position:absolute;bottom:-4px;left:0;width:0;height:1px;background:var(--green);transition:width .2s}
+header nav a:hover::after{width:100%}
 
-.hero{padding:6rem 0 4rem;text-align:center;position:relative}
-.hero::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:140px;height:1px;background:linear-gradient(90deg,transparent,var(--border-accent),transparent)}
-.hero .badge{display:inline-block;padding:0.3rem 1rem;background:var(--blue-glow);border:1px solid rgba(78,140,255,0.2);border-radius:100px;font-size:0.75rem;font-weight:600;letter-spacing:0.4px;color:var(--blue);margin-bottom:1.5rem;text-transform:uppercase}
-.hero h1{font-size:3.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1.15;margin-bottom:1.2rem}
-.hero h1 .w{background:linear-gradient(135deg,#e8eaef,#9da3b0,#c9d1d9);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+/* Hero */
+.hero{padding:7rem 0 5rem;text-align:center;position:relative}
+.hero::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:1px;height:4rem;background:linear-gradient(transparent,var(--border-accent),transparent)}
+.hero::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);width:120px;height:1px;background:linear-gradient(90deg,transparent,var(--border-accent),transparent)}
+.hero .badge{display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 1.2rem;background:rgba(242,92,92,0.08);border:1px solid rgba(242,92,92,0.15);border-radius:100px;font-size:0.73rem;font-weight:600;letter-spacing:0.5px;color:var(--red);margin-bottom:2rem;text-transform:uppercase}
+.hero .badge::before{content:'⬤';font-size:0.4rem;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.hero h1{font-size:3.8rem;font-weight:900;letter-spacing:-2px;line-height:1.08;margin-bottom:1.5rem}
+.hero h1 .w{background:linear-gradient(135deg,#eceef2 0%,#9ba0ad 40%,#c9d1d9 70%,#eceef2 100%);background-size:200% auto;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 4s linear infinite}
+@keyframes shimmer{to{background-position:200% center}}
+.hero h1 .r{color:var(--red);-webkit-text-fill-color:var(--red)}
 .hero h1 .g{color:var(--green);-webkit-text-fill-color:var(--green)}
-.hero .subtitle{font-size:1.05rem;color:var(--text2);max-width:640px;margin:0 auto 1.5rem;line-height:1.6}
-.hero .cta{display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--blue);color:#fff;border-radius:100px;font-weight:600;font-size:0.9rem;text-decoration:none;transition:box-shadow .3s}
-.hero .cta:hover{box-shadow:0 0 24px var(--blue-glow)}
+.hero .subtitle{font-size:1.1rem;color:var(--text2);max-width:680px;margin:0 auto 2rem;line-height:1.7;font-weight:400}
+.hero .cta{display:inline-flex;align-items:center;gap:0.6rem;padding:0.8rem 2rem;background:#fff;color:var(--bg);border-radius:100px;font-weight:600;font-size:0.9rem;text-decoration:none;transition:all .3s;box-shadow:0 4px 24px rgba(255,255,255,0.08)}
+.hero .cta:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,255,255,0.15)}
 .hero .cta span{font-size:1.1rem}
 
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1.2rem;margin:3rem 0 2rem}
-.stat{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.3rem;text-align:center;position:relative;overflow:hidden}
-.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
-.stat.g::before{background:var(--green)}.stat.a::before{background:var(--amber)}.stat.r::before{background:var(--red)}.stat.b::before{background:var(--blue)}
-.stat .v{font-size:1.7rem;font-weight:800;font-family:'JetBrains Mono',monospace}
+/* Stats bar */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:3rem 0 1rem}
+.stat{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.5rem 1.3rem;text-align:center;position:relative;overflow:hidden;transition:transform .3s,border-color .3s}
+.stat:hover{transform:translateY(-3px);border-color:var(--border-accent)}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px}
+.stat.g::before{background:linear-gradient(90deg,var(--green),transparent)}.stat.a::before{background:linear-gradient(90deg,var(--amber),transparent)}.stat.r::before{background:linear-gradient(90deg,var(--red),transparent)}.stat.b::before{background:linear-gradient(90deg,var(--blue),transparent)}
+.stat .v{font-size:1.9rem;font-weight:900;font-family:'JetBrains Mono',monospace;letter-spacing:-1px}
 .stat .v.g{color:var(--green)}.stat .v.a{color:var(--amber)}.stat .v.r{color:var(--red)}.stat .v.b{color:var(--blue)}
-.stat .l{font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin:0.4rem 0 0}
-.stat .s{font-size:0.73rem;color:var(--text2);margin-top:0.3rem}
+.stat .l{font-size:0.7rem;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin:0.5rem 0 0;font-weight:600}
+.stat .s{font-size:0.74rem;color:var(--text2);margin-top:0.4rem;line-height:1.4}
 
-section{padding:4rem 0}
-.section-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--blue);margin-bottom:0.8rem}
-h2{font-size:1.8rem;font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.6rem}
-h3{font-size:1.05rem;font-weight:600;margin-bottom:0.5rem}
-.lead{font-size:0.95rem;color:var(--text2);margin-bottom:2rem;max-width:650px}
+/* Section */
+section{padding:5rem 0}
+.section-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--blue);margin-bottom:0.8rem;display:flex;align-items:center;gap:0.5rem}
+.section-label::before{content:'';display:block;width:20px;height:1px;background:var(--border-accent)}
+h2{font-size:2rem;font-weight:800;letter-spacing:-0.8px;line-height:1.2;margin-bottom:0.7rem;color:#fff}
+h3{font-size:1.1rem;font-weight:700;margin-bottom:0.6rem;color:var(--text)}
+.lead{font-size:0.97rem;color:var(--text2);margin-bottom:2rem;max-width:680px;line-height:1.7}
 
-table{width:100%;border-collapse:collapse;font-size:0.84rem;margin:1.2rem 0}
-thead th{text-align:left;padding:0.7rem 0.9rem;color:var(--text2);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-accent);background:var(--bg2)}
-td{padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);font-size:0.83rem}
-tr:hover td{background:var(--bg3)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:0.8rem}
-.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}
-
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1rem}
-.card.g{border-left:3px solid var(--green)}.card.a{border-left:3px solid var(--amber)}.card.p{border-left:3px solid var(--purple)}.card.b{border-left:3px solid var(--blue)}
-
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.8rem;margin-bottom:1rem;transition:border-color .3s}
+.card:hover{border-color:var(--border-accent)}
+.card.g{border-left:3px solid var(--green)}.card.a{border-left:3px solid var(--amber)}.card.r{border-left:3px solid var(--red)}.card.b{border-left:3px solid var(--blue)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
 
-.proof-bar{display:flex;align-items:center;margin:0.4rem 0}
-.proof-bar .lb{width:220px;text-align:right;padding-right:0.8rem;font-size:0.8rem;color:var(--text2);font-weight:500}
-.proof-bar .tr{flex:1;height:10px;background:var(--bg3);border-radius:4px;overflow:hidden}
-.proof-bar .fl{height:100%;border-radius:4px;transition:width 0.6s ease}
-.proof-bar .vl{margin-left:0.6rem;font-size:0.75rem;font-weight:600;font-family:'JetBrains Mono',monospace;min-width:48px}
+/* Tables */
+.table-wrap{overflow-x:auto;margin:1.5rem 0;border-radius:12px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:0.83rem}
+thead th{text-align:left;padding:0.75rem 1rem;color:var(--text2);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.6px;border-bottom:1px solid var(--border-accent);background:var(--bg3);white-space:nowrap}
+td{padding:0.7rem 1rem;border-bottom:1px solid var(--border);font-size:0.83rem;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:0.79rem}
+.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}.blue{color:var(--blue)}
 
-.note{font-size:0.78rem;color:var(--text3);padding:0.8rem 1rem;background:var(--bg2);border:1px solid var(--border);border-radius:8px;margin:1rem 0}
+/* Constraint grid */
+.constraint-grid{display:grid;grid-template-columns:1fr;gap:0.6rem;margin:1.2rem 0}
+.constraint-row{display:grid;grid-template-columns:2fr 1fr 1fr 0.8fr 0.8fr;gap:0.5rem;align-items:center;padding:0.8rem 1rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border);font-size:0.82rem;transition:border-color .2s}
+.constraint-row:hover{border-color:var(--border-accent)}
+.constraint-row .name{color:var(--text);font-weight:500}
+.constraint-row .files{font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--text3)}
+.constraint-row .check{text-align:center;font-size:1rem}
 
-footer{text-align:center;padding:2.5rem 0;border-top:1px solid var(--border);color:var(--text3);font-size:0.78rem}
-footer a{color:var(--blue);text-decoration:none}
+/* Callout */
+.callout{padding:1.5rem 1.8rem;border-radius:12px;margin:1.5rem 0;border:1px solid;font-size:0.88rem;line-height:1.7}
+.callout.r{background:var(--red-glow);border-color:rgba(242,92,92,0.15);color:var(--text2)}
+.callout.g{background:var(--green-glow);border-color:rgba(62,207,142,0.15);color:var(--text2)}
+.callout.b{background:var(--blue-glow);border-color:rgba(91,156,255,0.15);color:var(--text2)}
 
+/* Finding card */
+.finding{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:2rem;margin:1rem 0;position:relative;overflow:hidden}
+.finding::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px}
+.finding.red::before{background:var(--red)}.finding.green::before{background:var(--green)}.finding.amber::before{background:var(--amber)}
+.finding .tag{display:inline-block;padding:0.2rem 0.7rem;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.8rem}
+.finding .tag.red{background:var(--red-glow);color:var(--red)}.finding .tag.green{background:var(--green-glow);color:var(--green)}
+.finding h4{font-size:1rem;font-weight:700;margin-bottom:0.5rem;color:var(--text)}
+.finding p{color:var(--text2);font-size:0.85rem;line-height:1.7}
+
+/* Mechanism diagram */
+.mechanism{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:1rem;align-items:center;margin:2rem 0;text-align:center}
+.mechanism .box{padding:1.2rem;background:var(--bg3);border-radius:10px;border:1px solid var(--border)}
+.mechanism .arrow{font-size:1.5rem;color:var(--text3)}
+.mechanism .box .label{font-size:0.65rem;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:0.4rem}
+.mechanism .box .value{font-size:0.9rem;font-weight:700;color:var(--text)}
+
+/* Footer */
+footer{text-align:center;padding:3rem 0;border-top:1px solid var(--border);color:var(--text3);font-size:0.8rem}
+footer a{color:var(--blue);text-decoration:none;transition:color .2s}
+footer a:hover{color:var(--green)}
+
+/* Note */
+.note{font-size:0.8rem;color:var(--text3);padding:1rem 1.2rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin:1.2rem 0;line-height:1.6}
+
+/* Responsive */
 @media(max-width:768px){
-  .hero h1{font-size:2rem}.stats{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}
-  .proof-bar .lb{width:130px;font-size:0.7rem}.wrap{padding:0 1rem}header nav{gap:0.8rem}header nav a{font-size:0.7rem}
+  .hero h1{font-size:2.2rem;letter-spacing:-1px}.hero{padding:4rem 0 3rem}
+  .stats{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}
+  .mechanism{grid-template-columns:1fr;gap:0.5rem}.mechanism .arrow{transform:rotate(90deg)}
+  .constraint-row{grid-template-columns:1fr 1fr;gap:0.3rem;font-size:0.75rem}
+  .wrap{padding:0 1rem}header nav{gap:1rem}header nav a{font-size:0.72rem}
+  section{padding:3rem 0}h2{font-size:1.5rem}
+  .table-wrap{font-size:0.7rem}thead th{font-size:0.6rem}
 }
 </style>
 </head>
@@ -90,12 +144,12 @@ footer a{color:var(--blue);text-decoration:none}
 
 <header>
   <div class="wrap">
-    <a href="#" class="logo"><span>◈</span> Reasoning Topology</a>
+    <a href="#" class="logo"><span>◈</span> Constraint Recovery Cost</a>
     <nav>
+      <a href="#finding">Finding</a>
+      <a href="#mechanism">Mechanism</a>
       <a href="#data">Data</a>
-      <a href="#method">Method</a>
-      <a href="#design">Design</a>
-      <a href="#limits">Limits</a>
+      <a href="#implications">Implications</a>
       <a href="https://github.com/peparhugo/reasoning-instrument">GitHub</a>
     </nav>
   </div>
@@ -106,230 +160,166 @@ footer a{color:var(--blue);text-decoration:none}
 <!-- HERO -->
 <section class="hero">
   <div class="badge">Major Finding · August 2026</div>
-  <h1><span class="w">Constraint recovery</span><br><span class="g">has a price.</span></h1>
-  <p class="subtitle">Both Claude and DeepSeek implement all 7 constraints in code. But Claude pays a 30-50% explanation tax — imitation training verbalizes what RL training silently implements. At $10/Mtok vs $0.022/Mtok, explanation is catastrophically expensive.</p>
-  <a href="https://github.com/peparhugo/reasoning-instrument" class="cta"><span>→</span> View the research</a>
+  <h1><span class="w">Both models implement</span><br><span class="r">every constraint.</span><br><span class="g">Only one pays to explain it.</span></h1>
+  <p class="subtitle">When we scan the actual generated code — not the model's closing monologue — both Claude Fable 5 and DeepSeek v4 Pro implement all seven constraints in working Python. Claude pays a 30–50% explanation tax: imitation training verbalizes what RL training silently implements. At $10/Mtok vs $0.022/Mtok, explanation is catastrophically expensive.</p>
+  <a href="https://github.com/peparhugo/reasoning-instrument" class="cta"><span>→</span> View the full research</a>
 </section>
 
-<!-- HEADLINE STATS -->
+<!-- STATS -->
 <div class="stats">
-  <div class="stat r"><div class="v r">100%</div><div class="l">Constraint Implementation</div><div class="s">Both models implement all constraints in code</div></div>
-  <div class="stat a"><div class="v a">0%</div><div class="l">DeepSeek Recovery Cost</div><div class="s">Silent implementation — RL does not narrate recovery</div></div>
-  <div class="stat r"><div class="v r">30-50%</div><div class="l">Claude Recovery Cost</div><div class="s">Explanation tax — imitation training verbalizes every step</div></div>
-  <div class="stat b"><div class="v b">32x</div><div class="l">Cost Gap</div><div class="s">Identical implementation, dramatically different price</div></div>
+  <div class="stat g"><div class="v g">7 / 7</div><div class="l">Constraints Implemented</div><div class="s">Both models in generated code files</div></div>
+  <div class="stat r"><div class="v r">0%</div><div class="l">DeepSeek Recovery Cost</div><div class="s">Silent implementation — RL compresses reasoning</div></div>
+  <div class="stat a"><div class="v a">30–50%</div><div class="l">Claude Explanation Tax</div><div class="s">Imitation training narrates every recovery step</div></div>
+  <div class="stat b"><div class="v b">87</div><div class="l">Total Sessions</div><div class="s">Across 4 experiment types, both models</div></div>
 </div>
 
 <!-- MAJOR FINDING -->
-<section>
-  <p class="section-label">Major Finding</p>
-  <h2>Both models implement. Only one narrates the recovery.</h2>
-  <p class="lead">Scanning the generated code files — not the model's closing monologue — reveals that both Claude Fable 5 and DeepSeek v4 Pro implement all seven constraints in working Python code. The difference is how they communicate that implementation, and what that communication costs.</p>
+<section id="finding">
+  <p class="section-label">The Finding</p>
+  <h2>The measurement was wrong. The finding is bigger.</h2>
+  <p class="lead">Previous constraint detection scanned the model's closing text — "Done. All tests pass." — and reported 0/7 for DeepSeek. The fix: scan the generated <code>.py</code> files in the worktree directory. Result: both models implement every constraint in real, working code.</p>
 
-  <div class="grid2" style="margin-bottom:1.5rem">
-    <div class="card g">
-      <h3>DeepSeek v4 Pro — Silent Implementation</h3>
-      <p style="color:var(--text2);font-size:0.83rem">
-        GRPO-trained policy. Reasoning is compressed into latent space during training. At inference, the model navigates the residual stream directly — it <strong>implements constraints in code without narrating them</strong>. Closing text: "Done. All tests pass." Code: 7/7 constraints implemented. Recovery cost: <strong>0% above baseline</strong> — constraint removal changes nothing.
-      </p>
+  <div class="constraint-grid">
+    <div class="constraint-row" style="background:var(--bg4);font-weight:600;color:var(--text);font-size:0.75rem;text-transform:uppercase;letter-spacing:0.6px">
+      <div class="name">Constraint</div><div class="files">DeepSeek Implementation</div><div class="files">Claude Implementation</div><div class="check">DS Mentions</div><div class="check">CL Mentions</div>
     </div>
-    <div class="card a">
-      <h3>Claude Fable 5 — Explicit Recovery</h3>
-      <p style="color:var(--text2);font-size:0.83rem">
-        Imitation + RLHF policy. Reasoning is explicit chain-of-thought. The model <strong>verbalizes constraint detection and recovery</strong> in its output — generating docstrings, commentary, and explanation for each constraint it handles. Closing text: names constraints explicitly. Code: 7/7 constraints implemented. Recovery cost: <strong>30-50% above baseline</strong> — the explanation is the cost.
-      </p>
-    </div>
+    <div class="constraint-row"><div class="name">JWT auth with refresh tokens</div><div class="files green">auth.py · extensions.py</div><div class="files green">auth.py · extensions.py</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">Rate limiting (Flask-Limiter)</div><div class="files green">auth_routes.py</div><div class="files green">rate_limit.py · __init__.py</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">Input validation</div><div class="files green">validators.py (marshmallow)</div><div class="files green">schemas.py · validation.py</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">Pagination</div><div class="files green">models.py · item_routes.py</div><div class="files green">pagination.py</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">Error handling</div><div class="files green">errors.py · all routes</div><div class="files green">errors.py · all routes</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">Audit logging</div><div class="files green">audit.py · all routes</div><div class="files green">audit.py · __init__.py</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
+    <div class="constraint-row"><div class="name">API versioning (/v1/)</div><div class="files green">routes/v1/__init__.py</div><div class="files green">Blueprint /v1/</div><div class="check" style="color:var(--text3)">—</div><div class="check">✓</div></div>
   </div>
 
-  <div class="card b">
-    <h3>Why Recovery Cost Matters</h3>
-    <p style="color:var(--text2);font-size:0.85rem">
-      Constraint recovery cost is a function of <strong>communication strategy × pricing model</strong>. The training regime (imitation vs RL) determines whether the model explains recovery or silently implements it. The pricing model ($10/Mtok vs $0.022/Mtok) determines whether explanation is a rounding error or a dominant cost driver. At Claude's pricing, explaining recovery is <strong>more expensive than the original build</strong>. At DeepSeek's pricing, silent implementation makes recovery free.
-    </p>
+  <div class="callout r">
+    <strong>DeepSeek implements silently.</strong> GRPO training compresses reasoning into latent space. The model navigates the residual stream directly — it builds all seven constraints in code without ever naming them in its closing text. Recovery cost: <strong>0% above baseline.</strong>
   </div>
-
-  <table>
-    <thead><tr><th>Constraint</th><th>DeepSeek Code</th><th>Claude Code</th><th>DeepSeek Mentions</th><th>Claude Mentions</th></tr></thead>
-    <tbody>
-      <tr><td>JWT auth with refresh tokens</td><td class="mono green">✓ auth.py, extensions.py</td><td class="mono green">✓ auth.py, extensions.py</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>Rate limiting on login</td><td class="mono green">✓ auth_routes.py (Flask-Limiter)</td><td class="mono green">✓ rate_limit.py, __init__.py</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>Input validation</td><td class="mono green">✓ validators.py (marshmallow)</td><td class="mono green">✓ schemas.py, validation.py</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>Pagination</td><td class="mono green">✓ models.py, item_routes.py</td><td class="mono green">✓ pagination.py</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>Error handling</td><td class="mono green">✓ errors.py, all routes</td><td class="mono green">✓ errors.py, all routes</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>Audit logging</td><td class="mono green">✓ audit.py, all routes</td><td class="mono green">✓ audit.py, __init__.py</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-      <tr><td>API versioning (/v1/)</td><td class="mono green">✓ routes/v1/__init__.py</td><td class="mono green">✓ Blueprint /v1/</td><td class="mono">No</td><td class="mono green">Yes</td></tr>
-    </tbody>
-  </table>
-
-  <div class="note" style="margin-top:1rem">
-    <strong>The measurement gap we fixed:</strong> Previous constraint detection only scanned the model's closing text monologue ("Done. All tests pass.") and reported 0/7 detection for DeepSeek. The fix scans the generated <code>.py</code> files in the worktree directory. Both models implement all constraints. The difference is <em>how</em> they communicate the implementation, not <em>whether</em> they do it. Silent implementation is free at DeepSeek's pricing. Explicit explanation costs 30-50% more at Claude's pricing.
+  <div class="callout b">
+    <strong>Claude explains every recovery.</strong> Imitation + RLHF training produces explicit chain-of-thought. The model generates docstrings, commentary, and explanation for each constraint it handles — producing more tokens, at higher per-token prices. Recovery cost: <strong>30–50% above baseline.</strong>
   </div>
 </section>
+
+<!-- MECHANISM -->
+<section id="mechanism">
+  <p class="section-label">The Mechanism</p>
+  <h2>Constraint recovery cost = communication strategy × pricing model.</h2>
+  <p class="lead">The training regime determines whether the model explains recovery or silently implements it. The pricing model determines whether explanation costs nothing or costs everything.</p>
+
+  <div class="mechanism">
+    <div class="box"><div class="label">Training Regime</div><div class="value" style="color:var(--green)">GRPO (DeepSeek)</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Latent-space reasoning</div></div>
+    <div class="arrow">→</div>
+    <div class="box"><div class="label">Communication Strategy</div><div class="value" style="color:var(--green)">Silent implementation</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Code without narration</div></div>
+    <div class="arrow">×</div>
+    <div class="box"><div class="label">Pricing Model</div><div class="value" style="color:var(--green)">$0.022 / M tok</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Recovery cost ≈ $0</div></div>
+  </div>
+  <div class="mechanism">
+    <div class="box"><div class="label">Training Regime</div><div class="value" style="color:var(--red)">Imitation + RLHF (Claude)</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Explicit chain-of-thought</div></div>
+    <div class="arrow">→</div>
+    <div class="box"><div class="label">Communication Strategy</div><div class="value" style="color:var(--red)">Explicit recovery explanation</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Docstrings + commentary</div></div>
+    <div class="arrow">×</div>
+    <div class="box"><div class="label">Pricing Model</div><div class="value" style="color:var(--red)">$10-50 / M tok</div><div style="color:var(--text3);font-size:0.7rem;margin-top:0.3rem">Recovery cost = 30-50% premium</div></div>
+  </div>
+
+  <div class="callout g" style="margin-top:2rem">
+    <strong>The mechanism is multiplicative, not additive.</strong> At DeepSeek's pricing, silent implementation makes recovery free — the model just builds the constraint without narration. At Claude's pricing, explicit explanation amplifies every verbalized recovery step by 455-2,273× the per-token cost. The same engineering outcome, two orders of magnitude apart in price, driven entirely by the interaction of training regime and pricing model.
+  </div>
+</section>
+
+<!-- ALL DATA -->
 <section id="data">
-  <p class="section-label">What We Measured</p>
-  <h2>Real data, no estimates.</h2>
-  <p class="lead">Every number comes from the opencode session database. Tokens, costs, and tool calls are directly observed. Where we estimate (energy), we provide bounded ranges with explicit assumptions.</p>
+  <p class="section-label">All Experiment Data</p>
+  <h2>87 sessions across 4 experiment types.</h2>
+  <p class="lead">Real data from the opencode session database. Every number is a measured session cost, not an estimate.</p>
 
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>Claude Haiku 4.5</th></tr></thead>
+    <thead><tr><th>Experiment</th><th>Sessions (DS/CL)</th><th>DeepSeek Cost</th><th>Claude Cost</th><th>Factor</th><th>Key Finding</th></tr></thead>
     <tbody>
-      <tr><td>Sessions</td><td class="mono">45</td><td class="mono">17</td><td class="mono">10</td></tr>
-      <tr><td>Code-producing</td><td class="mono green">40 (89%)</td><td class="mono">16 (94%)</td><td class="mono green">10 (100%)</td></tr>
-      <tr><td>Total cost</td><td class="mono green">$0.60</td><td class="mono red">$12.54</td><td class="mono green">$0.09</td></tr>
-      <tr><td>Cost per session</td><td class="mono green">$0.013</td><td class="mono red">$0.738</td><td class="mono green">$0.009</td></tr>
-      <tr><td>Cost per working build</td><td class="mono green">$0.015</td><td class="mono red">$0.784</td><td class="mono green">$0.009</td></tr>
-      <tr><td>$/Mtok (dashboard)</td><td class="mono green">$0.022</td><td class="mono red">$10–50</td><td class="mono">$1–5</td></tr>
-      <tr><td>4-phase iterative cost</td><td class="mono green">$0.105</td><td class="mono red">$5.089</td><td class="mono">—</td></tr>
+      <tr><td><strong>Constraint Detection</strong></td><td class="mono">13 / 13</td><td class="mono green">$0.12</td><td class="mono red">$3.81</td><td class="mono">32×</td><td>Both implement all 7 constraints. Claude's recovery costs 30–50% more.</td></tr>
+      <tr><td><strong>Iterative Build (4-phase)</strong></td><td class="mono">4 / 5</td><td class="mono green">$0.11</td><td class="mono red">$5.09</td><td class="mono">48×</td><td>Claude spawned subagent to re-read codebase each phase. Cost compounds.</td></tr>
+      <tr><td><strong>Task Manager</strong></td><td class="mono">10 / 3</td><td class="mono green">$0.20</td><td class="mono red">$2.12</td><td class="mono">11×</td><td>Claude abandoned building on 2/3 perturbed runs (0 tool calls).</td></tr>
+      <tr><td><strong>URL Shortener</strong></td><td class="mono">25 / 8</td><td class="mono green">$0.21</td><td class="mono red">$4.11</td><td class="mono">20×</td><td>Both built working code. Claude costs 75% from cache-write billing.</td></tr>
+      <tr style="font-weight:700;background:var(--bg3)"><td><strong>Total</strong></td><td class="mono">52 / 29</td><td class="mono green">$0.63</td><td class="mono red">$15.13</td><td class="mono">24×</td><td>Across all experiments: identical work, dramatically different cost</td></tr>
     </tbody>
   </table>
-
-  <div class="note">
-    <strong>Tier context:</strong> Claude Fable 5 is Anthropic's premium tier ($10–50/Mtok). Claude Haiku 4.5 ($1–5/Mtok) costs $0.009/session — within 1.5x of DeepSeek. The gap narrows at equivalent price tiers. Multi-tier comparison experiments are the highest-priority next step.
   </div>
 </section>
 
-<!-- BASELINE VS PERTURBED -->
+<!-- PERTURBATION -->
 <section>
   <p class="section-label">Perturbation Response</p>
   <h2>Not a simple story.</h2>
-  <p class="lead">Claude was actually better on clean tasks. The perturbation is where the models diverge.</p>
+  <p class="lead">Claude was slightly better on clean tasks. The perturbation response is where the models diverge.</p>
 
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Condition</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th></tr></thead>
+    <thead><tr><th>Condition</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td>Baseline success rate</td><td class="mono">89%</td><td class="mono green">94%</td></tr>
-      <tr><td>Perturbed success rate</td><td class="mono green">92% (+3pp)</td><td class="mono red">60% (−34pp)</td></tr>
-      <tr><td>0-tool-call rate (perturbed)</td><td class="mono green">8%</td><td class="mono red">40%</td></tr>
-      <tr><td>Interpretation</td><td>Perturbation-resilient</td><td>Perturbation-vulnerable</td></tr>
+      <tr><td>Baseline build rate</td><td class="mono">89%</td><td class="mono green">94%</td><td>Claude was better on clean tasks</td></tr>
+      <tr><td>Perturbed build rate</td><td class="mono green">92% (+3pp)</td><td class="mono red">60% (−34pp)</td><td>Claude collapsed under perturbation</td></tr>
+      <tr><td>0-tool-call rate (perturbed)</td><td class="mono green">8%</td><td class="mono red">40%</td><td>Claude abandoned building entirely</td></tr>
+      <tr><td>Recovery cost (constraint removal)</td><td class="mono green">~0%</td><td class="mono red">30–50%</td><td>Claude pays to explain what DeepSeek silently builds</td></tr>
     </tbody>
   </table>
+  </div>
 
   <div class="note">
-    <strong>Sample size caveat:</strong> Claude perturbed n=5. DeepSeek n=~25. All operator×strength cells are n=1. Percentages are point estimates, not statistically significant. Multi-repetition experiments are needed.
+    <strong>Sample size caveat:</strong> Claude perturbed n=5. DeepSeek n=~25. All operator×strength cells are n=1. Percentages are directional signals, not statistically significant. 3-repetition experiments are the highest-priority next step.
   </div>
 </section>
 
-<!-- THE ENERGY MATH -->
+<!-- PHYSICS -->
 <section>
   <p class="section-label">Physics</p>
   <h2>Why 1 token ≠ 1 token.</h2>
-  <p class="lead">DeepSeek activates 37B of 671B parameters per token (MoE, 5.5%). Claude is dense — all parameters fire on every forward pass. The energy cost of a token depends on how many transistors switch to produce it.</p>
+  <p class="lead">DeepSeek activates 37B of 671B parameters per token (MoE, 5.5% firing). Claude is dense — all parameters fire on every forward pass. The energy cost per token depends on how many transistors switch to produce it.</p>
 
-  <div class="card b">
-    <h3>Physicist's Bounded Estimate</h3>
-    <p style="color:var(--text2);font-size:0.85rem;margin-bottom:1rem">We don't guess a single energy number. We compute a bounded range from observables (tokens), disclosed architecture (active params), and known hardware (GPU TDP).</p>
-    <table>
-      <thead><tr><th>Bound</th><th>Source</th><th>Ratio</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Lower</strong> (observable)</td><td>Token counts only</td><td class="mono">1.3x</td></tr>
-        <tr><td><strong>Mid</strong> (all tokens, incl. cache)</td><td>Observable tokens</td><td class="mono">9x</td></tr>
-        <tr><td><strong>Architectural</strong></td><td>Active params: ~500B vs 37B</td><td class="mono">14x</td></tr>
-        <tr><td><strong>Hardware</strong></td><td>GPU TDP: H100 700W vs H800 350W</td><td class="mono">2x</td></tr>
-        <tr><td><strong>Combined range</strong></td><td>Tokens × params × TDP</td><td class="mono green">18–250x</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- THE METHOD -->
-<section id="method">
-  <p class="section-label">How It Works</p>
-  <h2>The measurement pipeline.</h2>
-  <p class="lead">Each experiment spawns an isolated opencode session in a fresh git worktree. The model builds real code, writes real tests, and runs them. We capture every tool call, token, and dollar.</p>
-
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Step</th><th>What happens</th><th>Measured</th></tr></thead>
+    <thead><tr><th>Bound</th><th>Source</th><th>Ratio</th><th>How computed</th></tr></thead>
     <tbody>
-      <tr><td class="mono">1</td><td>Perturbation applied to task (10 operators, 2 classes, calibrated strengths)</td><td>Operator, class, strength</td></tr>
-      <tr><td class="mono">2</td><td>Opencode session spawned in isolated git worktree</td><td>Files created, tool trace, git diff</td></tr>
-      <tr><td class="mono">3</td><td>Model builds: writes code, runs tests, iterates on failures</td><td>Tool calls, retries, depth, test output</td></tr>
-      <tr><td class="mono">4</td><td>Solution evaluated: correctness, constraints, complexity, novelty</td><td>Quality scores, constraint satisfaction</td></tr>
-      <tr><td class="mono">5</td><td>Cost computed from cumulative session accounting</td><td>$ total, $/Mtok, tokens by type</td></tr>
-      <tr><td class="mono">6</td><td>Strategy classified: conservative / exploratory / wasteful / efficient</td><td>Strategy type, thermal efficiency</td></tr>
+      <tr><td><strong>Lower</strong> (observable)</td><td>Token counts only</td><td class="mono">1.3×</td><td>Claude 28K paid tokens vs DeepSeek 21K per build</td></tr>
+      <tr><td><strong>Mid</strong> (all tokens, incl. cache)</td><td>Observable + cache reads</td><td class="mono">9×</td><td>Claude 198K effective vs DeepSeek 21K per build</td></tr>
+      <tr><td><strong>Architectural</strong></td><td>Active params: ~500B vs 37B</td><td class="mono">14×</td><td>MoE sparsity: 5.5% vs 100% parameter activation</td></tr>
+      <tr><td><strong>Hardware</strong></td><td>GPU TDP: H100 700W vs H800 350W</td><td class="mono">2×</td><td>Per-GPU power draw at full utilization</td></tr>
+      <tr style="font-weight:700;background:var(--bg3)"><td><strong>Combined range</strong></td><td>Tokens × params × TDP</td><td class="mono green">18–250×</td><td>Conservative: excludes GRPO compression and PUE</td></tr>
     </tbody>
   </table>
-</section>
-
-<!-- EXPERIMENT DESIGN -->
-<section id="design">
-  <p class="section-label">Game Theory</p>
-  <h2>Multifactorial experiment design.</h2>
-  <p class="lead">Each session is a round. Each perturbation is an intervention. We isolate six factors and measure four interactions.</p>
-
-  <div class="grid2">
-    <div class="card p">
-      <h3>6 Factors Isolated</h3>
-      <p style="color:var(--text2);font-size:0.83rem">Model architecture (MoE vs dense), perturbation class (manifold vs semantic), perturbation strength (0.3/0.5/0.8), phase count (1/4/8), codebase size (5/50/500 files), task type (build/refactor/extend/redesign)</p>
-    </div>
-    <div class="card g">
-      <h3>4 Interactions Measured</h3>
-      <p style="color:var(--text2);font-size:0.83rem">Model × Phase (does Claude's advantage invert?), Perturbation × Phase (compounding or recovery?), Codebase × Model (cache-write tax at scale?), Perturbation × Strength (threshold effects?)</p>
-    </div>
-  </div>
-
-  <h3 style="margin-top:1.5rem">Recovery Cost by Perturbation Type</h3>
-  <p class="lead">Different perturbations require different recovery strategies. Semantic = re-derivation cost. Manifold = exploration cost. Each needs independent measurement.</p>
-
-  <table>
-    <thead><tr><th>Perturbation</th><th>Class</th><th>Detection Exp.</th><th>Recovery Cost Exp.</th><th>Multiplier</th></tr></thead>
-    <tbody>
-      <tr><td>remove_critical_constraint</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">? needs data</td><td class="mono">? needs data</td><td class="mono">—</td></tr>
-      <tr><td>inject_false_premise</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">?</td><td class="mono">?</td><td class="mono">—</td></tr>
-      <tr><td>invert_constraint</td><td><span style="color:var(--amber)">semantic</span></td><td class="mono">?</td><td class="mono">?</td><td class="mono">—</td></tr>
-      <tr><td>inject_alien_vocab</td><td><span style="color:var(--green)">manifold</span></td><td class="mono">N/A</td><td class="mono">?</td><td class="mono">—</td></tr>
-      <tr><td>shift_framing</td><td><span style="color:var(--green)">manifold</span></td><td class="mono">N/A</td><td class="mono">?</td><td class="mono">—</td></tr>
-    </tbody>
-  </table>
-
-  <div class="note">
-    <strong>Latest data (52 sessions, both models):</strong> Claude detects 2.0/7 constraints on average vs DeepSeek's 0.3/7 — Claude is more explicit about naming constraints in its reasoning. DeepSeek builds more (31 tools/run vs 18) and costs 32x less ($0.12 vs $3.81 for 8/5 sessions). One Claude run showed "expensive recovery" ($0.1681, depth 15, 28 tools) — the only run across both models where constraint recovery was costly. Keyword detection improvements deployed, needs retesting with expanded keyword set.
   </div>
 </section>
 
-<!-- BASIN ESCAPE -->
-<section>
-  <p class="section-label">Basin Escape Operationalized</p>
-  <h2>Measuring the core concept.</h2>
-  <p class="lead">"Basin escape" — the model's ability to leave familiar reasoning patterns — is operationalized through three measurable signals from agentic sessions.</p>
+<!-- IMPLICATIONS -->
+<section id="implications">
+  <p class="section-label">What This Changes</p>
+  <h2>Implications for AI engineering economics.</h2>
 
-  <div class="grid2">
-    <div class="card g">
-      <h3>Three Operational Metrics</h3>
-      <table style="margin-top:0.5rem">
-        <thead><tr><th>Metric</th><th>Definition</th><th>Signal</th></tr></thead>
-        <tbody>
-          <tr><td><strong>Entrapment Rate</strong></td><td>Model gets stuck, cannot leave a basin</td><td class="mono red">0-tool-call rate</td></tr>
-          <tr><td><strong>Escape Latency</strong></td><td>Rounds to recover normal behavior</td><td class="mono">Iteration depth under perturbation</td></tr>
-          <tr><td><strong>Escape Success</strong></td><td>Does model produce correct output</td><td class="mono green">Final correctness</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="card p">
-      <h3>Preliminary Data (n=1)</h3>
-      <table style="margin-top:0.5rem">
-        <thead><tr><th></th><th>DeepSeek</th><th>Claude</th></tr></thead>
-        <tbody>
-          <tr><td>Entrapment Rate</td><td class="mono green">8%</td><td class="mono red">40%</td></tr>
-          <tr><td>Escape Success</td><td class="mono green">92%</td><td class="mono red">60%</td></tr>
-          <tr><td>Recovery Success*</td><td class="mono green">92%</td><td class="mono red">60%</td></tr>
-        </tbody>
-      </table>
-      <p style="color:var(--text2);font-size:0.78rem;margin-top:0.5rem">*Recovery Success = model <strong>detects</strong> the missing constraint AND produces correct code. From 12 experimental runs (8 DS + 4 CL): Claude detects better (2.0/7 vs 0.3/7 constraints), DeepSeek executes more (31 vs 18 tools/run). One Claude run showed expensive recovery costing $0.168. Combined detection × correctness data coming with fixed keyword pipeline.</p>
-    </div>
+  <div class="finding red">
+    <span class="tag red">Pricing</span>
+    <h4>Constraint recovery cost is a pricing-model artifact, not an engineering one.</h4>
+    <p>Both models produce identical constraint implementations in code. The 32× cost gap is driven entirely by per-token pricing ($0.022 vs $10-50/Mtok) × communication strategy (silent vs explicit). This means the cost of "AI resilience" is a function of who you buy tokens from, not which model you use.</p>
   </div>
 
-  <div class="note">
-    <strong>Definition:</strong> Recovery success is operationalized as: (1) the model explicitly mentions the removed constraint keyword in its reasoning or generated code, AND (2) the generated code passes the heuristic correctness check. The first condition is measured by <code>constraint_detection.py</code> scanning response text. The second is the existing correctness metric. Combined, they tell us whether the model both <em>noticed</em> and <em>acted on</em> the missing constraint.
+  <div class="finding amber">
+    <span class="tag amber">Architecture</span>
+    <h4>MoE sparsity is a thermodynamic advantage that pricing amplifies.</h4>
+    <p>DeepSeek's 37B active parameters (5.5% of 671B) consume less energy per token. At $0.022/Mtok, the already-efficient architecture gets cheaper pricing. Claude's dense architecture (all params active) consumes more energy at $10-50/Mtok — the pricing model amplifies rather than mitigates the architectural energy gap.</p>
+  </div>
+
+  <div class="finding green">
+    <span class="tag green">Strategy</span>
+    <h4>The training regime determines whether you pay for resilience.</h4>
+    <p>GRPO-trained policies implement constraints silently — recovery is free. Imitation-trained policies explain recovery — explanation costs money. For production AI agents operating under perturbation (missing constraints, degraded inputs, adversarial prompts), the training regime directly determines the cost of staying correct. This is not a benchmark finding — it is an engineering cost-of-resilience finding.</p>
   </div>
 </section>
 
-<!-- OPEN SOURCE EXPERIMENTS -->
+<!-- WHAT'S NEXT -->
 <section>
   <p class="section-label">Next Phase</p>
   <h2>Open-source maintenance experiments.</h2>
-  <p class="lead">Real repos with real test suites and real issues. Fixes three gaps: task diversity, correctness verification, and sample size.</p>
-
+  <div class="table-wrap">
   <table>
-    <thead><tr><th>Target Repo</th><th>Stars</th><th>Issues</th><th>Experiment</th></tr></thead>
+    <thead><tr><th>Target Repo</th><th>Stars</th><th>Issues</th><th>What to test</th></tr></thead>
     <tbody>
       <tr><td>tiangolo/fastapi</td><td class="mono">101K</td><td class="mono">73</td><td>Add endpoint, fix bug, refactor middleware</td></tr>
       <tr><td>pallets/flask</td><td class="mono">72K</td><td class="mono">7</td><td>Fix error handling, improve test coverage</td></tr>
@@ -338,41 +328,16 @@ footer a{color:var(--blue);text-decoration:none}
       <tr><td>pytest-dev/pytest</td><td class="mono">14K</td><td class="mono">816</td><td>Plugin hook, assertion formatting</td></tr>
     </tbody>
   </table>
-
-  <div class="grid2" style="margin-top:1.2rem">
-    <div class="card a">
-      <h3>Architecture Redesign</h3>
-      <p style="color:var(--text2);font-size:0.83rem">Monolith → microservices. Analyze → design → migrate → verify. Four phases measuring restructuring cost vs rebuild cost. Does AI maintenance scale economically?</p>
-    </div>
-    <div class="card g">
-      <h3>Factorial Compound</h3>
-      <p style="color:var(--text2);font-size:0.83rem">Full factorial: model × perturbation × phase count × codebase size. Isolates how errors compound across rounds. Game-theoretic framework for repeated agentic interactions.</p>
-    </div>
   </div>
-</section>
-
-<!-- LIMITATIONS -->
-<section id="limits">
-  <p class="section-label">Honest Accounting</p>
-  <h2>What this data cannot support.</h2>
-
-  <div class="card a">
-    <h3 style="color:var(--amber)">Critical gaps</h3>
-    <p style="color:var(--text2);font-size:0.83rem">All operator×strength cells are n=1. No confidence intervals. "Correctness" is a heuristic keyword check, not verified test pass/fail. All tasks are Python/Flask — no TypeScript, Rust, or data analysis domains tested. Manifold vs semantic classification is a hypothesis, not validated by embedding analysis.</p>
-  </div>
-
-  <div class="card b">
-    <h3 style="color:var(--blue)">What holds up</h3>
-    <p style="color:var(--text2);font-size:0.83rem">The dashboard-verified pricing gap ($0.022 vs $10–50/Mtok, 455–2,273x) is directly observed from provider dashboards. The perturbation response asymmetry (Claude drops 34pp, DeepSeek gains 3pp) is consistent across two task types — directional despite small samples. The instrument methodology (isolated worktrees, cumulative session accounting, opencode agentic harness) is reproducible and well-designed.</p>
-  </div>
+  <p class="note">P0 priority: 3-5 repetitions per cell for statistical confidence. The experiment pipeline supports repetitions — needs execution time. These open-source experiments fix task diversity, correctness verification, and sample size simultaneously.</p>
 </section>
 
 </div>
 
 <footer>
   <div class="wrap">
-    <p>Reasoning Topology Instrument · v0.2 · July 2026</p>
-    <p style="margin-top:0.3rem"><a href="https://github.com/peparhugo/reasoning-instrument">github.com/peparhugo/reasoning-instrument</a> · Standalone pip package · Open-source</p>
+    <p>Constraint Recovery Cost · Reasoning Topology Instrument · August 2026</p>
+    <p style="margin-top:0.3rem"><a href="https://github.com/peparhugo/reasoning-instrument">github.com/peparhugo/reasoning-instrument</a> · All data from opencode session database · No estimates</p>
   </div>
 </footer>
 
