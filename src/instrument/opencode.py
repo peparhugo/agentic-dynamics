@@ -164,10 +164,15 @@ def run_opencode_agentic(
 
     result.duration_s = time.monotonic() - t0
 
-    # Detect file changes
+    # Detect file changes (filter out venv, pip, pytest cache)
     files_after = _list_files(workdir)
-    result.files_created = sorted(files_after - files_before)
-    result.files_modified = sorted(files_after & files_before)
+    def _is_artifact(p):
+        parts = p.split('/')
+        for skip in ['.venv', 'venv', '__pycache__', '.pytest_cache', 'node_modules', '.git']:
+            if skip in parts: return True
+        return False
+    result.files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
+    result.files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
 
     # Extract final response from the last assistant message
     # (already set during parsing)
