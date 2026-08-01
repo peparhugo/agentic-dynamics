@@ -24,6 +24,13 @@ CLAUDE_EST_GPU_TDP = 700         # H100 TDP (W) — Anthropic uses AWS/GCP
 ARCH_RATIO = CLAUDE_EST_ACTIVE_PARAMS / DEEPSEEK_ACTIVE_PARAMS  # ~14x
 HARDWARE_RATIO = CLAUDE_EST_GPU_TDP / DEEPSEEK_GPU_TDP           # ~2x
 
+# Energy constants — per-token Joules
+# Based on TokenPowerBench (Niu et al., AAAI 2026): 0.1-2.0 J/tok range
+# Conservative lower-bound estimates for modern hardware
+ENERGY_PER_PROMPT_TOKEN = 0.08    # Joules per input token
+ENERGY_PER_OUTPUT_TOKEN = 0.23   # Joules per output token
+ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
+
 
 @dataclass
 class EfficiencyMetrics:
