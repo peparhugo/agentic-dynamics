@@ -1,279 +1,250 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="The AI Cost-Efficiency Rulebook: a C-suite decision tool for applying the Silent Inference Principle to AI FinOps.">
-<title>The AI Cost-Efficiency Rulebook</title>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>The Silent Inference Principle | AI FinOps Rulebook (Alpha)</title>
+<meta name="description" content="The AI Cost-Efficiency Rulebook. Quantifying inference economics with the Silent Inference Principle.">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
-:root{--bg:#06070a;--bg2:#0a0c13;--bg3:#10131c;--border:rgba(255,255,255,0.05);--border-accent:rgba(255,255,255,0.09);--text:#eceef2;--text2:#9ba0ad;--text3:#5e6472;--blue:#5b9cff;--green:#3ecf8e;--amber:#f0b34b;--red:#f25c5c;--purple:#9b6dff}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+:root{--bg:#06070a;--bg2:#0a0c13;--bg3:#10131c;--b:rgba(255,255,255,0.05);--ba:rgba(255,255,255,0.09);--t:#eceef2;--t2:#9ba0ad;--t3:#5e6472;--bl:#5b9cff;--gn:#3ecf8e;--am:#f0b34b;--rd:#f25c5c;--pu:#9b6dff}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
-body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(ellipse 60% 40% at 50% 0%,rgba(91,156,255,0.04),transparent),radial-gradient(ellipse 40% 30% at 80% 70%,rgba(62,207,142,0.03),transparent);pointer-events:none;z-index:-1}
-.wrap{max-width:1060px;margin:0 auto;padding:0 2rem}
-header{position:sticky;top:0;z-index:100;background:rgba(6,7,10,0.88);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:1rem 0}
-header .wrap{display:flex;justify-content:space-between;align-items:center}
-header .logo{font-weight:800;font-size:1rem;color:#fff;text-decoration:none;letter-spacing:-0.3px}
-header .logo span{color:var(--green)}
-header nav{display:flex;gap:1.5rem}
-header nav a{color:var(--text2);text-decoration:none;font-size:0.8rem;font-weight:500;transition:color .2s}
-header nav a:hover{color:#fff}
-.hero{padding:6rem 0 4rem;text-align:center;position:relative}
-.hero .badge{display:inline-flex;align-items:center;gap:0.5rem;padding:0.35rem 1.2rem;background:rgba(91,156,255,0.08);border:1px solid rgba(91,156,255,0.15);border-radius:100px;font-size:0.73rem;font-weight:600;letter-spacing:0.5px;color:var(--blue);margin-bottom:2rem;text-transform:uppercase}
-.hero h1{font-size:3.5rem;font-weight:900;letter-spacing:-1.5px;line-height:1.1;margin-bottom:1.4rem}
-.hero .subtitle{font-size:1.05rem;color:var(--text2);max-width:760px;margin:0 auto 2rem;line-height:1.7}
-.hero .pain{font-size:1.2rem;font-weight:600;color:var(--red);margin-bottom:1.2rem;line-height:1.5}
-.hero .cta{display:inline-flex;align-items:center;gap:0.6rem;padding:0.8rem 2rem;background:#fff;color:var(--bg);border-radius:100px;font-weight:600;font-size:0.9rem;text-decoration:none;transition:all .3s;box-shadow:0 4px 24px rgba(255,255,255,0.08)}
-.hero .cta:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,255,255,0.15)}
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin:1.5rem 0}
-.stat{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.4rem;text-align:center;transition:transform .3s,border-color .3s}
-.stat:hover{transform:translateY(-3px);border-color:var(--border-accent)}
-.stat::before{content:'';display:block;height:2.5px;margin-bottom:0.8rem;border-radius:2px}
-.stat.g::before{background:linear-gradient(90deg,var(--green),transparent)}.stat.r::before{background:linear-gradient(90deg,var(--red),transparent)}.stat.a::before{background:linear-gradient(90deg,var(--amber),transparent)}.stat.b::before{background:linear-gradient(90deg,var(--blue),transparent)}
-.stat .v{font-size:1.8rem;font-weight:900;font-family:'JetBrains Mono',monospace}
-.stat .v.g{color:var(--green)}.stat .v.r{color:var(--red)}.stat .v.a{color:var(--amber)}.stat .v.b{color:var(--blue)}
-.stat .l{font-size:0.68rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin:0.4rem 0 0;font-weight:600}
-.stat .s{font-size:0.74rem;color:var(--text2);margin-top:0.3rem;line-height:1.4}
-section{padding:4rem 0}
-.alt-section{background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:4rem 0}
-.section-label{font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--blue);margin-bottom:0.8rem}
-h2{font-size:1.85rem;font-weight:800;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.6rem;color:#fff}
+html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;scroll-snap-type:y mandatory;overflow-y:scroll}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--t);line-height:1.6;overflow-x:hidden}
+.slide{min-height:100vh;display:flex;align-items:center;justify-content:center;scroll-snap-align:start;position:relative;padding:3rem 2rem;overflow:hidden}
+.slide::before{content:'';position:absolute;inset:0;pointer-events:none;z-index:0}
+.s0::before{background:radial-gradient(ellipse 60% 50% at 50% 30%,rgba(91,156,255,0.06),transparent),radial-gradient(ellipse 40% 30% at 80% 70%,rgba(242,92,92,0.04),transparent)}
+.s1{background:var(--bg2)}.s2{background:var(--bg)}.s3{background:var(--bg2)}.s4{background:var(--bg)}.s5{background:var(--bg2)}.s6{background:var(--bg)}.s7{background:var(--bg2)}.s8{background:linear-gradient(180deg,var(--bg2),var(--bg))}
+.slide-inner{position:relative;z-index:1;max-width:900px;width:100%;text-align:center}
+.slide-inner.wide{max-width:1100px}
+.badge{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(91,156,255,0.08);border:1px solid rgba(91,156,255,0.15);border-radius:100px;font-size:0.68rem;font-weight:600;letter-spacing:0.5px;color:var(--bl);margin-bottom:1.5rem;text-transform:uppercase}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:var(--gn);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+h1{font-size:clamp(2.2rem,6vw,4.5rem);font-weight:900;letter-spacing:-1.5px;line-height:1.05;margin-bottom:1rem}
+h2{font-size:clamp(1.5rem,4vw,2.8rem);font-weight:800;letter-spacing:-0.8px;line-height:1.15;margin-bottom:0.8rem;color:#fff}
 h3{font-size:1rem;font-weight:700;margin-bottom:0.5rem}
-.lead{font-size:0.94rem;color:var(--text2);margin-bottom:1.8rem;max-width:760px;line-height:1.7}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:1.6rem;margin-bottom:1rem;transition:border-color .3s}
-.card:hover{border-color:var(--border-accent)}
-.card.g{border-left:3px solid var(--green)}.card.r{border-left:3px solid var(--red)}.card.b{border-left:3px solid var(--blue)}.card.a{border-left:3px solid var(--amber)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
-.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
-.model-card{background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:1.4rem;text-align:center;transition:transform .3s,border-color .3s}
-.model-card:hover{transform:translateY(-3px);border-color:var(--border-accent)}
-.model-card .model-name{font-size:0.75rem;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.8rem}
-.model-card .model-cost{font-size:1.5rem;font-weight:900;font-family:'JetBrains Mono',monospace;margin-bottom:0.3rem}
-.model-card .model-cost.green{color:var(--green)}.model-card .model-cost.red{color:var(--red)}.model-card .model-cost.amber{color:var(--amber)}
-.model-card .model-sub{font-size:0.72rem;color:var(--text2);margin-bottom:0.6rem}
-.model-card .model-badge{display:inline-block;padding:0.2rem 0.7rem;border-radius:100px;font-size:0.64rem;font-weight:600;margin-bottom:0.5rem}
-.model-card .model-badge.green{background:rgba(62,207,142,0.1);color:var(--green);border:1px solid rgba(62,207,142,0.2)}
-.model-card .model-badge.red{background:rgba(242,92,92,0.1);color:var(--red);border:1px solid rgba(242,92,92,0.2)}
-.model-card .model-badge.blue{background:rgba(91,156,255,0.1);color:var(--blue);border:1px solid rgba(91,156,255,0.2)}
-.model-card .model-badge.amber{background:rgba(240,179,75,0.1);color:var(--amber);border:1px solid rgba(240,179,75,0.2)}
-.model-card .model-meta{font-size:0.69rem;color:var(--text3);line-height:1.5}
-.section-cta{display:block;text-align:center;margin:1.5rem 0;font-size:0.82rem;font-weight:600;color:var(--blue);text-decoration:none;transition:color .2s}
-.section-cta:hover{color:var(--green)}
-.what-this-means{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:1rem 1.2rem;margin:1rem 0;font-size:0.8rem;color:var(--text2);line-height:1.8}
-.what-this-means strong{color:var(--text)}
-.what-this-means .role{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-right:0.4rem}
-.what-this-means .role.cto{background:rgba(91,156,255,0.1);color:var(--blue);border:1px solid rgba(91,156,255,0.2)}
-.what-this-means .role.cfo{background:rgba(62,207,142,0.1);color:var(--green);border:1px solid rgba(62,207,142,0.2)}
-.what-this-means .role.coo{background:rgba(240,179,75,0.1);color:var(--amber);border:1px solid rgba(240,179,75,0.2)}
-.role-line{display:block;margin:.35rem 0}
-.table-wrap{overflow-x:auto;margin:1.2rem 0;border-radius:12px;border:1px solid var(--border)}
-table{width:100%;border-collapse:collapse;font-size:0.82rem}
-thead th{text-align:left;padding:0.7rem 0.9rem;color:var(--text2);font-weight:600;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border-accent);background:var(--bg3);white-space:nowrap}
-td{padding:0.6rem 0.9rem;border-bottom:1px solid var(--border);font-size:0.82rem}
-tr:last-child td{border-bottom:none}tr:hover td{background:rgba(255,255,255,0.02)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:0.78rem}
-.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}.blue{color:var(--blue)}
-.constraint-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;margin:1rem 0}
-.constraint-row{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.6fr 0.6fr;gap:0.5rem;align-items:center;padding:0.7rem 1rem;background:var(--bg3);border-radius:8px;border:1px solid var(--border);font-size:0.81rem}
-.constraint-row .name{font-weight:500}.constraint-row .files{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--text3)}.constraint-row .check{text-align:center;font-size:0.9rem}
-.refs{font-size:0.81rem;color:var(--text2);line-height:1.8;margin:1rem 0}.refs strong{color:var(--text)}
-.callout{padding:1.3rem 1.6rem;border-radius:12px;margin:1.2rem 0;border:1px solid;font-size:0.86rem;line-height:1.7}
-.callout.r{background:rgba(242,92,92,0.06);border-color:rgba(242,92,92,0.12)}.callout.g{background:rgba(62,207,142,0.06);border-color:rgba(62,207,142,0.12)}.callout.b{background:rgba(91,156,255,0.06);border-color:rgba(91,156,255,0.12)}
-.exec-summary{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:2rem;margin:2rem 0}
-.exec-summary h3{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:1.2rem;text-align:center}
-footer{text-align:center;padding:3rem 0;border-top:1px solid var(--border);color:var(--text3);font-size:0.78rem}footer a{color:var(--blue);text-decoration:none}
-.note{font-size:0.8rem;color:var(--text3);padding:0.9rem 1.2rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px;margin:1rem 0}
-pre.code-block{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:1.8;overflow-x:auto;color:var(--text2)}
-pre.code-block b.cost{color:var(--blue)}pre.code-block b.eq{color:var(--green)}pre.code-block b.dec{color:var(--amber)}
-.decision{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin:1.4rem 0}.decision .card{height:100%}.kicker{color:var(--text3);font-size:.76rem;text-transform:uppercase;letter-spacing:.7px}.big{font:900 2.35rem/1.1 'JetBrains Mono',monospace;margin:.5rem 0}.fine{font-size:.76rem;color:var(--text3)}
-@media(max-width:768px){.hero h1{font-size:2rem}.stats{grid-template-columns:1fr 1fr}.grid2{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}.decision{grid-template-columns:1fr}.constraint-row{grid-template-columns:1fr 1fr;font-size:0.72rem}.wrap{padding:0 1rem}header nav{gap:0.8rem;font-size:0.7rem}header nav a:nth-child(-n+2){display:none}section{padding:2.5rem 0}}
+.pain{font-size:clamp(1rem,2.5vw,1.4rem);font-weight:600;color:var(--rd);margin-bottom:1rem;line-height:1.4}
+.lead{font-size:0.95rem;color:var(--t2);max-width:650px;margin:0 auto 2rem;line-height:1.6}
+.big-num{font-size:clamp(3rem,8vw,7rem);font-weight:900;font-family:'JetBrains Mono',monospace;line-height:1;margin:0.5rem 0}
+.big-num.gn{color:var(--gn)}.big-num.rd{color:var(--rd)}.big-num.am{color:var(--am)}.big-num.bl{color:var(--bl)}
+.big-label{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--t3);margin-bottom:0.5rem}
+.stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin:1.5rem 0}
+.stat-box{background:rgba(255,255,255,0.02);border:1px solid var(--b);border-radius:14px;padding:1.3rem;text-align:center;transition:transform .3s,border-color .3s}
+.stat-box:hover{transform:translateY(-2px);border-color:var(--ba)}
+.stat-box .val{font-size:1.6rem;font-weight:900;font-family:'JetBrains Mono',monospace}
+.stat-box .val.gn{color:var(--gn)}.stat-box .val.rd{color:var(--rd)}.stat-box .val.am{color:var(--am)}.stat-box .val.bl{color:var(--bl)}
+.stat-box .lbl{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.4rem;font-weight:600}
+.stat-box .sub{font-size:0.7rem;color:var(--t2);margin-top:0.2rem;line-height:1.3}
+.card-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.8rem;margin:1rem 0}
+.card{background:rgba(255,255,255,0.02);border:1px solid var(--b);border-radius:14px;padding:1.2rem;text-align:center;transition:transform .3s,border-color .3s}
+.card:hover{transform:translateY(-2px);border-color:var(--ba)}
+.card.gn{border-left:3px solid var(--gn)}.card.rd{border-left:3px solid var(--rd)}.card.am{border-left:3px solid var(--am)}.card.bl{border-left:3px solid var(--bl)}
+.card .big{font-size:1.5rem;font-weight:900;font-family:'JetBrains Mono',monospace}
+.card .big.gn{color:var(--gn)}.card .big.rd{color:var(--rd)}.card .big.am{color:var(--am)}
+.card .name{font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;color:var(--t)}
+.card .sub{font-size:0.7rem;color:var(--t2);line-height:1.5}
+.badge-tag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0.3rem 0}
+.badge-tag.gn{background:rgba(62,207,142,0.1);color:var(--gn);border:1px solid rgba(62,207,142,0.2)}
+.badge-tag.rd{background:rgba(242,92,92,0.1);color:var(--rd);border:1px solid rgba(242,92,92,0.2)}
+.badge-tag.am{background:rgba(240,179,75,0.1);color:var(--am);border:1px solid rgba(240,179,75,0.2)}
+.constraint-grid{display:grid;grid-template-columns:1fr;gap:0.35rem;margin:1rem 0;max-width:700px;margin-left:auto;margin-right:auto}
+.c-row{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.6fr 0.6fr;gap:0.5rem;align-items:center;padding:0.5rem 0.8rem;background:rgba(255,255,255,0.02);border-radius:8px;border:1px solid var(--b);font-size:0.75rem}
+.c-row.head{background:var(--bg3);font-weight:600;font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t)}
+.c-row .nm{font-weight:500}.c-row .fl{font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--t3)}.c-row .ck{text-align:center}
+.strategy-stack{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:700px;margin:1rem auto}
+.s-row{display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;background:rgba(255,255,255,0.02);border:1px solid var(--b);border-radius:10px;font-size:0.8rem;text-align:left}
+.s-row .num{font-size:1.5rem;font-weight:900;font-family:'JetBrains Mono',monospace;min-width:2rem;text-align:center}
+.s-row .num.gn{color:var(--gn)}.s-row .num.bl{color:var(--bl)}.s-row .num.am{color:var(--am)}.s-row .num.rd{color:var(--rd)}.s-row .num.pu{color:var(--pu)}
+.s-row .txt{flex:1}.s-row .txt strong{color:var(--t)}.s-row .lev{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px}
+.table-wrap{overflow-x:auto;margin:1rem 0;border-radius:10px;border:1px solid var(--b);max-width:700px;margin-left:auto;margin-right:auto}
+table{width:100%;border-collapse:collapse;font-size:0.75rem}
+thead th{text-align:left;padding:0.5rem 0.7rem;color:var(--t2);font-weight:600;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg3)}
+td{padding:0.45rem 0.7rem;border-bottom:1px solid var(--b);font-size:0.75rem}
+tr:last-child td{border-bottom:none}
+.mono{font-family:'JetBrains Mono',monospace;font-size:0.72rem}
+.gn{color:var(--gn)}.rd{color:var(--rd)}.am{color:var(--am)}.bl{color:var(--bl)}
+.cta{display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:#fff;color:var(--bg);border-radius:100px;font-weight:600;font-size:0.85rem;text-decoration:none;transition:all .3s;box-shadow:0 4px 24px rgba(255,255,255,0.08);margin-top:1rem}
+.cta:hover{transform:translateY(-2px);box-shadow:0 8px 32px rgba(255,255,255,0.15)}
+.cta.ghost{background:transparent;color:var(--t2);border:1px solid var(--ba);box-shadow:none}
+.cta.ghost:hover{color:#fff;border-color:var(--t3)}
+.eq-block{background:rgba(255,255,255,0.02);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.8;color:var(--t2);text-align:left;max-width:700px;margin:1rem auto}
+.eq-block .em{color:var(--gn)}.eq-block .param{color:var(--bl)}.eq-block .decomp{color:var(--am)}
+.note{font-size:0.72rem;color:var(--t3);padding:0.6rem 1rem;background:rgba(255,255,255,0.02);border:1px solid var(--b);border-radius:8px;margin:0.8rem 0}
+.ref-line{font-size:0.7rem;color:var(--t3);margin-top:1rem;line-height:1.6}
+.ref-line strong{color:var(--t2)}
+/* Nav dots */
+.nav-dots{position:fixed;right:1.5rem;top:50%;transform:translateY(-50%);z-index:200;display:flex;flex-direction:column;gap:0.6rem}
+.nav-dots a{width:10px;height:10px;border-radius:50%;background:var(--t3);transition:all .3s;display:block}
+.nav-dots a.active,.nav-dots a:hover{background:var(--bl);transform:scale(1.3)}
+@media(max-width:768px){.nav-dots{display:none}.slide{padding:2rem 1rem}.card-row{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
-<header><div class="wrap"><a class="logo" href="#top">AI Cost-Efficiency <span>Rulebook</span></a><nav aria-label="Primary"><a href="#principle">Principle</a><a href="#evidence">Evidence</a><a href="#model">Model</a><a href="#energy">Energy</a><a href="#action">Action</a></nav></div></header>
-<main id="top">
-<section class="hero"><div class="wrap">
-<div class="badge">Applying the Silent Inference Principle to AI FinOps</div>
+
+<!-- Nav dots -->
+<nav class="nav-dots" aria-label="Slide navigation">
+<a href="#s0" class="active" title="The Rulebook"></a>
+<a href="#s1" title="The Discovery"></a>
+<a href="#s2" title="Silent Inference"></a>
+<a href="#s3" title="Explanation Tax"></a>
+<a href="#s4" title="The Strategy"></a>
+<a href="#s5" title="The Evidence"></a>
+<a href="#s6" title="The Model"></a>
+<a href="#s7" title="The Rulebook"></a>
+</nav>
+
+<!-- S0: HERO -->
+<section class="slide s0" id="s0"><div class="slide-inner">
+<div class="badge"><span class="dot"></span> AI FinOps Rulebook · Alpha · Dashboard-Verified · 8 Models</div>
 <p class="pain">You're spending millions on AI inference. You don't know if you're wasting it.</p>
 <h1>The AI Cost-Efficiency Rulebook</h1>
-<p class="subtitle">The expensive model may not be implementing more. It may simply be narrating more. The <strong>Silent Inference Principle</strong> identifies models that recover constraints in latent space, implement them correctly, and avoid billing you for a running commentary. In the benchmark, Claude and DeepSeek both implemented all 7 constraints. DeepSeek's GRPO training compressed constraint recovery into latent space; Claude's imitation training plus RLHF explained every step. The measured difference reached <strong class="green">473x in cost per dollar</strong>.</p>
-<a class="cta" href="#principle">See the principle, proof, and switching rule</a>
-<div class="exec-summary">
-<h3>Executive Decision Brief</h3>
-<div class="grid4">
-<article class="stat g"><div class="v g">473x</div><div class="l">Core Finding</div><div class="s">Cost-efficiency gap. DeepSeek delivers 1,873 builds per dollar; Claude delivers 4.</div></article>
-<article class="stat r"><div class="v r">24-120%</div><div class="l">The Driver</div><div class="s">Explanation Tax: the token premium paid when models narrate reasoning.</div></article>
-<article class="stat b"><div class="v b">DS + fallback</div><div class="l">Which Model</div><div class="s">DeepSeek for constrained implementation; route architecture-sensitive work to GPT or Claude.</div></article>
-<article class="stat a"><div class="v a">1.80x</div><div class="l">The Risk</div><div class="s">2050 Energy Price Multiplier as data-center demand reaches 2,700 TWh.</div></article>
-</div></div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Model choice is now an architecture and routing decision, not a prestige decision.</span><span class="role-line"><span class="role cfo">CFO</span>The benchmarked 10-engineer scenario exposes a <strong>$3,476 monthly</strong> and approximately <strong>$40,000 annual</strong> avoidable gap.</span><span class="role-line"><span class="role coo">COO</span>Start with a controlled route-and-fallback policy rather than a full vendor replacement.</span></div>
-<a class="section-cta" href="#principle">Next: separate implementation from explanation &rarr;</a>
+<p class="lead" style="font-size:1.05rem;color:var(--t)">Applying the <strong style="color:var(--gn)">Silent Inference Principle</strong> to AI FinOps. Some models implement constraints silently — others pay a <strong style="color:var(--rd)">24–120% Explanation Tax</strong> for narrating every step. Both produce correct code. The cost difference is <strong style="color:var(--gn)">473×</strong> per dollar.</p>
+<div class="stat-row"><div class="stat-box"><div class="val rd">473×</div><div class="lbl">Cost Gap</div><div class="sub">Per-dollar efficiency</div></div><div class="stat-box"><div class="val gn">1,873</div><div class="lbl">Builds / Dollar</div><div class="sub">DeepSeek vs 4 for Claude</div></div><div class="stat-box"><div class="val bl">24–120%</div><div class="lbl">Explanation Tax</div><div class="sub">Reasoning verbosity penalty</div></div><div class="stat-box"><div class="val am">1.8×</div><div class="lbl">Energy Risk 2050</div><div class="sub">IEA-projected EPM</div></div></div>
+<a href="#s1" class="cta">See what we discovered ↓</a>
 </div></section>
 
-<section class="alt-section" id="principle"><div class="wrap">
-<p class="section-label">01 / Principle</p><h2>Correct work does not require visible reasoning</h2>
-<p class="lead">The Silent Inference Principle is proprietary AI FinOps IP: <strong>a model implements all constraints correctly without narrating them.</strong> It separates the outcome you buy from the prose you may not need.</p>
-<div class="grid2">
-<article class="card g"><h3>Silent inference</h3><p><strong>Detection:</strong> latent constraint recovery.<br><strong>Implementation:</strong> test pass rate confirms the work.<br><strong>Narration:</strong> absent from text output.</p><p class="mono green">Implementation=True, Narration=False</p></article>
-<article class="card r"><h3>Explanation Tax</h3><p>The cost delta when <span class="mono">Narration=True</span>. Natural-mode models pay a measured token premium of <strong>24-120%</strong> versus forced-silent execution.</p></article>
+<!-- S1: THE DISCOVERY -->
+<section class="slide s1" id="s1"><div class="slide-inner">
+<div class="badge">01 · The Discovery</div>
+<h2>Both implement all seven constraints.<br>Only one charges you to explain how.</h2>
+<p class="lead">We gave 8 models the identical task. Scanned every generated <code>.py</code> file. Both Claude and DeepSeek implemented every single requirement in working code. The difference: <strong style="color:var(--rd)">Claude narrated every recovery step</strong> — DeepSeek didn't.</p>
+<div class="constraint-grid">
+<div class="c-row head"><div class="nm">Constraint</div><div class="fl">DeepSeek Code</div><div class="fl">Claude Code</div><div class="ck">DS</div><div class="ck">CL</div></div>
+<div class="c-row"><div class="nm">JWT auth</div><div class="fl gn">auth.py, extensions.py</div><div class="fl gn">auth.py, extensions.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">Rate limiting</div><div class="fl gn">auth_routes.py</div><div class="fl gn">rate_limit.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">Input validation</div><div class="fl gn">validators.py</div><div class="fl gn">schemas.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">Pagination</div><div class="fl gn">models.py</div><div class="fl gn">pagination.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">Error handling</div><div class="fl gn">errors.py</div><div class="fl gn">errors.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">Audit logging</div><div class="fl gn">audit.py</div><div class="fl gn">audit.py</div><div class="ck">—</div><div class="ck gn">✓</div></div>
+<div class="c-row"><div class="nm">API versioning</div><div class="fl gn">routes/v1/</div><div class="fl gn">Blueprint /v1/</div><div class="ck">—</div><div class="ck gn">✓</div></div>
 </div>
-<div class="callout b"><strong>Same seven constraints. Different production economics.</strong> DeepSeek's GRPO training compresses constraint recovery into latent space and implements correctly in code without narrating. Claude's imitation training plus RLHF makes the reasoning explicit. Both implement all 7 constraints. The difference is how the work is surfaced and billed.</div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Gate on tests and constraints, not explanation length; forced-silent DeepSeek measured <strong>$0.013</strong> versus <strong>$0.163</strong> for Claude.</span><span class="role-line"><span class="role cfo">CFO</span>Narration alone added <strong>24.4%</strong> to DeepSeek and <strong>52.5%</strong> to Claude in the silent-mode sweep.</span><span class="role-line"><span class="role coo">COO</span>Make explanation an on-demand workflow, not the default production path.</span></div>
-<a class="section-cta" href="#evidence">Next: inspect the dashboard-verified evidence &rarr;</a>
+<p class="note" style="text-align:center;max-width:600px;margin:1rem auto">At <strong style="color:var(--rd)">$10/Mtok</strong> vs <strong style="color:var(--gn)">$0.022/Mtok</strong>, narration is catastrophically expensive. <strong style="color:var(--gn)">DeepSeek: 1,873 builds/$.</strong> <strong style="color:var(--rd)">Claude: 4.</strong></p>
+<a href="#s2" class="cta ghost">Why does this happen? →</a>
 </div></section>
 
-<section id="evidence"><div class="wrap">
-<p class="section-label">02 / Evidence</p><h2>The portfolio view: price, volume, and output</h2>
-<p class="lead">Every figure below is dashboard-verified, not estimated. Cards provide the top-line comparison; the session ledger preserves the full experiment record.</p>
-<div class="grid4">
-<article class="model-card"><div class="model-name">DeepSeek v4 Pro</div><div class="model-cost green">$0.0150</div><div class="model-sub">average per session</div><span class="model-badge green">Cost leader</span><div class="model-meta">88 sessions<br>$1.3189 total<br>711,866 output tokens</div></article>
-<article class="model-card"><div class="model-name">GPT-5-mini</div><div class="model-cost green">$0.0300</div><div class="model-sub">average per session</div><span class="model-badge blue">Low-cost fallback</span><div class="model-meta">12 sessions<br>$0.3595 total<br>67,925 output tokens</div></article>
-<article class="model-card"><div class="model-name">GPT-5.6</div><div class="model-cost amber">$0.4474</div><div class="model-sub">average per session</div><span class="model-badge amber">Premium route</span><div class="model-meta">15 sessions<br>$6.7108 total<br>130,337 output tokens</div></article>
-<article class="model-card"><div class="model-name">Claude Fable 5</div><div class="model-cost red">$0.9219</div><div class="model-sub">average per session</div><span class="model-badge red">Highest average</span><div class="model-meta">30 sessions<br>$27.6566 total<br>296,088 output tokens</div></article>
-</div>
-<div class="table-wrap"><table><thead><tr><th>Model</th><th>Sessions</th><th>Total cost</th><th>Average</th><th>Output tokens</th></tr></thead><tbody>
-<tr><td>anthropic/claude-fable-5</td><td class="mono">30</td><td class="mono">$27.6566</td><td class="mono">$0.9219</td><td class="mono">296,088</td></tr>
-<tr><td>openai/gpt-5.6</td><td class="mono">15</td><td class="mono">$6.7108</td><td class="mono">$0.4474</td><td class="mono">130,337</td></tr>
-<tr><td>openai/gpt-5.6-fast</td><td class="mono">7</td><td class="mono">$3.6704</td><td class="mono">$0.5243</td><td class="mono">31,675</td></tr>
-<tr><td>deepseek/deepseek-v4-pro</td><td class="mono">88</td><td class="mono">$1.3189</td><td class="mono green">$0.0150</td><td class="mono">711,866</td></tr>
-<tr><td>openai/gpt-5.5</td><td class="mono">5</td><td class="mono">$0.9363</td><td class="mono">$0.1873</td><td class="mono">14,952</td></tr>
-<tr><td>openai/gpt-5</td><td class="mono">5</td><td class="mono">$0.6614</td><td class="mono">$0.1323</td><td class="mono">27,902</td></tr>
-<tr><td>openai/gpt-5-mini</td><td class="mono">12</td><td class="mono">$0.3595</td><td class="mono">$0.0300</td><td class="mono">67,925</td></tr>
-<tr><td>openai/gpt-5-nano</td><td class="mono">5</td><td class="mono">$0.0281</td><td class="mono green">$0.0056</td><td class="mono">23,879</td></tr>
-</tbody></table></div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Use DeepSeek's <strong>$0.0150</strong> observed average as the default-route challenger; retain premium routes for failed checks.</span><span class="role-line"><span class="role cfo">CFO</span>Claude consumed <strong>$27.6566</strong> across 30 sessions while DeepSeek consumed <strong>$1.3189</strong> across 88.</span><span class="role-line"><span class="role coo">COO</span>Track cost per accepted outcome, not cost per token or session alone.</span></div>
-
-<h3>Explanation Tax: natural versus forced-silent</h3>
-<div class="table-wrap"><table><thead><tr><th>Model</th><th>Natural</th><th>Forced-silent</th><th>Explanation Tax</th></tr></thead><tbody>
-<tr><td>DeepSeek v4 Pro</td><td class="mono">$0.016</td><td class="mono">$0.013</td><td class="mono green">24.4%</td></tr>
-<tr><td>Claude Fable 5</td><td class="mono">$0.249</td><td class="mono">$0.163</td><td class="mono amber">52.5%</td></tr>
-<tr><td>GPT-5.6</td><td class="mono">$0.464</td><td class="mono">$0.309</td><td class="mono amber">50.1%</td></tr>
-<tr><td>GPT-5-mini</td><td class="mono">$0.060</td><td class="mono">$0.027</td><td class="mono red">119.6%</td></tr>
-</tbody></table></div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Silent-mode prompts cut measured GPT-5.6 cost from <strong>$0.464 to $0.309</strong> without changing the task definition.</span><span class="role-line"><span class="role cfo">CFO</span>GPT-5-mini's narration more than doubled cost: <strong>$0.060 natural</strong> versus <strong>$0.027 forced-silent</strong>.</span><span class="role-line"><span class="role coo">COO</span>Standardize silent production prompts, then request explanations only for review and incidents.</span></div>
-
-<h3>Standardized test pass rates</h3>
-<div class="table-wrap"><table><thead><tr><th>Model</th><th>Pass rate</th><th>Cost</th><th>Tools</th></tr></thead><tbody>
-<tr><td>Claude Fable 5</td><td class="mono green">54/54 (100%)</td><td class="mono">$0.060</td><td class="mono">15</td></tr>
-<tr><td>GPT-5.6</td><td class="mono green">16/16 (100%)</td><td class="mono">$0.010</td><td class="mono">11</td></tr>
-<tr><td>GPT-5-mini</td><td class="mono green">4/4 (100%)</td><td class="mono">$0.001</td><td class="mono">18</td></tr>
-<tr><td>GPT-5-nano</td><td class="mono green">5/5 (100%)</td><td class="mono">$0.001</td><td class="mono">16</td></tr>
-<tr><td>DeepSeek v4 Pro</td><td class="mono amber">25/41 (61%)</td><td class="mono">$0.009</td><td class="mono">16</td></tr>
-</tbody></table></div>
-<p class="note"><strong>Architecture note:</strong> DeepSeek's 61% result came from a FastAPI-over-Flask architectural choice. Retested with Flask-only, it passed <strong>11/11 (100%)</strong>. The observed failure mode was framework selection, not inability to implement the constraints.</p>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Constrain the framework explicitly: DeepSeek moved from <strong>25/41</strong> to <strong>11/11</strong> under Flask-only instructions.</span><span class="role-line"><span class="role cfo">CFO</span>In the standardized set, a passing GPT-5-mini run cost <strong>$0.001</strong> versus Claude's <strong>$0.060</strong>.</span><span class="role-line"><span class="role coo">COO</span>Budget for automated acceptance gates; cheap generation without environment control can create rework.</span></div>
-
-<h3>Cross-domain validation</h3>
-<div class="table-wrap"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>GPT-5-mini</th><th>Claude</th><th>Observed gap</th></tr></thead><tbody>
-<tr><td>Task Manager API</td><td class="mono green">$0.010</td><td class="mono">$0.499</td><td class="mono">$0.020</td><td class="mono red">$2.022</td><td class="mono">202x</td></tr>
-<tr><td>Data Table (frontend)</td><td class="mono green">$0.019</td><td class="mono">$0.798</td><td class="mono">Not tested</td><td class="mono red">$2.053</td><td class="mono">108x</td></tr>
-<tr><td>Collaborative Editor</td><td class="mono green">$0.022</td><td class="mono">$0.700</td><td class="mono">Not tested</td><td class="mono red">$2.490</td><td class="mono">113x</td></tr>
-<tr><td>13-config DeepSeek sweep</td><td class="mono green">$0.220 total</td><td class="mono">Not tested</td><td class="mono">Not tested</td><td class="mono">Projected comparison</td><td class="mono">~240x vs Claude</td></tr>
-</tbody></table></div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>The advantage persisted across API, frontend, and collaboration tasks; use domain-specific tests before routing.</span><span class="role-line"><span class="role cfo">CFO</span>The same Task Manager API cost <strong>$0.010</strong> on DeepSeek and <strong>$2.022</strong> on Claude, a <strong>202x</strong> gap.</span><span class="role-line"><span class="role coo">COO</span>A 13-configuration DeepSeek sweep cost <strong>$0.220 total</strong>, enabling broader experimentation within a fixed budget.</span></div>
-<a class="section-cta" href="#implementation">Next: examine verbosity and implementation risk &rarr;</a>
+<!-- S2: SILENT INFERENCE PRINCIPLE -->
+<section class="slide s2" id="s2"><div class="slide-inner">
+<div class="badge">02 · Silent Inference Principle</div>
+<h2>Knowing what to do<br>without saying it.</h2>
+<p class="lead">A model exhibits <strong style="color:var(--gn)">Silent Inference</strong> when it correctly implements all constraints without generating explicit narration about them. <strong style="color:var(--t)">Implementation = True, Narration = False.</strong> The cost delta when a model narrates is the <strong style="color:var(--rd)">Explanation Tax</strong>.</p>
+<div class="stat-row"><div class="stat-box"><div class="val gn">386</div><div class="lbl">DeepSeek Characters</div><div class="sub">GRPO compresses reasoning into latent space. $0.0001 per character.</div></div><div class="stat-box"><div class="val rd">1,639</div><div class="lbl">Claude Characters</div><div class="sub">Imitation + RLHF = verbose. $0.0007 per character. 7× more.</div></div><div class="stat-box"><div class="val am">1,167</div><div class="lbl">GPT-5.6 Characters</div><div class="sub">Between extremes. Moderate overhead.</div></div><div class="stat-box"><div class="val bl">4,797</div><div class="lbl">GPT-5-nano Characters</div><div class="sub">Smaller models compensate with more words.</div></div></div>
+<p class="note" style="text-align:center;max-width:600px;margin:1rem auto"><strong>Three measurable dimensions:</strong> Detection (latent, via code scanning) → Implementation (test pass rate) → Narration (reasoning text analysis). Silent Inference exists when the first two are true and the third is false.</p>
+<a href="#s3" class="cta ghost">How big is the tax? →</a>
 </div></section>
 
-<section class="alt-section" id="implementation"><div class="wrap">
-<p class="section-label">03 / Implementation Signal</p><h2>More words are not more work</h2>
-<p class="lead">Reasoning output reveals the training signature. Artifact inventory reveals the operational caveat. Read them together: silent inference can be efficient, but routing still needs dependency and architecture controls.</p>
-<div class="stats">
-<article class="stat g"><div class="v g">386</div><div class="l">DeepSeek characters</div><div class="s">GRPO compresses reasoning; $0.0001 per character.</div></article>
-<article class="stat r"><div class="v r">1,639</div><div class="l">Claude characters</div><div class="s">Imitation training is verbose; $0.0007 per character.</div></article>
-<article class="stat b"><div class="v b">1,167</div><div class="l">GPT-5.6 characters</div><div class="s">Between DeepSeek and Claude.</div></article>
-<article class="stat a"><div class="v a">4,797</div><div class="l">GPT-5-nano characters</div><div class="s">Smaller models compensate with more words.</div></article>
+<!-- S3: EXPLANATION TAX + PERTURBATION + RECOVERY -->
+<section class="slide s3" id="s3"><div class="slide-inner wide">
+<div class="badge">03 · Explanation Tax & Recovery</div>
+<h2>Narration costs 24–120%.<br>Perturbation reveals who recovers silently.</h2>
+<div class="card-row" style="margin:1.5rem 0">
+<div class="card gn"><div class="big gn">24.4%</div><div class="name">DeepSeek v4 Pro</div><div class="sub">Natural $0.016<br>Forced-Silent $0.013<br><span class="badge-tag gn">GRPO compresses already</span></div></div>
+<div class="card rd"><div class="big rd">52.5%</div><div class="name">Claude Fable 5</div><div class="sub">Natural $0.249<br>Forced-Silent $0.163<br><span class="badge-tag rd">Explicit CoT taxed heavily</span></div></div>
+<div class="card am"><div class="big am">50.1%</div><div class="name">GPT-5.6</div><div class="sub">Natural $0.464<br>Forced-Silent $0.309<br><span class="badge-tag am">Moderate overhead</span></div></div>
+<div class="card rd"><div class="big rd">119.6%</div><div class="name">GPT-5-mini</div><div class="sub">Natural $0.060<br>Forced-Silent $0.027<br><span class="badge-tag rd">Over-explains most</span></div></div>
 </div>
-<p class="note">Cost per character: <strong class="green">DeepSeek $0.0001</strong> versus <strong class="red">Claude $0.0007</strong>, a <strong>7x gap</strong>.</p>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Do not infer capability from prose volume: DeepSeek used <strong>386 characters</strong> while GPT-5-nano used <strong>4,797</strong>.</span><span class="role-line"><span class="role cfo">CFO</span>Claude's measured <strong>$0.0007 per character</strong> was seven times DeepSeek's <strong>$0.0001</strong>.</span><span class="role-line"><span class="role coo">COO</span>Move rationale generation to audit checkpoints rather than every execution.</span></div>
-
-<h3>Worktree inventory: 139 code artifacts on disk</h3>
-<div class="table-wrap"><table><thead><tr><th>Provider</th><th>Worktrees</th><th>Passed</th><th>Failed</th><th>Errors</th></tr></thead><tbody>
-<tr><td>Claude</td><td class="mono">26</td><td class="mono green">178</td><td class="mono">1</td><td class="mono">2</td></tr>
-<tr><td>OpenAI</td><td class="mono">45</td><td class="mono green">209</td><td class="mono">1</td><td class="mono">9</td></tr>
-<tr><td>DeepSeek</td><td class="mono">68</td><td class="mono green">298</td><td class="mono red">168</td><td class="mono red">415</td></tr>
-</tbody></table></div>
-<p class="note">DeepSeek failures were import and missing-dependency errors, including <span class="mono">aiosqlite</span> and FastAPI, not logic bugs.</p>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>DeepSeek produced <strong>298 passing</strong> checks but also <strong>415 errors</strong>; pin dependencies and frameworks before rollout.</span><span class="role-line"><span class="role cfo">CFO</span>The cheap model needs an environment-control budget; otherwise <strong>168 failures</strong> can erase generation savings through rework.</span><span class="role-line"><span class="role coo">COO</span>Separate logic quality from setup reliability in operating metrics and incident reviews.</span></div>
-
-<h3>AST code structure: GPT versus DeepSeek</h3>
-<div class="table-wrap"><table><thead><tr><th>Metric</th><th>GPT</th><th>DeepSeek</th><th>Difference</th></tr></thead><tbody>
-<tr><td>Files per worktree</td><td class="mono">2.6</td><td class="mono">9.5</td><td class="mono">-72%</td></tr>
-<tr><td>LOC per file</td><td class="mono">98.2</td><td class="mono">51.4</td><td class="mono">+91%</td></tr>
-<tr><td>Functions per file</td><td class="mono">7.3</td><td class="mono">3.3</td><td class="mono">+119%</td></tr>
-</tbody></table></div>
-<p class="note">GPT writes fewer, larger files with more functions: <strong>2.6 files/worktree</strong> versus DeepSeek's <strong>9.5</strong>.</p>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Reviewability differs structurally: GPT averages <strong>98.2 LOC/file</strong>; DeepSeek averages <strong>51.4</strong>.</span><span class="role-line"><span class="role cfo">CFO</span>Price review effort explicitly when comparing the <strong>$0.0150</strong> DeepSeek session average with premium routes.</span><span class="role-line"><span class="role coo">COO</span>Set repository conventions so nine-file outputs do not create avoidable coordination overhead.</span></div>
-<a class="section-cta" href="#model">Next: turn the evidence into a financial model &rarr;</a>
+<p class="lead" style="max-width:700px"><strong>The Explanation Tax is the cost of narration.</strong> Measured via silent-mode sweep: each model ran identical tasks in natural mode vs forced-silent (code-only). AST analysis confirms code structure is identical — the tax is purely from verbosity.</p>
+<div class="stat-row"><div class="stat-box"><div class="val bl">10</div><div class="lbl">Perturbation Operators</div><div class="sub">5 manifold (alien vocab, framing) + 5 semantic (missing constraints, false premises)</div></div><div class="stat-box"><div class="val gn">205</div><div class="lbl">Sessions Analyzed</div><div class="sub">Marker analysis correctly classifies perturbed vs baseline sessions</div></div><div class="stat-box"><div class="val rd">0.9×</div><div class="lbl">DS Recovery Multiplier</div><div class="sub">Perturbation reduces cost — silent recovery</div></div><div class="stat-box"><div class="val am">1.1×</div><div class="lbl">Claude Recovery Multiplier</div><div class="sub">Perturbation increases cost — pays to explain recovery</div></div></div>
+<p class="note" style="text-align:center;max-width:650px;margin:1rem auto">Constraint markers spike <strong style="color:var(--rd)">10×</strong> under perturbation — even silent models generate constraint-aware text when forced. AST analysis: perturbed code output is <strong style="color:var(--gn)">112.6% of baseline nodes</strong> — structurally identical.</p>
+<a href="#s4" class="cta ghost">The complete optimization strategy →</a>
 </div></section>
 
-<section id="model"><div class="wrap">
-<p class="section-label">04 / FinOps Model</p><h2>Price the outcome, not the prompt</h2>
-<p class="lead">The model combines base session cost, energy escalation, explanation overhead, velocity, and pass rate. Use it to compare routes on accepted outcomes and forecast team exposure.</p>
-<pre class="code-block"><b class="cost">Per-session</b>
-<b class="eq">c(t) = C0 * EPM(t) * (1 + beta*v*t)</b>
-
-<b class="cost">Cumulative</b>
-<b class="eq">C(N,v) = C0 * EPM(N) * [N + beta*v*N(N-1)/2]</b>
-
-<b class="cost">Cost per outcome</b>
-<b class="eq">CostPerOutcome(K,v) = C(K/P, v) / K</b>
-
-<b class="cost">Team monthly</b>
-<b class="eq">C_month = E * C0 * EPM(N_month) * [N_month + beta*v*N_month(N_month-1)/2]</b>
-
-<b class="cost">Cost gap decomposition</b>
-<b class="eq">Gap = (A * Verbosity * (1+epsilon)) * EPM(N)</b></pre>
-<div class="grid2">
-<article class="card b"><h3>Variables</h3><p class="fine"><span class="mono">C0</span> = base per-session cost<br><span class="mono">t</span> = year or time index<br><span class="mono">EPM</span> = Energy Price Multiplier<br><span class="mono">N</span> = session count<br><span class="mono">v</span> = execution velocity<br><span class="mono">beta</span> = velocity cost coefficient, <strong>0.001</strong></p></article>
-<article class="card g"><h3>Outcome and gap variables</h3><p class="fine"><span class="mono">K</span> = accepted outcomes<br><span class="mono">P</span> = pass probability<br><span class="mono">E</span> = engineer count<br><span class="mono">N_month</span> = monthly sessions per engineer<br><span class="mono">A</span> = active-parameter ratio, <strong>13.5x</strong> Claude/DeepSeek<br><span class="mono">epsilon</span> = Explanation Tax, <strong>24-120%</strong><br><span class="mono">Verbosity</span> = relative narrated output</p></article>
+<!-- S4: THE 5-LEVEL OPTIMIZATION STRATEGY -->
+<section class="slide s4" id="s4"><div class="slide-inner">
+<div class="badge">04 · The Strategy Stack</div>
+<h2>5 levels of AI cost optimization.<br>One unified equation.</h2>
+<p class="lead">Every cost lever maps to a single parameter in the FinOps equation. From model selection to energy hedging — one framework governs all.</p>
+<div class="strategy-stack">
+<div class="s-row"><div class="num gn">1</div><div class="txt"><strong>Model Selection</strong> — Route each task to the cheapest model that passes tests.<br><span class="lev">Lever: C₀ · Measured by: Cost per successful outcome</span></div></div>
+<div class="s-row"><div class="num bl">2</div><div class="txt"><strong>Reasoning Governance</strong> — Apply Silent Inference for routine tasks. Use explicit reasoning only for complex decisions.<br><span class="lev">Lever: ϵ (Explanation Tax) · Savings: 24–120%</span></div></div>
+<div class="s-row"><div class="num am">3</div><div class="txt"><strong>Architectural Efficiency</strong> — Favor MoE over dense models. Active params determine true per-token cost.<br><span class="lev">Lever: A (13.5× Claude/DS) · One-way door — hard to reverse</span></div></div>
+<div class="s-row"><div class="num rd">4</div><div class="txt"><strong>Codebase Growth Control</strong> — Context inflation compounds quadratically (N²). Refactor to control β.<br><span class="lev">Lever: β, v · 10% β error → 50% cost overrun after 100 sessions</span></div></div>
+<div class="s-row"><div class="num pu">5</div><div class="txt"><strong>Energy Price Hedging</strong> — Lock in today's model costs before EPM rises 1.8× by 2050.<br><span class="lev">Lever: EPM(t) · Sources: IEA, Goldman Sachs, EIA</span></div></div>
 </div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Route on <span class="mono">CostPerOutcome</span>, so DeepSeek's <strong>$0.009</strong> standardized test cost is adjusted for its task-specific pass probability.</span><span class="role-line"><span class="role cfo">CFO</span>Model the gap from the <strong>13.5x</strong> active-parameter ratio, <strong>24-120%</strong> explanation premium, and EPM instead of treating today's API price as fixed.</span><span class="role-line"><span class="role coo">COO</span>Use <strong>beta=0.001</strong> and measured velocity to expose the cumulative cost of scale.</span></div>
-
-<h3>Enterprise projection: 10-engineer team</h3>
-<div class="grid2">
-<article class="card g"><div class="kicker">DeepSeek monthly</div><div class="big green">$72</div><p class="fine">20 sessions/day, 20 days/month</p></article>
-<article class="card r"><div class="kicker">Claude monthly</div><div class="big red">$3,548</div><p class="fine">Same team activity assumption</p></article>
+<div class="card-row" style="margin-top:1.5rem">
+<div class="card bl"><div class="name">Two-Way Doors</div><div class="sub" style="text-align:left">Decisions that change C₀ alone — model routing, silent mode, caching. <strong>Experiment fast. Switch fast.</strong> The N² term doesn't lock you in.</div></div>
+<div class="card rd"><div class="name">One-Way Doors</div><div class="sub" style="text-align:left">Decisions that change β, v, or EPM — architecture choice, cloud provider, custom frameworks. <strong>Model rigorously.</strong> Use cumulative cost equation before committing.</div></div>
 </div>
-<div class="callout g"><strong>Current gap:</strong> $3,476 per month, approximately $40,000 per year. With a 2030 EPM of 1.2x, DeepSeek becomes <strong>$86/month</strong> and Claude becomes <strong>$4,258/month</strong>. The monthly gap widens to <strong>$4,172</strong>.</div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>A tested default-and-fallback route can preserve premium capability while challenging the <strong>$3,548 monthly</strong> Claude baseline.</span><span class="role-line"><span class="role cfo">CFO</span>The modeled saving is <strong>$3,476/month</strong>, approximately <strong>$40,000/year</strong>, before the 2030 energy gap.</span><span class="role-line"><span class="role coo">COO</span>Use the 10-engineer team as a pilot unit: 400 sessions per engineer per month under the stated 20-by-20 assumption.</span></div>
-<a class="section-cta" href="#energy">Next: stress-test the budget against energy prices &rarr;</a>
+<a href="#s5" class="cta ghost">Show me the evidence →</a>
 </div></section>
 
-<section class="alt-section" id="energy"><div class="wrap">
-<p class="section-label">05 / Energy Risk</p><h2>Today's model spread compounds with power demand</h2>
-<p class="lead">Energy risk does not reverse the recommendation; it increases the value of efficiency. The Energy Price Multiplier translates projected data-center demand into a common planning factor.</p>
-<pre class="code-block"><b class="eq">EPM(t) = 1.00 + 0.016*(t-2024)</b></pre>
-<div class="table-wrap"><table><thead><tr><th>Year</th><th>EPM</th><th>Global data-center demand</th></tr></thead><tbody>
-<tr><td>2024</td><td class="mono">1.00x</td><td class="mono">460 TWh</td></tr>
-<tr><td>2026</td><td class="mono">1.08x</td><td class="mono">565 TWh</td></tr>
-<tr><td>2030</td><td class="mono amber">1.20x</td><td class="mono">945-1,200 TWh</td></tr>
-<tr><td>2035</td><td class="mono amber">1.38x</td><td class="mono">1,300 TWh</td></tr>
-<tr><td>2050</td><td class="mono red">1.80x</td><td class="mono">2,700 TWh</td></tr>
-</tbody></table></div>
-<div class="refs"><strong>Sources:</strong> IEA 2025; Goldman Sachs 2026, projecting <strong>220% AI power-demand growth</strong>; EIA 2026, projecting data-center demand at <strong>6.7-12% of US generation</strong>.</div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Efficiency choices made in architecture now persist into a <strong>1.20x</strong> 2030 and <strong>1.80x</strong> 2050 energy environment.</span><span class="role-line"><span class="role cfo">CFO</span>At 2030 EPM, the modeled monthly gap grows from <strong>$3,476</strong> to <strong>$4,172</strong>.</span><span class="role-line"><span class="role coo">COO</span>Add EPM to vendor and capacity reviews; do not hold inference unit economics constant through 2050.</span></div>
-<a class="section-cta" href="#action">Next: adopt the model-routing rulebook &rarr;</a>
+<!-- S5: THE EVIDENCE -->
+<section class="slide s5" id="s5"><div class="slide-inner wide">
+<div class="badge">05 · The Evidence</div>
+<h2>8 models. Identical prompts.<br>Dashboard-verified costs.</h2>
+<div class="card-row" style="margin:1.2rem 0">
+<div class="card gn"><div class="big gn">$0.016</div><div class="name">DeepSeek v4 Pro</div><div class="sub">88 sessions · 1,873 builds/$<br>61% pass · 24.4% tax<br><span class="badge-tag gn">Silent Inference ✅</span></div></div>
+<div class="card rd"><div class="big rd">$0.249</div><div class="name">Claude Fable 5</div><div class="sub">30 sessions · 4 builds/$<br>100% pass · 52.5% tax<br><span class="badge-tag rd">Explanation Tax ⚠️</span></div></div>
+<div class="card am"><div class="big am">$0.464</div><div class="name">GPT-5.6</div><div class="sub">15 sessions · 45 builds/$<br>100% pass · 50.1% tax<br><span class="badge-tag am">Moderate Overhead</span></div></div>
+<div class="card rd"><div class="big rd">$0.060</div><div class="name">GPT-5-mini</div><div class="sub">12 sessions · 17 builds/$<br>100% pass · 119.6% tax<br><span class="badge-tag rd">Over-Explainer</span></div></div>
+</div>
+<div class="table-wrap"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>Claude</th><th>Gap</th></tr></thead><tbody>
+<tr><td>Task Manager API</td><td class="mono gn">$0.010</td><td class="mono">$0.499</td><td class="mono rd">$2.022</td><td class="mono rd">202×</td></tr>
+<tr><td>Data Table (frontend)</td><td class="mono gn">$0.019</td><td class="mono">$0.798</td><td class="mono rd">$2.053</td><td class="mono rd">108×</td></tr>
+<tr><td>Collaborative Editor</td><td class="mono gn">$0.022</td><td class="mono">$0.700</td><td class="mono rd">$2.490</td><td class="mono rd">113×</td></tr></tbody></table></div>
+<div class="stat-row" style="margin-top:1rem"><div class="stat-box"><div class="val gn">139</div><div class="lbl">Worktrees Analyzed</div><div class="sub">Full pytest on all on-disk code: Claude 178p/1f, OpenAI 209p/1f, DS 298p/168f</div></div><div class="stat-box"><div class="val bl">250+</div><div class="lbl">Sessions Total</div><div class="sub">8 models · 22 configs · Dashboard-verified costs</div></div><div class="stat-box"><div class="val am">$42.99</div><div class="lbl">Total Experiment Cost</div><div class="sub">All 250+ sessions combined across 8 models</div></div></div>
+<a href="#s6" class="cta ghost">The complete FinOps equation →</a>
 </div></section>
 
-<section id="action"><div class="wrap">
-<p class="section-label">06 / Action</p><h2>Use the cheapest model that clears the outcome gate</h2>
-<p class="lead">Do not switch everything. Segment work by constraint clarity, architecture sensitivity, and consequence of failure. Then promote or demote models using accepted-outcome economics.</p>
-<div class="decision">
-<article class="card g"><div class="kicker">Default</div><h3>DeepSeek v4 Pro</h3><p>Use for tightly constrained implementation with pinned frameworks, dependencies, tests, and silent output. Observed session average: <strong class="green">$0.0150</strong>.</p></article>
-<article class="card b"><div class="kicker">Low-cost fallback</div><h3>GPT-5-mini or nano</h3><p>Use when standardized acceptance tests fit the task. Both achieved 100% in their standardized sets at <strong>$0.001</strong>.</p></article>
-<article class="card a"><div class="kicker">Premium escalation</div><h3>GPT-5.6 or Claude</h3><p>Use for architecture ambiguity, high-consequence review, or when lower-cost routes fail. Standardized results were 100% at <strong>$0.010</strong> and <strong>$0.060</strong>.</p></article>
+<!-- S6: THE MODEL + EPM -->
+<section class="slide s6" id="s6"><div class="slide-inner">
+<div class="badge">06 · The Model</div>
+<h2>Price the outcome,<br>not the prompt.</h2>
+<div class="eq-block">
+<span class="param">C₀</span> = baseline session cost · <span class="param">EPM(t)</span> = Energy Price Multiplier<br>
+<span class="param">β</span> = 0.001 tokens/line · <span class="param">v</span> = velocity · <span class="param">N</span> = sessions<br>
+<span class="param">P</span> = pass rate · <span class="param">K</span> = desired outcomes · <span class="param">A</span> = arch multiplier (13.5×)<br>
+<span class="param">ϵ</span> = Explanation Tax (24–120%)
+
+<br><br><span class="em">Per-session:  c(t) = C₀ × EPM(t) × (1 + β·v·t)</span>
+<span class="em">Cumulative:   C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]</span>
+<span class="em">Per outcome:  CostPerOutcome(K,v) = C(K/P, v) / K</span>
+<span class="em">Team/month:   C_month = E × C₀ × EPM(N) × [N + β·v·N(N−1)/2]</span>
+
+<br><br><span class="decomp">Gap decomposition: (A × Verbosity × (1+ϵ)) × EPM(N)</span>
 </div>
-<div class="callout b"><strong>Switching rule:</strong> Start silent and constrained. Validate automatically. Escalate only when a route fails an acceptance gate, requires architecture judgment, or needs an auditable explanation. Recalculate with <span class="mono">CostPerOutcome(K,v)</span>, not model reputation.</div>
-<div class="grid2">
-<article class="card"><h3>30-day operating plan</h3><p><strong>Week 1:</strong> classify tasks and record current cost per accepted outcome.<br><strong>Week 2:</strong> run DeepSeek with pinned architecture and dependencies.<br><strong>Week 3:</strong> add GPT-5-mini, GPT-5.6, or Claude fallbacks by failure type.<br><strong>Week 4:</strong> enforce silent defaults and publish finance, quality, and rework metrics.</p></article>
-<article class="card"><h3>Board-ready scorecard</h3><p>Report model mix, pass probability, cost per accepted outcome, Explanation Tax, fallback rate, dependency errors, monthly run rate, annualized gap, and EPM-adjusted exposure.</p></article>
-</div>
-<div class="what-this-means"><strong>What This Means for CTO/CFO/COO</strong><span class="role-line"><span class="role cto">CTO</span>Default to <strong>$0.0150/session</strong> DeepSeek where constraints are explicit; escalate architecture-sensitive work after a failed gate.</span><span class="role-line"><span class="role cfo">CFO</span>Set the pilot target against the <strong>$3,476 monthly</strong> gap and report savings only after acceptance and rework costs.</span><span class="role-line"><span class="role coo">COO</span>Own the routing policy as an operating system: silent by default, tested always, premium by exception.</span></div>
-<a class="section-cta" href="#top">Return to the executive brief &uarr;</a>
+<div class="stat-row" style="margin-top:1rem"><div class="stat-box"><div class="val am">1.00×</div><div class="lbl">EPM 2024</div><div class="sub">460 TWh (IEA)</div></div><div class="stat-box"><div class="val am">1.20×</div><div class="lbl">EPM 2030</div><div class="sub">945–1,200 TWh</div></div><div class="stat-box"><div class="val am">1.38×</div><div class="lbl">EPM 2035</div><div class="sub">1,300 TWh (IEA)</div></div><div class="stat-box"><div class="val rd">1.80×</div><div class="lbl">EPM 2050</div><div class="sub">2,700 TWh (Rystad)</div></div></div>
+<p class="note" style="text-align:center;max-width:600px;margin:1rem auto"><strong style="color:var(--am)">EPM(t) = 1.00 + 0.016×(t−2024)</strong> · Goldman Sachs: 220% AI power demand growth · EIA: 6.7–12% of US generation by 2028</p>
+<a href="#s7" class="cta ghost">The rulebook — what to do now →</a>
 </div></section>
-</main>
-<footer><div class="wrap"><strong>The AI Cost-Efficiency Rulebook</strong><br>Applying the Silent Inference Principle to AI FinOps. Experiment figures are dashboard-verified, not estimates.</div></footer>
+
+<!-- S7: THE RULEBOOK -->
+<section class="slide s7" id="s7"><div class="slide-inner wide">
+<div class="badge">07 · The Rulebook</div>
+<h2>Start silent. Validate automatically.<br>Escalate by exception.</h2>
+<div class="card-row" style="margin:1.5rem 0">
+<div class="card gn"><div class="name">Default Route</div><div class="sub" style="text-align:left"><strong>DeepSeek v4 Pro</strong> — $0.016/session. 1,873 builds/$. Use for constrained tasks with pinned frameworks, dependencies, and tests. Silent mode by default.</div></div>
+<div class="card bl"><div class="name">Fallback Route</div><div class="sub" style="text-align:left"><strong>GPT-5-mini or nano</strong> — $0.001/session. 100% pass rate. Use when standardized tests fit the task and cost floor matters most.</div></div>
+<div class="card am"><div class="name">Premium Escalation</div><div class="sub" style="text-align:left"><strong>GPT-5.6 or Claude</strong> — $0.010–$0.060/session. 100% pass rate. Escalate when lower-cost routes fail, architecture is ambiguous, or auditable explanation is required.</div></div>
+</div>
+<div class="card-row" style="margin-top:0.5rem">
+<div class="card"><div class="name">30-Day Pilot</div><div class="sub" style="text-align:left"><strong>Week 1:</strong> Classify tasks. Record cost per accepted outcome.<br><strong>Week 2:</strong> Run DeepSeek with pinned architecture.<br><strong>Week 3:</strong> Add GPT/Claude fallbacks by failure type.<br><strong>Week 4:</strong> Enforce silent defaults. Publish cost metrics.</div></div>
+<div class="card"><div class="name">Board Scorecard</div><div class="sub" style="text-align:left">Report: model mix, pass probability, cost per accepted outcome, Explanation Tax, fallback rate, dependency errors, $/month run rate, annualized gap, EPM-adjusted exposure.</div></div>
+</div>
+<p class="lead" style="margin-top:1.2rem;font-size:0.85rem">
+<strong style="color:var(--t)">Enterprise impact:</strong> 10-engineer team running 20 sessions/day saves <strong style="color:var(--gn)">$3,476/month</strong> (~$40,000/year) using DeepSeek over Claude. With 2030 EPM of 1.2×, the gap widens to <strong style="color:var(--rd)">$4,172/month</strong>. Model choice today compounds energy savings.
+</p>
+<a href="https://github.com/peparhugo/reasoning-instrument" class="cta">View the full research on GitHub →</a>
+<p class="ref-line" style="margin-top:1.5rem"><strong>Sources:</strong> IEA 2025 · Goldman Sachs 2026 · EIA 2026 · Carnegie Mellon 2025 · Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) · TokenPowerBench (AAAI 2026) · Zhu & Zhu (2026) · CARL (ACL 2026) · TRACED (2026)<br><strong>The Silent Inference Principle · AI Cost-Efficiency Rulebook (Alpha) · Aug 2026</strong></p>
+</div></section>
+
+<script>
+// Update active nav dot on scroll
+const dots = document.querySelectorAll('.nav-dots a');
+const slides = document.querySelectorAll('.slide');
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if(e.isIntersecting) {
+      const id = e.target.id;
+      dots.forEach(d => d.classList.toggle('active', d.getAttribute('href') === '#' + id));
+    }
+  });
+}, {threshold: 0.5});
+slides.forEach(s => observer.observe(s));
+
+// Smooth nav dot clicks
+dots.forEach(d => d.addEventListener('click', e => {
+  e.preventDefault();
+  document.querySelector(d.getAttribute('href')).scrollIntoView({behavior:'smooth'});
+}));
+</script>
 </body>
 </html>
