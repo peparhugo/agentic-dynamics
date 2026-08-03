@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>How I Discovered the AI FinOps Framework — The Story</title>
+<meta name="description" content="The personal story behind the AI FinOps Framework. From a $20 DeepSeek API key to a predictive model covering 8 models and 178 sessions.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+--bg:#09090b;--bg2:#111113;--bg3:#18181b;--bg4:#1f1f23;
+--b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
+--t:#fafafa;--t2:#a1a1aa;--t3:#52525b;
+--ac:#10b981;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.8;-webkit-font-smoothing:antialiased}
+.topnav{position:sticky;top:0;z-index:100;background:rgba(9,9,11,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b);padding:0.8rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:0.8rem}
+.topnav a{color:var(--t2);text-decoration:none;transition:color .2s;font-weight:600}.topnav a:hover{color:var(--ac)}
+.topnav .brand{color:var(--ac);font-weight:800}
+article{max-width:720px;margin:0 auto;padding:5rem 2rem 4rem}
+h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-1.5px;line-height:1.12;color:#fff;margin-bottom:0.6rem}
+h2{font-size:clamp(1.3rem,3vw,1.8rem);font-weight:700;letter-spacing:-0.5px;line-height:1.25;color:#fff;margin:3rem 0 0.8rem}
+h3{font-weight:600;font-size:1.05rem;color:var(--t);margin:2rem 0 0.5rem}
+.subtitle{font-size:0.95rem;color:var(--t2);margin-bottom:2.5rem;line-height:1.6}
+p{font-size:0.95rem;color:var(--t2);margin-bottom:1.2rem}
+p strong{color:var(--t)}
+.highlight{background:var(--bg3);border:1px solid var(--b);border-radius:14px;padding:1.8rem;margin:2rem 0}
+.highlight h3{color:var(--ac);margin-top:0}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:0.8rem;margin:1.5rem 0}
+.stat{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.1rem;text-align:center}
+.stat .v{font-size:1.5rem;font-weight:800;color:var(--ac)}
+.stat .l{font-size:0.6rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.2rem;font-weight:600}
+blockquote{border-left:3px solid var(--ac);padding:1rem 1.5rem;margin:2rem 0;font-size:1.05rem;color:var(--t);font-style:italic;line-height:1.7;background:rgba(16,185,129,0.03);border-radius:0 10px 10px 0}
+blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:normal;margin-top:0.8rem}
+.callout{display:flex;align-items:flex-start;gap:1rem;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem 1.5rem;margin:1.5rem 0}
+.callout .icon{font-size:1.6rem;flex-shrink:0}
+.callout p{font-size:0.85rem;margin:0;color:var(--t2)}
+.callout p strong{color:var(--ac)}
+.comparison{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0}
+.comp-box{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left}
+.comp-box h3{font-size:0.85rem;margin:0 0 0.5rem}
+.comp-box ul{list-style:none;padding:0}.comp-box li{font-size:0.78rem;color:var(--t2);padding:0.2rem 0}
+.comp-box li::before{content:'\2192 ';color:var(--t3)}
+.comp-box.green h3{color:var(--ac)}.comp-box.amber h3{color:#fbbf24}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.8rem;margin:1.5rem 0}
+.stat-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.1rem;text-align:center;transition:transform .2s}
+.stat-card:hover{transform:translateY(-2px);border-color:rgba(16,185,129,0.25)}
+.stat-card .v{font-size:1.5rem;font-weight:800;color:var(--ac)}
+.stat-card .v.amber{color:#fbbf24}
+.stat-card .v.cyan{color:#22d3ee}
+.stat-card .l{font-size:0.6rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.2rem;font-weight:600}
+footer{padding:3rem 2rem;text-align:center;border-top:1px solid var(--b);font-size:0.7rem;color:var(--t3);line-height:1.8}
+footer a{color:var(--ac);text-decoration:none;font-weight:600}
+footer a:hover{text-decoration:underline}
+@media(max-width:768px){article{padding:3rem 1.5rem 2rem}.comparison{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+<a href="/" class="brand">&larr; AI FinOps Framework</a>
+<div><a href="methodology.html" style="color:var(--t2);text-decoration:none;font-weight:600;margin-right:1.5rem;font-size:0.8rem">Methodology</a><a href="evidence.html" style="color:var(--t2);text-decoration:none;font-weight:600;margin-right:1.5rem;font-size:0.8rem">Evidence</a><a href="https://github.com/peparhugo/ai-finops-rulebook" style="color:var(--t2);text-decoration:none;font-weight:600;font-size:0.8rem">GitHub</a></div>
+</nav>
+
+<article>
+
+<h1>How a $20 API key became an AI FinOps framework.</h1>
+<p class="subtitle">I wasn't trying to build a research instrument. I was trying to save money on a trip to Italy. What happened next changed how I think about AI inference costs.</p>
+
+<h2>The subscription problem.</h2>
+
+<p>At the start of 2026, I was spending close to <strong>$700 per month</strong> on AI subscriptions. ChatGPT Pro. Claude Max. All the tiers. I used them for everything &ndash; coding, writing, thinking through architecture decisions, running experiments. It was just the cost of doing business. I didn't think about it.</p>
+
+<p>Then I went on a break to Italy. I downgraded every subscription to the lowest tier. Minimum commitment. I wasn't going to be working anyway.</p>
+
+<p>But I had a few things I wanted to tinker with while I was away. So I did something I'd never done before: I loaded <strong>$20 USD</strong> onto the DeepSeek v4 API and pointed my tooling at it. Twenty dollars. That's less than I'd spend on a single lunch in Rome.</p>
+
+<p>That was weeks ago. <strong>As of writing this, I still have $7.27 remaining.</strong></p>
+
+<div class="stats-grid">
+<div class="stat-card"><div class="v">8</div><div class="l">Models Tested</div></div>
+<div class="stat-card"><div class="v">178</div><div class="l">Instrumented Sessions</div></div>
+<div class="stat-card"><div class="v amber">$39.95</div><div class="l">Total Research Cost</div></div>
+<div class="stat-card"><div class="v cyan">473&times;</div><div class="l">Measured Cost Gap</div></div>
+</div>
+
+<h2>What $12.73 built.</h2>
+
+<p>In the time it took me to burn through twelve dollars and seventy-three cents, I:</p>
+
+<div class="highlight">
+<ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
+<li>&rarr; Completely overhauled and refactored a Dreamlab exploratory codebase — the one that eventually became this research instrument</li>
+<li>&rarr; Built a greenfield project for downloading videos, generating subtitles, cutting them into shorts, and publishing to YouTube</li>
+<li>&rarr; Ran <strong>every experiment</strong> in the AI FinOps framework — 178 sessions across 8 models</li>
+<li>&rarr; Wrote this entire website — the framework, the rulebook, the calculator, the methodology page</li>
+<li>&rarr; Debugged production issues, explored architecture decisions, refactored storage layers, and built collaboration features</li>
+</ul>
+</div>
+
+<div class="stats-grid">
+<div class="stat-card"><div class="v">178</div><div class="l">Total Sessions</div></div>
+<div class="stat-card"><div class="v amber">$39.95</div><div class="l">All-Model Experiment Cost</div></div>
+<div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend</div></div>
+<div class="stat-card"><div class="v amber">$32.00</div><div class="l">Claude Would Have Cost</div></div>
+</div>
+
+<blockquote>
+"This doesn't make any sense. How is this possible? The same tasks. The same outcomes. A fraction of the cost. I had to understand why."
+<cite>&ndash; Me, staring at the DeepSeek billing dashboard, somewhere in Italy</cite>
+</blockquote>
+
+<h2>So I started researching.</h2>
+
+<p>Here is what I learned. It turned a personal budgeting hack into a framework that governs AI inference costs at scale.</p>
+
+<div class="comparison">
+<div class="comp-box green">
+<h3>DeepSeek v4 — The Explorer</h3>
+<ul>
+<li>Mixture-of-Experts architecture</li>
+<li>Only 3% of parameters active at inference</li>
+<li>Multi-token generation — predicts multiple tokens per step</li>
+<li>RL-based latent space chain-of-thought</li>
+<li>GRPO compresses reasoning into vectors, not words</li>
+<li>37B active parameters on 350W H800 GPUs</li>
+</ul>
+</div>
+<div class="comp-box amber">
+<h3>GPT &amp; Claude — The Narrators</h3>
+<ul>
+<li>Dense architectures — all parameters active, all the time</li>
+<li>Next-token prediction — one token at a time, every step</li>
+<li>SFT imitation chain-of-thought training</li>
+<li>Supervised fine-tuning creates bound reasoning paths</li>
+<li>The model cannot escape the path it was trained to follow</li>
+<li>~500B active parameters on 700W H100 GPUs</li>
+</ul>
+</div>
+</div>
+
+<p><strong>Supervised fine-tuning with imitation chain-of-thought.</strong> That phrase changed everything for me. When you train a model through SFT imitation, you are showing it what good reasoning looks like and asking it to copy that pattern. The model learns a path. It cannot leave the path. When perturbed — when you inject alien vocabulary, invert constraints, introduce contradictions — the model doesn't explore. It recovers. It narrates its way back to familiar territory. Every recovery step is a billable token.</p>
+
+<p><strong>Reinforcement learning in latent space does the opposite.</strong> DeepSeek's GRPO doesn't learn what reasoning should look like. It learns to get to the right answer, and the path is incidental. The reasoning exists as vectors, not words. When perturbed, DeepSeek explores. It finds new paths. It doesn't need to narrate the journey because the journey was never the point — the destination was.</p>
+
+<p>This is the <strong style="color:var(--ac)">Silent Inference Principle</strong>. Implementation = True. Narration = False. And it's a structural property of the training architecture, not a tuning parameter you can toggle.</p>
+
+<h2>From "DeepSeek is cheaper" to "here is the framework."</h2>
+
+<p>I started out trying to show that DeepSeek was more efficient. That was the whole point. Run the same tasks. Measure the costs. Publish the numbers. Simple.</p>
+
+<p>But as I stood back and thought about what I was actually measuring, the scope kept expanding.</p>
+
+<p><strong>Day-to-day operations.</strong> Teams using AI coding assistants. What model should they default to? When should they escalate? The Silent Inference Rule and the Explanation Tax Rule answer this.</p>
+
+<p><strong>Production systems.</strong> Model routing at scale. Classify the task, dispatch to the cheapest capable model. The Select-then-Route pattern isn't just a research concept — it's an operational architecture.</p>
+
+<p><strong>Policy decisions.</strong> One-way doors vs two-way doors. Switching C&#8320; is reversible. Committing to an architecture that determines &beta; and v is not. The decision framework wasn't theoretical — it emerged from watching how costs compound when you get the architecture wrong.</p>
+
+<p><strong>Long-term planning.</strong> Codebase growth compounds quadratically through the N&sup2; term. A 10% error in your context inflation estimate becomes a 50% cost overrun after 100 sessions. This isn't extrapolation — it's in the equation.</p>
+
+<p><strong>Business outcomes.</strong> CostPerOutcome. Not cost per prompt. Not cost per session. Cost per accepted, verified, working outcome. The only metric that matters if you're accountable for results.</p>
+
+<p><strong>Energy economics.</strong> EPM(t). The Energy Price Multiplier. Local energy markets determine long-term compute prices. The 4Ms framework from Google Cloud formalizes this. The IEA projects 1.8&times; growth by 2050. Whatever model looks cheapest today gets more expensive every year — and the models with the highest Watt-per-useful-token ratio compound fastest.</p>
+
+<div class="callout">
+<div class="icon">&#9888;</div>
+<p><strong>This became a cumulative framework for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
+</div>
+
+<h2>Why I was the person who could build this.</h2>
+
+<p>This framework sits at an intersection that almost nobody occupies. And that's not arrogance — it's an observation about how research gets siloed.</p>
+
+<p><strong>Economics.</strong> I understand cost curves, compounding growth, and the difference between marginal and total cost. When I saw the N&sup2; term in the cumulative cost equation, I didn't see math. I saw a production function. Context inflation is the new inflation. Codebase growth is a second-order cost driver, and most engineering teams don't have the economic vocabulary to model it.</p>
+
+<p><strong>Physics.</strong> Energy is not a line item. It's the substrate. A GPU drawing 700W at inference is converting electrons into tokens. The Energy Price Multiplier isn't a metaphor — it's a measurable physical quantity. Understanding thermodynamics gave me the intuition that Watt-per-useful-token would matter more than token-per-dollar over long horizons. That intuition became the EPM Horizon Rule.</p>
+
+<p><strong>Energy markets.</strong> Local energy prices determine long-term compute costs. Goldman Sachs projects 220% growth in AI power demand. The EIA expects data centers to consume 6.7&ndash;12% of US generation. These aren't data points you add to a slide. They're structural inputs to a model. If you don't model energy as a variable, you're not doing FinOps — you're doing procurement.</p>
+
+<p><strong>Software engineering and system architecture.</strong> I've built production systems. I know what a model routing layer looks like at scale. I understand why switching C&#8320; is a two-way door and committing to an architecture that determines &beta; is not. The decision framework didn't come from a management book. It came from watching architecture decisions compound across codebases.</p>
+
+<p><strong>C-suite career growth.</strong> I've been in the rooms where these decisions get made. I know what a CFO needs to see. I know what a CTO needs to justify. I know the difference between a benchmark that impresses engineers and a framework that changes procurement policy. The five rules are written for the people who sign contracts, not the people who run benchmarks.</p>
+
+<div class="callout">
+<div class="icon">&#9888;</div>
+<p><strong>None of these disciplines alone would have produced this framework.</strong> A physicist would stop at the EPM equation. An economist would stop at the cost curve. A software architect would stop at the routing layer. A CTO would stop at the decision framework. It took all of them together to see that these aren't separate problems — they're the same problem at different scales.</p>
+</div>
+
+<h2>Why benchmarks failed. Why buzzwords don't help.</h2>
+
+<p>Before this, what did AI FinOps even mean? Vendors threw around "outcome-based pricing" and "AI-native optimization" and "cost-intelligent routing." None of it was operational. None of it had an equation behind it. None of it could tell you, under your specific assumptions, what your costs would be in 2035.</p>
+
+<p>Benchmarks compare one model to another on a synthetic task. That's interesting. It's not useful. A CTO doesn't need to know that Model A scores 2% higher on HumanEval. They need to know whether switching models will save or cost them money over three years, given their team size, their velocity, their codebase growth rate, and their energy price exposure.</p>
+
+<p><strong>This framework gives AI FinOps a foundation.</strong> Not a benchmark. Not a white paper. Not a vendor dashboard. A predictive model with empirically measured parameters, a set of operational rules, and an interactive calculator that lets any team project their own costs under their own assumptions. That's what the term should have meant all along.</p>
+
+<blockquote>
+"The framework didn't come from theory. It came from watching $12.73 do more work than $700 ever did — and needing to understand why."
+</blockquote>
+
+<div style="text-align:center;margin:2rem 0">
+<a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">View the AI FinOps Framework &rarr;</a>
+</div>
+
+</article>
+
+<footer>
+<strong>The AI FinOps Framework</strong> &middot; A predictive model for AI outcome delivery costs<br>
+<a href="https://github.com/peparhugo/ai-finops-rulebook">github.com/peparhugo/ai-finops-rulebook</a><br>
+<a href="/">Framework</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="evidence.html" style="color:var(--ac);font-weight:700">Next: The Evidence &rarr;</a>
+</footer>
+
+</body>
+</html>
