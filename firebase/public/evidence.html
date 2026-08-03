@@ -144,7 +144,7 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <!-- Perturbation Response -->
 <section class="sec alt">
 <h2>Perturbation Response</h2>
-<p class="lead">10 calibrated perturbation operators applied across all models. Recovery multipliers measure how perturbation changes cost — below 1.0 means perturbation reduces cost (model explores instead of recovering).</p>
+<p class="lead">10 calibrated perturbation operators applied across all models. Recovery multipliers measure how perturbation changes cost — below 1.0 means perturbation reduces cost (model explores instead of recovering). <strong style="color:var(--ac)">Think of these as "state shocks":</strong> requirements shift, dependencies break, logs spike. We measure how each model responds when the world changes under it &ndash; and what that response costs.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Recovery Multiplier</th><th>Escape Behavior</th><th>Strategy Archetype</th></tr></thead><tbody>
 <tr><td>DeepSeek v4 Pro</td><td class="green">0.9&times;</td><td class="green">Explores — perturbation reduces cost</td><td class="green">EXPLORATORY</td></tr>
 <tr><td>Claude Fable 5</td><td class="amber">1.1&times;</td><td class="amber">Recovers — perturbation increases cost</td><td class="amber">CONSERVATIVE</td></tr>
