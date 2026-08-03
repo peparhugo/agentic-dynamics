@@ -60,7 +60,7 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 .wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1rem 0;font-size:0.8rem;color:var(--t2);line-height:1.7}
 .wtm strong{color:var(--t)}
 .constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0;max-width:650px;margin-left:auto;margin-right:auto}
-.cr{display:grid;grid-template-columns:2fr 1.2fr 1.2fr 0.6fr 0.6fr;gap:0.5rem;align-items:center;padding:0.45rem 0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--b);font-size:0.73rem}
+.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.45rem 0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--b);font-size:0.73rem}
 .cr.head{background:var(--bg4);font-weight:600;font-size:0.63rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
 .cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.63rem;color:var(--t3)}.cr .ck{text-align:center}
 .rules-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:720px;margin:1rem auto}
@@ -226,22 +226,22 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 <section class="slide s6" id="s6"><div class="inr wide">
 <div class="pulse">The Discovery</div>
 <h2>Both models implement every constraint.<br>Same output. Different cost structures.</h2>
-<p class="lead">We gave eight models the identical task. Scanned every generated file. <strong style="color:var(--ac)">DeepSeek</strong> and <strong style="color:var(--am)">Claude</strong> implemented all seven constraints in working Python. The difference: DeepSeek uses GRPO to compress reasoning into latent space. Claude externalizes every reasoning step into billable tokens. <strong style="color:var(--ac)">DeepSeek is the anchor case study, not an endorsement.</strong> The framework measures cost; you decide which model fits your context.</p>
+<p class="lead">We gave eight models the identical task. Scanned every generated file. <strong style="color:var(--ac)">DeepSeek</strong> and <strong style="color:var(--am)">Claude Fable 5</strong> implemented all seven constraints in working Python. The difference: DeepSeek uses GRPO to compress reasoning into latent space. Claude externalizes every reasoning step into billable tokens. <strong style="color:var(--ac)">DeepSeek is the anchor case study, not an endorsement.</strong> The framework measures cost; you decide which model fits your context.</p>
 <div class="constraints">
-<div class="cr head"><div class="nm">Constraint</div><div class="fl">DeepSeek Implementation</div><div class="fl">Claude Implementation</div><div class="ck">DS</div><div class="ck">CL</div></div>
-<div class="cr"><div class="nm">JWT authentication</div><div class="fl green">auth.py, extensions.py</div><div class="fl green">auth.py, extensions.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">Rate limiting</div><div class="fl green">auth_routes.py</div><div class="fl green">rate_limit.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">Input validation</div><div class="fl green">validators.py</div><div class="fl green">schemas.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">Pagination</div><div class="fl green">models.py</div><div class="fl green">pagination.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">Error handling</div><div class="fl green">errors.py</div><div class="fl green">errors.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">Audit logging</div><div class="fl green">audit.py</div><div class="fl green">audit.py</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
-<div class="cr"><div class="nm">API versioning</div><div class="fl green">routes/v1/</div><div class="fl green">Blueprint /v1/</div><div class="ck">&ndash;</div><div class="ck green">&check;</div></div>
+<div class="cr head"><div class="nm">Constraint</div><div class="fl">DeepSeek Implementation</div><div class="fl">Claude Fable 5 Implementation</div></div>
+<div class="cr"><div class="nm">JWT authentication</div><div class="fl green">auth.py, extensions.py</div><div class="fl green">auth.py, extensions.py</div></div>
+<div class="cr"><div class="nm">Rate limiting</div><div class="fl green">auth_routes.py</div><div class="fl green">rate_limit.py</div></div>
+<div class="cr"><div class="nm">Input validation</div><div class="fl green">validators.py</div><div class="fl green">schemas.py</div></div>
+<div class="cr"><div class="nm">Pagination</div><div class="fl green">models.py</div><div class="fl green">pagination.py</div></div>
+<div class="cr"><div class="nm">Error handling</div><div class="fl green">errors.py</div><div class="fl green">errors.py</div></div>
+<div class="cr"><div class="nm">Audit logging</div><div class="fl green">audit.py</div><div class="fl green">audit.py</div></div>
+<div class="cr"><div class="nm">API versioning</div><div class="fl green">routes/v1/</div><div class="fl green">Blueprint /v1/</div></div>
 </div>
-<div class="tbl" style="margin-top:1rem"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>Claude</th><th>Gap</th></tr></thead><tbody>
+<div class="tbl" style="margin-top:1rem"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>Claude Fable 5</th><th>Gap</th></tr></thead><tbody>
 <tr><td>Task Manager API</td><td class="mono green">$0.010</td><td class="mono">$0.499</td><td class="mono amber">$2.022</td><td class="mono amber">202&times;</td></tr>
 <tr><td>Data Table</td><td class="mono green">$0.019</td><td class="mono">$0.798</td><td class="mono amber">$2.053</td><td class="mono amber">108&times;</td></tr>
 <tr><td>Collaborative Editor</td><td class="mono green">$0.022</td><td class="mono">$0.700</td><td class="mono amber">$2.490</td><td class="mono amber">113&times;</td></tr></tbody></table></div>
-<div class="wtm"><strong>The gap isn't in capability. It's in architecture.</strong> DeepSeek's 37B active parameters (MoE) on 350W H800 GPUs vs Claude's ~500B active on 700W H100 GPUs. The 14&times; hardware gap compounds with the 7&times; token efficiency gap to produce the 473&times; cost difference. When frameworks are pinned in the prompt, DeepSeek matches Claude's pass rate at a fraction of the cost. This held across all three cross-domain comparisons.</div>
+<div class="wtm"><strong>The gap isn't in capability. It's in architecture.</strong> DeepSeek's 37B active parameters (MoE) on 350W H800 GPUs vs Claude Fable 5's ~500B active on 700W H100 GPUs. The 14&times; hardware gap compounds with the 7&times; token efficiency gap to produce the 473&times; cost difference. When frameworks are pinned in the prompt, DeepSeek matches Claude's pass rate at a fraction of the cost. This held across all three cross-domain comparisons.</div>
 <a href="#s7" class="cta-btn ghost">The tax measured across all 8 variants</a>
 </div></section><!-- S7: MODEL CARDS (simplified) -->
 <section class="slide s7" id="s7"><div class="inr wide">
