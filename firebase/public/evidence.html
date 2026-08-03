@@ -3,22 +3,18 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Evidence — AI FinOps Framework</title>
-<meta name="description" content="Full evidence: 186 worktrees, 178 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
+<meta name="description" content="Full evidence: 186 worktrees, 189 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
 --bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
 --b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
 --t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;
---ac:#6366F1;--am:var(--am);--cy:var(--cy);
+--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;-webkit-font-smoothing:antialiased}
-.topnav{position:sticky;top:0;z-index:100;background:rgba(9,9,11,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b);padding:0.75rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;gap:1.5rem;flex-wrap:wrap}
-.topnav a{color:var(--t2);text-decoration:none;transition:color .2s;font-weight:600;white-space:nowrap}
-.topnav a:hover,.topnav a.active{color:var(--ac)}
-.topnav .brand{color:var(--ac);font-weight:800}
 .sec{padding:4rem 2rem;max-width:1000px;margin:0 auto}
 .sec.alt{background:var(--bg2)}
 h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-1.5px;line-height:1.12;color:#fff;margin-bottom:0.5rem}
@@ -55,12 +51,12 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>The Evidence</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)">186 worktrees. 178 experiment sessions. 3 architectures, 8 variants. Every number on this page was measured, not estimated. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family.</span></p>
+<p class="lead" style="font-size:1rem;color:var(--t)">186 worktrees (169 experiment runs, 17 exploratory sessions). 189 instrumented experiment sessions across 3 architectures, 8 variants. Every number on this page was measured, not estimated. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
 <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
 <div class="card" style="text-align:center"><div class="cval">186</div><div class="cdesc" style="text-align:center">Worktrees analyzed</div></div>
-<div class="card" style="text-align:center"><div class="cval">178</div><div class="cdesc" style="text-align:center">Instrumented sessions</div></div>
+<div class="card" style="text-align:center"><div class="cval">189</div><div class="cdesc" style="text-align:center">Instrumented sessions</div></div>
 <div class="card" style="text-align:center"><div class="cval">8</div><div class="cdesc" style="text-align:center">Models tested</div></div>
-<div class="card" style="text-align:center"><div class="cval">$39.95</div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
+<div class="card" style="text-align:center"><div class="cval">$45.14</div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
 </div>
 </section>
 
@@ -182,7 +178,7 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-178 experiment sessions &middot; 3 architectures, 8 variants &middot; $39.95 total cost &middot; Verified from opencode DB<br>
+189 experiment sessions &middot; 3 architectures, 8 variants &middot; $45.14 total cost &middot; Verified from opencode DB<br>
 <a href="https://github.com/peparhugo/ai-finops-rulebook">github.com/peparhugo/ai-finops-rulebook</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

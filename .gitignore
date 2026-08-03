@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Firebase
+.firebase/
+
+# Generated inventory (rebuild with `scripts/inventory.py refresh`)
+experiments/inventory.json
+
+# Opencode worktrees (transient temp dirs)
+/tmp/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

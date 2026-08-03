@@ -1,75 +1,299 @@
-# AI FinOps Framework — v0.1
+# AI FinOps Framework
 
-The first open framework for measuring and predicting AI inference costs. Not a benchmark. An instrument you can extend, debate, and improve.
+<p align="center">
+  <strong>The first open framework for measuring and predicting AI inference costs.</strong><br>
+  Not a benchmark. An instrument — a calibrated measurement apparatus that probes how language models explore unfamiliar reasoning topologies, how they recover from perturbation, and what that costs.
+</p>
 
-> *"The one job of a v1.0 framework: establish vocabulary, measurement apparatus, and replicable methodology. By that standard, this is an A-."* — External review, August 2026
+<p align="center">
+  <a href="https://ai-finops-rulebook.web.app"><img src="https://img.shields.io/badge/website-ai--finops--rulebook.web.app-%236366F1" alt="Website"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
+  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen" alt="Contributions"></a>
+</p>
 
-## What This Is
+---
 
-- **10 perturbation operators** (5 manifold, 5 semantic) that probe reasoning topology
-- **6 recovery detection signals** that classify how models respond to disruption
-- **4 strategy archetypes** (Conservative, Exploratory, Wasteful, Efficient)
-- **One unified equation** that projects AI inference costs under any assumptions
-- **178 experiment sessions** across 8 models, 22 configs, 5 domains
+## The 30-Second Pitch
+
+You're spending money on AI models. How do you know it's the *right* amount? Most teams measure cost per prompt — a metric that ignores pass rates, codebase growth compounding, and energy price inflation.
+
+**This framework gives you a predictive equation.** Enter your assumptions — team size, velocity, energy scenario — and receive a cost projection, model selection rules, and an energy risk forecast. Every parameter is empirically grounded in 189 instrumented experiment sessions across 8 model variants and 3 architectures.
+
+> *"Your AI bill is a black box. This framework opens it."* — The homepage
+
+---
+
+## The Five Rules
+
+Each rule names a concept we measured. Each maps to a lever you control.
+
+| # | Rule | What It Tells You |
+|---|------|-------------------|
+| 1 | **The Silent Inference Rule** | Default to the cheapest model that passes your tests. If it produces correct code without narration, route to it. |
+| 2 | **The Explanation Tax Rule** | Narration has a measurable cost (24–120% more per session). Pay for it only when you need auditable reasoning. |
+| 3 | **The N² Tax Rule** | Codebase growth compounds quadratically. A 10% estimation error becomes a 50% cost overrun after 100 sessions. |
+| 4 | **The EPM Horizon Rule** | Energy costs are the inflation rate of AI compute. Find the year your local energy prices flip your model selection. |
+| 5 | **The Cost-Per-Pass Rule** | Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome. |
+
+---
+
+## What's In This Repo
+
+```
+├── src/instrument/           # Python measurement apparatus
+│   ├── perturb.py            # 10 perturbation operators (5 manifold, 5 semantic)
+│   ├── trajectory.py         # Reasoning trajectory capture
+│   ├── recovery.py           # Recovery classification (6 detection signals)
+│   ├── recovery_cost.py      # Cost of recovering from perturbation
+│   ├── basin.py              # Attractor basin escape measurement
+│   ├── strategy.py           # Strategy archetype classification (4 types)
+│   ├── efficiency.py         # Token / cost / energy efficiency measurement
+│   ├── solution.py           # Solution quality evaluation
+│   ├── constraint_detection.py   # Dual-signal constraint verification
+│   ├── semantic_validation.py    # AST analysis, marker profiling
+│   ├── game_report.py        # Markdown game report generation
+│   ├── experiment.py         # Full experiment runner
+│   ├── adapter.py            # LLM adapter instrumentation
+│   ├── opencode.py           # Agentic session runner + JSONL parser
+│   └── lab_book.py           # YAML-frontmatter markdown persistence
+├── experiments/
+│   ├── configs/              # 22 YAML experiment definitions
+│   ├── results/              # Raw experiment output (JSON + Markdown)
+│   └── inventory.json        # Persistent experiment/worktree registry
+├── scripts/
+│   ├── run.py                # Single experiment runner
+│   ├── batch_run.py          # Parallel batch experiments
+│   ├── sweep_silent_mode.py  # Silent-mode Explanation Tax sweep
+│   ├── sweep_parallel.py     # Parallel silent-mode sweep
+│   ├── finish_sweep.py       # Resume incomplete sweep cells
+│   ├── remaining_batch.py    # Sequential batch runner
+│   ├── multi_phase.py        # Iterative multi-phase builds
+│   ├── recovery_cost_table.py    # DB-based recovery cost analysis
+│   ├── validate_session.py   # Post-hoc pytest validation
+│   └── inventory.py          # Experiment/worktree inventory CLI
+├── firebase/public/          # Website source (HTML/CSS/JS)
+├── pyproject.toml            # Python package config
+├── CONTRIBUTING.md           # How to contribute
+└── CODE_OF_CONDUCT.md       # Community standards
+```
+
+---
 
 ## Quick Links
 
 | Page | What |
 |------|------|
-| [The Framework](https://ai-finops-rulebook.web.app) | Rules, calculator, decision framework |
+| [The Framework](https://ai-finops-rulebook.web.app) | Rules, interactive calculator, decision framework |
 | [The Story](https://ai-finops-rulebook.web.app/story.html) | How a $20 API key became this |
-| [The Methodology](https://ai-finops-rulebook.web.app/methodology.html) | Experiment design and instrument |
-| [The Evidence](https://ai-finops-rulebook.web.app/evidence.html) | 186 worktrees, full data, AST analysis |
+| [The Methodology](https://ai-finops-rulebook.web.app/methodology.html) | Experiment design and instrument architecture |
+| [The Evidence](https://ai-finops-rulebook.web.app/evidence.html) | 186 worktrees, full AST analysis, all data |
+| [The Roadmap](https://ai-finops-rulebook.web.app/roadmap.html) | Public research agenda, help-wanted items |
 
-## Repo Structure
+---
 
-```
-├── src/instrument/         # Python measurement apparatus
-│   ├── perturb.py          # 10 perturbation operators
-│   ├── trajectory.py       # Reasoning trajectory capture
-│   ├── recovery.py         # Recovery classification (6 signals)
-│   ├── basin.py            # Basin escape measurement
-│   ├── strategy.py         # Strategy archetype classification
-│   ├── efficiency.py       # Token/cost/energy efficiency
-│   └── experiment.py       # Full experiment runner
-├── experiments/
-│   ├── configs/            # 22 YAML experiment definitions
-│   └── results/            # Raw experiment output
-├── scripts/                # Run, batch, sweep scripts
-├── firebase/public/        # Website source
-└── pyproject.toml          # Python package config
-```
+## By the Numbers
 
-## How to Run
+| Metric | Value |
+|--------|-------|
+| Experiment sessions | 189 |
+| Worktrees analyzed | 186 |
+| Models tested | 8 (3 architectures) |
+| Experiment configs | 22 |
+| Perturbation operators | 10 |
+| Recovery signals | 6 |
+| Strategy archetypes | 4 |
+| Measured cost gap | 473× |
+| Total experiment cost | $45.14 |
+| Lines of generated code | 202,000+ |
+| AST-verified Python files | 2,416 |
+
+Run `python scripts/inventory.py list` for a live breakdown of all experiments, worktrees, and costs.
+
+---
+
+## Installation
+
+**Prerequisites:**
+- Python 3.10+
+- An [opencode](https://opencode.ai) installation (the CLI used to spawn agentic sessions)
+- LLM API credentials (DeepSeek, OpenAI, or Anthropic)
 
 ```bash
-# Install
+git clone https://github.com/peparhugo/ai-finops-rulebook.git
+cd ai-finops-rulebook
 pip install -e .
+```
 
-# Run a single experiment
+---
+
+## Usage
+
+### Run a Single Experiment
+
+```bash
 python scripts/run.py --config experiments/configs/task_manager.yaml
+```
 
-# Run a batch
+This will:
+1. Parse the YAML config
+2. Generate perturbed prompts using the specified operators
+3. Spawn an isolated opencode worktree with the perturbed prompt
+4. Capture the full reasoning trajectory
+5. Run multi-dimensional analysis (solution quality, basin escape, recovery classification, efficiency)
+6. Save results to `experiments/results/{name}_{model}.json`
+
+### Run a Batch
+
+```bash
 python scripts/batch_run.py
 ```
 
-## Current Scope (v0.1)
+### Run a Silent-Mode Sweep
 
-**Covered today:**
+```bash
+python scripts/sweep_silent_mode.py
+```
+
+This toggles the Explanation Tax on/off by controlling whether the model is allowed to externalize reasoning into billable tokens.
+
+### Inspect the Inventory
+
+```bash
+# Rebuild inventory from all data sources
+python scripts/inventory.py refresh
+
+# List all experiments with model breakdown
+python scripts/inventory.py list
+
+# Show aggregate statistics
+python scripts/inventory.py stats
+
+# List worktrees and their sessions
+python scripts/inventory.py worktrees
+
+# Print numbers formatted for the evidence page
+python scripts/inventory.py report
+```
+
+### Validate a Worktree
+
+```bash
+python scripts/validate_session.py /tmp/exp_xyz
+```
+
+Runs pytest in the worktree and reports pass/fail/error results.
+
+---
+
+## How It Works
+
+### The Experiment Pipeline
+
+```
+Experiment Config (YAML)
+  │
+  ├─► Perturbation Engine (10 operators × 3 strengths)
+  │     └─► Perturbed Prompts
+  │
+  ├─► Opencode Agentic Session
+  │     ├─► Isolated worktree (/tmp/exp_*)
+  │     ├─► Model receives (perturbed) prompt
+  │     └─► Captures: full reasoning trace, tool calls, tokens, cost
+  │
+  ├─► Multi-Dimensional Analysis
+  │     ├─► solution.py      → Correctness, constraints met, novelty
+  │     ├─► efficiency.py    → Token/cost/energy efficiency
+  │     ├─► basin.py         → Attractor basin escape score
+  │     ├─► recovery.py      → 6-signal recovery classification
+  │     ├─► strategy.py      → Archetype: Conservative/Exploratory/Wasteful/Efficient
+  │     ├─► constraint_detection.py → Dual-signal constraint verification
+  │     └─► recovery_cost.py → Recovery cost multiplier
+  │
+  └─► Results
+        ├─► JSON (experiments/results/)
+        └─► Markdown Game Reports (experiments/results/reports/)
+```
+
+### The Unified Cost Equation
+
+Every parameter is measured empirically — none are theoretical.
+
+```
+C₀   = baseline session cost
+P    = pass rate
+ε    = Explanation Tax (narration overhead)
+β    = context inflation rate
+v    = velocity (lines generated per session)
+EPM  = Energy Price Multiplier
+
+Per session:  c(t) = C₀ × EPM(t) × (1 + β·v·t)
+Cumulative:   C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]
+Per outcome:  CostPerOutcome(K,v) = C(K/P, v) / K
+```
+
+### The 10 Perturbation Operators
+
+**Manifold** (probe linguistic surface — test search dynamics):
+
+| Operator | What It Does |
+|----------|--------------|
+| Inject Alien Vocabulary | Replace domain terms with unrelated field vocabulary |
+| Shift Framing | Reframe from "build this" to "find the flaws in this" |
+| Reverse Causality | Present solution before the problem |
+| Force Abandonment | Force generation and discard of solutions |
+
+**Semantic** (probe reasoning coherence — test truth-seeking):
+
+| Operator | What It Does |
+|----------|--------------|
+| Inject False Premise | Insert a plausible but incorrect assumption |
+| Invert Constraint | Flip a requirement to its opposite |
+| Insert Contradiction | Place two mutually exclusive requirements |
+| Remove Critical Constraint | Silently drop a defining requirement |
+| Inject Phantom Success | Assert an intermediate step passed when it hasn't |
+| Inject Competing Goal | Add a conflicting requirement |
+
+---
+
+## Current Scope & Roadmap
+
+### v0.1 (Current)
+
 - 8 models across Python/Flask REST APIs, CRUD apps, real-time collaboration frontends
 - 10 prompt-level perturbation operators
-- IEA-baseline EPM projection (linear, 1.6%/year)
+- IEA-baseline linear EPM projection (1.6%/yr)
 - Inference cost measurement (tokens, dollars, joules)
 
-**Planned for v0.2+ (pull requests welcome):**
-- TypeScript, Rust, Go validation
-- Structural perturbation operators (broken deps, AST corruption)
-- EPM sensitivity analysis (aggressive/optimistic/volatile scenarios)
-- Human maintenance cost modeling
+### v0.2+ (Help Wanted)
 
-**Not in scope:**
-The framework does not judge whether narration is "wasteful" or "valuable" — it measures the cost. If your team needs auditable reasoning trails, the Explanation Tax is insurance, not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.
+| Pillar | Description | Status |
+|--------|-------------|--------|
+| Multi-Language AST | TypeScript, Go, Rust, Java validation | 🟢 1/5 |
+| Task Archetypes | Bug-fixing, refactoring, security hardening, ETL | 🟢 1/5 |
+| Model Diversity | Gemini, Llama-4, Mistral validation | 🟡 2/6 |
+| Structural Perturbations | Dependency injection, AST corruption, incident simulation | 🟢 1/5 |
+| Maintenance Tax | 6-month code evolution, blind preference testing | 🔵 0/2 |
+
+See the [full roadmap](https://ai-finops-rulebook.web.app/roadmap.html) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Citation
+
+If you use this framework in your research or decision-making:
+
+```bibtex
+@misc{ai-finops-framework-2026,
+  title  = {The AI FinOps Framework: A Predictive Model for AI Inference Costs},
+  author = {Hugo Pepar},
+  year   = {2026},
+  url    = {https://ai-finops-rulebook.web.app},
+  note   = {v0.1. 189 experiment sessions, 8 models, 10 perturbation operators.}
+}
+```
+
+---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE). The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement. The framework does not judge whether narration is "wasteful" or "valuable" — it measures the cost.
