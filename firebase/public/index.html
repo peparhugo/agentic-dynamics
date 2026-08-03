@@ -124,21 +124,19 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 
 <!-- S0: HERO + EXEC SUMMARY -->
 <section class="slide s0" id="s0"><div class="inr">
-<div class="pulse"><span class="dot"></span> v0.1 &middot; Open Framework &middot; 178 Experiments &middot; 8 Models &middot; Help us extend</div>
+<div class="pulse"><span class="dot"></span> v0.1 &middot; Open Framework &middot; 178 Experiments &middot; 3 Architectures, 8 Variants &middot; Help us extend</div>
 <h1>The AI FinOps<br>Framework</h1>
 <p class="lead" style="font-size:1rem;color:var(--t)"><strong style="color:var(--ac)">Your AI inference bill is a black box. This framework opens it.</strong> Not a benchmark. A predictive model grounded in 178 experiments. Enter your assumptions &ndash; team size, velocity, energy scenario &ndash; and receive a cost projection, model selection rules, and an energy risk forecast. The first open framework for AI FinOps. v0.1 &ndash; help us extend the benchmarks.</p>
-<div class="stats"><div class="stat"><div class="v">473&times;</div><div class="l">Cost Gap</div><div class="s">Between models producing identical code</div></div><div class="stat"><div class="v">8</div><div class="l">Models Tested</div><div class="s">DeepSeek, Claude, GPT-5/5.5/5.6/mini/nano/fast</div></div><div class="stat"><div class="v">178</div><div class="l">Experiment Sessions</div><div class="s">22 configs across 5 domains</div></div><div class="stat"><div class="v">$39.95</div><div class="l">Total Experiment Cost</div><div class="s">Controlled worktree sessions only</div></div></div>
+<div class="stats"><div class="stat"><div class="v">1</div><div class="l">Equation, 5 Rules</div><div class="s">Every cost driver, any scenario</div></div><div class="stat"><div class="v">3</div><div class="l">Architectures, 8 Variants</div><div class="s">DeepSeek MoE, Claude dense, GPT family</div></div><div class="stat"><div class="v">178</div><div class="l">Experiment Sessions</div><div class="s">22 configs across 5 domains</div></div><div class="stat"><div class="v">473&times;</div><div class="l">Measured Cost Gap</div><div class="s">Between least and most expensive per outcome</div></div></div>
 <div class="exec"><h3>What You Should Do</h3>
 <ol style="padding-left:0;list-style:none"><li><strong>Default-route</strong> constrained, testable tasks to models that implement silently. DeepSeek v4 Pro delivers constraint-complete code at 1/473th the cost of Claude per outcome.</li><li><strong>Escalate</strong> to explicit reasoning only when automated verification gates fail or the architecture is ambiguous. Do not pay the Explanation Tax for tasks your test suite already validates.</li><li><strong>Model cumulative cost</strong> before committing to architecture or multi-year contracts. Use the equation and calculator below with your own assumptions.</li><li style="font-size:0.78rem;color:var(--t3)">178 experiment sessions across 8 models &middot; 22 configs &middot; $39.95 total cost &middot; Verified from opencode session DB</li></ol></div>
-<div class="cta-bar"><a href="#s5" class="cta-btn big">Project Your Costs</a><a href="#s1" class="cta-btn ghost">The five rules</a></div>
+<div class="cta-bar"><a href="#s4" class="cta-btn big">Project Your Costs</a><a href="#s1" class="cta-btn ghost">The five rules</a></div>
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:0.8rem;max-width:700px;margin:1rem auto 0">
 <a href="#s1" style="text-decoration:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1.2rem;text-align:left;transition:all .25s;color:var(--t2);font-size:0.78rem;display:block" onmouseover="this.style.borderColor='var(--ba)'" onmouseout="this.style.borderColor='var(--b)'"><strong style="color:var(--ac)">I'm a CTO</strong><br><span style="font-size:0.72rem">Routing rules &amp; architecture decisions</span></a>
-<a href="#s6" style="text-decoration:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1.2rem;text-align:left;transition:all .25s;color:var(--t2);font-size:0.78rem;display:block" onmouseover="this.style.borderColor='var(--ba)'" onmouseout="this.style.borderColor='var(--b)'"><strong style="color:var(--ac)">I'm a CFO</strong><br><span style="font-size:0.72rem">Project costs &amp; energy risk</span></a>
+<a href="#s7" style="text-decoration:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1.2rem;text-align:left;transition:all .25s;color:var(--t2);font-size:0.78rem;display:block" onmouseover="this.style.borderColor='var(--ba)'" onmouseout="this.style.borderColor='var(--b)'"><strong style="color:var(--ac)">I'm a CFO</strong><br><span style="font-size:0.72rem">Project costs &amp; energy risk</span></a>
 <a href="evidence.html" style="text-decoration:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1.2rem;text-align:left;transition:all .25s;color:var(--t2);font-size:0.78rem;display:block" onmouseover="this.style.borderColor='var(--ba)'" onmouseout="this.style.borderColor='var(--b)'"><strong style="color:var(--ac)">I'm a Researcher</strong><br><span style="font-size:0.72rem">Full evidence &amp; methodology</span></a>
 </div>
-</div></section>
-
-<!-- S1: THE RULES — Decision first -->
+</div></section><!-- S1: THE RULES — Decision first -->
 <section class="slide s1" id="s1"><div class="inr">
 <div class="pulse">The Five Rules</div>
 <h2>Here is how you govern<br>AI inference costs.</h2>
@@ -152,9 +150,7 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 </div>
 <div class="note" style="max-width:720px;margin:1rem auto;text-align:left;font-size:0.73rem"><strong style="color:var(--ac)">Who this is for:</strong> Engineering teams of 5+ running Python/Flask workloads with annual AI inference spend exceeding $100K. Validated on REST APIs, CRUD applications, and real-time collaboration frontends. If your domain differs (TypeScript, Rust, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
 <a href="#s2" class="cta-btn ghost">The parameters you control</a>
-</div></section>
-
-<!-- S2: THE INPUTS -->
+</div></section><!-- S2: THE INPUTS -->
 <section class="slide s2" id="s2"><div class="inr wide">
 <div class="pulse">The Levers</div>
 <h2>The parameters you control.</h2>
@@ -169,11 +165,61 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 <div class="param"><div class="psym">&epsilon;</div><div class="pname">Explanation Tax. Reasoning/output token ratio. 0.00 (Claude, all narration billed as output) to 1.03 (nano, more reasoning than code).</div></div>
 <div class="param"><div class="psym">A</div><div class="pname">Architecture multiplier. MoE vs dense. 3% active params vs 100%. 13.6M cache reads (DeepSeek) vs 4.1M (Claude).</div></div>
 </div>
-<a href="#s3" class="cta-btn ghost">Why this works</a>
-</div></section>
-
-<!-- S3: THE DISCOVERY -->
+<a href="#s6" class="cta-btn ghost">Why this works</a>
+</div></section><!-- S3: THE MODEL -->
 <section class="slide s3" id="s3"><div class="inr wide">
+<div class="pulse">The Model</div>
+<h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
+<p class="lead">Every rule derives from this equation. Every term was measured empirically &ndash; no parameter is theoretical.</p>
+<div style="background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);max-width:700px;margin:1rem auto;text-align:left">
+<span style="color:var(--ac)">C&#8320;</span> = baseline cost &middot; <span style="color:var(--ac)">P</span> = pass rate &middot; <span style="color:var(--ac)">&epsilon;</span> = Explanation Tax<br>
+<span style="color:var(--ac)">&beta;</span> = context inflation &middot; <span style="color:var(--ac)">v</span> = velocity &middot; <span style="color:var(--ac)">N</span> = sessions &middot; <span style="color:var(--ac)">A</span> = architecture multiplier<br><br>
+<span style="color:var(--ac)">Per session:</span> c(t) = C&#8320; &times; EPM(t) &times; (1 + &beta;&middot;v&middot;t)<br>
+<span style="color:var(--ac)">Cumulative:</span> C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br>
+<span style="color:var(--ac)">Per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
+<span style="color:var(--ac)">Monthly:</span> C<sub>mo</sub> = E &times; C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br><br>
+<span style="color:#fbbf24">Gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)<br><br>
+<span style="color:var(--t3);font-size:0.7em">EPM(t) is an IEA baseline assumption (1.6%/yr). See the chart toggle for aggressive (2.5%) and optimistic (0.8%) scenarios.</span>
+</div>
+<div class="chart-wrap"><canvas id="costChart"></canvas></div>
+<div style="display:flex;justify-content:center;gap:0.5rem;margin-top:0.8rem;font-size:0.7rem">
+<span style="color:var(--t3)">Projection:</span>
+<a href="#" onclick="rebuildChart(3);return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="yr3">3 yr</a>
+<a href="#" onclick="rebuildChart(10);return false" style="color:var(--t3);text-decoration:none" id="yr10">10 yr</a>
+<a href="#" onclick="rebuildChart(25);return false" style="color:var(--t3);text-decoration:none" id="yr25">25 yr</a>
+<span style="color:var(--t3);margin:0 0.5rem">|</span>
+<span style="color:var(--t3)">EPM:</span>
+<a href="#" onclick="buildChart(chartYears,'baseline');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="epmBase">Baseline</a>
+<a href="#" onclick="buildChart(chartYears,'sensitivity');return false" style="color:var(--t3);text-decoration:none" id="epmSens">DS Scenarios</a>
+</div>
+<p class="note">Budget-cycle projections: 10-engineer team, 20 sessions/day, EPM +1.6%/year (IEA). Use 3yr for annual budgeting. Use 10yr for strategic planning. The 25yr projection carries a wider confidence interval — architecture and energy assumptions compound. Operationalizes the <strong style="color:#fbbf24">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
+<div class="stats"><div class="stat"><div class="v">$72</div><div class="l">DS Monthly (3yr)</div><div class="s">10 engineers, 20 sessions/day</div></div><div class="stat"><div class="v amber">$3,548</div><div class="l">Claude Monthly (3yr)</div><div class="s">Same team, same output</div></div><div class="stat"><div class="v">1.20&times;</div><div class="l">EPM 2030</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">1.38&times;</div><div class="l">EPM 2035</div><div class="s">High-demand scenario</div></div></div>
+<a href="#s4" class="cta-btn ghost">Project your costs</a>
+</div></section><!-- S4: CALCULATOR -->
+<section class="slide s4" id="s4"><div class="inr wide">
+<div class="pulse">Project Your Costs</div>
+<h2>Enter your assumptions.<br>Watch the model recalculate.</h2>
+<p class="lead">Every output is computed by the equation above. Adjust the sliders to match your team's parameters. <span style="color:var(--t3);font-size:0.8em">Defaults: 10 engineers, 20 sessions/day, 500 lines/session, 20 days/month, baseline EPM, $20K/mo loaded cost.</span></p>
+<div class="roi-calc">
+<div class="row"><div><label>Team Size <span class="val" id="v_eng">10</span> engineers</label><input type="range" min="1" max="100" value="10" oninput="updateROI()" id="r_eng"></div><div><label>Sessions / Engineer / Day <span class="val" id="v_ses">20</span></label><input type="range" min="1" max="100" value="20" oninput="updateROI()" id="r_ses"></div></div>
+<div class="row"><div><label>Velocity <span class="val" id="v_vel">500</span> lines/session</label><input type="range" min="50" max="2000" value="500" oninput="updateROI()" id="r_vel"></div><div><label>Working Days / Month <span class="val" id="v_day">20</span></label><input type="range" min="15" max="25" value="20" oninput="updateROI()" id="r_day"></div></div>
+<div class="row"><div><label>Energy Scenario <span class="val" id="v_epm">Baseline (1.00&times;)</span></label><input type="range" min="0" max="2" value="0" oninput="updateROI()" id="r_epm"></div><div><label>Engineer Loaded Cost / Month <span class="val" id="v_cost">$20,000</span></label><input type="range" min="5000" max="50000" value="20000" oninput="updateROI()" id="r_cost"></div></div>
+<div class="roi-out" id="roi_output"></div></div>
+<div class="cta-bar"><button class="cta-btn big" id="pdfBtn" onclick="downloadPDF()">Download PDF Report</button></div>
+<div class="cta-bar"><a href="#s5" class="cta-btn ghost">Decision framework</a></div>
+</div></section><!-- S5: DECISION FRAMEWORK -->
+<section class="slide s5" id="s5"><div class="inr">
+<div class="pulse">Decision Framework</div>
+<h2>When to move fast.<br>When to model thoroughly.</h2>
+<div class="doors">
+<div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime.</p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
+<div class="door ow"><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:#fbbf24">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting MoE vs dense architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p style="margin-top:0.5rem;font-weight:600;color:#fbbf24">Model cumulative cost. Project 36 months.</p></div>
+</div>
+<p class="note" style="max-width:600px;margin:0 auto">Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</p>
+<div class="wtm" style="margin-top:1rem"><strong>30-day implementation:</strong> Week 1: Classify tasks by complexity. Week 2: Default-route constrained tasks to silent models. Week 3: Establish verification gates and escalation paths. Week 4: Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
+<a href="#s6" class="cta-btn ghost">The evidence</a>
+</div></section><!-- S6: THE DISCOVERY -->
+<section class="slide s6" id="s6"><div class="inr wide">
 <div class="pulse">The Discovery</div>
 <h2>Both models implement every constraint.<br>Same output. Different cost structures.</h2>
 <p class="lead">We gave eight models the identical task. Scanned every generated file. <strong style="color:var(--ac)">DeepSeek</strong> and <strong style="color:#fbbf24">Claude</strong> implemented all seven constraints in working Python. The difference: DeepSeek uses GRPO to compress reasoning into latent space. Claude externalizes every reasoning step into billable tokens. <strong style="color:var(--ac)">DeepSeek is the anchor case study, not an endorsement.</strong> The framework measures cost; you decide which model fits your context.</p>
@@ -192,11 +238,9 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 <tr><td>Data Table</td><td class="mono green">$0.019</td><td class="mono">$0.798</td><td class="mono amber">$2.053</td><td class="mono amber">108&times;</td></tr>
 <tr><td>Collaborative Editor</td><td class="mono green">$0.022</td><td class="mono">$0.700</td><td class="mono amber">$2.490</td><td class="mono amber">113&times;</td></tr></tbody></table></div>
 <div class="wtm"><strong>The gap isn't in capability. It's in architecture.</strong> DeepSeek's 37B active parameters (MoE) on 350W H800 GPUs vs Claude's ~500B active on 700W H100 GPUs. The 14&times; hardware gap compounds with the 7&times; token efficiency gap to produce the 473&times; cost difference. When frameworks are pinned in the prompt, DeepSeek matches Claude's pass rate at a fraction of the cost. This held across all three cross-domain comparisons.</div>
-<a href="#s4" class="cta-btn ghost">The tax measured across all 8 models</a>
-</div></section>
-
-<!-- S4: MODEL CARDS (simplified) -->
-<section class="slide s4" id="s4"><div class="inr wide">
+<a href="#s7" class="cta-btn ghost">The tax measured across all 8 models</a>
+</div></section><!-- S7: MODEL CARDS (simplified) -->
+<section class="slide s7" id="s7"><div class="inr wide">
 <div class="pulse">The Evidence</div>
 <h2>Narration costs 24&ndash;120%.<br>Measured across all 8 models.</h2>
 <div class="cards">
@@ -210,67 +254,8 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 <div class="card" onclick="this.classList.toggle('expanded')"><div class="cname">GPT-5-nano</div><div class="cval cyan">$0.006</div><div class="csub">per session &middot; 7 worktrees &middot; 2.9 files/WT</div><div class="ctag cyan">Ultra-Light</div><div class="bar"><div class="fill cyan" style="width:35%"></div></div><div class="csub"><span style="color:#22d3ee;font-weight:700">Test-Only</span></div><div class="detail">1.03 reasoning ratio — more reasoning than output<br>24% type hints &middot; 1.1M cache reads &middot; 30K output tokens<br>Tests: 2/6 pass &middot; 3 logic failures — only model with real code errors<br><a href="evidence.html" style="color:var(--ac)">Full evidence &rarr;</a></div></div>
 </div>
 <p class="note">All 8 models produce structurally sound code (AST-verified across 2,416 Python files). Test pass rates and token economics vary dramatically by architecture — not by capability. <a href="evidence.html" style="color:var(--ac)">See the full evidence page for AST analysis, test results, token economics, perturbation response, and constraint detection.</a></p>
-<a href="#s5" class="cta-btn ghost">The model behind the rules</a>
-</div></section>
-
-<!-- S5: THE MODEL -->
-<section class="slide s5" id="s5"><div class="inr wide">
-<div class="pulse">The Model</div>
-<h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead">Every rule derives from this equation. Every term was measured empirically &ndash; no parameter is theoretical.</p>
-<div style="background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);max-width:700px;margin:1rem auto;text-align:left">
-<span style="color:var(--ac)">C&#8320;</span> = baseline cost &middot; <span style="color:var(--ac)">P</span> = pass rate &middot; <span style="color:var(--ac)">&epsilon;</span> = Explanation Tax<br>
-<span style="color:var(--ac)">&beta;</span> = context inflation &middot; <span style="color:var(--ac)">v</span> = velocity &middot; <span style="color:var(--ac)">N</span> = sessions &middot; <span style="color:var(--ac)">A</span> = architecture multiplier<br><br>
-<span style="color:var(--ac)">Per session:</span> c(t) = C&#8320; &times; EPM(t) &times; (1 + &beta;&middot;v&middot;t)<br>
-<span style="color:var(--ac)">Cumulative:</span> C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br>
-<span style="color:var(--ac)">Per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
-<span style="color:var(--ac)">Monthly:</span> C<sub>mo</sub> = E &times; C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br><br>
-<span style="color:#fbbf24">Gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
-</div>
-<div class="chart-wrap"><canvas id="costChart"></canvas></div>
-<div style="display:flex;justify-content:center;gap:0.5rem;margin-top:0.8rem;font-size:0.7rem">
-<span style="color:var(--t3)">Projection:</span>
-<a href="#" onclick="rebuildChart(3);return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="yr3">3 yr</a>
-<a href="#" onclick="rebuildChart(10);return false" style="color:var(--t3);text-decoration:none" id="yr10">10 yr</a>
-<a href="#" onclick="rebuildChart(25);return false" style="color:var(--t3);text-decoration:none" id="yr25">25 yr</a>
-<span style="color:var(--t3);margin:0 0.5rem">|</span>
-<span style="color:var(--t3)">EPM:</span>
-<a href="#" onclick="buildChart(chartYears,'baseline');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="epmBase">Baseline</a>
-<a href="#" onclick="buildChart(chartYears,'sensitivity');return false" style="color:var(--t3);text-decoration:none" id="epmSens">DS Scenarios</a>
-</div>
-<p class="note">Budget-cycle projections: 10-engineer team, 20 sessions/day, EPM +1.6%/year (IEA). Use 3yr for annual budgeting. Use 10yr for strategic planning. The 25yr projection carries a wider confidence interval — architecture and energy assumptions compound. Operationalizes the <strong style="color:#fbbf24">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
-<div class="stats"><div class="stat"><div class="v">$72</div><div class="l">DS Monthly (3yr)</div><div class="s">10 engineers, 20 sessions/day</div></div><div class="stat"><div class="v amber">$3,548</div><div class="l">Claude Monthly (3yr)</div><div class="s">Same team, same output</div></div><div class="stat"><div class="v">1.20&times;</div><div class="l">EPM 2030</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">1.38&times;</div><div class="l">EPM 2035</div><div class="s">High-demand scenario</div></div></div>
-<a href="#s6" class="cta-btn ghost">Project your costs</a>
-</div></section>
-
-<!-- S6: CALCULATOR -->
-<section class="slide s6" id="s6"><div class="inr wide">
-<div class="pulse">Project Your Costs</div>
-<h2>Enter your assumptions.<br>Watch the model recalculate.</h2>
-<p class="lead">Every output is computed by the equation above. Adjust the sliders to match your team's parameters.</p>
-<div class="roi-calc">
-<div class="row"><div><label>Team Size <span class="val" id="v_eng">10</span> engineers</label><input type="range" min="1" max="100" value="10" oninput="updateROI()" id="r_eng"></div><div><label>Sessions / Engineer / Day <span class="val" id="v_ses">20</span></label><input type="range" min="1" max="100" value="20" oninput="updateROI()" id="r_ses"></div></div>
-<div class="row"><div><label>Velocity <span class="val" id="v_vel">500</span> lines/session</label><input type="range" min="50" max="2000" value="500" oninput="updateROI()" id="r_vel"></div><div><label>Working Days / Month <span class="val" id="v_day">20</span></label><input type="range" min="15" max="25" value="20" oninput="updateROI()" id="r_day"></div></div>
-<div class="row"><div><label>Energy Scenario <span class="val" id="v_epm">Baseline (1.00&times;)</span></label><input type="range" min="0" max="2" value="0" oninput="updateROI()" id="r_epm"></div><div><label>Engineer Loaded Cost / Month <span class="val" id="v_cost">$20,000</span></label><input type="range" min="5000" max="50000" value="20000" oninput="updateROI()" id="r_cost"></div></div>
-<div class="roi-out" id="roi_output"></div></div>
-<div class="cta-bar"><button class="cta-btn big" id="pdfBtn" onclick="downloadPDF()">Download PDF Report</button></div>
-<div class="cta-bar"><a href="#s7" class="cta-btn ghost">Decision framework</a></div>
-</div></section>
-
-<!-- S7: DECISION FRAMEWORK -->
-<section class="slide s7" id="s7"><div class="inr">
-<div class="pulse">Decision Framework</div>
-<h2>When to move fast.<br>When to model thoroughly.</h2>
-<div class="doors">
-<div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime.</p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
-<div class="door ow"><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:#fbbf24">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting MoE vs dense architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p style="margin-top:0.5rem;font-weight:600;color:#fbbf24">Model cumulative cost. Project 36 months.</p></div>
-</div>
-<p class="note" style="max-width:600px;margin:0 auto">Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</p>
-<div class="wtm" style="margin-top:1rem"><strong>30-day implementation:</strong> Week 1: Classify tasks by complexity. Week 2: Default-route constrained tasks to silent models. Week 3: Establish verification gates and escalation paths. Week 4: Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
 <a href="#s8" class="cta-btn ghost">Research context</a>
-</div></section>
-
-<!-- S8: RESEARCH CONTEXT -->
+</div></section><!-- S8: RESEARCH CONTEXT -->
 <section class="slide s8" id="s8"><div class="inr wide">
 <div class="pulse">Research Context</div>
 <h2>Where this work fits<br>in the literature.</h2>
@@ -285,15 +270,13 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 </tbody></table></div>
 <div class="refs" style="text-align:center;margin-top:1rem"><strong>Energy:</strong> IEA 2025 &middot; Goldman Sachs 2026 (220% AI demand) &middot; EIA 2026 &middot; Carnegie Mellon 2025 &middot; Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) &middot; TokenPowerBench (AAAI 2026) &middot; Zhu & Zhu (2026) &middot; CARL (ACL 2026) &middot; TRACED (2026)</div>
 <div class="cta-bar"><a href="https://github.com/peparhugo/ai-finops-rulebook" class="cta-btn">Full Research on GitHub</a><a href="#s9" class="cta-btn ghost">Open source</a></div>
-</div></section>
-
-<!-- S9: CLOSING -->
+</div></section><!-- S9: CLOSING -->
 <section class="slide s9" id="s9"><div class="inr" style="text-align:center">
 <div class="pulse" style="display:inline-flex">Open Source &middot; Reproducible</div>
 <h2>Every claim is verifiable.</h2>
 <p class="lead">22 experiment configs. 10 perturbation operators. Full AST analysis. Every session recorded in the opencode database. The instrument is open source. The data is inspectable. The framework is derived from measurements you can reproduce.</p>
 <div class="cta-bar"><a href="https://github.com/peparhugo/ai-finops-rulebook" class="cta-btn big">View the Instrument on GitHub</a></div>
-<div class="cta-bar"><a href="story.html" class="cta-btn ghost">How This Started</a><a href="methodology.html" class="cta-btn ghost">Research Methodology</a><a href="#s6" class="cta-btn ghost">Project Your Costs</a><a href="#s1" class="cta-btn ghost">The Rules</a></div>
+<div class="cta-bar"><a href="story.html" class="cta-btn ghost">How This Started</a><a href="methodology.html" class="cta-btn ghost">Research Methodology</a><a href="#s4" class="cta-btn ghost">Project Your Costs</a><a href="#s1" class="cta-btn ghost">The Rules</a></div>
 <p style="font-size:0.7rem;color:var(--t3);margin-top:2rem"><strong>The AI FinOps Framework &middot; August 2026</strong><br>178 experiment sessions &middot; 8 models &middot; $39.95 total cost &middot; Verified from opencode DB</p>
 </div></section>
 
