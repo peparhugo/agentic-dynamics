@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI FinOps Framework — Executive Report</title>
+<meta name="description" content="Condensed executive report: the AI FinOps Framework — rules, evidence, methodology, and roadmap in one document.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fff;--bg2:#f8f9fa;--t:#1a1a2e;--t2:#4a4a5a;--t3:#888;--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;--b:#e0e0e0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;font-size:0.9rem}
+@media print{body{font-size:0.8rem}.page-break{page-break-before:always}}
+.container{max-width:800px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2rem;font-weight:800;color:#111;margin-bottom:0.3rem}
+h2{font-size:1.3rem;font-weight:700;color:#111;margin:2rem 0 0.5rem;border-bottom:2px solid var(--ac);padding-bottom:0.3rem}
+h3{font-size:1rem;font-weight:700;margin:1.2rem 0 0.3rem}
+.lead{font-size:0.95rem;color:var(--t2);margin-bottom:1rem}
+.meta{font-size:0.75rem;color:var(--t3);margin-bottom:1.5rem}
+.rule{margin:0.8rem 0;padding:0.8rem 1rem;background:var(--bg2);border-left:3px solid var(--ac);border-radius:0 6px 6px 0}
+.rule h3{font-size:0.9rem;margin:0 0 0.2rem;color:var(--ac)}
+.rule p{font-size:0.8rem;color:var(--t2)}
+.tbl{overflow-x:auto;margin:0.8rem 0}
+.tbl table{width:100%;border-collapse:collapse;font-size:0.75rem}
+.tbl th{text-align:left;padding:0.4rem 0.5rem;background:var(--bg2);border-bottom:2px solid var(--b);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+.tbl td{padding:0.3rem 0.5rem;border-bottom:1px solid var(--b)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:0.7rem}
+.stats{display:flex;gap:1.5rem;flex-wrap:wrap;margin:1rem 0}
+.stat{text-align:center;min-width:80px}
+.stat .v{font-size:1.4rem;font-weight:800;color:var(--ac)}
+.stat .l{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-top:1px solid var(--b);margin-top:2rem}
+a{color:var(--ac)}
+</style>
+</head>
+<body><div class="container">
+
+<h1>AI FinOps Framework</h1>
+<p class="lead">An evidence-based predictive model for AI costs. v0.1 — 178 experiment sessions across 3 architectures, 8 variants. Executive Report.</p>
+<div class="stats">
+<div class="stat"><div class="v">473×</div><div class="l">Cost Gap</div></div>
+<div class="stat"><div class="v">3</div><div class="l">Architectures</div></div>
+<div class="stat"><div class="v">178</div><div class="l">Sessions</div></div>
+<div class="stat"><div class="v">$39.95</div><div class="l">Total Cost</div></div>
+</div>
+<p class="meta">Generated August 2026 · Full site: <a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a></p>
+
+<h2>Executive Summary</h2>
+<p>We discovered a 473× cost gap between models that produce identical constraint-complete Python code. The gap is structural — not situational. DeepSeek v4 Pro uses GRPO-based latent reasoning (Silent Inference); Claude Fable 5 uses SFT imitation chain-of-thought (billed as output tokens). The framework measures the cost. You decide which model fits your context.</p>
+<p><strong>Your AI bill is a black box. This framework opens it.</strong></p>
+
+<h2>The Five Rules</h2>
+<div class="rule"><h3>Rule 1 — The Silent Inference Rule</h3><p>Default to the cheapest model that passes your test suite. Defaulting to silent models preserves budget runway for tasks that actually need explicit reasoning — database migrations, core architecture, security audits. Two-way door.</p></div>
+<div class="rule"><h3>Rule 2 — The Explanation Tax Rule</h3><p>Narration has a measurable cost (24–120%). Whether it's worth paying depends on your verification architecture. If automated tests validate output, route to silent models. If you need auditable reasoning, the tax is insurance.</p></div>
+<div class="rule"><h3>Rule 3 — The N² Tax Rule</h3><p>Model cumulative cost before architectural commitments. Context inflation compounds quadratically: C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]. A 10% β error produces a 50% overrun after 100 sessions. One-way door.</p></div>
+<div class="rule"><h3>Rule 4 — The EPM Horizon Rule</h3><p>Energy costs are the inflation rate of AI compute. Local energy markets determine long-term prices. Find the year your geographic energy costs flip your model selection. EPM(t) = 1.00 + r(t−2024). Hedge before that point.</p></div>
+<div class="rule"><h3>Rule 5 — The Cost-Per-Pass Rule</h3><p>Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per outcome — with double the latency and retry overhead. CostPerOutcome(K,v) = C(K/P, v) / K.</p></div>
+
+<h2>The Evidence</h2>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Architecture</th><th>Avg Cost</th><th>WTs</th><th>Reason Ratio</th><th>Test Pass (raw)</th><th>Route</th></tr></thead><tbody>
+<tr><td class="mono">DeepSeek v4 Pro</td><td>MoE</td><td>$0.013</td><td>90</td><td>0.21</td><td>28% (72% w/ env)</td><td>Default</td></tr>
+<tr><td class="mono">Claude Fable 5</td><td>Dense</td><td>$0.803</td><td>33</td><td>0.00</td><td>60% (100% w/ env)</td><td>Mission-Critical</td></tr>
+<tr><td class="mono">GPT-5.6</td><td>Dense</td><td>$0.422</td><td>20</td><td>0.07</td><td>50% (100% w/ env)</td><td>Escalation</td></tr>
+<tr><td class="mono">GPT-5-mini</td><td>Dense</td><td>$0.024</td><td>13</td><td>0.34</td><td>100%</td><td>Fallback</td></tr>
+<tr><td class="mono">GPT-5.6-fast</td><td>Dense</td><td>$0.487</td><td>9</td><td>0.08</td><td>83% (100% w/ env)</td><td>Avoid Routine</td></tr>
+<tr><td class="mono">GPT-5.5</td><td>Dense</td><td>$0.162</td><td>6</td><td>0.09</td><td>100%</td><td>Evaluate</td></tr>
+<tr><td class="mono">GPT-5</td><td>Dense</td><td>$0.112</td><td>6</td><td>0.45</td><td>75% (100% w/ env)</td><td>Consider</td></tr>
+<tr><td class="mono">GPT-5-nano</td><td>Dense</td><td>$0.004</td><td>7</td><td>1.01</td><td>33% (50% w/ env)</td><td>Test-Only</td></tr>
+</tbody></table></div>
+
+<h2>The Equation</h2>
+<p style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:2;background:var(--bg2);padding:1rem;border-radius:8px">
+<strong>Cumulative:</strong> C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]<br>
+<strong>Per outcome:</strong> CostPerOutcome(K,v) = C(K/P, v) / K<br>
+<strong>Monthly:</strong> C<sub>mo</sub> = E × C₀ × EPM(N) × [N + β·v·N(N−1)/2]
+</p>
+
+<h2>Decision Framework</h2>
+<p><strong>Two-Way Doors</strong> (C₀ changes): Switch models per task type, toggle silent mode, adjust caching. Reversible. Preserves runway. Experiment freely.</p>
+<p><strong>One-Way Doors</strong> (β, v, EPM changes): Architecture selection, multi-year contracts, proprietary frameworks. These compound through N². Model cumulative cost over 36 months before committing.</p>
+
+<h2>Methodology</h2>
+<p>The instrument runs 10 calibrated perturbation operators (5 manifold, 5 semantic) across 22 YAML configs. Six recovery detection signals classify model behavior. Four strategy archetypes (Conservative, Exploratory, Wasteful, Efficient) characterize response patterns. Every session recorded in the opencode database.</p>
+
+<h2>Research Roadmap (v0.2+)</h2>
+<p><strong>Pillar 1:</strong> Multi-language AST expansion — TypeScript, Go, Rust, Java. <strong>Pillar 2:</strong> Task archetypes — bug-fixing, refactoring, security. <strong>Pillar 3:</strong> Model diversity — Gemini, Llama, Mistral. <strong>Pillar 4:</strong> Structural perturbations — dependency injection, AST corruption. <strong>Pillar 5:</strong> Maintenance tax — human-in-the-loop studies.</p>
+
+<h2>Current Scope & Limitations</h2>
+<p>Validated on Python/Flask REST APIs, CRUD apps, and real-time collaboration frontends. Not yet validated on TypeScript, Rust, Go, or non-code tasks. EPM uses IEA baseline (1.6%/yr). The framework measures inference cost only — it does not model human maintenance or debugging time. v0.1. Open for contributions.</p>
+
+<footer>
+<strong>AI FinOps Framework · v0.1 · August 2026</strong><br>
+<a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a> · <a href="https://github.com/peparhugo/ai-finops-rulebook">GitHub</a>
+</footer>
+
+</div></body>
+</html>
