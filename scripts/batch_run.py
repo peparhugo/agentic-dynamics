@@ -3,7 +3,10 @@ import yaml, subprocess, time, sqlite3, os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-CONFIG_DIR = Path("/root/reasoning-instrument/experiments/configs")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
+OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 MODEL = "deepseek/deepseek-v4-pro"
 TIMEOUT = 250
 
@@ -13,7 +16,7 @@ def get_task(config_name):
     return cfg["task"].strip(), cfg.get("constraints", []), cfg.get("name", config_name[:-5])
 
 def cell_done(title):
-    db = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+    db = sqlite3.connect(str(OPENSCODE_DB))
     r = db.execute("SELECT tokens_output FROM session WHERE title=? AND tokens_output>0 ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
     return r is not None
@@ -44,14 +47,14 @@ def run_experiment(config_name, operator="baseline", silent=None):
     
     t0 = time.monotonic()
     r = subprocess.run([
-        "/root/.opencode/bin/opencode", "run",
+        OPENSCODE_BIN, "run",
         "--model", MODEL, "--title", title,
         "--format", "json", "--auto",
         "--dir", workdir, prompt,
     ], capture_output=True, text=True, timeout=TIMEOUT, stdin=subprocess.DEVNULL)
     elapsed = time.monotonic() - t0
     
-    db = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+    db = sqlite3.connect(str(OPENSCODE_DB))
     row = db.execute("SELECT cost,tokens_output FROM session WHERE title=? ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
     

@@ -1,20 +1,24 @@
 """Run remaining experiment cells — one at a time, no parallelism, no fuss."""
 import subprocess, time, sqlite3, os, yaml, sys
+from pathlib import Path
 
-CONFIG_DIR = "/root/reasoning-instrument/experiments/configs"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
+OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 def load_task(config_filename):
-    cfg = yaml.safe_load(open(f"{CONFIG_DIR}/{config_filename}"))
+    cfg = yaml.safe_load(open(CONFIG_DIR / config_filename))
     return cfg["task"].strip()
 
 def cell_done(title):
-    conn = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+    conn = sqlite3.connect(str(OPENSCODE_DB))
     r = conn.execute("SELECT tokens_output FROM session WHERE title=? AND tokens_output>0 ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     conn.close()
     return r is not None
 
 def get_session(title):
-    conn = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+    conn = sqlite3.connect(str(OPENSCODE_DB))
     r = conn.execute("SELECT cost,tokens_output FROM session WHERE title=? ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     conn.close()
     return r
@@ -33,7 +37,7 @@ def run_cell(model_id, title, config_file, timeout=400):
     t0 = time.monotonic()
     try:
         subprocess.run([
-            "/root/.opencode/bin/opencode", "run",
+            OPENSCODE_BIN, "run",
             "--model", model_id, "--title", title,
             "--format", "json", "--auto", "--dir", workdir,
             prompt,

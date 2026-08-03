@@ -5,6 +5,9 @@ import subprocess, time, json, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
+
 MODELS = [
     ("deepseek/deepseek-v4-pro", "DeepSeek_v4_Pro"),
     ("anthropic/claude-fable-5", "Claude_Fable_5"),
@@ -29,7 +32,7 @@ def cell_done(title):
     """Check if session already exists in DB."""
     try:
         import sqlite3
-        c = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+        c = sqlite3.connect(str(OPENSCODE_DB))
         r = c.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
         c.close()
         return r is not None
@@ -47,7 +50,7 @@ def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
 
     prompt = build_prompt(silent_mode, operator)
     cmd = [
-        "/root/.opencode/bin/opencode", "run",
+        OPENSCODE_BIN, "run",
         "--model", model_id,
         "--title", title,
         "--format", "json",
@@ -85,7 +88,7 @@ def main():
     # Summary from DB
     time.sleep(3)
     import sqlite3
-    c = sqlite3.connect('/root/.local/share/opencode/opencode.db')
+    c = sqlite3.connect(str(OPENSCODE_DB))
     rows = c.execute("SELECT title,cost,json_extract(model,'$.providerID') FROM session WHERE title LIKE '%silent_sweep%' ORDER BY title").fetchall()
     c.close()
     print(f"\n{len(rows)} sessions in DB:")

@@ -19,6 +19,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+
 from instrument import (
     build_operators, perturb_prompt,
     evaluate_solution, compute_efficiency,
@@ -80,7 +82,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
 
             # Skip if already completed successfully
             import sqlite3 as _sql
-            _c = _sql.connect('/root/.local/share/opencode/opencode.db')
+            _c = _sql.connect(str(OPENSCODE_DB))
             _cur = _c.cursor()
             _cur.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name,))
             if _cur.fetchone():
@@ -135,7 +137,7 @@ def run_sweep(models=None, dry_run=False, limit=0, timeout=200):
 
             # Skip if already completed
             import sqlite3 as _sql2
-            _c2 = _sql2.connect('/root/.local/share/opencode/opencode.db')
+            _c2 = _sql2.connect(str(OPENSCODE_DB))
             _cur2 = _c2.cursor()
             _cur2.execute("SELECT cost FROM session WHERE title = ? AND cost > 0 LIMIT 1", (session_name_p,))
             if _cur2.fetchone():

@@ -1,7 +1,0 @@
-Metadata-Version: 2.4
-Name: reasoning-instrument
-Version: 0.1.0
-Summary: Reasoning topology instrument — probe how language models explore unfamiliar reasoning trajectories
-Requires-Python: >=3.10
-Requires-Dist: httpx>=0.24
-Requires-Dist: pyyaml>=6.0
