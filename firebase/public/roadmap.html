@@ -10,12 +10,12 @@
 --bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
 --b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
 --t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;
---ac:#6366F1;--am:var(--am);--cy:var(--cy);
+--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;-webkit-font-smoothing:antialiased}
-.topnav{position:sticky;top:0;z-index:100;background:rgba(9,9,11,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b);padding:0.75rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;gap:1.2rem;flex-wrap:wrap}
+.topnav{position:sticky;top:0;z-index:100;background:rgba(13,17,23,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b);padding:0.75rem 2rem;display:flex;align-items:center;justify-content:space-between;font-size:0.8rem;gap:1.2rem;flex-wrap:wrap}
 .topnav a{color:var(--t2);text-decoration:none;transition:color .2s;font-weight:600;white-space:nowrap}
 .topnav a:hover,.topnav a.active{color:var(--ac)}
 .topnav .brand{color:var(--ac);font-weight:800}
@@ -23,35 +23,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .sec.alt{background:var(--bg2)}
 h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-1.5px;line-height:1.12;color:#fff;margin-bottom:0.5rem}
 h2{font-size:clamp(1.4rem,3vw,1.8rem);font-weight:700;color:#fff;margin-bottom:0.5rem}
-h3{font-weight:600;font-size:0.95rem;color:var(--t);margin:1.2rem 0 0.5rem}
 .lead{font-size:0.92rem;color:var(--t2);max-width:680px;line-height:1.65;margin-bottom:1.5rem}
 .progress-bar{display:flex;align-items:center;gap:1.5rem;padding:1.2rem 1.5rem;background:var(--bg3);border:1px solid var(--b);border-radius:12px;margin:1.5rem 0;flex-wrap:wrap;justify-content:center}
 .progress-bar .pb-stat{text-align:center}
 .progress-bar .pb-v{font-size:1.6rem;font-weight:800;color:var(--ac)}
 .progress-bar .pb-l{font-size:0.6rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px}
 .progress-bar .pb-div{width:1px;height:2rem;background:var(--b)}
-.pillar{margin:2rem 0}
-.pillar h3{font-size:1rem;color:var(--ac);margin-bottom:0.8rem}
-.tbl{overflow-x:auto;margin:0.8rem 0 1.5rem;border-radius:10px;border:1px solid var(--b)}
-.tbl table{width:100%;border-collapse:collapse;font-size:0.73rem}
-.tbl th{text-align:left;padding:0.45rem 0.6rem;color:var(--t2);font-weight:600;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg4);white-space:nowrap}
-.tbl td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--b);font-size:0.72rem;vertical-align:top}
+.underwriting{background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:10px;padding:0.8rem 1.2rem;margin:1rem 0;text-align:center;font-size:0.78rem;color:var(--t2)}
+.underwriting strong{color:var(--ac)}
+.filter-bar{display:flex;gap:0.5rem;margin:1rem 0;flex-wrap:wrap;justify-content:center}
+.filter-btn{background:var(--bg4);border:1px solid var(--b);color:var(--t3);padding:0.4rem 1rem;border-radius:100px;font-size:0.7rem;cursor:pointer;transition:all .2s;font-family:inherit;font-weight:600}
+.filter-btn:hover,.filter-btn.active{background:rgba(99,102,241,0.08);border-color:rgba(99,102,241,0.2);color:var(--ac)}
+.accordion{margin:1.5rem 0}
+.acc-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-radius:10px;cursor:pointer;transition:all .2s;gap:1rem}
+.acc-header:hover{border-color:var(--ba)}
+.acc-header h3{font-size:0.9rem;font-weight:700;color:var(--t);margin:0;flex:1}
+.acc-header .acc-arrow{font-size:0.7rem;color:var(--t3);transition:transform .3s}
+.acc-header.open .acc-arrow{transform:rotate(180deg)}
+.acc-content{display:none;padding:1rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-top:none;border-radius:0 0 10px 10px}
+.acc-content.open{display:block}
+.pillar-progress{margin:0.5rem 0 0.8rem;height:3px;background:var(--b);border-radius:2px;overflow:hidden}
+.pillar-progress .pp-fill{height:100%;border-radius:2px;background:var(--ac);transition:width .5s}
+.tbl{overflow-x:auto;margin:0.5rem 0;border-radius:8px;border:1px solid var(--b)}
+.tbl table{width:100%;border-collapse:collapse;font-size:0.72rem}
+.tbl th{text-align:left;padding:0.4rem 0.6rem;color:var(--t2);font-weight:600;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg4)}
+.tbl td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--b);font-size:0.71rem;vertical-align:top;transition:background .2s}
+.tbl tr.help-row td{background:rgba(245,158,11,0.04)}
 .badge{display:inline-block;padding:0.12rem 0.5rem;border-radius:4px;font-size:0.6rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
-.badge.complete{background:rgba(99,102,241,0.1);color:var(--ac);border:1px solid rgba(16,185,129,0.2)}
-.badge.in-progress{background:rgba(34,211,238,0.1);color:var(--cy);border:1px solid rgba(34,211,238,0.2)}
-.badge.planned{background:rgba(161,161,170,0.08);color:var(--t3);border:1px solid rgba(161,161,170,0.15)}
-.badge.help-wanted{background:rgba(251,191,36,0.1);color:var(--am);border:1px solid rgba(251,191,36,0.2)}
+.badge.complete{background:rgba(34,197,94,0.1);color:#22C55E;border:1px solid rgba(34,197,94,0.2)}
+.badge.in-progress{background:rgba(20,184,166,0.1);color:var(--cy);border:1px solid rgba(20,184,166,0.2)}
+.badge.planned{background:rgba(110,118,129,0.08);color:var(--t3);border:1px solid rgba(110,118,129,0.15)}
+.badge.help-wanted{background:rgba(245,158,11,0.12);color:var(--am);border:1px solid rgba(245,158,11,0.25)}
+.audience-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.55rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:0.2rem}
+.audience-tag.cto{background:rgba(99,102,241,0.1);color:var(--ac)}
+.audience-tag.cfo{background:rgba(245,158,11,0.1);color:var(--am)}
+.audience-tag.ceo{background:rgba(34,197,94,0.1);color:#22C55E}
+.audience-tag.researcher{background:rgba(20,184,166,0.1);color:var(--cy)}
 .cta-box{background:rgba(99,102,241,0.03);border:1px solid rgba(99,102,241,0.12);border-radius:12px;padding:1.5rem 2rem;margin:1.5rem 0}
-.cta-box h3{color:var(--ac);margin-bottom:0.5rem}
+.cta-box h3{color:var(--ac);margin-bottom:0.5rem;font-size:0.95rem}
 .cta-box ol{list-style-position:inside;font-size:0.78rem;color:var(--t2);line-height:2}
 .cta-box code{background:var(--bg3);padding:0.15rem 0.4rem;border-radius:3px;font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac)}
-.audience-tag{display:inline-block;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.55rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-left:0.3rem}
-.audience-tag.cto{background:rgba(99,102,241,0.1);color:var(--ac)}
-.audience-tag.cfo{background:rgba(251,191,36,0.1);color:var(--am)}
-.audience-tag.researcher{background:rgba(34,211,238,0.1);color:var(--cy)}
 footer{padding:3rem 2rem;text-align:center;border-top:1px solid var(--b);font-size:0.7rem;color:var(--t3);line-height:1.8}
 footer a{color:var(--ac);text-decoration:none;font-weight:600}
-@media(max-width:768px){.sec{padding:2.5rem 1.2rem}.topnav{gap:0.8rem;padding:0.6rem 1rem}.progress-bar{gap:0.8rem}}
+.hidden{display:none!important}
+@media(max-width:768px){.sec{padding:2.5rem 1.2rem}.topnav{gap:0.8rem;padding:0.6rem 1rem}.progress-bar{gap:0.8rem}.filter-bar{gap:0.3rem}}
 </style>
 </head>
 <body>
@@ -70,7 +85,12 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>Research Roadmap</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)">We built the instrument. Now we calibrate it. The 178 baseline experiments prove the concept &ndash; but a framework is only as strong as its boundaries. Below is our public research agenda for v0.2 and beyond.</p>
+<p class="lead" style="font-size:1rem;color:var(--t);margin-bottom:1rem">We built the instrument. Now we calibrate it. The 178 baseline experiments prove the concept &ndash; but a framework is only as strong as its boundaries. Below is our public research agenda for v0.2 and beyond.</p>
+
+<div class="underwriting">
+<strong>Underwritten by the UCL School of Management's AI Innovation Lab.</strong> This research program receives institutional support, ensuring methodological rigor and academic credibility. <a href="https://github.com/peparhugo/ai-finops-rulebook/issues" style="color:var(--ac)">Track our progress on GitHub Issues.</a>
+</div>
+
 <div class="progress-bar">
 <div class="pb-stat"><div class="pb-v">178</div><div class="pb-l">Baseline Runs</div></div>
 <div class="pb-div"></div>
@@ -78,102 +98,163 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <div class="pb-div"></div>
 <div class="pb-stat"><div class="pb-v" style="color:var(--am)">5</div><div class="pb-l">Research Pillars</div></div>
 <div class="pb-div"></div>
-<div class="pb-stat"><div class="pb-v" style="color:var(--t3)">~40%</div><div class="pb-l">Overall Completion</div></div>
+<div class="pb-stat"><div class="pb-v" style="color:var(--t3)">~40%</div><div class="pb-l">Of planned configs complete</div></div>
 </div>
-<p class="lead">Have API credits, a specific stack, or a novel perturbation idea? The instrument was designed for extensibility from day one. Run it, submit a PR with your results, and we&rsquo;ll verify and merge your findings into the evidence base.</p>
+
+<p class="lead">Have API credits, a specific stack, or a novel perturbation idea? The instrument was designed for extensibility from day one. Run it, submit a PR, and we&rsquo;ll merge your findings.</p>
+
+<div class="filter-bar">
+<button class="filter-btn active" onclick="filterPillars('all')">All Pillars</button>
+<button class="filter-btn" onclick="filterPillars('help-wanted')">Help Wanted Only</button>
+<button class="filter-btn" onclick="expandAll()">Expand All</button>
+<button class="filter-btn" onclick="collapseAll()">Collapse All</button>
+</div>
 </section>
 
 <!-- Pillar 1 -->
 <section class="sec alt">
-<div class="pillar">
-<h3>Pillar 1: Multi-Language AST Expansion <span class="audience-tag cto">CTO</span> <span class="audience-tag researcher">Researcher</span></h3>
-<p class="lead" style="margin-bottom:0.8rem">Testing whether the N&sup2; Tax holds universally or is Python-specific.</p>
+<div class="accordion">
+<div class="acc-header open" onclick="toggleAccordion(this)">
+<h3>Pillar 1: Multi-Language AST Expansion <span class="audience-tag cto">CTO</span><span class="audience-tag researcher">Researcher</span></h3>
+<span class="acc-arrow">▼</span>
+</div>
+<div class="acc-content open">
+<div class="pillar-progress"><div class="pp-fill" style="width:20%"></div></div>
+<p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Testing whether the N&sup2; Tax holds universally or is Python-specific. <strong>1 of 5 languages complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Language</th><th>Status</th><th>Notes</th></tr></thead><tbody>
-<tr><td>Python / Flask</td><td><span class="badge complete">Complete</span></td><td>178 runs across REST APIs, CRUD, real-time collaboration. Baseline established.</td></tr>
-<tr><td>TypeScript / Node.js</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Does the N&sup2; Tax hold in strictly-typed, compiled environments? Does Silent Inference survive type-checking?</td></tr>
-<tr><td>Go</td><td><span class="badge planned">Planned</span></td><td>Concurrency-heavy contexts. Does reasoning overhead scale differently with goroutines?</td></tr>
-<tr><td>Rust</td><td><span class="badge planned">Planned</span></td><td>Memory-safe systems. Will silent inference produce borrow-checker-compliant code?</td></tr>
-<tr><td>Java / Spring</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Enterprise workloads. Do verbose explanatory models justify their cost in regulated organizations?</td></tr>
+<tr><td>Python / Flask</td><td><span class="badge complete">Complete</span></td><td>178 runs. Baseline established.</td></tr>
+<tr class="help-row"><td>TypeScript / Node.js</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Does N&sup2; hold in strictly-typed, compiled environments?</td></tr>
+<tr><td>Go</td><td><span class="badge planned">Planned</span></td><td>Concurrency-heavy: does reasoning overhead scale differently?</td></tr>
+<tr><td>Rust</td><td><span class="badge planned">Planned</span></td><td>Will silent inference produce borrow-checker-compliant code?</td></tr>
+<tr class="help-row"><td>Java / Spring</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Do verbose models justify cost in regulated organizations?</td></tr>
 </tbody></table></div>
+</div>
 </div>
 
 <!-- Pillar 2 -->
-<div class="pillar">
+<div class="accordion">
+<div class="acc-header open" onclick="toggleAccordion(this)">
 <h3>Pillar 2: Task Archetype Expansion <span class="audience-tag cto">CTO</span></h3>
-<p class="lead" style="margin-bottom:0.8rem">Moving beyond constraint-complete REST endpoints to real-world task diversity.</p>
+<span class="acc-arrow">▼</span>
+</div>
+<div class="acc-content open">
+<div class="pillar-progress"><div class="pp-fill" style="width:20%"></div></div>
+<p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Moving beyond constraint-complete REST endpoints. <strong>1 of 5 archetypes complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Task Type</th><th>Status</th><th>What We're Measuring</th></tr></thead><tbody>
-<tr><td>REST API (constraint-complete)</td><td><span class="badge complete">Complete</span></td><td>All 7 constraints implemented. Baseline explanation tax measured.</td></tr>
-<tr><td>Bug-Fixing (legacy code)</td><td><span class="badge in-progress">In Progress</span></td><td>Recovery loops before a silent vs. explanatory model finds the fix in broken legacy systems.</td></tr>
-<tr><td>Refactoring</td><td><span class="badge planned">Planned</span></td><td>Does explanation help preserve invariants when changing code structure?</td></tr>
-<tr><td>Security Hardening</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Can silent models identify CVE patterns without narrating their threat model?</td></tr>
-<tr><td>Data Pipeline ETL</td><td><span class="badge planned">Planned</span></td><td>High-volume, low-context work. Does the Explanation Tax become pure waste?</td></tr>
+<tr><td>REST API (constraint-complete)</td><td><span class="badge complete">Complete</span></td><td>All 7 constraints. Baseline tax measured.</td></tr>
+<tr><td>Bug-Fixing (legacy code)</td><td><span class="badge in-progress">In Progress</span></td><td>Recovery loops before silent vs. explanatory finds the fix.</td></tr>
+<tr><td>Refactoring</td><td><span class="badge planned">Planned</span></td><td>Does explanation help preserve invariants?</td></tr>
+<tr class="help-row"><td>Security Hardening</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Can silent models identify CVE patterns without narrating?</td></tr>
+<tr><td>Data Pipeline ETL</td><td><span class="badge planned">Planned</span></td><td>High-volume, low-context. Does Explanation Tax become waste?</td></tr>
 </tbody></table></div>
+</div>
 </div>
 </section>
 
 <!-- Pillar 3 -->
 <section class="sec">
-<div class="pillar">
-<h3>Pillar 3: True Model Diversity <span class="audience-tag ceo">CEO</span> <span class="audience-tag cfo">CFO</span></h3>
-<p class="lead" style="margin-bottom:0.8rem">Moving beyond GPT-variants and DeepSeek. We need architectural variety across providers.</p>
-<div class="tbl"><table><thead><tr><th>Model Family</th><th>Status</th><th>Hypothesis to Test</th></tr></thead><tbody>
-<tr><td>DeepSeek v4 (MoE)</td><td><span class="badge complete">Complete</span></td><td>Baseline &ndash; 0.24 reasoning ratio, 31% type hints, 22 files/WT. GRPO latent reasoning.</td></tr>
-<tr><td>GPT family (6 variants)</td><td><span class="badge complete">Complete</span></td><td>Dense architecture &ndash; 0.06 to 1.03 reasoning ratio range. Nano is the only model with logic failures.</td></tr>
-<tr><td>Claude Opus / Sonnet</td><td><span class="badge in-progress">In Progress</span></td><td>Are reasoning tokens structurally different from GPT? Higher value per token?</td></tr>
-<tr><td>Gemini Ultra</td><td><span class="badge planned">Planned</span></td><td>Does Google's architecture compress explanation into latent space, reducing the tax?</td></tr>
-<tr><td>Llama-4</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Open-weight models. How does finetuning affect the Silent/Explanatory trade-off?</td></tr>
-<tr><td>Mistral Large</td><td><span class="badge planned">Planned</span></td><td>European architecture. Does regulatory context change the N&sup2; calculation?</td></tr>
+<div class="accordion">
+<div class="acc-header open" onclick="toggleAccordion(this)">
+<h3>Pillar 3: True Model Diversity <span class="audience-tag ceo">CEO</span><span class="audience-tag cfo">CFO</span></h3>
+<span class="acc-arrow">▼</span>
+</div>
+<div class="acc-content open">
+<div class="pillar-progress"><div class="pp-fill" style="width:33%"></div></div>
+<p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Moving beyond GPT-variants and DeepSeek. <strong>2 of 6 families complete.</strong></p>
+<div class="tbl"><table><thead><tr><th>Model Family</th><th>Status</th><th>Hypothesis</th></tr></thead><tbody>
+<tr><td>DeepSeek v4 (MoE)</td><td><span class="badge complete">Complete</span></td><td>0.21 reasoning ratio. GRPO latent. Baseline.</td></tr>
+<tr><td>GPT family (6 variants)</td><td><span class="badge complete">Complete</span></td><td>0.06-1.01 ratio range. Nano: only model with logic failures.</td></tr>
+<tr><td>Claude Opus / Sonnet</td><td><span class="badge in-progress">In Progress</span></td><td>Are reasoning tokens structurally different from GPT?</td></tr>
+<tr><td>Gemini Ultra</td><td><span class="badge planned">Planned</span></td><td>Does Google compress explanation into latent space?</td></tr>
+<tr class="help-row"><td>Llama-4</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Open-weight. How does finetuning affect the trade-off?</td></tr>
+<tr><td>Mistral Large</td><td><span class="badge planned">Planned</span></td><td>European architecture. Regulatory context affects N&sup2;?</td></tr>
 </tbody></table></div>
+</div>
 </div>
 
 <!-- Pillar 4 -->
-<div class="pillar">
+<div class="accordion">
+<div class="acc-header open" onclick="toggleAccordion(this)">
 <h3>Pillar 4: Structural Perturbations <span class="audience-tag cto">CTO</span></h3>
-<p class="lead" style="margin-bottom:0.8rem">Our current operators are semantic (changing the prompt). We need to break the system, not just the words.</p>
+<span class="acc-arrow">▼</span>
+</div>
+<div class="acc-content open">
+<div class="pillar-progress"><div class="pp-fill" style="width:20%"></div></div>
+<p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Breaking the system, not just the words. <strong>1 of 5 perturbation types complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Perturbation</th><th>Status</th><th>Why It Matters</th></tr></thead><tbody>
-<tr><td>10 prompt-level operators</td><td><span class="badge complete">Complete</span></td><td>Semantic + manifold operators. Calibrated at 0.0&ndash;1.0 strength.</td></tr>
-<tr><td>Dependency Injection</td><td><span class="badge planned">Planned</span></td><td>Break a library import mid-task. Does the silent model recover without narrating?</td></tr>
-<tr><td>AST Corruption</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Corrupt the AST of existing files. Does the model notice, or regenerate over it?</td></tr>
-<tr><td>Production Log Spike</td><td><span class="badge planned">Planned</span></td><td>High-cardinality logs. Does explanation get lost in the noise?</td></tr>
-<tr><td>Rate-Limiter Throttling</td><td><span class="badge in-progress">In Progress</span></td><td>We observed this with DeepSeek's raw pass rate. Formalizing as a perturbation operator.</td></tr>
+<tr><td>10 prompt-level operators</td><td><span class="badge complete">Complete</span></td><td>Semantic + manifold. Calibrated 0.0&ndash;1.0.</td></tr>
+<tr><td>Dependency Injection</td><td><span class="badge planned">Planned</span></td><td>Break a library import mid-task. Does silent model recover?</td></tr>
+<tr class="help-row"><td>AST Corruption</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Corrupt existing file ASTs. Does the model notice?</td></tr>
+<tr><td>Production Log Spike</td><td><span class="badge planned">Planned</span></td><td>High-cardinality logs. Does explanation get lost in noise?</td></tr>
+<tr><td>Rate-Limiter Throttling</td><td><span class="badge in-progress">In Progress</span></td><td>Observed with DeepSeek's raw pass rate. Formalizing as operator.</td></tr>
 </tbody></table></div>
+</div>
 </div>
 </section>
 
 <!-- Pillar 5 -->
 <section class="sec alt">
-<div class="pillar">
-<h3>Pillar 5: The Maintenance Tax <span class="audience-tag cfo">CFO</span> <span class="audience-tag ceo">CEO</span></h3>
-<p class="lead" style="margin-bottom:0.8rem">The most expensive part of AI-generated code is human debugging time. We need to measure this.</p>
+<div class="accordion">
+<div class="acc-header open" onclick="toggleAccordion(this)">
+<h3>Pillar 5: The Maintenance Tax <span class="audience-tag cfo">CFO</span><span class="audience-tag ceo">CEO</span></h3>
+<span class="acc-arrow">▼</span>
+</div>
+<div class="acc-content open">
+<div class="pillar-progress"><div class="pp-fill" style="width:0%"></div></div>
+<p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">The most expensive part of AI-generated code is human debugging time. <strong>0 of 2 studies complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Study</th><th>Status</th><th>Method</th></tr></thead><tbody>
-<tr><td>6-Month Code Evolution</td><td><span class="badge planned">Planned</span></td><td>Generate code from Silent vs. Explanatory models. Give both to human developers. Track time-to-fix, cyclomatic complexity, and bug recurrence over 6 simulated sprints.</td></tr>
-<tr><td>Blind Preference Test</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Give developers both outputs without source labels. Which do they prefer to maintain and why?</td></tr>
+<tr><td>6-Month Code Evolution</td><td><span class="badge planned">Planned</span></td><td>Silent vs. Explanatory code &rarr; human devs. Track time-to-fix, cyclomatic complexity, bug recurrence over 6 simulated sprints.</td></tr>
+<tr class="help-row"><td>Blind Preference Test</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Give developers both outputs without source labels. Which do they prefer to maintain and why?</td></tr>
 </tbody></table></div>
+</div>
 </div>
 </section>
 
 <!-- Contribution Guide -->
 <section class="sec">
 <h2>How to Contribute</h2>
-<p class="lead">Items marked <span class="badge help-wanted">Help Wanted</span> are actively seeking external runs. The instrument is open source and designed for extensibility.</p>
+<p class="lead">Items marked <span class="badge help-wanted">Help Wanted</span> are actively seeking external runs. Use the filter above to see only those.</p>
 <div class="cta-box">
 <ol>
-<li><strong>Fork the repo:</strong> <code>github.com/peparhugo/ai-finops-rulebook</code></li>
-<li><strong>Configure:</strong> Create or modify a config in <code>experiments/configs/</code> for your chosen stack, task, or model</li>
-<li><strong>Run:</strong> <code>python scripts/run.py --config experiments/configs/your-config.yaml</code></li>
-<li><strong>Submit:</strong> Open a PR with your results JSON and any generated worktree output</li>
-<li><strong>We verify:</strong> We validate the methodology and merge your findings, crediting you on this page</li>
+<li><strong>Fork:</strong> <code>github.com/peparhugo/ai-finops-rulebook</code></li>
+<li><strong>Configure:</strong> Add a config in <code>experiments/configs/</code></li>
+<li><strong>Run:</strong> <code>python scripts/run.py --config your-config.yaml</code></li>
+<li><strong>Submit:</strong> Open a PR with your results. We verify and merge.</li>
 </ol>
 </div>
-<p class="lead" style="font-size:0.82rem;margin-top:1rem">If you have API credits to contribute or want to coordinate on a specific pillar, reach out via GitHub Issues. We&rsquo;re exploring grant funding to sponsor community experiments at scale.</p>
+<p class="lead" style="font-size:0.82rem;margin-top:1rem">Track active tasks on <a href="https://github.com/peparhugo/ai-finops-rulebook/issues" style="color:var(--ac)">GitHub Issues</a>. If you have API credits or want to coordinate on a specific pillar, reach out there. We&rsquo;re exploring grant funding to sponsor community experiments.</p>
 </section>
 
 <footer>
 <strong>The AI FinOps Framework &middot; Research Roadmap</strong><br>
-178 baseline runs &middot; 3 architectures, 8 variants &middot; 5 research pillars &middot; Community-driven<br>
+178 baseline runs &middot; 5 pillars &middot; Community-driven &middot; Underwritten by UCL School of Management AI Innovation Lab<br>
 <a href="https://github.com/peparhugo/ai-finops-rulebook">github.com/peparhugo/ai-finops-rulebook</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>
 
+<script>
+function toggleAccordion(header){
+header.classList.toggle('open');
+header.nextElementSibling.classList.toggle('open');
+}
+function expandAll(){
+document.querySelectorAll('.acc-header').forEach(h=>{h.classList.add('open');h.nextElementSibling.classList.add('open')});
+}
+function collapseAll(){
+document.querySelectorAll('.acc-header').forEach(h=>{h.classList.remove('open');h.nextElementSibling.classList.remove('open')});
+}
+function filterPillars(type){
+document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active',b.textContent.includes(type==='all'?'All':type==='help-wanted'?'Help')));
+if(type==='all'){
+document.querySelectorAll('.help-row,.accordion').forEach(el=>el.classList.remove('hidden'));
+document.querySelectorAll('.acc-header').forEach(h=>{h.classList.add('open');h.nextElementSibling.classList.add('open')});
+}else{
+document.querySelectorAll('.accordion').forEach(a=>{a.classList.add('hidden')});
+document.querySelectorAll('.help-row').forEach(r=>{r.classList.remove('hidden');r.closest('.accordion').classList.remove('hidden')});
+document.querySelectorAll('.accordion:not(.hidden) .acc-header').forEach(h=>{h.classList.add('open');h.nextElementSibling.classList.add('open')});
+document.querySelectorAll('.accordion.hidden .acc-header').forEach(h=>{h.classList.remove('open');h.nextElementSibling.classList.remove('open')});
+}
+}
+</script>
 </body>
 </html>
