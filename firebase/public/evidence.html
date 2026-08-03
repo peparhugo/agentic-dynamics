@@ -7,10 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
---bg:#09090b;--bg2:#111113;--bg3:#18181b;--bg4:#1f1f23;
+--bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
 --b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
---t:#fafafa;--t2:#a1a1aa;--t3:#52525b;
---ac:#10b981;--am:#fbbf24;--cy:#22d3ee;
+--t:#E6EDF3;--t2:#8B949E;--t3:#484F58;
+--ac:#6366F1;--am:var(--am);--cy:var(--cy);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -176,12 +176,12 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <p class="lead">This is v0.1 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
 <div class="cards">
 <div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. 10 prompt-level perturbation operators (5 manifold, 5 semantic). IEA-baseline EPM projection (1.6%/yr). Inference cost measurement (tokens, dollars, joules).</div></div>
-<div class="card"><div class="ctitle" style="color:#fbbf24">Planned (v0.2+)</div><div class="cdesc">TypeScript, Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.2+)</div><div class="cdesc">TypeScript, Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
 <div class="card"><div class="ctitle">Not in Scope</div><div class="cdesc">The framework does not judge whether narration is wasteful or valuable. It measures the cost. If your team needs auditable reasoning trails for compliance or debugging, the Explanation Tax is insurance &ndash; not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.</div></div>
 </div>
 <div class="cards" style="margin-top:1rem">
 <div class="card"><div class="ctitle" style="color:var(--ac)">Test Pass Rate Caveat</div><div class="cdesc">Sampled pytest results are environment-sensitive. Approximately 31% of failures resolve with correct dependency installation. The raw pass rate counts everything; the "with correct env" column estimates real code quality. DeepSeek's 69% corrected rate is comparable to Claude and GPT-5.6.</div></div>
-<div class="card"><div class="ctitle" style="color:#fbbf24">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.2 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.2 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
 <div class="card"><div class="ctitle">Reproduce This</div><div class="cdesc">The instrument is open source. 22 configs, 10 operators, 6 recovery signals. Clone the repo, install the instrument, run a config. <a href="https://github.com/peparhugo/ai-finops-rulebook" style="color:var(--ac)">View on GitHub.</a> <a href="methodology.html" style="color:var(--ac)">See the methodology.</a></div></div>
 </div>
 </section>

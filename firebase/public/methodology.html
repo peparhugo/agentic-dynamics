@@ -7,10 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
---bg:#09090b;--bg2:#111113;--bg3:#18181b;--bg4:#1f1f23;
+--bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
 --b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
---t:#fafafa;--t2:#a1a1aa;--t3:#52525b;
---ac:#10b981;
+--t:#E6EDF3;--t2:#8B949E;--t3:#484F58;
+--ac:#6366F1;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -25,19 +25,19 @@ h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;letter-spacing:-1.5px;line-h
 h2{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;color:#fff;margin-bottom:0.6rem}
 h3{font-weight:600;font-size:0.95rem;color:var(--t);margin-bottom:0.3rem}
 .lead{font-size:0.95rem;color:var(--t2);max-width:680px;line-height:1.65;margin-bottom:1.5rem}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:100px;font-size:0.68rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1rem;text-transform:uppercase}
+.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.68rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1rem;text-transform:uppercase}
 .pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.8rem;margin:2rem 0}
 .stat{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;transition:transform .2s}
-.stat:hover{transform:translateY(-2px);border-color:rgba(16,185,129,0.25)}
+.stat:hover{transform:translateY(-2px);border-color:rgba(99,102,241,0.25)}
 .stat .v{font-size:1.5rem;font-weight:800;color:var(--ac)}
 .stat .l{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.3rem;font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.8rem;margin:1.5rem 0}
 .card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left;transition:all .25s}
 .card:hover{transform:translateY(-2px);border-color:var(--ba);box-shadow:0 8px 32px rgba(0,0,0,0.5)}
-.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;background:rgba(16,185,129,0.08);color:var(--ac);border:1px solid rgba(16,185,129,0.15)}
-.card .ctag.amber{background:rgba(251,191,36,0.08);color:#fbbf24;border:1px solid rgba(251,191,36,0.15)}
+.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
 .card .ctitle{font-size:0.85rem;font-weight:700;color:var(--t);margin-bottom:0.3rem}
 .card .cdesc{font-size:0.75rem;color:var(--t2);line-height:1.55}
 .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:2rem 0}
@@ -53,7 +53,7 @@ h3{font-weight:600;font-size:0.95rem;color:var(--t);margin-bottom:0.3rem}
 .tbl th{text-align:left;padding:0.5rem 0.7rem;color:var(--t2);font-weight:600;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg4)}
 .tbl td{padding:0.4rem 0.7rem;border-bottom:1px solid var(--b)}
 .mono{font-family:'JetBrains Mono',monospace;font-size:0.68rem}
-.green{color:var(--ac)}.amber{color:#fbbf24}
+.green{color:var(--ac)}.amber{color:var(--am)}
 .wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.8rem;color:var(--t2);line-height:1.7}
 .wtm strong{color:var(--t)}
 .eq{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);text-align:left;margin:1.5rem 0}
@@ -100,7 +100,7 @@ footer a:hover{text-decoration:underline}
 <!-- Operators -->
 <section class="sec wide">
 <h2>Perturbation Operators</h2>
-<p class="lead">10 calibrated operators probe two dimensions of the reasoning topology. <strong style="color:var(--ac)">Manifold</strong> operators push the model off its typical linguistic surface — testing search dynamics. <strong style="color:#fbbf24">Semantic</strong> operators inject contradictions within the reasoning manifold — testing truth-seeking and coherence policies.</p>
+<p class="lead">10 calibrated operators probe two dimensions of the reasoning topology. <strong style="color:var(--ac)">Manifold</strong> operators push the model off its typical linguistic surface — testing search dynamics. <strong style="color:var(--am)">Semantic</strong> operators inject contradictions within the reasoning manifold — testing truth-seeking and coherence policies.</p>
 <div class="cards">
 <div class="card"><div class="ctag">Manifold</div><div class="ctitle">Inject Alien Vocabulary</div><div class="cdesc">Replace domain terminology with vocabulary from unrelated fields (biology, music, astronomy, warfare). Tests whether the model maps alien terms back to correct concepts or gets lost in translation.</div></div>
 <div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject False Premise</div><div class="cdesc">Insert a plausible but incorrect assumption into the context. Tests whether the model identifies and rejects false premises or rationalizes them into the solution.</div></div>
@@ -118,7 +118,7 @@ footer a:hover{text-decoration:underline}
 <!-- Recovery -->
 <section class="sec alt wide">
 <h2>Recovery Classification</h2>
-<p class="lead">When perturbed, models either <strong style="color:var(--ac)">escape</strong> the basin (produce genuinely different solutions) or <strong style="color:#fbbf24">recover</strong> (return to the baseline). Six detection signals classify each reasoning segment as EXPLORATION or RECOVERY.</p>
+<p class="lead">When perturbed, models either <strong style="color:var(--ac)">escape</strong> the basin (produce genuinely different solutions) or <strong style="color:var(--am)">recover</strong> (return to the baseline). Six detection signals classify each reasoning segment as EXPLORATION or RECOVERY.</p>
 <div class="cards">
 <div class="card"><div class="ctitle">1. Recovery Markers</div><div class="cdesc">Text patterns like "let me explain," "in other words," "to clarify," "here's why" signal the model is justifying a return to familiar territory. 18 marker patterns scanned.</div></div>
 <div class="card"><div class="ctitle">2. Tool Convergence</div><div class="cdesc">Does the tool-call sequence converge toward the baseline set? Scored by Jaccard similarity between perturbed and baseline tool invocations.</div></div>
