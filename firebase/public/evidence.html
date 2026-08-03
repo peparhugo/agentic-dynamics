@@ -44,19 +44,13 @@ h3{font-weight:600;font-size:0.95rem;color:var(--t);margin:1.5rem 0 0.5rem}
 footer{padding:3rem 2rem;text-align:center;border-top:1px solid var(--b);font-size:0.7rem;color:var(--t3);line-height:1.8}
 footer a{color:var(--ac);text-decoration:none;font-weight:600}
 @media(max-width:768px){.sec{padding:2.5rem 1.2rem}.topnav{gap:0.8rem;padding:0.6rem 1rem}}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:150;display:flex;justify-content:flex-end;gap:1.5rem;padding:0.7rem 1.5rem;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--b)}
+.topbar-link{color:var(--t3);text-decoration:none;font-size:0.72rem;font-weight:600;transition:color .2s}.topbar-link:hover{color:var(--ac)}
 </style>
 </head>
 <body>
 
-<nav class="topnav">
-<a href="/" class="brand">AI FinOps Framework</a>
-<div style="display:flex;gap:1.2rem">
-<a href="story.html">Story</a>
-<a href="methodology.html">Methodology</a>
-<a href="evidence.html" class="active">Evidence</a>
-<a href="https://github.com/peparhugo/ai-finops-rulebook">GitHub</a>
-</div>
-</nav>
+<nav class="topbar"><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="report.html" class="topbar-link">Report</a><a href="https://github.com/peparhugo/ai-finops-rulebook" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
