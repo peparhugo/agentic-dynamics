@@ -103,9 +103,9 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <tr><td>Claude Fable 5</td><td>22</td><td>5</td><td>3</td><td>0</td><td>2</td><td class="green">0</td><td>60%</td><td class="green">100%</td></tr>
 <tr><td>GPT-5.6</td><td>15</td><td>8</td><td>4</td><td>0</td><td>4</td><td class="green">0</td><td>50%</td><td class="green">100%</td></tr>
 <tr><td>GPT-5-nano</td><td>6</td><td>6</td><td>2</td><td>0</td><td>1</td><td class="amber">3</td><td>33%</td><td>50%</td></tr>
-<tr><td>DeepSeek v4 Pro</td><td class="green">64</td><td>16</td><td>4</td><td>2</td><td>5</td><td>5</td><td>25%</td><td>69%</td></tr>
+<tr><td>DeepSeek v4 Pro</td><td class="green">64</td><td>18</td><td>5</td><td>4</td><td>4</td><td>5</td><td>28%</td><td>72%</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> DeepSeek was sampled at 16 (the most of any model, proportional to its 64 testable worktrees). Of 5 logic failures: 2 are rate-limiter over-triggering (tests getting 429), 1 is a Flask endpoint naming collision, 1 is a Jaccard similarity edge case in a graph algorithm, and 1 is a missing ARIA attribute in widget JS. Excluding environment and import failures (which resolve with dependency installation), DeepSeek's real pass rate is 69% — comparable to Claude and GPT-5.6. DeepSeek leads every AST quality metric (22 files/WT, 31% type hints). GPT-5-nano remains the only model with concentrated code logic failures (3 of 6).</div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek was tested at 18 (proportional to its 64 testable worktrees, the most of any model) with <code>pip install -r requirements.txt</code> before pytest. Of 5 logic failures: 2 are rate-limiter over-triggering (tests getting 429), 1 is a Flask endpoint naming collision, 1 is a Jaccard similarity edge case in a graph algorithm, and 1 is a missing ARIA attribute in widget JS. Excluding environment and import failures (which resolve with dependency installation), DeepSeek's real pass rate is 72% &mdash; comparable to Claude and GPT-5.6. DeepSeek leads every AST quality metric (22 files/WT, 31% type hints). GPT-5-nano remains the only model with concentrated code logic failures (3 of 6).</div>
 </section>
 
 <!-- Token Economics -->

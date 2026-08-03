@@ -185,7 +185,18 @@ footer a:hover{text-decoration:underline}
 <div class="wtm"><strong>What this proves:</strong> The 473&times; cost gap is not a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta is purely in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
 </section>
 
-<!-- Experiment Matrix -->
+<!-- Reproduce This -->
+<section class="sec">
+<h2>Reproduce This</h2>
+<p class="lead">The instrument is open source. Every experiment is a YAML config. Every run is seeded for reproducibility. Here's how to run your own.</p>
+
+<div class="cards">
+<div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/ai-finops-rulebook<br>cd ai-finops-rulebook<br>pip install -e .</code></div></div>
+<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml</code><br><br>Choose from 22 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
+<div class="card"><div class="ctitle">3. Read the Results</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Compare correctness, cost, escape scores, recovery ratios, and strategy classifications across runs.</div></div>
+<div class="card"><div class="ctitle">4. Extend It</div><div class="cdesc">Add new perturbation operators in <code>src/instrument/perturb.py</code>. Add new task configs in <code>experiments/configs/</code>. The instrument is modular by design &ndash; new operators, models, and domains plug in without modifying the core runner.</div></div>
+</div>
+</section>
 <section class="sec wide">
 <h2>Experiment Matrix</h2>
 <p class="lead">22 configuration files covering 5 task domains. Each config specifies the model, perturbation operators, strengths, and RNG seed. Every run is reproducible.</p>
