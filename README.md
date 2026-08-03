@@ -58,8 +58,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 │   └── lab_book.py           # YAML-frontmatter markdown persistence
 ├── experiments/
 │   ├── configs/              # 22 YAML experiment definitions
-│   ├── results/              # Raw experiment output (JSON + Markdown)
-│   └── inventory.json        # Persistent experiment/worktree registry
+│   └── results/              # Experiment output (generated, not tracked)
 ├── scripts/
 │   ├── run.py                # Single experiment runner
 │   ├── batch_run.py          # Parallel batch experiments
@@ -107,7 +106,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 | Lines of generated code | 202,000+ |
 | AST-verified Python files | 2,416 |
 
-Run `python scripts/inventory.py list` for a live breakdown of all experiments, worktrees, and costs.
+Run `python scripts/inventory.py list` for a live breakdown of all experiments, worktrees, and costs. Result files in `experiments/results/` are generated at runtime and not tracked in git — the inventory is the authoritative record.
 
 ---
 

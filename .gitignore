@@ -12,6 +12,11 @@ build/
 # Generated inventory (rebuild with `scripts/inventory.py refresh`)
 experiments/inventory.json
 
+# Generated experiment results (not tracked — use inventory.py)
+experiments/results/*.json
+experiments/results/*.md
+!experiments/results/README.md
+
 # Opencode worktrees (transient temp dirs)
 /tmp/
 

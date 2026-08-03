@@ -97,8 +97,8 @@ Results are saved to `experiments/results/your_experiment_{model}.json`.
 
 Include:
 - The config YAML
-- The result JSON
 - A brief description of what you tested and any findings
+- Run `python scripts/inventory.py refresh && python scripts/inventory.py report` and include the output in your PR description
 
 ---
 
