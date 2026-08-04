@@ -237,10 +237,11 @@ h3{font-weight:600;margin-bottom:0.4rem;font-size:0.95rem;color:var(--t)}
 <div class="cr"><div class="nm">Audit logging</div><div class="fl green">audit.py</div><div class="fl green">audit.py</div></div>
 <div class="cr"><div class="nm">API versioning</div><div class="fl green">routes/v1/</div><div class="fl green">Blueprint /v1/</div></div>
 </div>
-<div class="tbl" style="margin-top:1rem"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>Claude Fable 5</th><th>Gap</th></tr></thead><tbody>
-<tr><td>Task Manager API</td><td class="mono green">$0.010</td><td class="mono">$0.499</td><td class="mono amber">$2.022</td><td class="mono amber">202&times;</td></tr>
-<tr><td>Data Table</td><td class="mono green">$0.019</td><td class="mono">$0.798</td><td class="mono amber">$2.053</td><td class="mono amber">108&times;</td></tr>
-<tr><td>Collaborative Editor</td><td class="mono green">$0.022</td><td class="mono">$0.700</td><td class="mono amber">$2.490</td><td class="mono amber">113&times;</td></tr></tbody></table></div>
+<div class="tbl" style="margin-top:1rem"><table><thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>GPT-5.6</th><th>Claude Fable 5</th><th>Gap (DS/Claude)</th></tr></thead><tbody>
+<tr><td>Avg $ per session</td><td class="mono green">$0.014</td><td class="mono">$0.447</td><td class="mono amber">$0.918</td><td class="mono amber">65&times;</td></tr>
+<tr><td>Reports analyzed</td><td class="mono green">68</td><td class="mono">15</td><td class="mono amber">27</td><td class="mono">—</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green">691</td><td class="mono">367</td><td class="mono amber">412</td><td class="mono">1.7&times;</td></tr>
+<tr><td>Narration penalty</td><td class="mono green">3%</td><td class="mono">7%</td><td class="mono amber">44%</td><td class="mono amber">15&times;</td></tr></tbody></table></div>
 <div class="wtm"><strong>The gap isn't in capability. It's in architecture.</strong> DeepSeek's 37B active parameters (MoE) on 350W H800 GPUs vs Claude Fable 5's ~500B active on 700W H100 GPUs. The 14&times; hardware gap compounds with the 7&times; token efficiency gap to produce the 65&times; cost difference. When frameworks are pinned in the prompt, DeepSeek matches Claude's pass rate at a fraction of the cost. This held across all three cross-domain comparisons.</div>
 <a href="#s7" class="cta-btn ghost">The tax measured across all 8 variants</a>
 </div></section><!-- S7: MODEL CARDS (simplified) -->

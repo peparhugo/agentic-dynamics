@@ -147,16 +147,18 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 </div>
 </section>
 
-<!-- Cross-Domain -->
+<!-- Cross-Domain Summary -->
 <section class="sec">
-<h2>Cross-Domain Cost Comparison</h2>
-<p class="lead">Identical prompts across 3 task domains. Costs measured per session. Gap consistently 100-200&times; between DeepSeek and Claude.</p>
-<div class="tbl"><table><thead><tr><th>Domain</th><th>DeepSeek</th><th>GPT-5.6</th><th>Claude</th><th>Gap</th></tr></thead><tbody>
-<tr><td>Task Manager API</td><td class="mono green">$0.010</td><td class="mono">$0.499</td><td class="mono amber">$2.022</td><td class="mono amber">202&times;</td></tr>
-<tr><td>Data Table (frontend)</td><td class="mono green">$0.019</td><td class="mono">$0.798</td><td class="mono amber">$2.053</td><td class="mono amber">108&times;</td></tr>
-<tr><td>Collaborative Editor</td><td class="mono green">$0.022</td><td class="mono">$0.700</td><td class="mono amber">$2.490</td><td class="mono amber">113&times;</td></tr>
+<h2>Cross-Model Rollup</h2>
+<p class="lead">Measured across 142 game reports — not single-run data. DeepSeek delivers 1.7&times; more code per session at 1/65th the cost of Claude. The 44% narration penalty rate on Claude explains the gap: nearly half of Claude's sessions burned tokens on explanation without producing code.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody>
+<tr><td>Per-session cost</td><td class="mono green">$0.014</td><td class="mono">$0.447</td><td class="mono amber">$0.918</td><td class="mono">$0.270</td></tr>
+<tr><td>Narration penalty</td><td class="mono green">3%</td><td class="mono">7%</td><td class="mono amber">44%</td><td class="mono">20%</td></tr>
+<tr><td>Avg thinking ratio</td><td class="mono green">7%</td><td class="mono">6%</td><td class="mono amber">0%</td><td class="mono">6%</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green">691</td><td class="mono">367</td><td class="mono">412</td><td class="mono">483</td></tr>
+<tr><td>Constraint score</td><td class="mono green">3.2/7</td><td class="mono">3.1/6</td><td class="mono">2.3/6</td><td class="mono">2.6/7</td></tr>
 </tbody></table></div>
-</section>
+<div class="insight"><strong>What changed:</strong> The original cross-domain table used single-run costs ($2.02 Claude vs $0.01 DeepSeek for task_manager). These per-session averages from 142 game reports are the more robust metric. The 65&times; gap is the measured average — not the architectural extreme, and not a cherry-picked single run.</div>
 
 <!-- Current Scope & Roadmap -->
 <section class="sec alt">

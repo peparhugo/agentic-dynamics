@@ -147,7 +147,10 @@ def load_config_constraints(config_name: str) -> list[str]:
 
 
 def read_worktree_code(worktree_path: str) -> str:
-    """Concatenate project .py files in a worktree (skip venv, site-packages, tests)."""
+    """Concatenate project code files in a worktree.
+    
+    Reads .py files first. If none found, falls back to .html/.js/.css for frontend worktrees.
+    """
     p = Path(worktree_path)
     if not p.exists():
         return ""
@@ -282,7 +285,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # Read code
     code = read_worktree_code(worktree_path)
     if not code:
-        return None, {"error": "no Python files found"}
+        return None, {"error": "no Python files found",
+                        "narration_failure": True}
 
     # Session metadata
     title = session.get("title", "") if session else ""
@@ -302,31 +306,52 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     import ast
     real_code_lines = 0
     has_functions = False
-    for f in Path(worktree_path).rglob("*.py"):
-        if "__pycache__" in str(f):
+    total_code_files = 0
+    non_python_files = 0
+    for f in Path(worktree_path).rglob("*"):
+        if f.is_dir() or "__pycache__" in str(f) or ".git" in f.parts:
             continue
-        try:
-            content = f.read_text(errors="replace")
-            lines = [l for l in content.split("\n") if l.strip() 
-                    and not l.strip().startswith("#")]
-            real_code_lines += len(lines)
-            tree = ast.parse(content)
-            for node in ast.walk(tree):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
-                    has_functions = True
-        except Exception:
-            pass
+        if f.suffix in (".html", ".js", ".jsx", ".css", ".ts", ".tsx", ".json"):
+            non_python_files += 1
+            try:
+                content = f.read_text(errors="replace")
+                lines = [l for l in content.split("\n") if l.strip()]
+                real_code_lines += len(lines)
+            except: pass
+        elif f.suffix == ".py":
+            total_code_files += 1
+            try:
+                content = f.read_text(errors="replace")
+                lines = [l for l in content.split("\n") if l.strip() 
+                        and not l.strip().startswith("#")]
+                real_code_lines += len(lines)
+                tree = ast.parse(content)
+                for node in ast.walk(tree):
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+                        has_functions = True
+            except Exception:
+                pass
 
     output_tok = session.get("tokens_output", 0) or 0 if session else 0
     code_density = real_code_lines / max(output_tok, 1)
     narration_penalty = 0.0
+    narration_failure = False
+    is_frontend = False
 
-    if output_tok > 200 and not has_functions:
-        narration_penalty = 0.5  # heavy penalty: lots of tokens, no real code
+    if total_code_files == 0 and non_python_files == 0:
+        # Codeless: zero files of any kind = pure narration failure
+        narration_failure = True
+        narration_penalty = 1.0
+    elif total_code_files == 0 and non_python_files > 0:
+        # Frontend/browser worktree: HTML/JS but no Python
+        is_frontend = True
+    elif output_tok > 200 and not has_functions and total_code_files > 0:
+        narration_failure = True
+        narration_penalty = 0.5
     elif output_tok > 500 and code_density < 0.05:
-        narration_penalty = 0.3  # moderate penalty: some code but mostly narration
+        narration_penalty = 0.3
     elif output_tok > 1000 and code_density < 0.03:
-        narration_penalty = 0.2  # light penalty: large output, low code ratio
+        narration_penalty = 0.2
 
     if narration_penalty > 0:
         solution.correctness_score = max(0, solution.correctness_score - narration_penalty)
@@ -425,6 +450,9 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "ast": ast_profile,
         "narration_penalty": narration_penalty,
         "code_density": round(code_density, 4),
+        "narration_failure": narration_failure,
+        "is_frontend": is_frontend,
+        "non_python_files": non_python_files,
         "has_tests": ast_profile.get("has_tests", False),
         "test_results": test_results,
     }
@@ -825,9 +853,20 @@ def main():
                     md += f"| {label} | {val_str} |\n"
 
             if metrics.get("narration_penalty", 0) > 0:
-                md += f"\n⚠️ **Narration penalty:** {metrics['narration_penalty']:.0%} "
-                md += f"(output tokens: {s.get('tokens_output',0)} , "
-                md += f"code density: {metrics.get('code_density',0):.3f})\n"
+                md += f"\n## Narration Assessment\n\n"
+                md += f"**Narration penalty:** {metrics['narration_penalty']:.0%}\n\n"
+                md += f"| Metric | Value |\n|--------|-------|\n"
+                md += f"| Output tokens | {s.get('tokens_output', 0):,} |\n"
+                md += f"| Python files | {ast.get('py_files', 0)} |\n"
+                md += f"| Non-Python files | {metrics.get('non_python_files', 0)} |\n"
+                md += f"| Code density | {metrics.get('code_density', 0):.4f} LOC/tok |\n"
+                if metrics.get("narration_failure"):
+                    md += f"| **Verdict** | **NARRATION FAILURE — {s.get('tokens_output',0):,} tokens burned, zero code output** |\n"
+                elif metrics.get("is_frontend"):
+                    md += f"| **Verdict** | **FRONTEND WORKTREE — {metrics.get('non_python_files',0)} HTML/JS files, no Python** |\n"
+                else:
+                    md += f"| **Assessment** | Low code density — narration exceeded code output |\n"
+                md += "\n"
 
             # Test results section
             tr = metrics.get("test_results")
@@ -851,37 +890,54 @@ def main():
             test_str = ""
             if tr and tr.get("ok"):
                 test_str = f" T:{tr['passed']}/{tr['total']}"
-            elif tr and not tr.get("ok") and tr.get("error") and "no test" not in tr.get("error",""):
-                test_str = " T:✗"
+            elif metrics.get("narration_failure"):
+                test_str = " ❌ NARRATION"
+            elif metrics.get("is_frontend"):
+                test_str = " 🖥 FRONTEND"
             print(f"  {i+1:3d}/{len(analyzed)} {strat_icon} {wt['name']:<18} "
                   f"${metrics['cost']:>7.4f} cor={metrics['correctness']:.0%} "
                   f"esc={metrics['escape']:.2f} [{metrics['constraints']}]{test_str} "
                   f"→ {safe_name}.md")
         else:
             err = metrics.get("error", "unknown")
-            if args.worktree:
+            if metrics.get("narration_failure"):
+                cost = (s.get("cost") or 0) if s else 0
+                results.append({"experiment": wt["name"], "narration_failure": True,
+                               "cost": cost,
+                               "output_tokens": (s.get("tokens_output") or 0) if s else 0})
+                print(f"  {i+1:3d}/{len(analyzed)} ❌ {wt['name']:<18} "
+                      f"${cost:>7.4f} NARRATION FAIL ({s.get('tokens_output',0) if s else 0} tok)"
+                      f" → skipped")
+            elif args.worktree:
                 print(f"  Error: {err}")
-            else:
-                pass  # quiet for batch
 
     # Summary
     if results:
+        narrated = sum(1 for r in results if r.get("narration_failure"))
+        valid = [r for r in results if not r.get("narration_failure") and "correctness" in r]
+
         print(f"\n{'='*100}")
-        print(f"SUMMARY — {len(results)} reports generated")
+        print(f"SUMMARY — {len(results)} entries ({len(valid)} analyzed, {narrated} narration failures)")
         print(f"{'='*100}")
 
-        total_cost = sum(r["cost"] for r in results)
-        avg_correct = sum(r["correctness"] for r in results) / len(results)
-        avg_escape = sum(r["escape"] for r in results) / len(results)
-        strategies = {}
-        for r in results:
-            s = r.get("strategy", "?")
-            strategies[s] = strategies.get(s, 0) + 1
+        total_cost = sum(r.get("cost", 0) for r in results)
+        narr_cost = sum(r.get("cost", 0) for r in results if r.get("narration_failure"))
 
-        print(f"  Total cost analyzed: {_fmt_usd(total_cost)}")
-        print(f"  Avg correctness:     {avg_correct:.1%}")
-        print(f"  Avg escape score:    {avg_escape:.2f}")
-        print(f"  Strategy breakdown:  {strategies}")
+        if valid:
+            avg_correct = sum(r["correctness"] for r in valid) / len(valid)
+            avg_escape = sum(r["escape"] for r in valid) / len(valid)
+            strategies = {}
+            for r in valid:
+                s = r.get("strategy", "?")
+                strategies[s] = strategies.get(s, 0) + 1
+
+            print(f"  Total cost analyzed:  {_fmt_usd(total_cost)}")
+            print(f"  Narration waste:      {_fmt_usd(narr_cost)} ({narrated} worktrees)")
+            print(f"  Avg correctness:      {avg_correct:.1%}")
+            print(f"  Avg escape score:     {avg_escape:.2f}")
+            print(f"  Strategy breakdown:   {strategies}")
+        else:
+            print(f"  Total cost (all narr): {_fmt_usd(total_cost)}")
         print(f"\n  Reports saved to: {REPORTS_DIR}/")
     else:
         print("\nNo worktrees analyzed.")
