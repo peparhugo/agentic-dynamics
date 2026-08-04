@@ -1,8 +1,0 @@
-2026-08-01 19:26:48,672 INFO event=audit method=POST path=/api/v1/auth/login status=200 ip=127.0.0.1 user=None request_id=10455336-2da9-4e14-8174-a9047aeb5b91
-2026-08-01 19:26:48,682 INFO event=audit method=POST path=/api/v1/auth/login status=401 ip=127.0.0.1 user=None request_id=5de7f2be-3607-4f59-adaa-0e75a0d8acc7
-2026-08-02 19:46:58,917 INFO event=audit method=POST path=/api/v1/auth/login status=200 ip=127.0.0.1 user=None request_id=7382db0e-d2e5-4982-bec9-211fecd197dc
-2026-08-02 19:46:58,929 INFO event=audit method=POST path=/api/v1/auth/login status=401 ip=127.0.0.1 user=None request_id=5be1a825-c167-4771-99aa-9aced3841b91
-2026-08-02 20:06:56,543 INFO event=audit method=POST path=/api/v1/auth/login status=200 ip=127.0.0.1 user=None request_id=fa13250d-9e1e-4d60-890d-40db396f24db
-2026-08-02 20:06:56,556 INFO event=audit method=POST path=/api/v1/auth/login status=401 ip=127.0.0.1 user=None request_id=2f639d93-74a7-4127-b32c-d33e49c18e6a
-2026-08-03 09:02:39,855 INFO event=audit method=POST path=/api/v1/auth/login status=200 ip=127.0.0.1 user=None request_id=f892037e-36c6-4f0c-9589-2841f06578d4
-2026-08-03 09:02:39,871 INFO event=audit method=POST path=/api/v1/auth/login status=401 ip=127.0.0.1 user=None request_id=3203e80d-2560-43f4-b935-4739c92664a7
