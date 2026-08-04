@@ -93,4 +93,6 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Generated code](./exp_batch_batch_collaborative_editor_baseline gpt_/code/)
+- [Opencode session transcript](./exp_batch_batch_collaborative_editor_baseline gpt_/session.jsonl)
+
+*No code output — this session was narration-only.*

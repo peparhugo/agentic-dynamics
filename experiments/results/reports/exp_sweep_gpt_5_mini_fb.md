@@ -106,4 +106,6 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Generated code](./exp_sweep_gpt_5_mini_fb/code/)
+- [Opencode session transcript](./exp_sweep_gpt_5_mini_fb/session.jsonl)
+
+*No code output — this session was narration-only.*

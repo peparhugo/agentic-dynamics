@@ -106,4 +106,6 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Generated code](./exp_batch_batch_task_manager_baseline claude_fable/code/)
+- [Opencode session transcript](./exp_batch_batch_task_manager_baseline claude_fable/session.jsonl)
+
+*No code output — this session was narration-only.*

@@ -106,4 +106,6 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Generated code](./exp_zmwy64er/code/)
+- [Opencode session transcript](./exp_zmwy64er/session.jsonl)
+
+*No code output — this session was narration-only.*

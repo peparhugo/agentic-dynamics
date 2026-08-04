@@ -93,4 +93,6 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Generated code](./exp_rz0gn48h/code/)
+- [Opencode session transcript](./exp_rz0gn48h/session.jsonl)
+
+*No code output — this session was narration-only.*
