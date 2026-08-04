@@ -319,8 +319,69 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
     return worktrees
 
 
+def code_fingerprint(workdir: str) -> dict:
+    """Extract structural fingerprint from generated code: modules, routes, classes.
+    
+    Two worktrees with similar fingerprints were given the same instructions.
+    """
+    import ast
+    p = Path(workdir)
+    if not p.exists():
+        return {}
+    skip_dirs = {"__pycache__", ".git", "venv", ".venv", "site-packages",
+                 "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
+    py_files = []
+    for f in sorted(p.rglob("*.py")):
+        if skip_dirs & set(f.parts):
+            continue
+        try:
+            code = f.read_text(errors="replace")
+            if len(code) > 20:
+                py_files.append((f.relative_to(p), code))
+        except Exception:
+            pass
+        if len(py_files) > 30:
+            break
+    if not py_files:
+        return {}
+
+    modules = sorted(set(str(f).replace("/", ".").replace(".py", "") for f, _ in py_files))
+    routes = set()
+    classes = set()
+    for _, code in py_files:
+        for m in re.findall(r'@.*\.route\(["\']([^"\']+)', code):
+            routes.add(m)
+        try:
+            for node in ast.walk(ast.parse(code)):
+                if isinstance(node, ast.ClassDef) and not node.name.startswith("Test"):
+                    classes.add(node.name)
+        except Exception:
+            pass
+
+    return {"modules": sorted(modules), "routes": sorted(routes), "classes": sorted(classes)}
+
+
+def fingerprint_score(fp_a: dict, fp_b: dict) -> float:
+    """Structural similarity 0-1 based on modules, routes, classes."""
+    if not fp_a or not fp_b:
+        return 0.0
+    splits = []
+    for key in ["modules", "routes", "classes"]:
+        sa = set(fp_a.get(key, []))
+        sb = set(fp_b.get(key, []))
+        if not sa and not sb:
+            continue
+        inter = len(sa & sb)
+        union = len(sa | sb) or 1
+        splits.append(inter / union)
+    return sum(splits) / len(splits) if splits else 0.0
+
+
 def build_baseline_index(worktrees: list[dict]) -> dict:
-    """Index baselines by (experiment|model_short) -> code."""
+    """Index baselines by key -> {code, fingerprint, path}.
+    
+    Keys: experiment|model_short and experiment|provider/model_id
+    """
     index = {}
     for wt in worktrees:
         s = wt.get("session", {})
@@ -336,17 +397,20 @@ def build_baseline_index(worktrees: list[dict]) -> dict:
         for key in keys:
             if key not in index:
                 code = read_worktree_code(wt["path"])
-                if code: index[key] = code
+                if code:
+                    index[key] = {"code": code, "fp": code_fingerprint(wt["path"]),
+                                  "path": wt["path"], "prov": prov, "mid": mid}
     return index
 
 
 def find_baseline_code(worktree_title: str, session: dict,
-                       baseline_index: dict) -> str:
-    """Find matching baseline code for a worktree using the index.
+                       baseline_index: dict, worktree_path: str = "") -> str:
+    """Find matching baseline code, preferring instruction-level fingerprint matches.
     
-    Tries exact experiment+model match first, then falls back to
-    same-model matching (useful when perturbed worktrees use operator
-    names as experiment IDs).
+    Priority:
+      1. Fingerprint match (same instructions → same code structure)
+      2. Experiment+model exact match
+      3. Same-model fallback
     """
     info = parse_session_title_info(worktree_title)
     if info["operator"] == "baseline":
@@ -355,34 +419,54 @@ def find_baseline_code(worktree_title: str, session: dict,
     ms = info["model_short"]; exp = info["experiment"]
     prov = session.get("provider", ""); mid = session.get("model_id", "")
 
-    if exp and ms:
-        code = baseline_index.get(f"{exp}|{ms}")
-        if code: return code
-    if exp and prov and mid:
-        code = baseline_index.get(f"{exp}|{prov}/{mid}")
-        if code: return code
+    # ── Priority 1: fingerprint match ──
+    if worktree_path:
+        pert_fp = code_fingerprint(worktree_path)
+        if pert_fp:
+            best_score = 0.0
+            best_code = ""
+            for key, entry in baseline_index.items():
+                base_fp = entry.get("fp")
+                if not base_fp:
+                    continue
+                s = fingerprint_score(pert_fp, base_fp)
+                # Boost score for same-model matches
+                if prov and mid and entry.get("prov") == prov and entry.get("mid") == mid:
+                    s = min(s + 0.1, 1.0)
+                if s > best_score and s > 0.25:
+                    best_score = s
+                    best_code = entry["code"]
+            if best_code:
+                return best_code
 
-    # Fuzzy: partial model_short overlap within same experiment
+    # ── Priority 2: exact experiment+model match ──
+    if exp and ms:
+        entry = baseline_index.get(f"{exp}|{ms}")
+        if entry: return entry["code"]
+    if exp and prov and mid:
+        entry = baseline_index.get(f"{exp}|{prov}/{mid}")
+        if entry: return entry["code"]
+
+    # ── Priority 3: fuzzy model_short within same experiment ──
     if exp and ms:
         ms_words = set(ms.lower().replace("_", " ").split())
-        for key, code in baseline_index.items():
+        for key, entry in baseline_index.items():
             key_exp, key_ms = key.split("|", 1)
             if key_exp == exp:
                 kw = set(key_ms.lower().replace("_", " ").split())
-                if ms_words & kw: return code
-                if ms.lower() in key_ms.lower() or key_ms.lower() in ms.lower():
-                    return code
+                if ms_words & kw or ms.lower() in key_ms.lower() or key_ms.lower() in ms.lower():
+                    return entry["code"]
 
-    # Fallback: any baseline for the same model provider/ID
+    # ── Priority 4: any baseline for same model ──
     if prov and mid:
-        key = f"{prov}/{mid}"
-        for bk, code in baseline_index.items():
-            if key in bk:
-                return code
+        target = f"{prov}/{mid}"
+        for bk, entry in baseline_index.items():
+            if target in bk:
+                return entry["code"]
     if prov:
-        for bk, code in baseline_index.items():
+        for bk, entry in baseline_index.items():
             if prov in bk:
-                return code
+                return entry["code"]
 
     return ""
 
@@ -468,7 +552,7 @@ def main():
         title = (s.get("title", "") or "")[:60]
 
         # Find matching baseline via smart index
-        baseline_code = find_baseline_code(title, s, baseline_index)
+        baseline_code = find_baseline_code(title, s, baseline_index, worktree_path=wt["path"])
         if args.baseline and not baseline_code:
             baseline_code = read_worktree_code(args.baseline)
 
