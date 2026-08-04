@@ -38,6 +38,67 @@ OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 REPORTS_DIR = RESULTS_DIR / "reports"
 CONFIGS_DIR = PROJECT_ROOT / "experiments" / "configs"
+TEST_VENV = Path("/tmp/pytest_venv")
+PYTEST_DEPS = ["flask", "pytest", "sqlalchemy", "flask-jwt-extended", "flask-limiter",
+               "flask-cors", "flask-migrate"]
+
+run_tests_enabled = False
+_test_venv_ready = False
+
+
+def ensure_test_venv():
+    """Create or reuse a shared venv for pytest across all worktrees."""
+    global _test_venv_ready
+    if _test_venv_ready:
+        return
+    if not TEST_VENV.exists():
+        import venv as _venv
+        _venv.create(str(TEST_VENV), with_pip=True)
+    import subprocess as _sp
+    pip = str(TEST_VENV / "bin" / "pip")
+    _sp.run([pip, "install", "-q"] + PYTEST_DEPS, capture_output=True, timeout=60)
+    _test_venv_ready = True
+
+
+def run_pytest(worktree_path: str, timeout_sec: int = 15) -> dict:
+    """Run pytest in a worktree using the shared venv."""
+    import subprocess as _sp
+    p = Path(worktree_path)
+    if not p.exists():
+        return {"ok": False, "error": "worktree missing"}
+
+    test_dirs = list(p.rglob("tests"))
+    test_files = list(p.rglob("test_*.py"))
+    if not test_dirs and not test_files:
+        return {"ok": False, "error": "no test files"}
+
+    python = str(TEST_VENV / "bin" / "python")
+    t0 = time.monotonic()
+    try:
+        r = _sp.run(
+            [python, "-m", "pytest", "-q", "--tb=no"],
+            cwd=str(p), capture_output=True, text=True,
+            timeout=timeout_sec,
+        )
+        dur = time.monotonic() - t0
+        out = r.stdout + r.stderr
+
+        import re
+        passed = int(re.search(r'(\d+)\s+passed', out).group(1)) if re.search(r'(\d+)\s+passed', out) else 0
+        failed = int(re.search(r'(\d+)\s+failed', out).group(1)) if re.search(r'(\d+)\s+failed', out) else 0
+        errors = int(re.search(r'(\d+)\s+error', out).group(1)) if re.search(r'(\d+)\s+error', out) else 0
+        total = passed + failed
+
+        return {
+            "ok": total > 0,
+            "passed": passed, "failed": failed, "errors": errors,
+            "total": total, "duration_s": round(dur, 1),
+            "pass_rate": round(passed / max(total, 1), 3) if total > 0 else 0,
+        }
+    except _sp.TimeoutExpired:
+        return {"ok": False, "error": f"timeout {timeout_sec}s"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
 
 
 # ── Utility ──────────────────────────────────────────────────────────────────
@@ -213,6 +274,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     Returns:
         (GameReport, dict of metrics) or (None, error_dict)
     """
+    global run_tests_enabled
     wt = Path(worktree_path)
     if not wt.exists():
         return None, {"error": "worktree not found"}
@@ -326,6 +388,15 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
                                      operator=info.get("operator", ""),
                                      perturbation_class=pert_class)
 
+    # ── Test Results (if --run-tests) ──
+    test_results = None
+    if run_tests_enabled:
+        test_results = run_pytest(worktree_path)
+        if test_results.get("ok") and test_results.get("total", 0) > 0:
+            solution.tests_passed = test_results["passed"]
+            solution.tests_total = test_results["total"]
+            solution.correctness_score = test_results["pass_rate"]
+
     # ── Game Report ──
     experiment_id = info.get("experiment", wt.name) or wt.name
     report = GameReport(
@@ -355,6 +426,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "narration_penalty": narration_penalty,
         "code_density": round(code_density, 4),
         "has_tests": ast_profile.get("has_tests", False),
+        "test_results": test_results,
     }
 
 
@@ -408,7 +480,7 @@ def ast_profile_worktree(worktree_path: str) -> dict:
                     metrics["total_functions"] += 1
                     if node.returns: metrics["type_hints"] += 1
                     if (node.body and isinstance(node.body[0], ast.Expr)
-                            and isinstance(node.body[0].value, (ast.Constant, ast.Str))):
+                            and isinstance(node.body[0].value, ast.Constant)):
                         metrics["docstrings"] += 1
                     for arg in node.args.args:
                         if arg.annotation: metrics["type_hints"] += 1
@@ -648,7 +720,13 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="Max worktrees to analyze")
     ap.add_argument("--dry-run", action="store_true", help="Show what would be analyzed")
     ap.add_argument("--baseline", help="Baseline worktree path for comparison")
+    ap.add_argument("--run-tests", action="store_true", help="Run pytest in each worktree")
     args = ap.parse_args()
+
+    global run_tests_enabled
+    run_tests_enabled = args.run_tests
+    if run_tests_enabled:
+        ensure_test_venv()
 
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -746,10 +824,22 @@ def main():
                         val_str += "%"
                     md += f"| {label} | {val_str} |\n"
 
-                if metrics.get("narration_penalty", 0) > 0:
-                    md += f"\n⚠️ **Narration penalty:** {metrics['narration_penalty']:.0%} "
-                    md += f"(output tokens: {s.get('tokens_output',0)} , "
-                    md += f"code density: {metrics.get('code_density',0):.3f})\n"
+            if metrics.get("narration_penalty", 0) > 0:
+                md += f"\n⚠️ **Narration penalty:** {metrics['narration_penalty']:.0%} "
+                md += f"(output tokens: {s.get('tokens_output',0)} , "
+                md += f"code density: {metrics.get('code_density',0):.3f})\n"
+
+            # Test results section
+            tr = metrics.get("test_results")
+            if tr and tr.get("ok"):
+                md += "\n\n---\n\n## Pytest Results\n\n"
+                md += f"| Metric | Value |\n|--------|-------|\n"
+                md += f"| Passed | {tr['passed']} |\n"
+                md += f"| Failed | {tr['failed']} |\n"
+                md += f"| Errors | {tr['errors']} |\n"
+                md += f"| Total | {tr['total']} |\n"
+                md += f"| Pass rate | {tr['pass_rate']:.0%} |\n"
+                md += f"| Duration | {tr['duration_s']}s |\n"
 
             md_path.write_text(md)
 
@@ -758,9 +848,14 @@ def main():
             strat_icon = {"conservative": "C", "exploratory": "E",
                           "wasteful": "W", "efficient": "✓"}.get(
                 (metrics.get("strategy") or "").lower()[:1], "?")
+            test_str = ""
+            if tr and tr.get("ok"):
+                test_str = f" T:{tr['passed']}/{tr['total']}"
+            elif tr and not tr.get("ok") and tr.get("error") and "no test" not in tr.get("error",""):
+                test_str = " T:✗"
             print(f"  {i+1:3d}/{len(analyzed)} {strat_icon} {wt['name']:<18} "
                   f"${metrics['cost']:>7.4f} cor={metrics['correctness']:.0%} "
-                  f"esc={metrics['escape']:.2f} [{metrics['constraints']}] "
+                  f"esc={metrics['escape']:.2f} [{metrics['constraints']}]{test_str} "
                   f"→ {safe_name}.md")
         else:
             err = metrics.get("error", "unknown")
