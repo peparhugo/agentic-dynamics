@@ -154,36 +154,51 @@ def infer_constraints(worktree_path: str, title: str = "") -> list[str]:
 
 
 def parse_session_title_info(title: str) -> dict:
-    """Extract experiment metadata from session title."""
-    info = {"experiment": "", "operator": "baseline", "silent_mode": "natural"}
+    """Extract experiment and model metadata from session title.
+    
+    Returns: {experiment, operator, silent_mode, model_short}
+    """
+    info = {"experiment": "", "operator": "baseline", "silent_mode": "natural",
+            "model_short": ""}
     t = title or ""
 
-    # Extract bracket tags like [batch:task_manager:baseline] or [silent_sweep:baseline:forced]
-    bracket_m = re.findall(r'\[([^\]]+)\]', t)
-    if bracket_m:
-        for tag in bracket_m:
-            parts = tag.split(":")
-            if len(parts) >= 2:
-                info["experiment"] = parts[1] if len(parts) > 1 else parts[0]
-            if len(parts) >= 3:
-                info["operator"] = parts[2] if "baseline" in tag or "perturbed" in tag else info["operator"]
-            elif "perturbed" in tag:
+    bracket_tags = re.findall(r'\[([^\]]+)\]', t)
+    if bracket_tags:
+        first_tag = bracket_tags[0]
+        parts = first_tag.split(":")
+
+        if len(parts) == 1:
+            tag = parts[0]
+            if "baseline" in tag:
+                info["operator"] = "baseline"
+            elif any(k in tag for k in ["inject_", "remove_", "invert_", "shift_",
+                                          "alien_", "false_", "competing", "phantom",
+                                          "force_", "reverse_", "probe", "std_",
+                                          "standardized", "perturbed"]):
                 info["operator"] = "perturbed"
-            if "forced" in tag:
+                info["experiment"] = tag
+        elif len(parts) >= 2:
+            info["experiment"] = parts[1]
+            if len(parts) >= 3:
+                info["operator"] = parts[2] if parts[2] in ("baseline", "perturbed") else "baseline"
+            if "forced" in first_tag:
                 info["silent_mode"] = "forced-silent"
-            elif "natural" in tag:
+            elif "natural" in first_tag:
                 info["silent_mode"] = "natural"
 
-    # Try to extract from non-bracket titles
+    after_brackets = re.sub(r'\[[^\]]+\]\s*', '', t).strip()
+    info["model_short"] = after_brackets
+
     if not info["experiment"]:
-        for pattern, name in [
-            ("task_manager", "task_manager"),
-            ("collaborative_editor", "collaborative_editor"),
-            ("data_table", "data_table"),
-            ("url_shortener", "url_shortener"),
+        for pattern, exp_name in [
+            ("task_manage", "task_manager"), ("task manager", "task_manager"),
+            ("task api", "task_manager"), ("collaborative", "collaborative_editor"),
+            ("data_table", "data_table"), ("data table", "data_table"),
+            ("url_shortener", "url_shortener"), ("url shortener", "url_shortener"),
+            ("silent_sweep", "silent_sweep"),
         ]:
             if pattern in t.lower():
-                info["experiment"] = name
+                info["experiment"] = exp_name
                 break
 
     return info
@@ -304,6 +319,74 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
     return worktrees
 
 
+def build_baseline_index(worktrees: list[dict]) -> dict:
+    """Index baselines by (experiment|model_short) -> code."""
+    index = {}
+    for wt in worktrees:
+        s = wt.get("session", {})
+        title = s.get("title", "") or ""
+        info = parse_session_title_info(title)
+        if info["operator"] != "baseline":
+            continue
+        exp = info["experiment"]; ms = info["model_short"]
+        prov = s.get("provider", ""); mid = s.get("model_id", "")
+        keys = []
+        if exp and ms: keys.append(f"{exp}|{ms}")
+        if exp and prov and mid: keys.append(f"{exp}|{prov}/{mid}")
+        for key in keys:
+            if key not in index:
+                code = read_worktree_code(wt["path"])
+                if code: index[key] = code
+    return index
+
+
+def find_baseline_code(worktree_title: str, session: dict,
+                       baseline_index: dict) -> str:
+    """Find matching baseline code for a worktree using the index.
+    
+    Tries exact experiment+model match first, then falls back to
+    same-model matching (useful when perturbed worktrees use operator
+    names as experiment IDs).
+    """
+    info = parse_session_title_info(worktree_title)
+    if info["operator"] == "baseline":
+        return ""
+
+    ms = info["model_short"]; exp = info["experiment"]
+    prov = session.get("provider", ""); mid = session.get("model_id", "")
+
+    if exp and ms:
+        code = baseline_index.get(f"{exp}|{ms}")
+        if code: return code
+    if exp and prov and mid:
+        code = baseline_index.get(f"{exp}|{prov}/{mid}")
+        if code: return code
+
+    # Fuzzy: partial model_short overlap within same experiment
+    if exp and ms:
+        ms_words = set(ms.lower().replace("_", " ").split())
+        for key, code in baseline_index.items():
+            key_exp, key_ms = key.split("|", 1)
+            if key_exp == exp:
+                kw = set(key_ms.lower().replace("_", " ").split())
+                if ms_words & kw: return code
+                if ms.lower() in key_ms.lower() or key_ms.lower() in ms.lower():
+                    return code
+
+    # Fallback: any baseline for the same model provider/ID
+    if prov and mid:
+        key = f"{prov}/{mid}"
+        for bk, code in baseline_index.items():
+            if key in bk:
+                return code
+    if prov:
+        for bk, code in baseline_index.items():
+            if prov in bk:
+                return code
+
+    return ""
+
+
 def find_baseline_worktree(worktrees: list[dict], experiment: str) -> str:
     """Find a baseline worktree for the given experiment name."""
     baselines = [wt for wt in worktrees
@@ -366,9 +449,15 @@ def main():
         print(f"\n  Total: {len(analyzed)} worktrees")
         return
 
+    # Build baseline index from ALL worktrees (not just the limited subset)
+    print("Building baseline index...")
+    all_worktrees = discover_worktrees(sessions_by_dir)
+    all_with_sessions = [wt for wt in all_worktrees if wt.get("session")]
+    baseline_index = build_baseline_index(all_with_sessions)
+    print(f"  {len(baseline_index)} baselines indexed")
+
     # Analyze each worktree
     results = []
-    baseline_cache = {}  # experiment -> baseline code
 
     print(f"\n{'='*100}")
     print(f"ANALYZING {len(analyzed)} WORKTREES")
@@ -377,14 +466,9 @@ def main():
     for i, wt in enumerate(analyzed):
         s = wt.get("session", {})
         title = (s.get("title", "") or "")[:60]
-        info = parse_session_title_info(title)
-        exp = info.get("experiment", "")
 
-        # Get or create baseline code cache
-        if exp and exp not in baseline_cache:
-            baseline_cache[exp] = find_baseline_worktree(analyzed, exp) or ""
-
-        baseline_code = baseline_cache.get(exp, "")
+        # Find matching baseline via smart index
+        baseline_code = find_baseline_code(title, s, baseline_index)
         if args.baseline and not baseline_code:
             baseline_code = read_worktree_code(args.baseline)
 
