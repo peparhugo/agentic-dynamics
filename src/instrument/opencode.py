@@ -212,7 +212,6 @@ def run_opencode_agentic(
     # Create an isolated worktree per run
     if workdir is None:
         workdir = tempfile.mkdtemp(prefix="exp_")
-        result.workdir = workdir
 
     # Initialize git for version control tracking
     if init_git:

@@ -1,0 +1,402 @@
+.dt-container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: #1f2937;
+  position: relative;
+  overflow: hidden;
+  height: 100%;
+}
+
+.dt-container:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Toolbar */
+.dt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dt-toolbar-left,
+.dt-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dt-row-count {
+  color: #6b7280;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  color: #374151;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px 10px;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.dt-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.dt-btn:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+}
+
+.dt-btn-sm {
+  padding: 2px 8px;
+  font-size: 11px;
+}
+
+/* Loading */
+.dt-loading-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.dt-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: dt-spin 0.7s linear infinite;
+}
+
+@keyframes dt-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Table wrapper */
+.dt-table-wrapper {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.dt-table-wrapper:focus-visible {
+  outline: none;
+}
+
+/* Table */
+.dt-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+/* Header */
+.dt-thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #f9fafb;
+}
+
+.dt-header-row {
+  background: #f3f4f6;
+}
+
+.dt-th {
+  position: relative;
+  padding: 0;
+  border-bottom: 2px solid #d1d5db;
+  border-right: 1px solid #e5e7eb;
+  background: #f3f4f6;
+  text-align: left;
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+
+.dt-th:last-child {
+  border-right: none;
+}
+
+.dt-th-dragging {
+  opacity: 0.5;
+  background: #e5e7eb;
+}
+
+.dt-drop-before {
+  box-shadow: inset 2px 0 0 0 #3b82f6;
+}
+
+.dt-drop-after {
+  box-shadow: inset -2px 0 0 0 #3b82f6;
+}
+
+.dt-th-content {
+  display: flex;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 4px;
+  height: 100%;
+}
+
+.dt-header-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: #374151;
+}
+
+.dt-header-text.dt-sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.dt-header-text.dt-sortable:hover {
+  color: #1d4ed8;
+}
+
+.dt-header-text.dt-sortable:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 1px;
+  border-radius: 2px;
+}
+
+.dt-sort-indicator {
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+}
+
+/* Resize handle */
+.dt-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+  background: transparent;
+}
+
+.dt-resize-handle:hover,
+.dt-resize-handle:active {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.dt-resize-handle:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -1px;
+}
+
+/* Filter row */
+.dt-filter-row {
+  background: #fff;
+}
+
+.dt-filter-cell {
+  padding: 2px 4px;
+  border-bottom: 1px solid #e5e7eb;
+  border-right: 1px solid #e5e7eb;
+}
+
+.dt-filter-cell:last-child {
+  border-right: none;
+}
+
+.dt-filter-input {
+  width: 100%;
+  height: 26px;
+  padding: 2px 6px;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  font-size: 12px;
+  outline: none;
+  background: #fff;
+  color: #1f2937;
+}
+
+.dt-filter-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+}
+
+.dt-filter-input::placeholder {
+  color: #9ca3af;
+}
+
+/* Rows */
+.dt-row {
+  transition: background 0.1s;
+}
+
+.dt-row:hover {
+  background: #f0f4ff;
+}
+
+.dt-row-selected {
+  background: #dbeafe !important;
+}
+
+.dt-row-striped {
+  background: #f9fafb;
+}
+
+.dt-row-striped.dt-row-selected {
+  background: #dbeafe !important;
+}
+
+.dt-row:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Cells */
+.dt-td {
+  padding: 4px 10px;
+  border-bottom: 1px solid #f3f4f6;
+  border-right: 1px solid #f3f4f6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  font-size: 13px;
+  cursor: default;
+}
+
+.dt-td:last-child {
+  border-right: none;
+}
+
+.dt-td:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+  background: #eff6ff;
+  z-index: 1;
+  position: relative;
+}
+
+.dt-td-editing {
+  padding: 1px 4px;
+}
+
+.dt-td-select {
+  padding: 4px;
+  text-align: center;
+  width: 40px;
+}
+
+.dt-th-select {
+  padding: 4px;
+  text-align: center;
+  border-right: 1px solid #e5e7eb;
+}
+
+.dt-th-select input[type="checkbox"],
+.dt-td-select input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #3b82f6;
+}
+
+/* Cell value */
+.dt-cell-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Inline edit */
+.dt-inline-edit-input {
+  width: 100%;
+  height: 28px;
+  padding: 2px 6px;
+  border: 2px solid #3b82f6;
+  border-radius: 3px;
+  font-size: 13px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  background: #fff;
+}
+
+/* Empty state */
+.dt-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #9ca3af;
+  font-size: 14px;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* High contrast mode */
+@media (forced-colors: active) {
+  .dt-th {
+    border-color: CanvasText;
+  }
+  .dt-td {
+    border-color: CanvasText;
+  }
+  .dt-row-selected {
+    background: Highlight !important;
+    color: HighlightText;
+  }
+  .dt-row-selected .dt-td {
+    color: HighlightText;
+  }
+  .dt-btn:focus-visible,
+  .dt-td:focus {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .dt-spinner {
+    animation: none;
+    border-top-color: #9ca3af;
+  }
+  .dt-row {
+    transition: none;
+  }
+}
+
+/* Selection row - single mode */
+.dt-row-select .dt-th-select {
+  width: 40px;
+}

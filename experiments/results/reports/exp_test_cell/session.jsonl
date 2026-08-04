@@ -1,0 +1,9 @@
+{"type": "text", "text": "\"echo hello; echo TESTS: 5 passed, 0 failed\""}
+{"type": "step-start"}
+{"type": "reasoning", "text": "The user wants me to run a bash command that echoes \"hello\" and then \"TESTS: 5 passed, 0 failed\".", "time": {"start": 1785606441692, "end": 1785606442320}}
+{"type": "tool", "tool": "bash", "callID": "call_00_015jZRivwMAT1RgH3K8c2803", "state": {"status": "completed", "input": {"command": "echo hello; echo TESTS: 5 passed, 0 failed"}, "output": "hello\nTESTS: 5 passed, 0 failed\n", "metadata": {"output": "hello\nTESTS: 5 passed, 0 failed\n", "exit": 0, "truncated": false}, "title": "echo hello; echo TESTS: 5 passed, 0 failed", "time": {"start": 1785606443487, "end": 1785606443766}}}
+{"reason": "tool-calls", "type": "step-finish", "tokens": {"total": 7849, "input": 5845, "output": 56, "reasoning": 28, "cache": {"write": 0, "read": 1920}}, "cost": 0.002622615}
+{"type": "step-start"}
+{"type": "reasoning", "text": "The command ran successfully. Output shows \"hello\" and \"TESTS: 5 passed, 0 failed\" as expected.", "time": {"start": 1785606445975, "end": 1785606446462}}
+{"type": "text", "text": "hello\n\nTESTS: 5 passed, 0 failed", "time": {"start": 1785606446473, "end": 1785606446592}}
+{"reason": "stop", "type": "step-finish", "tokens": {"total": 7913, "input": 66, "output": 13, "reasoning": 26, "cache": {"write": 0, "read": 7808}}, "cost": 9.0944e-05}

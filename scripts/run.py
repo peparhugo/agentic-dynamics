@@ -71,7 +71,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     print(f"{'='*80}\n")
 
     all_runs = []
-    base = _run_baseline(task, constraints, model_id, timeout, name,
+    base = _run_baseline(task, constraints, model_id, timeout,
                          thinking_effort=thinking_effort,
                          thinking_budget_tokens=thinking_budget_tokens,
                          output_token_limit=output_token_limit,
@@ -86,7 +86,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
             for rep in range(repetitions):
                 run_idx += 1
                 r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout, name,
+                                   ops, model_id, run_idx, total_perturbed, timeout,
                                    thinking_effort=thinking_effort,
                                    thinking_budget_tokens=thinking_budget_tokens,
                                    output_token_limit=output_token_limit,
@@ -104,7 +104,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     return all_runs
 
 
-def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
+def _run_baseline(task, constraints, model_id, timeout,
                   thinking_effort="", thinking_budget_tokens=0,
                   output_token_limit=0, silent_mode=None,
                   standardize=True, enforce_pytest=True):
@@ -116,7 +116,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
                              output_token_limit=output_token_limit,
                              silent_mode=silent_mode,
                              standardize=standardize, enforce_pytest=enforce_pytest,
-                              session_name=f"[baseline] {exp_name}")
+                             session_name=f"[baseline] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints)
@@ -164,7 +164,7 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
 
 
 def _run_perturbed(task, constraints, op_name, strength, baseline,
-                   ops, model_id, run_idx, total, timeout, exp_name="exp",
+                   ops, model_id, run_idx, total, timeout,
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
                    standardize=True, enforce_pytest=True):
@@ -180,7 +180,7 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                              output_token_limit=output_token_limit,
                              silent_mode=silent_mode,
                              standardize=standardize, enforce_pytest=enforce_pytest,
-                              session_name=f"[{op_name}_s{strength}] {exp_name}")
+                             session_name=f"[{op_name}_s{strength}] {cfg.get('name','exp')}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints,
