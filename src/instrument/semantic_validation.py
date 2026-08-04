@@ -207,8 +207,14 @@ def analyze_ast(
     profile.if_count_delta = pt_ifs - bt_ifs
 
     # Rename rate: compare function/variable names
-    bt_names = {n.name for n in ast.walk(bt) if isinstance(n, (ast.FunctionDef, ast.Name))}
-    pt_names = {n.name for n in ast.walk(pt) if isinstance(n, (ast.FunctionDef, ast.Name))}
+    bt_names = {n.name if isinstance(n, ast.FunctionDef) else n.id
+                for n in ast.walk(bt)
+                if isinstance(n, (ast.FunctionDef, ast.Name))
+                and (isinstance(n, ast.FunctionDef) or isinstance(n, ast.Name))}
+    pt_names = {n.name if isinstance(n, ast.FunctionDef) else n.id
+                for n in ast.walk(pt)
+                if isinstance(n, (ast.FunctionDef, ast.Name))
+                and (isinstance(n, ast.FunctionDef) or isinstance(n, ast.Name))}
     all_names = bt_names | pt_names
     if all_names:
         renamed = len(pt_names - bt_names)

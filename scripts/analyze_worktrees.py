@@ -31,7 +31,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 from instrument import (
     evaluate_solution, compute_efficiency, measure_basin_escape,
     classify_strategy, GameReport, SolutionMetrics, EfficiencyMetrics, BasinMetrics,
-    StrategyReport,
+    StrategyReport, analyze_ast,
 )
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
@@ -236,6 +236,47 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # ── Solution Evaluation ──
     solution = evaluate_solution(code, constraints, baseline_code=baseline_code)
 
+    # ── Code Density Check — detect narration without code ──
+    import ast
+    real_code_lines = 0
+    has_functions = False
+    for f in Path(worktree_path).rglob("*.py"):
+        if "__pycache__" in str(f):
+            continue
+        try:
+            content = f.read_text(errors="replace")
+            lines = [l for l in content.split("\n") if l.strip() 
+                    and not l.strip().startswith("#")]
+            real_code_lines += len(lines)
+            tree = ast.parse(content)
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.body:
+                    has_functions = True
+        except Exception:
+            pass
+
+    output_tok = session.get("tokens_output", 0) or 0 if session else 0
+    code_density = real_code_lines / max(output_tok, 1)
+    narration_penalty = 0.0
+
+    if output_tok > 200 and not has_functions:
+        narration_penalty = 0.5  # heavy penalty: lots of tokens, no real code
+    elif output_tok > 500 and code_density < 0.05:
+        narration_penalty = 0.3  # moderate penalty: some code but mostly narration
+    elif output_tok > 1000 and code_density < 0.03:
+        narration_penalty = 0.2  # light penalty: large output, low code ratio
+
+    if narration_penalty > 0:
+        solution.correctness_score = max(0, solution.correctness_score - narration_penalty)
+        solution.composite_score = (
+            0.35 * solution.correctness_score
+            + 0.30 * solution.constraint_score
+            + 0.20 * solution.code_quality_score
+            + 0.15 * solution.novelty_score
+        )
+        solution.constraints_met = 0
+        solution.constraint_score = 0.0
+
     # ── Efficiency ──
     prompt_tok = session.get("tokens_input", 0) or 0 if session else 0
     completion_tok = session.get("tokens_output", 0) or 0 if session else 0
@@ -277,6 +318,14 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # ── Strategy ──
     strategy = classify_strategy(basin, solution, efficiency, pert_class)
 
+    # ── AST Profiling ──
+    ast_profile = ast_profile_worktree(worktree_path)
+    ast_comparison = None
+    if baseline_code and code:
+        ast_comparison = analyze_ast(baseline_code, code,
+                                     operator=info.get("operator", ""),
+                                     perturbation_class=pert_class)
+
     # ── Game Report ──
     experiment_id = info.get("experiment", wt.name) or wt.name
     report = GameReport(
@@ -302,6 +351,10 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "constraints": f"{solution.constraints_met}/{solution.constraints_total}",
         "escape": basin.escape_score,
         "strategy": strategy.strategy.value if strategy else "?",
+        "ast": ast_profile,
+        "narration_penalty": narration_penalty,
+        "code_density": round(code_density, 4),
+        "has_tests": ast_profile.get("has_tests", False),
     }
 
 
@@ -319,7 +372,78 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
     return worktrees
 
 
-def code_fingerprint(workdir: str) -> dict:
+def ast_profile_worktree(worktree_path: str) -> dict:
+    """Comprehensive AST analysis of a worktree's generated code.
+    
+    Returns the same metrics shown on the evidence page: files, functions,
+    classes, type hints, docstrings, error handlers, imports, decorators.
+    """
+    import ast
+    p = Path(worktree_path)
+    skip = {"__pycache__", ".git", "venv", ".venv", "site-packages",
+            "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
+    
+    metrics = {
+        "py_files": 0, "total_lines": 0, "total_functions": 0,
+        "total_classes": 0, "type_hints": 0, "docstrings": 0,
+        "error_handlers": 0, "imports": 0, "decorators": 0,
+        "test_files": 0, "parse_errors": 0, "has_tests": False,
+    }
+    
+    py_files = [f for f in sorted(p.rglob("*.py")) if not (skip & set(f.parts))]
+    metrics["py_files"] = len(py_files)
+    
+    for f in py_files:
+        rel = str(f.name)
+        if "test" in rel.lower():
+            metrics["test_files"] += 1
+        try:
+            code = f.read_text(errors="replace")
+            lines = [l for l in code.split("\n") if l.strip() and not l.strip().startswith("#")]
+            metrics["total_lines"] += len(lines)
+            
+            tree = ast.parse(code)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.FunctionDef):
+                    metrics["total_functions"] += 1
+                    if node.returns: metrics["type_hints"] += 1
+                    if (node.body and isinstance(node.body[0], ast.Expr)
+                            and isinstance(node.body[0].value, (ast.Constant, ast.Str))):
+                        metrics["docstrings"] += 1
+                    for arg in node.args.args:
+                        if arg.annotation: metrics["type_hints"] += 1
+                    # Check for error handler patterns
+                    for dec in node.decorator_list:
+                        metrics["decorators"] += 1
+                        dec_str = ast.unparse(dec) if hasattr(ast, 'unparse') else str(dec)
+                        if "error" in dec_str.lower():
+                            metrics["error_handlers"] += 1
+                
+                if isinstance(node, ast.ClassDef):
+                    metrics["total_classes"] += 1
+                
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    metrics["imports"] += 1
+                
+                if isinstance(node, ast.Try):
+                    metrics["error_handlers"] += 1
+        except Exception:
+            metrics["parse_errors"] += 1
+    
+    metrics["has_tests"] = metrics["test_files"] > 0
+    if metrics["py_files"] > 0:
+        metrics["functions_per_file"] = round(metrics["total_functions"] / metrics["py_files"], 1)
+        metrics["classes_per_file"] = round(metrics["total_classes"] / metrics["py_files"], 1)
+        metrics["avg_lines_per_file"] = round(metrics["total_lines"] / metrics["py_files"])
+        metrics["type_hint_pct"] = round(metrics["type_hints"] / max(metrics["total_functions"] * 2, 1) * 100)
+        metrics["docstring_pct"] = round(metrics["docstrings"] / max(metrics["total_functions"], 1) * 100)
+        metrics["test_rate"] = round(metrics["test_files"] / metrics["py_files"] * 100)
+    else:
+        metrics.update({"functions_per_file": 0, "classes_per_file": 0,
+                        "avg_lines_per_file": 0, "type_hint_pct": 0,
+                        "docstring_pct": 0, "test_rate": 0})
+    
+    return metrics
     """Extract structural fingerprint from generated code: modules, routes, classes.
     
     Two worktrees with similar fingerprints were given the same instructions.
@@ -358,6 +482,41 @@ def code_fingerprint(workdir: str) -> dict:
         except Exception:
             pass
 
+    return {"modules": sorted(modules), "routes": sorted(routes), "classes": sorted(classes)}
+
+
+def code_fingerprint(workdir: str) -> dict:
+    """Extract structural fingerprint: modules, routes, classes.
+    
+    Two worktrees with similar fingerprints were given the same instructions.
+    """
+    import ast
+    p = Path(workdir)
+    if not p.exists():
+        return {}
+    skip = {"__pycache__", ".git", "venv", ".venv", "site-packages",
+            "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
+    py_files = []
+    for f in sorted(p.rglob("*.py")):
+        if skip & set(f.parts): continue
+        try:
+            code = f.read_text(errors="replace")
+            if len(code) > 20:
+                py_files.append((f.relative_to(p), code))
+        except: pass
+        if len(py_files) > 30: break
+    if not py_files: return {}
+    modules = sorted(set(str(f).replace("/", ".").replace(".py", "") for f, _ in py_files))
+    routes = set()
+    classes = set()
+    for _, code in py_files:
+        for m in re.findall(r'@.*\.route\(["\']([^"\']+)', code):
+            routes.add(m)
+        try:
+            for node in ast.walk(ast.parse(code)):
+                if isinstance(node, ast.ClassDef) and not node.name.startswith("Test"):
+                    classes.add(node.name)
+        except: pass
     return {"modules": sorted(modules), "routes": sorted(routes), "classes": sorted(classes)}
 
 
@@ -559,10 +718,40 @@ def main():
         report, metrics = analyze_worktree(wt["path"], s, baseline_code=baseline_code)
 
         if report:
-            # Save markdown report
             safe_name = wt["name"].replace("/", "_")[:60]
             md_path = REPORTS_DIR / f"{safe_name}.md"
-            md_path.write_text(report.to_markdown())
+
+            # Build markdown with AST section
+            md = report.to_markdown()
+            ast = metrics.get("ast", {})
+            if ast:
+                md += "\n\n---\n\n## AST Code Quality\n\n"
+                md += "| Metric | Value |\n|--------|-------|\n"
+                for label, key in [
+                    ("Python files", "py_files"), ("Total lines", "total_lines"),
+                    ("Functions", "total_functions"), ("Classes", "total_classes"),
+                    ("Functions/file", "functions_per_file"), ("Classes/file", "classes_per_file"),
+                    ("Avg lines/file", "avg_lines_per_file"),
+                    ("Type hints", "type_hint_pct"), ("Docstrings", "docstring_pct"),
+                    ("Error handlers", "error_handlers"), ("Imports", "imports"),
+                    ("Decorators", "decorators"), ("Test files", "test_files"),
+                    ("Test file rate", "test_rate"), ("Parse errors", "parse_errors"),
+                ]:
+                    val = ast.get(key, 0)
+                    if isinstance(val, float):
+                        val_str = f"{val:.1f}" if key.endswith("_pct") or key.endswith("_rate") else f"{val:.1f}"
+                    else:
+                        val_str = str(val)
+                    if key.endswith("_pct") or key.endswith("_rate"):
+                        val_str += "%"
+                    md += f"| {label} | {val_str} |\n"
+
+                if metrics.get("narration_penalty", 0) > 0:
+                    md += f"\n⚠️ **Narration penalty:** {metrics['narration_penalty']:.0%} "
+                    md += f"(output tokens: {s.get('tokens_output',0)} , "
+                    md += f"code density: {metrics.get('code_density',0):.3f})\n"
+
+            md_path.write_text(md)
 
             results.append(metrics)
 
