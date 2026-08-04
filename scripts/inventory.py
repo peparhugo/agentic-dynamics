@@ -186,7 +186,7 @@ def _scan_db():
         SELECT id, directory, title, cost, tokens_input, tokens_output, tokens_reasoning,
                tokens_cache_read, tokens_cache_write,
                json_extract(model, '$.providerID') as provider,
-               json_extract(model, '$.modelID') as model_id,
+               json_extract(model, '$.id') as model_id,
                time_created, time_updated
         FROM session WHERE cost > 0 OR tokens_output > 0
         ORDER BY time_created
