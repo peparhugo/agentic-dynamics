@@ -28,8 +28,8 @@ The site lives in `firebase/public/`. Pure HTML/CSS/JS — no build step. Edit a
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ai-finops-rulebook.git
-cd ai-finops-rulebook
+git clone https://github.com/YOUR_USERNAME/ai-finops-framework.git
+cd ai-finops-framework
 pip install -e .
 ```
 
@@ -187,4 +187,4 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 
 ## Questions?
 
-Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/ai-finops-rulebook/discussions). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.
+Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/ai-finops-framework/discussions). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.

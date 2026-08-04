@@ -118,8 +118,8 @@ Run `python scripts/inventory.py list` for a live breakdown of all experiments, 
 - LLM API credentials (DeepSeek, OpenAI, or Anthropic)
 
 ```bash
-git clone https://github.com/peparhugo/ai-finops-rulebook.git
-cd ai-finops-rulebook
+git clone https://github.com/peparhugo/ai-finops-framework.git
+cd ai-finops-framework
 pip install -e .
 ```
 
