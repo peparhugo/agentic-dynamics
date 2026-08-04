@@ -99,3 +99,11 @@
 | Code density | 0.0483 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_mini_np/code/)

@@ -99,3 +99,11 @@
 | Code density | 0.0164 LOC/tok |
 | **Verdict** | **NARRATION FAILURE — 670 tokens burned, zero code output** |
 
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_zmwy64er/code/)

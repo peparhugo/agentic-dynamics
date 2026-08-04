@@ -86,3 +86,11 @@
 | Test files | 511 |
 | Test file rate | 45% |
 | Parse errors | 0 |
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_fastapi_maintenance_natural/code/)

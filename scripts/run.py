@@ -158,6 +158,8 @@ def _run_baseline(task, constraints, model_id, timeout,
         "final_response": r.final_response,
         "quality_per_dollar": sol.correctness_score / max(r.estimated_cost_usd, 0.000001),
         "quality_per_joule": sol.composite_score / max(eff.total_energy_j, 0.01),
+        "workdir": r.workdir,
+        "raw_transcript": r.raw_transcript,
     }
 
 
@@ -248,6 +250,8 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         "final_response": r.final_response,
         "quality_per_dollar": sol.correctness_score / max(r.estimated_cost_usd, 0.000001),
         "quality_per_joule": sol.composite_score / max(eff.total_energy_j, 0.01),
+        "workdir": r.workdir,
+        "raw_transcript": r.raw_transcript,
     }
 
 
@@ -314,7 +318,10 @@ def _save_results(runs, name, model_label, results_dir):
 
 
 def _generate_game_reports(runs, name, model_label, constraints, results_dir):
-    """Generate individual game reports in markdown."""
+    """Generate individual game reports in markdown with artifacts."""
+    import shutil
+    import os
+
     model_slug = model_label.replace(" ", "_").lower()
     reports_dir = results_dir / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
@@ -342,11 +349,52 @@ def _generate_game_reports(runs, name, model_label, constraints, results_dir):
             model=model_label,
         )
 
+        # Artifact bundling
+        artifact_dir_name = f"{name}_{model_slug}_{op}_s{s}"
+        artifact_dir = ""
+        has_code = False
+        has_session = False
+        workdir = r.get("workdir", "")
+        transcript = r.get("raw_transcript", "")
+
+        if workdir and os.path.isdir(workdir):
+            artifact_path = reports_dir / artifact_dir_name
+            code_dest = artifact_path / "code"
+            skip = {".git", "__pycache__", ".mypy_cache", ".pytest_cache",
+                    "venv", ".venv", "node_modules", ".instrument"}
+            file_count = 0
+            for item in Path(workdir).rglob("*"):
+                if item.is_file() and not (skip & set(item.parts)) \
+                        and not item.name.startswith("."):
+                    rel = item.relative_to(workdir)
+                    dest = code_dest / rel
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        shutil.copy2(item, dest)
+                        file_count += 1
+                    except Exception:
+                        pass
+
+            if file_count > 0:
+                has_code = True
+
+            if transcript:
+                if not has_code:
+                    code_dest.mkdir(parents=True, exist_ok=True)
+                (artifact_path / "session.jsonl").write_text(transcript)
+                has_session = True
+
+            if has_code or has_session:
+                artifact_dir = artifact_dir_name
+
         game = GameReport(
             experiment_id=f"{name}-{op}",
             model=model_label, task="",
             operator=op, perturbation_class=cls, perturbation_strength=s,
             reasoning=basin,
+            artifact_dir=artifact_dir,
+            has_code=has_code,
+            has_session=has_session,
         )
 
         md_path = reports_dir / f"{name}_{model_slug}_{op}_s{s}.md"

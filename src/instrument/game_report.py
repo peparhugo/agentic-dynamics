@@ -55,6 +55,11 @@ class GameReport:
     # Per-repetition metrics (for multi-rep runs)
     per_repetition: list[dict[str, Any]] = field(default_factory=list)
 
+    # Artifact paths (code + session transcript)
+    artifact_dir: str = ""
+    has_code: bool = False
+    has_session: bool = False
+
     # Aggregate scores across repetitions
     mean_escape: float = 0.0
     std_escape: float = 0.0
@@ -227,5 +232,24 @@ class GameReport:
                 f"**Energy:** ~{e.total_energy_j:.0f}J  |  "
                 f"**Thinking:** {e.thinking_ratio:.0%}"
             )
+
+        # Artifacts — session transcript + generated code
+        if self.artifact_dir and (self.has_code or self.has_session):
+            lines += [
+                "",
+                "---",
+                "",
+                "## Artifacts",
+                "",
+                "Raw session transcript and generated source code for independent verification.",
+                "",
+            ]
+            if self.has_session:
+                lines.append(f"- [Opencode session transcript](./{self.artifact_dir}/session.jsonl)")
+            if self.has_code:
+                lines.append(f"- [Generated code](./{self.artifact_dir}/code/)")
+            if not self.has_code and self.has_session:
+                lines.append("")
+                lines.append("*No code output — this session was narration-only.*")
 
         return "\n".join(lines)

@@ -99,3 +99,11 @@
 | Code density | 0.0250 LOC/tok |
 | **Verdict** | **NARRATION FAILURE — 840 tokens burned, zero code output** |
 
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_swp_Claude_F_np/code/)

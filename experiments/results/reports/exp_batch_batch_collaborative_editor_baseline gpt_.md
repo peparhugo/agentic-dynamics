@@ -86,3 +86,11 @@
 | Test files | 1 |
 | Test file rate | 100% |
 | Parse errors | 0 |
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_collaborative_editor_baseline gpt_/code/)

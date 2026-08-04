@@ -99,3 +99,11 @@
 | Code density | 0.0372 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_6km9sho1/code/)

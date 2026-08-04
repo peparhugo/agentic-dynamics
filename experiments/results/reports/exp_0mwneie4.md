@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [remove_critical_constraint_s0.5_r2] gpt_gather_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:44:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-04T13:59:15
 
 ---
 
@@ -64,6 +64,14 @@
 
 ## Headline Metric
 **Strategy:** EXPLORATORY  |  **Correctness:** 100%  |  **Cost:** $0.3443  |  **Energy:** ~1676J  |  **Thinking:** 3%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_0mwneie4/code/)
 
 ---
 

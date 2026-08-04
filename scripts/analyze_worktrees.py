@@ -19,6 +19,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import sqlite3
 import sys
 import time
@@ -826,6 +827,49 @@ def main():
         if report:
             safe_name = wt["name"].replace("/", "_")[:60]
             md_path = REPORTS_DIR / f"{safe_name}.md"
+
+            # Artifact bundling — copy code + session transcript for independent verification
+            artifact_path = REPORTS_DIR / safe_name
+            has_code = False
+            has_session = False
+            worktree_dir = wt["path"]
+            if worktree_dir and os.path.isdir(worktree_dir):
+                code_dest = artifact_path / "code"
+                skip_dirs = {"__pycache__", ".git", "venv", ".venv", "env",
+                             "site-packages", "node_modules", ".mypy_cache",
+                             ".pytest_cache", "dist", "build", "Lib", "lib",
+                             "include", ".instrument"}
+                file_count = 0
+                for item in Path(worktree_dir).rglob("*"):
+                    if item.is_file() and not (skip_dirs & set(item.parts)) \
+                            and not item.name.startswith("."):
+                        rel = item.relative_to(worktree_dir)
+                        dest = code_dest / rel
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            shutil.copy2(item, dest)
+                            file_count += 1
+                        except Exception:
+                            pass
+
+                if file_count > 0:
+                    has_code = True
+
+                # Look for session transcript saved by the instrument
+                session_jsonl = Path(worktree_dir) / ".instrument" / "session.jsonl"
+                if session_jsonl.exists():
+                    try:
+                        if not has_code:
+                            code_dest.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(session_jsonl, artifact_path / "session.jsonl")
+                        has_session = True
+                    except Exception:
+                        pass
+
+                if has_code or has_session:
+                    report.artifact_dir = safe_name
+                    report.has_code = has_code
+                    report.has_session = has_session
 
             # Build markdown with AST section
             md = report.to_markdown()

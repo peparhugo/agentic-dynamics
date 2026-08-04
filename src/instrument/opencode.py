@@ -71,6 +71,9 @@ class AgenticResult:
     # Cost
     estimated_cost_usd: float = 0.0
 
+    # Raw session transcript (JSONL from opencode stdout)
+    raw_transcript: str = ""
+
     @property
     def correctness(self) -> float:
         if self.tests_total == 0:
@@ -247,6 +250,9 @@ def run_opencode_agentic(
         result.exit_code = proc.returncode
         result.error = proc.stderr.strip() if proc.returncode != 0 else ""
 
+        # Store raw transcript for artifact bundling
+        result.raw_transcript = proc.stdout
+
         # Parse JSONL output even on non-zero exit (partial output)
         if proc.stdout:
             _parse_session_output(proc.stdout, result)
@@ -272,6 +278,12 @@ def run_opencode_agentic(
         return False
     result.files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
     result.files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
+
+    # Persist session transcript for post-hoc artifact bundling
+    if result.raw_transcript:
+        inst_dir = Path(workdir) / ".instrument"
+        inst_dir.mkdir(parents=True, exist_ok=True)
+        (inst_dir / "session.jsonl").write_text(result.raw_transcript)
 
     # Extract final response from the last assistant message
     # (already set during parsing)

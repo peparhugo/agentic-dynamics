@@ -1,0 +1,85 @@
+2026-08-01 03:40:40,540 - Unhandled exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1310, in __inner
+    self.limiter._check_request_limit(
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1172, in _check_request_limit
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1169, in _check_request_limit
+    self.__evaluate_limits(endpoint, all_limits)
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1153, in __evaluate_limits
+    raise RateLimitExceeded(
+flask_limiter.errors.RateLimitExceeded: 429 Too Many Requests: 2 per 1 minute
+2026-08-01 03:40:40,540 - Unhandled exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1310, in __inner
+    self.limiter._check_request_limit(
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1172, in _check_request_limit
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1169, in _check_request_limit
+    self.__evaluate_limits(endpoint, all_limits)
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1153, in __evaluate_limits
+    raise RateLimitExceeded(
+flask_limiter.errors.RateLimitExceeded: 429 Too Many Requests: 2 per 1 minute
+2026-08-01 03:40:40,540 - Unhandled exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1310, in __inner
+    self.limiter._check_request_limit(
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1172, in _check_request_limit
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1169, in _check_request_limit
+    self.__evaluate_limits(endpoint, all_limits)
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1153, in __evaluate_limits
+    raise RateLimitExceeded(
+flask_limiter.errors.RateLimitExceeded: 429 Too Many Requests: 2 per 1 minute
+2026-08-01 03:40:40,540 - Unhandled exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1310, in __inner
+    self.limiter._check_request_limit(
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1172, in _check_request_limit
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1169, in _check_request_limit
+    self.__evaluate_limits(endpoint, all_limits)
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1153, in __evaluate_limits
+    raise RateLimitExceeded(
+flask_limiter.errors.RateLimitExceeded: 429 Too Many Requests: 2 per 1 minute
+2026-08-01 03:40:40,540 - Unhandled exception
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 867, in full_dispatch_request
+    rv = self.dispatch_request()
+         ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask/app.py", line 852, in dispatch_request
+    return self.ensure_sync(self.view_functions[rule.endpoint])(**view_args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1310, in __inner
+    self.limiter._check_request_limit(
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1172, in _check_request_limit
+    raise e
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1169, in _check_request_limit
+    self.__evaluate_limits(endpoint, all_limits)
+  File "/usr/local/lib/python3.12/dist-packages/flask_limiter/extension.py", line 1153, in __evaluate_limits
+    raise RateLimitExceeded(
+flask_limiter.errors.RateLimitExceeded: 429 Too Many Requests: 2 per 1 minute

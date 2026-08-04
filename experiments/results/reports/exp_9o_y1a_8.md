@@ -86,3 +86,11 @@
 | Test files | 5 |
 | Test file rate | 29% |
 | Parse errors | 0 |
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_9o_y1a_8/code/)
