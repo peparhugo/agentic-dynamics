@@ -51,12 +51,12 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>The Evidence</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)">186 worktrees (169 experiment runs, 17 exploratory sessions). 189 instrumented experiment sessions across 3 architectures, 8 variants. Every number on this page was measured, not estimated. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
+<p class="lead" style="font-size:1rem;color:var(--t)">186 worktrees (169 experiment runs, 17 exploratory sessions). 189 instrumented experiment sessions across 3 architectures, 8 variants — plus 21 new cross-model TypeScript sessions. Every number on this page was measured, not estimated. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
 <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
 <div class="card" style="text-align:center"><div class="cval">186</div><div class="cdesc" style="text-align:center">Worktrees on disk</div></div>
-<div class="card" style="text-align:center"><div class="cval">142</div><div class="cdesc" style="text-align:center">Game reports generated</div></div>
-<div class="card" style="text-align:center"><div class="cval">8</div><div class="cdesc" style="text-align:center">Models tested</div></div>
-<div class="card" style="text-align:center"><div class="cval">$38.29</div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
+<div class="card" style="text-align:center"><div class="cval">142</div><div class="cdesc" style="text-align:center">Game reports (Python)</div></div>
+<div class="card" style="text-align:center"><div class="cval">21</div><div class="cdesc" style="text-align:center">TS runs (3 models)</div></div>
+<div class="card" style="text-align:center"><div class="cval">$39.21</div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
 </div>
 </section>
 
@@ -160,13 +160,26 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 </tbody></table></div>
 <div class="insight"><strong>What changed:</strong> The original cross-domain table used single-run costs ($2.02 Claude vs $0.01 DeepSeek for task_manager). These per-session averages from 142 game reports are the more robust metric. The 65&times; gap is the measured average — not the architectural extreme, and not a cherry-picked single run.</div>
 
+<!-- Multi-Language Expansion -->
+<section class="sec">
+<h2>Multi-Language Expansion</h2>
+<p class="lead">Initial TypeScript/Node.js baseline — 21 runs across 3 architectures on a static site generator task. <strong style="color:var(--am)">The cost gap widens in strictly-typed environments:</strong> from 65x on Python to 210x on TypeScript.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5</th><th>Claude F5</th><th>Gap (DS/Claude)</th></tr></thead><tbody>
+<tr><td>Per-session cost</td><td class="mono green">$0.0006</td><td class="mono">$0.015</td><td class="mono amber">$0.12</td><td class="mono amber">210&times;</td></tr>
+<tr><td>Avg correctness</td><td class="mono green">87%</td><td class="mono">77%</td><td class="mono amber">90%</td><td class="mono">—</td></tr>
+<tr><td>Avg tokens/session</td><td class="mono green">29K</td><td class="mono">19K</td><td class="mono">30K</td><td class="mono">1.0&times;</td></tr>
+<tr><td>Strategy archetypes</td><td class="mono green">efficient / exploratory</td><td class="mono">mixed</td><td class="mono">efficient / conservative</td><td class="mono">—</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> The gap widens from 65x on Python to 210x on TypeScript — strictly-typed environments with compilation and type checking produce more code per session, compounding the architecture cost delta. DeepSeek's GRPO-latent reasoning produces efficient implementations at negligible cost ($0.004 total for 7 runs). Claude scores highest on correctness (90%) but at 210x the price. GPT-5 is most fragile: collapses to 20% correctness on the shift_framing perturbation while burning a 28% thinking ratio. Go and Rust baselines are configured for the next measurement cycle.</div>
+</section>
+
 <!-- Current Scope & Roadmap -->
 <section class="sec alt">
 <h2>Current Scope &amp; What's Next</h2>
 <p class="lead">This is v0.1 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
 <div class="cards">
-<div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. 10 prompt-level perturbation operators (5 manifold, 5 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
-<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.2+)</div><div class="cdesc">TypeScript, Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. TypeScript/Node.js (initial: 3 variants, 21 cross-model runs). 10 prompt-level perturbation operators (5 manifold, 5 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.2+)</div><div class="cdesc">Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
 <div class="card"><div class="ctitle">Not in Scope</div><div class="cdesc">The framework does not judge whether narration is wasteful or valuable. It measures the cost. If your team needs auditable reasoning trails for compliance or debugging, the Explanation Tax is insurance &ndash; not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.</div></div>
 </div>
 <div class="cards" style="margin-top:1rem">
@@ -178,7 +191,7 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-189 experiment sessions &middot; 3 architectures, 8 variants &middot; $38.29 analyzed &middot; Verified from opencode DB<br>
+189 experiment sessions &middot; 3 architectures, 8 variants &middot; $39.21 analyzed &middot; +21 TypeScript cross-model runs &middot; Verified from opencode DB<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

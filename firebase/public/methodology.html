@@ -175,7 +175,7 @@ footer a:hover{text-decoration:underline}
 <p class="lead">The claim that "both models implement all seven constraints" isn't subjective. It's verified through a <strong style="color:var(--ac)">dual-signal system</strong> that scans both the reasoning text and the generated code for constraint mentions and implementations.</p>
 <div class="cards">
 <div class="card"><div class="ctitle">Reasoning Scan</div><div class="cdesc">Scans the model's reasoning output for explicit mentions of constraint keywords (JWT, rate limit, pagination, audit, etc.) and their expansion mappings. Detects whether the model <em>considered</em> each constraint.</div></div>
-<div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated <code>.py</code> files for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, and API versioning structures.</div></div>
+<div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated source files (Python, TypeScript, Go, Rust — 25+ file extensions) for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, API versioning structures, and domain-specific patterns across languages.</div></div>
 <div class="card"><div class="ctitle">AST Analysis</div><div class="cdesc">Parses generated Python into abstract syntax trees. Compares perturbed vs baseline AST node count and structure. Finding: perturbed output is 112.6% of baseline nodes — structurally identical code with minimal variance.</div></div>
 </div>
 <div class="wtm"><strong>What this proves:</strong> The 65× cost gap is not a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta is purely in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
@@ -195,7 +195,7 @@ footer a:hover{text-decoration:underline}
 </section>
 <section class="sec wide">
 <h2>Experiment Matrix</h2>
-<p class="lead">22 configuration files covering 5 task domains. Each config specifies the model, perturbation operators, strengths, and RNG seed. Every run is reproducible.</p>
+<p class="lead">34 configuration files covering 5 task domains plus 3 additional languages (TypeScript, Go, Rust). Each config specifies the model, perturbation operators, strengths, and RNG seed. Every run is reproducible.</p>
 <div class="tbl"><table><thead><tr><th>Config</th><th>Domain</th><th>Models Run</th><th>Operator Types</th></tr></thead><tbody>
 <tr><td class="mono">task_manager.yaml</td><td>REST API (Flask)</td><td>All 8 models</td><td>Baseline, perturbation, batch cross-domain</td></tr>
 <tr><td class="mono">data_table.yaml</td><td>Frontend data grid</td><td>DeepSeek, GPT-5.6, Claude</td><td>Baseline, batch cross-domain</td></tr>
@@ -237,7 +237,7 @@ footer a:hover{text-decoration:underline}
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-189 experiment sessions &middot; 3 architectures, 8 variants &middot; 142 game reports &middot; $38.29 analyzed<br>
+210 experiment sessions &middot; 3 architectures, 8 variants &middot; 142 game reports &middot; 21 TS cross-model runs &middot; $39.21 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>
