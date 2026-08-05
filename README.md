@@ -31,7 +31,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 |---|------|-------------------|
 | 1 | **The Silent Inference Rule** | Default to the cheapest model that passes your tests. If it produces correct code without narration, route to it. |
 | 2 | **The Explanation Tax Rule** | Narration has a measurable cost (24–120% more per session). Pay for it only when you need auditable reasoning. |
-| 3 | **The N² Tax Rule** | Codebase growth compounds quadratically. A 10% estimation error becomes a 50% cost overrun after 100 sessions. |
+| 3 | **The Snowball Rule** | Codebase growth compounds quadratically. A 10% estimation error becomes a 50% cost overrun after 100 sessions. |
 | 4 | **The EPM Horizon Rule** | Energy costs are the inflation rate of AI compute. Find the year your local energy prices flip your model selection. |
 | 5 | **The Cost-Per-Pass Rule** | Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome. |
 
@@ -101,7 +101,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 | Perturbation operators | 10 |
 | Recovery signals | 6 |
 | Strategy archetypes | 4 |
-| Measured cost gap | 473× |
+| Measured cost gap | 65× |
 | Total experiment cost | $45.14 |
 | Lines of generated code | 202,000+ |
 | AST-verified Python files | 2,416 |

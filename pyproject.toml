@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-instrument-run = "scripts.run:main"
+instrument-run = "scripts.run:run_experiment"
 
 [tool.setuptools.packages.find]
 where = ["src"]

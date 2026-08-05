@@ -35,7 +35,7 @@ pip install -e .
 
 ### 2. Set Up Opencode
 
-You need the [opencode](https://opencode.ai) CLI installed at `/root/.opencode/bin/opencode` (or configure the path in `src/instrument/opencode.py`). Set up your LLM API keys per the opencode documentation.
+You need the [opencode](https://opencode.ai) CLI installed and available on your `PATH` (configure the path in `src/instrument/opencode.py` if needed). Set up your LLM API keys per the opencode documentation.
 
 ### 3. Verify the Instrument Works
 

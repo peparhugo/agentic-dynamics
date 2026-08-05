@@ -7,6 +7,9 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#fff;--bg2:#f8f9fa;--t:#1a1a2e;--t2:#4a4a5a;--t3:#888;--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;--b:#e0e0e0}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:150;display:flex;justify-content:flex-end;gap:1.5rem;padding:0.7rem 1.5rem;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b)}
+.topbar-link{color:var(--t3);text-decoration:none;font-size:0.72rem;font-weight:600;transition:color .2s}.topbar-link:hover{color:var(--ac)}
+@media print{.topbar{display:none}}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;font-size:0.9rem}
 @media print{body{font-size:0.8rem}.page-break{page-break-before:always}}
@@ -32,7 +35,9 @@ footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-
 a{color:var(--ac)}
 </style>
 </head>
-<body><div class="container">
+<body>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<div class="container">
 
 <h1>AI FinOps Framework</h1>
 <p class="lead">An evidence-based predictive model for AI costs. v0.1 — 142 game reports across 3 architectures, 8 variants. Includes 21 cross-model TypeScript runs. Executive Report.</p>
@@ -41,7 +46,7 @@ a{color:var(--ac)}
 <div class="stat"><div class="v">210x</div><div class="l">Cost Gap (TS)</div></div>
 <div class="stat"><div class="v">142</div><div class="l">Reports (Py)</div></div>
 <div class="stat"><div class="v">21</div><div class="l">Runs (TS)</div></div>
-<div class="stat"><div class="v">$39.21</div><div class="l">Total Cost</div></div>
+<div class="stat"><div class="v">$45.14</div><div class="l">Total Cost</div></div>
 </div>
 <p class="meta">Generated August 2026 · Full site: <a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a></p>
 
@@ -80,7 +85,7 @@ a{color:var(--ac)}
 <p><strong>One-Way Doors</strong> (β, v, EPM changes): Architecture selection, multi-year contracts, proprietary frameworks. These compound through N². Model cumulative cost over 36 months before committing.</p>
 
 <h2>Methodology</h2>
-<p>The instrument runs 10 calibrated perturbation operators (5 manifold, 5 semantic) across 34 YAML configs covering Python, TypeScript, Go, and Rust. Six recovery detection signals classify model behavior. Four strategy archetypes (Conservative, Exploratory, Wasteful, Efficient) characterize response patterns. Every session recorded in the opencode database.</p>
+<p>The instrument runs 10 calibrated perturbation operators (5 manifold, 5 semantic) across 22 YAML configs covering Python, TypeScript, Go, and Rust. Six recovery detection signals classify model behavior. Four strategy archetypes (Conservative, Exploratory, Wasteful, Efficient) characterize response patterns. Every session recorded in the opencode database.</p>
 
 <h2>Research Roadmap (v0.2+)</h2>
 <p><strong>Pillar 1:</strong> Multi-language AST expansion — TypeScript (in progress: 21 runs), Go, Rust, Java. <strong>Pillar 2:</strong> Task archetypes — bug-fixing, refactoring, security. <strong>Pillar 3:</strong> Model diversity — Gemini, Llama, Mistral. <strong>Pillar 4:</strong> Structural perturbations — dependency injection, AST corruption. <strong>Pillar 5:</strong> Maintenance tax — human-in-the-loop studies.</p>
