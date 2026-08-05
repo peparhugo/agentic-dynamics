@@ -1,0 +1,42 @@
+# Go: Distributed Job Queue with At-Least-Once Semantics
+# Roadmap Pillar 1 — Concurrency + persistence + reliability patterns in Go
+name: go_jobqueue
+task: >
+  Build a distributed job queue system in Go. Accept jobs via a REST API (enqueue
+  with payload, priority, and optional delay) and process them with a configurable
+  pool of worker goroutines. Store jobs in SQLite with status tracking (pending,
+  running, completed, failed, dead). Implement at-least-once delivery: workers
+  heartbeat while processing, and a separate monitor goroutine detects stuck jobs
+  (no heartbeat for N seconds) and re-enqueues them. Support job retries with
+  exponential backoff, a max retry count, and a dead-letter queue. Provide a
+  REST endpoint for job status querying. Graceful shutdown drains the queue.
+  Write table-driven tests, an integration test with the full pipeline, and
+  benchmark tests for throughput. Use only the standard library plus a SQLite
+  driver. Be thorough.
+
+constraints:
+  - REST API for enqueue and status
+  - Priority queue with delayed execution
+  - Worker pool with configurable goroutines
+  - Heartbeat-based stuck job detection
+  - At-least-once delivery with re-enqueue
+  - Retry with exponential backoff and max retries
+  - Dead-letter queue for exhausted jobs
+  - Graceful shutdown with queue drain
+  - Table-driven tests and benchmarks
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_phantom_success
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
+
+standardized:
+  enabled: true
+  enforce_pytest: false

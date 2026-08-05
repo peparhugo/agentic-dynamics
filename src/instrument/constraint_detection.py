@@ -170,14 +170,57 @@ def _constraint_keywords(constraint: str) -> list[str]:
 
     # Domain-specific keyword expansions
     expansions = {
-        "jwt auth": ["jwt", "token", "authenticate", "bearer", "access_token", "refresh"],
+        # Python/web (existing)
+        "jwt auth": ["jwt", "token", "authenticate", "bearer", "access_token", "refresh", "jsonwebtoken"],
         "refresh token": ["refresh", "refresh_token", "token_refresh"],
         "rate limit": ["rate_limit", "ratelimit", "ratelimit", "throttle", "limiter", "too many request", "429"],
-        "input validation": ["validate", "validation", "sanitize", "schema", "marshmallow", "pydantic"],
-        "paginated": ["paginate", "pagination", "page", "offset", "limit", "per_page"],
-        "error handling": ["error", "exception", "400", "404", "500", "abort", "http_error"],
+        "input validation": ["validate", "validation", "sanitize", "schema", "marshmallow", "pydantic", "zod", "joi"],
+        "paginated": ["paginate", "pagination", "page", "offset", "limit", "per_page", "cursor"],
+        "error handling": ["error", "exception", "400", "404", "500", "abort", "http_error", "try", "catch"],
         "audit log": ["audit", "log", "logging", "logger", "trail"],
         "api version": ["version", "/v1/", "/v2/", "api_version", "versioning", "url_prefix"],
+
+        # TypeScript/Node
+        "websocket": ["websocket", "ws", "socket", "wss", "ws://"],
+        "channel": ["channel", "subscribe", "unsubscribe", "publish", "broadcast", "room"],
+        "cli": ["commander", "yargs", "argv", "process.argv", "cli", "command", "subcommand", "flag", "--", "option"],
+        "frontmatter": ["frontmatter", "gray-matter", "yaml", "front matter", "frontmatter", "js-yaml"],
+        "handlebars": ["handlebars", "hbs", "hbs", "template", "partial", "layout", "{{{", "compile"],
+        "rss": ["rss", "feed", "atom", "xml", "pubdate"],
+        "live reload": ["livereload", "live reload", "websocket", "chokidar", "watcher", "hot reload", "refresh", "inject"],
+        "syntax highlighting": ["highlight", "hljs", "prism", "marked-highlight", "highlight.js", "code block"],
+        "multi-tenant": ["tenant", "tenant_id", "multitenant", "multi-tenant", "workspace"],
+        "prisma": ["prisma", "schema.prisma", "prisma schema"],
+        "soft-delete": ["deleted_at", "soft delete", "soft_delete", "is_deleted"],
+        "api key": ["api_key", "apikey", "x-api-key", "api key"],
+
+        # Go
+        "goroutine": ["goroutine", "go func", "go routine", "worker", "wg", "sync.wg"],
+        "grpc": ["grpc", "proto", "protobuf", "protoc", ".proto", "bufconn"],
+        "streaming": ["stream", "server_side_streaming", "bidirectional", "bidi"],
+        "job queue": ["job", "queue", "enqueue", "dequeue", "worker", "dead letter"],
+        "dead letter": ["dead", "dlq", "dead_letter", "dead-letter"],
+        "heartbeat": ["heartbeat", "heart beat", "ping", "keepalive", "keep-alive"],
+        "graceful shutdown": ["graceful", "shutdown", "sigint", "sigterm", "signal", "os.signal", "ctx.done"],
+        "crawler": ["crawler", "spider", "fetch", "parse", "depth", "seed", "robots.txt", "robots"],
+
+        # Rust
+        "borrow check": ["borrow", "lifetime", "mut", "ref", "&self", "&mut"],
+        "resp": ["resp", "redis", "serialization protocol", "$1", "*2", "+ok"],
+        "tcp": ["tcp", "tcplistener", "tcpstream", "socket", "bind"],
+        "aof": ["aof", "append", "append_only", "append-only", "replay", "log file"],
+        "tokio": ["tokio", "async", "await", "spawn", "runtime"],
+        "ttl": ["ttl", "expire", "expiration", "expiry", "duration", "instant"],
+        "proxy": ["proxy", "reverse proxy", "upstream", "backend", "load balancer", "round robin"],
+        "cache": ["cache", "lru", "caching", "ttl", "eviction", "invalidate"],
+        "health check": ["health", "healthcheck", "health_check", "/health", "alive"],
+        "git object": ["git", "sha1", "sha256", "blob", "tree", "commit", "hash", "deflate", "zlib", "object"],
+        "content-addressable": ["content", "addressable", "hash", "sha", "store"],
+
+        # General
+        "test": ["test", "test", "spec", "pytest", "vitest", "jest", "mocha", "assert", "expect", "describe", "it("],
+        "config": ["config", "configuration", "settings", "env", "toml", "yaml"],
+        "logging": ["log", "logging", "winston", "pino", "slog", "tracing", "logger"],
     }
 
     keywords = set()

@@ -66,19 +66,26 @@ def evaluate_solution(
     constraints: list[str],
     test_results: dict[str, bool] | None = None,
     baseline_code: str = "",
+    code_files: dict[str, str] | None = None,
 ) -> SolutionMetrics:
     """Evaluate a generated solution across all quality dimensions.
 
     Args:
-        code: The generated implementation code.
+        code: The generated implementation code or model response.
         constraints: List of constraint descriptions to check.
         test_results: Dict of test_name -> passed for correctness.
         baseline_code: Baseline implementation for novelty comparison.
+        code_files: Dict of filename -> content for generated source files.
 
     Returns:
         SolutionMetrics with quality scores.
     """
     m = SolutionMetrics()
+
+    # Combine response + all generated files for richer analysis
+    full_text = code
+    if code_files:
+        full_text += "\n" + "\n".join(code_files.values())
 
     # ── Correctness ──
     if test_results:
@@ -86,18 +93,18 @@ def evaluate_solution(
         m.tests_passed = sum(1 for v in test_results.values() if v)
         m.correctness_score = m.tests_passed / max(m.tests_total, 1)
     else:
-        m.correctness_score = _estimate_correctness(code)
+        m.correctness_score = _estimate_correctness(full_text)
 
     # ── Constraint satisfaction ──
     m.constraints_total = len(constraints)
-    m.constraints_met = sum(1 for c in constraints if _check_constraint(code, c))
+    m.constraints_met = sum(1 for c in constraints if _check_constraint(full_text, c, code_files))
     m.constraint_score = m.constraints_met / max(m.constraints_total, 1)
 
     # ── Code quality ──
-    lines = [l for l in code.split("\n") if l.strip() and not l.strip().startswith("#")]
+    lines = [l for l in full_text.split("\n") if l.strip() and not l.strip().startswith("#")]
     m.lines_of_code = len(lines)
-    m.cyclomatic_complexity = _estimate_complexity(code)
-    m.comment_ratio = _comment_ratio(code)
+    m.cyclomatic_complexity = _estimate_complexity(full_text)
+    m.comment_ratio = _comment_ratio(full_text)
     # Quality: lower complexity and fewer lines = higher quality (with minimum bounds)
     complexity_bonus = max(0, 1.0 - m.cyclomatic_complexity / 30.0)
     density_bonus = min(1.0, 200.0 / max(m.lines_of_code, 1))
@@ -105,7 +112,7 @@ def evaluate_solution(
 
     # ── Novelty vs baseline ──
     if baseline_code:
-        m.novelty_score = _compute_novelty(baseline_code, code)
+        m.novelty_score = _compute_novelty(baseline_code, full_text)
     else:
         m.novelty_score = 0.5
 
@@ -141,12 +148,25 @@ def _estimate_correctness(code: str) -> float:
     return min(signals / 5.0, 1.0)
 
 
-def _check_constraint(code: str, constraint: str) -> bool:
-    """Check if a constraint is approximately satisfied in the code."""
-    keywords = set(constraint.lower().split())
-    code_lower = code.lower()
-    matches = sum(1 for kw in keywords if len(kw) > 3 and kw in code_lower)
-    return matches >= max(1, len(keywords) * 0.4)
+def _check_constraint(code: str, constraint: str, code_files: dict[str, str] | None = None) -> bool:
+    """Check if a constraint is approximately satisfied in the code.
+
+    Uses domain-specific keyword expansions (shared with constraint_detection.py)
+    and checks both response text and generated source files.
+    """
+    from .constraint_detection import _constraint_keywords, _is_code_context
+    keywords = _constraint_keywords(constraint)
+    if not keywords:
+        keywords = [w for w in constraint.lower().split() if len(w) > 3]
+
+    # Search in combined text: response + all code files
+    search_text = code.lower()
+    if code_files:
+        search_text += "\n" + "\n".join(v.lower() for v in code_files.values())
+
+    matches = sum(1 for kw in keywords if kw in search_text)
+    threshold = max(1, int(len(keywords) * 0.35))
+    return matches >= threshold
 
 
 def _estimate_complexity(code: str) -> float:

@@ -1,0 +1,42 @@
+# Rust: Proxy Server with Connection Pooling and Caching
+# Roadmap Pillar 1 — Async networking + memory management + routing in Rust
+name: rust_proxy
+task: >
+  Build an HTTP reverse proxy in Rust using hyper and tokio. Accept a config file
+  (TOML) defining upstream backends and routing rules (path prefix to backend
+  mapping). Features: round-robin load balancing across multiple backends for the
+  same route, connection pooling (reuse HTTP connections via hyper's connection
+  pool), response caching with configurable TTL per route (in-memory LRU cache),
+  request/response header modification (strip or add headers per route config),
+  health checking of backends with configurable interval and timeout (mark unhealthy
+  backends, retry on next interval), access logging with request duration and
+  status code, and graceful shutdown. Write comprehensive tests with a mock
+  upstream server. Provide Cargo.toml. Be thorough but concise.
+
+constraints:
+  - TOML config file for backends and routing rules
+  - Round-robin load balancing per route
+  - Connection pooling via hyper
+  - Response caching with configurable TTL
+  - Header modification per route config
+  - Backend health checking with automatic failover
+  - Access logging
+  - Graceful shutdown
+  - Tests with mock upstream server
+  - Cargo.toml with dependencies
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_phantom_success
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
+
+standardized:
+  enabled: true
+  enforce_pytest: false

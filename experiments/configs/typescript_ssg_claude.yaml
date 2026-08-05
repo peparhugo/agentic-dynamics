@@ -1,0 +1,39 @@
+# TypeScript/Node.js: CLI Static Site Generator with Live Reload
+# Roadmap Pillar 1 — File system + streaming + AST manipulation in TS
+name: typescript_ssg
+task: >
+  Build a static site generator CLI in TypeScript. Accept a source directory of
+  Markdown files with YAML frontmatter and a template directory of Handlebars
+  templates. Generate a static HTML site to an output directory. Features: frontmatter
+  parsing (title, date, tags, draft), template rendering with partials and layouts,
+  tag index pages, RSS feed generation, a dev server with live reload via WebSocket
+  (watch for file changes with chokidar, inject a reload script), and syntax
+  highlighting for code blocks. Write comprehensive tests including template rendering,
+  frontmatter parsing, and CLI flag behavior. Provide package.json and tsconfig.json.
+  Be thorough but concise.
+
+constraints:
+  - CLI with source, template, and output directory flags
+  - YAML frontmatter parsing
+  - Handlebars template rendering with layouts and partials
+  - Tag-based index page generation
+  - RSS/Atom feed generation
+  - Dev server with file watching and live reload
+  - Syntax highlighting for markdown code blocks
+  - Test suite with vitest
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_phantom_success
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5]
+model: claude
+model_id: anthropic/claude-fable-5
+
+standardized:
+  enabled: true
+  enforce_pytest: false

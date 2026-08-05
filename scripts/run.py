@@ -44,7 +44,10 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
         operators = operators[:limit]
     strengths = cfg["strengths"]
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
-    model_label = cfg.get("model", model_id.split("/")[-1])
+    if model_override:
+        model_label = model_override.split("/")[-1].replace(" ", "_").lower()
+    else:
+        model_label = cfg.get("model", model_id.split("/")[-1]).replace(" ", "_").lower()
     ops = build_operators()
 
     # Standardized constraints
@@ -71,7 +74,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     print(f"{'='*80}\n")
 
     all_runs = []
-    base = _run_baseline(task, constraints, model_id, timeout,
+    base = _run_baseline(task, constraints, model_id, timeout, name,
                          thinking_effort=thinking_effort,
                          thinking_budget_tokens=thinking_budget_tokens,
                          output_token_limit=output_token_limit,
@@ -86,7 +89,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
             for rep in range(repetitions):
                 run_idx += 1
                 r = _run_perturbed(task, constraints, op_name, s, base,
-                                   ops, model_id, run_idx, total_perturbed, timeout,
+                                   ops, model_id, run_idx, total_perturbed, timeout, name,
                                    thinking_effort=thinking_effort,
                                    thinking_budget_tokens=thinking_budget_tokens,
                                    output_token_limit=output_token_limit,
@@ -104,7 +107,7 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     return all_runs
 
 
-def _run_baseline(task, constraints, model_id, timeout,
+def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
                   thinking_effort="", thinking_budget_tokens=0,
                   output_token_limit=0, silent_mode=None,
                   standardize=True, enforce_pytest=True):
@@ -116,7 +119,7 @@ def _run_baseline(task, constraints, model_id, timeout,
                              output_token_limit=output_token_limit,
                              silent_mode=silent_mode,
                              standardize=standardize, enforce_pytest=enforce_pytest,
-                             session_name=f"[baseline] {cfg.get('name','exp')}")
+                              session_name=f"[baseline] {exp_name}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints)
@@ -127,6 +130,9 @@ def _run_baseline(task, constraints, model_id, timeout,
     )
     # Collect code files if workdir available
     code_files = _collect_code(r)
+    if code_files:
+        # Re-evaluate with code files for richer constraint matching
+        sol = evaluate_solution(r.final_response, constraints, code_files=code_files)
     det = detect_constraints(r.final_response, constraints, code_files=code_files)
 
     print(f"correct={sol.correctness_score:.0%} tok={r.total_tokens:,} "
@@ -164,7 +170,7 @@ def _run_baseline(task, constraints, model_id, timeout,
 
 
 def _run_perturbed(task, constraints, op_name, strength, baseline,
-                   ops, model_id, run_idx, total, timeout,
+                   ops, model_id, run_idx, total, timeout, exp_name="exp",
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
                    standardize=True, enforce_pytest=True):
@@ -180,7 +186,7 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                              output_token_limit=output_token_limit,
                              silent_mode=silent_mode,
                              standardize=standardize, enforce_pytest=enforce_pytest,
-                             session_name=f"[{op_name}_s{strength}] {cfg.get('name','exp')}")
+                              session_name=f"[{op_name}_s{strength}] {exp_name}")
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints,
@@ -189,6 +195,12 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     actual_correctness = sol.correctness_score
     if r.tests_total > 0:
         actual_correctness = r.tests_passed / r.tests_total
+    # Re-evaluate with code files for richer constraint matching
+    code_files = _collect_code(r)
+    if code_files:
+        sol = evaluate_solution(r.final_response, constraints,
+                                baseline_code=baseline.get("final_response", ""),
+                                code_files=code_files)
     eff = compute_efficiency(
         prompt_tokens=r.prompt_tokens, completion_tokens=r.completion_tokens,
         reasoning_tokens=r.reasoning_tokens, total_tokens=r.total_tokens,
@@ -434,6 +446,10 @@ def multi_model_compare(config_path, model_ids, timeout=200):
     return all_results
 
 
+_SOURCE_EXTS = {'.py', '.js', '.ts', '.tsx', '.jsx', '.go', '.rs', '.java', '.rb',
+                '.json', '.yaml', '.yml', '.toml', '.proto', '.prisma', '.sql',
+                '.css', '.scss', '.html', '.hbs', '.md', '.mjs', '.cjs'}
+
 def _collect_code(result) -> dict[str, str] | None:
     """Collect code file contents from an AgenticResult's workdir."""
     import os, glob
@@ -442,12 +458,14 @@ def _collect_code(result) -> dict[str, str] | None:
         return None
     code = {}
     for root, dirs, files in os.walk(wd):
-        dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
+        dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__'
+                    and d != 'node_modules' and d != '.git' and d != 'target']
         for f in files:
-            if f.endswith('.py') and not f.startswith('.'):
+            ext = os.path.splitext(f)[1].lower()
+            if ext in _SOURCE_EXTS and not f.startswith('.'):
                 fpath = os.path.join(root, f)
                 try:
-                    code[f] = open(fpath).read()
+                    code[os.path.relpath(fpath, wd)] = open(fpath).read()
                 except: pass
     return code if code else None
 
