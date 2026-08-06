@@ -44,6 +44,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <h1>How a $20 API key became an AI FinOps framework.</h1>
 <p class="subtitle">I wasn't trying to build a research instrument. I was trying to save money on a trip to Italy. What happened next changed how I think about AI costs.</p>
 
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 1 &middot; The Discovery</div>
+
 <h2>The subscription problem.</h2>
 
 <p>At the start of 2026, I was spending close to $700 per month on AI subscriptions. ChatGPT Pro. Claude Max. All the tiers. I used them for everything &ndash; coding, writing, thinking through architecture decisions, running experiments. It was just the cost of doing business. I didn't think about it.</p>
@@ -87,6 +89,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <cite>&ndash; Me, staring at the DeepSeek billing dashboard, on a train from Rome to Naples</cite>
 </blockquote>
 
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 2 &middot; The Insight</div>
+
 <h2>So I started researching.</h2>
 
 <p>Here is what I learned. It turned a personal budgeting hack into a framework that governs AI costs at scale.</p>
@@ -96,31 +100,27 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <h3>DeepSeek v4 — The Explorer</h3>
 <ul>
 <li>Mixture-of-Experts architecture</li>
-<li>Only 3% of parameters active at inference</li>
-<li>Multi-token generation — predicts multiple tokens per step</li>
-<li>RL-based latent space chain-of-thought</li>
+<li>Only 3% parameters active at inference</li>
 <li>GRPO compresses reasoning into vectors, not words</li>
-<li>37B active parameters on 350W H800 GPUs</li>
 </ul>
 </div>
 <div class="comp-box amber">
 <h3>GPT &amp; Claude — The Narrators</h3>
 <ul>
-<li>Dense architectures — all parameters active, all the time</li>
-<li>Next-token prediction — one token at a time, every step</li>
+<li>Dense architectures</li>
 <li>SFT imitation chain-of-thought training</li>
-<li>Supervised fine-tuning creates bound reasoning paths</li>
-<li>The model cannot escape the path it was trained to follow</li>
-<li>~500B active parameters on 700W H100 GPUs</li>
+<li>The model narrates its way back to familiar patterns</li>
 </ul>
 </div>
 </div>
 
-<p><strong>Supervised fine-tuning with imitation chain-of-thought.</strong> That phrase changed everything for me. When you train a model through SFT imitation, you are showing it what good reasoning looks like and asking it to copy that pattern. The model learns a path. It cannot leave the path. When perturbed — when you inject alien vocabulary, invert constraints, introduce contradictions — the model doesn't explore. It recovers. It narrates its way back to familiar territory. Every recovery step is a billable token.</p>
+<p><strong>Supervised fine-tuning with imitation chain-of-thought.</strong> When you train a model through SFT imitation, you are showing it what good reasoning looks like and asking it to copy that pattern. The model learns a path and cannot leave it. When perturbed, it narrates its way back to familiar territory — and every recovery step is a billable token.</p>
 
 <p><strong>Reinforcement learning in latent space does the opposite.</strong> DeepSeek's GRPO doesn't learn what reasoning should look like. It learns to get to the right answer, and the path is incidental. The reasoning exists as vectors, not words. When perturbed, DeepSeek explores. It finds new paths. It doesn't need to narrate the journey because the journey was never the point — the destination was.</p>
 
 <p>This is the <strong style="color:var(--ac)">Silent Inference Principle</strong>. Implementation = True. Narration = False. And it's a structural property of the training architecture, not a tuning parameter you can toggle.</p>
+
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
 <h2>From "DeepSeek is cheaper" to "here is the framework."</h2>
 
@@ -187,7 +187,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </article>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.1</strong><br>
+<strong>The AI FinOps Framework &middot; v0.3</strong><br>
 248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed &middot; Verified from opencode DB<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>

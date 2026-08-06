@@ -47,10 +47,10 @@ section.alt{background:var(--bg2)}
 <nav class="topbar"><a href="/" class="topbar-link active">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="hero"><div class="inr">
-  <div class="pulse"><span class="dot"></span> v0.2 · Open Framework · 248 Experiments · 3 Architectures, 8 Variants</div>
+  <div class="pulse"><span class="dot"></span> v0.3 · Open Framework · 248 Experiments · 3 Architectures, 8 Variants</div>
   <h1>The AI FinOps Framework</h1>
-  <h2 style="font-size:1.15rem;font-weight:600;color:var(--ac);margin-bottom:1rem;letter-spacing:0">Your AI bill is a black box. This framework opens it.</h2>
-  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Not just a cost model. A predictive engine grounded in 248 experiment sessions that tells you how to cut spend 50–70%, handle 10× the workload without hiring, and turn AI into a competitive weapon. The first open framework for AI FinOps.</p>
+  <h2 style="font-size:1.15rem;font-weight:600;color:var(--ac);margin-bottom:1rem;letter-spacing:0">A predictive engine that cuts AI spend 50–70% — with 248 experiments backing every rule.</h2>
+  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Not just a cost model. An open framework grounded in 248 experiment sessions across 8 models and 3 architectures. For teams and consulting firms who need to govern, forecast, and optimize AI inference costs at scale.</p>
   <div class="stats">
     <div class="stat"><div class="v">11</div><div class="l">Decision Rules</div><div class="s">5 measured · 6 framework extensions</div></div>
     <div class="stat"><div class="v">65×</div><div class="l">Measured Cost Gap</div><div class="s">Per-session average across 224 game reports</div></div>
@@ -58,6 +58,15 @@ section.alt{background:var(--bg2)}
     <div class="stat"><div class="v">$64.98</div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
   </div>
   <div class="cta-bar"><a href="framework.html" class="cta-btn big">Understand the Framework</a><a href="story.html" class="cta-btn ghost">Read the Origin Story</a></div>
+</div></section>
+
+<section class="alt"><div class="inner">
+  <h2>Your AI bill grows. You can&rsquo;t forecast it.<br>You can&rsquo;t govern it. This framework changes that.</h2>
+  <div class="trust-grid" style="margin-top:1.5rem">
+    <div class="trust-card"><h4>Your costs are invisible</h4><p>Most teams measure cost per prompt &mdash; a metric that ignores pass rates, codebase growth compounding, and energy price inflation.</p></div>
+    <div class="trust-card"><h4>Your model routing is guesswork</h4><p>Without calibrated pass-rate data, you can&rsquo;t know whether switching models saves or costs you money over a 3-year horizon.</p></div>
+    <div class="trust-card"><h4>Your budget runway is unmodeled</h4><p>Codebase growth compounds quadratically (N&sup2;). A 10% estimation error in context inflation becomes a 50% cost overrun after 100 sessions.</p></div>
+  </div>
 </div></section>
 
 <section><div class="inner">
@@ -69,19 +78,19 @@ section.alt{background:var(--bg2)}
   </div>
 </div></section>
 
-<section class="alt"><div class="inner wide">
-  <h2>Both models implement every constraint.<br>Same output. Different cost structures.</h2>
-  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">We gave eight models the identical task. Scanned every generated file. <strong style="color:var(--ac)">DeepSeek</strong> and <strong style="color:var(--am)">Claude Fable 5</strong> implemented all seven constraints in working Python. The difference: DeepSeek uses GRPO to compress reasoning into latent space. Claude externalizes every reasoning step into billable tokens.</p>
-  <div class="constraints">
-    <div class="cr head"><div class="nm">Constraint</div><div class="fl">DeepSeek</div><div class="fl">Claude Fable 5</div></div>
-    <div class="cr"><div class="nm">JWT authentication</div><div class="fl green">auth.py, extensions.py</div><div class="fl green">auth.py, extensions.py</div></div>
-    <div class="cr"><div class="nm">Rate limiting</div><div class="fl green">auth_routes.py</div><div class="fl green">rate_limit.py</div></div>
-    <div class="cr"><div class="nm">Input validation</div><div class="fl green">validators.py</div><div class="fl green">schemas.py</div></div>
-    <div class="cr"><div class="nm">Pagination</div><div class="fl green">models.py</div><div class="fl green">pagination.py</div></div>
-    <div class="cr"><div class="nm">Error handling</div><div class="fl green">errors.py</div><div class="fl green">errors.py</div></div>
-    <div class="cr"><div class="nm">Audit logging</div><div class="fl green">audit.py</div><div class="fl green">audit.py</div></div>
-    <div class="cr"><div class="nm">API versioning</div><div class="fl green">routes/v1/</div><div class="fl green">Blueprint /v1/</div></div>
+<section class="alt"><div class="inner">
+  <h2>How the framework works</h2>
+  <div class="trust-grid" style="margin-top:1.5rem">
+    <div class="trust-card"><h4>1. Assess</h4><p>Measure your current cost-to-serve per task type. Establish baseline WOC ratio, escalation rate, and model utilization profile.</p></div>
+    <div class="trust-card"><h4>2. Tune</h4><p>Apply the 11 rules. Implement cascade routing, cache layering, and budget enforcement. Target: 50&ndash;70% cost reduction.</p></div>
+    <div class="trust-card"><h4>3. Dashboard</h4><p>Track cost-per-outcome, throughput, and budget runway in real time. Prove ROI to stakeholders with the four-dimension executive dashboard.</p></div>
   </div>
+  <div class="cta-bar"><a href="framework.html" class="cta-btn">Start with the Framework</a><a href="executive-dashboard.html" class="cta-btn ghost">See the Executive Dashboard →</a></div>
+</div></section>
+
+<section><div class="inner wide">
+  <h2>Same output. 65&times; different cost.</h2>
+  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">We gave eight models the identical task. Scanned every generated file. <strong style="color:var(--ac)">DeepSeek v4 Pro</strong> and <strong style="color:var(--am)">Claude Fable 5</strong> implemented all seven constraints in working Python. The difference: DeepSeek uses GRPO to compress reasoning into latent space. Claude externalizes every reasoning step into billable tokens. <strong style="color:var(--ac)">DeepSeek is the anchor case study, not an endorsement.</strong> The framework measures cost; you decide which model fits your context.</p>
   <div class="tbl" style="margin-top:1rem"><table>
     <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>GPT-5.6</th></tr></thead>
     <tbody>
@@ -90,42 +99,17 @@ section.alt{background:var(--bg2)}
       <tr><td>Narration penalty</td><td class="mono green">3%</td><td class="mono amber">44%</td><td class="mono">7%</td></tr>
     </tbody>
   </table></div>
-  <div class="wtm"><strong>The gap isn't in capability. It's in architecture.</strong> DeepSeek's 37B active parameters (MoE) on 350W H800 GPUs vs Claude Fable 5's ~500B active on 700W H100 GPUs. The 14× hardware gap compounds with the 7× token efficiency gap to produce the 65× cost difference. When frameworks are pinned in the prompt, DeepSeek matches Claude's pass rate at a fraction of the cost.</div>
   <div class="cta-bar"><a href="evidence.html" class="cta-btn ghost">See the full evidence →</a></div>
 </div></section>
 
-<section><div class="inner">
+<section class="alt"><div class="inner">
   <h2>How we know what we know</h2>
   <div class="trust-grid">
     <div class="trust-card"><h4>Transparent methodology</h4><p>10 perturbation operators, 6 recovery signals, fully documented protocols. Every measurement traceable to original session data.</p></div>
-    <div class="trust-card"><h4>Multi-model</h4><p>8 variants across 3 architectures — GPT dense, DeepSeek MoE, Claude dense. Cross-architecture comparison at the AST level.</p></div>
-    <div class="trust-card"><h4>Replicable</h4><p>Fully open source under MIT license. 34 configs, 251 worktrees. The instrument runs locally — no API keys required to verify.</p></div>
-  </div>
-  <h3 style="margin-top:2rem">What we're honest about</h3>
-  <div class="trust-grid">
-    <div class="trust-card"><h4>Sample size limits</h4><p>248 sessions across 8 models means some variants have limited coverage. Framework extensions (Rules 6–11) await broader validation.</p></div>
-    <div class="trust-card"><h4>Single-domain bias</h4><p>Validated on Python/Flask CRUD workloads. TypeScript baselines exist (21 sessions) but full cross-language validation is underway.</p></div>
-    <div class="trust-card"><h4>Static snapshot risk</h4><p>Model APIs, pricing, and behavior change. A cost framework measured today may not hold in 6 months without recalibration.</p></div>
+    <div class="trust-card"><h4>Multi-model</h4><p>8 variants across 3 architectures &mdash; GPT dense, DeepSeek MoE, Claude dense. Cross-architecture comparison at the AST level.</p></div>
+    <div class="trust-card"><h4>Replicable</h4><p>Fully open source under MIT license. 34 configs, 251 worktrees. The instrument runs locally &mdash; no API keys required to verify.</p></div>
   </div>
   <div class="cta-bar"><a href="methodology.html" class="cta-btn ghost">Read the full methodology →</a><a href="credibility.html" class="cta-btn ghost">Credibility &amp; limitations →</a></div>
-</div></section>
-
-<section class="alt"><div class="inner wide">
-  <h2>Where this work fits in the literature</h2>
-  <div class="tbl"><table>
-    <thead><tr><th>Our Concept</th><th>Industry / Academic Term</th><th>Reference</th></tr></thead>
-    <tbody>
-      <tr><td><strong style="color:var(--ac)">Silent Inference</strong></td><td>Cost-Aware Architecture</td><td>Multi-agent systems literature</td></tr>
-      <tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank">OpenAI o1 System Card, 2025</a></td></tr>
-      <tr><td><strong style="color:var(--cy)">Cost-Per-Pass</strong></td><td>Cost-of-Pass</td><td><a href="https://arxiv.org/abs/2508.02694" target="_blank">Zhou et al., arXiv:2508.02694, 2025</a></td></tr>
-      <tr><td><strong style="color:var(--am)">Snowball Rule (N²)</strong></td><td>Inference Production Frontier</td><td><a href="https://arxiv.org/abs/2510.26136" target="_blank">Zhuang et al., arXiv:2510.26136, 2025</a></td></tr>
-      <tr><td><strong style="color:var(--ac)">EPM</strong></td><td>4Ms Framework</td><td><a href="https://cloud.google.com/blog/topics/systems/4ms-of-ai-efficiency" target="_blank">Google Cloud, 2025</a></td></tr>
-      <tr><td>Prompt &amp; Plan Caching</td><td>Cache Saver Framework</td><td><a href="https://aclanthology.org/2025.findings-emnlp.1" target="_blank">Potamitis et al., EMNLP 2025</a></td></tr>
-      <tr><td>Semantic &amp; Cascade Routing</td><td>SATER / Speculative Cascades</td><td><a href="https://arxiv.org/abs/2510.05164" target="_blank">Shen et al., arXiv:2510.05164, 2025</a></td></tr>
-    </tbody>
-  </table></div>
-  <div class="refs"><strong>Energy:</strong> IEA 2025 · Goldman Sachs 2026 (220% AI demand) · EIA 2026 · Carnegie Mellon 2025 · Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) · TokenPowerBench (AAAI 2026) · Zhu &amp; Zhu (2026) · CARL (ACL 2026) · TRACED (2026)</div>
-  <div class="cta-bar"><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn">Full Research on GitHub</a></div>
 </div></section>
 
 <section><div class="inner" style="text-align:center">
@@ -139,7 +123,7 @@ section.alt{background:var(--bg2)}
 </div></section>
 
 <footer>
-  <strong>The AI FinOps Framework · v0.2 · August 2026</strong><br>
+  <strong>The AI FinOps Framework · v0.3 · August 2026</strong><br>
   248 experiment sessions · 3 architectures, 8 variants · 224 game reports · $64.98 analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> ·

@@ -48,6 +48,14 @@
 </div>
 </section>
 
+<details style="max-width:800px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the methodology actually means</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
+<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">248 sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). The result: empirical data for every rule in the AI FinOps Framework. No parameter is theoretical; every variable in the cost equation was measured.</p>
+<p>Below is the full methodology — the operators, detection signals, pipeline, and reproducible experiment configs.</p>
+</div>
+</details>
+
 <!-- Pipeline -->
 <section class="sec alt wide">
 <h2>The Experiment Pipeline</h2>
@@ -203,8 +211,23 @@
 <div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">View the Framework &rarr;</a></div>
 </section>
 
+<section class="sec alt wide">
+<h2>Where This Work Fits in the Literature</h2>
+<p class="lead">The concepts in the AI FinOps Framework connect to established academic and industry research. Each coined term maps to a known body of work.</p>
+<div class="tbl"><table><thead><tr><th>Our Concept</th><th>Industry / Academic Term</th><th>Reference</th></tr></thead><tbody>
+<tr><td><strong style="color:var(--ac)">Silent Inference</strong></td><td>Cost-Aware Architecture</td><td>Multi-agent systems literature</td></tr>
+<tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank" style="color:var(--ac)">OpenAI o1 System Card, 2025</a></td></tr>
+<tr><td><strong style="color:var(--cy)">Cost-Per-Pass</strong></td><td>Cost-of-Pass</td><td><a href="https://arxiv.org/abs/2508.02694" target="_blank" style="color:var(--ac)">Zhou et al., arXiv:2508.02694, 2025</a></td></tr>
+<tr><td><strong style="color:var(--am)">Snowball Rule (N&sup2;)</strong></td><td>Inference Production Frontier</td><td><a href="https://arxiv.org/abs/2510.26136" target="_blank" style="color:var(--ac)">Zhuang et al., arXiv:2510.26136, 2025</a></td></tr>
+<tr><td><strong style="color:var(--ac)">EPM</strong></td><td>4Ms Framework</td><td><a href="https://cloud.google.com/blog/topics/systems/4ms-of-ai-efficiency" target="_blank" style="color:var(--ac)">Google Cloud, 2025</a></td></tr>
+<tr><td>Prompt &amp; Plan Caching</td><td>Cache Saver Framework</td><td><a href="https://aclanthology.org/2025.findings-emnlp.1" target="_blank" style="color:var(--ac)">Potamitis et al., EMNLP 2025</a></td></tr>
+<tr><td>Semantic &amp; Cascade Routing</td><td>SATER / Speculative Cascades</td><td><a href="https://arxiv.org/abs/2510.05164" target="_blank" style="color:var(--ac)">Shen et al., arXiv:2510.05164, 2025</a></td></tr>
+</tbody></table></div>
+<p style="font-size:0.78rem;color:var(--t3);text-align:center;margin-top:1rem"><strong>Energy:</strong> IEA 2025 &middot; Goldman Sachs 2026 (220% AI demand) &middot; EIA 2026 &middot; Carnegie Mellon 2025 &middot; Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) &middot; TokenPowerBench (AAAI 2026) &middot; Zhu &amp; Zhu (2026) &middot; CARL (ACL 2026) &middot; TRACED (2026)</p>
+</section>
+
 <footer>
-<strong>The AI FinOps Framework &middot; v0.1</strong><br>
+<strong>The AI FinOps Framework &middot; v0.3</strong><br>
 248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>

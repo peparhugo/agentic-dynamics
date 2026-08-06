@@ -33,6 +33,13 @@
 </div>
 </section>
 
+<details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence proves</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
+<p>Across <strong style="color:var(--t)">248 experiment sessions</strong> spanning 8 model variants and 3 architectures, we measured a <strong style="color:var(--ac)">65&times; cost gap</strong> between DeepSeek v4 Pro ($0.015/session) and Claude Fable 5 ($1.01/session) — for identical constraint-complete code. The gap widens to <strong style="color:var(--am)">210&times; on TypeScript</strong>. The cause isn't capability; both models implement all 7 constraints. It's architecture: DeepSeek's GRPO compresses reasoning into latent space; Claude's SFT chain-of-thought bills every reasoning step as output tokens. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
+</div>
+</details>
+
 <!-- AST Code Quality -->
 <section class="sec alt">
 <h2>AST Code Quality Analysis</h2>
@@ -49,6 +56,21 @@
 <tr><td><strong>Avg thinking ratio</strong></td><td>7%</td><td class="green">0%</td><td>6%</td><td>7%</td><td>7%</td><td class="green">2%</td><td>7%</td><td class="amber">19%</td></tr>
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> DeepSeek produces the most modular code (avg 28 files, 119 functions, 21 classes per worktree) — 3.5x Claude's file count. GPT-5 and GPT-5.5 lead on type hints (37-40%) but produce far fewer worktrees. GPT-5-nano has the highest thinking ratio (19%) and produces zero constraint-complete outputs — the only model that fundamentally fails on task completion rather than just cost.</div>
+</section>
+
+<section class="sec">
+<h2>Constraint Detection — DeepSeek vs Claude</h2>
+<p class="lead">Dual-signal verification: scanned both reasoning text and generated <code>.py</code> files for all 7 required constraints. Both models implemented every constraint — the 65&times; gap is in how they produce the code, not whether they can.</p>
+<div class="tbl"><table><thead><tr><th>Constraint</th><th>DeepSeek Implementation</th><th>Claude Fable 5 Implementation</th></tr></thead><tbody>
+<tr><td>JWT authentication</td><td class="green">auth.py, extensions.py</td><td class="green">auth.py, extensions.py</td></tr>
+<tr><td>Rate limiting</td><td class="green">auth_routes.py</td><td class="green">rate_limit.py</td></tr>
+<tr><td>Input validation</td><td class="green">validators.py</td><td class="green">schemas.py</td></tr>
+<tr><td>Pagination</td><td class="green">models.py</td><td class="green">pagination.py</td></tr>
+<tr><td>Error handling</td><td class="green">errors.py</td><td class="green">errors.py</td></tr>
+<tr><td>Audit logging</td><td class="green">audit.py</td><td class="green">audit.py</td></tr>
+<tr><td>API versioning</td><td class="green">routes/v1/</td><td class="green">Blueprint /v1/</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> All 7 constraints implemented by both models. The verification is structural — not based on whether the model <em>mentioned</em> the constraint in reasoning, but whether it appeared in the generated code. DeepSeek achieves this silently (0 reasoning tokens dedicated to constraint discussion). Claude narrates each constraint implementation in output tokens — billable at $10/Mtok.</div>
 </section>
 
 <!-- Narration Penalty Rates -->
@@ -155,21 +177,21 @@
 <!-- Current Scope & Roadmap -->
 <section class="sec alt">
 <h2>Current Scope &amp; What's Next</h2>
-<p class="lead">This is v0.1 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
+<p class="lead">This is v0.3 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
 <div class="cards">
 <div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. TypeScript/Node.js (initial: 3 variants, 21 cross-model runs). 10 prompt-level perturbation operators (5 manifold, 5 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
-<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.2+)</div><div class="cdesc">Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.3+)</div><div class="cdesc">Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
 <div class="card"><div class="ctitle">Not in Scope</div><div class="cdesc">The framework does not judge whether narration is wasteful or valuable. It measures the cost. If your team needs auditable reasoning trails for compliance or debugging, the Explanation Tax is insurance &ndash; not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.</div></div>
 </div>
 <div class="cards" style="margin-top:1rem">
 <div class="card"><div class="ctitle" style="color:var(--ac)">Test Pass Rate Caveat</div><div class="cdesc">Sampled pytest results are environment-sensitive. Approximately 31% of failures resolve with correct dependency installation. The raw pass rate counts everything; the "with correct env" column estimates real code quality. DeepSeek's 69% corrected rate is comparable to Claude and GPT-5.6.</div></div>
-<div class="card"><div class="ctitle" style="color:var(--am)">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.2 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.3 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
 <div class="card"><div class="ctitle">Reproduce This</div><div class="cdesc">The instrument is open source. 34 configs, 10 operators, 6 recovery signals. Clone the repo, install the instrument, run a config. <a href="https://github.com/peparhugo/ai-finops-framework" style="color:var(--ac)">View on GitHub.</a> <a href="methodology.html" style="color:var(--ac)">See the methodology.</a></div></div>
 </div>
 </section>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.1</strong><br>
+<strong>The AI FinOps Framework &middot; v0.3</strong><br>
 248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>

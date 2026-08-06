@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Research Roadmap — AI FinOps Framework v0.1</title>
+<title>Research Roadmap — AI FinOps Framework v0.3</title>
 <meta name="description" content="Public research agenda for the AI FinOps Framework. Multi-language expansion, task archetypes, model diversity, structural perturbations, human-in-the-loop studies.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
@@ -62,16 +62,16 @@
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>Research Roadmap</h1>
-<p class="lead" style="font-size:1rem;color:var(--t);margin-bottom:1rem">We built the instrument. Now we calibrate it. The 248 baseline experiments prove the concept &ndash; but a framework is only as strong as its boundaries. Below is our public research agenda for v0.2 and beyond.</p>
+<p class="lead" style="font-size:1rem;color:var(--t);margin-bottom:1rem">We built the instrument. Now we calibrate it. The 248 baseline experiments prove the concept &ndash; but a framework is only as strong as its boundaries. Below is our public research agenda for v0.3 and beyond.</p>
 
 <div class="progress-bar">
 <div class="pb-stat"><div class="pb-v">248</div><div class="pb-l">Baseline Runs</div></div>
 <div class="pb-div"></div>
-<div class="pb-stat"><div class="pb-v" style="color:var(--cy)">500+</div><div class="pb-l">v0.2 Target</div></div>
+<div class="pb-stat"><div class="pb-v" style="color:var(--cy)">500+</div><div class="pb-l">v0.3 Target</div></div>
 <div class="pb-div"></div>
 <div class="pb-stat"><div class="pb-v" style="color:var(--am)">5</div><div class="pb-l">Research Pillars</div></div>
 <div class="pb-div"></div>
-<div class="pb-stat"><div class="pb-v" style="color:var(--t3)">~50%</div><div class="pb-l">Of planned configs complete</div></div>
+<div class="pb-stat"><div class="pb-v" style="color:var(--t3)">~60%</div><div class="pb-l">Of planned configs complete</div></div>
 </div>
 
 <p class="lead">Have API credits, a specific stack, or a novel perturbation idea? The instrument was designed for extensibility from day one. Run it, submit a PR, and we&rsquo;ll merge your findings.</p>
@@ -99,10 +99,10 @@
 <p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Testing whether the Snowball Rule (N&sup2;) holds universally or is Python-specific. <strong>2 of 5 languages complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Language</th><th>Status</th><th>Notes</th></tr></thead><tbody>
 <tr><td>Python / Flask</td><td><span class="badge complete">Complete</span></td><td>248 runs. Baseline established.</td></tr>
-<tr><td>TypeScript / Node.js</td><td><span class="badge in-progress">In Progress</span></td><td>55 runs, 3 architectures. Baseline established. 210x cost gap measured on SSG task.</td></tr>
-<tr><td>Go</td><td><span class="badge in-progress">Configured</span></td><td>Configs exist. Concurrency-heavy: does reasoning overhead scale differently?</td></tr>
-<tr><td>Rust</td><td><span class="badge in-progress">Configured</span></td><td>Configs exist. Will silent inference produce borrow-checker-compliant code?</td></tr>
-<tr class="help-row"><td>Java / Spring</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Do verbose models justify cost in regulated organizations?</td></tr>
+<tr><td>TypeScript / Node.js</td><td><span class="badge in-progress">In Progress</span></td><td>55 runs, 3 architectures. 210× cost gap measured.</td></tr>
+<tr><td>Go</td><td><span class="badge in-progress">Configured</span></td><td>Concurrency-heavy validation pending.</td></tr>
+<tr><td>Rust</td><td><span class="badge in-progress">Configured</span></td><td>Borrow-checker + silent inference test.</td></tr>
+<tr class="help-row"><td>Java / Spring</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Do verbose models justify cost in regulated orgs?</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -118,10 +118,10 @@
 <p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Moving beyond constraint-complete REST endpoints. <strong>1 of 5 archetypes complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Task Type</th><th>Status</th><th>What We're Measuring</th></tr></thead><tbody>
 <tr><td>REST API (constraint-complete)</td><td><span class="badge complete">Complete</span></td><td>All 7 constraints. Baseline tax measured.</td></tr>
-<tr><td>Bug-Fixing (legacy code)</td><td><span class="badge in-progress">In Progress</span></td><td>Recovery loops before silent vs. explanatory finds the fix.</td></tr>
+<tr><td>Bug-Fixing (legacy code)</td><td><span class="badge in-progress">In Progress</span></td><td>Recovery loops before silent vs explanatory.</td></tr>
 <tr><td>Refactoring</td><td><span class="badge planned">Planned</span></td><td>Does explanation help preserve invariants?</td></tr>
-<tr class="help-row"><td>Security Hardening</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Can silent models identify CVE patterns without narrating?</td></tr>
-<tr><td>Data Pipeline ETL</td><td><span class="badge planned">Planned</span></td><td>High-volume, low-context. Does Explanation Tax become waste?</td></tr>
+<tr class="help-row"><td>Security Hardening</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Can silent models identify CVE patterns?</td></tr>
+<tr><td>Data Pipeline ETL</td><td><span class="badge planned">Planned</span></td><td>High-volume, low-context. Tax becomes waste?</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -139,11 +139,11 @@
 <p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Moving beyond GPT-variants and DeepSeek. <strong>2 of 6 families complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Model Family</th><th>Status</th><th>Hypothesis</th></tr></thead><tbody>
 <tr><td>DeepSeek v4 (MoE)</td><td><span class="badge complete">Complete</span></td><td>0.21 reasoning ratio. GRPO latent. Baseline.</td></tr>
-<tr><td>GPT family (6 variants)</td><td><span class="badge complete">Complete</span></td><td>0.06-1.01 ratio range. Nano: only model with logic failures.</td></tr>
-<tr><td>Claude Opus / Sonnet</td><td><span class="badge in-progress">In Progress</span></td><td>Are reasoning tokens structurally different from GPT?</td></tr>
+<tr><td>GPT family (6 variants)</td><td><span class="badge complete">Complete</span></td><td>0.06–1.01 ratio range. All measured.</td></tr>
+<tr><td>Claude Opus / Sonnet</td><td><span class="badge in-progress">In Progress</span></td><td>Are reasoning tokens structurally different?</td></tr>
 <tr><td>Gemini Ultra</td><td><span class="badge planned">Planned</span></td><td>Does Google compress explanation into latent space?</td></tr>
 <tr class="help-row"><td>Llama-4</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Open-weight. How does finetuning affect the trade-off?</td></tr>
-<tr><td>Mistral Large</td><td><span class="badge planned">Planned</span></td><td>European architecture. Regulatory context affects N&sup2;?</td></tr>
+<tr><td>Mistral Large</td><td><span class="badge planned">Planned</span></td><td>European architecture. Regulatory context matters?</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -158,11 +158,11 @@
 <div class="pillar-progress"><div class="pp-fill" style="width:20%"></div></div>
 <p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">Breaking the system, not just the words. <strong>1 of 5 perturbation types complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Perturbation</th><th>Status</th><th>Why It Matters</th></tr></thead><tbody>
-<tr><td>10 prompt-level operators</td><td><span class="badge complete">Complete</span></td><td>Semantic + manifold. Calibrated 0.0&ndash;1.0.</td></tr>
-<tr><td>Dependency Injection</td><td><span class="badge planned">Planned</span></td><td>Break a library import mid-task. Does silent model recover?</td></tr>
-<tr class="help-row"><td>AST Corruption</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Corrupt existing file ASTs. Does the model notice?</td></tr>
-<tr><td>Production Log Spike</td><td><span class="badge planned">Planned</span></td><td>High-cardinality logs. Does explanation get lost in noise?</td></tr>
-<tr><td>Rate-Limiter Throttling</td><td><span class="badge in-progress">In Progress</span></td><td>Observed with DeepSeek's raw pass rate. Formalizing as operator.</td></tr>
+<tr><td>10 prompt-level operators</td><td><span class="badge complete">Complete</span></td><td>Semantic + manifold. Calibrated 0.0–1.0.</td></tr>
+<tr><td>Dependency Injection</td><td><span class="badge planned">Planned</span></td><td>Break a library import mid-task.</td></tr>
+<tr class="help-row"><td>AST Corruption</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Corrupt existing file ASTs. Does model notice?</td></tr>
+<tr><td>Production Log Spike</td><td><span class="badge planned">Planned</span></td><td>High-cardinality logs. Does explanation get lost?</td></tr>
+<tr><td>Rate-Limiter Throttling</td><td><span class="badge in-progress">In Progress</span></td><td>Formalizing as operator from DS raw pass data.</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -179,8 +179,8 @@
 <div class="pillar-progress"><div class="pp-fill" style="width:0%"></div></div>
 <p class="lead" style="margin-bottom:0.5rem;font-size:0.8rem">The most expensive part of AI-generated code is human debugging time. <strong>0 of 2 studies complete.</strong></p>
 <div class="tbl"><table><thead><tr><th>Study</th><th>Status</th><th>Method</th></tr></thead><tbody>
-<tr><td>6-Month Code Evolution</td><td><span class="badge planned">Planned</span></td><td>Silent vs. Explanatory code &rarr; human devs. Track time-to-fix, cyclomatic complexity, bug recurrence over 6 simulated sprints.</td></tr>
-<tr class="help-row"><td>Blind Preference Test</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Give developers both outputs without source labels. Which do they prefer to maintain and why?</td></tr>
+<tr><td>6-Month Code Evolution</td><td><span class="badge planned">Planned</span></td><td>Silent vs explanatory code → human devs debug.</td></tr>
+<tr class="help-row"><td>Blind Preference Test</td><td><span class="badge help-wanted">Help Wanted</span></td><td>Which output do developers prefer to maintain?</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -202,7 +202,7 @@
 </section>
 
 <footer>
-<strong>The AI FinOps Framework &middot; Research Roadmap</strong><br>
+<strong>The AI FinOps Framework &middot; Research Roadmap v0.3</strong><br>
 248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
