@@ -142,29 +142,28 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <a href="#" onclick="showEq('auto');return false" style="color:var(--t3);text-decoration:none;padding:0.2rem 0.8rem;border-radius:100px" id="eqAuto">Autonomous Workloads</a>
 <a href="#" onclick="showEq('full');return false" style="color:var(--t3);text-decoration:none;padding:0.2rem 0.8rem;border-radius:100px" id="eqFull">Full Model</a>
 </div>
-<div style="min-height:16rem;max-width:700px;margin:0 auto">
-<div id="eq-augmented" style="background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<div style="position:relative;height:12rem;max-width:700px;margin:1rem auto">
+<div id="eq-augmented" style="position:absolute;top:0;left:0;width:100%;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
 <strong style="color:var(--ac)">Augmented Workforce</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span><br>
 <span style="color:var(--ac)">Per session:</span> c(t) = C&#8320; &times; EPM(t) &times; (1 + &beta;&middot;v&middot;t)<br>
 <span style="color:var(--ac)">Cumulative:</span> C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br>
 <span style="color:var(--ac)">Per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
 <span style="color:var(--ac)">Monthly:</span> C<sub>mo</sub> = E &times; C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]<br>
-<span style="color:var(--am)">Model gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
+<span style="color:var(--am)">Gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
 </div>
-<div id="eq-auto" style="display:none;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<div id="eq-auto" style="position:absolute;top:0;left:0;width:100%;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left;opacity:0;pointer-events:none">
 <strong style="color:var(--am)">Autonomous Workloads</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 6–10)</span><br>
 <span style="color:var(--am)">Per job:</span> C<sub>job</sub> = C&#8320; &times; EPM(t) &times; (1 &minus; b&times;0.5) &times; (1 + r&times;E&#8340;)<br>
-<span style="color:var(--am)">Where:</span> D(b) = 1 &minus; b&times;0.5 <span style="color:var(--t3)">(batch discount)</span> &middot; R(r, E&#8340;) = 1 + r&times;E&#8340; <span style="color:var(--t3)">(retry penalty)</span><br>
+<span style="color:var(--am)">Where:</span> D(b) = 1 &minus; b&times;0.5 <span style="color:var(--t3)">(batch)</span> &middot; R(r) = 1 + r&times;E&#8340; <span style="color:var(--t3)">(retry)</span><br>
 <span style="color:var(--am)">Monthly:</span> C<sub>auto</sub> = W &times; C<sub>job</sub><br>
-<span style="color:var(--am)">Throughput:</span> T<sub>max</sub> = Budget / C<sub>job</sub><br>
-<span style="color:var(--am)">WOC:</span> WOC = 1 / (1 + r) <span style="color:var(--t3)">(measured: r = 0.214, E&#8340; = 28.2&times;)</span>
+<span style="color:var(--am)">Throughput:</span> T<sub>max</sub> = Budget / C<sub>job</sub> &middot; <span style="color:var(--am)">WOC:</span> 1/(1+r) <span style="color:var(--t3)">(r=0.214&#x2192;0.79)</span>
 </div>
-<div id="eq-full" style="display:none;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<div id="eq-full" style="position:absolute;top:0;left:0;width:100%;background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left;opacity:0;pointer-events:none">
 <strong style="color:var(--t)">Full Model</strong> <span style="color:var(--t3);font-size:0.7em">(All 11 rules)</span><br>
-<span style="color:var(--ac)">C</span><sub style="color:var(--ac)">total</sub> = E&times;C&#8320;&times;EPM(N)&times;[N + &beta;&middot;v&middot;N(N&minus;1)/2] <span style="color:var(--t3)">(augmented)</span><br>
-<span style="padding-left:1rem;display:inline-block;color:var(--am)">+ W&times;C&#8320;&times;EPM(t)&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)</span> <span style="color:var(--t3)">(autonomous)</span><br>
+<span style="color:var(--ac)">C</span><sub style="color:var(--ac)">total</sub> = E&times;C&#8320;&times;EPM&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2] <span style="color:var(--t3)">(augmented)</span><br>
+<span style="padding-left:1rem;display:inline-block;color:var(--am)">+ W&times;C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)</span> <span style="color:var(--t3)">(autonomous)</span><br>
 <span style="padding-left:1rem;display:inline-block">+ H</span> <span style="color:var(--t3)">(human oversight)</span><br>
-<span style="color:var(--cy)">BVI = WOC / (C<sub>job</sub> + H/W)</span> <span style="color:var(--t3)">(Business Value Index)</span>
+<span style="color:var(--cy)">BVI = WOC / (C<sub>job</sub> + H/W)</span> <span style="color:var(--t3)">(outcomes per dollar)</span>
 </div>
 </div>
 <div class="chart-wrap"><canvas id="costChart" style="max-width:600px"></canvas></div>
@@ -313,7 +312,7 @@ function updateROI(){
   }
 }
 
-function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(function(id){var el=document.getElementById(id);if(el){el.style.color=id===active?'var(--ac)':'var(--t3)';el.style.fontWeight=id===active?'700':'400'}})}function showEq(view){['augmented','auto','full'].forEach(function(v){document.getElementById('eq-'+v).style.display=v===view?'block':'none';var t=document.getElementById('eq'+v.charAt(0).toUpperCase()+v.slice(1));if(v===view){t.style.color='#fff';t.style.background='var(--ac)';t.style.fontWeight='700'}else{t.style.color='var(--t3)';t.style.background='transparent';t.style.fontWeight='400'}});}
+function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(function(id){var el=document.getElementById(id);if(el){el.style.color=id===active?'var(--ac)':'var(--t3)';el.style.fontWeight=id===active?'700':'400'}})}function showEq(view){['augmented','auto','full'].forEach(function(v){var eq=document.getElementById('eq-'+v),tab=document.getElementById('eq'+v.charAt(0).toUpperCase()+v.slice(1));if(v===view){eq.style.opacity='1';eq.style.pointerEvents='auto';tab.style.color='#fff';tab.style.background='var(--ac)';tab.style.fontWeight='700'}else{eq.style.opacity='0';eq.style.pointerEvents='none';tab.style.color='var(--t3)';tab.style.background='transparent';tab.style.fontWeight='400'}});}
 
 function toggleHow(){var el=document.getElementById('howComputed'),btn=document.querySelector('#calculator button');if(el.style.display==='none'||!el.style.display){el.style.display='block';if(btn)btn.textContent='Hide how this is computed'}else{el.style.display='none';if(btn)btn.textContent='Show how this is computed'}}
 
