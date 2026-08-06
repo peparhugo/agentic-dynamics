@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:task_manager:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:58
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
+| Correctness | 93% (13/14 tests) |
 | Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 533 |
 | Cyclomatic complexity | 72.0 |
@@ -63,16 +63,24 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 93%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_task_manager_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 11 |
-| Total lines | 533 |
+| Total lines (Py) | 533 |
 | Functions | 40 |
 | Classes | 7 |
 | Functions/file | 3.6 |
@@ -87,12 +95,16 @@
 | Test file rate | 18% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_task_manager_natural/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 13 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 14 |
+| Pass rate | 93% |
+| Duration | 4.4s |

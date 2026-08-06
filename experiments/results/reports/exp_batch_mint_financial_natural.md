@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:mint_financial:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:42
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.766
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0175, ~4502J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.65) with moderate resource use ($0.0175, ~4502J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 1530 |
 | Cyclomatic complexity | 148.0 |
 | Code quality | 0.065 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.567** |
+| **Composite** | **0.652** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~4502 J** |
 | Solution density | 0.065037 LOC/tok |
 | Correctness/$ | 54 |
-| Quality/J | 0.000126 |
+| Quality/J | 0.000145 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_mint_financial_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 41 |
-| Total lines | 1530 |
+| Total lines (Py) | 1530 |
 | Functions | 18 |
 | Classes | 53 |
 | Functions/file | 0.4 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_mint_financial_natural/session.jsonl)
-
-*No code output — this session was narration-only.*

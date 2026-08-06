@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [remove_critical_constraint_s0.5_r1] cd_claude_2rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:09:05
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:49
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ygblv0tb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 21 |
-| Total lines | 768 |
+| Total lines (Py) | 768 |
 | Functions | 100 |
 | Classes | 24 |
 | Functions/file | 4.8 |
@@ -99,13 +107,3 @@
 | Code density | 0.0457 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ygblv0tb/session.jsonl)
-
-*No code output — this session was narration-only.*

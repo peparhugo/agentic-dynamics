@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:task_manager:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:20
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:47:12
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.59) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Correctness | 100% (27/27 tests) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 602 |
 | Cyclomatic complexity | 113.0 |
 | Code quality | 0.166 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.587** |
+| **Composite** | **0.673** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2564 J** |
 | Solution density | 0.055808 LOC/tok |
 | Correctness/$ | 87 |
-| Quality/J | 0.000229 |
+| Quality/J | 0.000262 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_task_manager_baseline gpt_5_6/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 9 |
-| Total lines | 602 |
+| Total lines (Py) | 602 |
 | Functions | 60 |
 | Classes | 0 |
 | Functions/file | 6.7 |
@@ -87,12 +95,16 @@
 | Test file rate | 44% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_batch_task_manager_baseline gpt_5_6/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 27 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 27 |
+| Pass rate | 100% |
+| Duration | 11.1s |

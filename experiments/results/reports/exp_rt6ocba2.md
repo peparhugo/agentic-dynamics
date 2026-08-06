@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [baseline] quality_gpt_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:15
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.757
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.52) with moderate resource use ($0.1924, ~7739J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.60) with moderate resource use ($0.1924, ~7739J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 100% (5/5 tests) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 397 |
 | Cyclomatic complexity | 75.0 |
 | Code quality | 0.252 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.518** |
+| **Composite** | **0.604** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~7739 J** |
 | Solution density | 0.006800 LOC/tok |
 | Correctness/$ | 49 |
-| Quality/J | 0.000067 |
+| Quality/J | 0.000078 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_rt6ocba2/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 397 |
+| Total lines (Py) | 397 |
 | Functions | 29 |
 | Classes | 4 |
 | Functions/file | 14.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_rt6ocba2/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 5 |
+| Pass rate | 100% |
+| Duration | 11.7s |

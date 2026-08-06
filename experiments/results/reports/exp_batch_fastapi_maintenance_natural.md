@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:fastapi_maintenance:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:27
 
 ---
 
@@ -67,12 +67,22 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_fastapi_maintenance_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 1136 |
-| Total lines | 96299 |
+| JS files | 4 |
+| Total lines (Py) | 96299 |
+| Total lines (TS/TSX) | 528 |
 | Functions | 3986 |
 | Classes | 692 |
 | Functions/file | 3.5 |
@@ -86,13 +96,3 @@
 | Test files | 511 |
 | Test file rate | 45% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_fastapi_maintenance_natural/session.jsonl)
-
-*No code output — this session was narration-only.*

@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><title>Tag: {{tag}}</title></head>
+<body>
+  <h1>Tag: {{tag}}</h1>
+  {{#each pages}}
+    <article>
+      <h2><a href="/{{slug}}.html">{{frontmatter.title}}</a></h2>
+    </article>
+  {{/each}}
+</body>
+</html>

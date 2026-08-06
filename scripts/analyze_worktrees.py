@@ -102,6 +102,54 @@ def run_pytest(worktree_path: str, timeout_sec: int = 15) -> dict:
         return {"ok": False, "error": str(e)[:60]}
 
 
+def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
+    """Run TypeScript tests in a worktree using npx jest or vitest."""
+    import subprocess as _sp
+    p = Path(worktree_path)
+    if not p.exists():
+        return {"ok": False, "error": "worktree missing"}
+
+    configs = list(p.glob("jest.config.*")) + list(p.glob("vitest.config.*"))
+    test_files = list(p.rglob("*.test.ts")) + list(p.rglob("*.spec.ts"))
+    if not test_files and not configs and not (p / "package.json").exists():
+        return {"ok": False, "error": "no TypeScript test infrastructure"}
+
+    t0 = time.monotonic()
+    try:
+        if (p / "package.json").exists():
+            r = _sp.run(
+                ["npx", "jest", "--passWithNoTests", "--no-coverage", "-q"],
+                cwd=str(p), capture_output=True, text=True,
+                timeout=timeout_sec, env={**os.environ, "CI": "true"},
+            )
+        else:
+            r = _sp.run(
+                ["npx", "tsc", "--noEmit"],
+                cwd=str(p), capture_output=True, text=True,
+                timeout=timeout_sec,
+            )
+        dur = time.monotonic() - t0
+        out = r.stdout + r.stderr
+        import re
+        passed = int(re.search(r'(\d+)\s+passed', out).group(1)) if re.search(r'(\d+)\s+passed', out) else 0
+        failed = int(re.search(r'(\d+)\s+failed', out).group(1)) if re.search(r'(\d+)\s+failed', out) else 0
+        total = passed + failed
+        if total == 0:
+            total = len(test_files)
+        return {
+            "ok": r.returncode == 0,
+            "passed": passed, "failed": failed or (r.returncode != 0 and 1 or 0),
+            "errors": 0, "total": max(total, len(test_files)),
+            "duration_s": round(dur, 1),
+            "pass_rate": round(passed / max(total, 1), 3) if total > 0 else (1.0 if r.returncode == 0 else 0),
+            "runner": "jest" if (p / "package.json").exists() else "tsc",
+        }
+    except _sp.TimeoutExpired:
+        return {"ok": False, "error": f"timeout {timeout_sec}s"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:60]}
+
+
 # ── Utility ──────────────────────────────────────────────────────────────────
 
 def _fmt_usd(v): return f"${v:,.4f}" if v is not None else "—"
@@ -150,7 +198,7 @@ def load_config_constraints(config_name: str) -> list[str]:
 def read_worktree_code(worktree_path: str) -> str:
     """Concatenate project code files in a worktree.
     
-    Reads .py files first. If none found, falls back to .html/.js/.css for frontend worktrees.
+    Reads .py files first. Falls back to .ts/.tsx if no Python found.
     """
     p = Path(worktree_path)
     if not p.exists():
@@ -170,8 +218,26 @@ def read_worktree_code(worktree_path: str) -> str:
                 code_parts.append(f"# {rel}\n{content}")
         except Exception:
             pass
-        if len(code_parts) > 200:  # safety cap: don't read 1000+ files
+        if len(code_parts) > 200:
             break
+    if not code_parts:
+        for ext in [".ts", ".tsx", ".js", ".jsx"]:
+            comment = "//" if ext in (".ts", ".tsx", ".js", ".jsx") else "#"
+            for f in sorted(p.rglob(f"*{ext}")):
+                parts = set(f.parts)
+                if parts & skip_dirs:
+                    continue
+                try:
+                    content = f.read_text(errors="replace")
+                    if content.strip() and len(content) > 20:
+                        rel = f.relative_to(p)
+                        code_parts.append(f"{comment} {rel}\n{content}")
+                except Exception:
+                    pass
+                if len(code_parts) > 200:
+                    break
+            if code_parts:
+                break
     return "\n\n".join(code_parts)
 
 
@@ -286,8 +352,15 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # Read code
     code = read_worktree_code(worktree_path)
     if not code:
-        return None, {"error": "no Python files found",
-                        "narration_failure": True}
+        # Check if TypeScript/frontend worktree with files but no Python
+        has_other_files = False
+        for ext in [".ts", ".tsx", ".js", ".jsx", ".html", ".css", ".json"]:
+            if list(Path(worktree_path).rglob(f"*{ext}")):
+                has_other_files = True
+                break
+        if not has_other_files:
+            return None, {"error": "no source files found",
+                            "narration_failure": True}
 
     # Session metadata
     title = session.get("title", "") if session else ""
@@ -417,8 +490,11 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # ── Test Results (if --run-tests) ──
     test_results = None
     if run_tests_enabled:
-        test_results = run_pytest(worktree_path)
-        if test_results.get("ok") and test_results.get("total", 0) > 0:
+        if ast_profile.get("py_files", 0) > 0:
+            test_results = run_pytest(worktree_path)
+        elif ast_profile.get("ts_files", 0) + ast_profile.get("tsx_files", 0) > 0:
+            test_results = run_ts_tests(worktree_path)
+        if test_results and test_results.get("ok") and test_results.get("total", 0) > 0:
             solution.tests_passed = test_results["passed"]
             solution.tests_total = test_results["total"]
             solution.correctness_score = test_results["pass_rate"]
@@ -474,10 +550,9 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
 
 
 def ast_profile_worktree(worktree_path: str) -> dict:
-    """Comprehensive AST analysis of a worktree's generated code.
+    """Comprehensive analysis of a worktree's generated code.
     
-    Returns the same metrics shown on the evidence page: files, functions,
-    classes, type hints, docstrings, error handlers, imports, decorators.
+    Analyzes Python files with AST. Counts TypeScript/JS files for multi-language worktrees.
     """
     import ast
     p = Path(worktree_path)
@@ -489,10 +564,23 @@ def ast_profile_worktree(worktree_path: str) -> dict:
         "total_classes": 0, "type_hints": 0, "docstrings": 0,
         "error_handlers": 0, "imports": 0, "decorators": 0,
         "test_files": 0, "parse_errors": 0, "has_tests": False,
+        "ts_files": 0, "tsx_files": 0, "js_files": 0, "ts_total_lines": 0,
     }
     
     py_files = [f for f in sorted(p.rglob("*.py")) if not (skip & set(f.parts))]
     metrics["py_files"] = len(py_files)
+    
+    # Count TypeScript and JavaScript files
+    for ext, key in [(".ts", "ts_files"), (".tsx", "tsx_files"), (".js", "js_files")]:
+        ts_list = [f for f in sorted(p.rglob(f"*{ext}")) if not (skip & set(f.parts))]
+        metrics[key] = len(ts_list)
+        for f in ts_list:
+            try:
+                content = f.read_text(errors="replace")
+                lines = [l for l in content.split("\n") if l.strip() and not l.strip().startswith("//")]
+                metrics["ts_total_lines"] += len(lines)
+            except Exception:
+                pass
     
     for f in py_files:
         rel = str(f.name)
@@ -875,10 +963,12 @@ def main():
             md = report.to_markdown()
             ast = metrics.get("ast", {})
             if ast:
-                md += "\n\n---\n\n## AST Code Quality\n\n"
+                md += "\n\n---\n\n## Code Quality\n\n"
                 md += "| Metric | Value |\n|--------|-------|\n"
                 for label, key in [
-                    ("Python files", "py_files"), ("Total lines", "total_lines"),
+                    ("Python files", "py_files"), ("TS files", "ts_files"),
+                    ("TSX files", "tsx_files"), ("JS files", "js_files"),
+                    ("Total lines (Py)", "total_lines"), ("Total lines (TS/TSX)", "ts_total_lines"),
                     ("Functions", "total_functions"), ("Classes", "total_classes"),
                     ("Functions/file", "functions_per_file"), ("Classes/file", "classes_per_file"),
                     ("Avg lines/file", "avg_lines_per_file"),
@@ -894,6 +984,9 @@ def main():
                         val_str = str(val)
                     if key.endswith("_pct") or key.endswith("_rate"):
                         val_str += "%"
+                    # Skip zero-value rows for irrelevant metrics
+                    if val == 0 and key in ("ts_files", "tsx_files", "js_files", "ts_total_lines"):
+                        continue
                     md += f"| {label} | {val_str} |\n"
 
             if metrics.get("narration_penalty", 0) > 0:

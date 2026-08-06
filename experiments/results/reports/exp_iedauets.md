@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener API with tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:53:23
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:57:54
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
+| Correctness | 100% (5/5 tests) |
 | Constraint satisfaction | 33% (2/6 constraints) |
 | Lines of code | 63 |
 | Cyclomatic complexity | 6.0 |
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_iedauets/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 63 |
+| Total lines (Py) | 63 |
 | Functions | 10 |
 | Classes | 0 |
 | Functions/file | 5.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_iedauets/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 5 |
+| Pass rate | 100% |
+| Duration | 0.7s |

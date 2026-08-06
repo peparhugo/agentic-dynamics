@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with rate limiting and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:57:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:05:11
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
+| Correctness | 38% (6/16 tests) |
 | Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 227 |
 | Cyclomatic complexity | 21.0 |
@@ -63,16 +63,24 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 38%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_tjlvdunl/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 227 |
+| Total lines (Py) | 227 |
 | Functions | 29 |
 | Classes | 0 |
 | Functions/file | 14.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_tjlvdunl/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 6 |
+| Failed | 10 |
+| Errors | 0 |
+| Total | 16 |
+| Pass rate | 38% |
+| Duration | 1.0s |

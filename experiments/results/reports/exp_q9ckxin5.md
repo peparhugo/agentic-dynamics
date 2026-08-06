@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Complete task management API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:10
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:02:36
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_q9ckxin5/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 6 |
-| Total lines | 267 |
+| Total lines (Py) | 267 |
 | Functions | 15 |
 | Classes | 7 |
 | Functions/file | 2.5 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_q9ckxin5/session.jsonl)
-
-*No code output — this session was narration-only.*

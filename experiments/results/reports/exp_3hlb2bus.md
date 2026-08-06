@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Task management API: Flask/SQLite/JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:45:55
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:41:11
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($1.2564, ~3282J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($1.2564, ~3282J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 581 |
 | Cyclomatic complexity | 134.0 |
 | Code quality | 0.172 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.631** |
+| **Composite** | **0.674** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3282 J** |
 | Solution density | 0.040663 LOC/tok |
 | Correctness/$ | 64 |
-| Quality/J | 0.000192 |
+| Quality/J | 0.000205 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_3hlb2bus/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 8 |
-| Total lines | 581 |
+| Total lines (Py) | 581 |
 | Functions | 45 |
 | Classes | 3 |
 | Functions/file | 5.6 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_3hlb2bus/session.jsonl)
-
-*No code output — this session was narration-only.*

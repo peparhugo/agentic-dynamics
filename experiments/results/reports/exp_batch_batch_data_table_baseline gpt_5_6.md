@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:data_table:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:20
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:45
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) |
+| Correctness | 100% (6/6 tests) |
 | Constraint satisfaction | 25% (1/4 constraints) |
 | Lines of code | 52 |
 | Cyclomatic complexity | 7.0 |
@@ -63,16 +63,28 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 80%  |  **Cost:** $0.7978  |  **Energy:** ~4255J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.7978  |  **Energy:** ~4255J  |  **Thinking:** 7%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_data_table_baseline gpt_5_6/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 1 |
-| Total lines | 52 |
+| TS files | 6 |
+| TSX files | 4 |
+| JS files | 2 |
+| Total lines (Py) | 52 |
+| Total lines (TS/TSX) | 544 |
 | Functions | 7 |
 | Classes | 0 |
 | Functions/file | 7.0 |
@@ -87,12 +99,16 @@
 | Test file rate | 100% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_batch_data_table_baseline gpt_5_6/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 6 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 6 |
+| Pass rate | 100% |
+| Duration | 3.5s |

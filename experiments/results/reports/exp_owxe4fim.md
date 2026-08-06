@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [remove_critical_constraint_s0.5_r1] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:30
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:28
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.802
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.72) with moderate resource use ($0.0179, ~2784J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.76) with moderate resource use ($0.0179, ~2784J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 245 |
 | Cyclomatic complexity | 33.0 |
 | Code quality | 0.408 |
 | Novelty vs baseline | 0.749 |
-| **Composite** | **0.715** |
+| **Composite** | **0.758** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2784 J** |
 | Solution density | 0.011839 LOC/tok |
 | Correctness/$ | 105 |
-| Quality/J | 0.000257 |
+| Quality/J | 0.000272 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_owxe4fim/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 245 |
+| Total lines (Py) | 245 |
 | Functions | 32 |
 | Classes | 6 |
 | Functions/file | 4.6 |
@@ -86,13 +94,3 @@
 | Test files | 1 |
 | Test file rate | 14% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_owxe4fim/session.jsonl)
-
-*No code output — this session was narration-only.*

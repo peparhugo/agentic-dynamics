@@ -1,0 +1,8 @@
+<header>
+  <nav>
+    <a href="{{site.baseUrl}}/">Home</a>
+    {{#each tags}}
+    <a href="{{site.baseUrl}}/tags/{{encodeURI this.tag}}/">#{{this.tag}}</a>
+    {{/each}}
+  </nav>
+</header>

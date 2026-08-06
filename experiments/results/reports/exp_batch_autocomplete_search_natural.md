@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:autocomplete_search:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:15
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:34
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.743
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.48) with moderate resource use ($0.0180, ~5350J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0180, ~5350J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 98% (66/67 tests) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 1186 |
 | Cyclomatic complexity | 191.0 |
 | Code quality | 0.084 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.485** |
+| **Composite** | **0.570** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~5350 J** |
 | Solution density | 0.050455 LOC/tok |
 | Correctness/$ | 59 |
-| Quality/J | 0.000091 |
+| Quality/J | 0.000107 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0180  |  **Energy:** ~5350J  |  **Thinking:** 16%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 98%  |  **Cost:** $0.0180  |  **Energy:** ~5350J  |  **Thinking:** 16%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_autocomplete_search_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 12 |
-| Total lines | 1186 |
+| Total lines (Py) | 1186 |
 | Functions | 92 |
 | Classes | 10 |
 | Functions/file | 7.7 |
@@ -87,12 +95,16 @@
 | Test file rate | 42% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_autocomplete_search_natural/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 66 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 67 |
+| Pass rate | 98% |
+| Duration | 1.0s |

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [standardized_build] claude...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:27
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.698
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.47) with moderate resource use ($1.1104, ~2910J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.51) with moderate resource use ($1.1104, ~2910J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
+| Correctness | 100% (54/54 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 600 |
 | Cyclomatic complexity | 86.0 |
 | Code quality | 0.167 |
 | Novelty vs baseline | 0.685 |
-| **Composite** | **0.467** |
+| **Composite** | **0.510** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~2910 J** |
 | Solution density | 0.047371 LOC/tok |
 | Correctness/$ | 50 |
-| Quality/J | 0.000160 |
+| Quality/J | 0.000175 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ovy9g9b5/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 10 |
-| Total lines | 600 |
+| Total lines (Py) | 600 |
 | Functions | 89 |
 | Classes | 14 |
 | Functions/file | 8.9 |
@@ -100,12 +108,16 @@
 | **Assessment** | Low code density — narration exceeded code output |
 
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ovy9g9b5/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 54 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 54 |
+| Pass rate | 100% |
+| Duration | 1.2s |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [silent_sweep:perturbed:natural] deepseek_v4_pro...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:00:53
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.711
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.58) with moderate resource use ($0.0206, ~7178J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.71) with moderate resource use ($0.0206, ~7178J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 694 |
 | Cyclomatic complexity | 53.0 |
 | Code quality | 0.144 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.582** |
+| **Composite** | **0.711** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~7178 J** |
 | Solution density | 0.022448 LOC/tok |
 | Correctness/$ | 85 |
-| Quality/J | 0.000081 |
+| Quality/J | 0.000099 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_n7psw3ue/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 16 |
-| Total lines | 694 |
+| Total lines (Py) | 694 |
 | Functions | 57 |
 | Classes | 18 |
 | Functions/file | 3.6 |
@@ -86,13 +94,3 @@
 | Test files | 2 |
 | Test file rate | 12% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_n7psw3ue/session.jsonl)
-
-*No code output — this session was narration-only.*

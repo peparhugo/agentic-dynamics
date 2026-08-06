@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with REST API and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:57:45
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:06:20
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.847
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0050, ~1076J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.71) with moderate resource use ($0.0050, ~1076J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 33% (2/6 constraints) |
+| Correctness | 100% (8/8 tests) |
+| Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 141 |
 | Cyclomatic complexity | 20.0 |
 | Code quality | 0.667 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.658** |
+| **Composite** | **0.708** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1076 J** |
 | Solution density | 0.015578 LOC/tok |
 | Correctness/$ | 244 |
-| Quality/J | 0.000612 |
+| Quality/J | 0.000658 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ue8nk4wv/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 141 |
+| Total lines (Py) | 141 |
 | Functions | 18 |
 | Classes | 0 |
 | Functions/file | 9.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ue8nk4wv/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 8 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 8 |
+| Pass rate | 100% |
+| Duration | 4.5s |

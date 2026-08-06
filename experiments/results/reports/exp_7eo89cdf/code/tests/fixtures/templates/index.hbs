@@ -1,0 +1,9 @@
+<h2>Posts</h2>
+<ul>
+{{#each posts}}
+  <li>
+    <a href="/{{slug}}/">{{title}}</a>
+    {{#if date}}<span>{{formatDate date}}</span>{{/if}}
+  </li>
+{{/each}}
+</ul>

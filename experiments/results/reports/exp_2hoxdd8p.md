@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [standardized_retry] gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:44:52
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:40:11
 
 ---
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 41.0 |
 | Code quality | 0.407 |
 | Novelty vs baseline | 0.966 |
-| **Composite** | **0.557** |
+| **Composite** | **0.600** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~6910 J** |
 | Solution density | 0.006409 LOC/tok |
 | Correctness/$ | 48 |
-| Quality/J | 0.000081 |
+| Quality/J | 0.000087 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_2hoxdd8p/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 6 |
-| Total lines | 246 |
+| Total lines (Py) | 246 |
 | Functions | 23 |
 | Classes | 2 |
 | Functions/file | 3.8 |
@@ -99,13 +107,3 @@
 | Code density | 0.0391 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_2hoxdd8p/session.jsonl)
-
-*No code output — this session was narration-only.*

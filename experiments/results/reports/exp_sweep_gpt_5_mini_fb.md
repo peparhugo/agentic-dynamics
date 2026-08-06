@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:baseline:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:47
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
+| Correctness | 100% (4/4 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 227 |
 | Cyclomatic complexity | 41.0 |
@@ -63,16 +63,24 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_mini_fb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 227 |
+| Total lines (Py) | 227 |
 | Functions | 20 |
 | Classes | 3 |
 | Functions/file | 10.0 |
@@ -100,12 +108,16 @@
 | **Assessment** | Low code density — narration exceeded code output |
 
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_sweep_gpt_5_mini_fb/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 4 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 100% |
+| Duration | 1.8s |

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:44:52
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:40:07
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
+| Correctness | 100% (14/14 tests) |
 | Constraint satisfaction | 0% (0/6 constraints) |
 | Lines of code | 159 |
 | Cyclomatic complexity | 27.0 |
@@ -63,16 +63,24 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.4696  |  **Energy:** ~852J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.4696  |  **Energy:** ~852J  |  **Thinking:** 0%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_2890hja3/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 159 |
+| Total lines (Py) | 159 |
 | Functions | 22 |
 | Classes | 0 |
 | Functions/file | 11.0 |
@@ -100,12 +108,16 @@
 | **Assessment** | Low code density — narration exceeded code output |
 
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_2890hja3/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 14 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 14 |
+| Pass rate | 100% |
+| Duration | 0.8s |

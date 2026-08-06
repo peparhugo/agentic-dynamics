@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [inject_phantom_success_s0.5] cd_gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:47:00
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:58
 
 ---
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 29.0 |
 | Code quality | 0.517 |
 | Novelty vs baseline | 0.967 |
-| **Composite** | **0.708** |
+| **Composite** | **0.750** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3878 J** |
 | Solution density | 0.005296 LOC/tok |
 | Correctness/$ | 69 |
-| Quality/J | 0.000182 |
+| Quality/J | 0.000194 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_6km9sho1/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 6 |
-| Total lines | 144 |
+| Total lines (Py) | 144 |
 | Functions | 12 |
 | Classes | 3 |
 | Functions/file | 2.0 |
@@ -99,13 +107,3 @@
 | Code density | 0.0372 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_6km9sho1/session.jsonl)
-
-*No code output — this session was narration-only.*

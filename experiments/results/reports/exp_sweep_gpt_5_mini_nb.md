@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:baseline:natural] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:54
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.656
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.55) with moderate resource use ($0.0595, ~8288J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.59) with moderate resource use ($0.0595, ~8288J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
+| Correctness | 75% (3/4 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 342 |
 | Cyclomatic complexity | 58.0 |
 | Code quality | 0.292 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.550** |
+| **Composite** | **0.593** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~8288 J** |
 | Solution density | 0.005429 LOC/tok |
 | Correctness/$ | 28 |
-| Quality/J | 0.000066 |
+| Quality/J | 0.000072 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0595  |  **Energy:** ~8288J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 75%  |  **Cost:** $0.0595  |  **Energy:** ~8288J  |  **Thinking:** 7%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_mini_nb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 8 |
-| Total lines | 342 |
+| Total lines (Py) | 342 |
 | Functions | 28 |
 | Classes | 4 |
 | Functions/file | 3.5 |
@@ -100,12 +108,16 @@
 | **Assessment** | Low code density — narration exceeded code output |
 
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_sweep_gpt_5_mini_nb/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 3 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 75% |
+| Duration | 3.5s |

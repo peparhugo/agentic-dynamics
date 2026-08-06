@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [silent_sweep:perturbed:natural] Claude_Fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:58
 
 ---
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 1.0 |
 | Code quality | 0.983 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.350** |
+| **Composite** | **0.392** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~194 J** |
 | Solution density | 0.024823 LOC/tok |
 | Correctness/$ | 108 |
-| Quality/J | 0.001805 |
+| Quality/J | 0.002026 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_swp_Claude_F_np/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 21 |
+| Total lines (Py) | 21 |
 | Functions | 0 |
 | Classes | 2 |
 | Functions/file | 0.0 |
@@ -99,13 +107,3 @@
 | Code density | 0.0250 LOC/tok |
 | **Verdict** | **NARRATION FAILURE — 840 tokens burned, zero code output** |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_swp_Claude_F_np/session.jsonl)
-
-*No code output — this session was narration-only.*

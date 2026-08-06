@@ -1,0 +1,10 @@
+<h1>{{site.title}}</h1>
+<p>{{site.description}}</p>
+<ul class="posts">
+{{#each posts}}
+  <li>
+    <a href="{{url}}">{{title}}</a>
+    {{#if date}}<time datetime="{{isoDate date}}">{{dateFormat date}}</time>{{/if}}
+  </li>
+{{/each}}
+</ul>

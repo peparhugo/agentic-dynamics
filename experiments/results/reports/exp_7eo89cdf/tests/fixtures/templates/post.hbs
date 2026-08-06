@@ -1,0 +1,6 @@
+<article>
+  <h1>{{post.title}}</h1>
+  {{#if post.date}}<time>{{formatDate post.date}}</time>{{/if}}
+  <div>{{{post.content}}}</div>
+  {{#each post.tags}}<a href="/tags/{{this}}/">{{this}}</a>{{/each}}
+</article>

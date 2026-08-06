@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Authenticated Flask REST API setup...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:48:47
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:10
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.670
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.60) with moderate resource use ($1.3795, ~3808J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.65) with moderate resource use ($1.3795, ~3808J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 61.0 |
 | Code quality | 0.137 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.605** |
+| **Composite** | **0.647** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3808 J** |
 | Solution density | 0.043990 LOC/tok |
 | Correctness/$ | 38 |
-| Quality/J | 0.000159 |
+| Quality/J | 0.000170 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_b48bnosz/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 19 |
-| Total lines | 729 |
+| Total lines (Py) | 729 |
 | Functions | 84 |
 | Classes | 23 |
 | Functions/file | 4.4 |
@@ -99,13 +107,3 @@
 | Code density | 0.0441 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_b48bnosz/session.jsonl)
-
-*No code output — this session was narration-only.*

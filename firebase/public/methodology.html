@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Research Methodology — AI FinOps Framework</title>
-<meta name="description" content="How the AI FinOps Framework was built. 189 sessions, 8 models, 10 perturbation operators, 6 recovery signals. The instrument behind the unified framework.">
+<meta name="description" content="How the AI FinOps Framework was built. 248 sessions, 8 models, 10 perturbation operators, 6 recovery signals. The instrument behind the unified framework.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -75,7 +75,7 @@ footer a:hover{text-decoration:underline}
 <div class="stat"><div class="v">6</div><div class="l">Recovery Signals</div></div>
 <div class="stat"><div class="v">4</div><div class="l">Strategy Archetypes</div></div>
 <div class="stat"><div class="v">22</div><div class="l">Experiment Configs</div></div>
-<div class="stat"><div class="v">189</div><div class="l">Sessions</div></div>
+<div class="stat"><div class="v">248</div><div class="l">Sessions</div></div>
 <div class="stat"><div class="v">8</div><div class="l">Models Tested</div></div>
 </div>
 </section>
@@ -166,7 +166,7 @@ footer a:hover{text-decoration:underline}
 <span style="color:var(--ac)">Cost per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
 <span style="color:var(--ac)">Model gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
 </div>
-<p style="font-size:0.8rem;color:var(--t3);text-align:center">C&#8320; = model choice, &epsilon; = cost of verbalized reasoning, &beta;&middot;N&sup2; = compounding codebase growth, EPM = energy market exposure, v = scaling speed. Change one and the others shift &mdash; that's why they're tested together. Every term was measured empirically from the 189-session experiment corpus.</p>
+<p style="font-size:0.8rem;color:var(--t3);text-align:center">C&#8320; = model choice, &epsilon; = cost of verbalized reasoning, &beta;&middot;N&sup2; = compounding codebase growth, EPM = energy market exposure, v = scaling speed. Change one and the others shift &mdash; that's why they're tested together. Every term was measured empirically from the 248-session experiment corpus.</p>
 </section>
 
 <!-- Constraint Detection -->
@@ -188,7 +188,7 @@ footer a:hover{text-decoration:underline}
 
 <div class="cards">
 <div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/ai-finops-framework<br>cd ai-finops-framework<br>pip install -e .</code></div></div>
-<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml</code><br><br>Choose from 22 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
+<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
 <div class="card"><div class="ctitle">3. Read the Results</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Compare correctness, cost, escape scores, recovery ratios, and strategy classifications across runs.</div></div>
 <div class="card"><div class="ctitle">4. Extend It</div><div class="cdesc">Add new perturbation operators in <code>src/instrument/perturb.py</code>. Add new task configs in <code>experiments/configs/</code>. The instrument is modular by design &ndash; new operators, models, and domains plug in without modifying the core runner.</div></div>
 </div>
@@ -230,14 +230,14 @@ footer a:hover{text-decoration:underline}
 <div class="stat"><div class="v">65×</div><div class="l">Measured Cost Gap</div></div>
 <div class="stat"><div class="v">24–120%</div><div class="l">Explanation Tax Range</div></div>
 <div class="stat"><div class="v">1.80&times;</div><div class="l">2050 EPM Horizon</div></div>
-<div class="stat"><div class="v">$45.14</div><div class="l">Total Experiment Cost</div></div>
+<div class="stat"><div class="v">$64.98</div><div class="l">Total Experiment Cost</div></div>
 </div>
 <div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">View the Framework &rarr;</a></div>
 </section>
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-189 experiment sessions &middot; 3 architectures, 8 variants &middot; 142 game reports &middot; 21 TS cross-model runs &middot; $45.14 analyzed<br>
+248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; 21 TS cross-model runs &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

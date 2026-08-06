@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [baseline] cd_openai_GPT_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:08:36
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:33
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.659
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.64) with moderate resource use ($0.0180, ~2629J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.68) with moderate resource use ($0.0180, ~2629J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 28.0 |
 | Code quality | 0.533 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.641** |
+| **Composite** | **0.684** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2629 J** |
 | Solution density | 0.009515 LOC/tok |
 | Correctness/$ | 81 |
-| Quality/J | 0.000244 |
+| Quality/J | 0.000260 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_x8g28_k8/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 187 |
+| Total lines (Py) | 187 |
 | Functions | 23 |
 | Classes | 4 |
 | Functions/file | 11.5 |
@@ -99,13 +107,3 @@
 | Code density | 0.0444 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_x8g28_k8/session.jsonl)
-
-*No code output — this session was narration-only.*

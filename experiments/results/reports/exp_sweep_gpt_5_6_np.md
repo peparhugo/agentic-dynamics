@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [silent_sweep:perturbed:natural] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:45
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.760
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.71) with moderate resource use ($0.4235, ~2264J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.76) with moderate resource use ($0.4235, ~2264J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 86% (6/7 constraints) |
+| Correctness | 100% (9/9 tests) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 618 |
 | Cyclomatic complexity | 73.0 |
 | Code quality | 0.162 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.715** |
+| **Composite** | **0.757** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2264 J** |
 | Solution density | 0.067578 LOC/tok |
 | Correctness/$ | 107 |
-| Quality/J | 0.000316 |
+| Quality/J | 0.000334 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_6_np/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 11 |
-| Total lines | 618 |
+| Total lines (Py) | 618 |
 | Functions | 58 |
 | Classes | 5 |
 | Functions/file | 5.3 |
@@ -87,12 +95,16 @@
 | Test file rate | 18% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_sweep_gpt_5_6_np/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 9 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 9 |
+| Pass rate | 100% |
+| Duration | 4.6s |

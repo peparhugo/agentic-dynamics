@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask SQLite task API with JWT and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:46:30
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:10
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0237, ~5945J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.65) with moderate resource use ($0.0237, ~5945J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 1446 |
 | Cyclomatic complexity | 126.0 |
 | Code quality | 0.069 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.567** |
+| **Composite** | **0.653** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5945 J** |
 | Solution density | 0.046621 LOC/tok |
 | Correctness/$ | 40 |
-| Quality/J | 0.000095 |
+| Quality/J | 0.000110 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_4f5g2wms/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 15 |
-| Total lines | 1446 |
+| Total lines (Py) | 1446 |
 | Functions | 137 |
 | Classes | 22 |
 | Functions/file | 9.1 |
@@ -86,13 +94,3 @@
 | Test files | 5 |
 | Test file rate | 33% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_4f5g2wms/session.jsonl)
-
-*No code output — this session was narration-only.*

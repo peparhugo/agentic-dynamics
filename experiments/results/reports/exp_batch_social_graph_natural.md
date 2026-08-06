@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:social_graph:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:54
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.753
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.48) with moderate resource use ($0.0130, ~3568J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.44) with moderate resource use ($0.0130, ~3568J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 98% (91/93 tests) |
+| Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 1333 |
 | Cyclomatic complexity | 260.0 |
 | Code quality | 0.075 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.483** |
+| **Composite** | **0.440** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~3568 J** |
 | Solution density | 0.072140 LOC/tok |
 | Correctness/$ | 84 |
-| Quality/J | 0.000135 |
+| Quality/J | 0.000123 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0130  |  **Energy:** ~3568J  |  **Thinking:** 11%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 98%  |  **Cost:** $0.0130  |  **Energy:** ~3568J  |  **Thinking:** 11%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_social_graph_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 17 |
-| Total lines | 1333 |
+| Total lines (Py) | 1333 |
 | Functions | 196 |
 | Classes | 22 |
 | Functions/file | 11.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 41% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_social_graph_natural/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 91 |
+| Failed | 2 |
+| Errors | 0 |
+| Total | 93 |
+| Pass rate | 98% |
+| Duration | 0.7s |

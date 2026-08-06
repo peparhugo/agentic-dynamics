@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:factorial_compound:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:46
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:48:01
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.763
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.61) with moderate resource use ($0.0215, ~5645J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0215, ~5645J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 1537 |
 | Cyclomatic complexity | 197.0 |
 | Code quality | 0.065 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.609** |
+| **Composite** | **0.567** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5645 J** |
 | Solution density | 0.053450 LOC/tok |
 | Correctness/$ | 45 |
-| Quality/J | 0.000108 |
+| Quality/J | 0.000100 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_factorial_compound_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 5 |
-| Total lines | 1537 |
+| Total lines (Py) | 1537 |
 | Functions | 141 |
 | Classes | 16 |
 | Functions/file | 28.2 |
@@ -86,13 +94,3 @@
 | Test files | 2 |
 | Test file rate | 40% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_factorial_compound_natural/session.jsonl)
-
-*No code output — this session was narration-only.*

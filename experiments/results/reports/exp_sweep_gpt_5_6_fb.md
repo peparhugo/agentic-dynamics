@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [silent_sweep:baseline:forced] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:34
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.761
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.60) with moderate resource use ($0.3088, ~1674J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.73) with moderate resource use ($0.3088, ~1674J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Correctness | 100% (12/12 tests) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 427 |
 | Cyclomatic complexity | 85.0 |
 | Code quality | 0.234 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.600** |
+| **Composite** | **0.729** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1674 J** |
 | Solution density | 0.062831 LOC/tok |
 | Correctness/$ | 143 |
-| Quality/J | 0.000359 |
+| Quality/J | 0.000435 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_6_fb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 427 |
+| Total lines (Py) | 427 |
 | Functions | 43 |
 | Classes | 4 |
 | Functions/file | 21.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_sweep_gpt_5_6_fb/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 12 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 12 |
+| Pass rate | 100% |
+| Duration | 5.1s |

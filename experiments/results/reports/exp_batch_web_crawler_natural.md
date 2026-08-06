@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:web_crawler:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:59
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.732
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.53) with moderate resource use ($0.0116, ~3571J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.62) with moderate resource use ($0.0116, ~3571J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 320 |
 | Cyclomatic complexity | 83.0 |
 | Code quality | 0.312 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.530** |
+| **Composite** | **0.616** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3571 J** |
 | Solution density | 0.017610 LOC/tok |
 | Correctness/$ | 129 |
-| Quality/J | 0.000149 |
+| Quality/J | 0.000173 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_web_crawler_natural/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 4 |
-| Total lines | 320 |
+| Total lines (Py) | 320 |
 | Functions | 33 |
 | Classes | 8 |
 | Functions/file | 8.2 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_web_crawler_natural/session.jsonl)
-
-*No code output — this session was narration-only.*

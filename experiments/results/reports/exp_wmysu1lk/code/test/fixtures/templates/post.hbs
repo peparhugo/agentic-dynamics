@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>{{post.title}} - {{site.title}}</title>
+</head>
+<body>
+  {{> header}}
+  <article>
+    <h1>{{post.title}}</h1>
+    <time>{{post.date}}</time>
+    <div>{{{post.content}}}</div>
+    <div>
+    {{#each post.tags}}<span class="tag">{{this}}</span>{{/each}}
+    </div>
+  </article>
+</body>
+</html>

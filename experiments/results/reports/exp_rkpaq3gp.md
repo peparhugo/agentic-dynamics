@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5_r2] constraint_detection_3rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:57
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:03
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.779
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.59) with moderate resource use ($0.0159, ~3925J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.72) with moderate resource use ($0.0159, ~3925J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 782 |
 | Cyclomatic complexity | 63.0 |
 | Code quality | 0.128 |
 | Novelty vs baseline | 0.569 |
-| **Composite** | **0.589** |
+| **Composite** | **0.718** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3925 J** |
 | Solution density | 0.035137 LOC/tok |
 | Correctness/$ | 62 |
-| Quality/J | 0.000150 |
+| Quality/J | 0.000183 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_rkpaq3gp/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 25 |
-| Total lines | 782 |
+| Total lines (Py) | 782 |
 | Functions | 77 |
 | Classes | 19 |
 | Functions/file | 3.1 |
@@ -86,13 +94,3 @@
 | Test files | 5 |
 | Test file rate | 20% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_rkpaq3gp/session.jsonl)
-
-*No code output — this session was narration-only.*

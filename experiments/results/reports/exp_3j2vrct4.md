@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** REST API: JWT, rate limiting, audit logging...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:46:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:41:29
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.68) with moderate resource use ($0.8723, ~2220J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.77) with moderate resource use ($0.8723, ~2220J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 463 |
 | Cyclomatic complexity | 94.0 |
 | Code quality | 0.216 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.682** |
+| **Composite** | **0.768** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2220 J** |
 | Solution density | 0.047920 LOC/tok |
 | Correctness/$ | 94 |
-| Quality/J | 0.000307 |
+| Quality/J | 0.000346 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_3j2vrct4/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 10 |
-| Total lines | 463 |
+| Total lines (Py) | 463 |
 | Functions | 36 |
 | Classes | 10 |
 | Functions/file | 3.6 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_3j2vrct4/session.jsonl)
-
-*No code output — this session was narration-only.*

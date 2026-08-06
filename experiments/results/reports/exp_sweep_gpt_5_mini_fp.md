@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:perturbed:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:50
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.764
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.71) with moderate resource use ($0.0323, ~5369J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0323, ~5369J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Correctness | 100% (3/3 tests) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 281 |
 | Cyclomatic complexity | 52.0 |
 | Code quality | 0.356 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.710** |
+| **Composite** | **0.753** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5369 J** |
 | Solution density | 0.006254 LOC/tok |
 | Correctness/$ | 61 |
-| Quality/J | 0.000132 |
+| Quality/J | 0.000140 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_sweep_gpt_5_mini_fp/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 281 |
+| Total lines (Py) | 281 |
 | Functions | 27 |
 | Classes | 5 |
 | Functions/file | 3.9 |
@@ -87,12 +95,16 @@
 | Test file rate | 29% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_sweep_gpt_5_mini_fp/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 3 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 3 |
+| Pass rate | 100% |
+| Duration | 2.9s |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [standardized_build] deepseek...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:52:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:56:38
 
 ---
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 29% (2/7 constraints) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 558 |
 | Cyclomatic complexity | 69.0 |
 | Code quality | 0.179 |
 | Novelty vs baseline | 0.723 |
-| **Composite** | **0.580** |
+| **Composite** | **0.623** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5226 J** |
 | Solution density | 0.016640 LOC/tok |
 | Correctness/$ | 68 |
-| Quality/J | 0.000111 |
+| Quality/J | 0.000119 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_gmnl5d6g/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 6 |
-| Total lines | 558 |
+| Total lines (Py) | 558 |
 | Functions | 47 |
 | Classes | 5 |
 | Functions/file | 7.8 |
@@ -86,13 +94,3 @@
 | Test files | 1 |
 | Test file rate | 17% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_gmnl5d6g/session.jsonl)
-
-*No code output — this session was narration-only.*

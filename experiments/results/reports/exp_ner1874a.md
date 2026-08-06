@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [remove_critical_constraint_s0.5_r1] cd_openai_GPT_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:14
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:00:54
 
 ---
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 241 |
 | Cyclomatic complexity | 45.0 |
 | Code quality | 0.415 |
 | Novelty vs baseline | 0.973 |
-| **Composite** | **0.707** |
+| **Composite** | **0.879** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2800 J** |
 | Solution density | 0.010238 LOC/tok |
 | Correctness/$ | 108 |
-| Quality/J | 0.000253 |
+| Quality/J | 0.000314 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ner1874a/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 241 |
+| Total lines (Py) | 241 |
 | Functions | 20 |
 | Classes | 5 |
 | Functions/file | 2.9 |
@@ -86,13 +94,3 @@
 | Test files | 2 |
 | Test file rate | 29% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ner1874a/session.jsonl)
-
-*No code output — this session was narration-only.*

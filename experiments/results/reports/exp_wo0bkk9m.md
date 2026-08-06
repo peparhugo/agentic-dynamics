@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Authenticated REST API with JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:08:30
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:24
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 298 |
 | Cyclomatic complexity | 41.0 |
 | Code quality | 0.336 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.664** |
+| **Composite** | **0.749** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1586 J** |
 | Solution density | 0.043157 LOC/tok |
 | Correctness/$ | 132 |
-| Quality/J | 0.000418 |
+| Quality/J | 0.000472 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_wo0bkk9m/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 298 |
+| Total lines (Py) | 298 |
 | Functions | 29 |
 | Classes | 17 |
 | Functions/file | 4.1 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_wo0bkk9m/session.jsonl)
-
-*No code output — this session was narration-only.*

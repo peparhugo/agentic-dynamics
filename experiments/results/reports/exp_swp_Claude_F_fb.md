@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [silent_sweep:baseline:forced] Claude_Fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:58
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.1629, ~82J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.70) with moderate resource use ($0.1629, ~82J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Constraint satisfaction | 29% (2/7 constraints) |
 | Lines of code | 48 |
 | Cyclomatic complexity | 2.0 |
 | Code quality | 0.967 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.661** |
+| **Composite** | **0.704** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~82 J** |
 | Solution density | 0.134078 LOC/tok |
 | Correctness/$ | 2550 |
-| Quality/J | 0.008059 |
+| Quality/J | 0.008582 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_swp_Claude_F_fb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 1 |
-| Total lines | 48 |
+| Total lines (Py) | 48 |
 | Functions | 6 |
 | Classes | 0 |
 | Functions/file | 6.0 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_swp_Claude_F_fb/session.jsonl)
-
-*No code output — this session was narration-only.*

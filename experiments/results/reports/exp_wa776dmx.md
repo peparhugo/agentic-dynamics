@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Building and critiquing Flask task API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:58:33
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:08:55
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.767
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0219, ~5388J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.65) with moderate resource use ($0.0219, ~5388J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 1295 |
 | Cyclomatic complexity | 114.0 |
 | Code quality | 0.077 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.569** |
+| **Composite** | **0.655** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5388 J** |
 | Solution density | 0.040181 LOC/tok |
 | Correctness/$ | 47 |
-| Quality/J | 0.000106 |
+| Quality/J | 0.000122 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_wa776dmx/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 14 |
-| Total lines | 1295 |
+| Total lines (Py) | 1295 |
 | Functions | 96 |
 | Classes | 21 |
 | Functions/file | 6.9 |
@@ -86,13 +94,3 @@
 | Test files | 4 |
 | Test file rate | 29% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_wa776dmx/session.jsonl)
-
-*No code output — this session was narration-only.*

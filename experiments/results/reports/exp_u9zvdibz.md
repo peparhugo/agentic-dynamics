@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT, SQLite, and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:57:34
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:05:56
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.760
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.61) with moderate resource use ($0.0213, ~5411J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0213, ~5411J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 1127 |
 | Cyclomatic complexity | 125.0 |
 | Code quality | 0.089 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.614** |
+| **Composite** | **0.657** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5411 J** |
 | Solution density | 0.038827 LOC/tok |
 | Correctness/$ | 50 |
-| Quality/J | 0.000114 |
+| Quality/J | 0.000121 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_u9zvdibz/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 10 |
-| Total lines | 1127 |
+| Total lines (Py) | 1127 |
 | Functions | 117 |
 | Classes | 10 |
 | Functions/file | 11.7 |
@@ -86,13 +94,3 @@
 | Test files | 3 |
 | Test file rate | 30% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_u9zvdibz/session.jsonl)
-
-*No code output — this session was narration-only.*

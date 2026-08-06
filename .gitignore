@@ -9,13 +9,7 @@ build/
 # Firebase
 .firebase/
 
-# Generated inventory (rebuild with `scripts/inventory.py refresh`)
-experiments/inventory.json
-
-# Generated experiment results (not tracked — use inventory.py)
-experiments/results/*.json
-experiments/results/*.md
-!experiments/results/README.md
+# Experiment results and inventory are now tracked in git
 
 # Opencode worktrees (transient temp dirs)
 /tmp/

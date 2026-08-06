@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask REST API: JWT, rate limiting & audit logging...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:08:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:48
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0142, ~3406J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0142, ~3406J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 809 |
 | Cyclomatic complexity | 52.0 |
 | Code quality | 0.124 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.664** |
+| **Composite** | **0.750** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3406 J** |
 | Solution density | 0.040245 LOC/tok |
 | Correctness/$ | 71 |
-| Quality/J | 0.000195 |
+| Quality/J | 0.000220 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_xszdrm2e/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 20 |
-| Total lines | 809 |
+| Total lines (Py) | 809 |
 | Functions | 89 |
 | Classes | 14 |
 | Functions/file | 4.5 |
@@ -86,13 +94,3 @@
 | Test files | 7 |
 | Test file rate | 35% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_xszdrm2e/session.jsonl)
-
-*No code output — this session was narration-only.*

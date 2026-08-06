@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task API: JWT, SQLite, throughput vs latency...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:25
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:03:13
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.58) with moderate resource use ($0.0197, ~4761J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0197, ~4761J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Correctness | 100% (70/70 tests) |
+| Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 925 |
 | Cyclomatic complexity | 110.0 |
 | Code quality | 0.108 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.575** |
+| **Composite** | **0.661** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~4761 J** |
 | Solution density | 0.032951 LOC/tok |
 | Correctness/$ | 52 |
-| Quality/J | 0.000121 |
+| Quality/J | 0.000139 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_qqhhxsn1/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 11 |
-| Total lines | 925 |
+| Total lines (Py) | 925 |
 | Functions | 98 |
 | Classes | 16 |
 | Functions/file | 8.9 |
@@ -87,12 +95,16 @@
 | Test file rate | 27% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_qqhhxsn1/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 70 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 70 |
+| Pass rate | 100% |
+| Duration | 14.9s |

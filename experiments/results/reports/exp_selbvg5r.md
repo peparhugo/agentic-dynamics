@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.5  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_gather_gpt_5_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:28
 
 ---
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Correctness | 100% (9/9 tests) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 288 |
 | Cyclomatic complexity | 47.0 |
 | Code quality | 0.347 |
 | Novelty vs baseline | 0.966 |
-| **Composite** | **0.779** |
+| **Composite** | **0.822** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2859 J** |
 | Solution density | 0.012643 LOC/tok |
 | Correctness/$ | 96 |
-| Quality/J | 0.000272 |
+| Quality/J | 0.000287 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_selbvg5r/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 3 |
-| Total lines | 288 |
+| Total lines (Py) | 288 |
 | Functions | 35 |
 | Classes | 1 |
 | Functions/file | 11.7 |
@@ -87,12 +95,16 @@
 | Test file rate | 67% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_selbvg5r/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 9 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 9 |
+| Pass rate | 100% |
+| Duration | 0.7s |

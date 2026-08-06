@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask REST API: JWT, pagination, rate limiting...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:00
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:00:35
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.0148, ~3606J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0148, ~3606J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 756 |
 | Cyclomatic complexity | 46.0 |
 | Code quality | 0.132 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.666** |
+| **Composite** | **0.751** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3606 J** |
 | Solution density | 0.036174 LOC/tok |
 | Correctness/$ | 68 |
-| Quality/J | 0.000185 |
+| Quality/J | 0.000208 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_mmp26p5c/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 21 |
-| Total lines | 756 |
+| Total lines (Py) | 756 |
 | Functions | 72 |
 | Classes | 21 |
 | Functions/file | 3.4 |
@@ -86,13 +94,3 @@
 | Test files | 4 |
 | Test file rate | 19% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_mmp26p5c/session.jsonl)
-
-*No code output — this session was narration-only.*

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:57:57
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:07:39
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.62) with moderate resource use ($0.3002, ~493J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.72) with moderate resource use ($0.3002, ~493J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 17% (1/6 constraints) |
+| Correctness | 88% (7/8 tests) |
+| Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 117 |
 | Cyclomatic complexity | 16.0 |
 | Code quality | 0.733 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.622** |
+| **Composite** | **0.722** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~493 J** |
 | Solution density | 0.054444 LOC/tok |
 | Correctness/$ | 424 |
-| Quality/J | 0.001261 |
+| Quality/J | 0.001464 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.3002  |  **Energy:** ~493J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 88%  |  **Cost:** $0.3002  |  **Energy:** ~493J  |  **Thinking:** 0%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_vw0msd_3/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 117 |
+| Total lines (Py) | 117 |
 | Functions | 18 |
 | Classes | 0 |
 | Functions/file | 9.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_vw0msd_3/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 7 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 8 |
+| Pass rate | 88% |
+| Duration | 3.3s |

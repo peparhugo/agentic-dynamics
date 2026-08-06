@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Collision-resistant URL shortener with analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:00:44
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.794
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.77) with moderate resource use ($0.0081, ~1882J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.72) with moderate resource use ($0.0081, ~1882J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 83% (5/6 constraints) |
+| Constraint satisfaction | 67% (4/6 constraints) |
 | Lines of code | 221 |
 | Cyclomatic complexity | 35.0 |
 | Code quality | 0.452 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.765** |
+| **Composite** | **0.715** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1882 J** |
 | Solution density | 0.016613 LOC/tok |
 | Correctness/$ | 150 |
-| Quality/J | 0.000407 |
+| Quality/J | 0.000380 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_mn5mnvtw/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 4 |
-| Total lines | 221 |
+| Total lines (Py) | 221 |
 | Functions | 3 |
 | Classes | 0 |
 | Functions/file | 0.8 |
@@ -86,13 +94,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_mn5mnvtw/session.jsonl)
-
-*No code output — this session was narration-only.*

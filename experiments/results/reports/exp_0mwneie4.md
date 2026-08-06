@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [remove_critical_constraint_s0.5_r2] gpt_gather_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T13:59:15
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:37:49
 
 ---
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Correctness | 100% (16/16 tests) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 407 |
 | Cyclomatic complexity | 62.0 |
 | Code quality | 0.246 |
 | Novelty vs baseline | 0.974 |
-| **Composite** | **0.717** |
+| **Composite** | **0.845** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1676 J** |
 | Solution density | 0.057502 LOC/tok |
 | Correctness/$ | 132 |
-| Quality/J | 0.000427 |
+| Quality/J | 0.000504 |
 
 ---
 
@@ -71,17 +71,16 @@
 
 Raw session transcript and generated source code for independent verification.
 
-- [Opencode session transcript](./exp_0mwneie4/session.jsonl)
+- [Generated code](./exp_0mwneie4/code/)
 
-*No code output — this session was narration-only.*
 ---
 
-## AST Code Quality
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 3 |
-| Total lines | 407 |
+| Total lines (Py) | 407 |
 | Functions | 48 |
 | Classes | 2 |
 | Functions/file | 16.0 |
@@ -95,3 +94,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 16 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 16 |
+| Pass rate | 100% |
+| Duration | 10.7s |

@@ -1,0 +1,29 @@
+{
+  "name": "ssgen",
+  "version": "1.0.0",
+  "description": "Static site generator: Markdown + Handlebars, tag pages, RSS, live-reload dev server",
+  "type": "module",
+  "bin": { "ssgen": "dist/cli.js" },
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "dev": "node dist/cli.js serve"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "chokidar": "^3.6.0",
+    "gray-matter": "^4.0.3",
+    "handlebars": "^4.7.8",
+    "highlight.js": "^11.9.0",
+    "markdown-it": "^14.1.0",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.1",
+    "@types/node": "^20.12.7",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}

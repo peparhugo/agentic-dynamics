@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [remove_critical_constraint_s0.5_r2] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:48:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:22
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.696
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.60) with moderate resource use ($0.0309, ~4390J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.68) with moderate resource use ($0.0309, ~4390J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
+| Correctness | 100% (4/4 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 306 |
 | Cyclomatic complexity | 60.0 |
 | Code quality | 0.327 |
 | Novelty vs baseline | 0.766 |
-| **Composite** | **0.597** |
+| **Composite** | **0.682** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~4390 J** |
 | Solution density | 0.010055 LOC/tok |
 | Correctness/$ | 49 |
-| Quality/J | 0.000136 |
+| Quality/J | 0.000155 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0309  |  **Energy:** ~4390J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0309  |  **Energy:** ~4390J  |  **Thinking:** 7%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ba8s0njl/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 306 |
+| Total lines (Py) | 306 |
 | Functions | 21 |
 | Classes | 3 |
 | Functions/file | 10.5 |
@@ -100,12 +108,16 @@
 | **Assessment** | Low code density — narration exceeded code output |
 
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ba8s0njl/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 4 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 100% |
+| Duration | 3.0s |

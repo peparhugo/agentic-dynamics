@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [remove_critical_constraint_s0.5_r1] gpt_gather_gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:46:30
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:16
 
 ---
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 86% (6/7 constraints) |
+| Correctness | 100% (14/14 tests) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 305 |
 | Cyclomatic complexity | 50.0 |
 | Code quality | 0.328 |
 | Novelty vs baseline | 0.970 |
-| **Composite** | **0.818** |
+| **Composite** | **0.861** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1443 J** |
 | Solution density | 0.050372 LOC/tok |
 | Correctness/$ | 156 |
-| Quality/J | 0.000567 |
+| Quality/J | 0.000597 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_4jvdqhzs/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 4 |
-| Total lines | 305 |
+| Total lines (Py) | 305 |
 | Functions | 36 |
 | Classes | 0 |
 | Functions/file | 9.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_4jvdqhzs/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 14 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 14 |
+| Pass rate | 100% |
+| Duration | 3.4s |

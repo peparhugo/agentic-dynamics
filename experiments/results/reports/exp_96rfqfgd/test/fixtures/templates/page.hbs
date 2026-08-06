@@ -1,0 +1,16 @@
+<article>
+  <h1>{{page.frontmatter.title}}</h1>
+  {{#if page.frontmatter.date}}
+    <time>{{page.frontmatter.date}}</time>
+  {{/if}}
+  <div class="content">
+    {{{page.html}}}
+  </div>
+  {{#if page.frontmatter.tags}}
+    <ul class="tags">
+      {{#each page.frontmatter.tags}}
+        <li><a href="/tags/{{this}}.html">{{this}}</a></li>
+      {{/each}}
+    </ul>
+  {{/if}}
+</article>

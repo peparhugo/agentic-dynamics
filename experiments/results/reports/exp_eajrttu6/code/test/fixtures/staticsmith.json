@@ -1,0 +1,12 @@
+{
+  "site": {
+    "title": "Test Blog",
+    "description": "A test blog",
+    "url": "https://example.com",
+    "author": "Test Author",
+    "language": "en"
+  },
+  "sourceDir": "content",
+  "outputDir": "public",
+  "templatesDir": "templates"
+}

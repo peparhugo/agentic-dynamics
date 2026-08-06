@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [debug_forced] deepseek...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:11:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:12:09
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_zmwy64er/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 1 |
-| Total lines | 11 |
+| Total lines (Py) | 11 |
 | Functions | 0 |
 | Classes | 0 |
 | Functions/file | 0.0 |
@@ -99,13 +107,3 @@
 | Code density | 0.0164 LOC/tok |
 | **Verdict** | **NARRATION FAILURE — 670 tokens burned, zero code output** |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_zmwy64er/session.jsonl)
-
-*No code output — this session was narration-only.*

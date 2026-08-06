@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT auth and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:52:50
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:57:17
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.765
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.57) with moderate resource use ($0.0210, ~5219J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.70) with moderate resource use ($0.0210, ~5219J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Correctness | 78% (14/18 tests) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 1070 |
 | Cyclomatic complexity | 141.0 |
 | Code quality | 0.093 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.572** |
+| **Composite** | **0.701** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~5219 J** |
 | Solution density | 0.036537 LOC/tok |
 | Correctness/$ | 49 |
-| Quality/J | 0.000110 |
+| Quality/J | 0.000134 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0210  |  **Energy:** ~5219J  |  **Thinking:** 5%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 78%  |  **Cost:** $0.0210  |  **Energy:** ~5219J  |  **Thinking:** 5%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_hcnattl6/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 19 |
-| Total lines | 1070 |
+| Total lines (Py) | 1070 |
 | Functions | 109 |
 | Classes | 14 |
 | Functions/file | 5.7 |
@@ -87,12 +95,16 @@
 | Test file rate | 21% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_hcnattl6/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 14 |
+| Failed | 4 |
+| Errors | 47 |
+| Total | 18 |
+| Pass rate | 78% |
+| Duration | 12.0s |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [remove_critical_constraint_s0.5_r2] gpt_gather_gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:51:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:51:42
 
 ---
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 441 |
 | Cyclomatic complexity | 72.0 |
 | Code quality | 0.227 |
 | Novelty vs baseline | 0.971 |
-| **Composite** | **0.755** |
+| **Composite** | **0.798** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1866 J** |
 | Solution density | 0.058784 LOC/tok |
 | Correctness/$ | 131 |
-| Quality/J | 0.000405 |
+| Quality/J | 0.000428 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_dm1gxwnd/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 4 |
-| Total lines | 441 |
+| Total lines (Py) | 441 |
 | Functions | 36 |
 | Classes | 0 |
 | Functions/file | 9.0 |
@@ -86,13 +94,3 @@
 | Test files | 2 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_dm1gxwnd/session.jsonl)
-
-*No code output — this session was narration-only.*

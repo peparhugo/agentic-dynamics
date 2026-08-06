@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Tag: {{#each tags}}{{#if @first}}{{name}}{{/if}}{{/each}} - {{site.title}}</title>
+</head>
+<body>
+  {{> header}}
+  <h1>Posts tagged: {{#each tags}}{{#if @first}}{{name}}{{/if}}{{/each}}</h1>
+  <ul>
+  {{#each posts}}
+    <li><a href="/posts/{{slug}}/index.html">{{title}}</a></li>
+  {{/each}}
+  </ul>
+</body>
+</html>

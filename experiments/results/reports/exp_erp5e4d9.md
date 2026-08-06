@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [standardized_build] gpt-5-mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:52:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:54:06
 
 ---
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 24.0 |
 | Code quality | 0.600 |
 | Novelty vs baseline | 0.903 |
-| **Composite** | **0.629** |
+| **Composite** | **0.672** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3597 J** |
 | Solution density | 0.007588 LOC/tok |
 | Correctness/$ | 67 |
-| Quality/J | 0.000175 |
+| Quality/J | 0.000187 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_erp5e4d9/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 200 |
+| Total lines (Py) | 200 |
 | Functions | 15 |
 | Classes | 7 |
 | Functions/file | 2.1 |
@@ -99,13 +107,3 @@
 | Code density | 0.0451 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_erp5e4d9/session.jsonl)
-
-*No code output — this session was narration-only.*

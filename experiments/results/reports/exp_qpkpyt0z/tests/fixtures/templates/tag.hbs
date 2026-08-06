@@ -1,0 +1,7 @@
+<h1>Tag: {{tag.name}}</h1>
+<p>{{tag.count}} posts</p>
+{{#each tag.pages}}
+  <article>
+    <h2><a href="{{url}}">{{title}}</a></h2>
+  </article>
+{{/each}}

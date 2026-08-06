@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_phantom_success_s0.5_r2] cd_claude_2rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:48
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:02:08
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.710
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.66) with moderate resource use ($0.9114, ~2430J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.71) with moderate resource use ($0.9114, ~2430J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 62.0 |
 | Code quality | 0.227 |
 | Novelty vs baseline | 0.769 |
-| **Composite** | **0.663** |
+| **Composite** | **0.706** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2430 J** |
 | Solution density | 0.041600 LOC/tok |
 | Correctness/$ | 60 |
-| Quality/J | 0.000273 |
+| Quality/J | 0.000290 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_pt6mynpf/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 13 |
-| Total lines | 440 |
+| Total lines (Py) | 440 |
 | Functions | 37 |
 | Classes | 13 |
 | Functions/file | 2.8 |
@@ -99,13 +107,3 @@
 | Code density | 0.0417 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_pt6mynpf/session.jsonl)
-
-*No code output — this session was narration-only.*

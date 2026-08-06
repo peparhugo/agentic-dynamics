@@ -1,0 +1,14 @@
+<section class="posts">
+  <h1>{{site.title}}</h1>
+  {{#each pages}}
+    <article>
+      <h2><a href="{{url}}">{{title}}</a></h2>
+      {{#if date}}<time>{{date}}</time>{{/if}}
+      {{#if tags}}
+        <nav class="tags">
+          {{#each tags}}<a href="/tags/{{this}}.html">{{this}}</a>{{/each}}
+        </nav>
+      {{/if}}
+    </article>
+  {{/each}}
+</section>

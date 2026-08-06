@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** URL shortener REST API in Flask...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:56:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:03:29
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
+| Correctness | 100% (21/21 tests) |
 | Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 391 |
 | Cyclomatic complexity | 37.0 |
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_qtjyfkab/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 391 |
+| Total lines (Py) | 391 |
 | Functions | 36 |
 | Classes | 0 |
 | Functions/file | 18.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_qtjyfkab/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 21 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 21 |
+| Pass rate | 100% |
+| Duration | 3.3s |

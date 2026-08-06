@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener: collision-resistant+analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:55:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:25
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.761
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.73) with moderate resource use ($0.0104, ~2559J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.68) with moderate resource use ($0.0104, ~2559J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 83% (5/6 constraints) |
+| Correctness | 63% (22/35 tests) |
+| Constraint satisfaction | 67% (4/6 constraints) |
 | Lines of code | 386 |
 | Cyclomatic complexity | 36.0 |
 | Code quality | 0.259 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.727** |
+| **Composite** | **0.677** |
 
 ---
 
@@ -58,21 +58,29 @@
 | **Total energy** | **~2559 J** |
 | Solution density | 0.024366 LOC/tok |
 | Correctness/$ | 114 |
-| Quality/J | 0.000284 |
+| Quality/J | 0.000265 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 63%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_ot4ttmtr/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 386 |
+| Total lines (Py) | 386 |
 | Functions | 48 |
 | Classes | 9 |
 | Functions/file | 24.0 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_ot4ttmtr/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 22 |
+| Failed | 13 |
+| Errors | 0 |
+| Total | 35 |
+| Pass rate | 63% |
+| Duration | 3.3s |

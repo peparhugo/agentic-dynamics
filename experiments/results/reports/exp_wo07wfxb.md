@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] constraint_detection_3rep...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T03:03:55
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:03
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.0145, ~3437J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0145, ~3437J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 750 |
 | Cyclomatic complexity | 55.0 |
 | Code quality | 0.133 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.666** |
+| **Composite** | **0.752** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3437 J** |
 | Solution density | 0.036290 LOC/tok |
 | Correctness/$ | 73 |
-| Quality/J | 0.000194 |
+| Quality/J | 0.000219 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_wo07wfxb/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 22 |
-| Total lines | 750 |
+| Total lines (Py) | 750 |
 | Functions | 83 |
 | Classes | 9 |
 | Functions/file | 3.8 |
@@ -86,13 +94,3 @@
 | Test files | 5 |
 | Test file rate | 23% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_wo07wfxb/session.jsonl)
-
-*No code output — this session was narration-only.*

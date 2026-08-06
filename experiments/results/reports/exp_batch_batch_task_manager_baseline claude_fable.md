@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [batch:task_manager:baseline] claude_fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:20
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:47:01
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.670
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.51) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.55) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 189.0 |
 | Code quality | 0.091 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.510** |
+| **Composite** | **0.553** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~5575 J** |
 | Solution density | 0.045057 LOC/tok |
 | Correctness/$ | 26 |
-| Quality/J | 0.000091 |
+| Quality/J | 0.000099 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_task_manager_baseline claude_fable/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 15 |
-| Total lines | 1093 |
+| Total lines (Py) | 1093 |
 | Functions | 127 |
 | Classes | 18 |
 | Functions/file | 8.5 |
@@ -99,13 +107,3 @@
 | Code density | 0.0451 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_batch_task_manager_baseline claude_fable/session.jsonl)
-
-*No code output — this session was narration-only.*

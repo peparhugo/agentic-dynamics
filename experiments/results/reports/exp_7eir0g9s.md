@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [inject_phantom_success_s0.5_r2] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:47:19
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:43:26
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.816
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0146, ~2132J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.87) with moderate resource use ($0.0146, ~2132J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 202 |
 | Cyclomatic complexity | 42.0 |
 | Code quality | 0.495 |
 | Novelty vs baseline | 0.834 |
-| **Composite** | **0.745** |
+| **Composite** | **0.874** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~2132 J** |
 | Solution density | 0.012533 LOC/tok |
 | Correctness/$ | 135 |
-| Quality/J | 0.000350 |
+| Quality/J | 0.000410 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_7eir0g9s/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 9 |
-| Total lines | 202 |
+| Total lines (Py) | 202 |
 | Functions | 22 |
 | Classes | 0 |
 | Functions/file | 2.4 |
@@ -86,13 +94,3 @@
 | Test files | 2 |
 | Test file rate | 22% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_7eir0g9s/session.jsonl)
-
-*No code output — this session was narration-only.*

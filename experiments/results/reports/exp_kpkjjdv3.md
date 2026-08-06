@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [standardized_build] gpt-5.6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:53:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:58:49
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.797
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.58) with moderate resource use ($0.2664, ~1242J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.62) with moderate resource use ($0.2664, ~1242J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 100% (16/16 tests) |
+| Constraint satisfaction | 29% (2/7 constraints) |
 | Lines of code | 268 |
 | Cyclomatic complexity | 32.0 |
 | Code quality | 0.373 |
 | Novelty vs baseline | 0.735 |
-| **Composite** | **0.578** |
+| **Composite** | **0.621** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1242 J** |
 | Solution density | 0.052933 LOC/tok |
 | Correctness/$ | 192 |
-| Quality/J | 0.000465 |
+| Quality/J | 0.000499 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_kpkjjdv3/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 268 |
+| Total lines (Py) | 268 |
 | Functions | 27 |
 | Classes | 1 |
 | Functions/file | 13.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_kpkjjdv3/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 16 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 16 |
+| Pass rate | 100% |
+| Duration | 2.2s |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [standardized_retry] gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:48:21
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:45:20
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.810
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.58) with moderate resource use ($0.6610, ~1549J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($0.6610, ~1549J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 100% (16/16 tests) |
+| Constraint satisfaction | 29% (2/7 constraints) |
 | Lines of code | 322 |
 | Cyclomatic complexity | 46.0 |
 | Code quality | 0.311 |
 | Novelty vs baseline | 0.853 |
-| **Composite** | **0.583** |
+| **Composite** | **0.626** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1549 J** |
 | Solution density | 0.052061 LOC/tok |
 | Correctness/$ | 160 |
-| Quality/J | 0.000376 |
+| Quality/J | 0.000404 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp__l_pm4_4/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 2 |
-| Total lines | 322 |
+| Total lines (Py) | 322 |
 | Functions | 29 |
 | Classes | 1 |
 | Functions/file | 14.5 |
@@ -87,12 +95,16 @@
 | Test file rate | 50% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp__l_pm4_4/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 16 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 16 |
+| Pass rate | 100% |
+| Duration | 1.9s |

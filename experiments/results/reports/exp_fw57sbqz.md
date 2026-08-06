@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with rate limiting and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:52:21
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:55:07
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_fw57sbqz/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 11 |
-| Total lines | 551 |
+| Total lines (Py) | 551 |
 | Functions | 65 |
 | Classes | 12 |
 | Functions/file | 5.9 |
@@ -86,13 +94,3 @@
 | Test files | 5 |
 | Test file rate | 45% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_fw57sbqz/session.jsonl)
-
-*No code output — this session was narration-only.*

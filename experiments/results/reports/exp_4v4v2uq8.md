@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5_r3] constraint_detection_3rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:46:31
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:17
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.798
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.64) with moderate resource use ($0.0169, ~4161J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.77) with moderate resource use ($0.0169, ~4161J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 1052 |
 | Cyclomatic complexity | 113.0 |
 | Code quality | 0.095 |
 | Novelty vs baseline | 0.693 |
-| **Composite** | **0.644** |
+| **Composite** | **0.773** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~4161 J** |
 | Solution density | 0.045396 LOC/tok |
 | Correctness/$ | 57 |
-| Quality/J | 0.000155 |
+| Quality/J | 0.000186 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_4v4v2uq8/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 26 |
-| Total lines | 1052 |
+| Total lines (Py) | 1052 |
 | Functions | 118 |
 | Classes | 14 |
 | Functions/file | 4.5 |
@@ -86,13 +94,3 @@
 | Test files | 4 |
 | Test file rate | 15% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_4v4v2uq8/session.jsonl)
-
-*No code output — this session was narration-only.*

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_gather_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:44:14
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:38:52
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.812
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.74) with moderate resource use ($0.3341, ~1672J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.82) with moderate resource use ($0.3341, ~1672J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Correctness | 100% (7/7 tests) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 407 |
 | Cyclomatic complexity | 70.0 |
 | Code quality | 0.246 |
 | Novelty vs baseline | 0.825 |
-| **Composite** | **0.737** |
+| **Composite** | **0.823** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1672 J** |
 | Solution density | 0.059321 LOC/tok |
 | Correctness/$ | 140 |
-| Quality/J | 0.000441 |
+| Quality/J | 0.000492 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_1d30evhp/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 3 |
-| Total lines | 407 |
+| Total lines (Py) | 407 |
 | Functions | 34 |
 | Classes | 0 |
 | Functions/file | 11.3 |
@@ -87,12 +95,16 @@
 | Test file rate | 33% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_1d30evhp/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 7 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 7 |
+| Pass rate | 100% |
+| Duration | 4.5s |

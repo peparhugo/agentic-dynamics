@@ -1,0 +1,6 @@
+<h1>Tag: {{tag.tag}}</h1>
+<ul>
+{{#each tag.pages}}
+  <li><a href="{{url}}">{{frontmatter.title}}</a></li>
+{{/each}}
+</ul>

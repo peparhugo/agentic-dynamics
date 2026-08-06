@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:collaborative_editor:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:19
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:40
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.762
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.61) with moderate resource use ($0.7001, ~3717J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.84) with moderate resource use ($0.7001, ~3717J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 0% (0/4 constraints) |
+| Correctness | 100% (5/5 tests) |
+| Constraint satisfaction | 75% (3/4 constraints) |
 | Lines of code | 40 |
 | Cyclomatic complexity | 4.0 |
 | Code quality | 0.933 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.612** |
+| **Composite** | **0.837** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~3717 J** |
 | Solution density | 0.002640 LOC/tok |
 | Correctness/$ | 64 |
-| Quality/J | 0.000165 |
+| Quality/J | 0.000225 |
 
 ---
 
@@ -67,12 +67,24 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_collaborative_editor_baseline gpt_/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 1 |
-| Total lines | 40 |
+| TS files | 8 |
+| TSX files | 6 |
+| JS files | 1 |
+| Total lines (Py) | 40 |
+| Total lines (TS/TSX) | 630 |
 | Functions | 6 |
 | Classes | 0 |
 | Functions/file | 6.0 |
@@ -87,12 +99,16 @@
 | Test file rate | 100% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_batch_collaborative_editor_baseline gpt_/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 5 |
+| Pass rate | 100% |
+| Duration | 0.5s |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT and SQLite...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:44:35
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:39:26
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_1erxln69/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 18 |
-| Total lines | 1266 |
+| Total lines (Py) | 1266 |
 | Functions | 126 |
 | Classes | 5 |
 | Functions/file | 7.0 |
@@ -86,13 +94,3 @@
 | Test files | 5 |
 | Test file rate | 28% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_1erxln69/session.jsonl)
-
-*No code output — this session was narration-only.*

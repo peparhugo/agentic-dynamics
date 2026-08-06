@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:54:14
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:59:22
 
 ---
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
+| Correctness | 100% (24/24 tests) |
 | Constraint satisfaction | 83% (5/6 constraints) |
 | Lines of code | 387 |
 | Cyclomatic complexity | 58.0 |
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_kt9lwfj8/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 9 |
-| Total lines | 387 |
+| Total lines (Py) | 387 |
 | Functions | 52 |
 | Classes | 10 |
 | Functions/file | 5.8 |
@@ -87,12 +95,16 @@
 | Test file rate | 33% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_kt9lwfj8/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 24 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 24 |
+| Pass rate | 100% |
+| Duration | 4.5s |

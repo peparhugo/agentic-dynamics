@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [batch:data_table:baseline] claude_fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:49:19
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:41
 
 ---
 
@@ -67,12 +67,23 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_batch_batch_data_table_baseline claude_fable_5/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 7 |
-| Total lines | 313 |
+| TS files | 10 |
+| TSX files | 1 |
+| Total lines (Py) | 313 |
+| Total lines (TS/TSX) | 838 |
 | Functions | 22 |
 | Classes | 6 |
 | Functions/file | 3.1 |
@@ -86,13 +97,3 @@
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_batch_batch_data_table_baseline claude_fable_5/session.jsonl)
-
-*No code output — this session was narration-only.*

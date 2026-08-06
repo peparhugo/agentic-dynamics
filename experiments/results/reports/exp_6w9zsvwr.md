@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [std_final] gpt-5.6-fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:47:00
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:43:00
 
 ---
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
+| Correctness | 100% (8/8 tests) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 292 |
 | Cyclomatic complexity | 32.0 |
 | Code quality | 0.342 |
 | Novelty vs baseline | 0.960 |
-| **Composite** | **0.605** |
+| **Composite** | **0.691** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~1498 J** |
 | Solution density | 0.049084 LOC/tok |
 | Correctness/$ | 167 |
-| Quality/J | 0.000404 |
+| Quality/J | 0.000461 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_6w9zsvwr/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 5 |
-| Total lines | 292 |
+| Total lines (Py) | 292 |
 | Functions | 26 |
 | Classes | 0 |
 | Functions/file | 5.2 |
@@ -87,12 +95,16 @@
 | Test file rate | 40% |
 | Parse errors | 0 |
 
+
 ---
 
-## Artifacts
+## Pytest Results
 
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_6w9zsvwr/session.jsonl)
-
-*No code output — this session was narration-only.*
+| Metric | Value |
+|--------|-------|
+| Passed | 8 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 8 |
+| Pass rate | 100% |
+| Duration | 1.7s |

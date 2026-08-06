@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] constraint_detection_3rep...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-04T02:54:32
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:59:56
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0169, ~4110J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0169, ~4110J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 891 |
 | Cyclomatic complexity | 74.0 |
 | Code quality | 0.112 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.662** |
+| **Composite** | **0.747** |
 
 ---
 
@@ -58,7 +58,7 @@
 | **Total energy** | **~4110 J** |
 | Solution density | 0.037748 LOC/tok |
 | Correctness/$ | 60 |
-| Quality/J | 0.000161 |
+| Quality/J | 0.000182 |
 
 ---
 
@@ -67,12 +67,20 @@
 
 ---
 
-## AST Code Quality
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Generated code](./exp_m3c9h6l0/code/)
+
+---
+
+## Code Quality
 
 | Metric | Value |
 |--------|-------|
 | Python files | 28 |
-| Total lines | 891 |
+| Total lines (Py) | 891 |
 | Functions | 86 |
 | Classes | 22 |
 | Functions/file | 3.1 |
@@ -86,13 +94,3 @@
 | Test files | 6 |
 | Test file rate | 21% |
 | Parse errors | 0 |
-
----
-
-## Artifacts
-
-Raw session transcript and generated source code for independent verification.
-
-- [Opencode session transcript](./exp_m3c9h6l0/session.jsonl)
-
-*No code output — this session was narration-only.*
