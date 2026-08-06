@@ -268,6 +268,7 @@ def run_experiment(
                     model=config.model_id,
                     task=config.task,
                     run_id=f"{op_name}_{strength}",
+                    cost_usd=eff.total_cost_usd,
                 )
 
                 # Strategy

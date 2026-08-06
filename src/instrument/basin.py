@@ -118,6 +118,7 @@ def measure_basin_escape(
     model: str = "",
     task: str = "",
     run_id: str = "",
+    cost_usd: float | None = None,
 ) -> BasinMetrics:
     """Measure how much the model's output diverged from baseline.
 
@@ -169,11 +170,10 @@ def measure_basin_escape(
     m.total_tokens = prompt_tokens + completion_tokens + reasoning_tokens
     m.reasoning_tokens = reasoning_tokens
     m.thinking_ratio = reasoning_tokens / max(m.total_tokens, 1)
-    m.cost_usd = (
-        prompt_tokens * 0.27 / 1_000_000
-        + completion_tokens * 1.10 / 1_000_000
-        + reasoning_tokens * 0.14 / 1_000_000
-    )
+    if cost_usd is not None:
+        m.cost_usd = cost_usd
+    else:
+        m.cost_usd = prompt_tokens * 0.27 / 1_000_000 + completion_tokens * 1.10 / 1_000_000 + reasoning_tokens * 0.14 / 1_000_000
     m.estimated_energy_j = (
         prompt_tokens * 0.08 + completion_tokens * 0.23 + reasoning_tokens * 0.47
     )

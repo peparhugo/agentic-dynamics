@@ -453,6 +453,9 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     )
     if db_cost > 0:
         efficiency.total_cost_usd = db_cost
+        efficiency.cost_input_usd = 0.0
+        efficiency.cost_output_usd = 0.0
+        efficiency.cost_reasoning_usd = 0.0
 
     # ── Basin Escape ──
     pert_class = "manifold" if any(k in info.get("operator", "") for k in
@@ -474,6 +477,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         perturbation_class=pert_class,
         perturbation_strength=0.5,
         model=session.get("model_id", "") if session else "",
+        cost_usd=db_cost if db_cost > 0 else None,
     )
 
     # ── Strategy ──
