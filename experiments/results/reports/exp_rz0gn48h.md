@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask Task API: Throughput vs Latency...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:24
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:48
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.6% |
-| Quality/$ | 50 |
+| Quality/$ | 49 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **26,932** |
 | Thinking ratio | 4.6% |
 | Output efficiency | 57.7% |
-| Input cost | $0.002739 |
-| Output cost | $0.017101 |
-| Reasoning cost | $0.000174 |
 | **Total cost** | **$0.020322** |
 | **Total energy** | **~4970 J** |
 | Solution density | 0.042292 LOC/tok |

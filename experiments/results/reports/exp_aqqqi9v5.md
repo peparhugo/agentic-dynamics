@@ -1,8 +1,8 @@
 # Game Report: exp_aqqqi9v5-baseline
 
-**Model:** exp_aqqqi9v5  |  **Task:** [baseline] typescript_ssg...
+**Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:48:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:44:52
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 5.1% |
-| Quality/$ | 47 |
+| Quality/$ | 46 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **29,808** |
 | Thinking ratio | 5.1% |
 | Output efficiency | 54.1% |
-| Input cost | $0.003286 |
-| Output cost | $0.017724 |
-| Reasoning cost | $0.000214 |
 | **Total cost** | **$0.021728** |
 | **Total energy** | **~5396 J** |
 | Solution density | 0.040929 LOC/tok |
@@ -64,6 +61,15 @@
 
 ## Headline Metric
 **Strategy:** CONSERVATIVE  |  **Correctness:** 80%  |  **Cost:** $0.0217  |  **Energy:** ~5396J  |  **Thinking:** 5%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Opencode session transcript](./exp_aqqqi9v5/session.jsonl)
+- [Generated code](./exp_aqqqi9v5/code/)
 
 ---
 

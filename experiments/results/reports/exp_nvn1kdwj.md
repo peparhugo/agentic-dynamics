@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_phantom_success_s0.5_r2] constraint_detection_3rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:03
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:05
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.200 |
 | Structure div | 0.211 |
 | Thinking ratio | 3.3% |
-| Quality/$ | 91 |
+| Quality/$ | 87 |
 | Quality/J | 0.0004 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **17,196** |
 | Thinking ratio | 3.3% |
 | Output efficiency | 44.7% |
-| Input cost | $0.002415 |
-| Output cost | $0.008452 |
-| Reasoning cost | $0.000080 |
 | **Total cost** | **$0.011504** |
 | **Total energy** | **~2750 J** |
 | Solution density | 0.029309 LOC/tok |

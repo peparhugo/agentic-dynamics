@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask SQLite task API with JWT and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:10
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:43:25
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.2% |
-| Quality/$ | 40 |
+| Quality/$ | 42 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **31,016** |
 | Thinking ratio | 3.2% |
 | Output efficiency | 66.2% |
-| Input cost | $0.002565 |
-| Output cost | $0.022589 |
-| Reasoning cost | $0.000137 |
 | **Total cost** | **$0.023656** |
 | **Total energy** | **~5945 J** |
 | Solution density | 0.046621 LOC/tok |

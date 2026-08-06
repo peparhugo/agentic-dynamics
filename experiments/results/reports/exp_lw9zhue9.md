@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_final_gpt_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:59:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:50:10
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.800 |
 | Structure div | 0.393 |
 | Thinking ratio | 5.6% |
-| Quality/$ | 147 |
+| Quality/$ | 16 |
 | Quality/J | 0.0005 |
 | Converged back | False |
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 203 |
 | Cyclomatic complexity | 43.0 |
 | Code quality | 0.493 |
 | Novelty vs baseline | 0.970 |
-| **Composite** | **0.808** |
+| **Composite** | **0.851** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **14,783** |
 | Thinking ratio | 5.6% |
 | Output efficiency | 23.6% |
-| Input cost | $0.002823 |
-| Output cost | $0.003843 |
-| Reasoning cost | $0.000116 |
 | **Total cost** | **$0.063435** |
 | **Total energy** | **~2031 J** |
 | Solution density | 0.013732 LOC/tok |
 | Correctness/$ | 147 |
-| Quality/J | 0.000398 |
+| Quality/J | 0.000419 |
 
 ---
 

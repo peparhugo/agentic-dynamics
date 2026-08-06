@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [baseline] cd_openai_GPT_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:33
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:55:08
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.659
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.68) with moderate resource use ($0.0180, ~2629J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.73) with moderate resource use ($0.0180, ~2629J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 5.5% |
-| Quality/$ | 115 |
+| Quality/$ | 56 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 28.0 |
 | Code quality | 0.533 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.684** |
+| **Composite** | **0.727** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **19,653** |
 | Thinking ratio | 5.5% |
 | Output efficiency | 21.5% |
-| Input cost | $0.003874 |
-| Output cost | $0.004638 |
-| Reasoning cost | $0.000152 |
 | **Total cost** | **$0.018000** |
 | **Total energy** | **~2629 J** |
 | Solution density | 0.009515 LOC/tok |
 | Correctness/$ | 81 |
-| Quality/J | 0.000260 |
+| Quality/J | 0.000276 |
 
 ---
 

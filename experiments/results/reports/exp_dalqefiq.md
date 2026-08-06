@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_competing_goal_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:51:17
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:17
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.667 |
 | Structure div | 0.467 |
 | Thinking ratio | 5.1% |
-| Quality/$ | 70 |
+| Quality/$ | 6 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **27,817** |
 | Thinking ratio | 5.1% |
 | Output efficiency | 30.1% |
-| Input cost | $0.004869 |
-| Output cost | $0.009213 |
-| Reasoning cost | $0.000197 |
 | **Total cost** | **$0.159429** |
 | **Total energy** | **~4031 J** |
 | Solution density | 0.016860 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Python Flask URL shortener with REST API and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:19
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:14
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 2.4% |
-| Quality/$ | 275 |
+| Quality/$ | 215 |
 | Quality/J | 0.0010 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (10/10 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 95 |
 | Cyclomatic complexity | 8.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **8,561** |
 | Thinking ratio | 2.4% |
 | Output efficiency | 19.0% |
-| Input cost | $0.001815 |
-| Output cost | $0.001793 |
-| Reasoning cost | $0.000029 |
 | **Total cost** | **$0.004661** |
 | **Total energy** | **~1010 J** |
 | Solution density | 0.011097 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 10 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 10 |
-| Pass rate | 100% |
-| Duration | 0.8s |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:data_table:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:45
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:29
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 7.2% |
-| Quality/$ | 56 |
+| Quality/$ | 1 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (6/6 tests) |
+| Correctness | 80% (0/0 tests) |
 | Constraint satisfaction | 25% (1/4 constraints) |
 | Lines of code | 52 |
 | Cyclomatic complexity | 7.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **17,239** |
 | Thinking ratio | 7.2% |
 | Output efficiency | 92.6% |
-| Input cost | $0.000012 |
-| Output cost | $0.017555 |
-| Reasoning cost | $0.000173 |
 | **Total cost** | **$0.797777** |
 | **Total energy** | **~4255 J** |
 | Solution density | 0.003016 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.7978  |  **Energy:** ~4255J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 80%  |  **Cost:** $0.7978  |  **Energy:** ~4255J  |  **Thinking:** 7%
 
 ---
 
@@ -98,17 +95,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 100% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 6 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 6 |
-| Pass rate | 100% |
-| Duration | 3.5s |

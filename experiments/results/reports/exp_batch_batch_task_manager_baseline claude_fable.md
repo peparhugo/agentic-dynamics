@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [batch:task_manager:baseline] claude_fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:47:01
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:29
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.670
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.55) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.60) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 38 |
+| Quality/$ | 0 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 189.0 |
 | Code quality | 0.091 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.553** |
+| **Composite** | **0.595** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **24,258** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000009 |
-| Output cost | $0.026649 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$2.022152** |
 | **Total energy** | **~5575 J** |
 | Solution density | 0.045057 LOC/tok |
 | Correctness/$ | 26 |
-| Quality/J | 0.000099 |
+| Quality/J | 0.000107 |
 
 ---
 

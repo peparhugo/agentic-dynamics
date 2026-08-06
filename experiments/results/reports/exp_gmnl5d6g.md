@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [standardized_build] deepseek...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:56:38
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:48:38
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.667 |
 | Structure div | 0.059 |
 | Thinking ratio | 11.0% |
-| Quality/$ | 68 |
+| Quality/$ | 50 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **33,533** |
 | Thinking ratio | 11.0% |
 | Output efficiency | 21.9% |
-| Input cost | $0.006073 |
-| Output cost | $0.008080 |
-| Reasoning cost | $0.000517 |
 | **Total cost** | **$0.020049** |
 | **Total energy** | **~5226 J** |
 | Solution density | 0.016640 LOC/tok |

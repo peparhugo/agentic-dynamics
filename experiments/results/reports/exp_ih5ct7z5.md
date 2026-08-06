@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:58:02
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:49:22
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.833 |
 | Structure div | 0.315 |
 | Thinking ratio | 8.6% |
-| Quality/$ | 98 |
+| Quality/$ | 84 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **17,596** |
 | Thinking ratio | 8.6% |
 | Output efficiency | 38.9% |
-| Input cost | $0.002496 |
-| Output cost | $0.007532 |
-| Reasoning cost | $0.000211 |
 | **Total cost** | **$0.011930** |
 | **Total energy** | **~3022 J** |
 | Solution density | 0.036940 LOC/tok |

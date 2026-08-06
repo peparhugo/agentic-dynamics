@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] constraint_detection_3rep...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:59:56
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:50:26
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.6% |
-| Quality/$ | 60 |
+| Quality/$ | 59 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **23,604** |
 | Thinking ratio | 3.6% |
 | Output efficiency | 53.5% |
-| Input cost | $0.002738 |
-| Output cost | $0.013884 |
-| Reasoning cost | $0.000118 |
 | **Total cost** | **$0.016892** |
 | **Total energy** | **~4110 J** |
 | Solution density | 0.037748 LOC/tok |

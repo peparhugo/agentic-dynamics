@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [debug_forced] deepseek...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:12:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:56:20
 
 ---
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **8,372** |
 | Thinking ratio | 6.5% |
 | Output efficiency | 8.0% |
-| Input cost | $0.001932 |
-| Output cost | $0.000737 |
-| Reasoning cost | $0.000077 |
 | **Total cost** | **$0.004301** |
 | **Total energy** | **~984 J** |
 | Solution density | 0.001314 LOC/tok |

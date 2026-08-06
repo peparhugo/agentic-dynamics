@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [remove_critical_constraint_s0.5_r2] gpt_gather_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:37:49
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:41:53
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.833 |
 | Structure div | 0.440 |
 | Thinking ratio | 3.1% |
-| Quality/$ | 132 |
+| Quality/$ | 3 |
 | Quality/J | 0.0006 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (16/16 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 407 |
 | Cyclomatic complexity | 62.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **7,078** |
 | Thinking ratio | 3.1% |
 | Output efficiency | 96.5% |
-| Input cost | $0.000008 |
-| Output cost | $0.007510 |
-| Reasoning cost | $0.000031 |
 | **Total cost** | **$0.344348** |
 | **Total energy** | **~1676 J** |
 | Solution density | 0.057502 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 16 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 16 |
-| Pass rate | 100% |
-| Duration | 10.7s |

@@ -1,8 +1,8 @@
 # Game Report: exp_0s36_d3n-baseline
 
-**Model:** exp_0s36_d3n  |  **Task:** [baseline] typescript_ssg...
+**Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:47:50
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:41:55
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 11.3% |
-| Quality/$ | 49 |
+| Quality/$ | 41 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **30,949** |
 | Thinking ratio | 11.3% |
 | Output efficiency | 48.1% |
-| Input cost | $0.003393 |
-| Output cost | $0.016371 |
-| Reasoning cost | $0.000490 |
 | **Total cost** | **$0.024139** |
 | **Total energy** | **~6074 J** |
 | Solution density | 0.032570 LOC/tok |
@@ -64,6 +61,15 @@
 
 ## Headline Metric
 **Strategy:** CONSERVATIVE  |  **Correctness:** 80%  |  **Cost:** $0.0241  |  **Energy:** ~6074J  |  **Thinking:** 11%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Opencode session transcript](./exp_0s36_d3n/session.jsonl)
+- [Generated code](./exp_0s36_d3n/code/)
 
 ---
 

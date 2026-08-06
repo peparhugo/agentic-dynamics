@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [shift_framing_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:09:48
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:54:35
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.857 |
 | Structure div | 0.350 |
 | Thinking ratio | 9.7% |
-| Quality/$ | 63 |
+| Quality/$ | 59 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **23,139** |
 | Thinking ratio | 9.7% |
 | Output efficiency | 51.3% |
-| Input cost | $0.002436 |
-| Output cost | $0.013057 |
-| Reasoning cost | $0.000315 |
 | **Total cost** | **$0.016813** |
 | **Total energy** | **~4508 J** |
 | Solution density | 0.039803 LOC/tok |

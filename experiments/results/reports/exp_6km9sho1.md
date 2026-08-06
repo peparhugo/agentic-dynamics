@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [inject_phantom_success_s0.5] cd_gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:43:45
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.750 |
 | Structure div | 0.300 |
 | Thinking ratio | 10.6% |
-| Quality/$ | 98 |
+| Quality/$ | 240 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **27,189** |
 | Thinking ratio | 10.6% |
 | Output efficiency | 14.2% |
-| Input cost | $0.005520 |
-| Output cost | $0.004253 |
-| Reasoning cost | $0.000403 |
 | **Total cost** | **$0.004173** |
 | **Total energy** | **~3878 J** |
 | Solution density | 0.005296 LOC/tok |

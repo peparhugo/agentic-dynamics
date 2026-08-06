@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Authenticated REST API with JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:24
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:55:04
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.79) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 132 |
+| Quality/$ | 2 |
 | Quality/J | 0.0006 |
 | Converged back | True |
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 86% (6/7 constraints) |
+| Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 298 |
 | Cyclomatic complexity | 41.0 |
 | Code quality | 0.336 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.749** |
+| **Composite** | **0.792** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **6,905** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.8% |
-| Input cost | $0.000003 |
-| Output cost | $0.007582 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.632214** |
 | **Total energy** | **~1586 J** |
 | Solution density | 0.043157 LOC/tok |
 | Correctness/$ | 132 |
-| Quality/J | 0.000472 |
+| Quality/J | 0.000499 |
 
 ---
 

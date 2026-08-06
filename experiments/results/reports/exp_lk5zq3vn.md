@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_competing_goal_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:59:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:50:10
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.750 |
 | Structure div | 0.263 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 46 |
+| Quality/$ | 1 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **19,651** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000006 |
-| Output cost | $0.021590 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$1.606180** |
 | **Total energy** | **~4516 J** |
 | Solution density | 0.046003 LOC/tok |

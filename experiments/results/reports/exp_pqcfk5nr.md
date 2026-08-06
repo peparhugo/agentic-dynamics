@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [baseline] cd_openai_GPT_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:36
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 13.0% |
-| Quality/$ | 75 |
+| Quality/$ | 6 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **29,091** |
 | Thinking ratio | 13.0% |
 | Output efficiency | 24.4% |
-| Input cost | $0.004920 |
-| Output cost | $0.007802 |
-| Reasoning cost | $0.000529 |
 | **Total cost** | **$0.177260** |
 | **Total energy** | **~4864 J** |
 | Solution density | 0.011241 LOC/tok |

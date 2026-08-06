@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [standardized_build] claude...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:27
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:16
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.455 |
 | Structure div | 0.189 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 72 |
+| Quality/$ | 1 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (54/54 tests) |
+| Correctness | 70% (0/0 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 600 |
 | Cyclomatic complexity | 86.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **12,666** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000005 |
-| Output cost | $0.013913 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$1.110397** |
 | **Total energy** | **~2910 J** |
 | Solution density | 0.047371 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
 
 ---
 
@@ -107,17 +104,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0474 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 54 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 54 |
-| Pass rate | 100% |
-| Duration | 1.2s |

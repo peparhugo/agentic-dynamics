@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_gather_gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:07:20
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:53:37
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.600 |
 | Structure div | 0.186 |
 | Thinking ratio | 4.3% |
-| Quality/$ | 172 |
+| Quality/$ | 2 |
 | Quality/J | 0.0008 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (10/10 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 100% (7/7 constraints) |
 | Lines of code | 291 |
 | Cyclomatic complexity | 59.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **5,529** |
 | Thinking ratio | 4.3% |
 | Output efficiency | 95.2% |
-| Input cost | $0.000008 |
-| Output cost | $0.005788 |
-| Reasoning cost | $0.000033 |
 | **Total cost** | **$0.566750** |
 | **Total energy** | **~1324 J** |
 | Solution density | 0.052632 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 10 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 10 |
-| Pass rate | 100% |
-| Duration | 1.8s |

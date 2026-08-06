@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:03:39
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:27
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 77 |
+| Quality/$ | 1 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **11,781** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000004 |
-| Output cost | $0.012944 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.940768** |
 | **Total energy** | **~2708 J** |
 | Solution density | 0.047704 LOC/tok |

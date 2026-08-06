@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [inject_phantom_success_s0.5_r1] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:53:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:52
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.091 |
 | Thinking ratio | 7.9% |
-| Quality/$ | 103 |
+| Quality/$ | 47 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (5/5 tests) |
+| Correctness | 70% (0/0 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 233 |
 | Cyclomatic complexity | 42.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **20,995** |
 | Thinking ratio | 7.9% |
 | Output efficiency | 24.2% |
-| Input cost | $0.003846 |
-| Output cost | $0.005597 |
-| Reasoning cost | $0.000233 |
 | **Total cost** | **$0.021119** |
 | **Total energy** | **~3092 J** |
 | Solution density | 0.011098 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0211  |  **Energy:** ~3092J  |  **Thinking:** 8%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0211  |  **Energy:** ~3092J  |  **Thinking:** 8%
 
 ---
 
@@ -107,17 +104,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0458 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 5 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 5 |
-| Pass rate | 100% |
-| Duration | 10.9s |

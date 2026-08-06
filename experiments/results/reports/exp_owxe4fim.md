@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [remove_critical_constraint_s0.5_r1] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:01:28
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:16
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.802
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.76) with moderate resource use ($0.0179, ~2784J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.80) with moderate resource use ($0.0179, ~2784J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.079 |
 | Thinking ratio | 4.9% |
-| Quality/$ | 105 |
+| Quality/$ | 56 |
 | Quality/J | 0.0004 |
 | Converged back | False |
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 245 |
 | Cyclomatic complexity | 33.0 |
 | Code quality | 0.408 |
 | Novelty vs baseline | 0.749 |
-| **Composite** | **0.758** |
+| **Composite** | **0.801** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **20,694** |
 | Thinking ratio | 4.9% |
 | Output efficiency | 23.5% |
-| Input cost | $0.003998 |
-| Output cost | $0.005347 |
-| Reasoning cost | $0.000143 |
 | **Total cost** | **$0.017885** |
 | **Total energy** | **~2784 J** |
 | Solution density | 0.011839 LOC/tok |
 | Correctness/$ | 105 |
-| Quality/J | 0.000272 |
+| Quality/J | 0.000288 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:baseline:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:47
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:49
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.650
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.58) with moderate resource use ($0.0271, ~3960J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.62) with moderate resource use ($0.0271, ~3960J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 10.1% |
-| Quality/$ | 92 |
+| Quality/$ | 37 |
 | Quality/J | 0.0003 |
 | Converged back | True |
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (4/4 tests) |
+| Correctness | 70% (0/0 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 227 |
 | Cyclomatic complexity | 41.0 |
 | Code quality | 0.441 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.580** |
+| **Composite** | **0.622** |
 
 ---
 
@@ -51,19 +51,16 @@
 | **Total tokens** | **27,135** |
 | Thinking ratio | 10.1% |
 | Output efficiency | 17.6% |
-| Input cost | $0.005296 |
-| Output cost | $0.005247 |
-| Reasoning cost | $0.000385 |
 | **Total cost** | **$0.027134** |
 | **Total energy** | **~3960 J** |
 | Solution density | 0.008366 LOC/tok |
 | Correctness/$ | 64 |
-| Quality/J | 0.000146 |
+| Quality/J | 0.000157 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
 
 ---
 
@@ -107,17 +104,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0476 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 4 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 4 |
-| Pass rate | 100% |
-| Duration | 1.8s |

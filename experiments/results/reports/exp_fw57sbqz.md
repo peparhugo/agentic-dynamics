@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with rate limiting and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:55:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:48:19
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.1% |
-| Quality/$ | 96 |
+| Quality/$ | 91 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **16,417** |
 | Thinking ratio | 4.1% |
 | Output efficiency | 44.8% |
-| Input cost | $0.002262 |
-| Output cost | $0.008098 |
-| Reasoning cost | $0.000095 |
 | **Total cost** | **$0.011027** |
 | **Total energy** | **~2682 J** |
 | Solution density | 0.033563 LOC/tok |

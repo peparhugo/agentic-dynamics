@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [remove_critical_constraint_s0.5_r2] gpt_gather_gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:51:42
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:19
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.800 |
 | Structure div | 0.417 |
 | Thinking ratio | 8.1% |
-| Quality/$ | 131 |
+| Quality/$ | 1 |
 | Quality/J | 0.0005 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **7,502** |
 | Thinking ratio | 8.1% |
 | Output efficiency | 91.3% |
-| Input cost | $0.000011 |
-| Output cost | $0.007538 |
-| Reasoning cost | $0.000085 |
 | **Total cost** | **$0.754770** |
 | **Total energy** | **~1866 J** |
 | Solution density | 0.058784 LOC/tok |

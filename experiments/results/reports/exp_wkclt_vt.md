@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Building Flask task management API + flaw analysis...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:09:39
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:54:32
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 8.5% |
-| Quality/$ | 67 |
+| Quality/$ | 64 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **21,878** |
 | Thinking ratio | 8.5% |
 | Output efficiency | 50.7% |
-| Input cost | $0.002410 |
-| Output cost | $0.012209 |
-| Reasoning cost | $0.000259 |
 | **Total cost** | **$0.015723** |
 | **Total energy** | **~4138 J** |
 | Solution density | 0.038989 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:task_manager:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:47:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:29
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.4% |
-| Quality/$ | 87 |
+| Quality/$ | 2 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (27/27 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Correctness | 100% (0/0 tests) |
+| Constraint satisfaction | 57% (4/7 constraints) |
 | Lines of code | 602 |
 | Cyclomatic complexity | 113.0 |
 | Code quality | 0.166 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.673** |
+| **Composite** | **0.630** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **10,787** |
 | Thinking ratio | 3.4% |
 | Output efficiency | 96.3% |
-| Input cost | $0.000010 |
-| Output cost | $0.011422 |
-| Reasoning cost | $0.000051 |
 | **Total cost** | **$0.498459** |
 | **Total energy** | **~2564 J** |
 | Solution density | 0.055808 LOC/tok |
 | Correctness/$ | 87 |
-| Quality/J | 0.000262 |
+| Quality/J | 0.000246 |
 
 ---
 
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 4 |
 | Test file rate | 44% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 27 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 27 |
-| Pass rate | 100% |
-| Duration | 11.1s |

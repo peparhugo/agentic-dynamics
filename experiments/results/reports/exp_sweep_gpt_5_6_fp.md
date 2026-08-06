@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [silent_sweep:perturbed:forced] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:40
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:49
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 8.0% |
-| Quality/$ | 126 |
+| Quality/$ | 3 |
 | Quality/J | 0.0005 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (19/19 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 86% (6/7 constraints) |
 | Lines of code | 477 |
 | Cyclomatic complexity | 89.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **7,793** |
 | Thinking ratio | 8.0% |
 | Output efficiency | 91.6% |
-| Input cost | $0.000007 |
-| Output cost | $0.007855 |
-| Reasoning cost | $0.000088 |
 | **Total cost** | **$0.393734** |
 | **Total energy** | **~1938 J** |
 | Solution density | 0.061209 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 19 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 19 |
-| Pass rate | 100% |
-| Duration | 6.4s |

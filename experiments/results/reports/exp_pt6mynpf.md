@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_phantom_success_s0.5_r2] cd_claude_2rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:02:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:40
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.400 |
 | Structure div | 0.130 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 86 |
+| Quality/$ | 1 |
 | Quality/J | 0.0004 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **10,577** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.8% |
-| Input cost | $0.000004 |
-| Output cost | $0.011617 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.911432** |
 | **Total energy** | **~2430 J** |
 | Solution density | 0.041600 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [remove_critical_constraint_s0.5] frontier_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:06:26
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:53:31
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.185 |
 | Thinking ratio | 4.7% |
-| Quality/$ | 137 |
+| Quality/$ | 3 |
 | Quality/J | 0.0006 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (7/7 tests) |
+| Correctness | 70% (0/0 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 323 |
 | Cyclomatic complexity | 67.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **6,981** |
 | Thinking ratio | 4.7% |
 | Output efficiency | 94.6% |
-| Input cost | $0.000012 |
-| Output cost | $0.007268 |
-| Reasoning cost | $0.000046 |
 | **Total cost** | **$0.374009** |
 | **Total energy** | **~1678 J** |
 | Solution density | 0.046268 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.3740  |  **Energy:** ~1678J  |  **Thinking:** 5%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.3740  |  **Energy:** ~1678J  |  **Thinking:** 5%
 
 ---
 
@@ -107,17 +104,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0489 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 7 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 7 |
-| Pass rate | 100% |
-| Duration | 5.8s |

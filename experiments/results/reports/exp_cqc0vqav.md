@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** URL shortener: collision-resistance & analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:50:33
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:12
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.4% |
-| Quality/$ | 121 |
+| Quality/$ | 102 |
 | Quality/J | 0.0005 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **15,460** |
 | Thinking ratio | 3.4% |
 | Output efficiency | 32.5% |
-| Input cost | $0.002676 |
-| Output cost | $0.005535 |
-| Reasoning cost | $0.000073 |
 | **Total cost** | **$0.009798** |
 | **Total energy** | **~2194 J** |
 | Solution density | 0.009444 LOC/tok |

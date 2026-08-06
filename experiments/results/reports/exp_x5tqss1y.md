@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:10:32
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:55:08
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.2% |
-| Quality/$ | 59 |
+| Quality/$ | 54 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **24,108** |
 | Thinking ratio | 4.2% |
 | Output efficiency | 53.4% |
-| Input cost | $0.002759 |
-| Output cost | $0.014156 |
-| Reasoning cost | $0.000143 |
 | **Total cost** | **$0.018550** |
 | **Total energy** | **~4258 J** |
 | Solution density | 0.036627 LOC/tok |

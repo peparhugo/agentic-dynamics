@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Building REST API URL shortener with analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:58:46
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:49:56
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.3% |
-| Quality/$ | 140 |
+| Quality/$ | 124 |
 | Quality/J | 0.0005 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **12,937** |
 | Thinking ratio | 4.3% |
 | Output efficiency | 34.8% |
-| Input cost | $0.002126 |
-| Output cost | $0.004959 |
-| Reasoning cost | $0.000078 |
 | **Total cost** | **$0.008056** |
 | **Total energy** | **~1927 J** |
 | Solution density | 0.021721 LOC/tok |

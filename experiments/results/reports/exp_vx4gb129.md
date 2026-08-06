@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** URL shortener with analytics and rate limiting...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:08:12
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:54:00
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.0% |
-| Quality/$ | 104 |
+| Quality/$ | 97 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **16,070** |
 | Thinking ratio | 4.0% |
 | Output efficiency | 39.9% |
-| Input cost | $0.002434 |
-| Output cost | $0.007047 |
-| Reasoning cost | $0.000091 |
 | **Total cost** | **$0.010329** |
 | **Total energy** | **~2499 J** |
 | Solution density | 0.032794 LOC/tok |

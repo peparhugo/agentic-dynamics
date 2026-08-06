@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [standardized_build] gpt-5-mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:54:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:48:06
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.600 |
 | Structure div | 0.167 |
 | Thinking ratio | 8.0% |
-| Quality/$ | 95 |
+| Quality/$ | 42 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -38,7 +38,7 @@
 | Cyclomatic complexity | 24.0 |
 | Code quality | 0.600 |
 | Novelty vs baseline | 0.903 |
-| **Composite** | **0.672** |
+| **Composite** | **0.629** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **26,356** |
 | Thinking ratio | 8.0% |
 | Output efficiency | 16.8% |
-| Input cost | $0.005349 |
-| Output cost | $0.004875 |
-| Reasoning cost | $0.000296 |
 | **Total cost** | **$0.023859** |
 | **Total energy** | **~3597 J** |
 | Solution density | 0.007588 LOC/tok |
 | Correctness/$ | 67 |
-| Quality/J | 0.000187 |
+| Quality/J | 0.000175 |
 
 ---
 

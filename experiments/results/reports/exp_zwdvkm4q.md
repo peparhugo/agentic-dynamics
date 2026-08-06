@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5_r1] constraint_detection_3rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:12:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:56:32
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.259 |
 | Thinking ratio | 3.1% |
-| Quality/$ | 96 |
+| Quality/$ | 91 |
 | Quality/J | 0.0004 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **16,922** |
 | Thinking ratio | 3.1% |
 | Output efficiency | 41.8% |
-| Input cost | $0.002519 |
-| Output cost | $0.007783 |
-| Reasoning cost | $0.000072 |
 | **Total cost** | **$0.011042** |
 | **Total energy** | **~2617 J** |
 | Solution density | 0.028602 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:task_manager:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:02
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.59) with moderate resource use ($0.0100, ~2397J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.55) with moderate resource use ($0.0100, ~2397J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.1% |
-| Quality/$ | 105 |
+| Quality/$ | 100 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -32,13 +32,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 93% (13/14 tests) |
-| Constraint satisfaction | 43% (3/7 constraints) |
+| Correctness | 100% (0/0 tests) |
+| Constraint satisfaction | 29% (2/7 constraints) |
 | Lines of code | 533 |
 | Cyclomatic complexity | 72.0 |
 | Code quality | 0.188 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.591** |
+| **Composite** | **0.548** |
 
 ---
 
@@ -51,19 +51,16 @@
 | **Total tokens** | **15,228** |
 | Thinking ratio | 3.1% |
 | Output efficiency | 43.5% |
-| Input cost | $0.002196 |
-| Output cost | $0.007281 |
-| Reasoning cost | $0.000067 |
 | **Total cost** | **$0.009994** |
 | **Total energy** | **~2397 J** |
 | Solution density | 0.035001 LOC/tok |
 | Correctness/$ | 105 |
-| Quality/J | 0.000247 |
+| Quality/J | 0.000229 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 93%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
 
 ---
 
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 18% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 13 |
-| Failed | 1 |
-| Errors | 0 |
-| Total | 14 |
-| Pass rate | 93% |
-| Duration | 4.4s |

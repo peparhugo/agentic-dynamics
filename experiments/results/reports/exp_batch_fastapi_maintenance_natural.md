@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:fastapi_maintenance:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:27
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:46:53
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.759
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.65) with moderate resource use ($0.0303, ~6524J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.60) with moderate resource use ($0.0303, ~6524J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 8.0% |
-| Quality/$ | 57 |
+| Quality/$ | 33 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 71% (5/7 constraints) |
+| Constraint satisfaction | 57% (4/7 constraints) |
 | Lines of code | 3021 |
 | Cyclomatic complexity | 153.0 |
 | Code quality | 0.033 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.646** |
+| **Composite** | **0.603** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **52,282** |
 | Thinking ratio | 8.0% |
 | Output efficiency | 9.1% |
-| Input cost | $0.011705 |
-| Output cost | $0.005232 |
-| Reasoning cost | $0.000584 |
 | **Total cost** | **$0.030303** |
 | **Total energy** | **~6524 J** |
 | Solution density | 0.057783 LOC/tok |
 | Correctness/$ | 57 |
-| Quality/J | 0.000099 |
+| Quality/J | 0.000092 |
 
 ---
 

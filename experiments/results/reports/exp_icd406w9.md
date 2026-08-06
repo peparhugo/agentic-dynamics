@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:57:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:48:56
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.750 |
 | Structure div | 0.229 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 62 |
+| Quality/$ | 1 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **14,765** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000004 |
-| Output cost | $0.016224 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$1.165116** |
 | **Total energy** | **~3394 J** |
 | Solution density | 0.050593 LOC/tok |

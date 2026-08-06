@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Task management API: Flask/SQLite/JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:41:11
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:43:05
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 64 |
+| Quality/$ | 1 |
 | Quality/J | 0.0003 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **14,288** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.8% |
-| Input cost | $0.000008 |
-| Output cost | $0.015686 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$1.256440** |
 | **Total energy** | **~3282 J** |
 | Solution density | 0.040663 LOC/tok |

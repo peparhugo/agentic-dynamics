@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with rate limiting and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:05:11
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:53:00
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.7% |
-| Quality/$ | 189 |
+| Quality/$ | 156 |
 | Quality/J | 0.0007 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 38% (6/16 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 50% (3/6 constraints) |
 | Lines of code | 227 |
 | Cyclomatic complexity | 21.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **10,747** |
 | Thinking ratio | 3.7% |
 | Output efficiency | 27.3% |
-| Input cost | $0.002001 |
-| Output cost | $0.003232 |
-| Reasoning cost | $0.000056 |
 | **Total cost** | **$0.006419** |
 | **Total energy** | **~1455 J** |
 | Solution density | 0.021122 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 38%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
 
 ---
 
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 6 |
-| Failed | 10 |
-| Errors | 0 |
-| Total | 16 |
-| Pass rate | 38% |
-| Duration | 1.0s |

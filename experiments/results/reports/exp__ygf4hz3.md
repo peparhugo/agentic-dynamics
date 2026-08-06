@@ -1,8 +1,8 @@
 # Game Report: exp__ygf4hz3-baseline
 
-**Model:** exp__ygf4hz3  |  **Task:** [baseline] typescript_ssg...
+**Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:48:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:44:49
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 31.3% |
-| Quality/$ | 50 |
+| Quality/$ | 30 |
 | Quality/J | 0.0001 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **43,590** |
 | Thinking ratio | 31.3% |
 | Output efficiency | 27.9% |
-| Input cost | $0.004801 |
-| Output cost | $0.013371 |
-| Reasoning cost | $0.001912 |
 | **Total cost** | **$0.033702** |
 | **Total energy** | **~10636 J** |
 | Solution density | 0.020876 LOC/tok |
@@ -64,6 +61,15 @@
 
 ## Headline Metric
 **Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0337  |  **Energy:** ~10636J  |  **Thinking:** 31%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Opencode session transcript](./exp__ygf4hz3/session.jsonl)
+- [Generated code](./exp__ygf4hz3/code/)
 
 ---
 

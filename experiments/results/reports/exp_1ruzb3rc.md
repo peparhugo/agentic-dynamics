@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [std_final] gpt-5-nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:39:40
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:42:15
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.333 |
 | Structure div | 0.154 |
 | Thinking ratio | 21.6% |
-| Quality/$ | 96 |
+| Quality/$ | 170 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (5/5 tests) |
+| Correctness | 70% (0/0 tests) |
 | Constraint satisfaction | 0% (0/7 constraints) |
 | Lines of code | 216 |
 | Cyclomatic complexity | 40.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **23,703** |
 | Thinking ratio | 21.6% |
 | Output efficiency | 23.7% |
-| Input cost | $0.003502 |
-| Output cost | $0.006173 |
-| Reasoning cost | $0.000717 |
 | **Total cost** | **$0.005871** |
 | **Total energy** | **~4735 J** |
 | Solution density | 0.009113 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0059  |  **Energy:** ~4735J  |  **Thinking:** 22%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0059  |  **Energy:** ~4735J  |  **Thinking:** 22%
 
 ---
 
@@ -107,17 +104,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0385 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 5 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 5 |
-| Pass rate | 100% |
-| Duration | 1.7s |

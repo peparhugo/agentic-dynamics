@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:mint_financial:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:42
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:46:59
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 4.3% |
-| Quality/$ | 54 |
+| Quality/$ | 57 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **23,525** |
 | Thinking ratio | 4.3% |
 | Output efficiency | 63.2% |
-| Input cost | $0.002069 |
-| Output cost | $0.016347 |
-| Reasoning cost | $0.000140 |
 | **Total cost** | **$0.017502** |
 | **Total energy** | **~4502 J** |
 | Solution density | 0.065037 LOC/tok |

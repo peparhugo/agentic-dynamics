@@ -1,8 +1,8 @@
 # Game Report: exp_1spl4mgd-baseline
 
-**Model:** exp_1spl4mgd  |  **Task:** [baseline] typescript_ssg...
+**Model:** anthropic/claude-fable-5  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:18
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:42:18
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 32 |
+| Quality/$ | 0 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **28,334** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000008 |
-| Output cost | $0.031134 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$2.241153** |
 | **Total energy** | **~6512 J** |
 | Solution density | 0.046834 LOC/tok |
@@ -64,6 +61,15 @@
 
 ## Headline Metric
 **Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $2.2412  |  **Energy:** ~6512J  |  **Thinking:** 0%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Opencode session transcript](./exp_1spl4mgd/session.jsonl)
+- [Generated code](./exp_1spl4mgd/code/)
 
 ---
 

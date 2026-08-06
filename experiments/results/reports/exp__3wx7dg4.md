@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** REST URL shortener with click analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:45:17
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:44:46
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 6.9% |
-| Quality/$ | 111 |
+| Quality/$ | 96 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **15,714** |
 | Thinking ratio | 6.9% |
 | Output efficiency | 37.4% |
-| Input cost | $0.002367 |
-| Output cost | $0.006457 |
-| Reasoning cost | $0.000151 |
 | **Total cost** | **$0.010436** |
 | **Total energy** | **~2558 J** |
 | Solution density | 0.024500 LOC/tok |

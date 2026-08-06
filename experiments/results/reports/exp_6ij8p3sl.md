@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [baseline] cd_gpt_5_nano...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:42:57
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:43:45
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 14.8% |
-| Quality/$ | 125 |
+| Quality/$ | 271 |
 | Quality/J | 0.0003 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **17,700** |
 | Thinking ratio | 14.8% |
 | Output efficiency | 24.2% |
-| Input cost | $0.002912 |
-| Output cost | $0.004718 |
-| Reasoning cost | $0.000367 |
 | **Total cost** | **$0.003687** |
 | **Total energy** | **~3083 J** |
 | Solution density | 0.010282 LOC/tok |

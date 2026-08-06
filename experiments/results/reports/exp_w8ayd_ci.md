@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_phantom_success_s0.5_r2] cd_3rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:08:24
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:54:01
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.148 |
 | Thinking ratio | 3.2% |
-| Quality/$ | 61 |
+| Quality/$ | 64 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **21,802** |
 | Thinking ratio | 3.2% |
 | Output efficiency | 57.8% |
-| Input cost | $0.002296 |
-| Output cost | $0.013873 |
-| Reasoning cost | $0.000096 |
 | **Total cost** | **$0.015627** |
 | **Total energy** | **~3904 J** |
 | Solution density | 0.044124 LOC/tok |

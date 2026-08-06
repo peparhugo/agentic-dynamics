@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [remove_critical_constraint_s0.5_r2] cd_claude_2rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:11:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:55:36
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.200 |
 | Structure div | 0.250 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 66 |
+| Quality/$ | 1 |
 | Quality/J | 0.0003 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **13,711** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.8% |
-| Input cost | $0.000008 |
-| Output cost | $0.015051 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$1.224702** |
 | **Total energy** | **~3149 J** |
 | Solution density | 0.046240 LOC/tok |

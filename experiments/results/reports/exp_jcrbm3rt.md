@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask REST API with JWT auth...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:58:22
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:49:35
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 90 |
+| Quality/$ | 1 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **10,124** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.7% |
-| Input cost | $0.000007 |
-| Output cost | $0.011108 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.968727** |
 | **Total energy** | **~2325 J** |
 | Solution density | 0.042671 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask REST API with JWT, pagination, rate limiting...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:27
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:49
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 2.5% |
-| Quality/$ | 61 |
+| Quality/$ | 60 |
 | Quality/J | 0.0003 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **22,430** |
 | Thinking ratio | 2.5% |
 | Output efficiency | 55.9% |
-| Input cost | $0.002522 |
-| Output cost | $0.013790 |
-| Reasoning cost | $0.000077 |
 | **Total cost** | **$0.016746** |
 | **Total energy** | **~3890 J** |
 | Solution density | 0.040080 LOC/tok |

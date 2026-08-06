@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:40:53
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:42:54
 
 ---
 
@@ -10,7 +10,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.62) with moderate resource use ($0.0217, ~4993J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.58) with moderate resource use ($0.0217, ~4993J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.2% |
-| Quality/$ | 50 |
+| Quality/$ | 46 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -33,12 +33,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
+| Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 796 |
 | Cyclomatic complexity | 117.0 |
 | Code quality | 0.126 |
 | Novelty vs baseline | 0.500 |
-| **Composite** | **0.622** |
+| **Composite** | **0.579** |
 
 ---
 
@@ -51,14 +51,11 @@
 | **Total tokens** | **31,155** |
 | Thinking ratio | 3.2% |
 | Output efficiency | 45.3% |
-| Input cost | $0.004336 |
-| Output cost | $0.015522 |
-| Reasoning cost | $0.000138 |
 | **Total cost** | **$0.021712** |
 | **Total energy** | **~4993 J** |
 | Solution density | 0.025550 LOC/tok |
 | Correctness/$ | 50 |
-| Quality/J | 0.000124 |
+| Quality/J | 0.000116 |
 
 ---
 

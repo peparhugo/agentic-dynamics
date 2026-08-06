@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:50:23
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:09
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.600 |
 | Structure div | 0.467 |
 | Thinking ratio | 6.1% |
-| Quality/$ | 57 |
+| Quality/$ | 5 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **37,866** |
 | Thinking ratio | 6.1% |
 | Output efficiency | 23.9% |
-| Input cost | $0.007161 |
-| Output cost | $0.009944 |
-| Reasoning cost | $0.000323 |
 | **Total cost** | **$0.184944** |
 | **Total energy** | **~5284 J** |
 | Solution density | 0.012571 LOC/tok |

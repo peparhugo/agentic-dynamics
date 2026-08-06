@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:09:06
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:54:17
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.667 |
 | Structure div | 0.470 |
 | Thinking ratio | 8.3% |
-| Quality/$ | 67 |
+| Quality/$ | 6 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **28,417** |
 | Thinking ratio | 8.3% |
 | Output efficiency | 32.2% |
-| Input cost | $0.004565 |
-| Output cost | $0.010057 |
-| Reasoning cost | $0.000332 |
 | **Total cost** | **$0.168483** |
 | **Total energy** | **~4568 J** |
 | Solution density | 0.016645 LOC/tok |

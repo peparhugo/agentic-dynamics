@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:23
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:48
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.857 |
 | Structure div | 0.327 |
 | Thinking ratio | 14.9% |
-| Quality/$ | 62 |
+| Quality/$ | 53 |
 | Quality/J | 0.0002 |
 | Converged back | False |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **25,779** |
 | Thinking ratio | 14.9% |
 | Output efficiency | 45.0% |
-| Input cost | $0.002789 |
-| Output cost | $0.012761 |
-| Reasoning cost | $0.000539 |
 | **Total cost** | **$0.018840** |
 | **Total energy** | **~5303 J** |
 | Solution density | 0.029404 LOC/tok |

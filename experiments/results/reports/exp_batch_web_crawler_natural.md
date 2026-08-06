@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:web_crawler:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:02
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 21.3% |
-| Quality/$ | 129 |
+| Quality/$ | 86 |
 | Quality/J | 0.0003 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **18,172** |
 | Thinking ratio | 21.3% |
 | Output efficiency | 22.2% |
-| Input cost | $0.002771 |
-| Output cost | $0.004432 |
-| Reasoning cost | $0.000543 |
 | **Total cost** | **$0.011600** |
 | **Total energy** | **~3571 J** |
 | Solution density | 0.017610 LOC/tok |

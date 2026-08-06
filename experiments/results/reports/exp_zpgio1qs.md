@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:12:15
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:56:20
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 8.5% |
-| Quality/$ | 47 |
+| Quality/$ | 5 |
 | Quality/J | 0.0001 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **50,554** |
 | Thinking ratio | 8.5% |
 | Output efficiency | 19.3% |
-| Input cost | $0.009859 |
-| Output cost | $0.010725 |
-| Reasoning cost | $0.000600 |
 | **Total cost** | **$0.220121** |
 | **Total energy** | **~7179 J** |
 | Solution density | 0.010167 LOC/tok |

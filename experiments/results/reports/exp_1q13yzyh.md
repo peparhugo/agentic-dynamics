@@ -1,31 +1,31 @@
 # Game Report: invert_constraint_s0.5-perturbed
 
-**Model:** exp_1q13yzyh  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
+**Model:** anthropic/claude-fable-5  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:49:04
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:42:15
 
 ---
 
 ## Strategy
-**Classification:** CONSERVATIVE
-**Score:** 0.775
+**Classification:** EXPLORATORY
+**Score:** 0.843
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.51) with moderate resource use ($0.9285, ~2109J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** EXPLORATORY — model escaped attractor (escape=0.63) and found a novel correct solution (novelty=0.95, correctness=100%). Cost: $0.9285, ~2109J.
 
-**Recommendation:** Reliable but not novel. Good for production, not for exploration.
+**Recommendation:** Promote this operator. The perturbation succeeded.
 
 ---
 
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
+| Escape score | 0.629 |
+| Architecture div | 0.750 |
+| Structure div | 0.144 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 99 |
+| Quality/$ | 1 |
 | Quality/J | 0.0005 |
-| Converged back | True |
+| Converged back | False |
 
 ---
 
@@ -37,8 +37,8 @@
 | Lines of code | 485 |
 | Cyclomatic complexity | 65.0 |
 | Code quality | 0.206 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.509** |
+| Novelty vs baseline | 0.954 |
+| **Composite** | **0.577** |
 
 ---
 
@@ -51,19 +51,25 @@
 | **Total tokens** | **9,177** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.9% |
-| Input cost | $0.000003 |
-| Output cost | $0.010084 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.928507** |
 | **Total energy** | **~2109 J** |
 | Solution density | 0.052850 LOC/tok |
 | Correctness/$ | 99 |
-| Quality/J | 0.000241 |
+| Quality/J | 0.000274 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.9285  |  **Energy:** ~2109J  |  **Thinking:** 0%
+**Strategy:** EXPLORATORY  |  **Correctness:** 100%  |  **Cost:** $0.9285  |  **Energy:** ~2109J  |  **Thinking:** 0%
+
+---
+
+## Artifacts
+
+Raw session transcript and generated source code for independent verification.
+
+- [Opencode session transcript](./exp_1q13yzyh/session.jsonl)
+- [Generated code](./exp_1q13yzyh/code/)
 
 ---
 

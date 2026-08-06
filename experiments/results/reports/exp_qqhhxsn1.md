@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task API: JWT, SQLite, throughput vs latency...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:03:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:14
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 3.3% |
-| Quality/$ | 52 |
+| Quality/$ | 51 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (70/70 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 71% (5/7 constraints) |
 | Lines of code | 925 |
 | Cyclomatic complexity | 110.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **28,072** |
 | Thinking ratio | 3.3% |
 | Output efficiency | 51.0% |
-| Input cost | $0.003458 |
-| Output cost | $0.015762 |
-| Reasoning cost | $0.000131 |
 | **Total cost** | **$0.019707** |
 | **Total energy** | **~4761 J** |
 | Solution density | 0.032951 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 3 |
 | Test file rate | 27% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 70 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 70 |
-| Pass rate | 100% |
-| Duration | 14.9s |

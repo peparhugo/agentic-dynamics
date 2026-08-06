@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [silent_sweep:baseline:natural] deepseek_v4_pro...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:11:57
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:56:10
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 6.8% |
-| Quality/$ | 66 |
+| Quality/$ | 61 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **22,056** |
 | Thinking ratio | 6.8% |
 | Output efficiency | 51.4% |
-| Input cost | $0.002485 |
-| Output cost | $0.012482 |
-| Reasoning cost | $0.000211 |
 | **Total cost** | **$0.016497** |
 | **Total energy** | **~4053 J** |
 | Solution density | 0.040125 LOC/tok |

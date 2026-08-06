@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:autocomplete_search:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:46:34
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:25
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 16.1% |
-| Quality/$ | 59 |
+| Quality/$ | 56 |
 | Quality/J | 0.0002 |
 | Converged back | True |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 98% (66/67 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 1186 |
 | Cyclomatic complexity | 191.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **23,506** |
 | Thinking ratio | 16.1% |
 | Output efficiency | 56.5% |
-| Input cost | $0.001738 |
-| Output cost | $0.014606 |
-| Reasoning cost | $0.000531 |
 | **Total cost** | **$0.017999** |
 | **Total energy** | **~5350 J** |
 | Solution density | 0.050455 LOC/tok |
@@ -63,7 +60,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 98%  |  **Cost:** $0.0180  |  **Energy:** ~5350J  |  **Thinking:** 16%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0180  |  **Energy:** ~5350J  |  **Thinking:** 16%
 
 ---
 
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 5 |
 | Test file rate | 42% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 66 |
-| Failed | 1 |
-| Errors | 0 |
-| Total | 67 |
-| Pass rate | 98% |
-| Duration | 1.0s |

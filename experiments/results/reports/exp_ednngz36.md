@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** REST API with JWT & rate limiting...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:53:00
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:52
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 97 |
+| Quality/$ | 1 |
 | Quality/J | 0.0005 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **9,361** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.7% |
-| Input cost | $0.000008 |
-| Output cost | $0.010266 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.937719** |
 | **Total energy** | **~2149 J** |
 | Solution density | 0.048713 LOC/tok |

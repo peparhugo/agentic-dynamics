@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Complete task management API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:02:36
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:58
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 140 |
+| Quality/$ | 2 |
 | Quality/J | 0.0007 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **6,510** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.8% |
-| Input cost | $0.000004 |
-| Output cost | $0.007143 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.645560** |
 | **Total energy** | **~1495 J** |
 | Solution density | 0.041014 LOC/tok |

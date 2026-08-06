@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [std_final] gpt_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:49
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.250 |
 | Structure div | 0.227 |
 | Thinking ratio | 7.1% |
-| Quality/$ | 117 |
+| Quality/$ | 63 |
 | Quality/J | 0.0004 |
 | Converged back | False |
 
@@ -32,7 +32,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (4/4 tests) |
+| Correctness | 100% (0/0 tests) |
 | Constraint satisfaction | 43% (3/7 constraints) |
 | Lines of code | 221 |
 | Cyclomatic complexity | 41.0 |
@@ -51,9 +51,6 @@
 | **Total tokens** | **20,777** |
 | Thinking ratio | 7.1% |
 | Output efficiency | 18.0% |
-| Input cost | $0.004204 |
-| Output cost | $0.004106 |
-| Reasoning cost | $0.000206 |
 | **Total cost** | **$0.015874** |
 | **Total energy** | **~2796 J** |
 | Solution density | 0.010637 LOC/tok |
@@ -94,17 +91,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 4 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 4 |
-| Pass rate | 100% |
-| Duration | 1.1s |

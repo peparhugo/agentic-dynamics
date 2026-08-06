@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [silent_sweep:baseline:natural] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T00:55:22
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:48:19
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 7.9% |
-| Quality/$ | 94 |
+| Quality/$ | 2 |
 | Quality/J | 0.0004 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **10,388** |
 | Thinking ratio | 7.9% |
 | Output efficiency | 91.8% |
-| Input cost | $0.000007 |
-| Output cost | $0.010495 |
-| Reasoning cost | $0.000115 |
 | **Total cost** | **$0.463703** |
 | **Total energy** | **~2582 J** |
 | Solution density | 0.061417 LOC/tok |

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [silent_sweep:baseline:forced] Claude_Fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T01:04:58
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:52:49
 
 ---
 
@@ -23,7 +23,7 @@
 | Architecture div | 0.000 |
 | Structure div | 0.000 |
 | Thinking ratio | 0.0% |
-| Quality/$ | 2,550 |
+| Quality/$ | 6 |
 | Quality/J | 0.0122 |
 | Converged back | True |
 
@@ -51,9 +51,6 @@
 | **Total tokens** | **358** |
 | Thinking ratio | 0.0% |
 | Output efficiency | 99.4% |
-| Input cost | $0.000001 |
-| Output cost | $0.000392 |
-| Reasoning cost | $0.000000 |
 | **Total cost** | **$0.162945** |
 | **Total energy** | **~82 J** |
 | Solution density | 0.134078 LOC/tok |
