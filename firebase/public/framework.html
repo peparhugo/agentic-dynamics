@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.fsec{min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;padding:3rem 2rem;overflow:hidden}
+.fsec{padding:4rem 2rem;position:relative}
 .fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
 .inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
 .pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
@@ -73,7 +73,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .chart-toggle-row{display:flex;justify-content:center;gap:0.5rem;margin-top:0.8rem;font-size:0.7rem;flex-wrap:wrap}
 .callout-box{background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:1.3rem;font-size:0.85rem;color:var(--t2);line-height:1.7;text-align:center}
 .callout-box strong{color:var(--ac)}
-@media(max-width:768px){.fsec{padding:2rem 1rem}.doors{grid-template-columns:1fr}.roi-calc .row{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}.params{grid-template-columns:1fr}}@media(max-width:550px){.cards{grid-template-columns:1fr}.model-cards{grid-template-columns:1fr}}
+@media(max-width:768px){.fsec{padding:3rem 1rem}.doors{grid-template-columns:1fr}.roi-calc .row{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}.params{grid-template-columns:1fr}}@media(max-width:550px){.cards{grid-template-columns:1fr}.model-cards{grid-template-columns:1fr}}
 </style>
 <script src="app.js"></script>
 </head>
@@ -106,14 +106,28 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="pulse">The Levers</div>
 <h2>What you control. What compounds.<br>What you must model.</h2>
-<p class="lead">The equation takes eight inputs. They fall into three categories. Understanding which is which means understanding which decisions are safe and which commit you for years.</p>
+<p class="lead">Every variable in the cost equation was measured empirically. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
+
+<h3 style="color:var(--ac);margin:1.5rem 0 0.5rem;text-align:center">Augmented Workforce (Rules 1&ndash;5)</h3>
+<p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
 <div class="params">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 100% Flask-pinned, 72% general with correct env. Pin frameworks to maximize this.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Explanation Tax. 0% (Claude bills it all as output) to 101% (nano generates more reasoning than code). Pay only when you need auditable reasoning.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">&beta;</div><div class="pname"><strong>How fast your codebase grows.</strong> Context inflation per line generated. Compounds quadratically. A 10% estimation error becomes a 50% cost overrun after 100 sessions.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">v</div><div class="pname"><strong>How much code you generate per session.</strong> Higher velocity accelerates compounding. Control through session scope discipline.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">EPM(t)</div><div class="pname"><strong>What energy will cost.</strong> Local energy markets determine long-term compute prices &ndash; and this isn't theoretical. DeepSeek already introduced peak hour pricing, mirroring energy market dynamics. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr. This is the variable that flips your model selection over time.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Explanation Tax ranges from 3% (DeepSeek) to 120% (nano). Pay only when you need auditable reasoning.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">&beta;</div><div class="pname"><strong>Context inflation per line.</strong> Compounds quadratically through the Snowball Rule (N&sup2;). A 10% error in &beta; becomes a 50% cost overrun after 100 sessions.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div></div>
+</div>
+
+<h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Autonomous Workloads (Rules 6&ndash;10)</h3>
+<p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
+<div class="params">
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 21.4% across 248 experiments. Drives the retry penalty R(r, E&#8340;).</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Measured: 28.2&times; (DeepSeek &rarr; GPT-5.6), 65.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div></div>
 </div>
 </div></section>
 
