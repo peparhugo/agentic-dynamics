@@ -22,7 +22,7 @@ li{margin-bottom:0.35rem}
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link" style="color:var(--ac)">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link" style="color:var(--ac)">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 <section class="sec alt">
 <h1>Autonomous Workloads</h1>
@@ -47,7 +47,7 @@ li{margin-bottom:0.35rem}
 <p style="color:var(--t2);font-size:0.9rem">Actual batch completion time = (Queue_length × Avg_job_time) + (Retry_buffer × retry_rate). Never batch jobs with an SLA less than 2× your observed queue depth. Always have an on-demand fallback for time-critical tasks.</p>
 
 <h3><span class="rule-num">Rule 10</span> · The WOC Ratio</h3>
-<p style="color:var(--t2);font-size:0.9rem">Work Completed / Work Offered = your efficiency metric. Below 0.85: investigate prompt design. Below 0.70: critical — fix immediately. Track WOC by task type, model, and time of day. Measured average across 248 experiments: 0.79 (21.4% overall failure rate).</p>
+<p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. With r=0.214: WOC=<strong>0.82</strong> (21.4% overall failure rate). Above 0.85: healthy. Below 0.70: critical — fix immediately. Track WOC by task type, model, and time of day.</p>
 </section>
 
 <section class="sec alt">
@@ -84,7 +84,7 @@ li{margin-bottom:0.35rem}
 </div>
 </div>
 <div class="highlight-box" style="margin-top:1rem">
-<p><strong>Measured average:</strong> <span class="met">WOC = 0.79</span> across 248 experiment sessions. This is in the "investigate" range — autonomy is viable but requires active monitoring. The 65&times; cost gap between Claude and DeepSeek is the dominant factor.</p>
+<p><strong>Calculated:</strong> <span class="met">WOC = 0.82</span> from retry rate r=0.214 across 248 experiment sessions.</p>
 </div>
 </section>
 

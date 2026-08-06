@@ -19,7 +19,7 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -36,7 +36,7 @@
 <details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence proves</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p>Across <strong style="color:var(--t)">248 experiment sessions</strong> spanning 8 model variants and 3 architectures, we measured a <strong style="color:var(--ac)">65&times; cost gap</strong> between DeepSeek v4 Pro ($0.015/session) and Claude Fable 5 ($1.01/session) — for identical constraint-complete code. The gap widens to <strong style="color:var(--am)">210&times; on TypeScript</strong>. The cause isn't capability; both models implement all 7 constraints. It's architecture: DeepSeek's GRPO compresses reasoning into latent space; Claude's SFT chain-of-thought bills every reasoning step as output tokens. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
+<p>Across <strong style="color:var(--t)">248 experiment sessions</strong> spanning 8 model variants and 3 architectures, we measured a <strong style="color:var(--ac)">65&times; cost gap</strong> between DeepSeek v4 Pro ($0.015/session) and Claude Fable 5 ($1.01/session) — for identical constraint-complete code. The gap widens to <strong style="color:var(--am)">200&times; on TypeScript</strong>. The cause isn't capability; both models implement all 7 constraints. It's architecture: DeepSeek's GRPO compresses reasoning into latent space; Claude's SFT chain-of-thought bills every reasoning step as output tokens. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
 </div>
 </details>
 
@@ -106,7 +106,7 @@
 <tr><td>GPT-5.6-fast</td><td>6</td><td>$0.49</td><td>$4.38</td><td>343</td><td>3.3/7</td><td class="green">0%</td><td>C=2 E=4</td></tr>
 <tr><td>Claude Fable 5</td><td>27</td><td class="amber">$1.01</td><td class="amber">$47.54</td><td>412</td><td>2.3/6</td><td class="amber">44%</td><td>C=25 E=1 W=1</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/65th of Claude per session on average ($0.015 vs $1.01) while producing 1.7x more code (691 vs 412 LOC). Total Claude spend ($47.54) exceeds all other models combined ($16.39). The Cost-Per-Pass Rule in action: GPT-5-nano is cheap per prompt but has a 100% narration penalty and 0.0 constraint score — the cheapest model that never delivers working code. <strong>Cost per working outcome = avg_cost / (1 - narration_rate).</strong></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/65th of Claude per session on average ($0.015 vs $1.01) while producing 1.7x more code (691 vs 412 LOC). Total Claude spend ($47.54) exceeds all other models combined ($16.39). The Cost-Per-Pass Rule in action: GPT-5-nano is cheap per prompt but has a 100% narration penalty and 0.0 constraint score — the cheapest model that never delivers working code. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
 <div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. Claude has zero separate reasoning tokens — all narration is billed as output tokens at full price. GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). DeepSeek's 7% thinking ratio reflects GRPO-compressed latent reasoning. 224/248 sessions analyzed with game reports — the remaining 24 are narration failures, frontend worktrees (HTML/JS not Python), and empty worktrees from failed sweeps.</div>
 </section>
 
@@ -164,14 +164,14 @@
 <!-- Multi-Language Expansion -->
 <section class="sec">
 <h2>Multi-Language Expansion</h2>
-<p class="lead">Initial TypeScript/Node.js baseline — 21 runs across 3 architectures on a static site generator task. <strong style="color:var(--am)">The cost gap widens in strictly-typed environments:</strong> from 65x on Python to 210x on TypeScript.</p>
+<p class="lead">Initial TypeScript/Node.js baseline — 21 runs across 3 architectures on a static site generator task. <strong style="color:var(--am)">The cost gap widens in strictly-typed environments:</strong> from 65x on Python to 200x on TypeScript.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5</th><th>Claude F5</th><th>Gap (DS/Claude)</th></tr></thead><tbody>
-<tr><td>Per-session cost</td><td class="mono green">$0.0006</td><td class="mono">$0.015</td><td class="mono amber">$0.12</td><td class="mono amber">210&times;</td></tr>
+<tr><td>Per-session cost</td><td class="mono green">$0.0006</td><td class="mono">$0.015</td><td class="mono amber">$0.12</td><td class="mono amber">200&times;</td></tr>
 <tr><td>Avg correctness</td><td class="mono green">87%</td><td class="mono">77%</td><td class="mono amber">90%</td><td class="mono">—</td></tr>
 <tr><td>Avg tokens/session</td><td class="mono green">29K</td><td class="mono">19K</td><td class="mono">30K</td><td class="mono">1.0&times;</td></tr>
 <tr><td>Strategy archetypes</td><td class="mono green">efficient / exploratory</td><td class="mono">mixed</td><td class="mono">efficient / conservative</td><td class="mono">—</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> The gap widens from 65x on Python to 210x on TypeScript — strictly-typed environments with compilation and type checking produce more code per session, compounding the architecture cost delta. DeepSeek's GRPO-latent reasoning produces efficient implementations at negligible cost ($0.004 total for 7 runs). Claude scores highest on correctness (90%) but at 210x the price. GPT-5 is most fragile: collapses to 20% correctness on the shift_framing perturbation while burning a 28% thinking ratio. Go and Rust baselines are configured for the next measurement cycle.</div>
+<div class="insight"><strong>Key insight:</strong> The gap widens from 65x on Python to 200x on TypeScript — strictly-typed environments with compilation and type checking produce more code per session, compounding the architecture cost delta. DeepSeek's GRPO-latent reasoning produces efficient implementations at negligible cost ($0.004 total for 7 runs). Claude scores highest on correctness (90%) but at 200x the price. GPT-5 is most fragile: collapses to 20% correctness on the shift_framing perturbation while burning a 28% thinking ratio. Go and Rust baselines are configured for the next measurement cycle.</div>
 </section>
 
 <!-- Current Scope & Roadmap -->
@@ -179,7 +179,7 @@
 <h2>Current Scope &amp; What's Next</h2>
 <p class="lead">This is v0.3 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
 <div class="cards">
-<div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. TypeScript/Node.js (initial: 3 variants, 21 cross-model runs). 10 prompt-level perturbation operators (5 manifold, 5 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. TypeScript/Node.js (initial: 3 variants, 21 cross-model runs). 10 prompt-level perturbation operators (4 manifold, 6 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
 <div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.3+)</div><div class="cdesc">Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
 <div class="card"><div class="ctitle">Not in Scope</div><div class="cdesc">The framework does not judge whether narration is wasteful or valuable. It measures the cost. If your team needs auditable reasoning trails for compliance or debugging, the Explanation Tax is insurance &ndash; not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.</div></div>
 </div>

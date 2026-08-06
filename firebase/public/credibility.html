@@ -22,7 +22,7 @@ li{margin-bottom:0.35rem}
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link" style="color:var(--ac)">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link" style="color:var(--ac)">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 <section class="sec alt">
 <h1>How We Know What We Know</h1>
@@ -41,7 +41,7 @@ li{margin-bottom:0.35rem}
 <div class="card">
 <h4>Perturbation</h4>
 <p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">10</p>
-<p>operators — 5 manifold (probe search dynamics) + 5 semantic (probe reasoning coherence)</p>
+<p>operators — 4 manifold (probe search dynamics) + 6 semantic (probe reasoning coherence)</p>
 </div>
 <div class="card">
 <h4>Recovery</h4>
@@ -111,11 +111,11 @@ li{margin-bottom:0.35rem}
 <tr><th>Variable</th><th>Symbol</th><th>Measured Value</th><th>Source</th></tr>
 <tr><td>Retry rate</td><td><code>r</code></td><td><span class="met">21.4%</span></td><td>53/248 sessions failed first-pass</td></tr>
 <tr><td>Escalation multiplier</td><td><code>Eₘ</code></td><td><span class="met">28.2&times;</span></td><td>DeepSeek V3 → GPT-5.6 cost delta</td></tr>
-<tr><td>Work Overhead Cost</td><td><code>WOC</code></td><td><span class="met">0.79</span></td><td>(validation + retries + escalations) / primary</td></tr>
+<tr><td>Work Overhead Cost</td><td><code>WOC</code></td><td><span class="met">0.82</span></td><td>1/(1+r) with r=0.214</td></tr>
 <tr><td>Cost gap</td><td>—</td><td><span class="met">65&times;</span></td><td>Claude $1.01 vs DeepSeek $0.015 per session</td></tr>
 <tr><td>Simple request share</td><td>—</td><td><span class="met">60–80%</span></td><td>Classification of request complexity across experiments</td></tr>
 <tr><td>Explanation Tax</td><td><code>ε</code></td><td><span class="met">24–120%</span></td><td>Narration overhead vs silent mode</td></tr>
-<tr><td>Context inflation</td><td><code>β</code></td><td><span class="met">0.002</span></td><td>Per-session token growth from accumulated context</td></tr>
+<tr><td>Context inflation</td><td><code>β</code></td><td><span class="met">0.001</span></td><td>Modeling parameter — calibrate to your codebase</td></tr>
 </table>
 </section>
 

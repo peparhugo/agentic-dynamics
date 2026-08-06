@@ -31,7 +31,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 |---|------|-------------------|
 | 1 | **The Silent Inference Rule** | Default to the cheapest model that passes your tests. If it produces correct code without narration, route to it. |
 | 2 | **The Explanation Tax Rule** | Narration has a measurable cost (24–120% more per session). Pay for it only when you need auditable reasoning. |
-| 3 | **The Snowball Rule** | Codebase growth compounds quadratically. A 10% estimation error becomes a 50% cost overrun after 100 sessions. |
+| 3 | **The Snowball Rule** | Codebase growth compounds quadratically through the N² term. Model the curve before architectural commitments. |
 | 4 | **The EPM Horizon Rule** | Energy costs are the inflation rate of AI compute. Find the year your local energy prices flip your model selection. |
 | 5 | **The Cost-Per-Pass Rule** | Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome. |
 
@@ -41,7 +41,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 
 ```
 ├── src/instrument/           # Python measurement apparatus
-│   ├── perturb.py            # 10 perturbation operators (5 manifold, 5 semantic)
+│   ├── perturb.py            # 10 perturbation operators (4 manifold, 6 semantic)
 │   ├── trajectory.py         # Reasoning trajectory capture
 │   ├── recovery.py           # Recovery classification (6 detection signals)
 │   ├── recovery_cost.py      # Cost of recovering from perturbation
@@ -256,7 +256,7 @@ Per outcome:  CostPerOutcome(K,v) = C(K/P, v) / K
 
 ## Current Scope & Roadmap
 
-### v0.1 (Current)
+### v0.3 (Current)
 
 - 8 models across Python/Flask REST APIs, CRUD apps, real-time collaboration frontends
 - 10 prompt-level perturbation operators
@@ -287,7 +287,7 @@ If you use this framework in your research or decision-making:
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},
-  note   = {v0.1. 248 experiment sessions, 8 models, 10 perturbation operators.}
+  note   = {v0.3. 248 experiment sessions, 8 models, 10 perturbation operators.}
 }
 ```
 

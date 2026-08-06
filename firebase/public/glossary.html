@@ -18,7 +18,7 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="sec" style="padding-top:6rem">
 <h1>Glossary</h1>
@@ -40,7 +40,7 @@
 
 <div class="gcard">
 <div class="gname">Snowball Effect (&beta;, v, N&sup2;)</div>
-<div class="gdef">The quadratic compounding of AI costs as a codebase grows. Each new line of generated code increases the context window for every future session. Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]. &beta; = context inflation rate per line. v = code velocity (lines/session). N = number of sessions. A 10% error in &beta; produces a 50% cost overrun after 100 sessions. The empirical basis for Rule 3.</div>
+<div class="gdef">The quadratic compounding of AI costs as a codebase grows. Each new line of generated code increases the context window for every future session. Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]. &beta; = context inflation rate per line (default 0.001 — calibrate to your codebase). v = code velocity (lines/session). N = number of sessions. The N&sup2; term compounds per-session growth — model the curve before architectural commitments. The empirical basis for Rule 3.</div>
 </div>
 
 <div class="gcard">
@@ -55,7 +55,7 @@
 
 <div class="gcard">
 <div class="gname">WOC Ratio (Work Overhead Cost)</div>
-<div class="gdef">The ratio of overhead costs (validation + retries + escalations) to primary run costs. WOC = (cost_validation + cost_retries + cost_escalations) / cost_primary. Measured average across 248 experiments: 0.79. Below 0.70 = healthy. Below 0.85 = investigate. At or above 0.85 = critical. The empirical basis for Rule 10.</div>
+<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.214: WOC=0.82. At or above 0.85 = healthy. Below 0.70 = critical. The empirical basis for Rule 10.</div>
 </div>
 
 <div class="gcard">
