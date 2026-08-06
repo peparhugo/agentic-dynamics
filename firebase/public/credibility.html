@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credibility — AI FinOps Framework</title>
+<style>
+:root{--bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;--b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);--t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;font-family:system-ui,-apple-system,sans-serif;color:var(--t);background:var(--bg)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column}
+.topbar{display:flex;flex-wrap:wrap;gap:0.25rem;padding:0.75rem 1.25rem;background:var(--bg2);border-bottom:1px solid var(--b);align-items:center}
+.topbar-link{color:var(--t2);text-decoration:none;font-size:0.8rem;padding:0.35rem 0.65rem;border-radius:6px;transition:color .15s,background .15s}
+.topbar-link:hover{color:var(--t);background:var(--b)}
+main{flex:1;max-width:960px;width:100%;margin:0 auto;padding:2rem 1.25rem 3rem}
+h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem}
+h2{font-size:1.25rem;font-weight:600;margin:2rem 0 0.75rem}
+h3{font-size:1rem;font-weight:600;margin:1.25rem 0 0.5rem;color:var(--t2)}
+.sec{background:var(--bg);border-radius:10px;border:1px solid var(--b);padding:1.5rem;margin-bottom:1.5rem}
+.sec.alt{background:var(--bg2)}
+.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
+code,p code,li code{font-family:"JetBrains Mono",monospace;font-size:0.82rem;background:var(--bg4);padding:0.15em 0.4em;border-radius:4px;color:var(--ac)}
+pre{background:var(--bg4);border:1px solid var(--b);border-radius:8px;padding:0.8rem 1rem;overflow-x:auto;font-size:0.8rem;font-family:"JetBrains Mono",monospace;line-height:1.5;margin:0.5rem 0 1rem}
+ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
+li{margin-bottom:0.35rem}
+a{color:var(--ac);text-decoration:none}
+a:hover{text-decoration:underline}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
+.card{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:1.25rem}
+.card h4{font-size:0.9rem;color:var(--ac);margin-bottom:0.5rem;font-family:"JetBrains Mono",monospace}
+.card p,.card li{font-size:0.82rem;color:var(--t2);line-height:1.5}
+table{width:100%;border-collapse:collapse;font-size:0.85rem;margin:1rem 0}
+th,td{padding:0.6rem 0.75rem;text-align:left;border-bottom:1px solid var(--b)}
+th{color:var(--t3);font-weight:500;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em}
+td{color:var(--t2)}
+td code{color:var(--ac)}
+.met{font-family:"JetBrains Mono",monospace;color:var(--am)}
+.tag{display:inline-block;font-size:0.7rem;padding:0.15em 0.5em;border-radius:4px;background:var(--bg4);color:var(--cy);margin-right:0.3rem}
+.highlight-box{background:var(--bg3);border-left:3px solid var(--ac);padding:1rem 1.25rem;border-radius:0 8px 8px 0;margin:1rem 0}
+.highlight-box p{font-size:0.85rem;color:var(--t2);line-height:1.5}
+.strength{color:var(--cy)}
+.caution{color:var(--am)}
+footer{text-align:center;padding:1.5rem 1rem;border-top:1px solid var(--b)}
+</style>
+</head>
+<body>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<main>
+<section class="sec alt">
+<h1>How We Know What We Know</h1>
+<p class="sub">The methodology, numbers, and honest limitations behind the AI FinOps Framework</p>
+</section>
+
+<section class="sec">
+<h2>Methodology Recap</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">The framework is not a survey, not an opinion, not a benchmark. It's a calibrated measurement instrument.</p>
+<div class="row">
+<div class="card">
+<h4>Scale</h4>
+<p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">248</p>
+<p>instrumented experiment sessions across 3 architectures and 8 model variants</p>
+</div>
+<div class="card">
+<h4>Perturbation</h4>
+<p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">10</p>
+<p>operators — 5 manifold (probe search dynamics) + 5 semantic (probe reasoning coherence)</p>
+</div>
+<div class="card">
+<h4>Recovery</h4>
+<p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">6</p>
+<p>detection signals classify recovery after perturbation</p>
+</div>
+<div class="card">
+<h4>Strategies</h4>
+<p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">4</p>
+<p>archetypes: Conservative, Exploratory, Wasteful, Efficient</p>
+</div>
+<div class="card">
+<h4>Constraint Detection</h4>
+<p style="font-size:1.3rem;color:var(--t);font-family:'JetBrains Mono',monospace">2-signal</p>
+<p>dual-signal approach: matches model output against known constraints to validate correctness</p>
+</div>
+</div>
+<div class="highlight-box" style="margin-top:1rem">
+<p><strong>Pipeline:</strong> Experiment Config (YAML) → Perturbation Engine (10 operators &times; 3 strengths) → Agentic Session → Multi-Dimensional Analysis (solution, efficiency, basin, recovery, strategy, constraints) → JSON Results + Markdown Game Reports</p>
+</div>
+</section>
+
+<section class="sec alt">
+<h2>What's Strong</h2>
+<div class="row">
+<div class="card">
+<h4>Transparent methodology</h4>
+<p>Every operator, every signal, every equation is documented in the open. The source code is the specification. No black-box rankings, no proprietary scoring.</p>
+</div>
+<div class="card">
+<h4>Multi-model</h4>
+<p>8 variants across 3 architectures (DeepSeek V3/R1, GPT-4o/GPT-5.6, Claude 3.5/4 Sonnet/Opus). Comparisons are calibrated, not cherry-picked.</p>
+</div>
+<div class="card">
+<h4>Replicable</h4>
+<p>Everything is open source (MIT). Clone the repo, install the package, run your own experiments. Every number in this framework can be independently verified.</p>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2>What We're Honest About</h2>
+<div class="row">
+<div class="card">
+<h4 style="color:var(--am)">Sample size limitations</h4>
+<p>248 sessions is statistically meaningful but not exhaustive. Confidence intervals widen for per-model-per-task breakdowns. We report aggregate numbers where data density supports them.</p>
+</div>
+<div class="card">
+<h4 style="color:var(--am)">Single-domain bias</h4>
+<p>All experiments use coding tasks (Python/Flask REST APIs, CRUD apps, real-time collaboration frontends). Results may not generalize directly to creative writing, legal analysis, or medical reasoning domains.</p>
+</div>
+<div class="card">
+<h4 style="color:var(--am)">Static snapshot risk</h4>
+<p>Model behavior, pricing, and rate limits change. This framework captures a moment in time (Q2–Q3 2025). Provider-side changes (new models, pricing updates, caching improvements) can shift conclusions.</p>
+</div>
+<div class="card">
+<h4 style="color:var(--am)">Self-validation risk</h4>
+<p>We wrote the instrumentation software and we ran the experiments. While the code is open and results are reproducible, independent replication by an unaffiliated team would strengthen confidence.</p>
+</div>
+</div>
+</section>
+
+<section class="sec alt">
+<h2>Key Variables Derived from Data</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Every constant in the cost equation is measured, not assumed. Here are the ones that drive the model.</p>
+<table>
+<tr><th>Variable</th><th>Symbol</th><th>Measured Value</th><th>Source</th></tr>
+<tr><td>Retry rate</td><td><code>r</code></td><td><span class="met">21.4%</span></td><td>53/248 sessions failed first-pass</td></tr>
+<tr><td>Escalation multiplier</td><td><code>Eₘ</code></td><td><span class="met">28.2&times;</span></td><td>DeepSeek V3 → GPT-5.6 cost delta</td></tr>
+<tr><td>Work Overhead Cost</td><td><code>WOC</code></td><td><span class="met">0.79</span></td><td>(validation + retries + escalations) / primary</td></tr>
+<tr><td>Cost gap</td><td>—</td><td><span class="met">65&times;</span></td><td>Claude $1.01 vs DeepSeek $0.015 per session</td></tr>
+<tr><td>Simple request share</td><td>—</td><td><span class="met">60–80%</span></td><td>Classification of request complexity across experiments</td></tr>
+<tr><td>Explanation Tax</td><td><code>ε</code></td><td><span class="met">24–120%</span></td><td>Narration overhead vs silent mode</td></tr>
+<tr><td>Context inflation</td><td><code>β</code></td><td><span class="met">0.002</span></td><td>Per-session token growth from accumulated context</td></tr>
+</table>
+</section>
+
+<section class="sec">
+<h2>Rules 6–11 Calibration Status</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Transparency on which rules are empirically grounded and which extend conceptually.</p>
+<div class="highlight-box">
+<p><strong>Rules 1–5</strong> (Silent Inference, Explanation Tax, Snowball, EPM Horizon, Cost-Per-Pass) are fully calibrated against the 248-experiment dataset. All five have measured numeric constants from the instrument pipeline.</p>
+</div>
+<div class="highlight-box" style="border-left-color:var(--am);margin-top:0.75rem">
+<p><strong>Rules 6–11</strong> (Autonomy Threshold, Escalation Cascade, Batch SLA Horizon, WOC Ratio Floor, Workstream Capacity Budgeting, Provider Selection) extend the framework conceptually from industry best practices. They have been calibrated using the 248-experiment dataset where possible — <code>r</code>, <code>Eₘ</code>, and <code>WOC</code> are measured. Full validation against autonomous workload scenarios is in the roadmap.</p>
+</div>
+</section>
+
+<section class="sec alt">
+<h2>Call to Reproduce</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Science depends on replication. Here's how to verify the numbers yourself.</p>
+<pre>git clone https://github.com/peparhugo/ai-finops-framework.git
+cd ai-finops-framework
+pip install -e .
+
+# Run a single experiment
+python scripts/run.py --config experiments/configs/task_manager.yaml
+
+# Run a full silent-mode sweep
+python scripts/sweep_silent_mode.py
+
+# Inspect the inventory
+python scripts/inventory.py list
+python scripts/inventory.py stats
+python scripts/inventory.py report
+
+# Validate a worktree
+python scripts/validate_session.py /tmp/exp_xyz</pre>
+<div class="highlight-box" style="margin-top:1rem">
+<p><strong>Challenge:</strong> Run the same experiment configs on your own models, your own hardware, your own tasks. If you find different numbers, open an issue with your data. The framework gets stronger with every independent replication — including ones that disagree.</p>
+</div>
+</section>
+</main>
+<footer>
+<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework · August 2026</strong><br>248 experiment sessions · 3 architectures, 8 variants · 224 game reports · $64.98 analyzed</p>
+</footer>
+</body>
+</html>
