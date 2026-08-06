@@ -2,15 +2,17 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:task_manager:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:02
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:21:42
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.55) with moderate resource use ($0.0100, ~2397J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.59) with moderate resource use ($0.0100, ~2397J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -19,48 +21,54 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
-| Thinking ratio | 3.1% |
-| Quality/$ | 100 |
-| Quality/J | 0.0004 |
-| Converged back | True |
+| Escape score [H] | 0.000 |
+| Architecture div [H] | 0.000 |
+| Structure div [H] | 0.000 |
+| Thinking ratio [C] | 3.1% |
+| Quality/$ [C] | 100 |
+| Quality/J [C] | 0.0004 |
+| Converged back [H] | True |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 29% (2/7 constraints) |
-| Lines of code | 533 |
-| Cyclomatic complexity | 72.0 |
-| Code quality | 0.188 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.548** |
+| Correctness | 93% (13/14 tests) [M] |
+| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Lines of code [M] | 533 |
+| Cyclomatic complexity [C] | 72.0 |
+| Code quality [H] | 0.188 |
+| Novelty vs baseline [H] | 0.500 |
+| **Composite [H]** | **0.591** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 8,132 |
-| Completion tokens | 6,619 |
-| Reasoning tokens | 477 |
+| Prompt tokens [M] | 8,132 |
+| Completion tokens [M] | 6,619 |
+| Reasoning tokens [M] | 477 |
+| Cache read tokens [M] | 78,208 |
+| Cache write tokens [M] | 0 |
 | **Total tokens** | **15,228** |
-| Thinking ratio | 3.1% |
-| Output efficiency | 43.5% |
+| Thinking ratio [C] | 3.1% |
+| Output efficiency [C] | 43.5% |
+| Input cost [M] | $0.001071 |
+| Output cost [M] | $0.003551 |
+| Reasoning cost [M] | $0.000033 |
+| Cache cost [M] | $0.005340 |
 | **Total cost** | **$0.009994** |
-| **Total energy** | **~2397 J** |
-| Solution density | 0.035001 LOC/tok |
-| Correctness/$ | 105 |
-| Quality/J | 0.000229 |
+| **Total energy [X]** | **~2397 J** |
+| Solution density [C] | 0.035001 LOC/tok |
+| Correctness/$ [C] | 49 |
+| Quality/J [C] | 0.000247 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 93%  |  **Cost:** $0.0100  |  **Energy:** ~2397J  |  **Thinking:** 3%
 
 ---
 
@@ -91,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 18% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 13 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 14 |
+| Pass rate | 93% |
+| Duration | 4.2s |

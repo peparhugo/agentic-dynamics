@@ -2,11 +2,13 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [standardized_build] claude...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:51:16
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:29:12
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.698
 
@@ -19,48 +21,54 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.444 |
-| Architecture div | 0.455 |
-| Structure div | 0.189 |
-| Thinking ratio | 0.0% |
-| Quality/$ | 1 |
-| Quality/J | 0.0003 |
-| Converged back | False |
+| Escape score [H] | 0.444 |
+| Architecture div [H] | 0.455 |
+| Structure div [H] | 0.189 |
+| Thinking ratio [C] | 0.0% |
+| Quality/$ [C] | 1 |
+| Quality/J [C] | 0.0003 |
+| Converged back [H] | False |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) |
-| Constraint satisfaction | 0% (0/7 constraints) |
-| Lines of code | 600 |
-| Cyclomatic complexity | 86.0 |
-| Code quality | 0.167 |
-| Novelty vs baseline | 0.685 |
-| **Composite** | **0.510** |
+| Correctness | 100% (54/54 tests) [M] |
+| Constraint satisfaction [H] | 0% (0/7 constraints) |
+| Lines of code [M] | 600 |
+| Cyclomatic complexity [C] | 86.0 |
+| Code quality [H] | 0.167 |
+| Novelty vs baseline [H] | 0.685 |
+| **Composite [H]** | **0.510** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 18 |
-| Completion tokens | 12,648 |
-| Reasoning tokens | 0 |
+| Prompt tokens [M] | 18 |
+| Completion tokens [M] | 12,648 |
+| Reasoning tokens [M] | 0 |
+| Cache read tokens [M] | 143,705 |
+| Cache write tokens [M] | 26,729 |
 | **Total tokens** | **12,666** |
-| Thinking ratio | 0.0% |
-| Output efficiency | 99.9% |
+| Thinking ratio [C] | 0.0% |
+| Output efficiency [C] | 99.9% |
+| Input cost [M] | $0.000180 |
+| Output cost [M] | $0.632400 |
+| Reasoning cost [M] | $0.000000 |
+| Cache cost [M] | $0.477818 |
 | **Total cost** | **$1.110397** |
-| **Total energy** | **~2910 J** |
-| Solution density | 0.047371 LOC/tok |
-| Correctness/$ | 50 |
-| Quality/J | 0.000175 |
+| **Total energy [X]** | **~2910 J** |
+| Solution density [C] | 0.047371 LOC/tok |
+| Correctness/$ [C] | 2 |
+| Quality/J [C] | 0.000175 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $1.1104  |  **Energy:** ~2910J  |  **Thinking:** 0%
 
 ---
 
@@ -104,3 +112,17 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0474 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 54 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 54 |
+| Pass rate | 100% |
+| Duration | 1.0s |

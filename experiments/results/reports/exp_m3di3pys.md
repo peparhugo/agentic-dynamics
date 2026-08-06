@@ -2,11 +2,13 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with REST API and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:50:36
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:28:06
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.837
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
-| Thinking ratio | 2.2% |
-| Quality/$ | 179 |
-| Quality/J | 0.0008 |
-| Converged back | True |
+| Escape score [H] | 0.000 |
+| Architecture div [H] | 0.000 |
+| Structure div [H] | 0.000 |
+| Thinking ratio [C] | 2.2% |
+| Quality/$ [C] | 179 |
+| Quality/J [C] | 0.0008 |
+| Converged back [H] | True |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 33% (2/6 constraints) |
-| Lines of code | 111 |
-| Cyclomatic complexity | 9.0 |
-| Code quality | 0.850 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.695** |
+| Correctness | 100% (11/11 tests) [M] |
+| Constraint satisfaction [H] | 33% (2/6 constraints) |
+| Lines of code [M] | 111 |
+| Cyclomatic complexity [C] | 9.0 |
+| Code quality [H] | 0.850 |
+| Novelty vs baseline [H] | 0.500 |
+| **Composite [H]** | **0.695** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 7,401 |
-| Completion tokens | 2,195 |
-| Reasoning tokens | 213 |
+| Prompt tokens [M] | 7,401 |
+| Completion tokens [M] | 2,195 |
+| Reasoning tokens [M] | 213 |
+| Cache read tokens [M] | 77,568 |
+| Cache write tokens [M] | 0 |
 | **Total tokens** | **9,809** |
-| Thinking ratio | 2.2% |
-| Output efficiency | 22.4% |
+| Thinking ratio [C] | 2.2% |
+| Output efficiency [C] | 22.4% |
+| Input cost [M] | $0.000731 |
+| Output cost [M] | $0.000883 |
+| Reasoning cost [M] | $0.000011 |
+| Cache cost [M] | $0.003971 |
 | **Total cost** | **$0.005596** |
-| **Total energy** | **~1197 J** |
-| Solution density | 0.011316 LOC/tok |
-| Correctness/$ | 225 |
-| Quality/J | 0.000581 |
+| **Total energy [X]** | **~1197 J** |
+| Solution density [C] | 0.011316 LOC/tok |
+| Correctness/$ [C] | 65 |
+| Quality/J [C] | 0.000581 |
 
 ---
 
@@ -91,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 11 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 11 |
+| Pass rate | 100% |
+| Duration | 0.7s |

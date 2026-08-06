@@ -2,15 +2,17 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Authenticated REST API with JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:55:04
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:36:18
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.79) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
-| Thinking ratio | 0.0% |
-| Quality/$ | 2 |
-| Quality/J | 0.0006 |
-| Converged back | True |
+| Escape score [H] | 0.000 |
+| Architecture div [H] | 0.000 |
+| Structure div [H] | 0.000 |
+| Thinking ratio [C] | 0.0% |
+| Quality/$ [C] | 2 |
+| Quality/J [C] | 0.0006 |
+| Converged back [H] | True |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 100% (7/7 constraints) |
-| Lines of code | 298 |
-| Cyclomatic complexity | 41.0 |
-| Code quality | 0.336 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.792** |
+| Correctness | 100% (0/0 tests) [H] |
+| Constraint satisfaction [H] | 86% (6/7 constraints) |
+| Lines of code [M] | 298 |
+| Cyclomatic complexity [C] | 41.0 |
+| Code quality [H] | 0.336 |
+| Novelty vs baseline [H] | 0.500 |
+| **Composite [H]** | **0.749** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 12 |
-| Completion tokens | 6,893 |
-| Reasoning tokens | 0 |
+| Prompt tokens [M] | 12 |
+| Completion tokens [M] | 6,893 |
+| Reasoning tokens [M] | 0 |
+| Cache read tokens [M] | 66,294 |
+| Cache write tokens [M] | 17,692 |
 | **Total tokens** | **6,905** |
-| Thinking ratio | 0.0% |
-| Output efficiency | 99.8% |
+| Thinking ratio [C] | 0.0% |
+| Output efficiency [C] | 99.8% |
+| Input cost [M] | $0.000120 |
+| Output cost [M] | $0.344650 |
+| Reasoning cost [M] | $0.000000 |
+| Cache cost [M] | $0.287444 |
 | **Total cost** | **$0.632214** |
-| **Total energy** | **~1586 J** |
-| Solution density | 0.043157 LOC/tok |
-| Correctness/$ | 132 |
-| Quality/J | 0.000499 |
+| **Total energy [X]** | **~1586 J** |
+| Solution density [C] | 0.043157 LOC/tok |
+| Correctness/$ [C] | 5 |
+| Quality/J [C] | 0.000472 |
 
 ---
 

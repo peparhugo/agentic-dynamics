@@ -2,11 +2,13 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:49:25
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:26:35
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** EXPLORATORY
 **Score:** 0.760
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.735 |
-| Architecture div | 0.857 |
-| Structure div | 0.336 |
-| Thinking ratio | 7.8% |
-| Quality/$ | 63 |
-| Quality/J | 0.0002 |
-| Converged back | False |
+| Escape score [H] | 0.735 |
+| Architecture div [H] | 0.857 |
+| Structure div [H] | 0.336 |
+| Thinking ratio [C] | 7.8% |
+| Quality/$ [C] | 63 |
+| Quality/J [C] | 0.0002 |
+| Converged back [H] | False |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) |
-| Constraint satisfaction | 14% (1/7 constraints) |
-| Lines of code | 700 |
-| Cyclomatic complexity | 52.0 |
-| Code quality | 0.143 |
-| Novelty vs baseline | 0.970 |
-| **Composite** | **0.497** |
+| Correctness | 80% (0/0 tests) [H] |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
+| Lines of code [M] | 700 |
+| Cyclomatic complexity [C] | 52.0 |
+| Code quality [H] | 0.143 |
+| Novelty vs baseline [H] | 0.970 |
+| **Composite [H]** | **0.497** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 10,037 |
-| Completion tokens | 10,679 |
-| Reasoning tokens | 1,753 |
+| Prompt tokens [M] | 10,037 |
+| Completion tokens [M] | 10,679 |
+| Reasoning tokens [M] | 1,753 |
+| Cache read tokens [M] | 205,440 |
+| Cache write tokens [M] | 0 |
 | **Total tokens** | **22,469** |
-| Thinking ratio | 7.8% |
-| Output efficiency | 47.5% |
+| Thinking ratio [C] | 7.8% |
+| Output efficiency [C] | 47.5% |
+| Input cost [M] | $0.000993 |
+| Output cost [M] | $0.004304 |
+| Reasoning cost [M] | $0.000090 |
+| Cache cost [M] | $0.010539 |
 | **Total cost** | **$0.015927** |
-| **Total energy** | **~4083 J** |
-| Solution density | 0.031154 LOC/tok |
-| Correctness/$ | 54 |
-| Quality/J | 0.000122 |
+| **Total energy [X]** | **~4083 J** |
+| Solution density [C] | 0.031154 LOC/tok |
+| Correctness/$ [C] | 18 |
+| Quality/J [C] | 0.000122 |
 
 ---
 

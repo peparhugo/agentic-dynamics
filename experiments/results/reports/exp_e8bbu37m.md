@@ -2,11 +2,13 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [baseline] cd_claude_2rep...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:47:40
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:23:03
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
-| Thinking ratio | 0.0% |
-| Quality/$ | 1 |
-| Quality/J | 0.0004 |
-| Converged back | True |
+| Escape score [H] | 0.000 |
+| Architecture div [H] | 0.000 |
+| Structure div [H] | 0.000 |
+| Thinking ratio [C] | 0.0% |
+| Quality/$ [C] | 1 |
+| Quality/J [C] | 0.0004 |
+| Converged back [H] | True |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 100% (7/7 constraints) |
-| Lines of code | 459 |
-| Cyclomatic complexity | 53.0 |
-| Code quality | 0.218 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.769** |
+| Correctness | 100% (0/0 tests) [H] |
+| Constraint satisfaction [H] | 100% (7/7 constraints) |
+| Lines of code [M] | 459 |
+| Cyclomatic complexity [C] | 53.0 |
+| Code quality [H] | 0.218 |
+| Novelty vs baseline [H] | 0.500 |
+| **Composite [H]** | **0.769** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 22 |
-| Completion tokens | 11,265 |
-| Reasoning tokens | 0 |
+| Prompt tokens [M] | 22 |
+| Completion tokens [M] | 11,265 |
+| Reasoning tokens [M] | 0 |
+| Cache read tokens [M] | 154,841 |
+| Cache write tokens [M] | 22,337 |
 | **Total tokens** | **11,287** |
-| Thinking ratio | 0.0% |
-| Output efficiency | 99.8% |
+| Thinking ratio [C] | 0.0% |
+| Output efficiency [C] | 99.8% |
+| Input cost [M] | $0.000220 |
+| Output cost [M] | $0.563250 |
+| Reasoning cost [M] | $0.000000 |
+| Cache cost [M] | $0.434054 |
 | **Total cost** | **$0.997524** |
-| **Total energy** | **~2593 J** |
-| Solution density | 0.040666 LOC/tok |
-| Correctness/$ | 81 |
-| Quality/J | 0.000296 |
+| **Total energy [X]** | **~2593 J** |
+| Solution density [C] | 0.040666 LOC/tok |
+| Correctness/$ [C] | 3 |
+| Quality/J [C] | 0.000296 |
 
 ---
 

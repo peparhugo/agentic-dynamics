@@ -2,11 +2,13 @@
 
 **Model:** openai/gpt-5.6-fast  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_gather_gpt_5_6_fast...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:53:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:34:03
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** EXPLORATORY
 **Score:** 0.819
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.551 |
-| Architecture div | 0.600 |
-| Structure div | 0.186 |
-| Thinking ratio | 4.3% |
-| Quality/$ | 2 |
-| Quality/J | 0.0008 |
-| Converged back | False |
+| Escape score [H] | 0.551 |
+| Architecture div [H] | 0.600 |
+| Structure div [H] | 0.186 |
+| Thinking ratio [C] | 4.3% |
+| Quality/$ [C] | 2 |
+| Quality/J [C] | 0.0008 |
+| Converged back [H] | False |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 100% (7/7 constraints) |
-| Lines of code | 291 |
-| Cyclomatic complexity | 59.0 |
-| Code quality | 0.344 |
-| Novelty vs baseline | 0.851 |
-| **Composite** | **0.846** |
+| Correctness | 100% (10/10 tests) [M] |
+| Constraint satisfaction [H] | 100% (7/7 constraints) |
+| Lines of code [M] | 291 |
+| Cyclomatic complexity [C] | 59.0 |
+| Code quality [H] | 0.344 |
+| Novelty vs baseline [H] | 0.851 |
+| **Composite [H]** | **0.846** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 30 |
-| Completion tokens | 5,262 |
-| Reasoning tokens | 237 |
+| Prompt tokens [M] | 30 |
+| Completion tokens [M] | 5,262 |
+| Reasoning tokens [M] | 237 |
+| Cache read tokens [M] | 78,722 |
+| Cache write tokens [M] | 12,623 |
 | **Total tokens** | **5,529** |
-| Thinking ratio | 4.3% |
-| Output efficiency | 95.2% |
+| Thinking ratio [C] | 4.3% |
+| Output efficiency [C] | 95.2% |
+| Input cost [M] | $0.000157 |
+| Output cost [M] | $0.219627 |
+| Reasoning cost [M] | $0.009892 |
+| Cache cost [M] | $0.337074 |
 | **Total cost** | **$0.566750** |
-| **Total energy** | **~1324 J** |
-| Solution density | 0.052632 LOC/tok |
-| Correctness/$ | 172 |
-| Quality/J | 0.000639 |
+| **Total energy [X]** | **~1324 J** |
+| Solution density [C] | 0.052632 LOC/tok |
+| Correctness/$ [C] | 7 |
+| Quality/J [C] | 0.000639 |
 
 ---
 
@@ -91,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 10 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 10 |
+| Pass rate | 100% |
+| Duration | 0.8s |

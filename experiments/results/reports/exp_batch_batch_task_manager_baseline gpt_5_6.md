@@ -2,15 +2,17 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:task_manager:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T21:45:29
+**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:19:04
 
 ---
 
-## Strategy
+> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced
+
+## Strategy [H]
 **Classification:** CONSERVATIVE
 **Score:** 0.768
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.4985, ~2564J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -19,43 +21,49 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score | 0.000 |
-| Architecture div | 0.000 |
-| Structure div | 0.000 |
-| Thinking ratio | 3.4% |
-| Quality/$ | 2 |
-| Quality/J | 0.0004 |
-| Converged back | True |
+| Escape score [H] | 0.000 |
+| Architecture div [H] | 0.000 |
+| Structure div [H] | 0.000 |
+| Thinking ratio [C] | 3.4% |
+| Quality/$ [C] | 2 |
+| Quality/J [C] | 0.0004 |
+| Converged back [H] | True |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) |
-| Constraint satisfaction | 57% (4/7 constraints) |
-| Lines of code | 602 |
-| Cyclomatic complexity | 113.0 |
-| Code quality | 0.166 |
-| Novelty vs baseline | 0.500 |
-| **Composite** | **0.630** |
+| Correctness | 100% (27/27 tests) [M] |
+| Constraint satisfaction [H] | 71% (5/7 constraints) |
+| Lines of code [M] | 602 |
+| Cyclomatic complexity [C] | 113.0 |
+| Code quality [H] | 0.166 |
+| Novelty vs baseline [H] | 0.500 |
+| **Composite [H]** | **0.673** |
 
 ---
 
 ## Resource Efficiency
 | Metric | Value |
 |--------|-------|
-| Prompt tokens | 36 |
-| Completion tokens | 10,384 |
-| Reasoning tokens | 367 |
+| Prompt tokens [M] | 36 |
+| Completion tokens [M] | 10,384 |
+| Reasoning tokens [M] | 367 |
+| Cache read tokens [M] | 122,447 |
+| Cache write tokens [M] | 18,324 |
 | **Total tokens** | **10,787** |
-| Thinking ratio | 3.4% |
-| Output efficiency | 96.3% |
+| Thinking ratio [C] | 3.4% |
+| Output efficiency [C] | 96.3% |
+| Input cost [M] | $0.000098 |
+| Output cost [M] | $0.225147 |
+| Reasoning cost [M] | $0.007957 |
+| Cache cost [M] | $0.265257 |
 | **Total cost** | **$0.498459** |
-| **Total energy** | **~2564 J** |
-| Solution density | 0.055808 LOC/tok |
-| Correctness/$ | 87 |
-| Quality/J | 0.000246 |
+| **Total energy [X]** | **~2564 J** |
+| Solution density [C] | 0.055808 LOC/tok |
+| Correctness/$ [C] | 4 |
+| Quality/J [C] | 0.000262 |
 
 ---
 
@@ -91,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 4 |
 | Test file rate | 44% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 27 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 27 |
+| Pass rate | 100% |
+| Duration | 10.2s |
