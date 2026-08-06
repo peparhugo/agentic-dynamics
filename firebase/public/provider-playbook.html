@@ -3,45 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Provider playbook for the AI FinOps Framework — how DeepSeek, OpenAI, and Anthropic map to your cost optimization levers.">
 <title>Provider Playbook — AI FinOps Framework</title>
+<link rel="stylesheet" href="base.css">
 <style>
-:root{--bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;--b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);--t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;font-family:system-ui,-apple-system,sans-serif;color:var(--t);background:var(--bg)}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{min-height:100vh;display:flex;flex-direction:column}
-.topbar{display:flex;flex-wrap:wrap;gap:0.25rem;padding:0.75rem 1.25rem;background:var(--bg2);border-bottom:1px solid var(--b);align-items:center}
-.topbar-link{color:var(--t2);text-decoration:none;font-size:0.8rem;padding:0.35rem 0.65rem;border-radius:6px;transition:color .15s,background .15s}
-.topbar-link:hover{color:var(--t);background:var(--b)}
-main{flex:1;max-width:960px;width:100%;margin:0 auto;padding:2rem 1.25rem 3rem}
-h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem}
-h2{font-size:1.25rem;font-weight:600;margin:2rem 0 0.75rem}
+main{flex:1;max-width:960px;width:100%;margin:0 auto;padding:3rem 1.25rem 3rem}
+h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;color:var(--t)}
+h2{font-size:1.25rem;font-weight:600;margin:2rem 0 0.75rem;color:var(--t)}
 h3{font-size:1rem;font-weight:600;margin:1.25rem 0 0.5rem;color:var(--t2)}
-.sec{background:var(--bg);border-radius:10px;border:1px solid var(--b);padding:1.5rem;margin-bottom:1.5rem}
-.sec.alt{background:var(--bg2)}
-.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
-code,p code,li code{font-family:"JetBrains Mono",monospace;font-size:0.82rem;background:var(--bg4);padding:0.15em 0.4em;border-radius:4px;color:var(--ac)}
-pre{background:var(--bg4);border:1px solid var(--b);border-radius:8px;padding:0.8rem 1rem;overflow-x:auto;font-size:0.8rem;font-family:"JetBrains Mono",monospace;line-height:1.5;margin:0.5rem 0 1rem}
+.sec{padding:1.5rem}
 ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
 li{margin-bottom:0.35rem}
-a{color:var(--ac);text-decoration:none}
-a:hover{text-decoration:underline}
-.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1rem}
-.card{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:1.25rem}
-.card h4{font-size:0.9rem;color:var(--ac);margin-bottom:0.5rem;font-family:"JetBrains Mono",monospace}
-.card p,.card li{font-size:0.82rem;color:var(--t2);line-height:1.5}
-table{width:100%;border-collapse:collapse;font-size:0.85rem;margin:1rem 0}
-th,td{padding:0.6rem 0.75rem;text-align:left;border-bottom:1px solid var(--b)}
-th{color:var(--t3);font-weight:500;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.05em}
-td{color:var(--t2)}
-td code{color:var(--ac)}
-.met{font-family:"JetBrains Mono",monospace;color:var(--am)}
-.tag{display:inline-block;font-size:0.7rem;padding:0.15em 0.5em;border-radius:4px;background:var(--bg4);color:var(--cy);margin-right:0.3rem}
-.highlight-box{background:var(--bg3);border-left:3px solid var(--ac);padding:1rem 1.25rem;border-radius:0 8px 8px 0;margin:1rem 0}
-.highlight-box p{font-size:0.85rem;color:var(--t2);line-height:1.5}
-footer{text-align:center;padding:1.5rem 1rem;border-top:1px solid var(--b)}
+.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
 </style>
+<script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link" style="color:var(--ac)">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link" style="color:var(--ac)">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 <section class="sec alt">
 <h1>The Provider Playbook</h1>

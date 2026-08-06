@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Glossary — AI FinOps Framework</title>
+<meta name="description" content="Every coined term in the AI FinOps Framework, defined in one place.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+.glossary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:1rem;margin:2rem 0}
+.gcard{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.5rem;transition:border-color .2s,transform .2s}
+.gcard:hover{border-color:var(--ba);transform:translateY(-2px)}
+.gcard .gname{font-size:0.95rem;font-weight:700;color:var(--ac);margin-bottom:0.6rem}
+.gcard .gdef{font-size:0.82rem;color:var(--t2);line-height:1.6}
+@media(max-width:768px){.glossary-grid{grid-template-columns:1fr}}
+</style>
+<script src="app.js"></script>
+</head>
+<body>
+
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+
+<section class="sec" style="padding-top:6rem">
+<h1>Glossary</h1>
+<p class="lead" style="font-size:1.05rem;color:var(--t)">Every coined term in the AI FinOps Framework, defined in one place.</p>
+</section>
+
+<section class="sec alt">
+<div class="glossary-grid">
+
+<div class="gcard">
+<div class="gname">Silent Inference</div>
+<div class="gdef">A model's ability to produce correct code without externalizing reasoning steps into billable output tokens. DeepSeek's GRPO architecture compresses reasoning into latent space vectors rather than narrated text. Contrasts with SFT imitation chain-of-thought. The empirical basis for Rule 1.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Explanation Tax (&epsilon;)</div>
+<div class="gdef">The measurable cost of a model narrating its reasoning as output tokens. Ranges from 3% (DeepSeek) to 120% (GPT-5-mini). Measured as: (output tokens &minus; code tokens) / code tokens. If automated tests validate output, this tax is avoidable overhead. The empirical basis for Rule 2.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Snowball Effect (&beta;, v, N&sup2;)</div>
+<div class="gdef">The quadratic compounding of AI costs as a codebase grows. Each new line of generated code increases the context window for every future session. Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]. &beta; = context inflation rate per line. v = code velocity (lines/session). N = number of sessions. A 10% error in &beta; produces a 50% cost overrun after 100 sessions. The empirical basis for Rule 3.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">EPM (Energy Price Multiplier)</div>
+<div class="gdef">A function that models how local energy prices affect long-term AI compute costs. EPM(t) = 1.00 + r(t&minus;2024), where r depends on regional energy markets. IEA baseline: r = 0.016 (1.6%/yr). Aggressive scenario: r = 0.025 (2.5%/yr). Based on the 4Ms Framework (Google Cloud, 2025). The empirical basis for Rule 4.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Cost-Per-Pass</div>
+<div class="gdef">The cost of a working outcome, accounting for retries. Not cost per prompt &mdash; cost per accepted, verified result. CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">WOC Ratio (Work Overhead Cost)</div>
+<div class="gdef">The ratio of overhead costs (validation + retries + escalations) to primary run costs. WOC = (cost_validation + cost_retries + cost_escalations) / cost_primary. Measured average across 248 experiments: 0.79. Below 0.70 = healthy. Below 0.85 = investigate. At or above 0.85 = critical. The empirical basis for Rule 10.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">BVI (Business Value Index)</div>
+<div class="gdef">Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. The goal isn't to minimize cost &mdash; it's to maximize outcomes per dollar. The empirical basis for Rule 11.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">GRPO (Group Relative Policy Optimization)</div>
+<div class="gdef">DeepSeek's reinforcement learning method that optimizes for correct answers rather than imitating human-like reasoning paths. Reasoning exists as vectors in latent space, not as words. This is what enables Silent Inference &mdash; the model doesn't need to narrate its reasoning because the reasoning was never the point. Contrasts with SFT imitation chain-of-thought used by GPT and Claude.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Attractor Basin</div>
+<div class="gdef">A model's default solution topology &mdash; the structural pattern it falls into when unconstrained. Measured by comparing perturbed vs baseline code structure (module count, class hierarchy, dependency graph). Models with deep attractor basins (Claude, GPT-5.6) resist perturbation and recover to familiar patterns. Models with shallow basins (DeepSeek) explore novel solutions.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Basin Escape Score</div>
+<div class="gdef">A composite metric (0&ndash;1) measuring how far perturbation pushes a model from its default solution topology. Combines architecture divergence and structural novelty. A score of 1.0 means the model fully abandoned its default pattern. DeepSeek: higher escape scores under manifold perturbations than semantic ones.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Recovery Multiplier</div>
+<div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). DeepSeek: 0.9&times; (explores). Claude: 1.1&times; (recovers). The empirical basis for the Explanation Tax.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Strategy Archetypes</div>
+<div class="gdef">Four computed classifications based on exploration-to-recovery token ratios: CONSERVATIVE (low explore, high recover &mdash; Claude, GPT-5.6), EXPLORATORY (high escape, low recover &mdash; DeepSeek), WASTEFUL (high explore, low quality &mdash; GPT-5-nano, GPT-5-mini), EFFICIENT (high explore, high quality, low cost &mdash; DeepSeek in forced-silent mode).</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Dual-Signal Verification</div>
+<div class="gdef">The method for validating that models implement constraints. Two independent scans: (1) reasoning text &mdash; does the model mention the constraint? (2) generated code &mdash; does the code actually implement the constraint? DeepSeek implements all 7 constraints without mentioning them in reasoning. Claude mentions and implements all 7 in billable output tokens.</div>
+</div>
+
+</div>
+</section>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.2</strong><br>
+248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
+<a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a> &middot; <a href="glossary.html">Glossary</a>
+</footer>
+
+</body>
+</html>

@@ -17,7 +17,7 @@
 
 You're spending money on AI models. How do you know it's the *right* amount? Most teams measure cost per prompt — a metric that ignores pass rates, codebase growth compounding, and energy price inflation.
 
-**This framework gives you a predictive equation.** Enter your assumptions — team size, velocity, energy scenario — and receive a cost projection, model selection rules, and an energy risk forecast. Every parameter is empirically grounded in 189 instrumented experiment sessions across 8 model variants and 3 architectures.
+**This framework gives you a predictive equation.** Enter your assumptions — team size, velocity, energy scenario — and receive a cost projection, model selection rules, and an energy risk forecast. Every parameter is empirically grounded in 248 instrumented experiment sessions across 8 model variants and 3 architectures.
 
 > *"Your AI bill is a black box. This framework opens it."* — The homepage
 
@@ -57,7 +57,7 @@ Each rule names a concept we measured. Each maps to a lever you control.
 │   ├── opencode.py           # Agentic session runner + JSONL parser
 │   └── lab_book.py           # YAML-frontmatter markdown persistence
 ├── experiments/
-│   ├── configs/              # 22 YAML experiment definitions
+│   ├── configs/              # 34 YAML experiment definitions
 │   └── results/              # Experiment output (generated, not tracked)
 ├── scripts/
 │   ├── run.py                # Single experiment runner
@@ -94,15 +94,15 @@ Each rule names a concept we measured. Each maps to a lever you control.
 
 | Metric | Value |
 |--------|-------|
-| Experiment sessions | 189 |
-| Worktrees analyzed | 186 |
+| Experiment sessions | 248 |
+| Worktrees analyzed | 251 |
 | Models tested | 8 (3 architectures) |
-| Experiment configs | 22 |
+| Experiment configs | 34 |
 | Perturbation operators | 10 |
 | Recovery signals | 6 |
 | Strategy archetypes | 4 |
 | Measured cost gap | 65× |
-| Total experiment cost | $45.14 |
+| Total experiment cost | $64.98 |
 | Lines of generated code | 202,000+ |
 | AST-verified Python files | 2,416 |
 
@@ -287,7 +287,7 @@ If you use this framework in your research or decision-making:
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},
-  note   = {v0.1. 189 experiment sessions, 8 models, 10 perturbation operators.}
+  note   = {v0.1. 248 experiment sessions, 8 models, 10 perturbation operators.}
 }
 ```
 

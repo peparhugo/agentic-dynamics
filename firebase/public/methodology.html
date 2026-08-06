@@ -5,38 +5,12 @@
 <title>Research Methodology — AI FinOps Framework</title>
 <meta name="description" content="How the AI FinOps Framework was built. 248 sessions, 8 models, 10 perturbation operators, 6 recovery signals. The instrument behind the unified framework.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
 <style>
-:root{
---bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
---b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
---t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;
---ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;-webkit-font-smoothing:antialiased}
-.sec{padding:5rem 2rem;max-width:960px;margin:0 auto}
-.sec.alt{background:var(--bg2)}
 .sec.wide{max-width:1100px}
-h1{font-size:clamp(2rem,5vw,3.5rem);font-weight:800;letter-spacing:-1.5px;line-height:1.1;color:#fff;margin-bottom:0.8rem}
-h2{font-size:clamp(1.5rem,3vw,2.2rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;color:#fff;margin-bottom:0.6rem}
-h3{font-weight:600;font-size:0.95rem;color:var(--t);margin-bottom:0.3rem}
-.lead{font-size:0.95rem;color:var(--t2);max-width:680px;line-height:1.65;margin-bottom:1.5rem}
 .pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.68rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1rem;text-transform:uppercase}
 .pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.8rem;margin:2rem 0}
-.stat{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;transition:transform .2s}
-.stat:hover{transform:translateY(-2px);border-color:rgba(99,102,241,0.25)}
-.stat .v{font-size:1.5rem;font-weight:800;color:var(--ac)}
-.stat .l{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.8px;margin-top:0.3rem;font-weight:600}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:0.8rem;margin:1.5rem 0}
-.card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left;transition:all .25s}
-.card:hover{transform:translateY(-2px);border-color:var(--ba);box-shadow:0 8px 32px rgba(0,0,0,0.5)}
-.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
-.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
-.card .ctitle{font-size:0.85rem;font-weight:700;color:var(--t);margin-bottom:0.3rem}
-.card .cdesc{font-size:0.75rem;color:var(--t2);line-height:1.55}
 .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:2rem 0}
 .pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;position:relative}
 .pipe-step .ps-num{font-size:2rem;font-weight:800;color:var(--ac);opacity:0.3;margin-bottom:0.3rem}
@@ -45,25 +19,19 @@ h3{font-weight:600;font-size:0.95rem;color:var(--t);margin-bottom:0.3rem}
 .pipe-step::after{content:'';position:absolute;right:-0.6rem;top:50%;width:0.8rem;height:0.8rem;border-top:2px solid var(--ac);border-right:2px solid var(--ac);transform:translateY(-50%) rotate(45deg);opacity:0.3}
 .pipe-step:last-child::after{display:none}
 @media(max-width:768px){.pipe-step::after{display:none}}
-.tbl{overflow-x:auto;margin:1.5rem 0;border-radius:10px;border:1px solid var(--b)}
-.tbl table{width:100%;border-collapse:collapse;font-size:0.72rem}
-.tbl th{text-align:left;padding:0.5rem 0.7rem;color:var(--t2);font-weight:600;font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg4)}
-.tbl td{padding:0.4rem 0.7rem;border-bottom:1px solid var(--b)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:0.68rem}
-.green{color:var(--ac)}.amber{color:var(--am)}
+.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
+.card .ctitle{font-size:0.85rem;font-weight:700;color:var(--t);margin-bottom:0.3rem}
+.card .cdesc{font-size:0.75rem;color:var(--t2);line-height:1.55}
 .wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1.5rem 0;font-size:0.8rem;color:var(--t2);line-height:1.7}
 .wtm strong{color:var(--t)}
 .eq{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);text-align:left;margin:1.5rem 0}
-footer{padding:3rem 2rem;text-align:center;border-top:1px solid var(--b);font-size:0.7rem;color:var(--t3);line-height:1.8}
-footer a{color:var(--ac);text-decoration:none;font-weight:600}
-footer a:hover{text-decoration:underline}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:150;display:flex;justify-content:flex-end;gap:1.5rem;padding:0.7rem 1.5rem;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--b)}
-.topbar-link{color:var(--t3);text-decoration:none;font-size:0.72rem;font-weight:600;transition:color .2s}.topbar-link:hover{color:var(--ac)}
 </style>
+<script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -237,7 +205,7 @@ footer a:hover{text-decoration:underline}
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; 21 TS cross-model runs &middot; $64.98 analyzed<br>
+248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

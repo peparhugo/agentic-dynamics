@@ -5,48 +5,21 @@
 <title>The Evidence — AI FinOps Framework</title>
 <meta name="description" content="Full evidence: 251 worktrees, 248 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-:root{
---bg:#0D1117;--bg2:#161B22;--bg3:#1C2333;--bg4:#21262D;
---b:rgba(255,255,255,0.06);--ba:rgba(255,255,255,0.1);
---t:#E6EDF3;--t2:#9BA3AF;--t3:#6E7681;
---ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;-webkit-font-smoothing:antialiased}
-.sec{padding:4rem 2rem;max-width:1000px;margin:0 auto}
-.sec.alt{background:var(--bg2)}
-h1{font-size:clamp(2rem,5vw,3.2rem);font-weight:800;letter-spacing:-1.5px;line-height:1.12;color:#fff;margin-bottom:0.5rem}
-h2{font-size:clamp(1.4rem,3vw,2rem);font-weight:700;letter-spacing:-0.5px;color:#fff;margin-bottom:0.5rem}
-h3{font-weight:600;font-size:0.95rem;color:var(--t);margin:1.5rem 0 0.5rem}
-.lead{font-size:0.92rem;color:var(--t2);max-width:680px;line-height:1.65;margin-bottom:1.5rem}
-.tbl{overflow-x:auto;margin:1.2rem 0;border-radius:10px;border:1px solid var(--b)}
-.tbl table{width:100%;border-collapse:collapse;font-size:0.72rem}
-.tbl th{text-align:left;padding:0.45rem 0.6rem;color:var(--t2);font-weight:600;font-size:0.58rem;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--ba);background:var(--bg4);white-space:nowrap}
-.tbl td{padding:0.4rem 0.6rem;border-bottom:1px solid var(--b);font-size:0.7rem}
-.mono{font-family:'JetBrains Mono',monospace;font-size:0.67rem}
-.green{color:var(--ac)}.amber{color:var(--am)}.cyan{color:var(--cy)}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1.2rem 0}
-.card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.2rem;text-align:left}
-.card:hover{border-color:var(--ba)}
 .card .ctitle{font-weight:700;color:var(--t);font-size:0.82rem;margin-bottom:0.4rem}
 .card .cdesc{font-size:0.73rem;color:var(--t2);line-height:1.55}
 .card .cval{font-size:1.3rem;font-weight:800;color:var(--ac);margin:0.4rem 0}
 .card .cval.amber{color:var(--am)}.card .cval.cyan{color:var(--cy)}
-.note{font-size:0.7rem;color:var(--t3);padding:0.5rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px;margin:1rem 0;text-align:center}
 .insight{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 8px 8px 0;padding:0.8rem 1.2rem;margin:1rem 0;font-size:0.78rem;color:var(--t2);line-height:1.6}
 .insight strong{color:var(--t)}
-footer{padding:3rem 2rem;text-align:center;border-top:1px solid var(--b);font-size:0.7rem;color:var(--t3);line-height:1.8}
-footer a{color:var(--ac);text-decoration:none;font-weight:600}
-@media(max-width:768px){.sec{padding:2.5rem 1.2rem}.topnav{gap:0.8rem;padding:0.6rem 1rem}}
-.topbar{position:fixed;top:0;left:0;right:0;z-index:150;display:flex;justify-content:flex-end;gap:1.5rem;padding:0.7rem 1.5rem;background:rgba(13,17,23,0.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--b)}
-.topbar-link{color:var(--t3);text-decoration:none;font-size:0.72rem;font-weight:600;transition:color .2s}.topbar-link:hover{color:var(--ac)}
 </style>
+<script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -78,7 +51,7 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <div class="insight"><strong>Key insight:</strong> DeepSeek produces the most modular code (avg 28 files, 119 functions, 21 classes per worktree) — 3.5x Claude's file count. GPT-5 and GPT-5.5 lead on type hints (37-40%) but produce far fewer worktrees. GPT-5-nano has the highest thinking ratio (19%) and produces zero constraint-complete outputs — the only model that fundamentally fails on task completion rather than just cost.</div>
 </section>
 
-<!-- Narration Penalty Rates — NEW -->
+<!-- Narration Penalty Rates -->
 <section class="sec">
 <h2>Narration Penalty Rate</h2>
 <p class="lead">Measured per-worktree: what fraction of a model's sessions produced tokens that went to <strong style="color:var(--am)">narration instead of code</strong>? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced.</p>
@@ -94,6 +67,8 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> The Explanation Tax isn't theoretical — it's measurable. Claude burns 44% of its sessions on narration with zero code output ($1.01/session avg). Nano hits 100% penalty rate. DeepSeek and GPT-5.6-fast hit near-zero. This directly validates the <strong style="color:var(--ac)">Silent Inference Rule</strong> from the framework: default to models that compress reasoning into latent space, not billable tokens.</div>
 </section>
+
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="narrationChart"></canvas></div>
 
 <!-- Token Economics -->
 <section class="sec alt">
@@ -112,6 +87,8 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/65th of Claude per session on average ($0.015 vs $1.01) while producing 1.7x more code (691 vs 412 LOC). Total Claude spend ($47.54) exceeds all other models combined ($16.39). The Cost-Per-Pass Rule in action: GPT-5-nano is cheap per prompt but has a 100% narration penalty and 0.0 constraint score — the cheapest model that never delivers working code. <strong>Cost per working outcome = avg_cost / (1 - narration_rate).</strong></div>
 <div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. Claude has zero separate reasoning tokens — all narration is billed as output tokens at full price. GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). DeepSeek's 7% thinking ratio reflects GRPO-compressed latent reasoning. 224/248 sessions analyzed with game reports — the remaining 24 are narration failures, frontend worktrees (HTML/JS not Python), and empty worktrees from failed sweeps.</div>
 </section>
+
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="costBarChart"></canvas></div>
 
 <!-- Constraint Detection -->
 <section class="sec">
@@ -161,6 +138,7 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 <div class="insight"><strong>What changed:</strong> The original cross-domain table used single-run costs ($2.02 Claude vs $0.01 DeepSeek for task_manager). These per-session averages from 224 game reports are the more robust metric. The 65&times; gap is the measured average — not the architectural extreme, and not a cherry-picked single run.</div>
 
 </section>
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="locVsCostChart"></canvas></div>
 <!-- Multi-Language Expansion -->
 <section class="sec">
 <h2>Multi-Language Expansion</h2>
@@ -192,10 +170,134 @@ footer a{color:var(--ac);text-decoration:none;font-weight:600}
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.1</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; $64.98 analyzed &middot; +21 TypeScript cross-model runs &middot; Verified from opencode DB<br>
+248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const labels = ['DeepSeek v4 Pro', 'GPT-5-nano', 'GPT-5-mini', 'GPT-5', 'GPT-5.5', 'GPT-5.6', 'GPT-5.6-fast', 'Claude Fable 5'];
+  const chartTextColor = '#a1a1aa';
+  const chartGridColor = 'rgba(161,161,170,0.12)';
+  const resolveColor = function (vals, thresholds) {
+    return vals.map(function (v) {
+      if (v <= thresholds[0]) return 'rgba(52,211,153,0.85)';
+      if (v <= thresholds[1]) return 'rgba(251,191,36,0.85)';
+      return 'rgba(239,68,68,0.85)';
+    });
+  };
+
+  // --- Cost Bar Chart ---
+  (function () {
+    var costData = [0.015, 0.005, 0.025, 0.14, 0.16, 0.43, 0.49, 1.01];
+    var ctx = document.getElementById('costBarChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Avg Cost / Session ($)',
+          data: costData,
+          backgroundColor: resolveColor(costData, [0.05, 0.30]),
+          borderColor: resolveColor(costData, [0.05, 0.30]).map(function (c) { return c.replace('0.85','1'); }),
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Per-Session Cost by Model', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 10 }, maxRotation: 45, minRotation: 0 }, grid: { color: chartGridColor } },
+          y: { title: { display: true, text: 'USD', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return '$' + v; } }, grid: { color: chartGridColor }, beginAtZero: true }
+        }
+      }
+    });
+  })();
+
+  // --- Narration Penalty Horizontal Bar ---
+  (function () {
+    var narrData = [3, 100, 58, 20, 0, 7, 0, 44];
+    var ctx = document.getElementById('narrationChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Penalty Rate (%)',
+          data: narrData,
+          backgroundColor: resolveColor(narrData, [10, 30]).reverse(),
+          borderColor: resolveColor(narrData, [10, 30]).reverse().map(function (c) { return c.replace('0.85','1'); }),
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Narration Penalty Rate by Model (%)', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { display: false }
+        },
+        scales: {
+          x: { title: { display: true, text: '%', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return v + '%'; } }, grid: { color: chartGridColor }, beginAtZero: true, max: 100 },
+          y: { ticks: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 10 } }, grid: { color: chartGridColor } }
+        }
+      }
+    });
+  })();
+
+  // --- LOC vs Cost Scatter/Bubble ---
+  (function () {
+    var locData  = [691, 199, 264, 300, 262, 367, 343, 412];
+    var costY    = [0.015, 0.005, 0.025, 0.14, 0.16, 0.43, 0.49, 1.01];
+    var reports  = [68, 6, 12, 5, 3, 15, 6, 27];
+    var ctx = document.getElementById('locVsCostChart');
+    if (!ctx) return;
+    var points = labels.map(function (l, i) {
+      return { x: locData[i], y: costY[i], r: Math.max(6, Math.sqrt(reports[i]) * 2.2) };
+    });
+    var modelColors = [
+      'rgba(99,102,241,0.80)',  // DeepSeek - indigo
+      'rgba(239,68,68,0.80)',   // nano - red
+      'rgba(239,68,68,0.80)',   // mini - red
+      'rgba(251,191,36,0.80)',  // 5 - amber
+      'rgba(251,191,36,0.80)',  // 5.5 - amber
+      'rgba(251,191,36,0.80)',  // 5.6 - amber
+      'rgba(251,191,36,0.80)',  // 5.6-fast - amber
+      'rgba(6,182,212,0.80)'    // Claude - cyan
+    ];
+    new Chart(ctx, {
+      type: 'bubble',
+      data: {
+        datasets: labels.map(function (l, i) {
+          return { label: l, data: [points[i]], backgroundColor: modelColors[i], borderColor: modelColors[i].replace('0.80','1'), borderWidth: 1 };
+        })
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Code Output vs Cost', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { labels: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 9 }, usePointStyle: true, padding: 12 } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Avg LOC / Session', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
+          y: { title: { display: true, text: 'Avg Cost / Session (USD)', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return '$' + v; } }, grid: { color: chartGridColor }, beginAtZero: true }
+        }
+      }
+    });
+  })();
+});
+</script>
 
 </body>
 </html>
