@@ -43,7 +43,7 @@ TEST_VENV = Path("/tmp/pytest_venv")
 PYTEST_DEPS = ["flask", "pytest", "sqlalchemy", "flask-jwt-extended", "flask-limiter",
                "flask-cors", "flask-migrate"]
 
-run_tests_enabled = False
+run_tests_enabled = True
 _test_venv_ready = False
 
 
@@ -442,20 +442,31 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     prompt_tok = session.get("tokens_input", 0) or 0 if session else 0
     completion_tok = session.get("tokens_output", 0) or 0 if session else 0
     reasoning_tok = session.get("tokens_reasoning", 0) or 0 if session else 0
+    cache_read = session.get("tokens_cache_read", 0) or 0 if session else 0
+    cache_write = session.get("tokens_cache_write", 0) or 0 if session else 0
     total_tok = prompt_tok + completion_tok + reasoning_tok
+    provider = str(session.get("provider", "") or "") if session else ""
+    model_id = str(session.get("model_id", "") or "") if session else ""
 
-    # Use DB cost if available, otherwise estimate
     db_cost = session.get("cost", 0) or 0 if session else 0
     efficiency = compute_efficiency(
         prompt_tokens=prompt_tok, completion_tokens=completion_tok,
         reasoning_tokens=reasoning_tok, total_tokens=total_tok,
+        cache_read_tokens=cache_read, cache_write_tokens=cache_write,
+        provider=provider, model=model_id,
         solution=solution,
     )
     if db_cost > 0:
+        # Override total with actual DB cost; proportionally split across components
+        est_total = efficiency.total_cost_usd
+        if est_total > 0:
+            scale = db_cost / est_total
+            efficiency.cost_input_usd *= scale
+            efficiency.cost_output_usd *= scale
+            efficiency.cost_reasoning_usd *= scale
+            efficiency.cost_cache_usd *= scale
         efficiency.total_cost_usd = db_cost
-        efficiency.cost_input_usd = 0.0
-        efficiency.cost_output_usd = 0.0
-        efficiency.cost_reasoning_usd = 0.0
+        efficiency.cost_is_estimated = False
 
     # ── Basin Escape ──
     pert_class = "manifold" if any(k in info.get("operator", "") for k in
@@ -505,10 +516,18 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── Game Report ──
     experiment_id = info.get("experiment", wt.name) or wt.name
+    model_str = ""
+    if session:
+        prov = str(session.get("provider", "") or "").strip()
+        mid = str(session.get("model_id", "") or "").strip()
+        if prov and mid:
+            model_str = f"{prov}/{mid}"
+    if not model_str:
+        # Fallback: try to detect from worktree name patterns
+        model_str = f"unknown ({wt.name})"
     report = GameReport(
         experiment_id=f"{experiment_id}-{info.get('operator', '?')}",
-        model=str(session.get("provider", "") or "") + "/" + str(session.get("model_id", "") or "")
-               if session and (session.get("provider") or session.get("model_id")) else wt.name,
+        model=model_str,
         task=title[:200] if title else str(wt.name),
         operator=info.get("operator", "baseline"),
         perturbation_class=pert_class,
@@ -841,11 +860,12 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="Max worktrees to analyze")
     ap.add_argument("--dry-run", action="store_true", help="Show what would be analyzed")
     ap.add_argument("--baseline", help="Baseline worktree path for comparison")
-    ap.add_argument("--run-tests", action="store_true", help="Run pytest in each worktree")
+    ap.add_argument("--no-tests", action="store_true", help="Skip pytest in worktrees (faster)")
     args = ap.parse_args()
 
     global run_tests_enabled
-    run_tests_enabled = args.run_tests
+    if args.no_tests:
+        run_tests_enabled = False
     if run_tests_enabled:
         ensure_test_venv()
 

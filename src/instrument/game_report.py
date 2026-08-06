@@ -113,7 +113,9 @@ class GameReport:
             "",
             "---",
             "",
-            "## Strategy",
+            "> **Legend:** [M] measured &middot; [C] computed from measured &middot; [H] heuristic estimate &middot; [X] externally sourced",
+            "",
+            "## Strategy [H]",
             f"**Classification:** {s.strategy.value.upper() if s else 'UNKNOWN'}",
             f"**Score:** {self.strategy.strategy_score:.3f}" if s else "",
         ]
@@ -131,13 +133,13 @@ class GameReport:
             lines += [
                 f"| Metric | Value |",
                 f"|--------|-------|",
-                f"| Escape score | {r.escape_score:.3f} |",
-                f"| Architecture div | {r.architecture_divergence:.3f} |",
-                f"| Structure div | {r.structure_divergence:.3f} |",
-                f"| Thinking ratio | {r.thinking_ratio:.1%} |",
-                f"| Quality/$ | {r.quality_per_dollar:,.0f} |",
-                f"| Quality/J | {r.quality_per_joule:.4f} |",
-                f"| Converged back | {r.converged_back} |",
+                f"| Escape score [H] | {r.escape_score:.3f} |",
+                f"| Architecture div [H] | {r.architecture_divergence:.3f} |",
+                f"| Structure div [H] | {r.structure_divergence:.3f} |",
+                f"| Thinking ratio [C] | {r.thinking_ratio:.1%} |",
+                f"| Quality/$ [C] | {r.quality_per_dollar:,.0f} |",
+                f"| Quality/J [C] | {r.quality_per_joule:.4f} |",
+                f"| Converged back [H] | {r.converged_back} |",
             ]
             if self.repetitions > 1:
                 lines += [
@@ -154,13 +156,13 @@ class GameReport:
             lines += [
                 f"| Metric | Value |",
                 f"|--------|-------|",
-                f"| Correctness | {sol.correctness_score:.0%} ({sol.tests_passed}/{sol.tests_total} tests) |",
-                f"| Constraint satisfaction | {sol.constraint_score:.0%} ({sol.constraints_met}/{sol.constraints_total} constraints) |",
-                f"| Lines of code | {sol.lines_of_code} |",
-                f"| Cyclomatic complexity | {sol.cyclomatic_complexity:.1f} |",
-                f"| Code quality | {sol.code_quality_score:.3f} |",
-                f"| Novelty vs baseline | {sol.novelty_score:.3f} |",
-                f"| **Composite** | **{sol.composite_score:.3f}** |",
+                f"| Correctness | {sol.correctness_score:.0%} ({sol.tests_passed}/{sol.tests_total} tests) {'[M]' if sol.tests_total > 0 else '[H]'} |",
+                f"| Constraint satisfaction [H] | {sol.constraint_score:.0%} ({sol.constraints_met}/{sol.constraints_total} constraints) |",
+                f"| Lines of code [M] | {sol.lines_of_code} |",
+                f"| Cyclomatic complexity [C] | {sol.cyclomatic_complexity:.1f} |",
+                f"| Code quality [H] | {sol.code_quality_score:.3f} |",
+                f"| Novelty vs baseline [H] | {sol.novelty_score:.3f} |",
+                f"| **Composite [H]** | **{sol.composite_score:.3f}** |",
             ]
             if self.repetitions > 1:
                 lines += [
@@ -177,17 +179,26 @@ class GameReport:
             lines += [
                 f"| Metric | Value |",
                 f"|--------|-------|",
-                f"| Prompt tokens | {e.prompt_tokens:,} |",
-                f"| Completion tokens | {e.completion_tokens:,} |",
-                f"| Reasoning tokens | {e.reasoning_tokens:,} |",
+                f"| Prompt tokens [M] | {e.prompt_tokens:,} |",
+                f"| Completion tokens [M] | {e.completion_tokens:,} |",
+                f"| Reasoning tokens [M] | {e.reasoning_tokens:,} |",
+                f"| Cache read tokens [M] | {e.cache_read_tokens:,} |",
+                f"| Cache write tokens [M] | {e.cache_write_tokens:,} |",
                 f"| **Total tokens** | **{e.total_tokens:,}** |",
-                f"| Thinking ratio | {e.thinking_ratio:.1%} |",
-                f"| Output efficiency | {e.output_efficiency:.1%} |",
+                f"| Thinking ratio [C] | {e.thinking_ratio:.1%} |",
+                f"| Output efficiency [C] | {e.output_efficiency:.1%} |",
+            ]
+            cost_label = " [C]" if e.cost_is_estimated else " [M]"
+            lines += [
+                f"| Input cost{cost_label} | ${e.cost_input_usd:.6f} |",
+                f"| Output cost{cost_label} | ${e.cost_output_usd:.6f} |",
+                f"| Reasoning cost{cost_label} | ${e.cost_reasoning_usd:.6f} |",
+                f"| Cache cost{cost_label} | ${e.cost_cache_usd:.6f} |",
                 f"| **Total cost** | **${e.total_cost_usd:.6f}** |",
-                f"| **Total energy** | **~{e.total_energy_j:.0f} J** |",
-                f"| Solution density | {e.solution_density:.6f} LOC/tok |",
-                f"| Correctness/$ | {e.correctness_per_dollar:.0f} |",
-                f"| Quality/J | {e.quality_per_joule:.6f} |",
+                f"| **Total energy [X]** | **~{e.total_energy_j:.0f} J** |",
+                f"| Solution density [C] | {e.solution_density:.6f} LOC/tok |",
+                f"| Correctness/$ [C] | {e.correctness_per_dollar:.0f} |",
+                f"| Quality/J [C] | {e.quality_per_joule:.6f} |",
             ]
             if self.repetitions > 1:
                 lines += [

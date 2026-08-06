@@ -31,6 +31,39 @@ ENERGY_PER_PROMPT_TOKEN = 0.08    # Joules per input token
 ENERGY_PER_OUTPUT_TOKEN = 0.23   # Joules per output token
 ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 
+# Provider pricing — approximate public rates per 1M tokens
+# Actual costs include cache, batch discounts, and tier-specific pricing.
+# Use DB cost for total; these rates provide approximate component breakdowns.
+PROVIDER_PRICING: dict[str, dict[str, float]] = {
+    "deepseek": {
+        "input": 0.27, "output": 1.10, "reasoning": 0.14,
+        "cache_read": 0.14, "cache_write": 0.27,
+    },
+    "anthropic": {
+        "input": 3.00, "output": 15.00, "reasoning": 15.00,
+        "cache_read": 0.30, "cache_write": 3.75,
+    },
+    "openai": {
+        "input": 1.25, "output": 10.00, "reasoning": 10.00,
+        "cache_read": 0.625, "cache_write": 2.50,
+    },
+}
+
+def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
+    """Get approximate pricing for a provider/model.
+    
+    Returns per-million-token rates. Falls back to generic provider rates
+    if model-specific pricing is unavailable.
+    """
+    p = provider_id.lower() if provider_id else ""
+    if "deepseek" in p:
+        return PROVIDER_PRICING["deepseek"]
+    if any(k in p for k in ("anthropic", "claude")):
+        return PROVIDER_PRICING["anthropic"]
+    if any(k in p for k in ("openai", "gpt")):
+        return PROVIDER_PRICING["openai"]
+    return PROVIDER_PRICING["deepseek"]  # fallback
+
 
 @dataclass
 class EfficiencyMetrics:
@@ -48,6 +81,8 @@ class EfficiencyMetrics:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
     # Thinking overhead
     thinking_ratio: float = 0.0      # reasoning_tokens / total_tokens
@@ -57,7 +92,9 @@ class EfficiencyMetrics:
     cost_input_usd: float = 0.0
     cost_output_usd: float = 0.0
     cost_reasoning_usd: float = 0.0
+    cost_cache_usd: float = 0.0
     total_cost_usd: float = 0.0
+    cost_is_estimated: bool = True  # True = computed from pricing; False = from API/DB
 
     # Energy (estimated Joules)
     energy_input_j: float = 0.0
@@ -80,12 +117,16 @@ class EfficiencyMetrics:
             "completion_tokens": self.completion_tokens,
             "reasoning_tokens": self.reasoning_tokens,
             "total_tokens": self.total_tokens,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
             "thinking_ratio": round(self.thinking_ratio, 4),
             "output_efficiency": round(self.output_efficiency, 4),
             "cost_input_usd": round(self.cost_input_usd, 6),
             "cost_output_usd": round(self.cost_output_usd, 6),
             "cost_reasoning_usd": round(self.cost_reasoning_usd, 6),
+            "cost_cache_usd": round(self.cost_cache_usd, 6),
             "total_cost_usd": round(self.total_cost_usd, 6),
+            "cost_is_estimated": self.cost_is_estimated,
             "energy_input_j": round(self.energy_input_j, 2),
             "energy_output_j": round(self.energy_output_j, 2),
             "energy_reasoning_j": round(self.energy_reasoning_j, 2),
@@ -102,9 +143,11 @@ def compute_efficiency(
     completion_tokens: int = 0,
     reasoning_tokens: int = 0,
     total_tokens: int = 0,
-    cost_input_per_m: float = 0.27,
-    cost_output_per_m: float = 1.10,
-    cost_reasoning_per_m: float = 0.14,
+    *,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+    provider: str = "",
+    model: str = "",
     solution: SolutionMetrics | None = None,
 ) -> EfficiencyMetrics:
     """Compute complete resource efficiency metrics.
@@ -112,32 +155,38 @@ def compute_efficiency(
     Args:
         prompt_tokens: Input tokens consumed.
         completion_tokens: Output tokens produced.
-        reasoning_tokens: Hidden reasoning tokens (DeepSeek R1 thinking budget).
+        reasoning_tokens: Hidden reasoning tokens.
         total_tokens: Grand total (can exceed sum due to cache).
-        cost_input_per_m: Provider pricing per 1M input tokens.
-        cost_output_per_m: Provider pricing per 1M output tokens.
-        cost_reasoning_per_m: Provider pricing per 1M reasoning tokens.
+        cache_read_tokens: Tokens read from provider cache.
+        cache_write_tokens: Tokens written to provider cache.
+        provider: Provider ID (e.g. 'deepseek', 'anthropic', 'openai').
+        model: Model ID for future per-model pricing.
         solution: Optional solution quality metrics for density.
 
     Returns:
         EfficiencyMetrics with full breakdown.
     """
     m = EfficiencyMetrics()
+    pricing = get_pricing(provider, model)
 
     m.prompt_tokens = prompt_tokens
     m.completion_tokens = completion_tokens
     m.reasoning_tokens = reasoning_tokens
+    m.cache_read_tokens = cache_read_tokens
+    m.cache_write_tokens = cache_write_tokens
     m.total_tokens = total_tokens or (prompt_tokens + completion_tokens + reasoning_tokens)
 
     # Thinking overhead
     m.thinking_ratio = reasoning_tokens / max(m.total_tokens, 1)
     m.output_efficiency = completion_tokens / max(m.total_tokens, 1)
 
-    # Cost
-    m.cost_input_usd = prompt_tokens * cost_input_per_m / 1_000_000
-    m.cost_output_usd = completion_tokens * cost_output_per_m / 1_000_000
-    m.cost_reasoning_usd = reasoning_tokens * cost_reasoning_per_m / 1_000_000
-    m.total_cost_usd = m.cost_input_usd + m.cost_output_usd + m.cost_reasoning_usd
+    # Cost — estimated from token counts × approximate provider pricing
+    m.cost_input_usd = prompt_tokens * pricing["input"] / 1_000_000
+    m.cost_output_usd = completion_tokens * pricing["output"] / 1_000_000
+    m.cost_reasoning_usd = reasoning_tokens * pricing["reasoning"] / 1_000_000
+    m.cost_cache_usd = (cache_read_tokens * pricing["cache_read"] + cache_write_tokens * pricing["cache_write"]) / 1_000_000
+    m.total_cost_usd = m.cost_input_usd + m.cost_output_usd + m.cost_reasoning_usd + m.cost_cache_usd
+    m.cost_is_estimated = True
 
     # Energy
     m.energy_input_j = prompt_tokens * ENERGY_PER_PROMPT_TOKEN
