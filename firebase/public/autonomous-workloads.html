@@ -31,8 +31,8 @@ li{margin-bottom:0.35rem}
 </section>
 
 <section class="sec">
-<h2>Rules 6–10 for Autonomous Workloads</h2>
-<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">These rules extend the core AI FinOps Framework (Rules 1–5) to systems where AI operates without human supervision — agentic coding, batch processing, automated PR review, CI/CD pipelines. Start with <a href="framework.html">Rules 1–5</a> for model selection and cost governance, then apply Rules 6–10 for unsupervised operations.</p>
+<h2>Rules 6–9 for Autonomous Workloads</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">These rules extend the core AI FinOps Framework (Rules 1–5) to systems where AI operates without human supervision — agentic coding, batch processing, automated PR review, CI/CD pipelines. Start with <a href="framework.html">Rules 1–5</a> for model selection and cost governance, then apply Rules 6–9 for unsupervised operations.</p>
 
 <h3><span class="rule-num">Rule 6</span> · The Batch Discount</h3>
 <p style="color:var(--t2);font-size:0.9rem">Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in under 4 hours, run in batch. Monitor queue depth to avoid SLA breaches. Batch discount: D(b) = 1 − b × 0.5.</p>
@@ -47,8 +47,7 @@ li{margin-bottom:0.35rem}
 <h3><span class="rule-num">Rule 9</span> · The SLA Buffer</h3>
 <p style="color:var(--t2);font-size:0.9rem">Actual batch completion time = (Queue_length × Avg_job_time) + (Retry_buffer × retry_rate). Never batch jobs with an SLA less than 2× your observed queue depth. Always have an on-demand fallback for time-critical tasks.</p>
 
-<h3><span class="rule-num">Rule 10</span> · The First-Pass Rule</h3>
-<p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong>0.90</strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical — fix immediately. Track WOC by task type, model, and time of day.</p>
+
 </section>
 
 <section class="sec alt">
@@ -57,7 +56,7 @@ li{margin-bottom:0.35rem}
 <ul style="margin-top:0.5rem">
 <li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (100% flail) and GPT-5-mini (58% flail) cannot be trusted unsupervised.</li>
 <li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $15/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
-<li><strong>First-Pass Success (Rule 10) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
+<li><strong>First-Pass Success (Rule 5) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
 </ul>
 </section>
 
@@ -74,7 +73,7 @@ li{margin-bottom:0.35rem}
 </section>
 
 <section class="sec">
-<h2>WOC Ratio</h2>
+<h2>WOC Ratio — Rule 5 (First-Pass)</h2>
 <p style="color:var(--t2);font-size:0.9rem">The Work Overhead Cost ratio tells you whether autonomy is actually saving money.</p>
 <span class="formula">WOC = (cost<sub>validation</sub> + cost<sub>retries</sub> + cost<sub>escalations</sub>) / cost<sub>primary</sub></span>
 <div class="row" style="margin-top:1rem">

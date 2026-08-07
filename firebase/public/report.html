@@ -60,12 +60,11 @@ footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-
 <div class="rule"><h3>Rule 2 — The Explanation Tax Rule</h3><p>Narration has a measurable cost (24–120%). Whether it's worth paying depends on your verification architecture. If automated tests validate output, route to silent models. If you need auditable reasoning, the tax is insurance.</p></div>
 <div class="rule"><h3>Rule 3 — The Snowball Rule</h3><p>Model cumulative cost before architectural commitments. Context inflation compounds quadratically: C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]. The β·v·N² term dominates long-run cost. One-way door.</p></div>
 <div class="rule"><h3>Rule 4 — The EPM Horizon Rule</h3><p>Energy costs are the inflation rate of AI compute. Local energy markets determine long-term prices. Find the year your geographic energy costs flip your model selection. EPM(t) = 1.00 + r(t−2024). Hedge before that point.</p></div>
-<div class="rule"><h3>Rule 5 — The Cost-Per-Pass Rule</h3><p>Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per outcome — with double the latency and retry overhead. CostPerOutcome(K,v) = C(K/P, v) / K.</p></div>
+<div class="rule"><h3>Rule 5 — First-Pass Rule</h3><p>Track WOC = 1/(1+r). WOC ratio below 0.70 is critical — model replacement is cheaper than retry. At or above 0.90 = healthy. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K.</p></div>
 <div class="rule"><h3>Rule 6 — Batch Discount</h3><p>Defer non-urgent work to 72-hour batch windows. Batch-eligible tasks at 50% cost open budget headroom. Two-way door.</p></div>
 <div class="rule"><h3>Rule 7 — Budget Ceiling</h3><p>Enforce per-model, per-workstream spend caps. Prevent reasoning models on trivial tasks. Track WOC ratio across teams.</p></div>
 <div class="rule"><h3>Rule 8 — Cascade Rule</h3><p>Route 78.6% of tasks to the cheapest tier that passes validation. Escalate only when quality gates fail. Two-way door.</p></div>
 <div class="rule"><h3>Rule 9 — SLA Buffer</h3><p>Reserve 15% of budget runway for SLA-critical escalations. The buffer absorbs reasoning model spikes without breaking the budget.</p></div>
-<div class="rule"><h3>Rule 10 — First-Pass Rule</h3><p>Track WOC = 1/(1+r). WOC ratio below 0.70 is critical — model replacement is cheaper than retry. At or above 0.90 = healthy.</p></div>
 
 <h2>The Evidence</h2>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Architecture</th><th>Avg Cost</th><th>WTs</th><th>Reason Ratio</th><th>Test Pass (raw)</th><th>Route</th></tr></thead><tbody id="report-model-tbody"></tbody></table></div>

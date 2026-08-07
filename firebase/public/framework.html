@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI FinOps Framework — Your AI bill is a black box. This framework opens it.</title>
-<meta name="description" content="The comprehensive AI FinOps Framework: 11 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 248 experiment sessions.">
+<meta name="description" content="The comprehensive AI FinOps Framework: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 248 experiment sessions.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -82,24 +82,23 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="model-cards.html" class="topbar-link">Model Cards</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
-<!-- SECTION: The Eleven Rules -->
+<!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr">
-<div class="pulse">The Eleven Rules</div>
+<div class="pulse">The Ten Rules</div>
 <h2>Here is how you govern<br>AI costs — and scale your business.</h2>
-<p class="lead">Rules 1–5 are empirically grounded in 248 instrumented experiment sessions. Rules 6–11 extend the framework to autonomous workloads and business outcomes.</p>
+<p class="lead">Rules 1–5 are empirically grounded in 248 instrumented experiment sessions. Rules 6–10 extend the framework to autonomous workloads and business outcomes.</p>
 <div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Engineering teams of 5+ running Python/Flask workloads with annual AI spend exceeding $100K. Validated on REST APIs, CRUD applications, and real-time collaboration frontends. If your domain differs (TypeScript, Rust, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
 <div class="rules-grid">
 <div class="rule"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation &mdash; producing zero code despite high token output &mdash; it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across two dimensions: semantic (logical corruption &mdash; false premises, inverted constraints) and manifold (linguistic distortion &mdash; alien vocabulary, framing shifts).<span class="rm">Concept: Grit (Ground-Truth Integrity) &middot; Lever: C&#8320;</span></div></div>
 <div class="rule"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS. In successful sessions, the ratio of explanatory tokens to code tokens. DeepSeek: ~3% overhead. Claude: ~50% overhead. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
 <div class="rule"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
 <div class="rule"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
-<div class="rule"><div class="rn purple">5</div><div class="rt"><strong>The Cost-Per-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead.<span class="rm">Concept: Cost-Per-Pass &middot; Lever: P</span></div></div>
+<div class="rule"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
 <div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">6</div><div class="rt"><strong>The Batch Discount.</strong> Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in &lt;4 hours, run in batch. Monitor queue depth. <span class="badge-ext">Extension</span><span class="rm">Concept: Batch Economics &middot; Lever: b, Q</span></div></div>
 <div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">7</div><div class="rt"><strong>The Budget Ceiling.</strong> Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job &times; (1 + retry_rate)). Double your budget, double your capacity &ndash; zero hiring required. <span class="badge-ext">Extension</span><span class="rm">Concept: Throughput Cap &middot; Lever: W (jobs/day)</span></div></div>
 <div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">8</div><div class="rt"><strong>The Cascade Rule.</strong> In autonomous workloads, failures auto-escalate through model tiers: Flash &rarr; Sonnet &rarr; Opus &rarr; Human. A 1% escalation to human review can double your total cost. Design for &lt;1% escalation. <span class="badge-ext">Extension</span><span class="rm">Concept: Auto-Escalation &middot; Lever: E&#8340; (28.2&times; measured: DS &rarr; GPT-5.6)</span></div></div>
 <div class="rule" style="border-left:3px solid var(--am)"><div class="rn purple">9</div><div class="rt"><strong>The SLA Buffer.</strong> Actual batch completion time = (Queue_length &times; Avg_job_time) + (Retry_buffer &times; retry_rate). Never batch jobs with an SLA less than 2&times; your observed queue depth. Always have an on-demand fallback. <span class="badge-ext">Extension</span><span class="rm">Concept: Batch SLA &middot; Lever: Slack Buffer</span></div></div>
-<div class="rule" style="border-left:3px solid var(--am)"><div class="rn purple">10</div><div class="rt"><strong>The First-Pass Rule.</strong> WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day. <span class="badge-ext">Extension</span><span class="rm">Concept: Efficiency Metric &middot; Lever: WOC Ratio</span></div></div>
-<div class="rule" style="border-left:3px solid var(--ac)"><div class="rn">11</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
+<div class="rule" style="border-left:3px solid var(--ac)"><div class="rn">10</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
 </div>
 </div></section>
 
@@ -121,7 +120,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div></div>
 </div>
 
-<h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Autonomous Workloads (Rules 6&ndash;10)</h3>
+<h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Autonomous Workloads (Rules 6&ndash;9)</h3>
 <p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
 <div class="params">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div></div>
@@ -148,14 +147,14 @@ CostPerOutcome = C(K/P, v)/K<br>
 C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]
 </div>
 <div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--am);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
-<strong style="color:var(--am)">Autonomous Workloads</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 6–10)</span><br>
+<strong style="color:var(--am)">Autonomous Workloads</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span><br>
 C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>
 C<sub>auto</sub> = W&times;C<sub>job</sub><br>
 T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br>
 <span style="color:var(--t3);font-size:0.7em">r=0.115&rarr;WOC=<span data-stat-fmt="woc">0.90</span> &middot; E&#8340;=28.2&times;</span>
 </div>
 <div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--cy);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
-<strong style="color:var(--cy)">Business Value Index</strong> <span style="color:var(--t3);font-size:0.7em">(Rule 11)</span><br>
+<strong style="color:var(--cy)">Business Value Index</strong> <span style="color:var(--t3);font-size:0.7em">(Rule 10)</span><br>
 BVI = WOC/(C<sub>job</sub>+H/W)<br>
 <span style="color:var(--t3)">= successful outcomes per total dollar</span><br>
 C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H

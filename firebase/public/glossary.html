@@ -55,18 +55,13 @@
 </div>
 
 <div class="gcard">
-<div class="gname">Cost-Per-Pass</div>
-<div class="gdef">The cost of a working outcome, accounting for retries. Not cost per prompt &mdash; cost per accepted, verified result. CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
-</div>
-
-<div class="gcard">
-<div class="gname">WOC Ratio (Work Overhead Cost)</div>
-<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.115: WOC=0.90. At or above 0.90 = healthy. Below 0.70 = critical. The empirical basis for Rule 10.</div>
+<div class="gname">WOC Ratio (Work Overhead Cost) / First-Pass</div>
+<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.115: WOC=0.90. At or above 0.90 = healthy. Below 0.70 = critical. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K. A model at half the cost but half the pass rate costs the same per outcome with double the latency. The empirical basis for Rule 5.</div>
 </div>
 
 <div class="gcard">
 <div class="gname">BVI (Business Value Index)</div>
-<div class="gdef">Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. The goal isn't to minimize cost &mdash; it's to maximize outcomes per dollar. The empirical basis for Rule 11.</div>
+<div class="gdef">Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. The goal isn't to minimize cost &mdash; it's to maximize outcomes per dollar. The empirical basis for Rule 10.</div>
 </div>
 
 <div class="gcard">
