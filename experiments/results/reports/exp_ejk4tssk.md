@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [inject_phantom_success_s0.5_r1] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:23:26
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:19:48
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (5/5 tests) [M] |
+| Correctness | 70% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 233 |
 | Cyclomatic complexity [C] | 42.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0211  |  **Energy:** ~3092J  |  **Thinking:** 8%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0211  |  **Energy:** ~3092J  |  **Thinking:** 8%
 
 ---
 
@@ -112,17 +112,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0458 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 5 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 5 |
-| Pass rate | 100% |
-| Duration | 3.0s |

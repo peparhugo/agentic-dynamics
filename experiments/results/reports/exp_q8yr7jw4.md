@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_phantom_success_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:29:55
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:24:14
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 1005 |
 | Cyclomatic complexity [C] | 134.0 |
 | Code quality [H] | 0.100 |
 | Novelty vs baseline [H] | 0.952 |
-| **Composite [H]** | **0.598** |
+| **Composite [H]** | **0.556** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5268 J** |
 | Solution density [C] | 0.043842 LOC/tok |
 | Correctness/$ [C] | 2 |
-| Quality/J [C] | 0.000114 |
+| Quality/J [C] | 0.000105 |
 
 ---
 

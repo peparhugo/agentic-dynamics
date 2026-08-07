@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [baseline] cd_gpt_5_nano...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:15:15
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:14:43
 
 ---
 

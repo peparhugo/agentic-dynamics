@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [remove_critical_constraint_s0.5_r1] gpt_gather_gpt_5_6...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:15:59
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:15:02
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (10/10 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 100% (7/7 constraints) |
 | Lines of code [M] | 453 |
 | Cyclomatic complexity [C] | 79.0 |
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 10 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 10 |
-| Pass rate | 100% |
-| Duration | 4.2s |

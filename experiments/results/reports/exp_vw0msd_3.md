@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:34:14
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:26:25
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 88% (7/8 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 50% (3/6 constraints) |
 | Lines of code [M] | 117 |
 | Cyclomatic complexity [C] | 16.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 88%  |  **Cost:** $0.3002  |  **Energy:** ~493J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.3002  |  **Energy:** ~493J  |  **Thinking:** 0%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 7 |
-| Failed | 1 |
-| Errors | 0 |
-| Total | 8 |
-| Pass rate | 88% |
-| Duration | 1.1s |

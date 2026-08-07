@@ -469,7 +469,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         efficiency.cost_is_estimated = False
 
     # ── Basin Escape ──
-    pert_class = "manifold" if any(k in info.get("operator", "") for k in
+    exp_name = info.get("experiment", "") or ""
+    pert_class = "manifold" if any(k in exp_name for k in
                                    ["alien_vocab", "shift_framing", "reverse_causality",
                                     "force_abandonment"]) else "semantic"
     basin = measure_basin_escape(
@@ -537,16 +538,51 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     return report, {
         "experiment": experiment_id,
+        "model": model_str,
         "operator": info["operator"],
+        "perturbation_class": pert_class,
         "silent_mode": info["silent_mode"],
         "code_lines": solution.lines_of_code,
         "cost": efficiency.total_cost_usd,
+        "cost_input_usd": efficiency.cost_input_usd,
+        "cost_output_usd": efficiency.cost_output_usd,
+        "cost_reasoning_usd": efficiency.cost_reasoning_usd,
+        "cost_cache_usd": efficiency.cost_cache_usd,
         "tokens": total_tok,
+        "tokens_input": prompt_tok,
+        "tokens_output": completion_tok,
+        "tokens_reasoning": reasoning_tok,
+        "tokens_cache_read": cache_read,
+        "tokens_cache_write": cache_write,
+        "energy_total_j": efficiency.total_energy_j,
+        "energy_input_j": efficiency.energy_input_j,
+        "energy_output_j": efficiency.energy_output_j,
+        "energy_reasoning_j": efficiency.energy_reasoning_j,
         "thinking_ratio": efficiency.thinking_ratio,
+        "output_efficiency": efficiency.output_efficiency,
+        "solution_density": efficiency.solution_density,
+        "correctness_per_dollar": efficiency.correctness_per_dollar,
+        "quality_per_joule": efficiency.quality_per_joule,
         "correctness": solution.correctness_score,
         "constraints": f"{solution.constraints_met}/{solution.constraints_total}",
+        "constraints_met": solution.constraints_met,
+        "constraints_total": solution.constraints_total,
+        "cyclomatic_complexity": solution.cyclomatic_complexity,
+        "comment_ratio": solution.comment_ratio,
+        "code_quality_score": solution.code_quality_score,
+        "novelty_score": solution.novelty_score,
+        "composite_score": solution.composite_score,
         "escape": basin.escape_score,
+        "architecture_divergence": basin.architecture_divergence,
+        "structure_divergence": basin.structure_divergence,
+        "basin_novelty": basin.novelty_score,
+        "basin_verdict": basin.verdict,
+        "converged_back": basin.converged_back,
         "strategy": strategy.strategy.value if strategy else "?",
+        "strategy_score": strategy.strategy_score if strategy else 0,
+        "exploration_premium": strategy.exploration_premium if strategy else 0,
+        "thermal_efficiency": strategy.thermal_efficiency if strategy else 0,
+        "strategy_verdict": strategy.verdict if strategy else "",
         "ast": ast_profile,
         "narration_penalty": narration_penalty,
         "code_density": round(code_density, 4),
@@ -936,8 +972,17 @@ def main():
 
         report, metrics = analyze_worktree(wt["path"], s, baseline_code=baseline_code)
 
+        safe_name = wt["name"].replace("/", "_")[:60]
+
+        # Compute model string for tracking (used in both success and failure branches)
+        fallback_model = ""
+        if s:
+            prov = str(s.get("provider", "") or "").strip()
+            mid = str(s.get("model_id", "") or "").strip()
+            if prov and mid:
+                fallback_model = f"{prov}/{mid}"
+
         if report:
-            safe_name = wt["name"].replace("/", "_")[:60]
             md_path = REPORTS_DIR / f"{safe_name}.md"
 
             # Artifact bundling — copy code + session transcript for independent verification
@@ -1043,6 +1088,7 @@ def main():
 
             md_path.write_text(md)
 
+            metrics["worktree_name"] = wt["name"]
             results.append(metrics)
 
             strat_icon = {"conservative": "C", "exploratory": "E",
@@ -1063,7 +1109,8 @@ def main():
             err = metrics.get("error", "unknown")
             if metrics.get("narration_failure"):
                 cost = (s.get("cost") or 0) if s else 0
-                results.append({"experiment": wt["name"], "narration_failure": True,
+                results.append({"experiment": wt["name"], "worktree_name": wt["name"],
+                               "model": fallback_model, "narration_failure": True,
                                "cost": cost,
                                "output_tokens": (s.get("tokens_output") or 0) if s else 0})
                 print(f"  {i+1:3d}/{len(analyzed)} ❌ {wt['name']:<18} "
@@ -1100,6 +1147,77 @@ def main():
         else:
             print(f"  Total cost (all narr): {_fmt_usd(total_cost)}")
         print(f"\n  Reports saved to: {REPORTS_DIR}/")
+
+        # ── Build enriched summary with operator-level aggregation ──
+        by_model = {}
+        by_operator = {}
+        by_operator_model = {}
+        for r in results:
+            m = r.get("model", "unknown")
+            o = r.get("operator", "unknown")
+            pc = r.get("perturbation_class", "unknown")
+
+            if m not in by_model:
+                by_model[m] = []
+            by_model[m].append(r)
+
+            if o not in by_operator:
+                by_operator[o] = []
+            by_operator[o].append(r)
+
+            key = f"{o}|{pc}|{m}"
+            if key not in by_operator_model:
+                by_operator_model[key] = []
+            by_operator_model[key].append(r)
+
+        def _agg(entries, fields):
+            agg = {"count": len(entries)}
+            for f in fields:
+                vals = [e.get(f, 0) for e in entries if isinstance(e.get(f), (int, float))]
+                if vals:
+                    agg[f"{f}_avg"] = round(sum(vals) / len(vals), 4)
+                    agg[f"{f}_sum"] = round(sum(vals), 4)
+                    agg[f"{f}_min"] = round(min(vals), 4)
+                    agg[f"{f}_max"] = round(max(vals), 4)
+            return agg
+
+        NUM_FIELDS = ["cost", "cost_input_usd", "cost_output_usd", "cost_reasoning_usd",
+                      "cost_cache_usd", "code_lines", "tokens", "tokens_input", "tokens_output",
+                      "tokens_reasoning", "tokens_cache_read", "tokens_cache_write",
+                      "energy_total_j", "thinking_ratio", "correctness", "escape",
+                      "narration_penalty", "code_density", "architecture_divergence",
+                      "structure_divergence", "strategy_score", "exploration_premium",
+                      "thermal_efficiency", "composite_score", "novelty_score",
+                      "code_quality_score", "solution_density", "correctness_per_dollar",
+                      "quality_per_joule"]
+
+        strategy_counts = {}
+        for r in results:
+            s = r.get("strategy", "?")
+            strategy_counts[s] = strategy_counts.get(s, 0) + 1
+
+        narrated = sum(1 for r in results if r.get("narration_failure"))
+
+        summary_data = {
+            "_meta": {
+                "generated_at": _now(),
+                "total_entries": len(results),
+                "narrated": narrated,
+                "valid_entries": len(results) - narrated,
+            },
+            "strategy_distribution": strategy_counts,
+            "entries": results,
+            "by_model": {m: _agg(entries, NUM_FIELDS) for m, entries in by_model.items()},
+            "by_operator": {o: _agg(entries, NUM_FIELDS) for o, entries in by_operator.items()},
+            "by_operator_model": {
+                k: _agg(entries, NUM_FIELDS) for k, entries in by_operator_model.items()
+            },
+        }
+
+        summary_path = REPORTS_DIR.parent / "_results_summary.json"
+        summary_path.write_text(json.dumps(summary_data, indent=2, default=str))
+        print(f"  Summary saved to: {summary_path}")
+
     else:
         print("\nNo worktrees analyzed.")
 

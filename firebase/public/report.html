@@ -33,45 +33,64 @@ footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-
 .sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
 @media print{.topbar{display:none}body{font-size:0.8rem}.page-break{page-break-before:always}}
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <div class="container">
 
 <h1>AI FinOps Framework</h1>
 <p class="lead">An evidence-based predictive model for AI costs. v0.3 — 203 game reports across 3 architectures, 8 variants. Includes 21 cross-model TypeScript runs. Executive Report.</p>
 <div class="stats">
-<div class="stat"><div class="v">65x</div><div class="l">Cost Gap (Python)</div></div>
+<div class="stat"><div class="v"><span data-stat="costgap">69x</span></div><div class="l">Cost Gap (Python)</div></div>
 <div class="stat"><div class="v">200x</div><div class="l">Cost Gap (TS)</div></div>
-<div class="stat"><div class="v">142</div><div class="l">Reports (Py)</div></div>
+<div class="stat"><div class="v"><span data-stat="reports">142</span></div><div class="l">Reports (Py)</div></div>
 <div class="stat"><div class="v">21</div><div class="l">Runs (TS)</div></div>
-<div class="stat"><div class="v">$64.98</div><div class="l">Total Cost</div></div>
+<div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Cost</div></div>
 </div>
 <p class="meta">Generated August 2026 · Full site: <a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a></p>
 
 <h2>Executive Summary</h2>
-<p>We discovered a 65× cost gap between models that produce identical constraint-complete Python code. The gap is structural — not situational. DeepSeek v4 Pro uses GRPO-based latent reasoning (Silent Inference); Claude Fable 5 uses SFT imitation chain-of-thought (billed as output tokens). The framework measures the cost. You decide which model fits your context.</p>
+<p>We discovered a 69× cost gap between models that produce identical constraint-complete Python code. The gap is structural — not situational. DeepSeek v4 Pro uses GRPO-based latent reasoning (Silent Inference); Claude Fable 5 uses SFT imitation chain-of-thought (billed as output tokens). The framework measures the cost. You decide which model fits your context.</p>
 <p><strong>Your AI bill is a black box. This framework opens it.</strong></p>
 
 <h2>The Five Rules</h2>
-<div class="rule"><h3>Rule 1 — The Silent Inference Rule</h3><p>Default to the cheapest model that passes your test suite. Defaulting to silent models preserves budget runway for tasks that actually need explicit reasoning — database migrations, core architecture, security audits. Two-way door.</p></div>
+<div class="rule"><h3>Rule 1 — Grit (Ground-Truth Integrity)</h3><p>Default to the cheapest model that passes your test suite. Models with high Grit maintain correctness under degraded, contradictory, or incomplete instructions. Defaulting to Grit-tested models preserves budget runway for tasks that actually need explicit reasoning — database migrations, core architecture, security audits. Two-way door.</p></div>
 <div class="rule"><h3>Rule 2 — The Explanation Tax Rule</h3><p>Narration has a measurable cost (24–120%). Whether it's worth paying depends on your verification architecture. If automated tests validate output, route to silent models. If you need auditable reasoning, the tax is insurance.</p></div>
 <div class="rule"><h3>Rule 3 — The Snowball Rule</h3><p>Model cumulative cost before architectural commitments. Context inflation compounds quadratically: C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]. The β·v·N² term dominates long-run cost. One-way door.</p></div>
 <div class="rule"><h3>Rule 4 — The EPM Horizon Rule</h3><p>Energy costs are the inflation rate of AI compute. Local energy markets determine long-term prices. Find the year your geographic energy costs flip your model selection. EPM(t) = 1.00 + r(t−2024). Hedge before that point.</p></div>
 <div class="rule"><h3>Rule 5 — The Cost-Per-Pass Rule</h3><p>Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per outcome — with double the latency and retry overhead. CostPerOutcome(K,v) = C(K/P, v) / K.</p></div>
+<div class="rule"><h3>Rule 6 — Batch Discount</h3><p>Defer non-urgent work to 72-hour batch windows. Batch-eligible tasks at 50% cost open budget headroom. Two-way door.</p></div>
+<div class="rule"><h3>Rule 7 — Budget Ceiling</h3><p>Enforce per-model, per-workstream spend caps. Prevent reasoning models on trivial tasks. Track WOC ratio across teams.</p></div>
+<div class="rule"><h3>Rule 8 — Cascade Rule</h3><p>Route 78.6% of tasks to the cheapest tier that passes validation. Escalate only when quality gates fail. Two-way door.</p></div>
+<div class="rule"><h3>Rule 9 — SLA Buffer</h3><p>Reserve 15% of budget runway for SLA-critical escalations. The buffer absorbs reasoning model spikes without breaking the budget.</p></div>
+<div class="rule"><h3>Rule 10 — First-Pass Rule</h3><p>Track WOC = 1/(1+r). WOC ratio below 0.70 is critical — model replacement is cheaper than retry. At or above 0.90 = healthy.</p></div>
 
 <h2>The Evidence</h2>
-<div class="tbl"><table><thead><tr><th>Model</th><th>Architecture</th><th>Avg Cost</th><th>WTs</th><th>Reason Ratio</th><th>Test Pass (raw)</th><th>Route</th></tr></thead><tbody>
-<tr><td class="mono">DeepSeek v4 Pro</td><td>MoE</td><td>$0.015</td><td>68</td><td>0.21</td><td>28% (72% w/ env)</td><td>Default</td></tr>
-<tr><td class="mono">Claude Fable 5</td><td>Dense</td><td>$1.01</td><td>27</td><td>0.00</td><td>60% (100% w/ env)</td><td>Mission-Critical</td></tr>
-<tr><td class="mono">GPT-5.6</td><td>Dense</td><td>$0.43</td><td>15</td><td>0.06</td><td>88% (100% w/ env)</td><td>Escalation</td></tr>
-<tr><td class="mono">GPT-5-mini</td><td>Dense</td><td>$0.025</td><td>12</td><td>0.38</td><td>100%</td><td>Fallback</td></tr>
-<tr><td class="mono">GPT-5.6-fast</td><td>Dense</td><td>$0.49</td><td>6</td><td>0.08</td><td>100%</td><td>Avoid Routine</td></tr>
-<tr><td class="mono">GPT-5.5</td><td>Dense</td><td>$0.16</td><td>3</td><td>0.09</td><td>100%</td><td>Evaluate</td></tr>
-<tr><td class="mono">GPT-5</td><td>Dense</td><td>$0.14</td><td>5</td><td>0.45</td><td>75% (100% w/ env)</td><td>Consider</td></tr>
-<tr><td class="mono">GPT-5-nano</td><td>Dense</td><td>$0.005</td><td>6</td><td>1.03</td><td>33% (50% w/ env)</td><td>Test-Only</td></tr>
-</tbody></table></div>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Architecture</th><th>Avg Cost</th><th>WTs</th><th>Reason Ratio</th><th>Test Pass (raw)</th><th>Route</th></tr></thead><tbody id="report-model-tbody"></tbody></table></div>
+<script>
+(function(){
+  var tbody=document.getElementById('report-model-tbody');
+  if(!tbody||tbody.children.length>0)return;
+  var D=window.FRAMEWORK_DATA;
+  if(!D||!D.models)return;
+  var archMap={deepseek:'MoE (GRPO)',anthropic:'Dense (SFT)',openai:'Dense (GPT)'};
+  var routeMap={'conservative':'Conservative','exploratory':'Exploratory','wasteful':'Wasteful','efficient':'Efficient'};
+  var getStrategy=function(m){
+    var max='conservative',maxv=m.strategy_cons||0;
+    if(m.strategy_expl>maxv){max='exploratory';maxv=m.strategy_expl;}
+    if(m.strategy_waste>maxv){max='wasteful';maxv=m.strategy_waste;}
+    if(m.strategy_efficient>maxv){max='efficient';}
+    return max;
+  };
+  D.models.forEach(function(m){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+m.label+'</td><td>'+((archMap[m.provider])||m.provider)+'</td><td>$'+(m.avg_cost||0).toFixed(4)+'</td><td>'+(m.sessions||0)+'</td><td>'+(m.avg_thinking_ratio||0).toFixed(2)+'</td><td>'+m.pass_rate+'</td><td>'+(routeMap[getStrategy(m)]||'—')+'</td>';
+    tbody.appendChild(tr);
+  });
+})();
+</script>
 
 <h2>The Equation</h2>
 <p style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:2;background:var(--bg2);padding:1rem;border-radius:8px">
@@ -95,7 +114,7 @@ footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.3</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 203 game reports &middot; $59.45 analyzed<br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
 <a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a> &middot; <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a>
 </footer>
 

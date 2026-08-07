@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:29:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:24:06
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.725
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($0.0229, ~7419J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.67) with moderate resource use ($0.0229, ~7419J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 57% (4/7 constraints) |
+| Constraint satisfaction [H] | 71% (5/7 constraints) |
 | Lines of code [M] | 607 |
 | Cyclomatic complexity [C] | 119.0 |
 | Code quality [H] | 0.165 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.629** |
+| **Composite [H]** | **0.672** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~7419 J** |
 | Solution density [C] | 0.016601 LOC/tok |
 | Correctness/$ [C] | 40 |
-| Quality/J [C] | 0.000085 |
+| Quality/J [C] | 0.000091 |
 
 ---
 

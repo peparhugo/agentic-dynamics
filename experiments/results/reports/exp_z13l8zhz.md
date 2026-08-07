@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with REST API and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:37:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:28:24
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (16/16 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 33% (2/6 constraints) |
 | Lines of code [M] | 169 |
 | Cyclomatic complexity [C] | 26.0 |
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 16 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 16 |
-| Pass rate | 100% |
-| Duration | 0.7s |

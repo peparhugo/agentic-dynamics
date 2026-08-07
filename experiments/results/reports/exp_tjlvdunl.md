@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with rate limiting and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:32:40
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:36
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 38% (6/16 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 50% (3/6 constraints) |
 | Lines of code [M] | 227 |
 | Cyclomatic complexity [C] | 21.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 38%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0064  |  **Energy:** ~1455J  |  **Thinking:** 4%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 6 |
-| Failed | 10 |
-| Errors | 0 |
-| Total | 16 |
-| Pass rate | 38% |
-| Duration | 0.9s |

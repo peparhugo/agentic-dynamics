@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-06T01:22:39.532310+00:00",
+  "generated_at": "2026-08-07T04:53:27.471266+00:00",
   "counts": {
-    "db_sessions_total": 335,
-    "db_sessions_experiments": 248,
+    "db_sessions_total": 391,
+    "db_sessions_experiments": 249,
     "worktrees_total": 251,
     "worktrees_experiments": 227,
     "worktrees_other": 24,
@@ -10,10 +10,10 @@
     "config_files": 34
   },
   "costs": {
-    "total_all_sessions": 82.463,
-    "total_experiment_sessions": 64.9779,
-    "tokens_all_sessions": 27988167,
-    "tokens_experiment_sessions": 4845897
+    "total_all_sessions": 86.2727,
+    "total_experiment_sessions": 64.9827,
+    "tokens_all_sessions": 34729840,
+    "tokens_experiment_sessions": 4854148
   },
   "model_breakdown": {
     "anthropic/claude-fable-5": {
@@ -32,9 +32,9 @@
       "tokens": 40229
     },
     "deepseek/deepseek-v4-pro": {
-      "sessions": 132,
-      "cost": 2.0379,
-      "tokens": 3003448
+      "sessions": 133,
+      "cost": 2.0427,
+      "tokens": 3011699
     },
     "openai/gpt-5": {
       "sessions": 13,
@@ -66,12 +66,12 @@
       "total_cost": 0.8173,
       "operators": [
         "baseline",
-        "invert_constraint",
-        "shift_framing",
         "inject_competing_goal",
         "inject_phantom_success",
+        "shift_framing",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "inject_alien_vocab",
+        "invert_constraint"
       ]
     },
     {
@@ -82,12 +82,12 @@
       "total_cost": 0.0039,
       "operators": [
         "baseline",
-        "invert_constraint",
-        "shift_framing",
         "inject_competing_goal",
         "inject_phantom_success",
+        "shift_framing",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "inject_alien_vocab",
+        "invert_constraint"
       ]
     },
     {
@@ -98,12 +98,12 @@
       "total_cost": 0.1044,
       "operators": [
         "baseline",
-        "invert_constraint",
-        "shift_framing",
         "inject_competing_goal",
         "inject_phantom_success",
+        "shift_framing",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "inject_alien_vocab",
+        "invert_constraint"
       ]
     }
   ],
@@ -3389,7 +3389,7 @@
     {
       "path": "/tmp/exp_kg2a1_b0",
       "name": "exp_kg2a1_b0",
-      "mtime": "2026-08-06T00:58:31.774395+00:00",
+      "mtime": "2026-08-06T22:26:56.706898+00:00",
       "total_files": 1724,
       "py_files": 776,
       "session": {
@@ -4841,7 +4841,7 @@
     {
       "path": "/tmp/exp_u9zvdibz",
       "name": "exp_u9zvdibz",
-      "mtime": "2026-08-06T01:05:56.260421+00:00",
+      "mtime": "2026-08-06T22:33:22.222467+00:00",
       "total_files": 57,
       "py_files": 10,
       "session": {
@@ -4929,7 +4929,7 @@
     {
       "path": "/tmp/exp_ue8nk4wv",
       "name": "exp_ue8nk4wv",
-      "mtime": "2026-08-06T01:06:19.822159+00:00",
+      "mtime": "2026-08-06T22:33:40.081270+00:00",
       "total_files": 2311,
       "py_files": 1080,
       "session": {
@@ -7620,6 +7620,13 @@
       "model_id": "deepseek-v4-pro",
       "cost": 0.019915692,
       "tokens_output": 6973
+    },
+    {
+      "title": "Restructure story.html three parts (@general subagent)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-pro",
+      "cost": 0.004763946,
+      "tokens_output": 1695
     }
   ]
 }

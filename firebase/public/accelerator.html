@@ -82,10 +82,11 @@ li{margin-bottom:0.35rem}
   .comparison-grid{grid-template-columns:1fr}
 }
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link" style="color:var(--ac)">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link" style="color:var(--ac)">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 
 <section class="sec alt" style="text-align:center">
@@ -95,8 +96,8 @@ li{margin-bottom:0.35rem}
   <div class="stats" style="margin-top:1.5rem">
     <div class="stat"><div class="v">248</div><div class="l">Experiment Sessions</div><div class="s">Across 8 models, 3 architectures</div></div>
     <div class="stat"><div class="v">11</div><div class="l">Decision Rules</div><div class="s">5 measured · 6 framework extensions</div></div>
-    <div class="stat"><div class="v">65×</div><div class="l">Measured Cost Gap</div><div class="s">Identical output. Different cost.</div></div>
-    <div class="stat"><div class="v">$64.98</div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
+    <div class="stat"><div class="v"><span data-stat="costgap">69×</span></div><div class="l">Measured Cost Gap</div><div class="s">Identical output. Different cost.</div></div>
+    <div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
   </div>
 </section>
 
@@ -180,10 +181,11 @@ li{margin-bottom:0.35rem}
   </div>
   <div class="roi-band">
     <div class="roi-metric"><div class="big green">50–70%</div><div class="lbl">Cost Reduction</div><div class="desc">Target, backed by 248 experiments across 3 architectures and 8 model variants</div></div>
-    <div class="roi-metric"><div class="big">65×</div><div class="lbl">Measured Cost Gap</div><div class="desc">Identical task. Cheapest model vs. most expensive. Evidence on every page.</div></div>
+    <div class="roi-metric"><div class="big">69×</div><div class="lbl">Measured Cost Gap</div><div class="desc">Identical task. Cheapest model vs. most expensive. Evidence on every page.</div></div>
     <div class="roi-metric"><div class="big">4–6</div><div class="lbl">Weeks to Baseline</div><div class="desc">From first session capture to calibrated cost model for your specific workloads</div></div>
-    <div class="roi-metric"><div class="big">0.82</div><div class="lbl">First-Pass Success Rate (WOC)</div><div class="desc">WOC = 1/(1+r) with r=0.214. 82% of sessions succeed first-pass.</div></div>
+    <div class="roi-metric"><div class="big">0.90</div><div class="lbl">First-Pass Success Rate (WOC)</div><div class="desc">WOC = 1/(1+r) with r=0.115. 90% of sessions succeed first-pass.</div></div>
   </div>
+  <p style="color:var(--t2);font-size:0.8rem;text-align:center;margin-top:0.25rem">Even when models use identical token volumes (~11K/session), per-token pricing diverges 25–75×.</p>
 </section>
 
 <section class="sec alt">
@@ -210,7 +212,7 @@ li{margin-bottom:0.35rem}
       <div class="ladder-level">3</div>
       <div class="ladder-body">
         <h4>Governance</h4>
-        <p>Policy enforcement, compliance guardrails, multi-team standards. Prevent expensive reasoning models on trivial tasks. Audit trails that prove compliance. Approval workflows for high-cost or high-risk operations. Track WOC ratio across teams and flag outliers before they become budget overruns.</p>
+        <p>Policy enforcement, compliance guardrails, multi-team standards. Select models by Grit (integrity under degraded input). Prevent expensive reasoning models on trivial tasks. Audit trails that prove compliance. Approval workflows for high-cost or high-risk operations. Track WOC ratio across teams and flag outliers before they become budget overruns.</p>
         <div class="tags"><span>Policy enforcement</span><span>Compliance</span><span>Audit trails</span><span>Standards</span></div>
       </div>
     </div>
@@ -300,11 +302,11 @@ li{margin-bottom:0.35rem}
 </main>
 <footer>
   <strong>The AI FinOps Business Accelerator · v0.3 · August 2026</strong><br>
-  248 experiment sessions · 3 architectures, 8 variants · 203 game reports · $59.45 analyzed<br>
+  <span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">203</span> game reports · $<span data-stat="cost">59.45</span> analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> ·
   <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> ·
-  <a href="roadmap.html">Roadmap</a> · <a href="credibility.html">Credibility</a>
+  <a href="roadmap.html">Roadmap</a> · 
 </footer>
 
 </body>

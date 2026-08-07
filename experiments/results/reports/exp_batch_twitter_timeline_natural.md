@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:twitter_timeline:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:21:43
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:18:42
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 94% (17/18 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 439 |
 | Cyclomatic complexity [C] | 42.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 94%  |  **Cost:** $0.0095  |  **Energy:** ~2418J  |  **Thinking:** 8%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0095  |  **Energy:** ~2418J  |  **Thinking:** 8%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 9% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 17 |
-| Failed | 1 |
-| Errors | 0 |
-| Total | 18 |
-| Pass rate | 94% |
-| Duration | 0.5s |

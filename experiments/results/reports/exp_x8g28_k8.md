@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [baseline] cd_openai_GPT_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:36:28
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:27:45
 
 ---
 

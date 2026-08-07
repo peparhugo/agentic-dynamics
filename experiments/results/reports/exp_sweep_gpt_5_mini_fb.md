@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:baseline:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:32:16
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:26
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (4/4 tests) [M] |
+| Correctness | 70% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 227 |
 | Cyclomatic complexity [C] | 41.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0271  |  **Energy:** ~3960J  |  **Thinking:** 10%
 
 ---
 
@@ -112,17 +112,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0476 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 4 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 4 |
-| Pass rate | 100% |
-| Duration | 1.5s |

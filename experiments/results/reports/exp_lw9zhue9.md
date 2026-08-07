@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_final_gpt_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:27:39
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:22:35
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 86% (6/7 constraints) |
+| Constraint satisfaction [H] | 71% (5/7 constraints) |
 | Lines of code [M] | 203 |
 | Cyclomatic complexity [C] | 43.0 |
 | Code quality [H] | 0.493 |
 | Novelty vs baseline [H] | 0.970 |
-| **Composite [H]** | **0.851** |
+| **Composite [H]** | **0.808** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~2031 J** |
 | Solution density [C] | 0.013732 LOC/tok |
 | Correctness/$ [C] | 11 |
-| Quality/J [C] | 0.000419 |
+| Quality/J [C] | 0.000398 |
 
 ---
 

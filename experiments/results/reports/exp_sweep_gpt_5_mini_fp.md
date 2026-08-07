@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:perturbed:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:32:19
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:26
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (3/3 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 281 |
 | Cyclomatic complexity [C] | 52.0 |
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 29% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 3 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 3 |
-| Pass rate | 100% |
-| Duration | 3.3s |

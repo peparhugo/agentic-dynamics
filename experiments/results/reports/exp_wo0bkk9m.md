@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Authenticated REST API with JWT...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:36:18
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:27:43
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.775
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.79) with moderate resource use ($0.6322, ~1586J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 86% (6/7 constraints) |
+| Constraint satisfaction [H] | 100% (7/7 constraints) |
 | Lines of code [M] | 298 |
 | Cyclomatic complexity [C] | 41.0 |
 | Code quality [H] | 0.336 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.749** |
+| **Composite [H]** | **0.792** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~1586 J** |
 | Solution density [C] | 0.043157 LOC/tok |
 | Correctness/$ [C] | 5 |
-| Quality/J [C] | 0.000472 |
+| Quality/J [C] | 0.000499 |
 
 ---
 

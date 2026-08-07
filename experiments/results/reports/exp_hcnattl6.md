@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask task management API with JWT auth and pytest...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:25:45
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:21:09
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 78% (14/18 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 1070 |
 | Cyclomatic complexity [C] | 141.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 78%  |  **Cost:** $0.0210  |  **Energy:** ~5219J  |  **Thinking:** 5%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0210  |  **Energy:** ~5219J  |  **Thinking:** 5%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 4 |
 | Test file rate | 21% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 14 |
-| Failed | 4 |
-| Errors | 47 |
-| Total | 18 |
-| Pass rate | 78% |
-| Duration | 11.9s |

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [remove_critical_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:24:50
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:34
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 907 |
 | Cyclomatic complexity [C] | 147.0 |
 | Code quality [H] | 0.110 |
 | Novelty vs baseline [H] | 0.953 |
-| **Composite [H]** | **0.574** |
+| **Composite [H]** | **0.531** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3871 J** |
 | Solution density [C] | 0.053844 LOC/tok |
 | Correctness/$ [C] | 2 |
-| Quality/J [C] | 0.000148 |
+| Quality/J [C] | 0.000137 |
 
 ---
 

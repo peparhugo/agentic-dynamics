@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Model Cards — AI FinOps Framework</title>
+<meta name="description" content="Detailed model profiles: cost, Grit, Explanation Tax, correctness, strategy archetypes for all 8 variants across 3 architectures.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<script src="data.js"></script>
+<style>
+.fsec{padding:4rem 2rem;position:relative}
+.fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
+.inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
+.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
+.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
+h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
+.mcard{background:var(--bg3);border:1px solid var(--b);border-radius:14px;padding:1.8rem;margin:1.2rem 0;text-align:left}
+.mcard:hover{border-color:var(--ba)}
+.mcard .mh{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.2rem}
+.mcard .mname{font-size:1.4rem;font-weight:800;color:var(--t)}
+.mcard .march{display:inline-block;padding:0.2rem 0.7rem;border-radius:4px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.mcard .march.moe{background:rgba(34,211,238,0.08);color:var(--cy);border:1px solid rgba(34,211,238,0.15)}
+.mcard .march.dense{background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8rem}
+.mstat{background:var(--bg4);border-radius:10px;padding:0.9rem;text-align:center}
+.mstat .mv{font-size:1.2rem;font-weight:800;color:var(--ac);font-family:'JetBrains Mono',monospace}
+.mstat .mv.amber{color:var(--am)}.mstat .mv.cyan{color:var(--cy)}.mstat .mv.green{color:var(--success)}.mstat .mv.red{color:var(--danger)}
+.mstat .ml{font-size:0.62rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.25rem;font-weight:600}
+.mstat .ms{font-size:0.7rem;color:var(--t2);margin-top:0.1rem}
+.pan{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;font-size:0.78rem;color:var(--t2);line-height:1.7}
+.pan strong{color:var(--t)}
+.strats{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem}
+.stag{padding:0.15rem 0.6rem;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(99,102,241,0.06);color:var(--ac);border:1px solid rgba(99,102,241,0.12)}
+.stag.cons{background:rgba(34,197,94,0.06);color:var(--success);border:1px solid rgba(34,197,94,0.12)}
+.stag.expl{background:rgba(251,191,36,0.06);color:var(--am);border:1px solid rgba(251,191,36,0.12)}
+.stag.waste{background:rgba(239,68,68,0.06);color:var(--danger);border:1px solid rgba(239,68,68,0.12)}
+.rec{font-size:0.85rem;color:var(--t);margin-top:0.8rem;padding:0.6rem 0.9rem;background:rgba(99,102,241,0.04);border-left:3px solid var(--ac);border-radius:0 8px 8px 0}
+.rec.amber{border-left-color:var(--am);background:rgba(251,191,36,0.04)}
+.rec.cyan{border-left-color:var(--cy);background:rgba(34,211,238,0.04)}
+.bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
+.bar .fill{height:100%;border-radius:2px;transition:width .5s;background:var(--ac)}
+.bar .fill.amber{background:var(--am)}.bar .fill.cyan{background:var(--cy)}
+.ptable{width:100%;border-collapse:collapse;font-size:0.75rem;margin:0.5rem 0}
+.ptable th,.ptable td{padding:0.35rem 0.6rem;text-align:center;border-bottom:1px solid var(--b);color:var(--t2)}
+.ptable th{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.ptable td.mono{font-family:'JetBrains Mono',monospace;font-size:0.72rem}
+@media(max-width:768px){.fsec{padding:3rem 1rem}.mgrid{grid-template-columns:1fr 1fr}.pan{grid-template-columns:1fr}.mcard .mh{flex-direction:column}}
+@media(max-width:550px){.mgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="model-cards.html" class="topbar-link" style="color:var(--ac)">Model Cards</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+
+<section class="fsec"><div class="inr wide">
+<div class="pulse"><span class="dot"></span> Model Cards</div>
+<h1>Detailed Model Profiles</h1>
+<p class="lead">All 8 model variants, 3 architectures. Populated from data.js with hardcoded fallbacks. Data provenance: <span data-stat="sessions">248</span> experiment sessions across <span data-stat="reports">203</span> game reports. <a href="methodology.html">See methodology</a>.</p>
+<div id="model-cards-root"></div>
+</div></section>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> &middot; <a href="framework.html">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a> &middot; <a href="provider-playbook.html">Playbook</a> &middot; <a href="autonomous-workloads.html">Autonomous</a> &middot; <a href="executive-dashboard.html">Dashboard</a>
+</footer>
+
+<script>
+(function(){
+  var fb = [
+    { id:"deepseek-v4-pro", name:"DeepSeek v4 Pro", arch:"MoE", archTag:"moe", provider:"DeepSeek",
+      cost:0.0158, total:2.04, sessions:133, tokensPerSes:18520, grit:8, locPerSes:706,
+      pass:"92%", quality:0.246, commentRatio:0.02, thinkingRatio:0.087,
+      strats:{cons:78,expl:29,waste:2,eff:0},
+      rec:"Default route for routine Python/Flask tasks. Lowest cost per successful outcome. Silent Inference via GRPO.",
+      recType:"", perturbation:{semantic:{count:97,avgCost:0.0157,avgCorrectness:0.94,avgEscape:0.18},manifold:{count:12,avgCost:0.0167,avgCorrectness:0.77,avgEscape:0.76}},
+      perturbNote: "Best-in-class semantic correctness (94%). Manifold perturbation drops to 77% — still leading relative to peers at 13× lower cost per session." },
+    { id:"gpt-5-nano", name:"GPT-5-nano", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.0057, total:0.03, sessions:7, tokensPerSes:21840, grit:14, locPerSes:199,
+      pass:"70%", quality:0.487, commentRatio:0.072, thinkingRatio:0.19,
+      strats:{cons:4,expl:2,waste:0,eff:0},
+      rec:"Test-only use. Lowest absolute cost but highest Grit (flail rate) and lowest correctness. Not suitable for unsupervised work.",
+      recType:"cyan", perturbation:{semantic:{count:6,avgCost:0.0057,avgCorrectness:0.7,avgEscape:0.45},manifold:{count:0,avgCost:null,avgCorrectness:null,avgEscape:null}},
+      perturbNote:"45% escape rate under semantic perturbation — worst in class. Highest comment ratio (7.2%) suggests over-explanation." },
+    { id:"gpt-5-mini", name:"GPT-5-mini", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.0258, total:0.41, sessions:16, tokensPerSes:21220, grit:8, locPerSes:264,
+      pass:"82%", quality:0.407, commentRatio:0.063, thinkingRatio:0.066,
+      strats:{cons:11,expl:1,waste:0,eff:0},
+      rec:"Fallback route when v4 Pro is unavailable. Acceptable cost at 1.6× premium. Low Grit (8%) but moderate correctness.",
+      recType:"amber", perturbation:{semantic:{count:12,avgCost:0.0258,avgCorrectness:0.83,avgEscape:0.2},manifold:{count:0,avgCost:null,avgCorrectness:null,avgEscape:null}},
+      perturbNote:"Solid semantic resilience (83% correctness, 20% escape). No manifold data — insufficient tests under linguistic distortion." },
+    { id:"gpt-5", name:"GPT-5", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.159, total:1.79, sessions:13, tokensPerSes:27610, grit:15, locPerSes:403,
+      pass:"88%", quality:0.273, commentRatio:0.063, thinkingRatio:0.083,
+      strats:{cons:3,expl:8,waste:0,eff:0},
+      rec:"Exploratory tasks only. High Grit (15%) with moderate correctness. Exploratory-dominant strategy profile.",
+      recType:"amber", perturbation:{semantic:{count:10,avgCost:0.158,avgCorrectness:0.89,avgEscape:0.5},manifold:{count:1,avgCost:0.1685,avgCorrectness:0.8,avgEscape:0.7}},
+      perturbNote:"50–70% escape under perturbation — highly fragile. Falls apart on alien vocabulary. Avoid in production pipelines." },
+    { id:"gpt-5.5", name:"GPT-5.5", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.282, total:0.97, sessions:6, tokensPerSes:10500, grit:50, locPerSes:262,
+      pass:"100%", quality:0.383, commentRatio:0.01, thinkingRatio:0.021,
+      strats:{cons:1,expl:2,waste:0,eff:0},
+      rec:"Evaluate further. 50% Grit is worst in class — flails on half of perturbed inputs. 100% correctness but at what cost?",
+      recType:"cyan", perturbation:{semantic:{count:3,avgCost:0.282,avgCorrectness:1.0,avgEscape:0.64},manifold:{count:0,avgCost:null,avgCorrectness:null,avgEscape:null}},
+      perturbNote:"64% escape under perturbation — highest in class. Perfect correctness on baseline but extreme fragility. Small sample (n=3)." },
+    { id:"gpt-5.6", name:"GPT-5.6", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.4474, total:7.82, sessions:18, tokensPerSes:7780, grit:6, locPerSes:367,
+      pass:"94%", quality:0.37, commentRatio:0.009, thinkingRatio:0.064,
+      strats:{cons:14,expl:1,waste:0,eff:0},
+      rec:"Escalation route when v4 Pro fails. 28.2× escalation cost. Conservative-dominant strategy. Validated for Python CRUD.",
+      recType:"amber", perturbation:{semantic:{count:15,avgCost:0.4474,avgCorrectness:0.94,avgEscape:0.16},manifold:{count:0,avgCost:null,avgCorrectness:null,avgEscape:null}},
+      perturbNote:"Excellent resilience — 94% correctness with only 16% escape under semantic perturbation. Low Grit (6%). Strong escalation candidate." },
+    { id:"gpt-5.6-fast", name:"GPT-5.6-fast", arch:"Dense", archTag:"dense", provider:"OpenAI",
+      cost:0.6625, total:4.38, sessions:9, tokensPerSes:4330, grit:33, locPerSes:343,
+      pass:"100%", quality:0.299, commentRatio:0.008, thinkingRatio:0.071,
+      strats:{cons:2,expl:4,waste:0,eff:0},
+      rec:"Avoid for routine. 41.9× escalation cost with 33% Grit. Speed tier at speed-tier prices. Use only when latency is paramount.",
+      recType:"amber", perturbation:{semantic:{count:6,avgCost:0.6625,avgCorrectness:1.0,avgEscape:0.58},manifold:{count:0,avgCost:null,avgCorrectness:null,avgEscape:null}},
+      perturbNote:"58% escape under perturbation despite perfect correctness — the model runs but at high cost. Exploratory-dominant strategy bias." },
+    { id:"claude-fable-5", name:"Claude Fable 5", arch:"Dense", archTag:"dense", provider:"Anthropic",
+      cost:1.0847, total:47.54, sessions:47, tokensPerSes:10320, grit:11, locPerSes:568,
+      pass:"88%", quality:0.278, commentRatio:0.033, thinkingRatio:0.0,
+      strats:{cons:27,expl:12,waste:0,eff:0},
+      rec:"Mission-critical, auditable work only. 68.7× cost vs v4 Pro. Highest total spend across the experiment ($47.54). SFT chain-of-thought bills every reasoning step.",
+      recType:"amber", perturbation:{semantic:{count:36,avgCost:1.0677,avgCorrectness:0.88,avgEscape:0.21},manifold:{count:3,avgCost:1.2892,avgCorrectness:0.87,avgEscape:0.62}},
+      perturbNote:"Solid correctness (87–88%) across both perturbation types. 62% escape on manifold — linguistic distortion costs even more at premium token prices." }
+  ];
+
+  var dataModels = (window.FRAMEWORK_DATA && window.FRAMEWORK_DATA.models) || [];
+  var dataPerturb = (window.FRAMEWORK_DATA && window.FRAMEWORK_DATA.perturbation_class_breakdown) || {semantic:{},manifold:{}};
+
+  dataModels.forEach(function(dm){
+    var m = fb.find(function(f){return dm.label===f.name||dm.id.indexOf(f.id)>=0});
+    if(!m) return;
+    m._data = dm;
+    if(dataPerturb.semantic[dm.label]){
+      m.perturbation.semantic = dataPerturb.semantic[dm.label];
+    }
+    if(dataPerturb.manifold[dm.label]){
+      m.perturbation.manifold = dataPerturb.manifold[dm.label];
+    }
+  });
+
+  var html = '';
+  fb.forEach(function(m){
+    var d = m._data || {};
+    var costPerSes = d.avg_cost || m.cost;
+    var totalCost = d.total_cost || m.total;
+    var sessions = d.sessions || m.sessions;
+    var passRate = (d.pass_rate || m.pass).replace(/[ \[\]H]/g,'');
+    var gritRate = d.narration_rate !== undefined ? d.narration_rate : m.grit;
+    var loc = d.avg_loc || m.locPerSes;
+    var thinking = d.avg_thinking_ratio || m.thinkingRatio;
+    var quality = d.avg_code_quality || m.quality;
+    var commentR = d.avg_comment_ratio || m.commentRatio;
+    var strats = m.strats;
+    var pertS = m.perturbation.semantic;
+    var pertM = m.perturbation.manifold;
+
+    var archColor = m.archTag === 'moe' ? 'cy' : 'ac';
+    var gritColor = gritRate > 30 ? 'red' : gritRate > 15 ? 'amber' : 'green';
+    var passColor = parseFloat(passRate) >= 90 ? 'green' : parseFloat(passRate) >= 80 ? 'amber' : 'red';
+
+    html += '<div class="mcard">';
+    html += '<div class="mh"><div><span class="mname">'+m.name+'</span> &nbsp; <span class="march '+m.archTag+'">'+m.arch+'</span> &nbsp; <span style="font-size:0.7rem;color:var(--t3)">'+m.provider+'</span></div></div>';
+    html += '<div class="mgrid">';
+    html += '<div class="mstat"><div class="mv" style="color:var(--'+archColor+')">$'+costPerSes.toFixed(3)+'</div><div class="ml">Cost / Session</div><div class="ms">$'+totalCost.toFixed(2)+' total · '+sessions+' sessions</div></div>';
+    html += '<div class="mstat"><div class="mv">'+(m.tokensPerSes>=1000?(m.tokensPerSes/1000).toFixed(0)+'K':m.tokensPerSes)+'</div><div class="ml">Tokens / Session</div><div class="ms">Input+output+reasoning avg</div></div>';
+    html += '<div class="mstat"><div class="mv '+gritColor+'">'+gritRate+'%</div><div class="ml">Grit (Flail Rate)</div><div class="ms">Narration rate under perturbation</div></div>';
+    html += '<div class="mstat"><div class="mv amber">'+(thinking*100).toFixed(1)+'%</div><div class="ml">Explanation Tax &epsilon;</div><div class="ms">Thinking ratio to output</div></div>';
+    html += '<div class="mstat"><div class="mv">'+loc+'</div><div class="ml">LOC / Session</div><div class="ms">Avg lines of code generated</div></div>';
+    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'%</div><div class="ml">Correctness</div><div class="ms">Test pass rate</div></div>';
+    html += '</div>';
+
+    html += '<div class="pan"><div>';
+    html += '<strong>Code Quality</strong><br>';
+    html += 'Composite: '+(quality*100).toFixed(0)+'/100 &middot; Comment ratio: '+(commentR*100).toFixed(1)+'%<br>';
+    html += 'Arch divergence: '+((d.avg_arch_divergence||0)*100).toFixed(1)+'% &middot; Struct divergence: '+((d.avg_struct_divergence||0)*100).toFixed(1)+'%';
+    html += '</div><div>';
+    html += '<strong>Perturbation Response</strong><br>';
+    if(pertS && pertS.avgCorrectness!==null){
+      html += 'Semantic: '+pertS.count+' runs · '+(pertS.avgCorrectness*100).toFixed(0)+'% correct · '+(pertS.avgEscape*100).toFixed(0)+'% escape · $'+pertS.avgCost.toFixed(4)+'/sess<br>';
+    }
+    if(pertM && pertM.avgCorrectness!==null){
+      html += 'Manifold: '+pertM.count+' runs · '+(pertM.avgCorrectness*100).toFixed(0)+'% correct · '+(pertM.avgEscape*100).toFixed(0)+'% escape · $'+pertM.avgCost.toFixed(4)+'/sess';
+    }
+    html += '</div></div>';
+
+    html += '<div class="strats">';
+    if(strats.cons>0) html += '<span class="stag cons">Conservative: '+strats.cons+'</span>';
+    if(strats.expl>0) html += '<span class="stag expl">Exploratory: '+strats.expl+'</span>';
+    if(strats.waste>0) html += '<span class="stag waste">Wasteful: '+strats.waste+'</span>';
+    if(strats.eff>0) html += '<span class="stag">Efficient: '+strats.eff+'</span>';
+    html += '</div>';
+
+    html += '<div class="rec '+m.recType+'"><strong>Recommended use:</strong> '+m.rec+'</div>';
+    html += '</div>';
+  });
+
+  document.getElementById('model-cards-root').innerHTML = html;
+})();
+</script>
+
+</body>
+</html>

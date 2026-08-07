@@ -27,11 +27,12 @@
 .wtm strong{color:var(--t)}
 .eq{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);text-align:left;margin:1.5rem 0}
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -117,7 +118,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="card"><div class="ctitle">5. Length Convergence</div><div class="cdesc">Token output length ratio between perturbed and baseline. Models that recover tend to match baseline output length as they return to familiar solution patterns.</div></div>
 <div class="card"><div class="ctitle">6. Pattern Convergence</div><div class="cdesc">Structural overlap in the reasoning trace. Do the same reasoning sub-steps appear? Measured by n-gram overlap between trajectories.</div></div>
 </div>
-<div class="wtm"><strong>Key finding:</strong> DeepSeek exhibits a 0.9&times; recovery multiplier — perturbation <em>reduces</em> its cost. Claude exhibits 1.1&times; — perturbation <em>increases</em> cost. This is the empirical basis for the Explanation Tax: models that recover through narration pay a measurable token penalty.</div>
+<div class="wtm"><strong>Verified finding:</strong> Manifold perturbations (alien vocabulary, framing shifts) produce escape=0.76 for DeepSeek vs 0.62 for Claude. Semantic perturbations (constraint removal, false premises) produce escape=0.18 vs 0.21. This validates the perturbation taxonomy: linguistic surface shifts force models to explore novel solution topologies; logical contradictions test error detection capability. Across both classes, DeepSeek's recovery costs 68-77× less than Claude's.</div>
 </section>
 
 <!-- Basin -->
@@ -151,7 +152,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="cards">
 <div class="card"><div class="ctitle">Token Efficiency</div><div class="cdesc">Input tokens, output tokens, and reasoning tokens tracked per session. The code-to-reasoning token ratio is the primary signal for Silent Inference detection. DeepSeek: 37B active parameters (MoE), Claude: ~500B active (dense).</div></div>
 <div class="card"><div class="ctitle">finops</div><div class="cdesc">USD cost computed from provider pricing at time of inference. Builds-per-dollar, cost-per-pass, and Explanation Tax all derived directly from session cost data. Not estimated — measured.</div></div>
-<div class="card"><div class="ctitle">Energy Efficiency</div><div class="cdesc">Joule estimates computed from GPU TDP, active parameters, and token counts. DeepSeek H800 TDP: 350W. Claude H100 TDP: 700W. Architectural efficiency compounds with token efficiency — ~14&times; hardware ratio &times; ~7&times; token ratio = the 65× gap.</div></div>
+<div class="card"><div class="ctitle">Energy Efficiency</div><div class="cdesc">Joule estimates computed from GPU TDP, active parameters, and token counts. DeepSeek H800 TDP: 350W. Claude H100 TDP: 700W. Architectural efficiency compounds with token efficiency — The 69× cost gap is driven by per-token output pricing: Claude charges ~$15/Mtok for output tokens; DeepSeek charges ~$1.10/Mtok. Generated token volumes are near-identical (~11K output+reasoning tokens per session for both). The pricing architecture is the dominant lever, not token efficiency..</div></div>
 </div>
 <div class="eq">
 <span style="color:var(--ac)">C&#8320;</span> = baseline session cost &middot; <span style="color:var(--ac)">P</span> = pass rate &middot; <span style="color:var(--ac)">&epsilon;</span> = Explanation Tax &middot; <span style="color:var(--ac)">&beta;</span> = context inflation<br>
@@ -172,7 +173,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated source files (Python, TypeScript, Go, Rust — 25+ file extensions) for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, API versioning structures, and domain-specific patterns across languages.</div></div>
 <div class="card"><div class="ctitle">AST Analysis</div><div class="cdesc">Parses generated Python into abstract syntax trees. Compares perturbed vs baseline AST node count and structure. Finding: perturbed output is 112.6% of baseline nodes — structurally identical code with minimal variance.</div></div>
 </div>
-<div class="wtm"><strong>What this proves:</strong> The 65× cost gap is not a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta is purely in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
+<div class="wtm"><strong>What this proves:</strong> The 69× cost gap is not a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta is purely in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
 </section>
 
 <!-- Reproduce This -->
@@ -221,10 +222,10 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>The Unified Framework</h2>
 <p class="lead" style="margin:0 auto">The perturbation operators test reasoning topology. The recovery signals classify behavior. The strategy taxonomy maps behavior to cost. The efficiency metrics quantify the cost. Together, they produce a single equation that predicts AI delivery costs under any assumptions.</p>
 <div class="stats" style="max-width:800px;margin:2rem auto">
-<div class="stat"><div class="v">65×</div><div class="l">Measured Cost Gap</div></div>
+<div class="stat"><div class="v">69×</div><div class="l">Measured Cost Gap</div></div>
 <div class="stat"><div class="v">24–120%</div><div class="l">Explanation Tax Range</div></div>
 <div class="stat"><div class="v">1.80&times;</div><div class="l">2050 EPM Horizon</div></div>
-<div class="stat"><div class="v">$64.98</div><div class="l">Total Experiment Cost</div></div>
+<div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Experiment Cost</div></div>
 </div>
 <div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">View the Framework &rarr;</a></div>
 </section>
@@ -244,9 +245,16 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <p style="font-size:0.78rem;color:var(--t3);text-align:center;margin-top:1rem"><strong>Energy:</strong> IEA 2025 &middot; Goldman Sachs 2026 (220% AI demand) &middot; EIA 2026 &middot; Carnegie Mellon 2025 &middot; Rystad Energy 2025<br><strong>Research:</strong> Liu et al. (2026) &middot; TokenPowerBench (AAAI 2026) &middot; Zhu &amp; Zhu (2026) &middot; CARL (ACL 2026) &middot; TRACED (2026)</p>
 </section>
 
+<section class="sec alt wide">
+<h2>Limitations</h2>
+<p class="lead" style="font-size:0.82rem;color:var(--t2);line-height:1.7;max-width:900px;margin:0 auto">
+227 experiments is statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q2–Q3 2025 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.
+</p>
+</section>
+
 <footer>
 <strong>The AI FinOps Framework &middot; v0.3</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 203 game reports &middot; $59.45 analyzed<br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

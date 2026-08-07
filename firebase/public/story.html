@@ -33,11 +33,12 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 .comp-box.green h3{color:var(--ac)}.comp-box.amber h3{color:var(--am)}
 @media(max-width:768px){article{padding:3rem 1.5rem 2rem}.comparison{grid-template-columns:1fr}}
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link" style="color:var(--ac)">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link" style="color:var(--ac)">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <article>
 
@@ -54,13 +55,13 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>But I had a few things I wanted to tinker with while I was away. So I did something I'd never done before: I loaded $20 USD onto the DeepSeek v4 API and pointed my tooling at it. Twenty dollars. That's less than I'd spend on a single lunch in Rome.</p>
 
-<p>That was weeks ago. I burned through $12.73 in DeepSeek compute — the rest covered months of experimentation.</p>
+<p>That was weeks ago. I burned through <span data-stat="deepseek_cost">$12.73</span> in DeepSeek compute — the rest covered months of experimentation.</p>
 
 <div class="stats-grid">
 <div class="stat-card"><div class="v">8</div><div class="l">Models Tested</div></div>
 <div class="stat-card"><div class="v">248</div><div class="l">Instrumented Sessions</div></div>
-<div class="stat-card"><div class="v amber">$64.98</div><div class="l">Total Research Cost</div></div>
-<div class="stat-card"><div class="v cyan">65&times;</div><div class="l">Measured Cost Gap</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">64.98</span></div><div class="l">Total Research Cost</div></div>
+<div class="stat-card"><div class="v cyan"><span data-stat="costgap">69&times;</span></div><div class="l">Measured Cost Gap</div></div>
 </div>
 
 <h2>What $12.73 built.</h2>
@@ -79,9 +80,9 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <div class="stats-grid">
 <div class="stat-card"><div class="v">248</div><div class="l">Total Sessions</div></div>
-<div class="stat-card"><div class="v amber">$64.98</div><div class="l">All-Model Experiment Cost</div></div>
-<div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend</div></div>
-<div class="stat-card"><div class="v amber">$47.54</div><div class="l">Claude F5 Spend</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">64.98</span></div><div class="l">All-Model Experiment Cost</div></div>
+<div class="stat-card"><div class="v"><span data-stat="deepseek_cost">$12.73</span></div><div class="l">DeepSeek Spend</div></div>
+<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$47.54</span></div><div class="l">Claude F5 Spend</div></div>
 </div>
 
 <blockquote>
@@ -95,23 +96,16 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>Here is what I learned. It turned a personal budgeting hack into a framework that governs AI costs at scale.</p>
 
-<div class="comparison">
-<div class="comp-box green">
-<h3>DeepSeek v4 — The Explorer</h3>
-<ul>
-<li>Mixture-of-Experts architecture</li>
-<li>Only 3% parameters active at inference</li>
-<li>GRPO compresses reasoning into vectors, not words</li>
+<p>The experiments revealed something I didn't expect. When we deliberately broke the instructions — inverted constraints ('must be fast' → 'must be slow'), removed critical requirements, injected alien vocabulary — the models' true nature emerged. Claude didn't just 'narrate more.' Claude couldn't resist its training distribution. It was trained to be a conversational assistant. When confused, it defaulted to talking. DeepSeek was trained through GRPO to optimize for outcomes. When confused, it explored silently in latent space, then acted.</p>
+
+<p>I'm calling this <strong style="color:var(--ac)">Grit</strong>: Ground-Truth Integrity. How well does a model maintain correctness when the input is degraded?</p>
+
+<p>The measurement produced two dimensions:</p>
+<div class="highlight" style="padding:1.3rem">
+<ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
+<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 100%.</li>
+<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? Claude: ~50% overhead at $15 per million output tokens. DeepSeek: ~3% overhead at $1.10 per million output tokens.</li>
 </ul>
-</div>
-<div class="comp-box amber">
-<h3>GPT &amp; Claude — The Narrators</h3>
-<ul>
-<li>Dense architectures</li>
-<li>SFT imitation chain-of-thought training</li>
-<li>The model narrates its way back to familiar patterns</li>
-</ul>
-</div>
 </div>
 
 <p><strong>Supervised fine-tuning with imitation chain-of-thought.</strong> When you train a model through SFT imitation, you are showing it what good reasoning looks like and asking it to copy that pattern. The model learns a path and cannot leave it. When perturbed, it narrates its way back to familiar territory — and every recovery step is a billable token.</p>
@@ -119,6 +113,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>Reinforcement learning in latent space does the opposite.</strong> DeepSeek's GRPO doesn't learn what reasoning should look like. It learns to get to the right answer, and the path is incidental. The reasoning exists as vectors, not words. When perturbed, DeepSeek explores. It finds new paths. It doesn't need to narrate the journey because the journey was never the point — the destination was.</p>
 
 <p>This is the <strong style="color:var(--ac)">Silent Inference Principle</strong>. Implementation = True. Narration = False. And it's a structural property of the training architecture, not a tuning parameter you can toggle.</p>
+
+<p>Later analysis revealed the deeper layer: both models generate ~11,000 tokens per session. Identical computational effort. Claude's tokens just cost 25× more per unit. And Claude writes 22,500 tokens to cache per session at $15/Mtok — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 
 <div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
@@ -146,6 +142,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div class="icon">&#9888;</div>
 <p><strong>This became a cumulative framework for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
 </div>
+
+<p>What I didn't expect: When we first published this framework, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't. It uses the SAME number of generated tokens as Claude. The difference is that each of Claude's tokens costs 25× more. And the cache write tax — 22,500 tokens written to cache at $15/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
 
 <h2>Why I was the person who could build this.</h2>
 
@@ -188,7 +186,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.3</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 203 game reports &middot; $59.45 analyzed &middot; Verified from opencode DB<br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

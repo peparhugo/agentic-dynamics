@@ -14,11 +14,12 @@
 .gcard .gdef{font-size:0.82rem;color:var(--t2);line-height:1.6}
 @media(max-width:768px){.glossary-grid{grid-template-columns:1fr}}
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="sec" style="padding-top:6rem">
 <h1>Glossary</h1>
@@ -29,13 +30,18 @@
 <div class="glossary-grid">
 
 <div class="gcard">
-<div class="gname">Silent Inference</div>
-<div class="gdef">A model's ability to produce correct code without externalizing reasoning steps into billable output tokens. DeepSeek's GRPO architecture compresses reasoning into latent space vectors rather than narrated text. Contrasts with SFT imitation chain-of-thought. The empirical basis for Rule 1.</div>
+<div class="gname">Grit (Ground-Truth Integrity)</div>
+<div class="gdef">How well a model maintains correctness when given degraded, contradictory, or incomplete instructions. Measured by 10 perturbation operators across two dimensions (semantic and manifold). Two sub-measurements: Flail Rate (sessions producing zero code) and Recovery Cost &epsilon; (overhead when code IS produced).</div>
 </div>
 
 <div class="gcard">
 <div class="gname">Explanation Tax (&epsilon;)</div>
-<div class="gdef">The measurable cost of a model narrating its reasoning as output tokens. Ranges from 3% (DeepSeek) to 120% (GPT-5-mini). Measured as: (output tokens &minus; code tokens) / code tokens. If automated tests validate output, this tax is avoidable overhead. The empirical basis for Rule 2.</div>
+<div class="gdef">The cost premium a model pays to work through confused or degraded input. In successful sessions, the ratio of explanatory tokens to code tokens. Claude: ~50% overhead at $15/Mtok. DeepSeek: ~3% overhead at $1.10/Mtok.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Silent Inference</div>
+<div class="gdef">A model's ability to reason in structured latent space rather than through explicit chain-of-thought narration billed as output tokens. DeepSeek's GRPO architecture separates reasoning (2,300 tokens/session in a low-cost channel) from output (8,800 tokens/session).</div>
 </div>
 
 <div class="gcard">
@@ -55,7 +61,7 @@
 
 <div class="gcard">
 <div class="gname">WOC Ratio (Work Overhead Cost)</div>
-<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.214: WOC=0.82. At or above 0.85 = healthy. Below 0.70 = critical. The empirical basis for Rule 10.</div>
+<div class="gdef">First-pass success rate: WOC = 1/(1+r) where r is retry rate. With measured r=0.115: WOC=0.90. At or above 0.90 = healthy. Below 0.70 = critical. The empirical basis for Rule 10.</div>
 </div>
 
 <div class="gcard">
@@ -80,7 +86,7 @@
 
 <div class="gcard">
 <div class="gname">Recovery Multiplier</div>
-<div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). DeepSeek: 0.9&times; (explores). Claude: 1.1&times; (recovers). The empirical basis for the Explanation Tax.</div>
+<div class="gdef">How perturbation changes cost relative to baseline. Below 1.0: perturbation reduces cost (model explores). Above 1.0: perturbation increases cost (model recovers through narration). Values per model are in the live data (see evidence page). The empirical basis for the Explanation Tax.</div>
 </div>
 
 <div class="gcard">
@@ -93,12 +99,22 @@
 <div class="gdef">The method for validating that models implement constraints. Two independent scans: (1) reasoning text &mdash; does the model mention the constraint? (2) generated code &mdash; does the code actually implement the constraint? DeepSeek implements all 7 constraints without mentioning them in reasoning. Claude mentions and implements all 7 in billable output tokens.</div>
 </div>
 
+<div class="gcard">
+<div class="gname">Cache Strategy</div>
+<div class="gdef">A two-way door affecting C&#8320;. Cache-write stores context at $15/Mtok (Anthropic default). Cache-read retrieves at $0.14/Mtok (DeepSeek default). Measure cache hit rate: if &lt;50%, use cache-read. If &gt;80%, cache-write pays off.</div>
+</div>
+
+<div class="gcard">
+<div class="gname">Grit Spectrum</div>
+<div class="gdef">The unified measurement of how models handle degraded input. From Flail (complete breakdown, 100% failure) through Expensive Grit (correct but costly recovery) to Efficient Grit (correct and cheap recovery).</div>
+</div>
+
 </div>
 </section>
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.3</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 203 game reports &middot; $59.45 analyzed<br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a> &middot; <a href="glossary.html">Glossary</a>
 </footer>

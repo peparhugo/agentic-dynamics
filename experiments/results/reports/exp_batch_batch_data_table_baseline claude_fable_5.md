@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [batch:data_table:baseline] claude_fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:18:34
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:32
 
 ---
 

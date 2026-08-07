@@ -1,8 +1,8 @@
 # Game Report: inject_alien_vocab_s0.5-perturbed
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
-**Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:29:21
+**Operator:** perturbed (manifold, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:23:49
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 1212 |
 | Cyclomatic complexity [C] | 136.0 |
 | Code quality [H] | 0.083 |
 | Novelty vs baseline [H] | 0.953 |
-| **Composite [H]** | **0.638** |
+| **Composite [H]** | **0.595** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5315 J** |
 | Solution density [C] | 0.052406 LOC/tok |
 | Correctness/$ [C] | 2 |
-| Quality/J [C] | 0.000120 |
+| Quality/J [C] | 0.000112 |
 
 ---
 

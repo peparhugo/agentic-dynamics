@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [batch:task_manager:baseline] claude_fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:18:54
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:33
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.670
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.55) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=70%, quality=0.60) with moderate resource use ($2.0222, ~5575J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -40,7 +40,7 @@
 | Cyclomatic complexity [C] | 189.0 |
 | Code quality [H] | 0.091 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.553** |
+| **Composite [H]** | **0.595** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5575 J** |
 | Solution density [C] | 0.045057 LOC/tok |
 | Correctness/$ [C] | 1 |
-| Quality/J [C] | 0.000099 |
+| Quality/J [C] | 0.000107 |
 
 ---
 

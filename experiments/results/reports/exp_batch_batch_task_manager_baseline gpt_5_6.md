@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:task_manager:baseline] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:19:04
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:33
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (27/27 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 71% (5/7 constraints) |
 | Lines of code [M] | 602 |
 | Cyclomatic complexity [C] | 113.0 |
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 4 |
 | Test file rate | 44% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 27 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 27 |
-| Pass rate | 100% |
-| Duration | 10.2s |

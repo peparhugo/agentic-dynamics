@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:22:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:18:55
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 1115 |
 | Cyclomatic complexity [C] | 113.0 |
 | Code quality [H] | 0.090 |
 | Novelty vs baseline [H] | 0.968 |
-| **Composite [H]** | **0.572** |
+| **Composite [H]** | **0.529** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~6268 J** |
 | Solution density [C] | 0.033274 LOC/tok |
 | Correctness/$ [C] | 10 |
-| Quality/J [C] | 0.000091 |
+| Quality/J [C] | 0.000084 |
 
 ---
 

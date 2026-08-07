@@ -1,8 +1,8 @@
 # Game Report: inject_alien_vocab_s0.5-perturbed
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
-**Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:37:27
+**Operator:** perturbed (manifold, strength=0.0)
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:28:37
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:31:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:01
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.705
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.52) with moderate resource use ($0.9408, ~2708J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.48) with moderate resource use ($0.9408, ~2708J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 562 |
 | Cyclomatic complexity [C] | 72.0 |
 | Code quality [H] | 0.178 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.519** |
+| **Composite [H]** | **0.476** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~2708 J** |
 | Solution density [C] | 0.047704 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000192 |
+| Quality/J [C] | 0.000176 |
 
 ---
 

@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [silent_sweep:perturbed:natural] Claude_Fable_5...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:32:27
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:26
 
 ---
 

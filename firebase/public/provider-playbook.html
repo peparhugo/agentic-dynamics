@@ -17,10 +17,11 @@ ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;marg
 li{margin-bottom:0.35rem}
 .sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
 </style>
+<script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="provider-playbook.html" class="topbar-link" style="color:var(--ac)">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="credibility.html" class="topbar-link">Credibility</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link" style="color:var(--ac)">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 <section class="sec alt">
 <h1>The Provider Playbook</h1>
@@ -35,6 +36,16 @@ li{margin-bottom:0.35rem}
 <tr><td>Escalation cascade</td><td>Rule 8 (Escalation Cascade) + Rule 10 (WOC Ratio)</td></tr>
 </table>
 </div>
+</section>
+
+<section class="sec">
+<h2>Per-Token Pricing (per 1M tokens)</h2>
+<table>
+<tr><th>Provider</th><th>Input</th><th>Output</th><th>Cache Read</th><th>Cache Write</th></tr>
+<tr><td>DeepSeek</td><td>$0.27</td><td>$1.10</td><td>$0.14</td><td>—</td></tr>
+<tr><td>OpenAI (GPT-4o)</td><td>$1.25</td><td>$10.00</td><td>$0.625</td><td>—</td></tr>
+<tr><td>Anthropic (Sonnet)</td><td>$3.00</td><td>$15.00</td><td>$3.00</td><td>$15.00</td></tr>
+</table>
 </section>
 
 <section class="sec">
@@ -60,6 +71,8 @@ li{margin-bottom:0.35rem}
 <div class="highlight-box" style="border-left-color:var(--am);margin-top:1rem">
 <p><strong>Critical rule:</strong> Static content before dynamic content — one dynamic field in the wrong position invalidates the prefix cache. Place system prompts, tool definitions, and static instructions first. Append user input last.</p>
 </div>
+<h3>Cache Strategy: Two-Way Door</h3>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Cache writes preserve context but cost $15/Mtok (Anthropic). Cache reads retrieve context at $0.14/Mtok (DeepSeek). Measure your cache hit rate. If under 50%, switch to cache-read mode. If over 80%, cache-write pays for itself. This is a two-way door — toggle it per workstream.</p>
 </section>
 
 <section class="sec alt">
@@ -158,9 +171,9 @@ li{margin-bottom:0.35rem}
 <h3>Key metrics from 248 experiments</h3>
 <table>
 <tr><th>Metric</th><th>Value</th></tr>
-<tr><td>Escalation multiplier (Eₘ)</td><td><span class="met">28.2&times;</span> DeepSeek → GPT-5.6</td></tr>
+<tr><td>Escalation multiplier (Eₘ)</td><td><span class="met">28.3&times;</span> DeepSeek → GPT-5.6</td></tr>
 <tr><td>Retry rate</td><td><span class="met">21.4%</span> (53/248 sessions)</td></tr>
-<tr><td>Claude vs DeepSeek gap</td><td><span class="met">65&times;</span> ($1.01 vs $0.015)</td></tr>
+<tr><td>Claude vs DeepSeek gap</td><td><span class="met">68.7&times;</span> ($1.01 vs $0.015)</td></tr>
 </table>
 </div>
 <div>
@@ -180,7 +193,7 @@ li{margin-bottom:0.35rem}
 </section>
 </main>
 <footer>
-<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br>248 experiment sessions · 3 architectures, 8 variants · 203 game reports · $59.45 analyzed</p>
+<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br><span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">203</span> game reports · $<span data-stat="cost">59.45</span> analyzed</p>
 </footer>
 </body>
 </html>

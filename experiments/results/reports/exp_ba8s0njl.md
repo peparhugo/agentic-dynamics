@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [remove_critical_constraint_s0.5_r2] cd_openai_GPT_5_mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:18:17
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:16
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (4/4 tests) [M] |
+| Correctness | 70% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 306 |
 | Cyclomatic complexity [C] | 60.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0309  |  **Energy:** ~4390J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0309  |  **Energy:** ~4390J  |  **Thinking:** 7%
 
 ---
 
@@ -112,17 +112,3 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0397 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 4 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 4 |
-| Pass rate | 100% |
-| Duration | 2.9s |

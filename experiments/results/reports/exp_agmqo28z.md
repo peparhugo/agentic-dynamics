@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [silent_sweep:perturbed:natural] deepseek_v4_pro...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:17:35
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:15:50
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 79% (15/19 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 706 |
 | Cyclomatic complexity [C] | 89.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 79%  |  **Cost:** $0.0142  |  **Energy:** ~3854J  |  **Thinking:** 13%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0142  |  **Energy:** ~3854J  |  **Thinking:** 13%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 18% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 15 |
-| Failed | 4 |
-| Errors | 0 |
-| Total | 19 |
-| Pass rate | 79% |
-| Duration | 4.3s |

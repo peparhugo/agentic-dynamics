@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener: collision-resistant+analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:29:10
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:23:46
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 63% (22/35 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 67% (4/6 constraints) |
 | Lines of code [M] | 386 |
 | Cyclomatic complexity [C] | 36.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 63%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
 
 ---
 
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 22 |
-| Failed | 13 |
-| Errors | 0 |
-| Total | 35 |
-| Pass rate | 63% |
-| Duration | 2.3s |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.5  |  **Task:** [inject_phantom_success_s0.5_r1] gpt_gather_gpt_5_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:31:56
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:25
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (9/9 tests) [M] |
+| Correctness | 100% (0/0 tests) [H] |
 | Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 288 |
 | Cyclomatic complexity [C] | 47.0 |
@@ -99,17 +99,3 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
-
-
----
-
-## Pytest Results
-
-| Metric | Value |
-|--------|-------|
-| Passed | 9 |
-| Failed | 0 |
-| Errors | 0 |
-| Total | 9 |
-| Pass rate | 100% |
-| Duration | 0.8s |

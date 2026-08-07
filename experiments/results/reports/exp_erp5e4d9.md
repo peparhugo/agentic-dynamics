@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [standardized_build] gpt-5-mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:23:56
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:09
 
 ---
 
@@ -40,7 +40,7 @@
 | Cyclomatic complexity [C] | 24.0 |
 | Code quality [H] | 0.600 |
 | Novelty vs baseline [H] | 0.903 |
-| **Composite [H]** | **0.672** |
+| **Composite [H]** | **0.629** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3597 J** |
 | Solution density [C] | 0.007588 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000187 |
+| Quality/J [C] | 0.000175 |
 
 ---
 

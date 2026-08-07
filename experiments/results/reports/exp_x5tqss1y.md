@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-06T22:36:26
+**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:27:45
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.697
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.46) with moderate resource use ($0.0185, ~4258J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.42) with moderate resource use ($0.0185, ~4258J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 883 |
 | Cyclomatic complexity [C] | 65.0 |
 | Code quality [H] | 0.113 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.463** |
+| **Composite [H]** | **0.421** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~4258 J** |
 | Solution density [C] | 0.036627 LOC/tok |
 | Correctness/$ [C] | 8 |
-| Quality/J [C] | 0.000109 |
+| Quality/J [C] | 0.000099 |
 
 ---
 
