@@ -34,20 +34,20 @@ li{margin-bottom:0.35rem}
 <h2>Rules 6–10 for Autonomous Workloads</h2>
 <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">These rules extend the core AI FinOps Framework (Rules 1–5) to systems where AI operates without human supervision — agentic coding, batch processing, automated PR review, CI/CD pipelines. Start with <a href="framework.html">Rules 1–5</a> for model selection and cost governance, then apply Rules 6–10 for unsupervised operations.</p>
 
-<h3><span class="rule-num">Rule 6</span> · The Work / Time Tradeoff</h3>
+<h3><span class="rule-num">Rule 6</span> · The Batch Discount</h3>
 <p style="color:var(--t2);font-size:0.9rem">Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in under 4 hours, run in batch. Monitor queue depth to avoid SLA breaches. Batch discount: D(b) = 1 − b × 0.5.</p>
 <div class="highlight-box"><p><strong>Example:</strong> Running 5,000 test-generation jobs at batch fraction 70% saves $262/day vs on-demand. The tradeoff: results arrive in 8.2 hours instead of 4.3 minutes.</p></div>
 
-<h3><span class="rule-num">Rule 7</span> · The Workstream Capacity Constraint</h3>
+<h3><span class="rule-num">Rule 7</span> · The Budget Ceiling</h3>
 <p style="color:var(--t2);font-size:0.9rem">Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job × (1 + retry_rate)). Double your budget, double your capacity — zero hiring required.</p>
 
-<h3><span class="rule-num">Rule 8</span> · The Escalation Cascade</h3>
+<h3><span class="rule-num">Rule 8</span> · The Cascade Rule</h3>
 <p style="color:var(--t2);font-size:0.9rem">In autonomous workloads, failures auto-escalate through model tiers: Flash → Sonnet → Opus → Human. A 1% escalation to human review can double your total cost. Design for under 1% escalation. Measured multiplier: 28.2× (DeepSeek → GPT-5.6).</p>
 
-<h3><span class="rule-num">Rule 9</span> · The 72-Hour Horizon</h3>
+<h3><span class="rule-num">Rule 9</span> · The SLA Buffer</h3>
 <p style="color:var(--t2);font-size:0.9rem">Actual batch completion time = (Queue_length × Avg_job_time) + (Retry_buffer × retry_rate). Never batch jobs with an SLA less than 2× your observed queue depth. Always have an on-demand fallback for time-critical tasks.</p>
 
-<h3><span class="rule-num">Rule 10</span> · The WOC Ratio</h3>
+<h3><span class="rule-num">Rule 10</span> · The First-Pass Rule</h3>
 <p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong>0.90</strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical — fix immediately. Track WOC by task type, model, and time of day.</p>
 </section>
 
@@ -65,7 +65,7 @@ li{margin-bottom:0.35rem}
 <h2>Escalation Cascade</h2>
 <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Visual flow from cheapest to most expensive resolution path.</p>
 <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;margin:0 auto">
-<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek V3</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek v4 Pro</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
 <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--am);color:var(--bg)">T2</span><strong style="color:var(--t)">Sonnet / GPT-4o</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;8–12 cost</span></div>
 <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (measured)</span></div>
 <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
@@ -161,7 +161,7 @@ li{margin-bottom:0.35rem}
 </section>
 </main>
 <footer>
-<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br><span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">203</span> game reports · $<span data-stat="cost">59.45</span> analyzed</p>
+<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.4 &middot; August 2026</strong><br><span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed</p>
 </footer>
 </body>
 </html>

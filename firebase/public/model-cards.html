@@ -62,8 +62,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </div></section>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br>
-<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">203</span> game reports &middot; $<span data-stat="cost">59.45</span> analyzed<br>
+<strong>The AI FinOps Framework &middot; v0.4 &middot; August 2026</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> &middot; <a href="framework.html">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a> &middot; <a href="provider-playbook.html">Playbook</a> &middot; <a href="autonomous-workloads.html">Autonomous</a> &middot; <a href="executive-dashboard.html">Dashboard</a>
 </footer>
 
@@ -132,7 +132,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
   var dataPerturb = (window.FRAMEWORK_DATA && window.FRAMEWORK_DATA.perturbation_class_breakdown) || {semantic:{},manifold:{}};
 
   dataModels.forEach(function(dm){
-    var m = fb.find(function(f){return dm.label===f.name||dm.id.indexOf(f.id)>=0});
+    var sortedFb = fb.slice().sort(function(a,b){ return b.id.length - a.id.length; });
+    var m = sortedFb.find(function(f){ return dm.label===f.name || dm.id.indexOf(f.id)>=0; });
     if(!m) return;
     m._data = dm;
     if(dataPerturb.semantic[dm.label]){
