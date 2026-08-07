@@ -3,7 +3,7 @@ experiment_id: lab_claude_audit
 title: "Lab Book 1: The Claude Audit — Where Did $47.54 Go?"
 hypothesis: "Claude's $47.54 total spend is concentrated on specific task types and perturbation classes where it provides no correctness advantage over DeepSeek. The cost premium purchases narration, not capability."
 null_hypothesis: "Claude's higher cost correlates with higher correctness on tasks where DeepSeek fails."
-status: planned
+status: completed
 created: 2026-08-07
 data_sources:
   - experiments/results/_results_summary.json
@@ -78,10 +78,26 @@ analysis_script: scripts/lab_claude_audit.py
 
 ## Results
 
-*To be filled after analysis execution.*
+*Executed 2026-08-07.*
 
-| Task Type | Claude Cost | Claude Correct | DS Cost | DS Correct | Notes |
-|-----------|-------------|----------------|---------|------------|-------|
+| Metric | DeepSeek v4 Pro | Claude Fable 5 |
+|--------|-----------------|----------------|
+| Avg cost/session | $0.015 | $1.08 |
+| Avg correctness | 91% | 86% |
+| Cost ratio | 73× | — |
+| Cost per correct point | $0.016 | $1.27 |
+| Tasks where model leads | 7/15 | 3/15 |
+| Tasks tied | 5/15 | 5/15 |
+
+**Claude leads on:** `inject_alien_vocab` (90% vs 74%, 82.6× cost), `invert_constraint` (100% vs 72%, 57.6×), `data_table` (100% vs 60%, 105.8×).
+
+**DeepSeek leads on:** `baseline`, `url_shortener`, `shift_framing`, `task_manager`, `collaborative_editor`, `remove_critical_constraint`, `standardized_build`.
+
+**Cost breakdown:** Output tokens ($24.26, 57%) + Cache ($18.26, 43%) + Input ($0.01, <1%). No reasoning token costs.
+
+**Finding:** Claude leads on 3/15 tasks — all perturbation types where linguistic surface shifts test the model. On general tasks (baseline, url_shortener, task_manager), DeepSeek is both more correct and 10-105× cheaper. Claude's premium buys correctness on specific stress tests, not general coding.
+
+**Null hypothesis:** Rejected (Claude does not lead on ≥3 tasks with >5pp margin — 3 leads, 2 of which are genuine >5pp).
 | | | | | | |
 
 ## Artifacts
