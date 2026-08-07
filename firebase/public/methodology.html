@@ -51,7 +51,7 @@
 <details style="max-width:800px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the methodology actually means</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">248 sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). The result: empirical data for every rule in the AI FinOps Framework. No parameter is theoretical; every variable in the cost equation was measured.</p>
+<p>We built a measurement instrument that applies <strong style="color:var(--t)">10 types of "stress tests"</strong> (perturbation operators) to AI models across <strong style="color:var(--t)">248 sessions</strong>. It measures how models respond — do they explore new solutions, or recover to familiar patterns? — and classifies that behavior into <strong style="color:var(--t)">4 strategy archetypes</strong> (Conservative, Exploratory, Wasteful, Efficient). Cost drivers (C₀, P, ε, r) are measured from the 227-session corpus. Modeling parameters (β, EPM) are externally calibrated. Analysis outputs (escape scores, strategy) are heuristically computed — every metric is tagged with provenance [M]/[C]/[H]/[X] in the game reports.</p>
 <p>Below is the full methodology — the operators, detection signals, pipeline, and reproducible experiment configs.</p>
 </div>
 </details>
@@ -71,7 +71,19 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="pipe-step"><div class="ps-num">2</div><div class="ps-title">Session</div><div class="ps-desc">Isolated opencode worktree. Model receives the (perturbed) prompt and produces code + reasoning.</div></div>
 <div class="pipe-step"><div class="ps-num">3</div><div class="ps-title">Trajectory</div><div class="ps-desc">Full reasoning trace captured — tool calls, outputs, token counts, timing. Levenshtein + cosine distance vs baseline.</div></div>
 <div class="pipe-step"><div class="ps-num">4</div><div class="ps-title">Analysis</div><div class="ps-desc">Solution quality, basin escape, recovery classification, strategy taxonomy, efficiency metrics. All scored.</div></div>
-<div class="pipe-step"><div class="ps-num">5</div><div class="ps-desc">All measurements feed the unified cost equation. Every parameter empirically grounded.</div></div>
+<div class="pipe-step"><div class="ps-num">5</div><div class="ps-desc">Measured session costs and test results feed the cost equation. Provenance-tagged metrics power the 11 decision rules.</div></div>
+</div>
+</section>
+
+<!-- Measurement Provenance -->
+<section class="sec alt wide">
+<h2>Measurement Provenance</h2>
+<p class="lead">Every metric in the game reports carries a provenance tag. This taxonomy makes clear what was measured, what was computed, and what is estimated.</p>
+<div class="pipeline">
+<div class="pipe-step"><div class="ps-num">[M]</div><div class="ps-title">Measured</div><div class="ps-desc">API tokens &amp; costs, pytest results, LOC, cache tokens, exit codes, session duration &mdash; directly from the openCode DB or filesystem.</div></div>
+<div class="pipe-step"><div class="ps-num">[C]</div><div class="ps-title">Computed</div><div class="ps-desc">Thinking ratio, output density, quality/$, quality/J &mdash; derived directly from measured values with no estimation.</div></div>
+<div class="pipe-step"><div class="ps-num">[H]</div><div class="ps-title">Heuristic</div><div class="ps-desc">Escape scores, novelty, code quality, strategy classification &mdash; algorithmic analysis with author-chosen thresholds.</div></div>
+<div class="pipe-step"><div class="ps-num">[X]</div><div class="ps-title">External</div><div class="ps-desc">Energy estimates from TokenPowerBench (Niu et al., AAAI 2026). EPM projections from IEA World Energy Outlook 2024.</div></div>
 </div>
 </section>
 
@@ -234,7 +246,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 
 <footer>
 <strong>The AI FinOps Framework &middot; v0.3</strong><br>
-248 experiment sessions &middot; 3 architectures, 8 variants &middot; 224 game reports &middot; $64.98 analyzed<br>
+248 experiment sessions &middot; 3 architectures, 8 variants &middot; 203 game reports &middot; $59.45 analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
 </footer>

@@ -106,14 +106,15 @@ li{margin-bottom:0.35rem}
 
 <section class="sec alt">
 <h2>Key Variables Derived from Data</h2>
-<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Every constant in the cost equation is measured, not assumed. Here are the ones that drive the model.</p>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Cost drivers are measured from the 227-session corpus. Modeling parameters are calibrated to your environment. Analysis outputs are heuristically computed.</p>
 <table>
 <tr><th>Variable</th><th>Symbol</th><th>Measured Value</th><th>Source</th></tr>
 <tr><td>Retry rate</td><td><code>r</code></td><td><span class="met">21.4%</span></td><td>53/248 sessions failed first-pass</td></tr>
 <tr><td>Escalation multiplier</td><td><code>Eₘ</code></td><td><span class="met">28.2&times;</span></td><td>DeepSeek V3 → GPT-5.6 cost delta</td></tr>
 <tr><td>Work Overhead Cost</td><td><code>WOC</code></td><td><span class="met">0.82</span></td><td>1/(1+r) with r=0.214</td></tr>
-<tr><td>Cost gap</td><td>—</td><td><span class="met">65&times;</span></td><td>Claude $1.01 vs DeepSeek $0.015 per session</td></tr>
-<tr><td>Simple request share</td><td>—</td><td><span class="met">60–80%</span></td><td>Classification of request complexity across experiments</td></tr>
+<tr><td>Cost gap (Python)</td><td>—</td><td><span class="met">66&times;</span></td><td>Claude $1.06 vs DeepSeek $0.016 per session</td></tr>
+<tr><td>Overall correctness</td><td><code>P</code></td><td><span class="met">93.2%</span></td><td>987/1059 tests passed across 203 game reports</td></tr>
+<tr><td>Strategy distribution</td><td>—</td><td><span class="met">140C / 59E</span></td><td>63% conservative, 26% exploratory, 0% wasteful</td></tr>
 <tr><td>Explanation Tax</td><td><code>ε</code></td><td><span class="met">24–120%</span></td><td>Narration overhead vs silent mode</td></tr>
 <tr><td>Context inflation</td><td><code>β</code></td><td><span class="met">0.001</span></td><td>Modeling parameter — calibrate to your codebase</td></tr>
 </table>
@@ -156,7 +157,7 @@ python scripts/validate_session.py /tmp/exp_xyz</pre>
 </section>
 </main>
 <footer>
-<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br>248 experiment sessions · 3 architectures, 8 variants · 224 game reports · $64.98 analyzed</p>
+<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.3 &middot; August 2026</strong><br>248 experiment sessions · 3 architectures, 8 variants · 203 game reports · $59.45 analyzed</p>
 </footer>
 </body>
 </html>
