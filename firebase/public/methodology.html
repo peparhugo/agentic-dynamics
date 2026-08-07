@@ -118,7 +118,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="card"><div class="ctitle">5. Length Convergence</div><div class="cdesc">Token output length ratio between perturbed and baseline. Models that recover tend to match baseline output length as they return to familiar solution patterns.</div></div>
 <div class="card"><div class="ctitle">6. Pattern Convergence</div><div class="cdesc">Structural overlap in the reasoning trace. Do the same reasoning sub-steps appear? Measured by n-gram overlap between trajectories.</div></div>
 </div>
-<div class="wtm"><strong>Verified finding:</strong> Manifold perturbations (alien vocabulary, framing shifts) produce escape=0.76 for DeepSeek vs 0.62 for Claude. Semantic perturbations (constraint removal, false premises) produce escape=0.18 vs 0.21. This validates the perturbation taxonomy: linguistic surface shifts force models to explore novel solution topologies; logical contradictions test error detection capability. Across both classes, DeepSeek's recovery costs 68-77× less than Claude's.</div>
+<div class="wtm"><strong>Observed pattern:</strong> Manifold perturbations (alien vocabulary, framing shifts) produce escape=0.76 for DeepSeek vs 0.62 for Claude. Semantic perturbations (constraint removal, false premises) produce escape=0.18 vs 0.21. This pattern supports the perturbation taxonomy: linguistic surface shifts appear to force models to explore novel solution topologies; logical contradictions appear to test error detection capability. Across both classes, DeepSeek's recovery costs 68-77× less than Claude's.</div>
 </section>
 
 <!-- Basin -->
@@ -173,7 +173,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated source files (Python, TypeScript, Go, Rust — 25+ file extensions) for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, API versioning structures, and domain-specific patterns across languages.</div></div>
 <div class="card"><div class="ctitle">AST Analysis</div><div class="cdesc">Parses generated Python into abstract syntax trees. Compares perturbed vs baseline AST node count and structure. Finding: perturbed output is 112.6% of baseline nodes — structurally identical code with minimal variance.</div></div>
 </div>
-<div class="wtm"><strong>What this proves:</strong> The 69× cost gap is not a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta is purely in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
+<div class="wtm"><strong>What this suggests:</strong> The 69× cost gap does not appear to be a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta appears to be in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
 </section>
 
 <!-- Reproduce This -->

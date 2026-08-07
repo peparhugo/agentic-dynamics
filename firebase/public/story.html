@@ -112,7 +112,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p><strong>Reinforcement learning in latent space does the opposite.</strong> DeepSeek's GRPO doesn't learn what reasoning should look like. It learns to get to the right answer, and the path is incidental. The reasoning exists as vectors, not words. When perturbed, DeepSeek explores. It finds new paths. It doesn't need to narrate the journey because the journey was never the point — the destination was.</p>
 
-<p>This is the <strong style="color:var(--ac)">Silent Inference Principle</strong>. Implementation = True. Narration = False. And it's a structural property of the training architecture, not a tuning parameter you can toggle.</p>
+<p>We call this the <strong style="color:var(--ac)">Silent Inference Principle</strong>. The model's ability to reason in latent space and act, rather than narrating every step as billable output. It's a structural property of the training architecture, not a parameter you can toggle.</p>
 
 <p>Later analysis revealed the deeper layer: both models generate ~11,000 tokens per session. Identical computational effort. Claude's tokens just cost 25× more per unit. And Claude writes 22,500 tokens to cache per session at $15/Mtok — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 
