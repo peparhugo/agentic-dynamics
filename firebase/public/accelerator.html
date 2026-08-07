@@ -153,6 +153,25 @@ li{margin-bottom:0.35rem}
   </div>
 </section>
 
+<section class="sec alt">
+  <h2>What This Means for Your Enterprise</h2>
+  <p class="sub" style="font-size:0.88rem;margin-bottom:1.5rem">Every enterprise AI concern maps to a measured dimension of the framework. Here's the translation layer.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>If you're worried about...</th><th>Our measurement is...</th><th>What you can do</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Paying for models to re-learn your architecture every session</strong></td><td>Cache Strategy + Snowball Rule</td><td>Switch to cache-read at $0.14/Mtok. Measure N² curve. If cache hit rate under 50%, don't write.</td></tr>
+      <tr><td><strong>Models that break when instructions are incomplete or contradictory</strong></td><td>Grit — Flail Rate + Recovery Cost</td><td>Don't deploy models with >15% flail rate. High-Grit models (DeepSeek 8%) self-correct. Low-Grit models (nano 100%) cannot be trusted unsupervised.</td></tr>
+      <tr><td><strong>Budget overruns from models that narrate every decision</strong></td><td>Explanation Tax ε</td><td>Route routine work to models with <10% ε (DeepSeek: 3%). Reserve high-ε models (Claude: 50%) for auditable work only.</td></tr>
+      <tr><td><strong>Autonomous systems silently failing at scale</strong></td><td>First-Pass Rule — WOC Ratio</td><td>Track WOC by model, task type, and time of day. Escalate if below 0.85. Design cascades so low-Grit models never enter unsupervised pipelines.</td></tr>
+      <tr><td><strong>3-year cost projections that keep surprising finance</strong></td><td>EPM Horizon + Snowball Rule</td><td>Model the N² curve before committing. Hedge energy price exposure. A 2× EPM spike during a 5-year horizon doubles cumulative costs.</td></tr>
+      <tr><td><strong>Every AI session starting from scratch</strong></td><td>Cache Strategy + Persistent State</td><td>Organizational memory as durable infrastructure. Architecture decisions, standards, business context become assets that compound.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="highlight-box" style="margin-top:1rem">
+    <strong>Intelligence Efficiency</strong> — the competitive advantage belongs to organizations that build systems where intelligence compounds. Every session gets cheaper not because the model costs less, but because it never has to think about the same thing twice.
+  </div>
+</section>
+
 <section class="sec">
   <h2>How it works</h2>
   <p class="sub" style="font-size:0.88rem">From invisible spend to precision acceleration. Engineered methodology, not a black box.</p>
@@ -231,6 +250,47 @@ li{margin-bottom:0.35rem}
         <p>Full AI-native transformation. Agentic CI/CD pipelines that auto-escalate through model tiers. Autonomous governance and evolution (AGE) — systems that self-monitor, self-correct, and self-optimize. The escalation cascade: 78.6% of tasks resolve at the cheapest tier. Only &lt;5% ever reach a human. Continuous optimization that fine-tunes enterprise AI spend over time.</p>
         <div class="tags"><span>Agentic CI/CD</span><span>Autonomous governance</span><span>Escalation cascade</span><span>Continuous optimization</span></div>
       </div>
+    </div>
+  </div>
+</section>
+
+
+<section class="sec alt">
+  <h2>Enterprise Projections</h2>
+  <p class="sub" style="font-size:0.88rem;margin-bottom:1rem">What Grit-routed model selection means in practice. Projections derived from our 227-session experiment corpus, applied to realistic enterprise team sizes.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>Scenario</th><th>Current (Claude default)</th><th>Optimized (Grit-routed)</th><th>Annual Savings</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>Augmented Workforce</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">50 engineers, 20 sessions/day, 20 days/month</span></td>
+        <td class="mono amber">$21,600/month<br><span style="font-size:0.68rem;color:var(--t3)">$1.08/session × 20K sessions</span></td>
+        <td class="mono green">$640/month<br><span style="font-size:0.68rem;color:var(--t3)">$0.016/session × 20K sessions, 10% escalation to Claude for mission-critical</span></td>
+        <td class="mono green"><strong>$251,520/year</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Cache Strategy</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">22.5K cache writes/session at $15/Mtok</span></td>
+        <td class="mono amber">$3,375/month<br><span style="font-size:0.68rem;color:var(--t3)">Full cache-write on all sessions</span></td>
+        <td class="mono green">$42/month<br><span style="font-size:0.68rem;color:var(--t3)">Cache-read only at $0.14/Mtok. Write only when hit rate >80%</span></td>
+        <td class="mono green"><strong>$39,996/year</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Autonomous Batch</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">5,000 jobs/day, unsupervised, 21 working days/month</span></td>
+        <td class="mono amber">$113,400/month<br><span style="font-size:0.68rem;color:var(--t3)">$1.08/job × 105K jobs/month</span></td>
+        <td class="mono green">$3,360/month<br><span style="font-size:0.68rem;color:var(--t3)">$0.016/job × 105K × (1 + 0.115 × 28.3) with Grit-gated escalation</span></td>
+        <td class="mono green"><strong>$1,320,480/year</strong></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="cards" style="margin-top:1.2rem">
+    <div class="card">
+      <div class="ctitle" style="color:var(--ac)">How these numbers are derived</div>
+      <div class="cdesc">Every projection uses actual measured values from our 227-session experiment corpus. Augmented workforce: $0.016/session (DeepSeek measured avg) vs $1.08/session (Claude measured avg). Cache: 22,500 write tokens/session at $15/Mtok (measured from 47 Claude sessions). Autonomous: $0.016/job base cost, 11.5% retry rate (measured), 28.3× escalation multiplier (DS to GPT-5.6). All projections documented with provenance [M] measured / [C] computed.</div>
+    </div>
+    <div class="card">
+      <div class="ctitle" style="color:var(--am)">This is the floor, not the ceiling</div>
+      <div class="cdesc">These projections assume you switch models but don't change your processes. The full accelerator adds cascade routing, cache layering, batch scheduling, and persistent organizational memory — each compounding on the last. The 50-70% cost reduction target is conservative against what measured data shows is possible.</div>
     </div>
   </div>
 </section>
