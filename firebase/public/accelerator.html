@@ -73,6 +73,15 @@ li{margin-bottom:0.35rem}
 .comp-col.accent{background:rgba(99,102,241,0.05);border-color:rgba(99,102,241,0.2)}
 .comp-col.accent h4{color:var(--ac)}
 
+.formula{font-family:"JetBrains Mono",monospace;color:var(--am);font-size:0.9rem;display:block;padding:0.5rem 0}
+.rule-num{font-family:"JetBrains Mono",monospace;color:var(--ac);font-size:0.8rem;font-weight:600}
+.dashboard-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.25rem}
+.dim{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1.5rem}
+.dim h3{font-size:1rem;color:var(--ac);margin:0 0 0.75rem}
+.metric-label{font-size:0.72rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.15rem}
+.metric-value{font-family:"JetBrains Mono",monospace;font-size:1.1rem;color:var(--t);margin-bottom:0.75rem}
+.kpi{display:flex;flex-direction:column}
+
 @media(max-width:768px){
   .timeline-step{grid-template-columns:80px 1fr}
   .timeline-label{font-size:0.7rem}
@@ -80,13 +89,14 @@ li{margin-bottom:0.35rem}
   .ladder-level{font-size:1rem}
   .problem-item{grid-template-columns:36px 1fr}
   .comparison-grid{grid-template-columns:1fr}
+  .dashboard-grid{grid-template-columns:1fr}
 }
 </style>
 <script src="data.js"></script>
 <script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link" style="color:var(--ac)">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 
 <section class="sec alt" style="text-align:center">
@@ -296,6 +306,192 @@ li{margin-bottom:0.35rem}
 </section>
 
 <section class="sec">
+  <h2>Autonomous Workloads</h2>
+  <p class="sub">When AI works without human supervision — the rules, economics, and operational model</p>
+
+  <h3>How Grit Controls Autonomous Workloads</h3>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">The Grit framework directly governs unsupervised AI operations. In autonomous mode, you can't review every output. You need models that self-correct when given bad context — because bad context is inevitable in real systems (stale documentation, conflicting requirements, incomplete specifications).</p>
+  <ul style="margin-top:0.5rem">
+  <li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (100% flail) and GPT-5-mini (58% flail) cannot be trusted unsupervised.</li>
+  <li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $15/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
+  <li><strong>First-Pass Success (Rule 5) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
+  </ul>
+
+  <h3>Real-World Autonomous Patterns</h3>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Autonomous AI maps directly to established workforce management disciplines:</p>
+  <ul>
+  <li><strong>Call Center / Task Queue:</strong> AHT (average handle time) = steps per session. Service level = % of tasks resolved within SLA buffer (Rule 9).</li>
+  <li><strong>Back-Office Processing:</strong> Batch window = 72-hour horizon (Rule 6). Throughput cap = budget / cost-per-job (Rule 7).</li>
+  <li><strong>CI/CD Pipelines:</strong> Cascade routing = escalation chain (Rule 8). Grit determines which models auto-resolve vs escalate to human review.</li>
+  <li><strong>Agentic Workflows:</strong> Multi-step autonomous tasks require high-Grit models that can recover from intermediate failures without flailing.</li>
+  </ul>
+
+  <h3>Batch vs On-Demand Decision Table</h3>
+  <div class="tbl"><table>
+  <tr><th>Task Type</th><th>Urgency</th><th>Complexity</th><th>Mode</th><th>Rationale</th></tr>
+  <tr><td>Code review</td><td>&lt; 1 hour</td><td>Low–Medium</td><td><span style="color:var(--cy)">On-demand</span></td><td>Blocks developer workflow</td></tr>
+  <tr><td>Test generation</td><td>&lt; 4 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Non-blocking, can queue</td></tr>
+  <tr><td>PR description</td><td>&lt; 5 min</td><td>Low</td><td><span style="color:var(--cy)">On-demand</span></td><td>Trivial, no queuing benefit</td></tr>
+  <tr><td>Refactoring sweep</td><td>&lt; 72 hours</td><td>High</td><td><span style="color:var(--am)">Batch</span></td><td>Large scope, schedule overnight</td></tr>
+  <tr><td>Documentation gen</td><td>&lt; 24 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Non-urgent, perfect for idle windows</td></tr>
+  <tr><td>Incident triage</td><td>&lt; 2 min</td><td>High</td><td><span style="color:var(--cy)">On-demand</span></td><td>Time-critical, needs fastest model</td></tr>
+  <tr><td>Dependency updates</td><td>&lt; 72 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Can run weekly, huge cost savings</td></tr>
+  <tr><td>Security audit</td><td>&lt; 72 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Queue depth manageable, retry-safe</td></tr>
+  </table></div>
+
+  <h3>WOC Ratio — Rule 5 (First-Pass)</h3>
+  <p style="color:var(--t2);font-size:0.9rem">The Work Overhead Cost ratio tells you whether autonomy is actually saving money.</p>
+  <span class="formula">WOC = (cost<sub>validation</sub> + cost<sub>retries</sub> + cost<sub>escalations</sub>) / cost<sub>primary</sub></span>
+  <div class="row" style="margin-top:1rem">
+  <div class="card">
+  <h4>Healthy</h4>
+  <p style="font-size:1.5rem;color:var(--cy);font-family:'JetBrains Mono',monospace">WOC &lt; 0.70</p>
+  <p>Overhead is manageable. Scaling is safe.</p>
+  </div>
+  <div class="card">
+  <h4>Investigate</h4>
+  <p style="font-size:1.5rem;color:var(--am);font-family:'JetBrains Mono',monospace">WOC &lt; 0.85</p>
+  <p>Retry or escalation rate rising. Tune thresholds.</p>
+  </div>
+  <div class="card">
+  <h4>Critical</h4>
+  <p style="font-size:1.5rem;color:#EF4444;font-family:'JetBrains Mono',monospace">WOC &ge; 0.85</p>
+  <p>Overhead dominates. Pause autonomy until root cause found.</p>
+  </div>
+  </div>
+  <div class="highlight-box" style="margin-top:1rem">
+  <p><strong>Calculated:</strong> <span class="met">WOC = 0.90</span> from retry rate r=0.115 across 248 experiment sessions.</p>
+  </div>
+
+  <h3>Escalation Cascade</h3>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Visual flow from cheapest to most expensive resolution path.</p>
+  <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;margin:0 auto">
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek v4 Pro</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--am);color:var(--bg)">T2</span><strong style="color:var(--t)">Sonnet / GPT-4o</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;8–12 cost</span></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (measured)</span></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
+  </div>
+  <div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> 88.5% of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees &lt; 5% of all tasks.</p></div>
+
+  <h3>Workstream Capacity</h3>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">How many jobs can you process per day at a given budget?</p>
+  <span class="formula">Throughput = Budget / (cost<sub>per_job</sub> &times; (1 + retry_rate))</span>
+  <div class="tbl" style="margin-top:1rem">
+  <table>
+  <tr><th>Scenario</th><th>Budget/Day</th><th>Cost/Job</th><th>Retry Rate</th><th>Jobs/Day</th></tr>
+  <tr><td>Light coding tasks</td><td><code>$5.00</code></td><td><code>$0.015</code></td><td>11.5%</td><td><span class="met">274</span></td></tr>
+  <tr><td>Code review + fix</td><td><code>$10.00</code></td><td><code>$0.08</code></td><td>11.5%</td><td><span class="met">103</span></td></tr>
+  <tr><td>Architecture generation</td><td><code>$20.00</code></td><td><code>$0.42</code></td><td>11.5%</td><td><span class="met">39</span></td></tr>
+  <tr><td>Full-stack PRD → deploy</td><td><code>$50.00</code></td><td><code>$1.01</code></td><td>11.5%</td><td><span class="met">41</span></td></tr>
+  </table></div>
+</section>
+
+<section class="sec alt">
+  <h2>Executive Dashboard</h2>
+  <p class="sub">Four dimensions that tell you if AI is paying for itself.</p>
+
+  <h3>Four Dimensions of AI Spend</h3>
+  <div class="dashboard-grid">
+  <div class="dim">
+  <h4 style="font-size:0.9rem;color:var(--ac);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Financial</h4>
+  <div class="metric-label">Cost-to-Serve</div>
+  <div class="metric-value">$0.11 / completed task</div>
+  <div class="metric-label" style="margin-top:0.5rem">Batch vs On-Demand Split</div>
+  <div class="metric-value">68% batch · 32% on-demand</div>
+  <div class="metric-label" style="margin-top:0.5rem">Cost by Escalation Tier</div>
+  <div class="metric-value">T1: 47% · T2: 31% · T3: 22%</div>
+  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Track cost per completed task by type, not cost per prompt. A task that takes 3 retries costs 3&times; the prompt price.</p>
+  </div>
+  <div class="dim">
+  <h4 style="font-size:0.9rem;color:var(--cy);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Operational</h4>
+  <div class="metric-label">Throughput</div>
+  <div class="metric-value">274 jobs / day (T1)</div>
+  <div class="metric-label" style="margin-top:0.5rem">Queue Depth</div>
+  <div class="metric-value">12 jobs (avg)</div>
+  <div class="metric-label" style="margin-top:0.5rem">Avg Completion Time</div>
+  <div class="metric-value">4.3 min (on-demand) · 8.2 hr (batch)</div>
+  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Throughput bottlenecks hide in retry loops. Monitor jobs/hour and queue depth by workstream.</p>
+  </div>
+  <div class="dim">
+  <h4 style="font-size:0.9rem;color:var(--am);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Quality</h4>
+  <div class="metric-label">WOC Ratio</div>
+  <div class="metric-value" style="color:var(--am)">0.82</div>
+  <div class="metric-label" style="margin-top:0.5rem">Validation Pass Rate</div>
+  <div class="metric-value">78.6% first-pass</div>
+  <div class="metric-label" style="margin-top:0.5rem">Escalation Rate</div>
+  <div class="metric-value">21.4% to T2/T3</div>
+  <div class="metric-label" style="margin-top:0.5rem">Human Review Rate</div>
+  <div class="metric-value">&lt; 5%</div>
+  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Quality = first-pass success rate. Every retry burns budget and erodes trust. Target WOC &lt; 0.70.</p>
+  </div>
+  <div class="dim">
+  <h4 style="font-size:0.9rem;color:var(--am);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Strategic</h4>
+  <div class="metric-label">Runway</div>
+  <div class="metric-value">18 months at current burn</div>
+  <div class="metric-label" style="margin-top:0.5rem">Elasticity</div>
+  <div class="metric-value">10&times; throughput within 5 min</div>
+  <div class="metric-label" style="margin-top:0.5rem">Projected vs Actual</div>
+  <div class="metric-value">-12% under projection</div>
+  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Scalability is not just cost — it's whether your system handles 10&times; volume without linear cost growth.</p>
+  </div>
+  </div>
+
+  <h3>What to Measure</h3>
+  <div class="row">
+  <div class="card">
+  <h4>Per Task</h4>
+  <ul>
+  <li>Cost per completed outcome</li>
+  <li>First-pass success rate</li>
+  <li>Model tier used</li>
+  <li>Retry count (if any)</li>
+  <li>Time to completion</li>
+  </ul>
+  </div>
+  <div class="card">
+  <h4>Per Workstream</h4>
+  <ul>
+  <li>Daily / weekly / monthly spend</li>
+  <li>Throughput (jobs / day)</li>
+  <li>WOC ratio trend</li>
+  <li>Escalation rate trend</li>
+  <li>Budget vs actual variance</li>
+  </ul>
+  </div>
+  <div class="card">
+  <h4>Per Budget Period</h4>
+  <ul>
+  <li>Total spend vs budget</li>
+  <li>Cost-by-model breakdown</li>
+  <li>Cost-by-workstream breakdown</li>
+  <li>Batch savings (cost avoided)</li>
+  <li>Projected runway remaining</li>
+  </ul>
+  </div>
+  </div>
+
+  <h3>Projected ROI</h3>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Conservative estimates based on the 248-experiment dataset and industry benchmarks.</p>
+  <div class="row">
+  <div class="card">
+  <p style="font-size:2rem;color:var(--cy);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">50–70%</p>
+  <p>Cost reduction through cascade routing, caching, and batch scheduling</p>
+  </div>
+  <div class="card">
+  <p style="font-size:2rem;color:var(--ac);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">10&times;</p>
+  <p>Throughput increase with autonomous workstreams and 72-hour batch windows</p>
+  </div>
+  <div class="card">
+  <p style="font-size:2rem;color:var(--cy);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">Zero</p>
+  <p>Headcount growth needed to scale workload — autonomy absorbs volume growth</p>
+  </div>
+  </div>
+  <div class="highlight-box" style="margin-top:1.25rem">
+  <p><strong>Bottom line:</strong> A team spending $5,000/month on AI inference can expect to reduce that to $1,500–$2,500/month while increasing output 10&times;. The framework pays for itself in the first month.</p>
+  </div>
+</section>
+
+<section class="sec">
   <h2>The Measurement Harness</h2>
   <p class="sub">The AI FinOps Framework isn't theory. It's a calibrated instrument — 248 sessions, 10 perturbation operators, 6 recovery signals — that measures exactly what AI costs and why. Run it against your own sessions and fine-tune the machine to your workloads.</p>
   <div class="trust-grid" style="margin-top:1.5rem">
@@ -352,10 +548,7 @@ li{margin-bottom:0.35rem}
     <a href="framework.html">10 Decision Rules</a>
     <a href="methodology.html">Methodology</a>
     <a href="evidence.html">The Evidence</a>
-    <a href="autonomous-workloads.html">Autonomous Workloads</a>
-    <a href="executive-dashboard.html">Executive Dashboard</a>
     <a href="story.html">Origin Story</a>
-    <a href="roadmap.html">Research Roadmap</a>
   </div>
 </section>
 
@@ -365,8 +558,7 @@ li{margin-bottom:0.35rem}
   <span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> ·
-  <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> ·
-  <a href="roadmap.html">Roadmap</a> · 
+  <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 </body>
