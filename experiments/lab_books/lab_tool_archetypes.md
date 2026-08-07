@@ -3,7 +3,7 @@ experiment_id: lab_tool_archetypes
 title: "Lab Book 5: Tool-Choice Archetypes — Write vs Patch vs Bash"
 hypothesis: "Models that directly write files produce more modular, higher-quality code than models that patch via bash. The tool choice reflects architectural confidence."
 null_hypothesis: "Tool choice pattern has no correlation with code quality or correctness."
-status: planned
+status: completed
 created: 2026-08-07
 data_sources:
   - experiments/results/_trajectory_aggregate.json
@@ -83,7 +83,22 @@ Beyond the aggregate percentages, the `tool_call_sequence` array in `_trajectory
 
 ## Results
 
-*To be filled after analysis execution.*
+*Executed 2026-08-07. 201 valid entries, 8 models.*
+
+**By Archetype:**
+- Write-dominant (148 entries): 91% correctness, $0.30/session, 670 LOC — DeepSeek + Claude
+- Bash-dominant (18 entries): 88% correctness, $0.24/session, 291 LOC — GPT-5-mini + GPT-5.6-fast
+- Balanced (35 entries): 89% correctness, $0.27/session, 340 LOC — GPT-5, GPT-5.5, GPT-5.6, GPT-5-nano
+
+**Key finding:** Write-dominant models produce 2.3× more LOC per session (670 vs 291/340) at comparable correctness. DeepSeek achieves this at $0.015/session (write-dominant, 670 LOC). Claude also produces 568 LOC (write-dominant) but at $1.08/session.
+
+**Model Profiles:**
+- DeepSeek: 59.9% write, 6.5% read, 18.5% bash — iterative writer (15 steps/session)
+- Claude: 62.1% write, 0% read, 18.1% bash — confident writer (never reads files)
+- GPT-5-nano: 0% write, 9.9% read, 12.8% bash — hesitant reader (highest read%, lowest write%)
+- GPT-5.6-fast: 0% write, 0.9% read, 46.3% bash — heavy bash user
+
+**Hypothesis assessment:** H1 partially supported. Write-dominant models produce more LOC at comparable correctness, but quality scores are slightly lower (0.25 vs 0.37 bash-dominant). The tradeoff is volume vs quality, not correctness.
 
 ## Artifacts
 

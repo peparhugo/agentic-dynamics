@@ -3,7 +3,7 @@ experiment_id: lab_task_routing
 title: "Lab Book 6: Task-Optimal Routing — Decision Table"
 hypothesis: "A routing strategy (DeepSeek by default, escalate to Claude/GPT-5.6 only when correctness drops below 85%) produces lower total cost at equal or higher correctness than any single-model strategy."
 null_hypothesis: "A single-model strategy produces better cost-correctness outcomes than a routing strategy."
-status: planned
+status: completed
 created: 2026-08-07
 data_sources:
   - experiments/results/_results_summary.json
@@ -82,7 +82,21 @@ GPT-5.6 escalation: P tasks (P% of total)
 
 ## Results
 
-*To be filled after analysis execution.*
+*Executed 2026-08-07. 17 task types with multi-model data.*
+
+**Routing distribution:** 14 tasks → DeepSeek default, 3 tasks → Claude escalation.
+
+**Claude escalation justified for:** `data_table`, `inject_alien_vocab`, `invert_constraint` — all perturbation tasks where Claude leads by >16pp correctness.
+
+**Strategy Comparison:**
+
+| Strategy | Entries | Total Cost | Avg Cost | Avg Correctness | Cost/Correct Point |
+|----------|---------|-----------|----------|-----------------|-------------------|
+| Claude-only | 39 | $42.30 | $1.08 | 88% | $1.23 |
+| DeepSeek-only | 109 | $1.72 | $0.016 | 92% | $0.017 |
+| Grit-routed | 67 | $7.88 | $0.12 | 95% | $0.12 |
+
+**Finding:** DeepSeek-only beats Claude-only on BOTH cost AND correctness. Grit-routed achieves highest correctness (95%) at $0.12/session — 9× cheaper than Claude-only with 7pp higher correctness. The optimal strategy is DeepSeek by default, escalate to Claude only on 3 specific perturbation types.
 
 ## Artifacts
 

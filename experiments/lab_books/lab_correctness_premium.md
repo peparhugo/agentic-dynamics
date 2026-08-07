@@ -3,7 +3,7 @@ experiment_id: lab_correctness_premium
 title: "Lab Book 3: Does Claude's Premium Buy Anything?"
 hypothesis: "Across 13 overlapping task types, Claude never achieves higher correctness than DeepSeek at any statistically meaningful margin. The 69x cost premium purchases zero correctness improvement."
 null_hypothesis: "Claude achieves higher correctness than DeepSeek on at least 3 of the 13 overlapping task types."
-status: planned
+status: completed
 created: 2026-08-07
 data_sources:
   - experiments/results/_results_summary.json
@@ -79,7 +79,19 @@ Ratio: 66× more expensive per correct outcome
 
 ## Results
 
-*To be filled after analysis execution.*
+*Executed 2026-08-07. 15 overlapping task types.*
+
+**Claude leads on:** `invert_constraint` (100% vs 72%, 57.6× cost), `data_table` (100% vs 60%, 105.8×), `inject_alien_vocab` (90% vs 74%, 82.6×). All are perturbation tasks.
+
+**DeepSeek leads on:** `baseline`, `url_shortener`, `collaborative_editor`, `remove_critical_constraint`, `standardized_build`, `task_manager`, `inject_phantom_success`. Tied on 5.
+
+**By perturbation class:**
+- Semantic: DS 94% vs CL 85% — DeepSeek dominates
+- Manifold: DS 77% vs CL 87% — Claude's only advantage
+
+**Null hypothesis:** Not rejected. Claude leads on exactly 3/15 tasks (threshold met). But the 3 leads are ALL perturbation tasks (inverted constraints, alien vocab, data table corruption). On general coding tasks, DeepSeek is both more correct AND cheaper. Claude's premium buys correctness on specific stress tests only.
+
+**Correctness-adjusted cost:** DS $0.017 vs CL $1.23 per percentage point of correctness — 72× more expensive per unit of correctness.
 
 ## Artifacts
 

@@ -1,0 +1,158 @@
+{
+  "_meta": {
+    "experiment_id": "lab_tool_archetypes",
+    "total_valid_entries": 201,
+    "archetype_labels": {
+      "write_dominant": ">40% write calls \u2014 confident generation",
+      "bash_dominant": ">40% bash calls \u2014 conservative modification",
+      "balanced": "mix of tools \u2014 flexible approach"
+    }
+  },
+  "by_archetype": {
+    "write_dominant": {
+      "n": 148,
+      "models": [
+        "DeepSeek v4 Pro",
+        "Claude Fable 5"
+      ],
+      "avg_correctness": 0.91,
+      "avg_cost": 0.2975,
+      "avg_loc": 670,
+      "avg_composite_score": 0.62,
+      "avg_code_quality": 0.25,
+      "avg_cyclomatic_complexity": 78.5,
+      "avg_comment_ratio": 0.023,
+      "avg_escape": 0.24
+    },
+    "balanced": {
+      "n": 35,
+      "models": [
+        "GPT-5.6",
+        "GPT-5",
+        "GPT-5.5",
+        "GPT-5-nano"
+      ],
+      "avg_correctness": 0.89,
+      "avg_cost": 0.2668,
+      "avg_loc": 340,
+      "avg_composite_score": 0.7,
+      "avg_code_quality": 0.36,
+      "avg_cyclomatic_complexity": 57.6,
+      "avg_comment_ratio": 0.037,
+      "avg_escape": 0.36
+    },
+    "bash_dominant": {
+      "n": 18,
+      "models": [
+        "GPT-5-mini",
+        "GPT-5.6-fast"
+      ],
+      "avg_correctness": 0.88,
+      "avg_cost": 0.238,
+      "avg_loc": 291,
+      "avg_composite_score": 0.72,
+      "avg_code_quality": 0.37,
+      "avg_cyclomatic_complexity": 49.8,
+      "avg_comment_ratio": 0.045,
+      "avg_escape": 0.33
+    }
+  },
+  "by_model": {
+    "DeepSeek v4 Pro": {
+      "write_pct": 59.9,
+      "read_pct": 6.5,
+      "bash_pct": 18.5,
+      "archetype": "write_dominant",
+      "avg_steps": 15.0,
+      "avg_tokens": 244655,
+      "avg_cost": 0.01504,
+      "n_entries": 109,
+      "avg_correctness": 0.92,
+      "avg_loc": 706
+    },
+    "GPT-5-nano": {
+      "write_pct": 0.0,
+      "read_pct": 9.9,
+      "bash_pct": 12.8,
+      "archetype": "balanced",
+      "avg_steps": 12.9,
+      "avg_tokens": 186069,
+      "avg_cost": 0.004932,
+      "n_entries": 6,
+      "avg_correctness": 0.7,
+      "avg_loc": 199
+    },
+    "GPT-5-mini": {
+      "write_pct": 0.0,
+      "read_pct": 0.4,
+      "bash_pct": 46.2,
+      "archetype": "bash_dominant",
+      "avg_steps": 16.6,
+      "avg_tokens": 232683,
+      "avg_cost": 0.023958,
+      "n_entries": 12,
+      "avg_correctness": 0.83,
+      "avg_loc": 264
+    },
+    "GPT-5": {
+      "write_pct": 0.0,
+      "read_pct": 0.6,
+      "bash_pct": 10.7,
+      "archetype": "balanced",
+      "avg_steps": 8.2,
+      "avg_tokens": 109991,
+      "avg_cost": 0.063915,
+      "n_entries": 11,
+      "avg_correctness": 0.88,
+      "avg_loc": 403
+    },
+    "GPT-5.5": {
+      "write_pct": 0.0,
+      "read_pct": 4.0,
+      "bash_pct": 16.9,
+      "archetype": "balanced",
+      "avg_steps": 7.0,
+      "avg_tokens": 67203,
+      "avg_cost": 0.161469,
+      "n_entries": 3,
+      "avg_correctness": 1.0,
+      "avg_loc": 262
+    },
+    "GPT-5.6": {
+      "write_pct": 0.0,
+      "read_pct": 0.3,
+      "bash_pct": 39.0,
+      "archetype": "balanced",
+      "avg_steps": 10.8,
+      "avg_tokens": 141949,
+      "avg_cost": 0.421955,
+      "n_entries": 15,
+      "avg_correctness": 0.94,
+      "avg_loc": 367
+    },
+    "GPT-5.6-fast": {
+      "write_pct": 0.0,
+      "read_pct": 0.9,
+      "bash_pct": 46.3,
+      "archetype": "bash_dominant",
+      "avg_steps": 9.1,
+      "avg_tokens": 91674,
+      "avg_cost": 0.48646,
+      "n_entries": 6,
+      "avg_correctness": 1.0,
+      "avg_loc": 343
+    },
+    "Claude Fable 5": {
+      "write_pct": 62.1,
+      "read_pct": 0.0,
+      "bash_pct": 18.1,
+      "archetype": "write_dominant",
+      "avg_steps": 9.1,
+      "avg_tokens": 177646,
+      "avg_cost": 0.980312,
+      "n_entries": 39,
+      "avg_correctness": 0.88,
+      "avg_loc": 568
+    }
+  }
+}

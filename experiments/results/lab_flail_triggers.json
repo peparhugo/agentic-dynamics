@@ -1,0 +1,526 @@
+{
+  "_meta": {
+    "experiment_id": "lab_flail_triggers",
+    "total_entries": 227,
+    "flail_entries": 26,
+    "valid_entries": 201,
+    "overall_flail_rate": 11.5
+  },
+  "by_model": {
+    "DeepSeek v4 Pro": {
+      "total": 119,
+      "flail_count": 10,
+      "flail_rate": 8.4,
+      "avg_cost_when_flailing": 0.0068
+    },
+    "GPT-5-nano": {
+      "total": 7,
+      "flail_count": 1,
+      "flail_rate": 14.3,
+      "avg_cost_when_flailing": 0.0005
+    },
+    "GPT-5-mini": {
+      "total": 13,
+      "flail_count": 1,
+      "flail_rate": 7.7,
+      "avg_cost_when_flailing": 0.0021
+    },
+    "GPT-5": {
+      "total": 13,
+      "flail_count": 2,
+      "flail_rate": 15.4,
+      "avg_cost_when_flailing": 0.0216
+    },
+    "GPT-5.5": {
+      "total": 6,
+      "flail_count": 3,
+      "flail_rate": 50.0,
+      "avg_cost_when_flailing": 0.041
+    },
+    "GPT-5.6": {
+      "total": 16,
+      "flail_count": 1,
+      "flail_rate": 6.2,
+      "avg_cost_when_flailing": 0.0405
+    },
+    "GPT-5.6-fast": {
+      "total": 9,
+      "flail_count": 3,
+      "flail_rate": 33.3,
+      "avg_cost_when_flailing": 0.1343
+    },
+    "Claude Fable 5": {
+      "total": 44,
+      "flail_count": 5,
+      "flail_rate": 11.4,
+      "avg_cost_when_flailing": 0.2231
+    }
+  },
+  "by_perturbation_class": {
+    "manifold": {
+      "total": 16,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "semantic": {
+      "total": 187,
+      "flail_count": 2,
+      "flail_rate": 1.1
+    },
+    "unknown": {
+      "total": 24,
+      "flail_count": 24,
+      "flail_rate": 100.0
+    }
+  },
+  "by_task_type": {
+    "url_shortener": {
+      "total": 29,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "inject_phantom_success_s0.5": {
+      "total": 16,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "remove_critical_constraint_s0.5": {
+      "total": 15,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "remove_critical_constraint": {
+      "total": 10,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "inject_alien_vocab": {
+      "total": 10,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "inject_phantom_success": {
+      "total": 9,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "perturbed": {
+      "total": 9,
+      "flail_count": 1,
+      "flail_rate": 11.1
+    },
+    "invert_constraint": {
+      "total": 8,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "task_manager": {
+      "total": 8,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "baseline": {
+      "total": 8,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "shift_framing": {
+      "total": 6,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "inject_competing_goal": {
+      "total": 6,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "std_final": {
+      "total": 4,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "data_table": {
+      "total": 4,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    },
+    "standardized_build": {
+      "total": 4,
+      "flail_count": 0,
+      "flail_rate": 0.0
+    }
+  },
+  "flail_signature": {
+    "total_flail_entries": 26,
+    "produced_reasoning_but_no_code": 14,
+    "never_wrote_files": 19,
+    "short_sessions_under_5_steps": 18,
+    "read_only_no_writes": 2
+  },
+  "flail_details": [
+    {
+      "worktree": "exp_0msu9zd1",
+      "model": "GPT-5",
+      "cost": 0.010025,
+      "reasoning_chars": 608,
+      "step_count": 1,
+      "output_tokens": 76,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_0msu9zd1",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_1gahysrh",
+      "model": "GPT-5.6-fast",
+      "cost": 0.0809475,
+      "reasoning_chars": 57,
+      "step_count": 1,
+      "output_tokens": 18,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_1gahysrh",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_3uf12sxn",
+      "model": "GPT-5-nano",
+      "cost": 0.00053795,
+      "reasoning_chars": 1844,
+      "step_count": 1,
+      "output_tokens": 98,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_3uf12sxn",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_8ivd26c4",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.011363099,
+      "reasoning_chars": 37417,
+      "step_count": 2,
+      "output_tokens": 335,
+      "write_calls": 1,
+      "read_calls": 1,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_8ivd26c4",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_aeomzucw",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.0061684159999999995,
+      "reasoning_chars": 10550,
+      "step_count": 3,
+      "output_tokens": 377,
+      "write_calls": 1,
+      "read_calls": 1,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_aeomzucw",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_dmot6oqc",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.009530878999999999,
+      "reasoning_chars": 3261,
+      "step_count": 12,
+      "output_tokens": 5474,
+      "write_calls": 7,
+      "read_calls": 1,
+      "bash_calls": 1,
+      "code_density": 2.2369,
+      "experiment": "exp_dmot6oqc",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_f9j9q60r",
+      "model": "GPT-5.6-fast",
+      "cost": 0.1683115,
+      "reasoning_chars": 1554,
+      "step_count": 6,
+      "output_tokens": 583,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 5,
+      "code_density": 0.0,
+      "experiment": "exp_f9j9q60r",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_gbgylz6j",
+      "model": "GPT-5.5",
+      "cost": 0.032495,
+      "reasoning_chars": 57,
+      "step_count": 1,
+      "output_tokens": 18,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_gbgylz6j",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_i2wnu2xf",
+      "model": "GPT-5-mini",
+      "cost": 0.00212125,
+      "reasoning_chars": 484,
+      "step_count": 1,
+      "output_tokens": 70,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_i2wnu2xf",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_k443ygtb",
+      "model": "GPT-5.6-fast",
+      "cost": 0.153747,
+      "reasoning_chars": 2677,
+      "step_count": 5,
+      "output_tokens": 511,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 3,
+      "code_density": 0.0,
+      "experiment": "exp_k443ygtb",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_kr8u4k9e",
+      "model": "Claude Fable 5",
+      "cost": 0.1422075,
+      "reasoning_chars": 57,
+      "step_count": 1,
+      "output_tokens": 21,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_kr8u4k9e",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_mbijryn4",
+      "model": "GPT-5.5",
+      "cost": 0.03745,
+      "reasoning_chars": 175,
+      "step_count": 1,
+      "output_tokens": 143,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_mbijryn4",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_mz5y0vdz",
+      "model": "Claude Fable 5",
+      "cost": 0.21897,
+      "reasoning_chars": 3167,
+      "step_count": 1,
+      "output_tokens": 1516,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_mz5y0vdz",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_nbqsk827",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.009640818,
+      "reasoning_chars": 2516,
+      "step_count": 8,
+      "output_tokens": 6531,
+      "write_calls": 8,
+      "read_calls": 1,
+      "bash_calls": 3,
+      "code_density": 3.6945,
+      "experiment": "exp_nbqsk827",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_nelwyyzc",
+      "model": "Claude Fable 5",
+      "cost": 0.285395,
+      "reasoning_chars": 0,
+      "step_count": 0,
+      "output_tokens": 0,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_nelwyyzc",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_njr4tmez",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.002590425,
+      "reasoning_chars": 205,
+      "step_count": 1,
+      "output_tokens": 14,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_njr4tmez",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_s3c_4qka",
+      "model": "GPT-5.6",
+      "cost": 0.04048625,
+      "reasoning_chars": 57,
+      "step_count": 1,
+      "output_tokens": 18,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_s3c_4qka",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_swp_Claude_F_nb",
+      "model": "Claude Fable 5",
+      "cost": 0.248456,
+      "reasoning_chars": 50,
+      "step_count": 3,
+      "output_tokens": 1374,
+      "write_calls": 1,
+      "read_calls": 0,
+      "bash_calls": 1,
+      "code_density": 0.0,
+      "experiment": "exp_swp_Claude_F_nb",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_swp_Claude_F_np",
+      "model": "Claude Fable 5",
+      "cost": 0.2205605,
+      "reasoning_chars": 305,
+      "step_count": 3,
+      "output_tokens": 840,
+      "write_calls": 2,
+      "read_calls": 0,
+      "bash_calls": 2,
+      "code_density": 0.9631,
+      "experiment": "perturbed",
+      "perturbation_class": "semantic"
+    },
+    {
+      "worktree": "exp_swp_DeepSeek_fp",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.00285882,
+      "reasoning_chars": 599,
+      "step_count": 1,
+      "output_tokens": 114,
+      "write_calls": 0,
+      "read_calls": 1,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_swp_DeepSeek_fp",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_test_cell",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.002713559,
+      "reasoning_chars": 224,
+      "step_count": 2,
+      "output_tokens": 69,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 1,
+      "code_density": 0.0,
+      "experiment": "exp_test_cell",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_u32m5is3",
+      "model": "GPT-5",
+      "cost": 0.033154,
+      "reasoning_chars": 0,
+      "step_count": 0,
+      "output_tokens": 0,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 0,
+      "code_density": 0.0,
+      "experiment": "exp_u32m5is3",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_ubxsfht9",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.0125106,
+      "reasoning_chars": 44634,
+      "step_count": 1,
+      "output_tokens": 47,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 1,
+      "code_density": 0.0,
+      "experiment": "exp_ubxsfht9",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_uqt5f9yi",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.006699087,
+      "reasoning_chars": 17395,
+      "step_count": 2,
+      "output_tokens": 150,
+      "write_calls": 0,
+      "read_calls": 1,
+      "bash_calls": 1,
+      "code_density": 0.0,
+      "experiment": "exp_uqt5f9yi",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_xbxssi1k",
+      "model": "GPT-5.5",
+      "cost": 0.052955999999999996,
+      "reasoning_chars": 1801,
+      "step_count": 6,
+      "output_tokens": 471,
+      "write_calls": 0,
+      "read_calls": 0,
+      "bash_calls": 3,
+      "code_density": 0.0,
+      "experiment": "exp_xbxssi1k",
+      "perturbation_class": ""
+    },
+    {
+      "worktree": "exp_zmwy64er",
+      "model": "DeepSeek v4 Pro",
+      "cost": 0.0043006419999999995,
+      "reasoning_chars": 1936,
+      "step_count": 5,
+      "output_tokens": 670,
+      "write_calls": 2,
+      "read_calls": 1,
+      "bash_calls": 1,
+      "code_density": 0.9075,
+      "experiment": "exp_zmwy64er",
+      "perturbation_class": "semantic"
+    }
+  ]
+}
