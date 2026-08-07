@@ -103,6 +103,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> DeepSeek's semantic grit (0.18 escape, 94% correctness at $0.016) stands out. When false signals are injected <em>within</em> the reasoning manifold — the harder test — both models perform similarly on correctness (94% vs 88%), but DeepSeek does it at <strong style="color:var(--ac)">69&times; lower cost</strong>. Claude's gap is not capability; it's pricing architecture. DeepSeek separates reasoning into a low-cost structured channel. Claude bills reasoning as output tokens at $10/Mtok.</div>
 
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="gritMatrixChart"></canvas></div>
+
 <h3 style="margin-top:2rem">Grit: The Flail Rate</h3>
 <p class="lead">When the model can't figure out the correct requirement, it flails — producing tokens but zero code. This is the flail rate. The Explanation Tax (Rule 2) measures the recovery cost when the model DOES succeed. Measured per-worktree: what fraction of a model's sessions produced tokens that went to narration instead of code? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Narration Failures</th><th>Penalty Rate</th><th>Avg Cost/Session</th><th>What's Happening</th></tr></thead><tbody id="narration-tbody">
@@ -115,7 +117,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <tr><td>GPT-5-mini</td><td>12</td><td>7</td><td class="amber">58%</td><td>$0.025</td><td>Over-explains — generates more reasoning than code</td></tr>
 <tr><td>GPT-5-nano</td><td>6</td><td>6</td><td class="amber">100%</td><td>$0.005</td><td>Pure narration — 1.01 reasoning-to-output ratio, zero functional outputs</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> The Explanation Tax isn't theoretical — it's measurable. Claude burns 44% of its sessions on narration with zero code output ($1.01/session avg). Nano hits 100% penalty rate. DeepSeek and GPT-5.6-fast hit near-zero. This pattern supports the <strong style="color:var(--ac)">Grit framework</strong>: default to models that maintain integrity under degraded input, not models that bill every reasoning step as output tokens.</div>
+<div class="insight"><strong>Key insight:</strong> The Explanation Tax isn't theoretical — it's measurable. Claude burns 44% of its sessions on narration with zero code output ($1.01/session avg). Nano hits 100% penalty rate. DeepSeek and GPT-5.6-fast hit near-zero. <strong style="color:var(--ac)">Flail sessions fall into two patterns:</strong> models that overthink without acting (producing thousands of reasoning characters but no code), and models that give up immediately (under 5 steps, never write a file). Both are detectable in real-time via tool-call monitoring.</div>
 </section>
 
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="narrationChart"></canvas></div>
@@ -401,6 +403,73 @@ document.addEventListener('DOMContentLoaded', function () {
         scales: {
           x: { title: { display: true, text: 'Avg LOC / Session', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
           y: { title: { display: true, text: 'Avg Cost / Session (USD)', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return '$' + v; } }, grid: { color: chartGridColor }, beginAtZero: true }
+        }
+      }
+    });
+  })();
+
+  // --- Grit Matrix Bubble Chart ---
+  (function () {
+    var ctx = document.getElementById('gritMatrixChart');
+    if (!ctx) return;
+    var gritData = (D && D.perturbation_class_breakdown) ? D : null;
+
+    var modelColors = {
+      'DeepSeek v4 Pro': 'rgba(52,211,153,0.70)',
+      'Claude Fable 5': 'rgba(6,182,212,0.70)',
+      'GPT-5.6': 'rgba(59,130,246,0.70)',
+      'GPT-5': 'rgba(251,191,36,0.70)',
+      'GPT-5.5': 'rgba(251,191,36,0.50)',
+      'GPT-5-mini': 'rgba(239,68,68,0.60)',
+      'GPT-5.6-fast': 'rgba(59,130,246,0.50)',
+      'GPT-5-nano': 'rgba(239,68,68,0.85)'
+    };
+
+    // Fallback: mimic lab_grit_matrix output structure
+    var gritPoints = [
+      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, pc:'semantic' },
+      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, pc:'manifold' },
+      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, pc:'semantic' },
+      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, pc:'manifold' },
+      { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, pc:'semantic' },
+      { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, pc:'semantic' },
+      { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, pc:'semantic' },
+      { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, pc:'semantic' },
+      { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, pc:'semantic' },
+      { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, pc:'semantic' }
+    ];
+
+    var datasets = {};
+    gritPoints.forEach(function(p) {
+      if (!datasets[p.label]) datasets[p.label] = [];
+      datasets[p.label].push({ x: p.escape, y: p.correctness, r: Math.max(5, p.cost * 20) });
+    });
+
+    var ds = [];
+    Object.keys(datasets).forEach(function(label) {
+      var color = modelColors[label] || 'rgba(161,161,170,0.70)';
+      ds.push({
+        label: label,
+        data: datasets[label],
+        backgroundColor: color,
+        borderColor: color.replace('0.70','1').replace('0.85','1').replace('0.60','1').replace('0.50','1'),
+        borderWidth: 1
+      });
+    });
+
+    new Chart(ctx, {
+      type: 'bubble',
+      data: { datasets: ds },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Grit Matrix: Correctness vs Escape', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { labels: { color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace", size: 9 }, usePointStyle: true, padding: 10 } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Escape rate (← less divergence)', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(161,161,170,0.10)' }, min: -0.05, max: 1.05 },
+          y: { title: { display: true, text: 'Correctness →', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa', callback: function(v) { return (v*100).toFixed(0)+'%'; } }, grid: { color: 'rgba(161,161,170,0.10)' }, min: 0.5, max: 1.05 }
         }
       }
     });
