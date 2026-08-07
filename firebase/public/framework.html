@@ -129,8 +129,23 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Measured: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div></div>
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div></div>
-</div>
+  </div>
 </div></section>
+
+<div style="max-width:1100px;margin:0 auto;padding:0 2rem 2rem">
+<div class="callout-box" style="border-left-color:var(--cy);text-align:left;font-size:0.82rem">
+  <strong style="color:var(--cy)">Autonomous AI workforce management is call center WFM, reframed.</strong><br>
+  The equations are the same. The resource under management is the only difference.
+  <div class="constraints" style="margin-top:0.6rem">
+    <div class="cr head"><div class="nm">AI FinOps Concept</div><div class="fl">Workforce Management Equivalent</div><div class="fl">Shared Principle</div></div>
+    <div class="cr"><div class="nm">Budget Ceiling: T<sub>max</sub> = Budget / C<sub>job</sub></div><div class="fl">Erlang staffing: throughput from headcount</div><div class="fl">Capacity is budget-constrained, not infra-constrained</div></div>
+    <div class="cr"><div class="nm">Cascade Rule: Flash → Sonnet → Opus → Human</div><div class="fl">Tiered support: L1 → L2 → L3 → supervisor</div><div class="fl">Escalate only what can't be resolved at current tier</div></div>
+    <div class="cr"><div class="nm">SLA Buffer: 72-hour batch horizon</div><div class="fl">AHT + service level targets</div><div class="fl">Queue depth × avg completion time = SLA window</div></div>
+    <div class="cr"><div class="nm">First-Pass Rule: WOC = 1/(1+r)</div><div class="fl">First-call resolution rate (FCR)</div><div class="fl">First-attempt success is the primary quality metric</div></div>
+    <div class="cr"><div class="nm">Batch Discount: 50% cheaper deferred</div><div class="fl">Back-office batch processing</div><div class="fl">Cost of immediacy: cheaper to wait</div></div>
+  </div>
+</div>
+</div>
 
 <!-- SECTION: The Cost Model -->
 <section class="fsec" id="model"><div class="inr wide">

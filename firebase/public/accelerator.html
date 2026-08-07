@@ -314,13 +314,15 @@ li{margin-bottom:0.35rem}
   </ul>
 
   <h3>Real-World Autonomous Patterns</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Autonomous AI maps directly to established workforce management disciplines:</p>
-  <ul>
-  <li><strong>Call Center / Task Queue:</strong> AHT (average handle time) = steps per session. Service level = % of tasks resolved within SLA buffer (Rule 9).</li>
-  <li><strong>Back-Office Processing:</strong> Batch window = 72-hour horizon (Rule 6). Throughput cap = budget / cost-per-job (Rule 7).</li>
-  <li><strong>CI/CD Pipelines:</strong> Cascade routing = escalation chain (Rule 8). Grit determines which models auto-resolve vs escalate to human review.</li>
-  <li><strong>Agentic Workflows:</strong> Multi-step autonomous tasks require high-Grit models that can recover from intermediate failures without flailing.</li>
-  </ul>
+  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Autonomous AI maps directly to established workforce management disciplines. The equations are the same. The resource under management is what's different.</p>
+  <div class="constraints">
+    <div class="cr head"><div class="nm">AI FinOps Concept</div><div class="fl">WFM Discipline</div><div class="fl">How It Maps</div></div>
+    <div class="cr"><div class="nm">Budget Ceiling</div><div class="fl">Erlang-C staffing models</div><div class="fl">Throughput derived from budget, not headcount. T<sub>max</sub> = Budget / C<sub>job</sub> is the AI equivalent of Erlang's offered load → agents → service level.</div></div>
+    <div class="cr"><div class="nm">Cascade Rule</div><div class="fl">Tiered support (L1/L2/L3)</div><div class="fl">Flash → Sonnet → Opus → Human is the same structure as L1 agent → L2 specialist → L3 engineer → supervisor. Grit gates determine which tier auto-resolves vs escalates.</div></div>
+    <div class="cr"><div class="nm">SLA Buffer</div><div class="fl">AHT × service level targets</div><div class="fl">Queue depth × average job time + retry buffer = completion window. Same formula as call center SLAs.</div></div>
+    <div class="cr"><div class="nm">First-Pass Rule (WOC)</div><div class="fl">First-call resolution (FCR)</div><div class="fl">WOC = 1/(1+r) is the AI equivalent of FCR. Above 0.85 healthy. Below 0.70 critical. Track by task type, model, time of day — exactly how call centers track FCR.</div></div>
+    <div class="cr"><div class="nm">Batch Discount</div><div class="fl">Back-office batch processing</div><div class="fl">Deferred work is cheaper. Real-time has a premium. The 50% batch discount mirrors the economics of night-shift back-office processing vs daytime real-time queues.</div></div>
+  </div>
 
   <h3>Batch vs On-Demand Decision Table</h3>
   <div class="tbl"><table>
