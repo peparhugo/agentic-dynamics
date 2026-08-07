@@ -1,0 +1,308 @@
+{
+  "_meta": {
+    "experiment_id": "lab_basin_topology",
+    "method": "Behavioral topology inferred from output surface divergence patterns. Not latent space geometry.",
+    "reference": "Munshi et al., 'Manifold of Failure: Behavioral Attraction Basins in Language Models,' arXiv:2602.22291, 2026",
+    "basin_types": {
+      "wide_shallow": "Low escape, high correctness, low recovery cost \u2014 explores efficiently (GRPO/MoE signature)",
+      "narrow_deep": "Low escape, high correctness, high recovery cost \u2014 stays close to patterns (SFT/Dense signature)",
+      "wide_moderate": "Moderate escape, good correctness, reasonable recovery cost",
+      "deep_expensive": "Moderate escape, high recovery cost \u2014 exploration is expensive",
+      "unstable": "Cannot maintain correctness under perturbation",
+      "collapsed": "Cannot recover from perturbation (>50% flail rate)"
+    },
+    "basin_volume_formula": "(1 - escape) \u00d7 correctness / recovery_multiplier"
+  },
+  "model_profiles": {
+    "DeepSeek v4 Pro": {
+      "model_id": "deepseek/deepseek-v4-pro",
+      "total_sessions": 119,
+      "valid_sessions": 109,
+      "flail_count": 10,
+      "flail_rate": 8.4,
+      "overall_escape": 0.25,
+      "overall_correctness": 0.92,
+      "overall_cost": 0.0158,
+      "basin_profiles": {
+        "semantic": {
+          "n": 97,
+          "escape": 0.18,
+          "correctness": 0.94,
+          "cost": 0.0157,
+          "architecture_divergence": 0.193,
+          "structure_divergence": 0.08,
+          "novelty": 0.268,
+          "tokens": 22558,
+          "loc": 703,
+          "thinking_ratio": 0.085,
+          "recovery_multiplier": 1.115,
+          "basin_volume": 0.691,
+          "basin_type": "wide_shallow",
+          "basin_description": "Wide, shallow basin \u2014 explores efficiently at low cost. GRPO/MoE signature."
+        },
+        "manifold": {
+          "n": 12,
+          "escape": 0.76,
+          "correctness": 0.77,
+          "cost": 0.0167,
+          "architecture_divergence": 0.871,
+          "structure_divergence": 0.398,
+          "novelty": 0.972,
+          "tokens": 22870,
+          "loc": 729,
+          "thinking_ratio": 0.098,
+          "recovery_multiplier": 1.103,
+          "basin_volume": 0.168,
+          "basin_type": "unstable",
+          "basin_description": "Unstable basin \u2014 model cannot maintain correctness under perturbation."
+        }
+      }
+    },
+    "GPT-5-nano": {
+      "model_id": "openai/gpt-5-nano",
+      "total_sessions": 7,
+      "valid_sessions": 6,
+      "flail_count": 1,
+      "flail_rate": 14.3,
+      "overall_escape": 0.45,
+      "overall_correctness": 0.7,
+      "overall_cost": 0.0057,
+      "basin_profiles": {
+        "semantic": {
+          "n": 6,
+          "escape": 0.45,
+          "correctness": 0.7,
+          "cost": 0.0057,
+          "architecture_divergence": 0.428,
+          "structure_divergence": 0.184,
+          "novelty": 0.747,
+          "tokens": 25482,
+          "loc": 199,
+          "thinking_ratio": 0.19,
+          "recovery_multiplier": 1.643,
+          "basin_volume": 0.234,
+          "basin_type": "unstable",
+          "basin_description": "Unstable basin \u2014 model cannot maintain correctness under perturbation."
+        }
+      }
+    },
+    "GPT-5-mini": {
+      "model_id": "openai/gpt-5-mini",
+      "total_sessions": 13,
+      "valid_sessions": 12,
+      "flail_count": 1,
+      "flail_rate": 7.7,
+      "overall_escape": 0.2,
+      "overall_correctness": 0.83,
+      "overall_cost": 0.0258,
+      "basin_profiles": {
+        "semantic": {
+          "n": 12,
+          "escape": 0.2,
+          "correctness": 0.83,
+          "cost": 0.0258,
+          "architecture_divergence": 0.133,
+          "structure_divergence": 0.063,
+          "novelty": 0.412,
+          "tokens": 28288,
+          "loc": 264,
+          "thinking_ratio": 0.066,
+          "recovery_multiplier": 0.67,
+          "basin_volume": 0.991,
+          "basin_type": "unclassified",
+          "basin_description": "No clear basin pattern."
+        }
+      }
+    },
+    "GPT-5": {
+      "model_id": "openai/gpt-5",
+      "total_sessions": 13,
+      "valid_sessions": 11,
+      "flail_count": 2,
+      "flail_rate": 15.4,
+      "overall_escape": 0.51,
+      "overall_correctness": 0.88,
+      "overall_cost": 0.159,
+      "basin_profiles": {
+        "semantic": {
+          "n": 10,
+          "escape": 0.5,
+          "correctness": 0.89,
+          "cost": 0.158,
+          "architecture_divergence": 0.495,
+          "structure_divergence": 0.308,
+          "novelty": 0.685,
+          "tokens": 33055,
+          "loc": 396,
+          "thinking_ratio": 0.083,
+          "recovery_multiplier": 0.72,
+          "basin_volume": 0.618,
+          "basin_type": "wide_moderate",
+          "basin_description": "Wide, moderate basin \u2014 explores but maintains correctness. Reasonable recovery cost."
+        }
+      }
+    },
+    "GPT-5.5": {
+      "model_id": "openai/gpt-5.5",
+      "total_sessions": 6,
+      "valid_sessions": 3,
+      "flail_count": 3,
+      "flail_rate": 50.0,
+      "overall_escape": 0.64,
+      "overall_correctness": 1.0,
+      "overall_cost": 0.282,
+      "basin_profiles": {
+        "semantic": {
+          "n": 3,
+          "escape": 0.64,
+          "correctness": 1.0,
+          "cost": 0.282,
+          "architecture_divergence": 0.683,
+          "structure_divergence": 0.287,
+          "novelty": 0.929,
+          "tokens": 21005,
+          "loc": 262,
+          "thinking_ratio": 0.021,
+          "recovery_multiplier": 1.0,
+          "basin_volume": 0.36,
+          "basin_type": "collapsed",
+          "basin_description": "Basin collapsed \u2014 model cannot recover from perturbation. >50% flail rate."
+        }
+      }
+    },
+    "GPT-5.6": {
+      "model_id": "openai/gpt-5.6",
+      "total_sessions": 16,
+      "valid_sessions": 15,
+      "flail_count": 1,
+      "flail_rate": 6.2,
+      "overall_escape": 0.16,
+      "overall_correctness": 0.94,
+      "overall_cost": 0.4474,
+      "basin_profiles": {
+        "semantic": {
+          "n": 15,
+          "escape": 0.16,
+          "correctness": 0.94,
+          "cost": 0.4474,
+          "architecture_divergence": 0.116,
+          "structure_divergence": 0.074,
+          "novelty": 0.318,
+          "tokens": 9330,
+          "loc": 367,
+          "thinking_ratio": 0.064,
+          "recovery_multiplier": 0.662,
+          "basin_volume": 1.193,
+          "basin_type": "wide_shallow",
+          "basin_description": "Wide, shallow basin \u2014 explores efficiently at low cost. GRPO/MoE signature."
+        }
+      }
+    },
+    "GPT-5.6-fast": {
+      "model_id": "openai/gpt-5.6-fast",
+      "total_sessions": 9,
+      "valid_sessions": 6,
+      "flail_count": 3,
+      "flail_rate": 33.3,
+      "overall_escape": 0.58,
+      "overall_correctness": 1.0,
+      "overall_cost": 0.6625,
+      "basin_profiles": {
+        "semantic": {
+          "n": 6,
+          "escape": 0.58,
+          "correctness": 1.0,
+          "cost": 0.6625,
+          "architecture_divergence": 0.565,
+          "structure_divergence": 0.29,
+          "novelty": 0.906,
+          "tokens": 6488,
+          "loc": 343,
+          "thinking_ratio": 0.071,
+          "recovery_multiplier": 1.0,
+          "basin_volume": 0.42,
+          "basin_type": "wide_moderate",
+          "basin_description": "Wide, moderate basin \u2014 explores but maintains correctness. Reasonable recovery cost."
+        }
+      }
+    },
+    "Claude Fable 5": {
+      "model_id": "anthropic/claude-fable-5",
+      "total_sessions": 44,
+      "valid_sessions": 39,
+      "flail_count": 5,
+      "flail_rate": 11.4,
+      "overall_escape": 0.24,
+      "overall_correctness": 0.88,
+      "overall_cost": 1.0847,
+      "basin_profiles": {
+        "semantic": {
+          "n": 36,
+          "escape": 0.21,
+          "correctness": 0.88,
+          "cost": 1.0677,
+          "architecture_divergence": 0.213,
+          "structure_divergence": 0.081,
+          "novelty": 0.319,
+          "tokens": 12185,
+          "loc": 545,
+          "thinking_ratio": 0.0,
+          "recovery_multiplier": 1.312,
+          "basin_volume": 0.53,
+          "basin_type": "wide_shallow",
+          "basin_description": "Wide, shallow basin \u2014 explores efficiently at low cost. GRPO/MoE signature."
+        },
+        "manifold": {
+          "n": 3,
+          "escape": 0.62,
+          "correctness": 0.87,
+          "cost": 1.2892,
+          "architecture_divergence": 0.677,
+          "structure_divergence": 0.215,
+          "novelty": 0.954,
+          "tokens": 15464,
+          "loc": 841,
+          "thinking_ratio": 0.0,
+          "recovery_multiplier": 1.344,
+          "basin_volume": 0.246,
+          "basin_type": "wide_moderate",
+          "basin_description": "Wide, moderate basin \u2014 explores but maintains correctness. Reasonable recovery cost."
+        }
+      }
+    }
+  },
+  "basin_volume_ranking": [
+    {
+      "model": "GPT-5.6",
+      "basin_volume": 1.193
+    },
+    {
+      "model": "GPT-5-mini",
+      "basin_volume": 0.991
+    },
+    {
+      "model": "DeepSeek v4 Pro",
+      "basin_volume": 0.691
+    },
+    {
+      "model": "GPT-5",
+      "basin_volume": 0.618
+    },
+    {
+      "model": "Claude Fable 5",
+      "basin_volume": 0.53
+    },
+    {
+      "model": "GPT-5.6-fast",
+      "basin_volume": 0.42
+    },
+    {
+      "model": "GPT-5.5",
+      "basin_volume": 0.36
+    },
+    {
+      "model": "GPT-5-nano",
+      "basin_volume": 0.234
+    }
+  ]
+}
