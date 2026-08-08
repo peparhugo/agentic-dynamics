@@ -105,6 +105,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="gritMatrixChart"></canvas></div>
 
+<div class="insight" style="border-left-color:var(--cy);margin-top:1.5rem"><strong style="color:var(--cy)">Industry validation:</strong> Databricks recently published their playbook for reducing AI coding costs at scale (Wendell et al., Aug 2026). Their four cost levers — shifting to efficient models, dynamic routing, progressive budgeting, and reducing token overhead — map directly to rules in this framework. They call the core concept the <strong>"Efficiency Frontier"</strong>: the set of models with the best price point for a given level of intelligence. We call it Grit. They surveyed companies. We stress-tested models with 10 perturbation operators across 227 experiments.</div>
+
 <h3 style="margin-top:2rem">Grit: The Flail Rate</h3>
 <p class="lead">When the model can't figure out the correct requirement, it flails — producing tokens but zero code. This is the flail rate. The Explanation Tax (Rule 2) measures the recovery cost when the model DOES succeed. Measured per-worktree: what fraction of a model's sessions produced tokens that went to narration instead of code? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Narration Failures</th><th>Penalty Rate</th><th>Avg Cost/Session</th><th>What's Happening</th></tr></thead><tbody id="narration-tbody">
