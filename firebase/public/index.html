@@ -50,8 +50,15 @@ section.alt{background:var(--bg2)}
 <section class="hero"><div class="inr">
   <div class="pulse"><span class="dot"></span> v0.4 · Open Framework · 248 Experiments · 3 Architectures, 8 Variants · Validated by Databricks</div>
   <h1>The AI FinOps Framework</h1>
-  <h2 style="font-size:1.15rem;font-weight:600;color:var(--ac);margin-bottom:1rem;letter-spacing:0">On August 7, 2026, Databricks published the same conclusions. We just have the experiments to prove it.</h2>
-  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Every session rebuilds context. Every retry rewrites cache. Every model narrates reasoning you've already paid for. We stress-tested 8 models across 227 experiments with 10 calibrated perturbation operators. A $40B company surveyed five companies and reached the same four conclusions — but we published <strong style="color:var(--ac)">calibrated measurements, not directional surveys.</strong> The most resilient model costs $0.016 per session. The least costs $1.08. Same output. 69× different cost. This framework governs that gap.</p>
+  <h2 style="font-size:1.15rem;font-weight:600;color:var(--ac);margin-bottom:1rem;letter-spacing:0">On August 7, 2026, a $40B company published the same conclusions. We just have the experiments to prove it.</h2>
+  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. They arrived at four cost levers: shift to efficient models, smart routing, progressive budgeting, and reducing token overhead. We stress-tested 8 models across 227 experiments with 10 calibrated perturbation operators — arriving at the same four conclusions through <strong style="color:var(--ac)">controlled experiments, not industry surveys.</strong> The numbers are not estimates. They're measured.</p>
+  <div class="constraints">
+    <div class="cr head"><div class="nm">Databricks Lever</div><div class="fl">Their Estimate</div><div class="fl">Our Measurement</div></div>
+    <div class="cr"><div class="nm">Shift to efficient models</div><div class="fl">~50% savings (survey)</div><div class="fl"><strong style="color:var(--ac)">69× gap:</strong> $0.016 vs $1.08/session, 227 experiments</div></div>
+    <div class="cr"><div class="nm">Smart routing</div><div class="fl">~30% savings (internal)</div><div class="fl"><strong style="color:var(--ac)">95% correctness</strong> at $0.12/session, 17 task types</div></div>
+    <div class="cr"><div class="nm">Progressive budgeting</div><div class="fl">~10% savings</div><div class="fl"><strong style="color:var(--ac)">WOC = 0.90:</strong> measured first-pass success rate</div></div>
+    <div class="cr"><div class="nm">Reduce token overhead</div><div class="fl">~10% + 50% token cut</div><div class="fl"><strong style="color:var(--ac)">Cache write tax:</strong> $15/Mtok vs $0.14/Mtok, 100× gap</div></div>
+  </div>
   <div class="stats">
     <div class="stat"><div class="v">10</div><div class="l">Decision Rules</div><div class="s">5 measured · 5 framework extensions</div></div>
     <div class="stat"><div class="v"><span data-stat="costgap">69×</span></div><div class="l">Measured Cost Gap</div><div class="s">Per-session average across 203 game reports</div></div>
