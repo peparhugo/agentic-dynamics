@@ -692,45 +692,6 @@ def ast_profile_worktree(worktree_path: str) -> dict:
                         "docstring_pct": 0, "test_rate": 0})
     
     return metrics
-    """Extract structural fingerprint from generated code: modules, routes, classes.
-    
-    Two worktrees with similar fingerprints were given the same instructions.
-    """
-    import ast
-    p = Path(workdir)
-    if not p.exists():
-        return {}
-    skip_dirs = {"__pycache__", ".git", "venv", ".venv", "site-packages",
-                 "node_modules", ".mypy_cache", ".pytest_cache", "Lib", "lib"}
-    py_files = []
-    for f in sorted(p.rglob("*.py")):
-        if skip_dirs & set(f.parts):
-            continue
-        try:
-            code = f.read_text(errors="replace")
-            if len(code) > 20:
-                py_files.append((f.relative_to(p), code))
-        except Exception:
-            pass
-        if len(py_files) > 30:
-            break
-    if not py_files:
-        return {}
-
-    modules = sorted(set(str(f).replace("/", ".").replace(".py", "") for f, _ in py_files))
-    routes = set()
-    classes = set()
-    for _, code in py_files:
-        for m in re.findall(r'@.*\.route\(["\']([^"\']+)', code):
-            routes.add(m)
-        try:
-            for node in ast.walk(ast.parse(code)):
-                if isinstance(node, ast.ClassDef) and not node.name.startswith("Test"):
-                    classes.add(node.name)
-        except Exception:
-            pass
-
-    return {"modules": sorted(modules), "routes": sorted(routes), "classes": sorted(classes)}
 
 
 def code_fingerprint(workdir: str) -> dict:

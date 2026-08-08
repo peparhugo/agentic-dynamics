@@ -201,7 +201,7 @@ def _architecture_divergence(baseline: str, perturbed: str) -> float:
         "postgresql", "mysql", "mongodb", "redis", "sqlite",
         "docker", "kubernetes", "aws", "gcp", "azure",
         "graphql", "rest", "grpc", "websocket",
-        "reddis", "kafka", "rabbitmq", "celery",
+        "redis", "kafka", "rabbitmq", "celery",
         "typescript", "javascript", "python", "rust", "go", "java",
         "crdt", "ot", "raft", "paxos",
     ]
