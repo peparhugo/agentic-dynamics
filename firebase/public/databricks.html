@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Databricks Playbook vs AI FinOps Framework</title>
+<meta name="description" content="On August 7, 2026, Databricks published their AI cost playbook. We arrived at the same four conclusions through 227 controlled experiments. This page maps every claim to calibrated measurements.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
+.subtitle{font-size:0.95rem;color:var(--t2);margin-bottom:1rem;line-height:1.6}
+.ext-link{display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:0.75rem;font-weight:600;color:var(--ac);text-decoration:none;margin-bottom:2rem;transition:border-color .2s}
+.ext-link:hover{border-color:rgba(99,102,241,0.3);text-decoration:none}
+.section-hd{border-left:3px solid var(--ac);padding-left:1rem;margin:2.5rem 0 1rem}
+.section-hd.amber{border-left-color:var(--am)}
+.claim-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.claim-box{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:left}
+.claim-box h4{font-size:0.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 0.5rem}
+.claim-box .tag{display:inline-block;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
+.claim-box .tag.their{background:rgba(6,182,212,0.08);color:var(--cy);border:1px solid rgba(6,182,212,0.15)}
+.claim-box .tag.ours{background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.15)}
+.claim-box p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
+.mono{font-family:'JetBrains Mono',monospace}
+.gap-box{background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);border-left:3px solid var(--am);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:0.8rem 0;font-size:0.8rem;color:var(--t2);line-height:1.6}
+.gap-box strong{color:var(--am)}
+.miss-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1rem 0}
+.miss-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
+.miss-card h4{font-size:0.85rem;color:var(--t);margin:0 0 0.3rem}
+.miss-card p{font-size:0.76rem;color:var(--t2);line-height:1.5;margin:0}
+.bottom{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1.2rem 1.5rem;margin:2rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7}
+.bottom strong{color:var(--t)}
+@media(max-width:768px){article{padding:3rem 1.5rem 2rem}.claim-grid{grid-template-columns:1fr}}
+</style>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+
+<article>
+
+<h1>The Databricks Playbook vs. The AI FinOps Framework</h1>
+<p class="subtitle">On August 7, 2026, a $40B company published their playbook for reducing AI coding costs. We arrived at the same four conclusions — independently — through 227 controlled stress tests. This page maps every claim in their playbook to our calibrated measurements, and identifies where surveys stop and experiments begin.</p>
+
+<a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original: Databricks — Managing AI Coding Costs at Scale (Aug 7, 2026) →</a>
+
+<!-- Section 1: Efficiency Frontier = Grit -->
+<div class="section-hd"><h2>The Efficiency Frontier = Grit</h2></div>
+
+<p>Databricks defines the <strong style="color:var(--ac)">Efficiency Frontier</strong> as "the set of models that have the best price point for a given level of intelligence." We define <strong style="color:var(--ac)">Grit</strong> as Ground-Truth Integrity — how well a model maintains correctness when given degraded, contradictory, or incomplete instructions.</p>
+
+<p>Same concept, independently discovered. Different methodology. Different depth.</p>
+
+<div class="claim-grid">
+<div class="claim-box">
+  <div class="tag their">Databricks</div>
+  <h4>Their evidence</h4>
+  <p>Surveys of Stripe, Coinbase, Uber, and Ramp. Directional estimates. "Public benchmarks do a poor job of indicating real-world performance on coding tasks."</p>
+</div>
+<div class="claim-box">
+  <div class="tag ours">This framework</div>
+  <h4>Our evidence</h4>
+  <p><strong>227 controlled experiments</strong> across 8 models and 3 architectures. 10 calibrated perturbation operators. Every measurement provenance-tagged [M] measured, [C] computed, [H] heuristic, [X] external.</p>
+</div>
+</div>
+
+<!-- Lever 1 -->
+<div class="section-hd"><h2>Lever 1: Shift to Efficient Models</h2></div>
+<div class="claim-grid">
+<div class="claim-box">
+  <div class="tag their">Databricks</div>
+  <h4>Their finding</h4>
+  <p>"Rapidly adopting newer, more efficient models delivers the largest cost wins." ~50% savings. "The efficiency frontier is advancing far faster than the intelligence frontier."</p>
+</div>
+<div class="claim-box">
+  <div class="tag ours">This framework</div>
+  <h4>Our measurement</h4>
+  <p><strong class="mono" style="color:#34d399">$0.016/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$1.08/session (Claude).</strong> <strong style="color:var(--ac)">69× cost gap.</strong> On 12 of 15 overlapping tasks, the cheaper model is MORE correct. Same generated token volume (~11K tokens/session). The gap is pricing architecture, not capability.</p>
+</div>
+</div>
+<div class="gap-box"><strong>Where they stop short:</strong> They compare price/intelligence. We measure integrity under stress. A model can be cheap AND smart on a benchmark — and flail 100% when given inverted constraints. Grit captures this. The Efficiency Frontier doesn't.</div>
+
+<!-- Lever 2 -->
+<div class="section-hd"><h2>Lever 2: Dynamic Request and Task Routing</h2></div>
+<div class="claim-grid">
+<div class="claim-box">
+  <div class="tag their">Databricks</div>
+  <h4>Their finding</h4>
+  <p>"Internal results suggest that our AI Gateway Smart Router is able to consistently reduce average task cost by more than 30%." Request-level, task-level, and escalation routing.</p>
+</div>
+<div class="claim-box">
+  <div class="tag ours">This framework</div>
+  <h4>Our measurement</h4>
+  <p><strong>Grit-routed strategy: 95% correctness at $0.12/session.</strong> Per-task routing decision table from 17 task types. 14/17 → DeepSeek default. 3/17 → Claude escalation. DeepSeek-only beats Claude-only on BOTH cost AND correctness.</p>
+</div>
+</div>
+<div class="gap-box"><strong>Where they stop short:</strong> Routing based on task complexity taxonomy. No Grit-gated routing. A model might be cheap on simple tasks but flail when instructions are degraded. Their router doesn't measure flail rate under perturbation. Ours does.</div>
+
+<!-- Lever 3 -->
+<div class="section-hd"><h2>Lever 3: Visibility, Tripwires, and Progressive Budgets</h2></div>
+<div class="claim-grid">
+<div class="claim-box">
+  <div class="tag their">Databricks</div>
+  <h4>Their finding</h4>
+  <p>"Instead of a hard user spending cap, most companies are adopting a more nuanced and progressive approach." Visibility, spend gates, downshifting, suspension. ~10% savings.</p>
+</div>
+<div class="claim-box">
+  <div class="tag ours">This framework</div>
+  <h4>Our measurement</h4>
+  <p><strong>WOC = 0.90</strong> — measured first-pass success rate across 227 experiments. Rule 7: Budget Ceiling (T<sub>max</sub> = Budget / C<sub>job</sub>). Rule 8: Cascade Rule (escalate only on Grit failure). Their "downshifting" = our cascade. Their "spend gates" = our WOC alerts.</p>
+</div>
+</div>
+<div class="gap-box"><strong>Where they stop short:</strong> Reactive budgeting — they detect overspend after it happens. We forecast costs before they compound. The Snowball Rule (N²) and EPM Horizon model 3-year cost trajectories. Their playbook optimizes this month's bill. Our framework models next year's.</div>
+
+<!-- Lever 4 -->
+<div class="section-hd"><h2>Lever 4: Reducing Token Overhead</h2></div>
+<div class="claim-grid">
+<div class="claim-box">
+  <div class="tag their">Databricks</div>
+  <h4>Their finding</h4>
+  <p>"Simple tuning of our harness and caching settings led to an almost 50% reduction in the number of generated tokens." Compaction, less chatty harnesses, cache tuning. ~10% + 50% token reduction.</p>
+</div>
+<div class="claim-box">
+  <div class="tag ours">This framework</div>
+  <h4>Our measurement</h4>
+  <p><strong>Explanation Tax:</strong> 3% (DeepSeek) vs 50% (Claude). <strong>Cache Tax:</strong> $15/Mtok writes vs $0.14/Mtok reads — <strong>100× pricing asymmetry.</strong> Claude writes 22.5K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
+</div>
+</div>
+<div class="gap-box"><strong>Where they stop short:</strong> They found token overhead exists. We measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation. That's actionable at the model selection level, not just the harness tuning level. If you're tuning a harness to make Claude less chatty, you're fighting its training distribution. If you route to DeepSeek, the problem disappears.</div>
+
+<!-- What They Miss -->
+<div class="section-hd amber"><h2>What the Databricks Playbook Misses Entirely</h2></div>
+
+<div class="miss-grid">
+<div class="miss-card">
+  <h4>No perturbation testing</h4>
+  <p>Can't measure Grit. A model that performs well on a benchmark may flail 100% when instructions are degraded. 10 calibrated stress tests reveal the difference.</p>
+</div>
+<div class="miss-card">
+  <h4>No model behavior under degraded input</h4>
+  <p>Manifold vs semantic perturbation classification. Some models handle logical corruption (94% correctness). Others collapse under linguistic distortion (escape=0.76).</p>
+</div>
+<div class="miss-card">
+  <h4>No compounding or forecasting</h4>
+  <p>Snowball Rule (N²): codebase growth compounds quadratically. EPM Horizon: energy prices inflate compute costs. Survival Horizon: how many sessions before bankruptcy?</p>
+</div>
+<div class="miss-card">
+  <h4>No attractor basin topology</h4>
+  <p>The shape of a model's failure space. Wide-shallow basins explore efficiently. Narrow-deep basins recover expensively. Collapsed basins flail. Measured, not theorized.</p>
+</div>
+<div class="miss-card">
+  <h4>No autonomous workforce model</h4>
+  <p>Their playbook is for individual developers. No batch economics (50% discount, 72-hour horizon). No escalation cascades. No SLA buffers. No workforce capacity modeling.</p>
+</div>
+<div class="miss-card">
+  <h4>No reproducibility</h4>
+  <p>Directional survey estimates from 5 companies. Our measurements are provenance-tagged [M]/[C]/[H]/[X], open-source under MIT, and inspectable down to individual session transcripts.</p>
+</div>
+</div>
+
+<!-- Bottom Line -->
+<div class="bottom">
+  <strong>The bottom line:</strong> Databricks and this framework independently arrived at the same four conclusions within days of each other. They surveyed five companies. We ran 227 controlled experiments. A playbook tells you what to do. A framework tells you why — with calibrated thresholds, provenance-tagged data, and an open-source instrument that anyone can run against their own workloads.<br><br>
+  <a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" style="color:var(--ac)" target="_blank">Read the original Databricks playbook →</a><br>
+  <a href="evidence.html" style="color:var(--ac)">See the full experimental evidence →</a>
+</div>
+
+</article>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.4</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
+<a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
+</footer>
+
+</body>
+</html>
