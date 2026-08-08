@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://ai-finops-rulebook.web.app"><img src="https://img.shields.io/badge/website-ai--finops--rulebook.web.app-%236366F1" alt="Website"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
   <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen" alt="Contributions"></a>
 </p>
 
@@ -295,4 +295,4 @@ If you use this framework in your research or decision-making:
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement. The framework does not judge whether narration is "wasteful" or "valuable" — it measures the cost.
+Apache 2.0 — see [LICENSE](LICENSE). The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement. The framework does not judge whether narration is "wasteful" or "valuable" — it measures the cost.
