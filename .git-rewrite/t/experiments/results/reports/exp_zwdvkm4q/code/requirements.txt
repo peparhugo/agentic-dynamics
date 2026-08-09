@@ -1,6 +1,0 @@
-flask>=3.0
-flask-limiter>=3.5
-pyjwt>=2.8
-werkzeug>=3.0
-pydantic>=2.5
-pytest>=8.0

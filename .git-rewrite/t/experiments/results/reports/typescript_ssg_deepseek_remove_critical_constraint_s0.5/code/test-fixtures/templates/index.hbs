@@ -1,9 +1,0 @@
-<h1>{{site.title}}</h1>
-<ul>
-  {{#each pages}}
-  <li>
-    <a href="/{{slug}}">{{frontmatter.title}}</a>
-    {{#if frontmatter.date}}<span>{{frontmatter.date}}</span>{{/if}}
-  </li>
-  {{/each}}
-</ul>

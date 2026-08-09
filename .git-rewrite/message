@@ -1,8 +1,0 @@
-v0.4 fixes: model-cards matching bug, rule names, narration penalty, version, footers
-
-- Fixed model-cards.html: sort fb by ID length to prevent gpt-5 false-matching gpt-5.6
-- Renamed autonomous rules: Batch Discount, Budget Ceiling, Cascade Rule, SLA Buffer, First-Pass Rule
-- Fixed DeepSeek V3 -> v4 Pro in autonomous-workloads.html
-- Fixed index.html narration penalty: 3%/44% -> 8%/11%
-- Updated v0.3 -> v0.4 across all pages
-- Updated footer hardcoded fallbacks: 203 -> 224 reports, 59.45 -> 64.98 cost
