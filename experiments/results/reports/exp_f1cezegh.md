@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:32:15
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.769
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.53) with moderate resource use ($0.0167, ~3949J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.48) with moderate resource use ($0.0167, ~3949J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -21,13 +21,13 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 2.8% |
-| Quality/$ [C] | 60 |
-| Quality/J [C] | 0.0003 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 1178 |
 | Cyclomatic complexity [C] | 73.0 |
 | Code quality [H] | 0.085 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.528** |
+| **Composite [H]** | **0.485** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3949 J** |
 | Solution density [C] | 0.052165 LOC/tok |
 | Correctness/$ [C] | 17 |
-| Quality/J [C] | 0.000134 |
+| Quality/J [C] | 0.000123 |
 
 ---
 

@@ -402,11 +402,11 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
                     # pytest output: X passed, Y failed
                     m = re.search(r'(\d+)\s+passed', str(output))
                     if m:
-                        result.tests_passed = int(m.group(1))
-                    mf = re.search(r'(\d+)\s+failed', str(output))
-                    if mf:
-                        result.tests_total += int(mf.group(1))
-                    result.tests_total += result.tests_passed
+                        p = int(m.group(1))
+                        mf = re.search(r'(\d+)\s+failed', str(output))
+                        f = int(mf.group(1)) if mf else 0
+                        result.tests_passed = p
+                        result.tests_total = p + f
                 result.test_output = str(output)[-500:]
 
     result.tool_calls = tool_calls

@@ -1,8 +1,8 @@
-/* Generated 2026-08-08 17:08:44 UTC by build_data.py */
+/* Generated 2026-08-09 18:47:48 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.FRAMEWORK_DATA = {
   "_meta": {
-    "generated_at": "2026-08-08T17:08:44.898023+00:00",
+    "generated_at": "2026-08-09T18:47:48.296875+00:00",
     "source_inventory": "/root/reasoning-instrument/experiments/inventory.json",
     "source_summary": "/root/reasoning-instrument/experiments/results/_results_summary.json",
     "source_db": "/root/.local/share/opencode/opencode.db",
@@ -23,23 +23,30 @@ window.FRAMEWORK_DATA = {
       "label": "DeepSeek v4 Pro",
       "provider": "deepseek",
       "sessions": 133,
+      "n_reports": 119,
+      "n_valid": 109,
+      "n_narrated": 10,
       "reports": 119,
       "reports_valid": 109,
       "reports_narrated": 10,
       "avg_cost": 0.0158,
       "total_cost": 2.0427,
-      "pass_rate": "92% [H]",
+      "cost_ci95": [
+        0.0147,
+        0.017
+      ],
+      "pass_rate": "84% (976/1163)",
       "strategy_cons": 78,
       "strategy_expl": 29,
       "strategy_waste": 2,
       "strategy_efficient": 0,
       "avg_loc": 706,
       "avg_thinking_ratio": 0.087,
-      "avg_escape": 0.25,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.0,
-      "avg_arch_divergence": 0.267,
-      "avg_struct_divergence": 0.115,
-      "avg_composite_score": 0.617,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
+      "avg_composite_score": 0.615,
       "avg_code_quality": 0.246,
       "avg_comment_ratio": 0.02,
       "avg_energy_j": 4091.8,
@@ -63,23 +70,30 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5-nano",
       "provider": "openai",
       "sessions": 7,
+      "n_reports": 7,
+      "n_valid": 6,
+      "n_narrated": 1,
       "reports": 7,
       "reports_valid": 6,
       "reports_narrated": 1,
       "avg_cost": 0.0057,
       "total_cost": 0.0345,
-      "pass_rate": "70% [H]",
+      "cost_ci95": [
+        0.0044,
+        0.0072
+      ],
+      "pass_rate": "89% (8/9)",
       "strategy_cons": 4,
       "strategy_expl": 2,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "avg_loc": 199,
       "avg_thinking_ratio": 0.19,
-      "avg_escape": 0.45,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.3,
-      "avg_arch_divergence": 0.428,
-      "avg_struct_divergence": 0.184,
-      "avg_composite_score": 0.681,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
+      "avg_composite_score": 0.688,
       "avg_code_quality": 0.487,
       "avg_comment_ratio": 0.072,
       "avg_energy_j": 4689.4,
@@ -103,23 +117,30 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5-mini",
       "provider": "openai",
       "sessions": 16,
+      "n_reports": 13,
+      "n_valid": 12,
+      "n_narrated": 1,
       "reports": 13,
       "reports_valid": 12,
       "reports_narrated": 1,
       "avg_cost": 0.0258,
       "total_cost": 0.4077,
-      "pass_rate": "82% [H]",
+      "cost_ci95": [
+        0.0206,
+        0.0333
+      ],
+      "pass_rate": "94% (30/32)",
       "strategy_cons": 11,
       "strategy_expl": 1,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "avg_loc": 264,
       "avg_thinking_ratio": 0.066,
-      "avg_escape": 0.2,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.18,
-      "avg_arch_divergence": 0.133,
-      "avg_struct_divergence": 0.063,
-      "avg_composite_score": 0.698,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
+      "avg_composite_score": 0.694,
       "avg_code_quality": 0.407,
       "avg_comment_ratio": 0.063,
       "avg_energy_j": 3838.6,
@@ -143,23 +164,30 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5",
       "provider": "openai",
       "sessions": 13,
+      "n_reports": 13,
+      "n_valid": 11,
+      "n_narrated": 2,
       "reports": 13,
       "reports_valid": 11,
       "reports_narrated": 2,
       "avg_cost": 0.159,
       "total_cost": 1.7921,
-      "pass_rate": "88% [H]",
+      "cost_ci95": [
+        0.1303,
+        0.1846
+      ],
+      "pass_rate": "70% (16/23)",
       "strategy_cons": 3,
       "strategy_expl": 8,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "avg_loc": 403,
       "avg_thinking_ratio": 0.083,
-      "avg_escape": 0.51,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.03,
-      "avg_arch_divergence": 0.51,
-      "avg_struct_divergence": 0.323,
-      "avg_composite_score": 0.642,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
+      "avg_composite_score": 0.639,
       "avg_code_quality": 0.273,
       "avg_comment_ratio": 0.063,
       "avg_energy_j": 4816.7,
@@ -183,12 +211,16 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5.5",
       "provider": "openai",
       "sessions": 6,
+      "n_reports": 6,
+      "n_valid": 3,
+      "n_narrated": 3,
       "reports": 6,
       "reports_valid": 3,
       "reports_narrated": 3,
       "avg_cost": 0.282,
       "total_cost": 0.9688,
-      "pass_rate": "100% [H]",
+      "cost_ci95": null,
+      "pass_rate": "100% (27/27)",
       "strategy_cons": 1,
       "strategy_expl": 2,
       "strategy_waste": 0,
@@ -223,22 +255,29 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5.6",
       "provider": "openai",
       "sessions": 18,
+      "n_reports": 16,
+      "n_valid": 15,
+      "n_narrated": 1,
       "reports": 16,
       "reports_valid": 15,
       "reports_narrated": 1,
       "avg_cost": 0.4474,
       "total_cost": 7.817,
-      "pass_rate": "94% [H]",
+      "cost_ci95": [
+        0.3763,
+        0.5175
+      ],
+      "pass_rate": "100% (166/166)",
       "strategy_cons": 14,
       "strategy_expl": 1,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "avg_loc": 367,
       "avg_thinking_ratio": 0.064,
-      "avg_escape": 0.16,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.02,
-      "avg_arch_divergence": 0.116,
-      "avg_struct_divergence": 0.074,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
       "avg_composite_score": 0.726,
       "avg_code_quality": 0.37,
       "avg_comment_ratio": 0.009,
@@ -263,12 +302,19 @@ window.FRAMEWORK_DATA = {
       "label": "GPT-5.6-fast",
       "provider": "openai",
       "sessions": 9,
+      "n_reports": 9,
+      "n_valid": 6,
+      "n_narrated": 3,
       "reports": 9,
       "reports_valid": 6,
       "reports_narrated": 3,
       "avg_cost": 0.6625,
       "total_cost": 4.3781,
-      "pass_rate": "100% [H]",
+      "cost_ci95": [
+        0.6082,
+        0.7169
+      ],
+      "pass_rate": "100% (73/73)",
       "strategy_cons": 2,
       "strategy_expl": 4,
       "strategy_waste": 0,
@@ -303,23 +349,30 @@ window.FRAMEWORK_DATA = {
       "label": "Claude Fable 5",
       "provider": "anthropic",
       "sessions": 47,
+      "n_reports": 44,
+      "n_valid": 39,
+      "n_narrated": 5,
       "reports": 44,
       "reports_valid": 39,
       "reports_narrated": 5,
       "avg_cost": 1.0847,
       "total_cost": 47.5417,
-      "pass_rate": "88% [H]",
+      "cost_ci95": [
+        0.9058,
+        1.2585
+      ],
+      "pass_rate": "99% (276/279)",
       "strategy_cons": 27,
       "strategy_expl": 12,
       "strategy_waste": 0,
       "strategy_efficient": 0,
       "avg_loc": 568,
       "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.24,
+      "avg_escape": NaN,
       "avg_narration_penalty": 0.08,
-      "avg_arch_divergence": 0.249,
-      "avg_struct_divergence": 0.091,
-      "avg_composite_score": 0.637,
+      "avg_arch_divergence": NaN,
+      "avg_struct_divergence": NaN,
+      "avg_composite_score": 0.636,
       "avg_code_quality": 0.278,
       "avg_comment_ratio": 0.033,
       "avg_energy_j": 2857.6,
@@ -406,22 +459,22 @@ window.FRAMEWORK_DATA = {
       {
         "n": "DeepSeek v4 Pro",
         "c": 0.0158,
-        "p": 0.92
+        "p": 0.84
       },
       {
         "n": "GPT-5-nano",
         "c": 0.0057,
-        "p": 0.7
+        "p": 0.89
       },
       {
         "n": "GPT-5-mini",
         "c": 0.0258,
-        "p": 0.82
+        "p": 0.94
       },
       {
         "n": "GPT-5",
         "c": 0.159,
-        "p": 0.88
+        "p": 0.7
       },
       {
         "n": "GPT-5.5",
@@ -431,7 +484,7 @@ window.FRAMEWORK_DATA = {
       {
         "n": "GPT-5.6",
         "c": 0.4474,
-        "p": 0.94
+        "p": 1.0
       },
       {
         "n": "GPT-5.6-fast",
@@ -441,7 +494,7 @@ window.FRAMEWORK_DATA = {
       {
         "n": "Claude Fable 5",
         "c": 1.0847,
-        "p": 0.88
+        "p": 0.99
       }
     ],
     "escalation_tiers": [
@@ -484,9 +537,9 @@ window.FRAMEWORK_DATA = {
   "derived": {
     "cost_gap": "69\u00d7",
     "cost_gap_computation": "$1.0847 / $0.0158 = 68.7\u00d7",
-    "overall_pass_rate": "90.3% [H]",
-    "total_tests_passed": 0,
-    "total_tests_run": 0,
+    "overall_pass_rate": "88.7% (1572/1772)",
+    "total_tests_passed": 1572,
+    "total_tests_run": 1772,
     "total_cost_all_models": 64.9827,
     "total_cost_deepseek": 2.0427,
     "total_cost_claude": 47.5417,
@@ -499,68 +552,163 @@ window.FRAMEWORK_DATA = {
       "perturbation_class": "semantic",
       "models": {
         "DeepSeek v4 Pro": {
-          "count": 12,
+          "n": 12,
           "avg_cost": 0.0167,
+          "cost_ci95": [
+            0.0136,
+            0.0197
+          ],
           "avg_escape": 0.7595,
+          "escape_ci95": [
+            0.7302,
+            0.8062
+          ],
           "avg_correctness": 0.7667,
+          "correctness_ci95": [
+            0.6167,
+            0.8667
+          ],
           "avg_thinking_ratio": 0.0981,
-          "avg_energy_j": 4355.4208
+          "avg_energy_j": 4355.4208,
+          "low_n": false
         },
         "GPT-5.6": {
-          "count": 6,
+          "n": 6,
           "avg_cost": 0.3424,
+          "cost_ci95": [
+            0.2968,
+            0.393
+          ],
           "avg_escape": 0.4097,
-          "avg_correctness": 0.95,
+          "escape_ci95": [
+            0.2944,
+            0.5432
+          ],
+          "avg_correctness": 1.0,
+          "correctness_ci95": [
+            1.0,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0603,
-          "avg_energy_j": 1628.735
+          "avg_energy_j": 1628.735,
+          "low_n": false
         },
         "Claude Fable 5": {
-          "count": 3,
+          "n": 3,
           "avg_cost": 1.2892,
+          "cost_ci95": [
+            0.9862,
+            1.8753
+          ],
           "avg_escape": 0.6214,
+          "escape_ci95": [
+            0.5937,
+            0.6432
+          ],
           "avg_correctness": 0.8667,
+          "correctness_ci95": [
+            0.8,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 3553.32
+          "avg_energy_j": 3553.32,
+          "low_n": true
         },
         "GPT-5-nano": {
-          "count": 5,
+          "n": 5,
           "avg_cost": 0.0061,
+          "cost_ci95": [
+            0.0046,
+            0.0079
+          ],
           "avg_escape": 0.5408,
-          "avg_correctness": 0.7,
+          "escape_ci95": [
+            0.419,
+            0.6641
+          ],
+          "avg_correctness": 0.77,
+          "correctness_ci95": [
+            0.7,
+            0.88
+          ],
           "avg_thinking_ratio": 0.1984,
-          "avg_energy_j": 5010.78
+          "avg_energy_j": 5010.78,
+          "low_n": false
         },
         "GPT-5.6-fast": {
-          "count": 6,
+          "n": 6,
           "avg_cost": 0.6625,
+          "cost_ci95": [
+            0.6082,
+            0.7169
+          ],
           "avg_escape": 0.5846,
+          "escape_ci95": [
+            0.4395,
+            0.707
+          ],
           "avg_correctness": 1.0,
+          "correctness_ci95": [
+            1.0,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0706,
-          "avg_energy_j": 1598.6667
+          "avg_energy_j": 1598.6667,
+          "low_n": false
         },
         "GPT-5-mini": {
-          "count": 6,
+          "n": 6,
           "avg_cost": 0.0207,
+          "cost_ci95": [
+            0.0169,
+            0.0253
+          ],
           "avg_escape": 0.3912,
-          "avg_correctness": 0.85,
+          "escape_ci95": [
+            0.3152,
+            0.4779
+          ],
+          "avg_correctness": 0.95,
+          "correctness_ci95": [
+            0.85,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0651,
-          "avg_energy_j": 3131.795
+          "avg_energy_j": 3131.795,
+          "low_n": false
         },
         "GPT-5": {
-          "count": 1,
+          "n": 1,
           "avg_cost": 0.1685,
+          "cost_ci95": null,
           "avg_escape": 0.7032,
-          "avg_correctness": 0.8,
+          "escape_ci95": null,
+          "avg_correctness": 1.0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0.0833,
-          "avg_energy_j": 4568.33
+          "avg_energy_j": 4568.33,
+          "low_n": true
         },
         "GPT-5.5": {
-          "count": 3,
+          "n": 3,
           "avg_cost": 0.282,
+          "cost_ci95": [
+            0.2251,
+            0.3159
+          ],
           "avg_escape": 0.6383,
+          "escape_ci95": [
+            0.468,
+            0.7321
+          ],
           "avg_correctness": 1.0,
+          "correctness_ci95": [
+            1.0,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0205,
-          "avg_energy_j": 2553.56
+          "avg_energy_j": 2553.56,
+          "low_n": true
         }
       }
     },
@@ -568,68 +716,115 @@ window.FRAMEWORK_DATA = {
       "perturbation_class": "unknown",
       "models": {
         "GPT-5": {
-          "count": 2,
+          "n": 2,
           "avg_cost": 0.0216,
+          "cost_ci95": [
+            0.01,
+            0.0332
+          ],
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "GPT-5.6-fast": {
-          "count": 3,
+          "n": 3,
           "avg_cost": 0.1343,
+          "cost_ci95": [
+            0.0809,
+            0.1683
+          ],
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "GPT-5-nano": {
-          "count": 1,
+          "n": 1,
           "avg_cost": 0.0005,
+          "cost_ci95": null,
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "DeepSeek v4 Pro": {
-          "count": 9,
+          "n": 9,
           "avg_cost": 0.0071,
+          "cost_ci95": [
+            0.0049,
+            0.0095
+          ],
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": false
         },
         "GPT-5.5": {
-          "count": 3,
+          "n": 3,
           "avg_cost": 0.041,
+          "cost_ci95": [
+            0.0325,
+            0.053
+          ],
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "GPT-5-mini": {
-          "count": 1,
+          "n": 1,
           "avg_cost": 0.0021,
+          "cost_ci95": null,
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "Claude Fable 5": {
-          "count": 4,
+          "n": 4,
           "avg_cost": 0.2238,
+          "cost_ci95": [
+            0.1688,
+            0.2688
+          ],
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         },
         "GPT-5.6": {
-          "count": 1,
+          "n": 1,
           "avg_cost": 0.0405,
+          "cost_ci95": null,
           "avg_escape": 0,
+          "escape_ci95": null,
           "avg_correctness": 0,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0,
-          "avg_energy_j": 0
+          "avg_energy_j": 0,
+          "low_n": true
         }
       }
     },
@@ -637,52 +832,121 @@ window.FRAMEWORK_DATA = {
       "perturbation_class": "semantic",
       "models": {
         "DeepSeek v4 Pro": {
-          "count": 68,
+          "n": 68,
           "avg_cost": 0.015,
-          "avg_escape": 0.0,
-          "avg_correctness": 0.9368,
+          "cost_ci95": [
+            0.0134,
+            0.0165
+          ],
+          "avg_escape": NaN,
+          "escape_ci95": [
+            NaN,
+            NaN
+          ],
+          "avg_correctness": 0.8988,
+          "correctness_ci95": [
+            0.8486,
+            0.9405
+          ],
           "avg_thinking_ratio": 0.0786,
-          "avg_energy_j": 3843.4185
+          "avg_energy_j": 3843.4185,
+          "low_n": false
         },
         "Claude Fable 5": {
-          "count": 24,
+          "n": 24,
           "avg_cost": 0.9288,
-          "avg_escape": 0.0,
-          "avg_correctness": 0.8542,
+          "cost_ci95": [
+            0.6883,
+            1.1929
+          ],
+          "avg_escape": NaN,
+          "escape_ci95": [
+            NaN,
+            NaN
+          ],
+          "avg_correctness": 0.924,
+          "correctness_ci95": [
+            0.8344,
+            0.9833
+          ],
           "avg_thinking_ratio": 0.0,
-          "avg_energy_j": 2335.8121
+          "avg_energy_j": 2335.8121,
+          "low_n": false
         },
         "GPT-5-nano": {
-          "count": 1,
+          "n": 1,
           "avg_cost": 0.0037,
-          "avg_escape": 0.0,
+          "cost_ci95": null,
+          "avg_escape": NaN,
+          "escape_ci95": null,
           "avg_correctness": 0.7,
+          "correctness_ci95": null,
           "avg_thinking_ratio": 0.1482,
-          "avg_energy_j": 3082.71
+          "avg_energy_j": 3082.71,
+          "low_n": true
         },
         "GPT-5.6": {
-          "count": 9,
+          "n": 9,
           "avg_cost": 0.5174,
-          "avg_escape": 0.0,
-          "avg_correctness": 0.9333,
+          "cost_ci95": [
+            0.4159,
+            0.6236
+          ],
+          "avg_escape": NaN,
+          "escape_ci95": [
+            NaN,
+            NaN
+          ],
+          "avg_correctness": 1.0,
+          "correctness_ci95": [
+            1.0,
+            1.0
+          ],
           "avg_thinking_ratio": 0.0669,
-          "avg_energy_j": 2725.0289
+          "avg_energy_j": 2725.0289,
+          "low_n": false
         },
         "GPT-5-mini": {
-          "count": 6,
+          "n": 6,
           "avg_cost": 0.0309,
-          "avg_escape": 0.0,
-          "avg_correctness": 0.8,
+          "cost_ci95": [
+            0.0219,
+            0.0435
+          ],
+          "avg_escape": NaN,
+          "escape_ci95": [
+            NaN,
+            NaN
+          ],
+          "avg_correctness": 0.8667,
+          "correctness_ci95": [
+            0.7667,
+            0.9583
+          ],
           "avg_thinking_ratio": 0.066,
-          "avg_energy_j": 4545.4
+          "avg_energy_j": 4545.4,
+          "low_n": false
         },
         "GPT-5": {
-          "count": 3,
+          "n": 3,
           "avg_cost": 0.1966,
-          "avg_escape": 0.0,
+          "cost_ci95": [
+            0.1773,
+            0.2201
+          ],
+          "avg_escape": NaN,
+          "escape_ci95": [
+            NaN,
+            NaN
+          ],
           "avg_correctness": 0.8333,
+          "correctness_ci95": [
+            0.7,
+            1.0
+          ],
           "avg_thinking_ratio": 0.1019,
-          "avg_energy_j": 6593.97
+          "avg_energy_j": 6593.97,
+          "low_n": true
         }
       }
     }
@@ -690,80 +954,175 @@ window.FRAMEWORK_DATA = {
   "perturbation_class_breakdown": {
     "semantic": {
       "DeepSeek v4 Pro": {
-        "count": 97,
+        "n": 97,
+        "low_n": false,
         "avg_cost": 0.0157,
-        "avg_escape": 0.18,
-        "avg_correctness": 0.94,
+        "cost_ci95": [
+          0.0144,
+          0.017
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          NaN,
+          NaN
+        ],
+        "avg_correctness": 0.91,
+        "correctness_ci95": [
+          0.8791,
+          0.9426
+        ],
         "avg_thinking_ratio": 0.085,
         "avg_loc": 703,
         "avg_tokens": 22558,
         "avg_narration_penalty": 0.0
       },
       "GPT-5.6": {
-        "count": 15,
+        "n": 15,
+        "low_n": false,
         "avg_cost": 0.4474,
-        "avg_escape": 0.16,
-        "avg_correctness": 0.94,
+        "cost_ci95": [
+          0.3763,
+          0.5175
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          NaN,
+          NaN
+        ],
+        "avg_correctness": 1.0,
+        "correctness_ci95": [
+          1.0,
+          1.0
+        ],
         "avg_thinking_ratio": 0.064,
         "avg_loc": 367,
         "avg_tokens": 9330,
         "avg_narration_penalty": 0.02
       },
       "Claude Fable 5": {
-        "count": 36,
+        "n": 36,
+        "low_n": false,
         "avg_cost": 1.0677,
-        "avg_escape": 0.21,
-        "avg_correctness": 0.88,
+        "cost_ci95": [
+          0.8761,
+          1.2718
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          NaN,
+          NaN
+        ],
+        "avg_correctness": 0.95,
+        "correctness_ci95": [
+          0.9132,
+          0.9826
+        ],
         "avg_thinking_ratio": 0.0,
         "avg_loc": 545,
         "avg_tokens": 12185,
         "avg_narration_penalty": 0.09
       },
       "GPT-5-nano": {
-        "count": 6,
+        "n": 6,
+        "low_n": false,
         "avg_cost": 0.0057,
-        "avg_escape": 0.45,
-        "avg_correctness": 0.7,
+        "cost_ci95": [
+          0.0044,
+          0.0072
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          0.4464,
+          NaN
+        ],
+        "avg_correctness": 0.76,
+        "correctness_ci95": [
+          0.7,
+          0.8583
+        ],
         "avg_thinking_ratio": 0.19,
         "avg_loc": 199,
         "avg_tokens": 25482,
         "avg_narration_penalty": 0.3
       },
       "GPT-5.6-fast": {
-        "count": 6,
+        "n": 6,
+        "low_n": false,
         "avg_cost": 0.6625,
+        "cost_ci95": [
+          0.6082,
+          0.7169
+        ],
         "avg_escape": 0.58,
+        "escape_ci95": [
+          0.4395,
+          0.707
+        ],
         "avg_correctness": 1.0,
+        "correctness_ci95": [
+          1.0,
+          1.0
+        ],
         "avg_thinking_ratio": 0.071,
         "avg_loc": 343,
         "avg_tokens": 6488,
         "avg_narration_penalty": 0.0
       },
       "GPT-5-mini": {
-        "count": 12,
+        "n": 12,
+        "low_n": false,
         "avg_cost": 0.0258,
-        "avg_escape": 0.2,
-        "avg_correctness": 0.83,
+        "cost_ci95": [
+          0.0206,
+          0.0333
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          NaN,
+          NaN
+        ],
+        "avg_correctness": 0.91,
+        "correctness_ci95": [
+          0.8333,
+          0.975
+        ],
         "avg_thinking_ratio": 0.066,
         "avg_loc": 264,
         "avg_tokens": 28288,
         "avg_narration_penalty": 0.18
       },
       "GPT-5": {
-        "count": 10,
+        "n": 10,
+        "low_n": false,
         "avg_cost": 0.158,
-        "avg_escape": 0.5,
-        "avg_correctness": 0.89,
+        "cost_ci95": [
+          0.1241,
+          0.1865
+        ],
+        "avg_escape": NaN,
+        "escape_ci95": [
+          NaN,
+          NaN
+        ],
+        "avg_correctness": 0.95,
+        "correctness_ci95": [
+          0.87,
+          1.0
+        ],
         "avg_thinking_ratio": 0.083,
         "avg_loc": 396,
         "avg_tokens": 33055,
         "avg_narration_penalty": 0.03
       },
       "GPT-5.5": {
-        "count": 3,
+        "n": 3,
+        "low_n": true,
         "avg_cost": 0.282,
+        "cost_ci95": null,
         "avg_escape": 0.64,
+        "escape_ci95": null,
         "avg_correctness": 1.0,
+        "correctness_ci95": null,
         "avg_thinking_ratio": 0.021,
         "avg_loc": 262,
         "avg_tokens": 21005,
@@ -772,30 +1131,51 @@ window.FRAMEWORK_DATA = {
     },
     "manifold": {
       "DeepSeek v4 Pro": {
-        "count": 12,
+        "n": 12,
+        "low_n": false,
         "avg_cost": 0.0167,
+        "cost_ci95": [
+          0.0136,
+          0.0197
+        ],
         "avg_escape": 0.76,
+        "escape_ci95": [
+          0.7302,
+          0.8062
+        ],
         "avg_correctness": 0.77,
+        "correctness_ci95": [
+          0.6167,
+          0.8667
+        ],
         "avg_thinking_ratio": 0.098,
         "avg_loc": 729,
         "avg_tokens": 22870,
         "avg_narration_penalty": 0.0
       },
       "Claude Fable 5": {
-        "count": 3,
+        "n": 3,
+        "low_n": true,
         "avg_cost": 1.2892,
+        "cost_ci95": null,
         "avg_escape": 0.62,
+        "escape_ci95": null,
         "avg_correctness": 0.87,
+        "correctness_ci95": null,
         "avg_thinking_ratio": 0.0,
         "avg_loc": 841,
         "avg_tokens": 15464,
         "avg_narration_penalty": 0.0
       },
       "GPT-5": {
-        "count": 1,
+        "n": 1,
+        "low_n": true,
         "avg_cost": 0.1685,
+        "cost_ci95": null,
         "avg_escape": 0.7,
-        "avg_correctness": 0.8,
+        "escape_ci95": null,
+        "avg_correctness": 1.0,
+        "correctness_ci95": null,
         "avg_thinking_ratio": 0.083,
         "avg_loc": 473,
         "avg_tokens": 28417,

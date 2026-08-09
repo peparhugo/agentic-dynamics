@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [remove_critical_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:19:36
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:31:11
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 615 |
 | Cyclomatic complexity [C] | 93.0 |
 | Code quality [H] | 0.163 |
 | Novelty vs baseline [H] | 0.968 |
-| **Composite [H]** | **0.613** |
+| **Composite [H]** | **0.571** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3040 J** |
 | Solution density [C] | 0.031836 LOC/tok |
 | Correctness/$ [C] | 17 |
-| Quality/J [C] | 0.000202 |
+| Quality/J [C] | 0.000188 |
 
 ---
 

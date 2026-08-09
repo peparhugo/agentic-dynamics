@@ -93,10 +93,9 @@ li{margin-bottom:0.35rem}
 }
 </style>
 <script src="data.js"></script>
-<script src="app.js"></script>
 </head>
 <body>
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link" style="color:var(--ac)">Apply</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 <main>
 
 <section class="sec alt" style="text-align:center">
@@ -104,11 +103,16 @@ li{margin-bottom:0.35rem}
   <h1>The FinOps engine that turns AI investment into enterprise acceleration.</h1>
   <p class="sub" style="max-width:640px;margin-left:auto;margin-right:auto;margin-top:0.5rem">From individual worker to autonomous workforce — precision measurement at every level of AI maturity. Grounded in 248 experiment sessions, not slideware.</p>
   <div class="stats" style="margin-top:1.5rem">
-    <div class="stat"><div class="v">248</div><div class="l">Experiment Sessions</div><div class="s">Across 8 models, 3 architectures</div></div>
+    <div class="stat"><div class="v">249</div><div class="l">Experiment Sessions</div><div class="s">Across 8 models, 3 architectures</div></div>
     <div class="stat"><div class="v">10</div><div class="l">Decision Rules</div><div class="s">5 measured · 5 framework extensions</div></div>
     <div class="stat"><div class="v"><span data-stat="costgap">69×</span></div><div class="l">Measured Cost Gap</div><div class="s">Identical output. Different cost.</div></div>
     <div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
   </div>
+</section>
+
+<section class="sec">
+  <h2>What is the Accelerator?</h2>
+  <p class="sub">The Accelerator is an implementation guide and measurement harness — open-source Python tooling that instruments your AI sessions to measure cost-per-outcome across models. It is not a SaaS product. It runs locally against your sessions.</p>
 </section>
 
 <section class="sec">
@@ -154,7 +158,7 @@ li{margin-bottom:0.35rem}
   <p class="sub">Not a cost tracker. A business acceleration engine — powered by precision AI FinOps, backed by 248 experiments.</p>
   <div class="trust-grid" style="margin-top:1.5rem">
     <div class="trust-card"><h4>Precision FinOps Measurement</h4><p>Not cost-per-prompt. Cost-per-outcome. Baseline WOC ratio, escalation rate, model utilization profile — captured by a calibrated instrument that knows the difference between cheap and efficient. Every token, every route, every recovery event tracked and inspectable.</p></div>
-    <div class="trust-card"><h4>Systemic Efficiency</h4><p>Not cheaper models. Smarter state. Persistent organizational memory means AI retains architecture, standards, and business context across sessions. Every task builds on the last — context compounds instead of being billed repeatedly.</p></div>
+    <div class="trust-card"><h4>Systemic Efficiency</h4><p>Not cheaper models. Smarter measurement. Track cost-per-outcome by task type, model, and team. Every session's cost is inspectable. Every routing decision is backed by calibrated pass-rate data.</p></div>
     <div class="trust-card"><h4>The AI Maturity Ladder</h4><p>Engage at any level. Individual worker tool selection. Team budgeting and cost controls. Governance and compliance. 3-year projections and CapEx-to-OpEx modeling. Full augmented and autonomous workforce transformation. Start where you are. Scale to where you need to be.</p></div>
   </div>
 </section>
@@ -166,15 +170,15 @@ li{margin-bottom:0.35rem}
     <thead><tr><th>If you're worried about...</th><th>Our measurement is...</th><th>What you can do</th></tr></thead>
     <tbody>
       <tr><td><strong>Paying for models to re-learn your architecture every session</strong></td><td>Cache Strategy + Snowball Rule</td><td>Switch to cache-read at $0.14/Mtok. Measure N² curve. If cache hit rate under 50%, don't write.</td></tr>
-      <tr><td><strong>Models that break when instructions are incomplete or contradictory</strong></td><td>Grit — Flail Rate + Recovery Cost</td><td>Don't deploy models with >15% flail rate. High-Grit models (DeepSeek 8%) self-correct. Low-Grit models (nano 100%) cannot be trusted unsupervised.</td></tr>
+      <tr><td><strong>Models that break when instructions are incomplete or contradictory</strong></td><td>Grit — Flail Rate + Recovery Cost</td><td>Don't deploy models with >15% flail rate. High-Grit models (DeepSeek 8%) self-correct. Low-Grit models (nano 14%) cannot be trusted unsupervised.</td></tr>
       <tr><td><strong>Budget overruns from models that narrate every decision</strong></td><td>Explanation Tax ε</td><td>Route routine work to models with <10% ε (DeepSeek: 3%). Reserve high-ε models (Claude: 50%) for auditable work only.</td></tr>
       <tr><td><strong>Autonomous systems silently failing at scale</strong></td><td>First-Pass Rule — WOC Ratio</td><td>Track WOC by model, task type, and time of day. Escalate if below 0.85. Design cascades so low-Grit models never enter unsupervised pipelines.</td></tr>
       <tr><td><strong>3-year cost projections that keep surprising finance</strong></td><td>EPM Horizon + Snowball Rule</td><td>Model the N² curve before committing. Hedge energy price exposure. A 2× EPM spike during a 5-year horizon doubles cumulative costs.</td></tr>
-      <tr><td><strong>Every AI session starting from scratch</strong></td><td>Cache Strategy + Persistent State</td><td>Organizational memory as durable infrastructure. Architecture decisions, standards, business context become assets that compound.</td></tr>
+      <tr><td><strong>Every AI session billed at premium rates by default</strong></td><td>Cache Strategy + Model Selection</td><td>Route routine work to $0.016/session models. Only 11.5% of sessions need escalation. Cache-read at $0.14/Mtok instead of cache-write at $3.75/Mtok.</td></tr>
     </tbody>
   </table></div>
   <div class="highlight-box" style="margin-top:1rem">
-    <strong>The bottom line</strong> — the organizations that win won't be the ones with the largest AI budgets or newest models. They'll be the ones that build systems where every session costs less than the last — not because the model's cheaper, but because it already knows the context.
+    <strong>The bottom line</strong> — the organizations that win won't have the largest AI budgets. They'll have the most disciplined measurement — routing work to the cheapest capable model for every task, tracking cost-per-outcome, and never paying for more reasoning than the job requires.
   </div>
 </section>
 
@@ -200,12 +204,12 @@ li{margin-bottom:0.35rem}
       <div class="timeline-label">Week 5+</div>
       <div class="timeline-body">
         <h4>Monitor &amp; Compound</h4>
-        <p>Dashboard cost-per-outcome, throughput, and budget runway in real time. Persistent organizational memory — architecture decisions, engineering standards, business context become durable assets. Every session gets faster, cheaper, and more informed than the last.</p>
+        <p>Dashboard cost-per-outcome, throughput, and budget runway in real time. Every session feeds back into your calibrated cost model — routing gets smarter, projections get tighter, and the framework adapts to your actual workloads.</p>
       </div>
     </div>
   </div>
   <div class="roi-band">
-    <div class="roi-metric"><div class="big green">50–70%</div><div class="lbl">Cost Reduction</div><div class="desc">Target, backed by 248 experiments across 3 architectures and 8 model variants</div></div>
+    <div class="roi-metric"><div class="big green">Target: 50–70%</div><div class="lbl">Cost Reduction</div><div class="desc">Target, backed by 248 experiments across 3 architectures and 8 model variants</div></div>
     <div class="roi-metric"><div class="big">69×</div><div class="lbl">Measured Cost Gap</div><div class="desc">Identical task. Cheapest model vs. most expensive. Evidence on every page.</div></div>
     <div class="roi-metric"><div class="big">4–6</div><div class="lbl">Weeks to Baseline</div><div class="desc">From first session capture to calibrated cost model for your specific workloads</div></div>
     <div class="roi-metric"><div class="big">0.90</div><div class="lbl">First-Pass Success Rate (WOC)</div><div class="desc">WOC = 1/(1+r) with r=0.115. 90% of sessions succeed first-pass.</div></div>
@@ -265,39 +269,8 @@ li{margin-bottom:0.35rem}
   <h2>Enterprise Projections</h2>
   <p class="sub" style="font-size:0.88rem;margin-bottom:1rem">What Grit-routed model selection means in practice. Projections derived from our 227-session experiment corpus, applied to realistic enterprise team sizes.</p>
 
-  <div class="tbl"><table>
-    <thead><tr><th>Scenario</th><th>Current (Claude default)</th><th>Optimized (Grit-routed)</th><th>Annual Savings</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><strong>Augmented Workforce</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">50 engineers, 20 sessions/day, 20 days/month</span></td>
-        <td class="mono amber">$21,600/month<br><span style="font-size:0.68rem;color:var(--t3)">$1.08/session × 20K sessions</span></td>
-        <td class="mono green">$640/month<br><span style="font-size:0.68rem;color:var(--t3)">$0.016/session × 20K sessions, 10% escalation to Claude for mission-critical</span></td>
-        <td class="mono green"><strong>$251,520/year</strong></td>
-      </tr>
-      <tr>
-        <td><strong>Cache Strategy</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">22.5K cache writes/session at $15/Mtok</span></td>
-        <td class="mono amber">$3,375/month<br><span style="font-size:0.68rem;color:var(--t3)">Full cache-write on all sessions</span></td>
-        <td class="mono green">$42/month<br><span style="font-size:0.68rem;color:var(--t3)">Cache-read only at $0.14/Mtok. Write only when hit rate >80%</span></td>
-        <td class="mono green"><strong>$39,996/year</strong></td>
-      </tr>
-      <tr>
-        <td><strong>Autonomous Batch</strong><br><span class="mono" style="font-size:0.7rem;color:var(--t3)">5,000 jobs/day, unsupervised, 21 working days/month</span></td>
-        <td class="mono amber">$113,400/month<br><span style="font-size:0.68rem;color:var(--t3)">$1.08/job × 105K jobs/month</span></td>
-        <td class="mono green">$3,360/month<br><span style="font-size:0.68rem;color:var(--t3)">$0.016/job × 105K × (1 + 0.115 × 28.3) with Grit-gated escalation</span></td>
-        <td class="mono green"><strong>$1,320,480/year</strong></td>
-      </tr>
-    </tbody>
-  </table></div>
-
-  <div class="cards" style="margin-top:1.2rem">
-    <div class="card">
-      <div class="ctitle" style="color:var(--ac)">How these numbers are derived</div>
-      <div class="cdesc">Every projection uses actual measured values from our 227-session experiment corpus. Augmented workforce: $0.016/session (DeepSeek measured avg) vs $1.08/session (Claude measured avg). Cache: 22,500 write tokens/session at $15/Mtok (measured from 47 Claude sessions). Autonomous: $0.016/job base cost, 11.5% retry rate (measured), 28.3× escalation multiplier (DS to GPT-5.6). All projections documented with provenance [M] measured / [C] computed.</div>
-    </div>
-    <div class="card">
-      <div class="ctitle" style="color:var(--am)">This is the floor, not the ceiling</div>
-      <div class="cdesc">These projections assume you switch models but don't change your processes. The full accelerator adds cascade routing, cache layering, batch scheduling, and persistent organizational memory — each compounding on the last. The 50-70% cost reduction target is conservative against what measured data shows is possible.</div>
-    </div>
+  <div class="highlight-box" style="margin-top:1rem">
+    <strong>Project your costs:</strong> Use the <a href="framework.html#calculator" style="color:var(--ac)">interactive calculator on the Framework page</a> to project costs for your team size and workload.
   </div>
 </section>
 
@@ -308,8 +281,8 @@ li{margin-bottom:0.35rem}
   <h3>How Grit Controls Autonomous Workloads</h3>
   <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">The Grit framework directly governs unsupervised AI operations. In autonomous mode, you can't review every output. You need models that self-correct when given bad context — because bad context is inevitable in real systems (stale documentation, conflicting requirements, incomplete specifications).</p>
   <ul style="margin-top:0.5rem">
-  <li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (100% flail) and GPT-5-mini (58% flail) cannot be trusted unsupervised.</li>
-  <li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $15/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
+  <li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (14% flail) and GPT-5-mini (8% flail) cannot be trusted unsupervised.</li>
+  <li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $3.75/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
   <li><strong>First-Pass Success (Rule 5) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
   </ul>
 
@@ -338,23 +311,22 @@ li{margin-bottom:0.35rem}
   </table></div>
 
   <h3>WOC Ratio — Rule 5 (First-Pass)</h3>
-  <p style="color:var(--t2);font-size:0.9rem">The Work Overhead Cost ratio tells you whether autonomy is actually saving money.</p>
-  <span class="formula">WOC = (cost<sub>validation</sub> + cost<sub>retries</sub> + cost<sub>escalations</sub>) / cost<sub>primary</sub></span>
+  <p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. Higher WOC = better (more first-pass success). Measured: WOC = 0.90 from r=0.115.</span>
   <div class="row" style="margin-top:1rem">
   <div class="card">
   <h4>Healthy</h4>
-  <p style="font-size:1.5rem;color:var(--cy);font-family:'JetBrains Mono',monospace">WOC &lt; 0.70</p>
-  <p>Overhead is manageable. Scaling is safe.</p>
+  <p style="font-size:1.5rem;color:var(--cy);font-family:'JetBrains Mono',monospace">WOC &gt; 0.85</p>
+  <p>Good first-pass rate. Scaling is safe.</p>
   </div>
   <div class="card">
   <h4>Investigate</h4>
-  <p style="font-size:1.5rem;color:var(--am);font-family:'JetBrains Mono',monospace">WOC &lt; 0.85</p>
-  <p>Retry or escalation rate rising. Tune thresholds.</p>
+  <p style="font-size:1.5rem;color:var(--am);font-family:'JetBrains Mono',monospace">WOC 0.70–0.85</p>
+  <p>Retry rate rising. Tune thresholds.</p>
   </div>
   <div class="card">
   <h4>Critical</h4>
-  <p style="font-size:1.5rem;color:#EF4444;font-family:'JetBrains Mono',monospace">WOC &ge; 0.85</p>
-  <p>Overhead dominates. Pause autonomy until root cause found.</p>
+  <p style="font-size:1.5rem;color:#EF4444;font-family:'JetBrains Mono',monospace">WOC &lt; 0.70</p>
+  <p>Too many retries. Pause autonomy until root cause found.</p>
   </div>
   </div>
   <div class="highlight-box" style="margin-top:1rem">
@@ -366,7 +338,7 @@ li{margin-bottom:0.35rem}
   <div style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;margin:0 auto">
   <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek v4 Pro</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
   <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--am);color:var(--bg)">T2</span><strong style="color:var(--t)">Sonnet / GPT-4o</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;8–12 cost</span></div>
-  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (measured)</span></div>
+  <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (price ratio)</span></div>
   <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
   </div>
   <div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> 88.5% of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees &lt; 5% of all tasks.</p></div>
@@ -384,110 +356,7 @@ li{margin-bottom:0.35rem}
   </table></div>
 </section>
 
-<section class="sec alt">
-  <h2>Executive Dashboard</h2>
-  <p class="sub">Four dimensions that tell you if AI is paying for itself.</p>
 
-  <h3>Four Dimensions of AI Spend</h3>
-  <div class="dashboard-grid">
-  <div class="dim">
-  <h4 style="font-size:0.9rem;color:var(--ac);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Financial</h4>
-  <div class="metric-label">Cost-to-Serve</div>
-  <div class="metric-value">$0.11 / completed task</div>
-  <div class="metric-label" style="margin-top:0.5rem">Batch vs On-Demand Split</div>
-  <div class="metric-value">68% batch · 32% on-demand</div>
-  <div class="metric-label" style="margin-top:0.5rem">Cost by Escalation Tier</div>
-  <div class="metric-value">T1: 47% · T2: 31% · T3: 22%</div>
-  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Track cost per completed task by type, not cost per prompt. A task that takes 3 retries costs 3&times; the prompt price.</p>
-  </div>
-  <div class="dim">
-  <h4 style="font-size:0.9rem;color:var(--cy);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Operational</h4>
-  <div class="metric-label">Throughput</div>
-  <div class="metric-value">274 jobs / day (T1)</div>
-  <div class="metric-label" style="margin-top:0.5rem">Queue Depth</div>
-  <div class="metric-value">12 jobs (avg)</div>
-  <div class="metric-label" style="margin-top:0.5rem">Avg Completion Time</div>
-  <div class="metric-value">4.3 min (on-demand) · 8.2 hr (batch)</div>
-  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Throughput bottlenecks hide in retry loops. Monitor jobs/hour and queue depth by workstream.</p>
-  </div>
-  <div class="dim">
-  <h4 style="font-size:0.9rem;color:var(--am);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Quality</h4>
-  <div class="metric-label">WOC Ratio</div>
-  <div class="metric-value" style="color:var(--am)">0.82</div>
-  <div class="metric-label" style="margin-top:0.5rem">Validation Pass Rate</div>
-  <div class="metric-value">78.6% first-pass</div>
-  <div class="metric-label" style="margin-top:0.5rem">Escalation Rate</div>
-  <div class="metric-value">21.4% to T2/T3</div>
-  <div class="metric-label" style="margin-top:0.5rem">Human Review Rate</div>
-  <div class="metric-value">&lt; 5%</div>
-  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Quality = first-pass success rate. Every retry burns budget and erodes trust. Target WOC &lt; 0.70.</p>
-  </div>
-  <div class="dim">
-  <h4 style="font-size:0.9rem;color:var(--am);margin:0 0 0.75rem;font-family:'JetBrains Mono',monospace">Strategic</h4>
-  <div class="metric-label">Runway</div>
-  <div class="metric-value">18 months at current burn</div>
-  <div class="metric-label" style="margin-top:0.5rem">Elasticity</div>
-  <div class="metric-value">10&times; throughput within 5 min</div>
-  <div class="metric-label" style="margin-top:0.5rem">Projected vs Actual</div>
-  <div class="metric-value">-12% under projection</div>
-  <p style="color:var(--t2);font-size:0.8rem;margin-top:0.75rem">Scalability is not just cost — it's whether your system handles 10&times; volume without linear cost growth.</p>
-  </div>
-  </div>
-
-  <h3>What to Measure</h3>
-  <div class="row">
-  <div class="card">
-  <h4>Per Task</h4>
-  <ul>
-  <li>Cost per completed outcome</li>
-  <li>First-pass success rate</li>
-  <li>Model tier used</li>
-  <li>Retry count (if any)</li>
-  <li>Time to completion</li>
-  </ul>
-  </div>
-  <div class="card">
-  <h4>Per Workstream</h4>
-  <ul>
-  <li>Daily / weekly / monthly spend</li>
-  <li>Throughput (jobs / day)</li>
-  <li>WOC ratio trend</li>
-  <li>Escalation rate trend</li>
-  <li>Budget vs actual variance</li>
-  </ul>
-  </div>
-  <div class="card">
-  <h4>Per Budget Period</h4>
-  <ul>
-  <li>Total spend vs budget</li>
-  <li>Cost-by-model breakdown</li>
-  <li>Cost-by-workstream breakdown</li>
-  <li>Batch savings (cost avoided)</li>
-  <li>Projected runway remaining</li>
-  </ul>
-  </div>
-  </div>
-
-  <h3>Projected ROI</h3>
-  <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Conservative estimates based on the 248-experiment dataset and industry benchmarks.</p>
-  <div class="row">
-  <div class="card">
-  <p style="font-size:2rem;color:var(--cy);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">50–70%</p>
-  <p>Cost reduction through cascade routing, caching, and batch scheduling</p>
-  </div>
-  <div class="card">
-  <p style="font-size:2rem;color:var(--ac);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">10&times;</p>
-  <p>Throughput increase with autonomous workstreams and 72-hour batch windows</p>
-  </div>
-  <div class="card">
-  <p style="font-size:2rem;color:var(--cy);font-family:'JetBrains Mono',monospace;margin-bottom:0.25rem">Zero</p>
-  <p>Headcount growth needed to scale workload — autonomy absorbs volume growth</p>
-  </div>
-  </div>
-  <div class="highlight-box" style="margin-top:1.25rem">
-  <p><strong>Bottom line:</strong> A team spending $5,000/month on AI inference can expect to reduce that to $1,500–$2,500/month while increasing output 10&times;. The framework pays for itself in the first month.</p>
-  </div>
-</section>
 
 <section class="sec">
   <h2>The Measurement Harness</h2>
@@ -498,7 +367,7 @@ li{margin-bottom:0.35rem}
     <div class="trust-card"><h4>Session capture &amp; fine-tuning</h4><p>Run the harness against your organization's own AI tool sessions. Calibrate cost models to your specific workloads, models, and task types. Every session captured becomes training data for a continuously improving cost intelligence engine.</p></div>
   </div>
   <div class="stats" style="margin-top:1.5rem">
-    <div class="stat"><div class="v">248</div><div class="l">Experiment Sessions</div><div class="s">Every session recorded and inspectable</div></div>
+    <div class="stat"><div class="v">249</div><div class="l">Experiment Sessions</div><div class="s">Every session recorded and inspectable</div></div>
     <div class="stat"><div class="v">3</div><div class="l">Architectures</div><div class="s">GPT dense · DeepSeek MoE · Claude dense</div></div>
     <div class="stat"><div class="v">8</div><div class="l">Model Variants</div><div class="s">Cross-architecture AST-level comparison</div></div>
     <div class="stat"><div class="v">34</div><div class="l">Configs</div><div class="s">Open source · Apache 2.0 license</div></div>
@@ -515,7 +384,6 @@ li{margin-bottom:0.35rem}
         <li>Model routing decisions made on price, not pass-rate data</li>
         <li>Token budgets cut without understanding reasoning impact</li>
         <li>3-year projections built in spreadsheets, not simulations</li>
-        <li>Every AI session rebuilds context from scratch</li>
         <li>Governance is reactive — budget overruns found after the quarter closes</li>
         <li>Vendor benchmarks used as cost estimates for your specific workloads</li>
       </ul>
@@ -527,7 +395,7 @@ li{margin-bottom:0.35rem}
         <li>Calibrated pass-rate data drives every routing decision</li>
         <li>Budget enforcement that preserves reasoning depth</li>
         <li>N² growth modeling with scenario simulation built in</li>
-        <li>Persistent organizational memory compounds intelligence</li>
+        <li>Calibrated pass-rate data drives every routing decision</li>
         <li>Real-time dashboards flag WOC outliers before they become overruns</li>
         <li>Your own sessions calibrate your own cost models</li>
       </ul>
@@ -539,8 +407,8 @@ li{margin-bottom:0.35rem}
 </section>
 
 <section class="sec">
-  <h2>Intelligence compounds. Are you measuring it?</h2>
-  <p class="sub">Traditional engineering optimizes for CPU, memory, storage, and network. AI introduces a new resource that deserves the same discipline: reasoning. Every time a model rebuilds architecture and business context from scratch, it consumes budget without creating new value. The Accelerator ensures context persists — so every session starts where the last one left off.</p>
+  <h2>Cost compounds. Are you measuring it?</h2>
+  <p class="sub">Traditional engineering optimizes for CPU, memory, storage, and network. AI introduces a new resource that deserves the same discipline: reasoning. The framework measures what that reasoning costs — by model, by task, by session — so you route work where it delivers results. No more guessing which model is right for the job.</p>
   <div class="link-grid" style="margin-top:1.5rem">
     <a href="/">Framework Overview</a>
     <a href="framework.html">10 Decision Rules</a>
@@ -550,14 +418,17 @@ li{margin-bottom:0.35rem}
   </div>
 </section>
 
+<div style="text-align:center;margin-top:1rem"><a href="framework.html" class="cta-btn">Explore the Framework →</a></div>
+
 </main>
 <footer>
   <strong>The AI FinOps Business Accelerator · v0.4 · August 2026</strong><br>
-  <span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+  <span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> ·
   <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
+<script src="app.js"></script>
 </body>
 </html>

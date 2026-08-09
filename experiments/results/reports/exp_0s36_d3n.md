@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [baseline] typescript_ssg...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:12:47
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:17:00
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 11.3% |
-| Quality/$ [C] | 41 |
-| Quality/J [C] | 0.0002 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) [H] |
+| Correctness | 100% (4/4 tests) [M] |
 | Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 1008 |
 | Cyclomatic complexity [C] | 89.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 80%  |  **Cost:** $0.0241  |  **Energy:** ~6074J  |  **Thinking:** 11%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0241  |  **Energy:** ~6074J  |  **Thinking:** 11%
 
 ---
 
@@ -103,3 +103,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 4 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 100% |
+| Duration | 6.8s |

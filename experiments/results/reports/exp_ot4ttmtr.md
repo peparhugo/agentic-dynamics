@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener: collision-resistant+analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:23:46
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:37:38
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 7.2% |
-| Quality/$ [C] | 97 |
-| Quality/J [C] | 0.0004 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 63% (22/35 tests) [M] |
 | Constraint satisfaction [H] | 67% (4/6 constraints) |
 | Lines of code [M] | 386 |
 | Cyclomatic complexity [C] | 36.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 63%  |  **Cost:** $0.0104  |  **Energy:** ~2559J  |  **Thinking:** 7%
 
 ---
 
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 22 |
+| Failed | 13 |
+| Errors | 0 |
+| Total | 35 |
+| Pass rate | 63% |
+| Duration | 2.1s |

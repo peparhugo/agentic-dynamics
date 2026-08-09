@@ -44,6 +44,7 @@ PYTEST_DEPS = ["flask", "pytest", "sqlalchemy", "flask-jwt-extended", "flask-lim
                "flask-cors", "flask-migrate"]
 
 run_tests_enabled = True
+_test_timeout = 120
 _test_venv_ready = False
 
 
@@ -57,11 +58,11 @@ def ensure_test_venv():
         _venv.create(str(TEST_VENV), with_pip=True)
     import subprocess as _sp
     pip = str(TEST_VENV / "bin" / "pip")
-    _sp.run([pip, "install", "-q"] + PYTEST_DEPS, capture_output=True, timeout=60)
+    _sp.run([pip, "install", "-q"] + PYTEST_DEPS, capture_output=True, timeout=120)
     _test_venv_ready = True
 
 
-def run_pytest(worktree_path: str, timeout_sec: int = 15) -> dict:
+def run_pytest(worktree_path: str, timeout_sec: int = 120) -> dict:
     """Run pytest in a worktree using the shared venv."""
     import subprocess as _sp
     p = Path(worktree_path)
@@ -103,7 +104,7 @@ def run_pytest(worktree_path: str, timeout_sec: int = 15) -> dict:
 
 
 def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
-    """Run TypeScript tests in a worktree using npx jest or vitest."""
+    """Run TypeScript tests in a worktree using vitest or jest."""
     import subprocess as _sp
     p = Path(worktree_path)
     if not p.exists():
@@ -114,20 +115,42 @@ def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
     if not test_files and not configs and not (p / "package.json").exists():
         return {"ok": False, "error": "no TypeScript test infrastructure"}
 
+    has_package_json = (p / "package.json").exists()
+
+    # Detect vitest vs jest
+    has_vitest = any(f.name.startswith("vitest.config") for f in configs)
+    has_jest = any(f.name.startswith("jest.config") for f in configs)
+
     t0 = time.monotonic()
     try:
-        if (p / "package.json").exists():
+        if has_vitest and has_package_json:
+            r = _sp.run(
+                ["npx", "vitest", "run", "--reporter=verbose"],
+                cwd=str(p), capture_output=True, text=True,
+                timeout=timeout_sec, env={**os.environ, "CI": "true"},
+            )
+            runner = "vitest"
+        elif has_jest and has_package_json:
             r = _sp.run(
                 ["npx", "jest", "--passWithNoTests", "--no-coverage", "-q"],
                 cwd=str(p), capture_output=True, text=True,
                 timeout=timeout_sec, env={**os.environ, "CI": "true"},
             )
+            runner = "jest"
+        elif has_package_json:
+            r = _sp.run(
+                ["npx", "vitest", "run", "--reporter=verbose"],
+                cwd=str(p), capture_output=True, text=True,
+                timeout=timeout_sec, env={**os.environ, "CI": "true"},
+            )
+            runner = "vitest"
         else:
             r = _sp.run(
                 ["npx", "tsc", "--noEmit"],
                 cwd=str(p), capture_output=True, text=True,
                 timeout=timeout_sec,
             )
+            runner = "tsc"
         dur = time.monotonic() - t0
         out = r.stdout + r.stderr
         import re
@@ -142,7 +165,7 @@ def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
             "errors": 0, "total": max(total, len(test_files)),
             "duration_s": round(dur, 1),
             "pass_rate": round(passed / max(total, 1), 3) if total > 0 else (1.0 if r.returncode == 0 else 0),
-            "runner": "jest" if (p / "package.json").exists() else "tsc",
+            "runner": runner,
         }
     except _sp.TimeoutExpired:
         return {"ok": False, "error": f"timeout {timeout_sec}s"}
@@ -471,11 +494,39 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     # ── Basin Escape ──
     exp_name = info.get("experiment", "") or ""
     pert_class = "manifold" if any(k in exp_name for k in
-                                   ["alien_vocab", "shift_framing", "reverse_causality",
-                                    "force_abandonment"]) else "semantic"
-    basin = measure_basin_escape(
-        baseline_code=baseline_code or code,  # self-comparison if no baseline
-        perturbed_code=code,
+                                    ["alien_vocab", "shift_framing", "reverse_causality",
+                                     "force_abandonment"]) else "semantic"
+    no_baseline = not baseline_code
+    if no_baseline:
+        # No baseline available — mark as "no baseline" instead of self-comparison
+        from instrument.basin import BasinMetrics as _BM
+        basin = _BM(
+            perturbation_operator=info.get("operator", "baseline"),
+            perturbation_class=pert_class,
+            perturbation_strength=0.5,
+            model=session.get("model_id", "") if session else "",
+            cost_usd=db_cost if db_cost > 0 else None,
+            correctness=solution.correctness_score,
+            constraints_met=solution.constraints_met,
+            constraints_total=solution.constraints_total,
+            lines_of_code=solution.lines_of_code,
+            total_tokens=total_tok,
+            reasoning_tokens=reasoning_tok,
+            thinking_ratio=reasoning_tok / max(total_tok, 1),
+            estimated_energy_j=efficiency.total_energy_j,
+            escape_score=float('nan'),
+            architecture_divergence=float('nan'),
+            structure_divergence=float('nan'),
+            novelty_score=float('nan'),
+            quality_per_dollar=float('nan'),
+            quality_per_joule=float('nan'),
+            converged_back=None,
+            verdict="no baseline",
+        )
+    else:
+        basin = measure_basin_escape(
+            baseline_code=baseline_code,
+            perturbed_code=code,
         baseline_correctness=solution.correctness_score,
         perturbed_correctness=solution.correctness_score,
         baseline_constraints_met=solution.constraints_met,
@@ -507,9 +558,9 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     test_results = None
     if run_tests_enabled:
         if ast_profile.get("py_files", 0) > 0:
-            test_results = run_pytest(worktree_path)
+            test_results = run_pytest(worktree_path, timeout_sec=_test_timeout)
         elif ast_profile.get("ts_files", 0) + ast_profile.get("tsx_files", 0) > 0:
-            test_results = run_ts_tests(worktree_path)
+            test_results = run_ts_tests(worktree_path, timeout_sec=_test_timeout)
         if test_results and test_results.get("ok") and test_results.get("total", 0) > 0:
             solution.tests_passed = test_results["passed"]
             solution.tests_total = test_results["total"]
@@ -578,6 +629,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "basin_novelty": basin.novelty_score,
         "basin_verdict": basin.verdict,
         "converged_back": basin.converged_back,
+        "no_baseline": no_baseline,
         "strategy": strategy.strategy.value if strategy else "?",
         "strategy_score": strategy.strategy_score if strategy else 0,
         "exploration_premium": strategy.exploration_premium if strategy else 0,
@@ -858,11 +910,14 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="Show what would be analyzed")
     ap.add_argument("--baseline", help="Baseline worktree path for comparison")
     ap.add_argument("--no-tests", action="store_true", help="Skip pytest in worktrees (faster)")
+    ap.add_argument("--tests", action="store_true", default=True, help="Run tests (default)")
+    ap.add_argument("--timeout", type=int, default=120, help="Test timeout in seconds (default 120)")
     args = ap.parse_args()
 
-    global run_tests_enabled
+    global run_tests_enabled, _test_timeout
     if args.no_tests:
         run_tests_enabled = False
+    _test_timeout = args.timeout
     if run_tests_enabled:
         ensure_test_venv()
 
@@ -1131,15 +1186,36 @@ def main():
                 by_operator_model[key] = []
             by_operator_model[key].append(r)
 
+        def _bootstrap_ci(vals, n_resamples=1000, ci=95):
+            """Compute bootstrap confidence interval for the mean."""
+            import random as _rnd
+            if len(vals) < 2:
+                return None, None
+            _rng = _rnd.Random(42)
+            means = []
+            for _ in range(n_resamples):
+                sample = [_rng.choice(vals) for _ in range(len(vals))]
+                means.append(sum(sample) / len(sample))
+            means.sort()
+            lo_idx = int((100 - ci) / 2 * n_resamples / 100)
+            hi_idx = n_resamples - lo_idx - 1
+            return round(means[lo_idx], 4), round(means[hi_idx], 4)
+
         def _agg(entries, fields):
-            agg = {"count": len(entries)}
+            agg = {"n": len(entries)}
             for f in fields:
                 vals = [e.get(f, 0) for e in entries if isinstance(e.get(f), (int, float))]
                 if vals:
-                    agg[f"{f}_avg"] = round(sum(vals) / len(vals), 4)
+                    avg = round(sum(vals) / len(vals), 4)
+                    agg[f"{f}_avg"] = avg
                     agg[f"{f}_sum"] = round(sum(vals), 4)
                     agg[f"{f}_min"] = round(min(vals), 4)
                     agg[f"{f}_max"] = round(max(vals), 4)
+                    ci_lo, ci_hi = _bootstrap_ci(vals)
+                    if ci_lo is not None:
+                        agg[f"{f}_ci95_lo"] = ci_lo
+                        agg[f"{f}_ci95_hi"] = ci_hi
+                    agg[f"{f}_n"] = len(vals)
             return agg
 
         NUM_FIELDS = ["cost", "cost_input_usd", "cost_output_usd", "cost_reasoning_usd",

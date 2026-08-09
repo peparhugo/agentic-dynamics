@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Building REST API URL shortener with analytics...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:22:20
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:35:35
 
 ---
 
@@ -21,13 +21,13 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 4.3% |
-| Quality/$ [C] | 124 |
-| Quality/J [C] | 0.0005 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 

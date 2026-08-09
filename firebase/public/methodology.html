@@ -28,11 +28,10 @@
 .eq{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;font-family:'JetBrains Mono',monospace;font-size:0.7rem;line-height:1.9;color:var(--t2);text-align:left;margin:1.5rem 0}
 </style>
 <script src="data.js"></script>
-<script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Apply</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -44,7 +43,7 @@
 <div class="stat"><div class="v">6</div><div class="l">Recovery Signals</div></div>
 <div class="stat"><div class="v">4</div><div class="l">Strategy Archetypes</div></div>
 <div class="stat"><div class="v">34</div><div class="l">Experiment Configs</div></div>
-<div class="stat"><div class="v">248</div><div class="l">Sessions</div></div>
+<div class="stat"><div class="v">249</div><div class="l">Sessions</div></div>
 <div class="stat"><div class="v">8</div><div class="l">Models Tested</div></div>
 </div>
 </section>
@@ -161,7 +160,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <span style="color:var(--ac)">Cost per outcome:</span> CostPerOutcome(K,v) = C(K/P, v) / K<br>
 <span style="color:var(--ac)">Model gap:</span> Gap = (A &times; Verbosity &times; (1+&epsilon;)) &times; EPM(N)
 </div>
-<p style="font-size:0.8rem;color:var(--t3);text-align:center">C&#8320; = model choice, &epsilon; = cost of verbalized reasoning, &beta;&middot;N&sup2; = compounding codebase growth, EPM = energy market exposure, v = scaling speed. Change one and the others shift &mdash; that's why they're tested together. Every term was measured empirically from the 248-session experiment corpus.</p>
+<p style="font-size:0.8rem;color:var(--t3);text-align:center">C&#8320; = model choice, &epsilon; = cost of verbalized reasoning, &beta;&middot;N&sup2; = compounding codebase growth, EPM = energy market exposure, v = scaling speed. Cost drivers (C&#8320;, P, &epsilon;, r) measured from the experiment corpus; &beta; and EPM externally calibrated — see provenance tags [M]/[C]/[H]/[X] throughout.</p>
 </section>
 
 <!-- Constraint Detection -->
@@ -235,7 +234,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <p class="lead">The concepts in the AI FinOps Framework connect to established academic and industry research. Each coined term maps to a known body of work.</p>
 <div class="tbl"><table><thead><tr><th>Our Concept</th><th>Industry / Academic Term</th><th>Reference</th></tr></thead><tbody>
 <tr><td><strong style="color:var(--ac)">Silent Inference</strong></td><td>Cost-Aware Architecture</td><td>Multi-agent systems literature</td></tr>
-<tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank" style="color:var(--ac)">OpenAI o1 System Card, 2025</a></td></tr>
+<tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank" style="color:var(--ac)">DeepSeek-R1 Technical Report, 2025</a></td></tr>
 <tr><td><strong style="color:var(--cy)">Cost-Per-Pass</strong></td><td>Cost-of-Pass</td><td><a href="https://arxiv.org/abs/2508.02694" target="_blank" style="color:var(--ac)">Zhou et al., arXiv:2508.02694, 2025</a></td></tr>
 <tr><td><strong style="color:var(--am)">Snowball Rule (N&sup2;)</strong></td><td>Inference Production Frontier</td><td><a href="https://arxiv.org/abs/2510.26136" target="_blank" style="color:var(--ac)">Zhuang et al., arXiv:2510.26136, 2025</a></td></tr>
 <tr><td><strong style="color:var(--ac)">EPM</strong></td><td>4Ms Framework</td><td><a href="https://cloud.google.com/blog/topics/systems/4ms-of-ai-efficiency" target="_blank" style="color:var(--ac)">Google Cloud, 2025</a></td></tr>
@@ -254,12 +253,15 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 </p>
 </section>
 
+<div style="text-align:center;margin-top:1rem"><a href="evidence.html" class="cta-btn">View the Evidence →</a></div>
+
 <footer>
 <strong>The AI FinOps Framework &middot; v0.4</strong><br>
 <span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
-<a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; 
+  <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
 </footer>
 
+<script src="app.js"></script>
 </body>
 </html>

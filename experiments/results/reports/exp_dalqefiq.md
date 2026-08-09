@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_competing_goal_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:19:01
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:30:21
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 14% (1/7 constraints) |
+| Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 469 |
 | Cyclomatic complexity [C] | 65.0 |
 | Code quality [H] | 0.213 |
 | Novelty vs baseline [H] | 0.983 |
-| **Composite [H]** | **0.583** |
+| **Composite [H]** | **0.540** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~4031 J** |
 | Solution density [C] | 0.016860 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000145 |
+| Quality/J [C] | 0.000134 |
 
 ---
 

@@ -115,6 +115,25 @@ footer a:hover{text-decoration:underline}
 .card h4{font-size:0.9rem;color:var(--ac);margin-bottom:0.5rem;font-family:"JetBrains Mono",monospace}
 .card p,.card li{font-size:0.82rem;color:var(--t2);line-height:1.55}
 
+/* --- Shared Component: Entry Cards --- */
+.entry-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin:2rem auto;max-width:960px}
+.entry-card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.5rem;text-align:left;transition:border-color .2s,transform .2s;text-decoration:none;display:block;color:inherit}
+.entry-card:hover{border-color:rgba(99,102,241,0.3);transform:translateY(-3px);text-decoration:none}
+.entry-card h3{color:var(--ac);margin:0 0 0.4rem;font-size:0.95rem}
+.entry-card p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
+
+/* --- Shared Component: Trust Grid --- */
+.trust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1.5rem 0}
+.trust-card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left;transition:border-color .2s,transform .2s}
+.trust-card:hover{transform:translateY(-2px);border-color:var(--ba)}
+.trust-card h4{font-size:0.88rem;color:var(--t);margin-bottom:0.5rem;font-family:"JetBrains Mono",monospace}
+.trust-card p,.trust-card li{font-size:0.78rem;color:var(--t2);line-height:1.55;margin:0}.trust-card ul{list-style:none;padding:0;margin:0}.trust-card li{margin:0.3rem 0}
+
+/* --- Shared Component: Link Grid --- */
+.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin:1.5rem auto;max-width:700px}
+.link-grid a{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:0.7rem 1rem;text-align:center;font-size:0.78rem;font-weight:600;transition:border-color .2s,transform .2s;text-decoration:none;color:var(--ac)}
+.link-grid a:hover{border-color:var(--ba);transform:translateY(-2px);text-decoration:none}
+
 /* --- Shared Component: Section --- */
 .sec{
   padding:4rem 2rem;max-width:960px;margin:0 auto;
@@ -137,10 +156,10 @@ footer a:hover{text-decoration:underline}
 .tbl th{
   text-align:left;padding:0.5rem 0.7rem;
   color:var(--t2);font-weight:600;
-  font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;
+  font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;
   border-bottom:1px solid var(--ba);background:var(--bg4);
 }
-.tbl td{padding:0.45rem 0.7rem;border-bottom:1px solid var(--b);font-size:0.78rem}
+.tbl td{padding:0.45rem 0.7rem;border-bottom:1px solid var(--b);font-size:0.82rem}
 .tbl td code,.tbl .mono{font-size:0.72rem}
 table{width:100%;border-collapse:collapse;font-size:0.85rem;margin:1rem 0}
 th,td{padding:0.6rem 0.75rem;text-align:left;border-bottom:1px solid var(--b)}
@@ -168,6 +187,11 @@ td code{color:var(--ac)}
 /* --- Shared Component: Key Metric --- */
 .met{font-family:"JetBrains Mono",monospace;color:var(--am)}
 .tag{display:inline-block;font-size:0.7rem;padding:0.15em 0.5em;border-radius:4px;background:var(--bg4);color:var(--cy);margin-right:0.3rem}
+
+/* --- Visual Hierarchy --- */
+.featured-section{padding:4.5rem 2rem;border-left:3px solid var(--ac);background:linear-gradient(135deg,var(--bg3),var(--bg2));border-radius:12px;margin-bottom:1.5rem}
+.secondary-section{padding:3rem 2rem;background:var(--bg3);border:1px solid var(--b);border-radius:12px;margin-bottom:1.5rem}
+.detail-section{padding:1.5rem 2rem;font-size:0.78rem;color:var(--t3);background:var(--bg4);border:1px solid var(--b);border-radius:8px;margin-bottom:1rem;max-width:960px;margin-left:auto;margin-right:auto}
 
 /* --- CTA Button --- */
 .cta-btn{

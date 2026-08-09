@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
 **Operator:** perturbed (manifold, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:26:56
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:43:30
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) [H] |
+| Correctness | 100% (2/2 tests) [M] |
 | Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 473 |
 | Cyclomatic complexity [C] | 91.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** EXPLORATORY  |  **Correctness:** 80%  |  **Cost:** $0.1685  |  **Energy:** ~4568J  |  **Thinking:** 8%
+**Strategy:** EXPLORATORY  |  **Correctness:** 100%  |  **Cost:** $0.1685  |  **Energy:** ~4568J  |  **Thinking:** 8%
 
 ---
 
@@ -102,3 +102,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 2 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 2 |
+| Pass rate | 100% |
+| Duration | 3.6s |

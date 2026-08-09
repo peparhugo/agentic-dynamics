@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:13:22
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:18:42
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 0.0% |
-| Quality/$ [C] | 2 |
-| Quality/J [C] | 0.0012 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) [H] |
+| Correctness | 100% (14/14 tests) [M] |
 | Constraint satisfaction [H] | 0% (0/6 constraints) |
 | Lines of code [M] | 159 |
 | Cyclomatic complexity [C] | 27.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.4696  |  **Energy:** ~852J  |  **Thinking:** 0%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.4696  |  **Energy:** ~852J  |  **Thinking:** 0%
 
 ---
 
@@ -112,3 +112,17 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0430 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 14 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 14 |
+| Pass rate | 100% |
+| Duration | 0.8s |

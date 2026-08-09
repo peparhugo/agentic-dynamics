@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [batch:data_table:baseline] gpt56_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:36
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:26:45
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 7.4% |
-| Quality/$ [C] | 2 |
-| Quality/J [C] | 0.0003 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 60% (0/0 tests) [H] |
+| Correctness | 100% (8/8 tests) [M] |
 | Constraint satisfaction [H] | 25% (1/4 constraints) |
 | Lines of code [M] | 29 |
 | Cyclomatic complexity [C] | 8.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 60%  |  **Cost:** $0.6613  |  **Energy:** ~3529J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.6613  |  **Energy:** ~3529J  |  **Thinking:** 7%
 
 ---
 
@@ -103,3 +103,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 100% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 8 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 8 |
+| Pass rate | 100% |
+| Duration | 0.5s |

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [remove_critical_constraint_s0.5_r1] cd_openai_GPT_5...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:23:32
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:37:16
 
 ---
 

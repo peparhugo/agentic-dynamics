@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** Flask URL shortener REST API...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:22:32
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:35:55
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 0.0% |
-| Quality/$ [C] | 1 |
-| Quality/J [C] | 0.0005 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 100% (24/24 tests) [M] |
 | Constraint satisfaction [H] | 83% (5/6 constraints) |
 | Lines of code [M] | 387 |
 | Cyclomatic complexity [C] | 58.0 |
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 3 |
 | Test file rate | 33% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 24 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 24 |
+| Pass rate | 100% |
+| Duration | 1.6s |

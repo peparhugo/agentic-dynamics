@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:perturbed:forced] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:26
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:40:48
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.764
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.75) with moderate resource use ($0.0323, ~5369J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.71) with moderate resource use ($0.0323, ~5369J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -21,26 +21,26 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 5.4% |
-| Quality/$ [C] | 31 |
-| Quality/J [C] | 0.0002 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 86% (6/7 constraints) |
+| Correctness | 100% (3/3 tests) [M] |
+| Constraint satisfaction [H] | 71% (5/7 constraints) |
 | Lines of code [M] | 281 |
 | Cyclomatic complexity [C] | 52.0 |
 | Code quality [H] | 0.356 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.753** |
+| **Composite [H]** | **0.710** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5369 J** |
 | Solution density [C] | 0.006254 LOC/tok |
 | Correctness/$ [C] | 3 |
-| Quality/J [C] | 0.000140 |
+| Quality/J [C] | 0.000132 |
 
 ---
 
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 29% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 3 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 3 |
+| Pass rate | 100% |
+| Duration | 3.1s |

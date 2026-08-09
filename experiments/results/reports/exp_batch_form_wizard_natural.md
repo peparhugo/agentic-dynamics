@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:form_wizard:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:18:37
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:28
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.690
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.45) with moderate resource use ($0.0203, ~5303J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=80%, quality=0.40) with moderate resource use ($0.0203, ~5303J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -21,13 +21,13 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 7.3% |
-| Quality/$ [C] | 49 |
-| Quality/J [C] | 0.0002 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 14% (1/7 constraints) |
+| Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 405 |
 | Cyclomatic complexity [C] | 61.0 |
 | Code quality [H] | 0.247 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.447** |
+| **Composite [H]** | **0.404** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5303 J** |
 | Solution density [C] | 0.013414 LOC/tok |
 | Correctness/$ [C] | 24 |
-| Quality/J [C] | 0.000084 |
+| Quality/J [C] | 0.000076 |
 
 ---
 

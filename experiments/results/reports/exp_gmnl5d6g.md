@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [standardized_build] deepseek...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:49
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:33:18
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Constraint satisfaction [H] | 43% (3/7 constraints) |
 | Lines of code [M] | 558 |
 | Cyclomatic complexity [C] | 69.0 |
 | Code quality [H] | 0.179 |
 | Novelty vs baseline [H] | 0.723 |
-| **Composite [H]** | **0.580** |
+| **Composite [H]** | **0.623** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~5226 J** |
 | Solution density [C] | 0.016640 LOC/tok |
 | Correctness/$ [C] | 25 |
-| Quality/J [C] | 0.000111 |
+| Quality/J [C] | 0.000119 |
 
 ---
 

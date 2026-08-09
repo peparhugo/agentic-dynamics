@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [baseline] cd_openai_GPT_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:27:45
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:44:56
 
 ---
 
@@ -21,13 +21,13 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 5.5% |
-| Quality/$ [C] | 56 |
-| Quality/J [C] | 0.0004 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 

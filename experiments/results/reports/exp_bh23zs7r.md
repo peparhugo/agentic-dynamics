@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5  |  **Task:** [inject_phantom_success_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:18:47
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:29:47
 
 ---
 
@@ -34,13 +34,13 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 29% (2/7 constraints) |
+| Correctness | 100% (1/5 tests) [M] |
+| Constraint satisfaction [H] | 14% (1/7 constraints) |
 | Lines of code [M] | 475 |
 | Cyclomatic complexity [C] | 72.0 |
 | Code quality [H] | 0.211 |
 | Novelty vs baseline [H] | 0.983 |
-| **Composite [H]** | **0.555** |
+| **Composite [H]** | **0.512** |
 
 ---
 
@@ -63,12 +63,12 @@
 | **Total energy [X]** | **~4399 J** |
 | Solution density [C] | 0.018021 LOC/tok |
 | Correctness/$ [C] | 4 |
-| Quality/J [C] | 0.000126 |
+| Quality/J [C] | 0.000117 |
 
 ---
 
 ## Headline Metric
-**Strategy:** EXPLORATORY  |  **Correctness:** 80%  |  **Cost:** $0.1477  |  **Energy:** ~4399J  |  **Thinking:** 10%
+**Strategy:** EXPLORATORY  |  **Correctness:** 100%  |  **Cost:** $0.1477  |  **Energy:** ~4399J  |  **Thinking:** 10%
 
 ---
 
@@ -102,3 +102,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 1 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 5 |
+| Pass rate | 100% |
+| Duration | 3.9s |

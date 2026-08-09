@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [standardized_build] gpt-5-mini...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:09
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:32:06
 
 ---
 

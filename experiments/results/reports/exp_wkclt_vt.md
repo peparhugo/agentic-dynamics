@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Building Flask task management API + flaw analysis...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:27:11
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:44:11
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.758
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.66) with moderate resource use ($0.0157, ~4138J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.62) with moderate resource use ($0.0157, ~4138J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -21,26 +21,26 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 8.5% |
-| Quality/$ [C] | 64 |
-| Quality/J [C] | 0.0002 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 71% (5/7 constraints) |
+| Correctness | 98% (53/54 tests) [M] |
+| Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 853 |
 | Cyclomatic complexity [C] | 92.0 |
 | Code quality [H] | 0.117 |
 | Novelty vs baseline [H] | 0.500 |
-| **Composite [H]** | **0.663** |
+| **Composite [H]** | **0.620** |
 
 ---
 
@@ -63,12 +63,12 @@
 | **Total energy [X]** | **~4138 J** |
 | Solution density [C] | 0.038989 LOC/tok |
 | Correctness/$ [C] | 27 |
-| Quality/J [C] | 0.000160 |
+| Quality/J [C] | 0.000150 |
 
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0157  |  **Energy:** ~4138J  |  **Thinking:** 8%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 98%  |  **Cost:** $0.0157  |  **Energy:** ~4138J  |  **Thinking:** 8%
 
 ---
 
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 3 |
 | Test file rate | 30% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 53 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 54 |
+| Pass rate | 98% |
+| Duration | 25.5s |

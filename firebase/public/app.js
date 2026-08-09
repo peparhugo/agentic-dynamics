@@ -25,7 +25,7 @@
     var D = window.FRAMEWORK_DATA;
     if (!D) return;
 
-    function fmtUSD(v) { return '$' + (typeof v === 'number' ? v.toFixed(2) : v); }
+    function fmtUSD(v) { return (typeof v === 'number' ? v.toFixed(2) : v); }
 
     var statMap = {
       'sessions': function() { return D.summary.sessions_total; },

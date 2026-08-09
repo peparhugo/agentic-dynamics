@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-mini  |  **Task:** [silent_sweep:baseline:natural] gpt_5_mini...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:26
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:40:52
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 6.8% |
-| Quality/$ [C] | 17 |
-| Quality/J [C] | 0.0001 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) [H] |
+| Correctness | 75% (3/4 tests) [M] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 342 |
 | Cyclomatic complexity [C] | 58.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0595  |  **Energy:** ~8288J  |  **Thinking:** 7%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 75%  |  **Cost:** $0.0595  |  **Energy:** ~8288J  |  **Thinking:** 7%
 
 ---
 
@@ -112,3 +112,17 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0325 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 3 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 75% |
+| Duration | 3.8s |

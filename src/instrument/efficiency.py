@@ -55,14 +55,14 @@ def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     Returns per-million-token rates. Falls back to generic provider rates
     if model-specific pricing is unavailable.
     """
-    p = provider_id.lower() if provider_id else ""
-    if "deepseek" in p:
+    combined = f"{provider_id} {model_id}".lower()
+    if "deepseek" in combined:
         return PROVIDER_PRICING["deepseek"]
-    if any(k in p for k in ("anthropic", "claude")):
+    if any(k in combined for k in ("anthropic", "claude")):
         return PROVIDER_PRICING["anthropic"]
-    if any(k in p for k in ("openai", "gpt")):
+    if any(k in combined for k in ("openai", "gpt")):
         return PROVIDER_PRICING["openai"]
-    return PROVIDER_PRICING["deepseek"]  # fallback
+    raise ValueError(f"Unknown provider: provider={provider_id!r}, model={model_id!r}")
 
 
 @dataclass

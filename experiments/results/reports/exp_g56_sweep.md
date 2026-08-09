@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [silent_sweep:baseline:natural] gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:20:27
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:32:43
 
 ---
 
@@ -21,13 +21,13 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 7.9% |
-| Quality/$ [C] | 2 |
-| Quality/J [C] | 0.0004 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 

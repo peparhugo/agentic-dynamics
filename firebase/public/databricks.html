@@ -32,16 +32,15 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
 @media(max-width:768px){article{padding:3rem 1.5rem 2rem}.claim-grid{grid-template-columns:1fr}}
 </style>
 <script src="data.js"></script>
-<script src="app.js"></script>
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Apply</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <article>
 
 <h1>The Databricks Playbook vs. The AI FinOps Framework</h1>
-<p class="subtitle">On August 7, 2026, a $40B company published their playbook for reducing AI coding costs. We arrived at the same four conclusions — independently — through 227 controlled stress tests. Their playbook is correct. Our experiments support it — and go further. This page maps every claim to our calibrated measurements, and identifies where surveys stop and experiments begin.</p>
+<p class="subtitle">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. We stress-tested 8 models across 227 experiments. Both arrived at the same four cost levers through different methods — their production data and our controlled experiments converge. The framework adds a dimension their playbook doesn't address: model integrity under degraded input.</p>
 
 <a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original: Databricks — Managing AI Coding Costs at Scale (Aug 7, 2026) →</a>
 
@@ -79,7 +78,7 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
   <p><strong class="mono" style="color:#34d399">$0.016/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$1.08/session (Claude).</strong> <strong style="color:var(--ac)">69× cost gap.</strong> On 12 of 15 overlapping tasks, the cheaper model is MORE correct. Same generated token volume (~11K tokens/session). The gap is pricing architecture, not capability.</p>
 </div>
 </div>
-<div class="gap-box"><strong>Where they stop short:</strong> They compare price/intelligence. We measure integrity under stress. A model can be cheap AND smart on a benchmark — and flail 100% when given inverted constraints. Grit captures this. The Efficiency Frontier doesn't.</div>
+<div class="gap-box"><strong>Where they stop short:</strong> They compare price/intelligence. We measure integrity under stress. A model can be cheap AND smart on a benchmark — and collapse completely when given inverted constraints. Grit captures this. The Efficiency Frontier doesn't.</div>
 
 <!-- Lever 2 -->
 <div class="section-hd"><h2>Lever 2: Dynamic Request and Task Routing</h2></div>
@@ -124,18 +123,18 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
 <div class="claim-box">
   <div class="tag ours">This framework</div>
   <h4>Our measurement</h4>
-  <p><strong>Explanation Tax:</strong> 3% (DeepSeek) vs 50% (Claude). <strong>Cache Tax:</strong> $15/Mtok writes vs $0.14/Mtok reads — <strong>100× pricing asymmetry.</strong> Claude writes 22.5K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
+  <p><strong>Explanation Tax:</strong> 3% (DeepSeek) vs 50% (Claude). <strong>Cache Tax:</strong> $3.75/Mtok writes vs $0.14/Mtok reads — <strong>100× pricing asymmetry.</strong> Claude writes 22.5K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
 </div>
 </div>
 <div class="gap-box"><strong>Where they stop short:</strong> They found token overhead exists. We measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation. That's actionable at the model selection level, not just the harness tuning level. If you're tuning a harness to make Claude less chatty, you're fighting its training distribution. If you route to DeepSeek, the problem disappears.</div>
 
 <!-- What They Miss -->
-<div class="section-hd amber"><h2>What the Databricks Playbook Misses Entirely</h2></div>
+<div class="section-hd amber"><h2>What the Framework Adds</h2></div>
 
 <div class="miss-grid">
 <div class="miss-card">
   <h4>No perturbation testing</h4>
-  <p>Can't measure Grit. A model that performs well on a benchmark may flail 100% when instructions are degraded. 10 calibrated stress tests reveal the difference.</p>
+  <p>Can't measure Grit. A model that performs well on a benchmark may fail entirely when instructions are degraded. 10 calibrated stress tests reveal the difference.</p>
 </div>
 <div class="miss-card">
   <h4>No model behavior under degraded input</h4>
@@ -166,6 +165,8 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
   <a href="evidence.html" style="color:var(--ac)">See the full experimental evidence →</a>
 </div>
 
+<div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">View the Full Evidence →</a></div>
+
 </article>
 
 <footer>
@@ -175,5 +176,6 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
 <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
 </footer>
 
+<script src="app.js"></script>
 </body>
 </html>

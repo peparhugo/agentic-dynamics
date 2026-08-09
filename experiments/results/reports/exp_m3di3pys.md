@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask URL shortener with REST API and tests...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:23:02
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:36:36
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 2.2% |
-| Quality/$ [C] | 179 |
-| Quality/J [C] | 0.0008 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 100% (11/11 tests) [M] |
 | Constraint satisfaction [H] | 33% (2/6 constraints) |
 | Lines of code [M] | 111 |
 | Cyclomatic complexity [C] | 9.0 |
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 1 |
 | Test file rate | 50% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 11 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 11 |
+| Pass rate | 100% |
+| Duration | 0.7s |

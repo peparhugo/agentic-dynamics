@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [std_final] gpt-5-nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:13:08
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:18:15
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) [H] |
+| Correctness | 100% (5/5 tests) [M] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 216 |
 | Cyclomatic complexity [C] | 40.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0059  |  **Energy:** ~4735J  |  **Thinking:** 22%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0059  |  **Energy:** ~4735J  |  **Thinking:** 22%
 
 ---
 
@@ -112,3 +112,17 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0385 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 5 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 5 |
+| Pass rate | 100% |
+| Duration | 1.1s |

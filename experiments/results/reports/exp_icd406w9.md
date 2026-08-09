@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:21:13
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:34:12
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 100% (2/2 tests) [M] |
 | Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 747 |
 | Cyclomatic complexity [C] | 112.0 |
@@ -102,3 +102,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 2 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 2 |
+| Pass rate | 100% |
+| Duration | 4.1s |

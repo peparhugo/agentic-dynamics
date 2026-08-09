@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [remove_critical_constraint_s0.5] cd_gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:26:07
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:42:08
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 70% (0/0 tests) [H] |
+| Correctness | 75% (3/4 tests) [M] |
 | Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 240 |
 | Cyclomatic complexity [C] | 59.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 70%  |  **Cost:** $0.0064  |  **Energy:** ~5984J  |  **Thinking:** 31%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 75%  |  **Cost:** $0.0064  |  **Energy:** ~5984J  |  **Thinking:** 31%
 
 ---
 
@@ -112,3 +112,17 @@ Raw session transcript and generated source code for independent verification.
 | Code density | 0.0487 LOC/tok |
 | **Assessment** | Low code density — narration exceeded code output |
 
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 3 |
+| Failed | 1 |
+| Errors | 0 |
+| Total | 4 |
+| Pass rate | 75% |
+| Duration | 0.9s |

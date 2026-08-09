@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [shift_framing_s0.5] typescript_ssg...
 **Operator:** perturbed (manifold, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:14:56
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:21:58
 
 ---
 

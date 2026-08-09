@@ -111,30 +111,70 @@ class PerturbationOperator:
 
 
 def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> str:
-    """Inject cross-domain vocabulary as directional noise.
+    """Replace domain terminology with cross-domain vocabulary as directional noise.
 
     Alien words act as latent-space navigation hints — they push the
     model's embedding off the typical linguistic manifold, forcing
     exploration of boundary states.
 
-    At low strength (0.2): 2 alien tokens injected at prompt end.
-    At high strength (0.8): 6 alien tokens injected at prompt start.
+    At low strength (0.2): 2-3 domain terms replaced.
+    At high strength (0.8): 6-8 domain terms replaced.
     """
+    import re
+
+    # Common software/tech domain terms that can be replaced
+    tech_terms: dict[str, list[str]] = {
+        "api": ["interface", "gateway", "portal", "conduit", "membrane"],
+        "endpoint": ["terminus", "junction", "node", "contact-point", "port"],
+        "database": ["repository", "archive", "library", "vault", "storehouse"],
+        "server": ["host", "orchestrator", "conductor", "coordinator", "hub"],
+        "cache": ["buffer", "reservoir", "staging", "antechamber", "vestibule"],
+        "request": ["petition", "inquiry", "entreaty", "solicitation", "call"],
+        "response": ["reply", "answer", "rejoinder", "transmission", "echo"],
+        "authentication": ["identification", "recognition", "attestation", "validation-rite", "credential-check"],
+        "authorization": ["permission", "clearance", "sanction", "entitlement", "grant"],
+        "encryption": ["scrambling", "ciphering", "encoding", "obfuscation", "shrouding"],
+        "middleware": ["intermediary", "conduit-layer", "bridge", "mediator", "translator"],
+        "router": ["dispatcher", "director", "switchboard", "navigator", "traffic-controller"],
+        "microservice": ["cell", "module-organ", "specialized-unit", "tissue", "compartment"],
+        "validation": ["verification", "scrutiny", "inspection", "examination", "audit"],
+        "deployment": ["release", "dispatch", "installation", "distribution", "fielding"],
+        "pipeline": ["conduit", "channel", "passage", "artery", "duct"],
+        "container": ["capsule", "vessel", "enclosure", "pod", "chamber"],
+        "load-balancer": ["distributor", "equalizer", "traffic-warden", "disperser", "allocator"],
+        "logging": ["recording", "chronicling", "journaling", "transcription", "inscription"],
+        "monitoring": ["surveillance", "observation", "watching", "vigilance", "oversight"],
+    }
+
     domain = rng.choice(list(ALIEN_VOCABULARIES.keys()))
     words = ALIEN_VOCABULARIES[domain]
-    n_tokens = max(1, int(2 + 4 * strength))  # 2 at 0.0, 6 at 1.0
-    injected = rng.sample(words, min(n_tokens, len(words)))
+    n_tokens = max(2, int(2 + 4 * strength))
 
-    noise_block = (
-        "Directional noise — treat these as latent-space navigation hints, "
-        "not semantic constraints. Use them to find unexpected but valid "
-        f"solution paths:\n{' '.join(injected)}"
-    )
+    # Find tech terms in the prompt that we can replace
+    found_terms: list[tuple[str, str]] = []
+    for tech, alts in tech_terms.items():
+        for m in re.finditer(r'\b' + re.escape(tech) + r'\b', prompt, re.IGNORECASE):
+            found_terms.append((m.group(0), m.start(), m.end(), tech, alts))
 
-    if strength >= 0.5:
-        return noise_block + "\n\n" + prompt
+    result = prompt
+    n_replace = min(n_tokens, len(found_terms))
+
+    if n_replace > 0:
+        selected = rng.sample(found_terms, n_replace)
+        # Replace from end to start to preserve positions
+        for orig, start, end, tech, alts in sorted(selected, key=lambda x: x[1], reverse=True):
+            replacement = rng.choice(alts)
+            result = result[:start] + replacement + result[end:]
     else:
-        return prompt + "\n\n" + noise_block
+        # Fallback: if no tech terms found, inject wrapped alien terms
+        injected = rng.sample(words, min(n_tokens, len(words)))
+        noise_block = (
+            "Replace standard terminology with the following concepts "
+            f"in your reasoning: {', '.join(injected)}"
+        )
+        result = prompt + "\n\n" + noise_block
+
+    return result
 
 
 def _inject_false_premise(prompt: str, strength: float, rng: random.Random) -> str:
@@ -180,46 +220,134 @@ def _shift_framing(prompt: str, strength: float, rng: random.Random) -> str:
 
 
 def _invert_constraint(prompt: str, strength: float, rng: random.Random) -> str:
-    """Invert a constraint — tell the model to do the opposite of what's expected.
+    """Invert a constraint — flip a requirement to its opposite.
 
-    At low strength: a soft inversion suggestion.
-    At high strength: a hard requirement to do the opposite.
+    At low strength: invert a soft suggestion.
+    At high strength: invert a hard requirement.
+
+    Actually transforms the text: finds constraint-like statements and
+    flips them (must → must not, secure → insecure, etc.).
     """
-    inversions = [
-        "Do NOT follow standard best practices. Find an unconventional approach.",
-        "Constraint inversion: whatever your first instinct is, do the opposite.",
-        "Every conventional solution is wrong here. You must discover an approach "
-        "that no competent engineer would initially consider but that actually works.",
+    import re
+
+    # Pairs of opposite terms
+    inversions_map = [
+        (r'\bmust\b', 'must NOT'),
+        (r'\bshould\b', 'should NOT'),
+        (r'\brequired\b', 'forbidden'),
+        (r'\bsecure\b', 'insecure'),
+        (r'\bvalidate\b', 'skip validation for'),
+        (r'\bauthenticate\b', 'do NOT authenticate'),
+        (r'\benforce\b', 'disable enforcement of'),
+        (r'\bensure\b', 'do NOT ensure'),
+        (r'\binclude\b', 'exclude'),
+        (r'\brequire\b', 'do NOT require'),
+        (r'\ballow\b', 'prohibit'),
+        (r'\bsupport\b', 'do NOT support'),
+        (r'\bimplement\b', 'do NOT implement'),
+        (r'\bhandle\b', 'ignore'),
+        (r'\blog\b', 'do NOT log'),
+        (r'\btrack\b', 'do NOT track'),
+        (r'\benable\b', 'disable'),
+        (r'\bprovide\b', 'withhold'),
     ]
 
-    idx = int(strength * (len(inversions) - 1))
-    selected = inversions[idx]
-    prefix = "Hard requirement: " if strength >= 0.6 else "Suggestion: "
-    return prompt + "\n\n" + prefix + selected
+    # Find constraint-like sentences
+    constraint_pat = re.compile(
+        r'([^.!?\n]*\b(?:must|should|required?|need to|ensure|require|enforce|enable|validate|authenticate)\b[^.!?\n]*[.!?])',
+        re.IGNORECASE,
+    )
+    candidates = constraint_pat.findall(prompt)
+
+    if not candidates:
+        # Fallback: find any sentence with imperative verbs
+        candidates = [s.strip() for s in prompt.split('\n') if s.strip()
+                      and any(kw in s.lower() for kw in ('must', 'should', 'required', 'need', 'ensure'))]
+        if not candidates:
+            return prompt
+
+    # Choose how many to invert based on strength
+    n = max(1, int(len(candidates) * min(strength, 0.8)))
+    selected = rng.sample(candidates, min(n, len(candidates)))
+
+    result = prompt
+    for sent in selected:
+        inverted = sent
+        for pattern, replacement in inversions_map:
+            if re.search(pattern, inverted, re.IGNORECASE):
+                inverted = re.sub(pattern, replacement, inverted, count=1, flags=re.IGNORECASE)
+                break
+        result = result.replace(sent, inverted, 1)
+
+    return result
 
 
 def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> str:
-    """Insert a statement that contradicts earlier context, testing resolution.
+    """Insert actual contradictory requirements into the prompt.
 
     The model must either resolve the contradiction, reject one premise,
     or rationalize both — each response reveals something about its
     reasoning policy.
     """
-    contradictions = [
-        ("soft", "Earlier context suggested X. However, new evidence shows X is impossible. Reconcile."),
-        ("medium", "Constraint A and Constraint B are mutually exclusive. You must violate one. Which one and why?"),
-        ("hard", "Every assumption you've made so far is wrong. Start over from contradictory premises."),
-    ]
+    import re
 
-    levels = [c for c in contradictions if c[0] == ("hard" if strength >= 0.7 else "medium" if strength >= 0.4 else "soft")]
-    if not levels:
-        levels = contradictions[:1]
-    _, text = rng.choice(levels)
-    return prompt + "\n\n" + text
+    domain_contradictions = {
+        "api": [
+            ("The API must be stateless.", "Every request must maintain server-side session state."),
+            ("Use REST endpoints.", "All endpoints must use GraphQL."),
+            ("The API must be versioned via URL prefix.", "No versioning in URLs — use headers instead."),
+            ("Rate limiting must be per-IP.", "Rate limiting must be per-user-account, not per-IP."),
+            ("All responses must be JSON.", "All responses must be XML."),
+        ],
+        "database": [
+            ("The database must be normalized to 3NF.", "The database must be fully denormalized for read performance."),
+            ("Use PostgreSQL.", "Use MongoDB as the only database."),
+            ("All writes must be synchronous.", "All writes must be asynchronous with eventual consistency."),
+        ],
+        "security": [
+            ("Use JWT for authentication.", "Use session cookies for authentication — no JWTs."),
+            ("Passwords must be hashed with bcrypt.", "Passwords must be stored in plaintext for audit purposes."),
+            ("All endpoints require authentication.", "No authentication required — the API is fully public."),
+        ],
+        "general": [
+            ("The system must be extremely fast.", "The system must use zero caching."),
+            ("Minimize code complexity.", "Maximize extensibility with full plugin architecture."),
+            ("Zero downtime deployments required.", "No redundant infrastructure allowed."),
+        ],
+    }
+
+    # Pick contradiction domain based on prompt content
+    all_domains = []
+    for domain, pairs in domain_contradictions.items():
+        for a, b in pairs:
+            if any(kw.lower() in prompt.lower() for kw in a.lower().split()[:3]):
+                all_domains = pairs
+                break
+    if not all_domains:
+        all_domains = domain_contradictions["general"]
+
+    const_a, const_b = rng.choice(all_domains)
+
+    if strength >= 0.8:
+        formatted = f"Hard requirement: {const_a}\nHard requirement: {const_b}\nThese two requirements are conflicting. You must satisfy both."
+    elif strength >= 0.4:
+        formatted = f"Requirement: {const_a}\nRequirement: {const_b}\nNote: these may be in tension."
+    else:
+        formatted = f"Requirement: {const_a}\nAdditionally: {const_b}"
+
+    # Insert near the requirements section if possible, otherwise append
+    lines = prompt.split('\n')
+    insert_pos = len(lines)
+    for i, line in enumerate(lines):
+        if any(kw in line.lower() for kw in ('requirement', 'constraint', 'specification', 'must', 'should')):
+            insert_pos = i + 1
+
+    lines.insert(insert_pos, '\n' + formatted)
+    return '\n'.join(lines)
 
 
 def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random) -> str:
-    """Silently remove a constraint that makes the problem well-defined.
+    """Silently drop a defining constraint from the problem statement.
 
     Tests epistemic vigilance — does the model notice the problem is now
     under-specified and flag it, or does it fill the gap with plausible
@@ -228,18 +356,74 @@ def _remove_critical_constraint(prompt: str, strength: float, rng: random.Random
     At low strength: remove a minor constraint.
     At high strength: remove a defining constraint.
     """
-    drops = [
-        ("minor", "Note: performance requirements have been relaxed. Handle edge cases as you see fit."),
-        ("minor", "The storage backend is flexible. Choose whatever works."),
-        ("major", "All previously stated constraints are now optional. Determine what matters and proceed."),
-        ("major", "The specification is deliberately incomplete. Fill in missing requirements as needed."),
-        ("critical", "Ignore all constraints. Solve the problem in any way that works."),
+    import re
+
+    # Find constraint-like sentences: lines starting with -, *, •, numbered items,
+    # or sentences containing "must", "should", "required", "constraint", "need to"
+    constraint_patterns = [
+        # bullet/numbered items (MULTILINE so ^ matches line start)
+        (r'^[\s]*[-*•\d]+[\.\)\s]*\s*(.+)', re.MULTILINE),
+        # sentences with constraint keywords ending in punctuation or newline
+        (r'([^.!?\n]*\b(?:must|shall|required?|need to|constraint)\b[^.!?\n]*(?:[.!?]|\n|$))', re.IGNORECASE),
+        # sentences with API-specific constraint keywords
+        (r'([^.!?\n]*\b(?:API|endpoint|route|auth|token|rate.?limit|validate|paginate)\b[^.!?\n]*[.!?\n])', re.IGNORECASE),
     ]
-    levels = [d for d in drops if d[0] == ("critical" if strength >= 0.8 else "major" if strength >= 0.5 else "minor")]
-    if not levels:
-        levels = drops[:2]
-    _, text = rng.choice(levels)
-    return prompt + "\n\n" + text
+
+    candidates: list[str] = []
+    for pat, flags in constraint_patterns:
+        for m in re.finditer(pat, prompt, flags):
+            text = m.group(1).strip().rstrip('.!?\n')
+            if len(text) > 10 and text not in candidates:
+                candidates.append(text)
+
+    if not candidates:
+        # Fallback: try to find and remove any checklist-like item
+        lines = prompt.split('\n')
+        removals = [l for l in lines if l.strip() and len(l.strip()) > 15 and (
+            l.strip().startswith('-') or l.strip().startswith('*') or
+            any(kw in l.lower() for kw in ('must', 'should', 'required', 'ensure'))
+        )]
+        if removals:
+            to_remove = rng.choice(removals)
+            return prompt.replace(to_remove, '', 1)
+
+        return prompt
+
+    # Pick a constraint to remove — severity aligned with strength
+    # Filter out task-description lines (not actual constraints)
+    task_indicators = ['build ', 'create ', 'implement ', 'write ', 'design ']
+    actual_constraints = [c for c in candidates
+                          if not any(c.lower().startswith(ti) for ti in task_indicators)]
+
+    if not actual_constraints:
+        actual_constraints = candidates
+
+    if strength >= 0.8:
+        # Remove the most critical-looking constraint
+        critical_keywords = ['auth', 'token', 'sec', 'rate', 'limit', 'validate', 'required', 'must']
+        scored = []
+        for c in actual_constraints:
+            score = sum(1 for kw in critical_keywords if kw.lower() in c.lower())
+            scored.append((score, c))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        if scored and scored[0][0] > 0:
+            to_remove = scored[0][1]
+        else:
+            to_remove = rng.choice(actual_constraints)
+        n_remove = max(1, int(len(actual_constraints) * 0.4))
+        removals = [to_remove] + rng.sample([c for c in actual_constraints if c != to_remove], min(n_remove - 1, len(actual_constraints) - 1))
+    elif strength >= 0.5:
+        n_remove = max(1, int(len(actual_constraints) * 0.2))
+        removals = rng.sample(actual_constraints, min(n_remove, len(actual_constraints)))
+    else:
+        removals = [rng.choice(actual_constraints)]
+
+    result = prompt
+    for rem in removals:
+        result = result.replace(rem, '', 1)
+    # Clean up double newlines
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    return result.strip()
 
 
 def _inject_phantom_success(prompt: str, strength: float, rng: random.Random) -> str:
@@ -267,29 +451,81 @@ def _inject_phantom_success(prompt: str, strength: float, rng: random.Random) ->
 
 
 def _reverse_causality(prompt: str, strength: float, rng: random.Random) -> str:
-    """Present solution before problem, or effect before cause.
+    """Present solution before problem — reorder the prompt structure.
 
     Forces non-linear reasoning. SFT models tend to reorder into familiar
     narrative structure before reasoning; RL models may handle inverted order
     directly without restructuring.
 
-    At low strength: start with constraints, end with goal.
-    At high strength: full structural inversion.
+    At low strength: move requirements before task description.
+    At high strength: full structural inversion (constraints → output format → task).
     """
-    inversions = [
-        "Important: read the constraints and success criteria below BEFORE "
-        "considering the task description. Your first thinking step should "
-        "address how you'll satisfy these constraints.",
-        "Constraint-first approach: absorb the restrictions below, then "
-        "synthesize what problem they define, then solve that problem. "
-        "Do NOT start with the problem statement.",
-        "Complete inversion: the architecture specification follows. "
-        "Reverse-engineer the problem it solves, then evaluate whether "
-        "the architecture is actually correct for that problem. "
-        "Begin from the architecture, not the problem.",
-    ]
-    idx = min(int(strength * (len(inversions) - 1)), len(inversions) - 1)
-    return inversions[idx] + "\n\n" + prompt
+    import re
+
+    lines = prompt.split('\n')
+    if len(lines) < 3:
+        return "Consider the expected output first, then determine what problem it solves.\n\n" + prompt
+
+    # Try to identify sections: task/problem description, requirements/constraints, output/format
+    task_start = 0
+    req_start = -1
+    output_start = -1
+
+    req_keywords = ['requirement', 'constraint', 'must', 'should', 'need to', 'specification', 'rule']
+    output_keywords = ['output', 'format', 'return', 'respond', 'deliverable', 'result', 'expected']
+
+    for i, line in enumerate(lines):
+        stripped = line.strip().lower()
+        if req_start < 0 and any(kw in stripped for kw in req_keywords):
+            req_start = i
+        if output_start < 0 and any(kw in stripped for kw in output_keywords):
+            output_start = i
+
+    if req_start < 0 and output_start < 0:
+        # No clear sections — do a simple reversal
+        mid = len(lines) // 2
+        reversed_lines = lines[mid:] + [''] + lines[:mid]
+        prefix = "Read the constraints and expected output BELOW before the task description above.\n\n"
+        return prefix + '\n'.join(reversed_lines)
+
+    # Build reordered prompt
+    preamble = []
+    if req_start > 0:
+        preamble = lines[:req_start]
+        remaining = lines[req_start:]
+    elif output_start > 0:
+        preamble = lines[:output_start]
+        remaining = lines[output_start:]
+    else:
+        preamble = lines[:1]
+        remaining = lines[1:]
+
+    if strength >= 0.8 and output_start > req_start >= 0:
+        # Full inversion: constraints → output format → task description → preamble
+        output_section = lines[output_start:]
+        req_section = lines[req_start:output_start]
+        task_section = lines[:req_start]
+        reordered = (
+            ["[INVERTED: constraints first, then expected output, then task]"]
+            + req_section + [''] + output_section + [''] + task_section + preamble
+        )
+    elif strength >= 0.4 and req_start >= 0:
+        # Moderate: constraints before task
+        task_section = lines[:req_start]
+        req_section = lines[req_start:]
+        reordered = (
+            ["[INVERTED: constraints before task description]"]
+            + req_section + [''] + task_section
+        )
+    else:
+        # Mild: swap halves
+        mid = len(lines) // 2
+        reordered = (
+            ["[REORDERED: second half first]"]
+            + lines[mid:] + [''] + lines[:mid]
+        )
+
+    return '\n'.join(reordered)
 
 
 def _inject_competing_goal(prompt: str, strength: float, rng: random.Random) -> str:

@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5.6  |  **Task:** [baseline] frontier_gpt_5_6...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:55
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:41:50
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 5.3% |
-| Quality/$ [C] | 2 |
-| Quality/J [C] | 0.0005 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 100% (11/11 tests) [M] |
 | Constraint satisfaction [H] | 86% (6/7 constraints) |
 | Lines of code [M] | 455 |
 | Cyclomatic complexity [C] | 72.0 |
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 67% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 11 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 11 |
+| Pass rate | 100% |
+| Duration | 4.1s |

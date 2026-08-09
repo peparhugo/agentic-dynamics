@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** Flask Task Management API with JWT and SQLite...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:14:11
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:20:33
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 4.3% |
-| Quality/$ [C] | 62 |
-| Quality/J [C] | 0.0003 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 89% (42/47 tests) [M] |
 | Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 840 |
 | Cyclomatic complexity [C] | 80.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0163  |  **Energy:** ~3880J  |  **Thinking:** 4%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 89%  |  **Cost:** $0.0163  |  **Energy:** ~3880J  |  **Thinking:** 4%
 
 ---
 
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 3 |
 | Test file rate | 25% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 42 |
+| Failed | 5 |
+| Errors | 0 |
+| Total | 47 |
+| Pass rate | 89% |
+| Duration | 20.5s |

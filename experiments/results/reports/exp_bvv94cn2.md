@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [invert_constraint_s0.5] typescript_ssg...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:18:55
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:30:01
 
 ---
 
@@ -34,7 +34,7 @@
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 80% (0/0 tests) [H] |
+| Correctness | 100% (7/7 tests) [M] |
 | Constraint satisfaction [H] | 29% (2/7 constraints) |
 | Lines of code [M] | 1115 |
 | Cyclomatic complexity [C] | 113.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** EXPLORATORY  |  **Correctness:** 80%  |  **Cost:** $0.0243  |  **Energy:** ~6268J  |  **Thinking:** 9%
+**Strategy:** EXPLORATORY  |  **Correctness:** 100%  |  **Cost:** $0.0243  |  **Energy:** ~6268J  |  **Thinking:** 9%
 
 ---
 
@@ -102,3 +102,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 0 |
 | Test file rate | 0% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 7 |
+| Failed | 0 |
+| Errors | 0 |
+| Total | 7 |
+| Pass rate | 100% |
+| Duration | 4.0s |

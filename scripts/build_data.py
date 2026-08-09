@@ -46,9 +46,9 @@ MODEL_DISPLAY_ORDER = [
 ]
 
 PROVIDER_PRICING = {
-    "deepseek": {"input": 0.27, "output": 1.10, "cache_read": 0.14, "cache_write": 1.10},
-    "anthropic": {"input": 3.00, "output": 15.00, "cache_read": 3.00, "cache_write": 15.00},
-    "openai": {"input": 1.25, "output": 5.00, "cache_read": 0.625, "cache_write": 5.00},
+    "deepseek": {"input": 0.27, "output": 1.10, "cache_read": 0.14, "cache_write": 0.27},
+    "anthropic": {"input": 3.00, "output": 15.00, "cache_read": 0.30, "cache_write": 3.75},
+    "openai": {"input": 1.25, "output": 10.00, "cache_read": 0.625, "cache_write": 2.50},
 }
 
 
@@ -64,6 +64,22 @@ def _parse_model_id(model_str):
         if mid in model_str:
             return mid
     return model_str
+
+
+def _bootstrap_ci(vals, n_resamples=1000, ci=95):
+    """Compute bootstrap confidence interval for the mean."""
+    import random as _rnd
+    if len(vals) < 2:
+        return None, None
+    _rng = _rnd.Random(42)
+    means = []
+    for _ in range(n_resamples):
+        sample = [_rng.choice(vals) for _ in range(len(vals))]
+        means.append(sum(sample) / len(sample))
+    means.sort()
+    lo_idx = int((100 - ci) / 2 * n_resamples / 100)
+    hi_idx = n_resamples - lo_idx - 1
+    return round(means[lo_idx], 4), round(means[hi_idx], 4)
 
 
 def load_inventory():
@@ -210,11 +226,15 @@ def compute_model_data(inventory, summary, db_breakdown):
             "label": label,
             "provider": provider,
             "sessions": inv.get("sessions", 0),
+            "n_reports": len(reports),
+            "n_valid": len(valid),
+            "n_narrated": len(narrated),
             "reports": len(reports),
             "reports_valid": len(valid),
             "reports_narrated": len(narrated),
             "avg_cost": avg_cost,
             "total_cost": total_cost,
+            "cost_ci95": list(_bootstrap_ci([r.get("cost", 0) for r in valid])) if len(valid) >= 5 else None,
             "pass_rate": pass_rate_val or "N/A",
             "strategy_cons": strategies["conservative"],
             "strategy_expl": strategies["exploratory"],
@@ -394,12 +414,16 @@ def build():
             if op not in op_comparison:
                 op_comparison[op] = {"perturbation_class": pc, "models": {}}
             op_comparison[op]["models"][model_label] = {
-                "count": agg.get("count", 0),
+                "n": agg.get("n", agg.get("count", 0)),
                 "avg_cost": agg.get("cost_avg", 0),
+                "cost_ci95": [agg.get("cost_ci95_lo"), agg.get("cost_ci95_hi")] if agg.get("cost_ci95_lo") is not None else None,
                 "avg_escape": agg.get("escape_avg", 0),
+                "escape_ci95": [agg.get("escape_ci95_lo"), agg.get("escape_ci95_hi")] if agg.get("escape_ci95_lo") is not None else None,
                 "avg_correctness": agg.get("correctness_avg", 0),
+                "correctness_ci95": [agg.get("correctness_ci95_lo"), agg.get("correctness_ci95_hi")] if agg.get("correctness_ci95_lo") is not None else None,
                 "avg_thinking_ratio": agg.get("thinking_ratio_avg", 0),
                 "avg_energy_j": agg.get("energy_total_j_avg", 0),
+                "low_n": (agg.get("n", agg.get("count", 0)) < 5),
             }
 
     # ── Perturbation class breakdown — manifold vs semantic vs baseline ──
@@ -431,10 +455,14 @@ def build():
         for label, pb in pc_models.items():
             n = pb["count"]
             pert_class_summary[pc][label] = {
-                "count": n,
+                "n": n,
+                "low_n": n < 5,
                 "avg_cost": round(sum(pb["costs"]) / n, 4),
+                "cost_ci95": list(_bootstrap_ci(pb["costs"])) if n >= 5 else None,
                 "avg_escape": round(sum(pb["escapes"]) / n, 2),
+                "escape_ci95": list(_bootstrap_ci(pb["escapes"])) if n >= 5 else None,
                 "avg_correctness": round(sum(pb["correctness"]) / n, 2),
+                "correctness_ci95": list(_bootstrap_ci(pb["correctness"])) if n >= 5 else None,
                 "avg_thinking_ratio": round(sum(pb["thinking_ratios"]) / n, 3),
                 "avg_loc": round(sum(pb["locs"]) / n),
                 "avg_tokens": round(sum(pb["tokens"]) / n),

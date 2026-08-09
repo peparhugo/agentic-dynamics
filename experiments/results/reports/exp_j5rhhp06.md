@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [standardized_test] deepseek...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:21:44
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:34:54
 
 ---
 
@@ -12,7 +12,7 @@
 **Classification:** CONSERVATIVE
 **Score:** 0.804
 
-**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.63) with moderate resource use ($0.0091, ~2196J). Attractor basin held. Perturbation was handled in-manifold.
+**Verdict:** CONSERVATIVE — model maintained sound reasoning (correctness=100%, quality=0.68) with moderate resource use ($0.0091, ~2196J). Attractor basin held. Perturbation was handled in-manifold.
 
 **Recommendation:** Reliable but not novel. Good for production, not for exploration.
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 100% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 43% (3/7 constraints) |
+| Constraint satisfaction [H] | 57% (4/7 constraints) |
 | Lines of code [M] | 369 |
 | Cyclomatic complexity [C] | 41.0 |
 | Code quality [H] | 0.271 |
 | Novelty vs baseline [H] | 0.669 |
-| **Composite [H]** | **0.633** |
+| **Composite [H]** | **0.676** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~2196 J** |
 | Solution density [C] | 0.025942 LOC/tok |
 | Correctness/$ [C] | 48 |
-| Quality/J [C] | 0.000288 |
+| Quality/J [C] | 0.000308 |
 
 ---
 

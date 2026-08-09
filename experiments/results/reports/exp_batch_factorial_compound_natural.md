@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [batch:factorial_compound:baseline] ds_natural...
 **Operator:** baseline (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:16:52
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:27:51
 
 ---
 
@@ -21,20 +21,20 @@
 ## Reasoning Dynamics
 | Metric | Value |
 |--------|-------|
-| Escape score [H] | 0.000 |
-| Architecture div [H] | 0.000 |
-| Structure div [H] | 0.000 |
+| Escape score [H] | nan |
+| Architecture div [H] | nan |
+| Structure div [H] | nan |
 | Thinking ratio [C] | 6.0% |
-| Quality/$ [C] | 47 |
-| Quality/J [C] | 0.0002 |
-| Converged back [H] | True |
+| Quality/$ [C] | nan |
+| Quality/J [C] | nan |
+| Converged back [H] | None |
 
 ---
 
 ## Solution Quality
 | Metric | Value |
 |--------|-------|
-| Correctness | 100% (0/0 tests) [H] |
+| Correctness | 92% (81/88 tests) [M] |
 | Constraint satisfaction [H] | 43% (3/7 constraints) |
 | Lines of code [M] | 1537 |
 | Cyclomatic complexity [C] | 197.0 |
@@ -68,7 +68,7 @@
 ---
 
 ## Headline Metric
-**Strategy:** CONSERVATIVE  |  **Correctness:** 100%  |  **Cost:** $0.0215  |  **Energy:** ~5645J  |  **Thinking:** 6%
+**Strategy:** CONSERVATIVE  |  **Correctness:** 92%  |  **Cost:** $0.0215  |  **Energy:** ~5645J  |  **Thinking:** 6%
 
 ---
 
@@ -99,3 +99,17 @@ Raw session transcript and generated source code for independent verification.
 | Test files | 2 |
 | Test file rate | 40% |
 | Parse errors | 0 |
+
+
+---
+
+## Pytest Results
+
+| Metric | Value |
+|--------|-------|
+| Passed | 81 |
+| Failed | 7 |
+| Errors | 0 |
+| Total | 88 |
+| Pass rate | 92% |
+| Duration | 43.6s |

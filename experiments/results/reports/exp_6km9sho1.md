@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [inject_phantom_success_s0.5] cd_gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:14:43
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:21:40
 
 ---
 

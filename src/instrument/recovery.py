@@ -78,8 +78,24 @@ def classify_trajectory_segments(
     2. Behavioral convergence: tool calls returning to baseline patterns
     """
     markers = recovery_markers or _default_recovery_markers()
-    baseline_tools = set(baseline.tool_call_sequence())
-    perturbed_tools = perturbed.tool_call_sequence()
+    baseline_tools_set = set(baseline.tool_call_sequence())
+    baseline_tool_seq = baseline.tool_call_sequence()
+    perturbed_tool_seq = perturbed.tool_call_sequence()
+
+    # Build index maps: for each step index, what position in the filtered tool sequence?
+    perturbed_step_to_tool_idx: dict[int, int] = {}
+    _tool_pos = 0
+    for _i, _s in enumerate(perturbed.steps):
+        if _s.tool_name:
+            perturbed_step_to_tool_idx[_i] = _tool_pos
+            _tool_pos += 1
+
+    baseline_step_to_tool_idx: dict[int, int] = {}
+    _tool_pos = 0
+    for _i, _s in enumerate(baseline.steps):
+        if _s.tool_name:
+            baseline_step_to_tool_idx[_i] = _tool_pos
+            _tool_pos += 1
 
     classifications: list[SegmentClassification] = []
 
@@ -94,13 +110,15 @@ def classify_trajectory_segments(
             signals.append((confidence, f"recovery markers found: {marker_hits}"))
 
         # Signal 2: behavioral convergence — using same tools as baseline
-        if step.tool_name and step.tool_name in baseline_tools:
-            # If we're at the same step index in baseline, this is expected.
-            # If this is a different tool showing up, it's recovery.
+        if step.tool_name and step.tool_name in baseline_tools_set:
+            pt_idx = perturbed_step_to_tool_idx.get(i)
+            bt_idx = baseline_step_to_tool_idx.get(i)
             baseline_has_at_index = (
-                i < len(perturbed_tools)
-                and i < len(baseline.tool_call_sequence())
-                and perturbed_tools[i] == baseline.tool_call_sequence()[i]
+                pt_idx is not None
+                and bt_idx is not None
+                and pt_idx < len(perturbed_tool_seq)
+                and bt_idx < len(baseline_tool_seq)
+                and perturbed_tool_seq[pt_idx] == baseline_tool_seq[bt_idx]
             )
             if not baseline_has_at_index:
                 signals.append((0.4, f"tool '{step.tool_name}' converges toward baseline"))

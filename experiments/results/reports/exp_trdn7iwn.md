@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_alien_vocab_s0.5] typescript_ssg...
 **Operator:** perturbed (manifold, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:25:54
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:41:31
 
 ---
 

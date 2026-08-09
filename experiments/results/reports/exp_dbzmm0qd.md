@@ -2,7 +2,7 @@
 
 **Model:** deepseek/deepseek-v4-pro  |  **Task:** [shift_framing_s0.5] typescript_ssg...
 **Operator:** perturbed (manifold, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:19:05
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:30:35
 
 ---
 
@@ -35,12 +35,12 @@
 | Metric | Value |
 |--------|-------|
 | Correctness | 80% (0/0 tests) [H] |
-| Constraint satisfaction [H] | 14% (1/7 constraints) |
+| Constraint satisfaction [H] | 0% (0/7 constraints) |
 | Lines of code [M] | 439 |
 | Cyclomatic complexity [C] | 48.0 |
 | Code quality [H] | 0.228 |
 | Novelty vs baseline [H] | 0.967 |
-| **Composite [H]** | **0.513** |
+| **Composite [H]** | **0.471** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~3394 J** |
 | Solution density [C] | 0.022928 LOC/tok |
 | Correctness/$ [C] | 16 |
-| Quality/J [C] | 0.000151 |
+| Quality/J [C] | 0.000139 |
 
 ---
 

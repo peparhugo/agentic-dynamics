@@ -2,7 +2,7 @@
 
 **Model:** anthropic/claude-fable-5  |  **Task:** [inject_phantom_success_s0.5_r2] cd_claude_2rep...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:24:10
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:38:16
 
 ---
 

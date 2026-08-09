@@ -79,14 +79,22 @@ class InstrumentedAdapter:
             result = self._adapter(prompt, model=effective_model, timeout=timeout)
             # Support both object attributes and dict keys
             if isinstance(result, dict):
-                return result.get("text", ""), result.get("completion_tokens", 0) or result.get("total_tokens", 0) or 0, result.get("estimated_cost_usd", 0) or result.get("cost", 0.0)
-            return getattr(result, "text", ""), getattr(result, "completion_tokens", 0) or getattr(result, "total_tokens", 0) or 0, getattr(result, "estimated_cost_usd", 0.0)
+                text = result.get("text", "")
+                tokens = result.get("completion_tokens", 0) or result.get("total_tokens", 0) or 0
+                cost = result.get("estimated_cost_usd", 0) or result.get("cost", 0.0)
+                prompt_tokens = result.get("prompt_tokens", 0) or 0
+                return text, tokens, cost, prompt_tokens
+            text = getattr(result, "text", "")
+            tokens = getattr(result, "completion_tokens", 0) or getattr(result, "total_tokens", 0) or 0
+            cost = getattr(result, "estimated_cost_usd", 0.0)
+            prompt_tokens = getattr(result, "prompt_tokens", 0) or 0
+            return text, tokens, cost, prompt_tokens
 
         t0 = time.monotonic()
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(_call)
             try:
-                text, tokens, cost = future.result(timeout=timeout + 10)
+                text, tokens, cost, prompt_tokens = future.result(timeout=timeout + 10)
             except concurrent.futures.TimeoutError:
                 raise InvokeTimeoutError(
                     f"LLM invoke exceeded {timeout}s timeout for turn '{thought}' "
@@ -103,7 +111,7 @@ class InstrumentedAdapter:
             tokens_used=tokens,
         )
         self._steps.append(step)
-        self._total_input_tokens += result.prompt_tokens or 0
+        self._total_input_tokens += prompt_tokens
         self._total_output_tokens += tokens
         self._total_cost += cost
         self._total_duration += duration

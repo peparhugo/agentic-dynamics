@@ -61,7 +61,11 @@ def persist_to_lab_book(result: ExperimentResult, output_dir: Path | None = None
 
     for r in result.runs:
         cls = "manifold" if r.operator in _MANIFOLD_OPS else "semantic"
-        body.append(f"| {r.operator} | {r.strength} | {r.basin.escape_score:.3f} | {r.recovery_ratio:.3f} | {cls} | {r.basin.get_verdict()[:50]} |")
+        try:
+            rr = getattr(r, "recovery_ratio", r.basin.thinking_ratio)
+        except Exception:
+            rr = 0.0
+        body.append(f"| {r.operator} | {r.strength} | {r.basin.escape_score:.3f} | {rr:.3f} | {cls} | {r.basin.get_verdict()[:50]} |")
 
     body += ["", f"**Manifold avg escape:** {m_avg:.3f}  **Semantic avg escape:** {s_avg:.3f}  **Delta:** {m_avg-s_avg:+.3f}",
              "", "## Conclusion", f"**Null hypothesis:** {conclusion['null_status']}", f"**Reasoning:** {conclusion['reasoning']}"]

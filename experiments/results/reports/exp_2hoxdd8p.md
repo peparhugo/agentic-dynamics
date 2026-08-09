@@ -2,7 +2,7 @@
 
 **Model:** openai/gpt-5-nano  |  **Task:** [standardized_retry] gpt_5_nano...
 **Operator:** perturbed (semantic, strength=0.0)
-**Repetitions:** 1  |  **Timestamp:** 2026-08-07T14:13:25
+**Repetitions:** 1  |  **Timestamp:** 2026-08-09T18:18:45
 
 ---
 
@@ -40,7 +40,7 @@
 | Cyclomatic complexity [C] | 41.0 |
 | Code quality [H] | 0.407 |
 | Novelty vs baseline [H] | 0.966 |
-| **Composite [H]** | **0.557** |
+| **Composite [H]** | **0.600** |
 
 ---
 
@@ -63,7 +63,7 @@
 | **Total energy [X]** | **~6910 J** |
 | Solution density [C] | 0.006409 LOC/tok |
 | Correctness/$ [C] | 1 |
-| Quality/J [C] | 0.000081 |
+| Quality/J [C] | 0.000087 |
 
 ---
 
