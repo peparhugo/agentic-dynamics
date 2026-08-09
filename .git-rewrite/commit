@@ -1,0 +1,14 @@
+tree 6d22c1734513477f3b13d549a491163078e91839
+parent 67bedd22abf95a1d5e9aa3e6c36cc77000b6d2f0
+author ChaosClaw <chaosclaw@local.invalid> 1786123367 +0200
+committer ChaosClaw <chaosclaw@local.invalid> 1786123367 +0200
+
+Merge Rule 5 (Cost-Per-Pass) into Rule 10 (First-Pass/WOC): 11 -> 10 rules
+
+- Deleted standalone Rule 5 (Cost-Per-Pass) — same concept as WOC
+- Promoted old Rule 10 (First-Pass/WOC) to new Rule 5
+- Renumbered Outcome Multiplier from 11 to 10
+- Updated all rule counts: 11 -> 10, 5+6 -> 5+5 extensions
+- Updated glossary: merged Cost-Per-Pass into WOC/First-Pass entry
+- Updated autonomous-workloads: Rules 6-10 -> Rules 6-9
+- Fixed all cross-references across 10 pages

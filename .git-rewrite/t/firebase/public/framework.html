@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI FinOps Framework — Your AI bill is a black box. This framework opens it.</title>
+<meta name="description" content="The comprehensive AI FinOps Framework: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 248 experiment sessions.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.fsec{padding:4rem 2rem;position:relative}
+.fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
+.inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
+.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
+.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
+h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
+.exec{background:rgba(22,27,34,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(99,102,241,0.1);border-radius:14px;padding:1.8rem;margin:2rem 0;text-align:left}
+.exec h3{color:var(--ac);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem}
+.exec li{margin:0.5rem 0;font-size:0.85rem;line-height:1.6;color:var(--t2);list-style:none;padding-left:1.5rem;position:relative}
+.exec li::before{content:'';position:absolute;left:0;top:0.55rem;width:8px;height:8px;border-radius:50%;background:var(--ac)}
+.exec strong{color:var(--t)}
+.card .cname{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;color:var(--t)}
+.card .cval{font-size:1.4rem;font-weight:800;color:var(--ac)}
+.card .cval.amber{color:var(--am)}
+.card .csub{font-size:0.72rem;color:var(--t2);margin:0.3rem 0}
+.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0.3rem 0;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
+.card .ctag.cyan{background:rgba(34,211,238,0.08);color:var(--cy);border:1px solid rgba(34,211,238,0.15)}
+.bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
+.bar .fill{height:100%;border-radius:2px;transition:width .5s;background:var(--ac)}
+.bar .fill.amber{background:var(--am)}.bar .fill.cyan{background:var(--cy)}
+.wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7}
+.wtm strong{color:var(--t)}
+.constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0;max-width:650px;margin-left:auto;margin-right:auto}
+.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.45rem 0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--b);font-size:0.78rem}
+.cr.head{background:var(--bg4);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
+.cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--t3)}.cr .ck{text-align:center}
+.rules-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:720px;margin:1rem auto}
+.rule{display:flex;align-items:flex-start;gap:1.2rem;padding:0.9rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-radius:10px;font-size:0.85rem;text-align:left}
+.rule .rn{font-size:1.6rem;font-weight:800;min-width:2rem;text-align:center;flex-shrink:0;color:var(--ac)}
+.rule .rn.amber{color:var(--am)}.rule .rn.purple{color:#a78bfa}
+.rule .rt{flex:1}.rule .rt strong{color:var(--t)}.rule .rt .rm{display:block;font-size:0.72rem;color:var(--t3);margin-top:0.2rem}
+.rule .rt .badge-ext{display:inline-block;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.3rem;background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.2)}
+.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.6rem;max-width:780px;margin:1rem auto}
+.param{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1rem;text-align:left}
+.param .psym{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;color:var(--ac);margin-bottom:0.2rem}
+.param .pname{font-size:0.72rem;color:var(--t2)}
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}
+.door{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left}
+.door.tw{border-left:3px solid var(--ac)}.door.ow{border-left:3px solid var(--am)}
+.door h3{font-size:0.9rem;margin-bottom:0.5rem}.door.tw h3{color:var(--ac)}.door.ow h3{color:var(--am)}
+.door p,.door li{font-size:0.82rem;color:var(--t2);line-height:1.6;margin:0.3rem 0}.door ul{list-style:none;padding:0}.door li::before{content:'\2192 ';color:var(--t3)}
+.roi-calc{background:rgba(22,27,34,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(99,102,241,0.1);border-radius:12px;padding:1.5rem;margin:1rem 0;text-align:left}
+.roi-calc .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+.roi-calc label{display:block;font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3);margin-bottom:0.3rem}
+.roi-calc input[type=range]{width:100%;accent-color:var(--ac)}
+.roi-calc .val{font-size:0.72rem;color:var(--ac);font-family:'JetBrains Mono',monospace}
+.roi-out{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.6rem;margin-top:1rem}
+.roi-out .o{background:var(--bg4);border-radius:8px;padding:0.8rem;text-align:center}
+.roi-out .o .ov{font-size:1.2rem;font-weight:800;color:var(--ac);transition:color .15s}
+.roi-out .o .ov.flash{color:#818CF8}
+.roi-out .o .ov.amber{color:var(--am)}
+.roi-out .o .ol{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.2rem}
+.chart-wrap{max-width:700px;margin:1rem auto}.chart-wrap canvas{width:100%!important}
+.risk-box{background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);border-radius:12px;padding:1.3rem;font-size:0.85rem;color:var(--t2);line-height:1.7;display:flex;align-items:flex-start;gap:1rem}
+.risk-box .icon{font-size:1.8rem;flex-shrink:0}.risk-box strong{color:var(--am)}
+.refs{font-size:0.72rem;color:var(--t3);line-height:1.7;margin:1rem 0}.refs strong{color:var(--t2)}
+.card .detail{display:none;font-size:0.72rem;color:var(--t3);line-height:1.6;margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid var(--b)}
+.card.expanded .detail{display:block}
+.model-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1.2rem 0}
+.chart-toggle-row{display:flex;justify-content:center;gap:0.5rem;margin-top:0.8rem;font-size:0.7rem;flex-wrap:wrap}
+.callout-box{background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:1.3rem;font-size:0.85rem;color:var(--t2);line-height:1.7;text-align:center}
+.callout-box strong{color:var(--ac)}
+@media(max-width:768px){.fsec{padding:3rem 1rem}.doors{grid-template-columns:1fr}.roi-calc .row{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}.params{grid-template-columns:1fr}}@media(max-width:550px){.cards{grid-template-columns:1fr}.model-cards{grid-template-columns:1fr}}
+</style>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+
+<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="model-cards.html" class="topbar-link">Model Cards</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+
+<!-- SECTION: The Ten Rules -->
+<section class="fsec" id="rules"><div class="inr">
+<div class="pulse">The Ten Rules</div>
+<h2>Here is how you govern<br>AI costs — and scale your business.</h2>
+<p class="lead">Rules 1–5 are empirically grounded in 248 instrumented experiment sessions. Rules 6–10 extend the framework to autonomous workloads and business outcomes.</p>
+<div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(99,102,241,0.04);border:1px solid rgba(99,102,241,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Engineering teams of 5+ running Python/Flask workloads with annual AI spend exceeding $100K. Validated on REST APIs, CRUD applications, and real-time collaboration frontends. If your domain differs (TypeScript, Rust, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
+<div class="rules-grid">
+<div class="rule"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation &mdash; producing zero code despite high token output &mdash; it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across two dimensions: semantic (logical corruption &mdash; false premises, inverted constraints) and manifold (linguistic distortion &mdash; alien vocabulary, framing shifts).<span class="rm">Concept: Grit (Ground-Truth Integrity) &middot; Lever: C&#8320;</span></div></div>
+<div class="rule"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS. In successful sessions, the ratio of explanatory tokens to code tokens. DeepSeek: ~3% overhead. Claude: ~50% overhead. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
+<div class="rule"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
+<div class="rule"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
+<div class="rule"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
+<div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">6</div><div class="rt"><strong>The Batch Discount.</strong> Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in &lt;4 hours, run in batch. Monitor queue depth. <span class="badge-ext">Extension</span><span class="rm">Concept: Batch Economics &middot; Lever: b, Q</span></div></div>
+<div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">7</div><div class="rt"><strong>The Budget Ceiling.</strong> Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job &times; (1 + retry_rate)). Double your budget, double your capacity &ndash; zero hiring required. <span class="badge-ext">Extension</span><span class="rm">Concept: Throughput Cap &middot; Lever: W (jobs/day)</span></div></div>
+<div class="rule" style="border-left:3px solid var(--am)"><div class="rn amber">8</div><div class="rt"><strong>The Cascade Rule.</strong> In autonomous workloads, failures auto-escalate through model tiers: Flash &rarr; Sonnet &rarr; Opus &rarr; Human. A 1% escalation to human review can double your total cost. Design for &lt;1% escalation. <span class="badge-ext">Extension</span><span class="rm">Concept: Auto-Escalation &middot; Lever: E&#8340; (28.2&times; measured: DS &rarr; GPT-5.6)</span></div></div>
+<div class="rule" style="border-left:3px solid var(--am)"><div class="rn purple">9</div><div class="rt"><strong>The SLA Buffer.</strong> Actual batch completion time = (Queue_length &times; Avg_job_time) + (Retry_buffer &times; retry_rate). Never batch jobs with an SLA less than 2&times; your observed queue depth. Always have an on-demand fallback. <span class="badge-ext">Extension</span><span class="rm">Concept: Batch SLA &middot; Lever: Slack Buffer</span></div></div>
+<div class="rule" style="border-left:3px solid var(--ac)"><div class="rn">10</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
+</div>
+</div></section>
+
+<!-- SECTION: The Levers -->
+<section class="fsec" id="levers"><div class="inr wide">
+<div class="pulse">The Levers</div>
+<h2>What you control. What compounds.<br>What you must model.</h2>
+<p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment sessions. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
+
+<h3 style="color:var(--ac);margin:1.5rem 0 0.5rem;text-align:center">Augmented Workforce (Rules 1&ndash;5)</h3>
+<p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
+<div class="params">
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac);font-size:0.68rem">C&#8320; sub-lever</div><div class="pname"><strong>Cache Strategy.</strong> Cache write strategy: Store context at $15/Mtok (Claude default). Cache read strategy: Retrieve existing context at $0.14/Mtok (DeepSeek default). Two-way door &mdash; measure your cache hit rate before committing. If &lt;50% reuse, switch to cache-read.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Explanation Tax ranges from 3% (DeepSeek) to 120% (nano). Pay only when you need auditable reasoning.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">&beta;</div><div class="pname"><strong>Context inflation per line.</strong> Compounds quadratically through the Snowball Rule (N&sup2;). Default 0.001 — calibrate to your codebase growth rate.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div></div>
+</div>
+
+<h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Autonomous Workloads (Rules 6&ndash;9)</h3>
+<p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
+<div class="params">
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 248 experiments. Drives the retry penalty R(r, E&#8340;).</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Measured: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:#F59E0B">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div></div>
+</div>
+</div></section>
+
+<!-- SECTION: The Cost Model -->
+<section class="fsec" id="model"><div class="inr wide">
+<div class="pulse">The Model</div>
+<h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Every term was measured empirically &ndash; no parameter is theoretical.</p>
+
+<div style="max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.8rem">
+<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--ac);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<strong style="color:var(--ac)">Augmented Workforce</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span><br>
+c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>
+C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>
+CostPerOutcome = C(K/P, v)/K<br>
+C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]
+</div>
+<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--am);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<strong style="color:var(--am)">Autonomous Workloads</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span><br>
+C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>
+C<sub>auto</sub> = W&times;C<sub>job</sub><br>
+T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br>
+<span style="color:var(--t3);font-size:0.7em">r=0.115&rarr;WOC=<span data-stat-fmt="woc">0.90</span> &middot; E&#8340;=28.2&times;</span>
+</div>
+<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--cy);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
+<strong style="color:var(--cy)">Business Value Index</strong> <span style="color:var(--t3);font-size:0.7em">(Rule 10)</span><br>
+BVI = WOC/(C<sub>job</sub>+H/W)<br>
+<span style="color:var(--t3)">= successful outcomes per total dollar</span><br>
+C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
+</div>
+</div>
+<div class="chart-wrap"><canvas id="costChart" style="max-width:600px"></canvas></div>
+<div class="chart-toggle-row">
+<span style="color:var(--t3)">Projection:</span>
+<a href="#" onclick="rebuildChart(3);return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="yr3">3 yr</a>
+<a href="#" onclick="rebuildChart(10);return false" style="color:var(--t3);text-decoration:none" id="yr10">10 yr</a>
+<a href="#" onclick="rebuildChart(25);return false" style="color:var(--t3);text-decoration:none" id="yr25">25 yr</a>
+<span style="color:var(--t3);margin:0 0.5rem">|</span>
+<span style="color:var(--t3)">EPM:</span>
+<a href="#" onclick="buildChart(chartYears,'baseline','cost');updateChartToggle('vwCost','vwThroughput');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="epmBase">Baseline</a>
+<a href="#" onclick="buildChart(chartYears,'sensitivity','cost');updateChartToggle('vwCost','vwThroughput');return false" style="color:var(--t3);text-decoration:none" id="epmSens">DS Scenarios</a>
+<span style="color:var(--t3);margin:0 0.5rem">|</span>
+<span style="color:var(--t3)">View:</span>
+<a href="#" onclick="buildChart(chartYears,chartMode,'cost');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="vwCost">Cost</a>
+<a href="#" onclick="buildChart(chartYears,chartMode,'throughput');updateChartToggle('vwThroughput','vwCost');return false" style="color:var(--t3);text-decoration:none" id="vwThroughput">Throughput</a>
+</div>
+<p class="note">Baseline projections at IEA EPM (1.6%/yr). Use 3yr for quarterly budgeting. Use 10yr for strategic planning. Toggle to DS Scenarios for aggressive (2.5%) and optimistic (0.8%) energy paths. Operationalizes the <strong style="color:var(--am)">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
+<div class="stats"><div class="stat"><div class="v">—</div><div class="l">DS Monthly Cost</div><div class="s">Use calculator above — &beta;·v·N&sup2; depends on your inputs</div></div><div class="stat"><div class="v amber">—</div><div class="l">Claude Monthly Cost</div><div class="s">Use calculator above — same team, same output</div></div><div class="stat"><div class="v">1.6%</div><div class="l">EPM Annual Rate</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">2.5%</div><div class="l">Aggressive Scenario</div><div class="s">Toggle on chart to compare</div></div><div class="stat"><div class="v" style="color:var(--cy)">~667K</div><div class="l">Max Jobs/Day</div><div class="s">$10K budget, $0.015/job (no retry/batch)</div></div><div class="stat"><div class="v amber" data-stat="woc_percent">90%</div><div class="l">WOC Ratio</div><div class="s">Calculated: 1/(1+0.115)</div></div></div>
+</div></section>
+
+<!-- SECTION: Interactive Calculator -->
+<section class="fsec" id="calculator"><div class="inr wide">
+<div class="pulse">Project Your Costs</div>
+<h2>Turn the equation into<br>your quarterly budget.</h2>
+<p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for unsupervised batch processing. Every adjustment recalculates your projected spend in real time.</p>
+
+<div style="display:flex;justify-content:center;gap:0.5rem;margin:1rem 0">
+<button id="btnAugmented" onclick="setCalcMode('augmented')" style="background:var(--ac);color:#09090b;border:none;border-radius:100px;padding:0.5rem 1.5rem;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:inherit">Augmented Workforce</button>
+<button id="btnAutonomous" onclick="setCalcMode('autonomous')" style="background:transparent;color:var(--t2);border:1px solid var(--ba);border-radius:100px;padding:0.5rem 1.5rem;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:inherit">Autonomous Workloads</button>
+</div>
+
+<div class="roi-calc">
+<div id="calcAugmented">
+<div class="row"><div><label>Team Size <span class="val" id="v_eng">10</span> engineers</label><input type="range" min="1" max="100" value="10" oninput="updateROI()" id="r_eng"></div><div><label>Sessions / Engineer / Day <span class="val" id="v_ses">20</span></label><input type="range" min="1" max="100" value="20" oninput="updateROI()" id="r_ses"></div></div>
+<div class="row"><div><label>Velocity <span class="val" id="v_vel">500</span> lines/session</label><input type="range" min="50" max="2000" value="500" oninput="updateROI()" id="r_vel"></div><div><label>Working Days / Month <span class="val" id="v_day">20</span></label><input type="range" min="15" max="25" value="20" oninput="updateROI()" id="r_day"></div></div>
+<div class="row"><div><label>Energy Scenario <span class="val" id="v_epm">Baseline (1.00&times;)</span></label><input type="range" min="0" max="2" value="0" oninput="updateROI()" id="r_epm"></div><div><label>Engineer Loaded Cost / Month <span class="val" id="v_cost">$20,000</span></label><input type="range" min="5000" max="50000" value="20000" oninput="updateROI()" id="r_cost"></div></div>
+<div class="row"><div><label>EPM Annual Rate <span class="val" id="v_rate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_rate"></div><div><label>Monthly AI Budget Cap <span class="val" id="v_budget">$10,000</span></label><input type="range" min="500" max="500000" value="10000" step="500" oninput="updateROI()" id="r_budget"></div></div>
+</div>
+<div id="calcAutonomous" style="display:none">
+<div class="row"><div><label>Workload <span class="val" id="v_workload">5,000</span> jobs/day</label><input type="range" min="100" max="100000" value="5000" oninput="updateROI()" id="r_workload"></div><div><label>Batch Fraction <span class="val" id="v_batch">70</span>%</label><input type="range" min="0" max="100" value="70" oninput="updateROI()" id="r_batch"></div></div>
+<div class="row"><div><label>Retry Rate <span class="val" id="v_retry">11.5</span>% (measured)</label><input type="range" min="0" max="100" value="11.5" step="0.1" oninput="updateROI()" id="r_retry"></div><div><label>Escalation Tier <span class="val" id="v_escalation">DeepSeek &rarr; GPT-5.6 (28.2&times;)</span></label><input type="range" min="1" max="4" value="2" oninput="updateROI()" id="r_escalation"></div></div>
+<div class="row"><div><label>Baseline Cost / Job <span class="val" id="v_ac0">$0.015</span></label><input type="range" min="1" max="200" value="15" oninput="updateROI()" id="r_ac0"></div><div><label>EPM Annual Rate <span class="val" id="v_arate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_arate"></div></div>
+</div>
+<div class="roi-out" id="roi_output"></div>
+<p style="font-size:0.68rem;color:var(--ac);text-align:center;margin-top:0.5rem;font-family:'JetBrains Mono',monospace" id="roi_context"></p>
+<div id="howComputed" style="display:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;margin-top:1rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;line-height:1.8;color:var(--t2);text-align:left;overflow-x:auto"></div>
+<button onclick="toggleHow()" style="display:block;margin:1rem auto 0;background:none;border:1px solid var(--ba);color:var(--t3);padding:0.4rem 1rem;border-radius:100px;font-size:0.7rem;cursor:pointer;font-family:inherit;transition:all .2s" onmouseover="this.style.color='var(--ac)'" onmouseout="this.style.color='var(--t3)'">Show how this is computed</button></div>
+</div></section>
+
+<!-- SECTION: Decision Framework -->
+<section class="fsec" id="decisions"><div class="inr">
+<div class="pulse">Decision Framework</div>
+<h2>When to move fast.<br>When to model thoroughly.</h2>
+<div class="doors">
+<div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
+<div class="door ow"><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:var(--am)">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting MoE vs dense architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--am)">Model cumulative cost. Project 36 months.</p></div>
+<div class="door" style="border-left:3px solid var(--cy)"><h3 style="color:var(--cy)">Autonomous Doors</h3><p>Decisions affecting <strong style="color:var(--cy)">batch routing, escalation chains, and SLA windows</strong>. Commit your autonomous workforce architecture for years.</p><ul><li>Batch vs on-demand workstream split</li><li>Escalation cascade design (which model when)</li><li>WOC ratio targets and retry budgets</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--cy)">Design for &lt;1% human escalation. Measure WOC daily.</p></div>
+</div>
+<p class="note" style="max-width:600px;margin:0 auto">Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</p>
+<div class="callout-box" style="margin-top:1rem"><strong>30-day implementation:</strong> Week 1: Classify tasks by complexity. Week 2: Default-route constrained tasks to silent models. Week 3: Establish verification gates and escalation paths. Week 4: Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
+</div></section>
+
+<!-- SECTION: Model Cards -->
+<section class="fsec" id="modelcards"><div class="inr">
+<div class="pulse">Model Cards</div>
+<h2>Narration costs 24&ndash;120%.<br>See detailed model profiles &rarr;</h2>
+<div class="callout-box" style="margin-top:1rem"><strong>See detailed model profiles &rarr; <a href="model-cards.html" style="color:var(--ac)">model-cards.html</a></strong></div>
+<p class="note">All 3 architectures (GPT dense, DeepSeek MoE, Claude dense) across 8 variants produce structurally sound code (AST-verified across 2,416 Python files). Test pass rates and token economics vary dramatically by architecture — not by capability.</p>
+</div></section>
+
+<!-- SECTION: Provider Playbook Summary -->
+<section class="fsec" id="playbook"><div class="inr wide">
+<div class="pulse">The Provider Playbook</div>
+<h2>How DeepSeek, OpenAI, and Anthropic<br>map to your cost levers.</h2>
+<p class="lead">Each lever has a provider-specific implementation. Default to DeepSeek Flash for routine. Cache everything. Cap TPM per environment. Batch what can wait.</p>
+<div class="tbl" style="max-width:800px"><table><thead><tr><th>Lever</th><th>DeepSeek</th><th>OpenAI</th><th>Anthropic</th></tr></thead><tbody>
+<tr><td><strong style="color:var(--ac)">C&#8320;</strong> (Model Cost)</td><td>Route routine to <strong>Flash</strong> ($0.14/M)</td><td>Route to <strong>GPT-4o-mini</strong></td><td>Route to <strong>Claude Haiku</strong></td></tr>
+<tr><td><strong style="color:var(--ac)">&epsilon;</strong> (Explanation Tax)</td><td>Use <strong>Pro</strong> only for planning/review</td><td>Use <strong>o1</strong> only for reasoning-heavy</td><td>Set <strong>effort: low</strong> for lookups</td></tr>
+<tr><td><strong style="color:var(--am)">&beta;&middot;v</strong> (Snowball)</td><td>Cache contexts &rarr; <strong>90% savings</strong></td><td>TPM limits/env &rarr; <strong>42% savings</strong></td><td>Cache system prompts &rarr; <strong>90% savings</strong></td></tr>
+<tr><td><strong style="color:var(--am)">EPM(t)</strong> (Energy)</td><td>&mdash;</td><td>Use <strong>Reserved Capacity</strong></td><td>Use <strong>Batch API</strong> &rarr; 50% off</td></tr>
+</tbody></table></div>
+<div class="stats" style="margin-top:1.5rem"><div class="stat"><div class="v" style="color:var(--cy)">75&ndash;90%</div><div class="l">Cache Savings</div><div class="s">Across all 3 providers</div></div><div class="stat"><div class="v" style="color:var(--ac)">60&ndash;70%</div><div class="l">Simple Calls</div><div class="s">Don't need premium models</div></div><div class="stat"><div class="v amber">28.2&times;</div><div class="l">Escalation Cost</div><div class="s">DeepSeek &rarr; GPT-5.6, if cheap model fails</div></div></div>
+<div class="note" style="text-align:left;font-family:'JetBrains Mono',monospace;font-size:0.68rem;max-width:800px;margin:1rem auto">
+<span style="color:var(--ac)">Cache:</span> static content before dynamic &mdash; one dynamic field in the wrong position invalidates the entire prefix.<br>
+<span style="color:var(--ac)">Route:</span> request &rarr; complexity classifier &rarr; cheapest capable model &rarr; confidence check &rarr; escalate only on failure.<br>
+<span style="color:var(--ac)">Cap:</span> <span style="color:var(--t2)">pip install tokencap</span> &middot; <span style="color:var(--t2)">client = tokencap.wrap(provider, limit=50000)</span>
+</div>
+<div class="cta-bar" style="margin-top:1rem"><a href="provider-playbook.html" class="cta-btn">Deep-dive: Provider Playbook &rarr;</a></div>
+</div></section>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.4 &middot; August 2026</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> &middot; <a href="framework.html">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a> &middot; <a href="provider-playbook.html">Playbook</a> &middot; <a href="autonomous-workloads.html">Autonomous</a> &middot;  &middot; <a href="executive-dashboard.html">Dashboard</a>
+</footer>
+
+<script>
+let calcMode='augmented';
+const epmScenarios=[1.00,1.25,1.50],epmLabels=['Baseline (1.00&times;)','High (1.25&times;)','Extreme (1.50&times;)'];
+var models=(window.FRAMEWORK_DATA&&window.FRAMEWORK_DATA.calculator&&window.FRAMEWORK_DATA.calculator.model_costs)||[{n:'DeepSeek v4 Pro',c:0.015,p:0.95},{n:'GPT-5-nano',c:0.005,p:0.33},{n:'GPT-5-mini',c:0.025,p:1.0},{n:'GPT-5',c:0.14,p:1.0},{n:'GPT-5.5',c:0.16,p:1.0},{n:'Claude Fable 5',c:1.01,p:1.0},{n:'GPT-5.6',c:0.43,p:1.0},{n:'GPT-5.6-fast',c:0.49,p:1.0}];
+
+function setCalcMode(m){
+  calcMode=m;
+  document.getElementById('calcAugmented').style.display=m==='augmented'?'block':'none';
+  document.getElementById('calcAutonomous').style.display=m==='autonomous'?'block':'none';
+  var ba=document.getElementById('btnAugmented'),bo=document.getElementById('btnAutonomous');
+  if(m==='augmented'){ba.style.background='var(--ac)';ba.style.color='#09090b';ba.style.border='none';bo.style.background='transparent';bo.style.color='var(--t2)';bo.style.border='1px solid var(--ba)';}
+  else{bo.style.background='var(--am)';bo.style.color='#09090b';bo.style.border='none';ba.style.background='transparent';ba.style.color='var(--t2)';ba.style.border='1px solid var(--ba)';}
+  updateROI();
+}
+
+function updateROI(){
+  if(calcMode==='augmented'){
+    var E=+r_eng.value,S=+r_ses.value,V=+r_vel.value,D=+r_day.value,ei=+r_epm.value,HC=+r_cost.value,er=+r_rate.value/1000,EPM=epmScenarios[ei],budget=+r_budget.value;
+    v_eng.textContent=E;v_ses.textContent=S;v_vel.textContent=V;v_day.textContent=D;v_epm.textContent=epmLabels[ei];v_cost.textContent='$'+HC.toLocaleString();v_rate.textContent=(er*100).toFixed(1)+'% (IEA Baseline)';v_budget.textContent='$'+budget.toLocaleString();
+    roi_context.textContent='Augmented: '+E+' eng \u00b7 '+S+' sess/day \u00b7 V='+V+' LOC/sess \u00b7 EPM='+(er*100).toFixed(1)+'%';
+    var N=S*D,B=0.001,h='',costs=[];
+    models.forEach(function(m){var cm=E*m.c*EPM*(N+B*V*N*(N-1)/2);costs.push(cm);h+='<div class="o"><div class="ov '+(cm<100?'':cm<1000?'amber':'amber')+'">$'+cm.toFixed(0)+'</div><div class="ol">'+m.n+'/mo</div></div>'});var dsCost=costs[0],clCost=costs[5],annualSave=(clCost-dsCost)*12,hrRate=HC/(D*8),hrSave=hrRate>0?((clCost-dsCost)/hrRate).toFixed(1):'0';h+='<div class="o"><div class="ov">$'+annualSave.toFixed(0)+'</div><div class="ol">Annual Savings vs Claude</div></div><div class="o"><div class="ov">'+hrSave+'h</div><div class="ol">Labor-Cost Equiv. (eng-hrs/mo)</div></div>';var runway=budget/dsCost*30;h+='<div class="o"><div class="ov '+(runway>=30?'':runway>=15?'amber':'amber')+'">'+Math.round(runway)+' days</div><div class="ol">Budget Runway</div></div>';h+='<div class="o"><div class="ov amber">$'+dsCost.toFixed(0)+'</div><div class="ol">Lowest Cost/Mo (DS)</div></div><div class="o"><div class="ov amber">$'+clCost.toFixed(0)+'</div><div class="ol">Highest Cost/Mo (Claude)</div></div>';document.getElementById('roi_output').innerHTML=h;
+    document.getElementById('howComputed').textContent='Augmented Workforce\nPer-session: c(t) = C\u2080 \u00d7 EPM(t) \u00d7 (1 + \u03b2\u00b7v\u00b7t)\nCumulative: C(N,v) = C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nMonthly: C_mo = E \u00d7 C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nWhere: E='+E+' eng, N='+N+' sess/mo, \u03b2='+B+', v='+V+', EPM='+EPM.toFixed(2);
+  } else {
+    var W=+r_workload.value,b=+r_batch.value/100,rr=+r_retry.value/100,ac0=+r_ac0.value/1000,er=+r_arate.value/1000;
+    var escTiers=(window.FRAMEWORK_DATA&&window.FRAMEWORK_DATA.calculator&&window.FRAMEWORK_DATA.calculator.escalation_tiers)||[{m:'DS\u2192mini',e:1.66},{m:'DS\u2192GPT-5.6',e:28.2},{m:'DS\u2192Claude',e:68.7},{m:'\u2192Human ($5/job)',e:333}],escLabels=['DS\u2192mini (1.7\u00d7)','DS\u2192GPT-5.6 (28.2\u00d7)','DS\u2192Claude (68.7\u00d7)','\u2192Human ($5)'];
+    var Em=escTiers[+r_escalation.value-1].e;
+    v_workload.textContent=W.toLocaleString();v_batch.textContent=Math.round(b*100);v_retry.textContent=(rr*100).toFixed(1);v_escalation.textContent=escLabels[+r_escalation.value-1];v_ac0.textContent='$'+ac0.toFixed(3);v_arate.textContent=(er*100).toFixed(1)+'%';
+    roi_context.textContent='Auto: '+W.toLocaleString()+' jobs/day \u00b7 '+(b*100).toFixed(0)+'% batch \u00b7 r='+(rr*100).toFixed(1)+'% \u00b7 E\u2098='+Em.toFixed(1)+'\u00d7';
+    var Ep=1.00+er*2,Cjob=ac0*Ep*(1-b*0.5)*(1+rr*Em),Ceff=Cjob;
+    var maxJobs=10000/Cjob,Cmo=W*30*Cjob,woc=1/(1+rr);
+    var h='<div class="o"><div class="ov '+(Cjob<0.01?'':'amber')+'">$'+Cjob.toFixed(3)+'</div><div class="ol">Cost / Job</div></div>';
+    h+='<div class="o"><div class="ov">$'+Ceff.toFixed(3)+'</div><div class="ol">Effective Avg Cost</div></div>';
+    h+='<div class="o"><div class="ov" style="color:var(--cy)">'+Math.round(maxJobs).toLocaleString()+'</div><div class="ol">Max Jobs/Day ($10K)</div></div>';
+    h+='<div class="o"><div class="ov amber">$'+Math.round(Cmo).toLocaleString()+'</div><div class="ol">Monthly Spend</div></div>';
+    h+='<div class="o"><div class="ov '+(woc>0.85?'':woc>=0.70?'amber':'amber')+'">'+(woc*100).toFixed(0)+'%</div><div class="ol">WOC Ratio (1/(1+r))</div></div>';
+    h+='<div class="o"><div class="ov">'+(rr*100).toFixed(1)+'%</div><div class="ol">Retry Rate</div></div>';
+    document.getElementById('roi_output').innerHTML=h;
+    document.getElementById('howComputed').textContent='Autonomous Workloads\nPer job: C_job = C\u2080 \u00d7 EPM \u00d7 (1 \u2212 b\u00d70.5) \u00d7 (1 + r\u00d7E\u2098)\nBatch discount: D(b) = 1 \u2212 b\u00d70.5 (0% batch=full, 100% batch=half)\nRetry penalty: R(r, E\u2098) = 1 + r\u00d7E\u2098\nMonthly: C_auto = W \u00d7 30 \u00d7 C_job\nThroughput: T_max = Budget / C_job\nWhere: W='+W.toLocaleString()+', b='+(b*100).toFixed(0)+'%, r='+(rr*100).toFixed(1)+'%, E\u2098='+Em.toFixed(1)+', C\u2080=$'+ac0.toFixed(3);
+  }
+}
+
+function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(function(id){var el=document.getElementById(id);if(el){el.style.color=id===active?'var(--ac)':'var(--t3)';el.style.fontWeight=id===active?'700':'400'}})}
+
+function toggleHow(){var el=document.getElementById('howComputed'),btn=document.querySelector('#calculator button');if(el.style.display==='none'||!el.style.display){el.style.display='block';if(btn)btn.textContent='Hide how this is computed'}else{el.style.display='none';if(btn)btn.textContent='Show how this is computed'}}
+
+var chart,chartYears=3,chartMode='baseline',chartView='cost';function rebuildChart(yr){buildChart(yr,chartMode,chartView)}function buildChart(yr,mode,view){chartYears=yr||3;if(mode)chartMode=mode;if(view)chartView=view;var ctx=document.getElementById('costChart');if(!ctx)return;var E=10,S=20,D=20,V=500,B=0.001,Ny=S*D*12;var years=Array.from({length:chartYears+1},function(_,i){return 2024+i});var cYr=function(c,rate){var cum=0;return years.map(function(y){var EPM=1.00+(rate||0.016)*(y-2024);cum+=E*c*EPM*(Ny+B*V*Ny*(Ny-1)/2);return cum})};chart&&chart.destroy();if(chartView==='throughput'){var labels=[0.01,0.05,0.1,0.15,0.2,0.25,0.3];var jobCosts=function(r){return labels.map(function(fr){return 10000/(0.015*(1-fr*0.5)*(1+r*28.2))})};var datasets=[{label:'r=5% (DeepSeek)',data:jobCosts(0.05),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=21% (measured avg)',data:jobCosts(0.21),borderColor:'#6366F1',backgroundColor:'rgba(99,102,241,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=44% (Claude rate)',data:jobCosts(0.44),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}];chart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return (l*100).toFixed(0)+'%'}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Retry Rate',display:true,color:'#a1a1aa'}},y:{title:{text:'Max Jobs/Day ($10K)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return (v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}}}}});return}var datasets;if(mode==='sensitivity'){datasets=[{label:'DS - Aggressive EPM (2.5%/yr)',data:cYr(0.015,0.025),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.06)',borderDash:[6,3],fill:false,tension:0.3,borderWidth:2,pointRadius:0},{label:'DS - Baseline EPM (1.6%/yr)',data:cYr(0.015,0.016),borderColor:'#6366F1',backgroundColor:'rgba(99,102,241,0.08)',fill:false,tension:0.3,borderWidth:2.5,pointRadius:0},{label:'DS - Optimistic EPM (0.8%/yr)',data:cYr(0.015,0.008),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',borderDash:[4,2],fill:false,tension:0.3,borderWidth:2,pointRadius:0}]}else{datasets=[{label:'DeepSeek v4 Pro ($0.015/sess)',data:cYr(0.015,0.016),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'GPT-5.6 ($0.43/sess)',data:cYr(0.43,0.016),borderColor:'#6366F1',backgroundColor:'rgba(99,102,241,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'Claude Fable 5 ($1.01/sess)',data:cYr(1.01,0.016),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}]}chart=new Chart(ctx,{type:'line',data:{labels:years,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Year',display:true,color:'#a1a1aa'}},y:{title:{text:'Cumulative Cost (USD)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return '$'+(v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return '$'+ctx.raw.toFixed(0)}}}}}})}
+document.addEventListener('DOMContentLoaded',function(){updateROI();buildChart(3)});
+</script>
+</body>
+</html>

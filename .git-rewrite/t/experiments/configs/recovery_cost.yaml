@@ -1,0 +1,34 @@
+# Recovery cost experiment — specifically measures constraint recovery cost
+name: recovery_cost
+task: >
+  Build a task management API with authentication, CRUD, pagination,
+  filtering, and comprehensive tests. Be thorough.
+
+  The application MUST include these specific features:
+  - JWT-based user authentication
+  - Task CRUD with title, description, status, priority, due_date
+  - Task assignment to users
+  - Paginated task list with filtering by status/priority/assignee
+  - Rate limiting on auth endpoints
+  - Comprehensive pytest test suite (~20+ tests across all features)
+
+  Phase 1: Build the complete application with ALL features and tests.
+  Phase 2: Run the full test suite and verify everything passes.
+
+constraints:
+  - JWT authentication with token refresh
+  - Full task CRUD with all fields
+  - Task-to-user assignment relationship
+  - Paginated and filtered list endpoints
+  - Rate limiting (token bucket) on POST /auth/login
+  - Test coverage: at least one test per endpoint, per error case
+  - Flask + SQLAlchemy + pytest
+
+operators:
+  - remove_critical_constraint
+  - inject_false_premise
+  - invert_constraint
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro

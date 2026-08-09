@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>The Evidence — AI FinOps Framework</title>
+<meta name="description" content="Full evidence: 251 worktrees, 248 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.card .ctitle{font-weight:700;color:var(--t);font-size:0.82rem;margin-bottom:0.4rem}
+.card .cdesc{font-size:0.73rem;color:var(--t2);line-height:1.55}
+.card .cval{font-size:1.3rem;font-weight:800;color:var(--ac);margin:0.4rem 0}
+.card .cval.amber{color:var(--am)}.card .cval.cyan{color:var(--cy)}
+.insight{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 8px 8px 0;padding:0.8rem 1.2rem;margin:1rem 0;font-size:0.78rem;color:var(--t2);line-height:1.6}
+.insight strong{color:var(--t)}
+</style>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+
+<!-- Hero -->
+<section class="sec" style="padding-top:6rem">
+<h1>The Evidence</h1>
+<p class="lead" style="font-size:1rem;color:var(--t)">251 worktrees (227 experiment runs, 24 exploratory sessions). 248 instrumented experiment sessions across 3 architectures, 8 variants — plus 21 new cross-model TypeScript sessions. Numbers are tagged by provenance: [M] measured from API/session data &middot; [C] computed from measurements &middot; [H] heuristic estimate &middot; [X] externally sourced. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+<div class="card" style="text-align:center"><div class="cval" data-stat="worktrees">251</div><div class="cdesc" style="text-align:center">Worktrees on disk</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="reports">224</div><div class="cdesc" style="text-align:center">Game reports</div></div>
+<div class="card" style="text-align:center"><div class="cval">21</div><div class="cdesc" style="text-align:center">TS runs (3 models)</div></div>
+<div class="card" style="text-align:center"><div class="cval">$<span data-stat="cost">59.45</span></div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
+</div>
+</section>
+
+<details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence proves</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
+<p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We measured which ones across <strong style="color:var(--ac)">227 experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. Same computational effort. <strong style="color:var(--am)">69&times; different cost.</strong> The gap is pricing architecture, not token volume. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
+</div>
+</details>
+
+<!-- ==================== THE GRIT SPECTRUM ==================== -->
+<section class="sec alt">
+<h2>The Grit Spectrum</h2>
+<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models — 4 manifold operators that push the model off its typical linguistic surface, and 6 semantic operators that inject contradictions within the reasoning manifold. Grit is measured by escape rate (how often the model leaves the correct path) at a given correctness threshold.</p>
+
+<div class="cards" style="margin-top:1.2rem">
+<div class="card"><div class="ctitle">Manifold Operators (4)</div><div class="cdesc">Push the model off its typical linguistic surface — alien vocabulary injection, framing shifts, causality reversal, forced abandonment. Test search dynamics.</div></div>
+<div class="card"><div class="ctitle">Semantic Operators (6)</div><div class="cdesc">Inject contradictions within the reasoning manifold — false premises, inverted constraints, phantom successes, competing goals, removed critical constraints, contradiction insertion. Test truth-seeking policies.</div></div>
+<div class="card"><div class="ctitle">Detector: Recovery Signals (6)</div><div class="cdesc">Markers, tool convergence, qualifier patterns, tech stack convergence, output length ratio, reasoning structure overlap. Classify every segment as EXPLORATION or RECOVERY.</div></div>
+<div class="card"><div class="ctitle">Detector: Strategy Archetypes (4)</div><div class="cdesc">CONSERVATIVE (low explore, high recover), EXPLORATORY (high escape, low recover), WASTEFUL (high explore, low quality), EFFICIENT (high explore, high quality, low cost).</div></div>
+</div>
+
+<h3 style="margin-top:2rem;color:var(--ac)">Manifold vs Semantic Grit: DeepSeek vs Claude</h3>
+<p class="lead">Manifold perturbations test whether the model stays on the correct path when pushed off its linguistic surface. Semantic perturbations test truth-seeking — can the model reject false signals inside its reasoning manifold? Lower escape = more grit. Higher correctness = more reliable.</p>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Type</th><th>Escape Rate</th><th>Correctness</th><th>Cost/Session</th><th>Interpretation</th></tr></thead><tbody>
+<tr><td rowspan="2"><strong>DeepSeek v4 Pro</strong></td><td>Manifold</td><td class="amber">0.76</td><td>77%</td><td class="green">$0.017</td><td>Explores broadly when pushed, but mostly recovers</td></tr>
+<tr><td>Semantic</td><td class="green">0.18</td><td class="green">94%</td><td class="green">$0.016</td><td>High grit — rejects false signals inside the manifold</td></tr>
+<tr><td rowspan="2"><strong>Claude Fable 5</strong></td><td>Manifold</td><td class="amber">0.62</td><td>87%</td><td class="amber">$1.29</td><td>Stays close to the manifold, recovers via narration</td></tr>
+<tr><td>Semantic</td><td class="green">0.21</td><td class="green">88%</td><td class="amber">$1.07</td><td>Strong truth-seeking, but bills every reasoning step</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek's semantic grit (0.18 escape, 94% correctness at $0.016) is the standout metric. When false signals are injected <em>within</em> the reasoning manifold — the harder test — both models perform similarly on correctness (94% vs 88%), but DeepSeek does it at <strong style="color:var(--ac)">69&times; lower cost</strong>. Claude's gap is not capability; it's pricing architecture. DeepSeek separates reasoning into a low-cost structured channel. Claude bills reasoning as output tokens at $10/Mtok.</div>
+
+<h3 style="margin-top:2rem">Grit: The Flail Rate</h3>
+<p class="lead">When the model can't figure out the correct requirement, it flails — producing tokens but zero code. This is the flail rate. The Explanation Tax (Rule 2) measures the recovery cost when the model DOES succeed. Measured per-worktree: what fraction of a model's sessions produced tokens that went to narration instead of code? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced.</p>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Narration Failures</th><th>Penalty Rate</th><th>Avg Cost/Session</th><th>What's Happening</th></tr></thead><tbody id="narration-tbody">
+<tr><td>DeepSeek v4 Pro</td><td>68</td><td>2</td><td class="green">3%</td><td class="green">$0.015</td><td>Silent inference — reasoning compressed into latent space</td></tr>
+<tr><td>GPT-5.6-fast</td><td>6</td><td>0</td><td class="green">0%</td><td>$0.49</td><td>Efficient code generation, no wasted tokens</td></tr>
+<tr><td>GPT-5.5</td><td>3</td><td>0</td><td class="green">0%</td><td>$0.16</td><td>Clean output, high constraint satisfaction</td></tr>
+<tr><td>GPT-5.6</td><td>15</td><td>1</td><td>7%</td><td>$0.43</td><td>Mostly clean, occasional over-explanation</td></tr>
+<tr><td>GPT-5</td><td>5</td><td>1</td><td>20%</td><td>$0.14</td><td>Some narration, moderate efficiency</td></tr>
+<tr><td>Claude Fable 5</td><td>27</td><td>12</td><td class="amber">44%</td><td class="amber">$1.01</td><td>Narrates before coding — externalizes every reasoning step</td></tr>
+<tr><td>GPT-5-mini</td><td>12</td><td>7</td><td class="amber">58%</td><td>$0.025</td><td>Over-explains — generates more reasoning than code</td></tr>
+<tr><td>GPT-5-nano</td><td>6</td><td>6</td><td class="amber">100%</td><td>$0.005</td><td>Pure narration — 1.01 reasoning-to-output ratio, zero functional outputs</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> The Explanation Tax isn't theoretical — it's measurable. Claude burns 44% of its sessions on narration with zero code output ($1.01/session avg). Nano hits 100% penalty rate. DeepSeek and GPT-5.6-fast hit near-zero. This directly validates the <strong style="color:var(--ac)">Silent Inference Rule</strong> from the framework: default to models that compress reasoning into latent space, not billable tokens.</div>
+</section>
+
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="narrationChart"></canvas></div>
+
+<!-- ==================== SAME OUTPUT, DIFFERENT COST ==================== -->
+<section class="sec">
+<h2>Same Output, Different Cost</h2>
+<p class="lead">Both DeepSeek and Claude generate <strong style="color:var(--t)">~11,000 output+reasoning tokens per session</strong>. Same computational effort. DeepSeek produces <strong style="color:var(--ac)">64 LOC per 1,000 tokens</strong>. Claude produces <strong style="color:var(--am)">46 LOC per 1,000 tokens</strong>. That's 39% more code per token — at <strong style="color:var(--ac)">69&times; less cost</strong>. The gap is not about which model is smarter. It's about which tokens you're billed for.</p>
+
+<h3 style="margin-top:2rem;color:var(--ac)">Cost Efficiency Ranking</h3>
+<p class="lead">Per-session cost averaged across all reports. The right-hand columns show what you're paying for: code density (LOC per output token), constraint completion, and the narration penalty rate.</p>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Avg Cost</th><th>Total Cost</th><th>Correctness</th><th>Strategy</th></tr></thead><tbody id="cost-ranking-tbody">
+<tr><td>GPT-5-nano</td><td>6</td><td class="green">$0.006</td><td>$0.03</td><td>76% (1/2)</td><td>C=4 E=2</td></tr>
+<tr><td>DeepSeek v4 Pro</td><td>110</td><td class="green">$0.016</td><td>$1.73</td><td>87% (438/506)</td><td>C=79 E=29</td></tr>
+<tr><td>GPT-5-mini</td><td>12</td><td>$0.026</td><td>$0.31</td><td>94% (30/32)</td><td>C=11 E=1</td></tr>
+<tr><td>GPT-5</td><td>11</td><td>$0.16</td><td>$1.75</td><td>100% (5/5)</td><td>C=3 E=8</td></tr>
+<tr><td>GPT-5.5</td><td>3</td><td>$0.28</td><td>$0.85</td><td>100% (27/27)</td><td>C=1 E=2</td></tr>
+<tr><td>GPT-5.6</td><td>15</td><td>$0.45</td><td>$6.71</td><td class="green">100% (166/166)</td><td>C=14 E=1</td></tr>
+<tr><td>GPT-5.6-fast</td><td>6</td><td>$0.66</td><td>$3.98</td><td class="green">100% (73/73)</td><td>C=2 E=4</td></tr>
+<tr><td>Claude Fable 5</td><td>40</td><td class="amber">$1.06</td><td class="amber">$42.52</td><td>100% (240/241)</td><td>C=27 E=12</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.06) while producing 1.7x more code (700 vs 554 LOC). Total Claude spend ($42.52) exceeds all other models combined ($15.35). Correctness data is from actual pytest/jest execution — 93.2% overall across 987/1059 tests. GPT-5-nano is the only model below 80% correctness. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
+<div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. DeepSeek separates reasoning into a low-cost structured channel. GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). DeepSeek's 7% thinking ratio reflects GRPO-compressed latent reasoning. 203/248 sessions analyzed with game reports — 26 narration failures, 19 unanalyzed.</div>
+
+<div class="insight"><strong>The Cache Tax:</strong> Claude writes 22,500 tokens to cache per session at $15/Mtok. DeepSeek writes zero — instead reads 223,000 tokens from cache at $0.14/Mtok. Same context management capability. <strong style="color:var(--am)">100&times; pricing difference.</strong> Cache strategy is a two-way door. Measure your hit rate. If under 50%, use cache-read. If over 80%, cache-write pays for itself.</div>
+</section>
+
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="costBarChart"></canvas></div>
+
+<!-- ==================== FULL MODEL COMPARISON ==================== -->
+
+<!-- AST Code Quality -->
+<section class="sec alt">
+<h2>AST Code Quality Analysis</h2>
+<p class="lead">203 game reports across 8 model variants. Every function, class, decorator, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DS v4 Pro</th><th>Claude F5</th><th>GPT-5.6</th><th>GPT-5-mini</th><th>GPT-5.6-fast</th><th>GPT-5.5</th><th>GPT-5</th><th>GPT-5-nano</th></tr></thead><tbody>
+<tr><td><strong>Reports</strong></td><td class="green">68</td><td>27</td><td>15</td><td>12</td><td>6</td><td>3</td><td>5</td><td>6</td></tr>
+<tr><td><strong>Avg LOC/worktree</strong></td><td class="green">691</td><td>412</td><td>367</td><td>264</td><td>343</td><td>262</td><td>300</td><td>199</td></tr>
+<tr><td><strong>Avg files/worktree</strong></td><td class="green">28</td><td>8</td><td>4</td><td>5</td><td>3</td><td>3</td><td>8</td><td>3</td></tr>
+<tr><td><strong>Avg functions</strong></td><td class="green">119</td><td>44</td><td>35</td><td>25</td><td>33</td><td>33</td><td>21</td><td>21</td></tr>
+<tr><td><strong>Avg classes</strong></td><td class="green">21</td><td>9</td><td>2</td><td>3</td><td>2</td><td>1</td><td>2</td><td>2</td></tr>
+<tr><td><strong>Type hints</strong></td><td>16%</td><td>27%</td><td>5%</td><td>9%</td><td>28%</td><td class="green">37%</td><td class="green">40%</td><td>27%</td></tr>
+<tr><td><strong>Docstrings</strong></td><td>3%</td><td class="green">8%</td><td>0%</td><td>1%</td><td>0%</td><td>0%</td><td>2%</td><td>0%</td></tr>
+<tr><td><strong>Constraint score</strong></td><td class="green">3.2/7</td><td>2.3/6</td><td>3.1/6</td><td>1.4/7</td><td>3.3/7</td><td class="green">5.7/7</td><td>2.6/7</td><td class="amber">0.0/7</td></tr>
+<tr><td><strong>Avg thinking ratio</strong></td><td>7%</td><td class="green">0%</td><td>6%</td><td>7%</td><td>7%</td><td class="green">2%</td><td>7%</td><td class="amber">19%</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek produces the most modular code (avg 28 files, 119 functions, 21 classes per worktree) — 3.5x Claude's file count. GPT-5 and GPT-5.5 lead on type hints (37-40%) but produce far fewer worktrees. GPT-5-nano has the highest thinking ratio (19%) and produces zero constraint-complete outputs — the only model that fundamentally fails on task completion rather than just cost.</div>
+</section>
+
+<!-- Constraint Detection — DeepSeek vs Claude -->
+<section class="sec">
+<h2>Constraint Detection — DeepSeek vs Claude</h2>
+<p class="lead">Dual-signal verification: scanned both reasoning text and generated <code>.py</code> files for all 7 required constraints. Both models implemented every constraint — the 69&times; gap is in how they produce the code, not whether they can.</p>
+<div class="tbl"><table><thead><tr><th>Constraint</th><th>DeepSeek Implementation</th><th>Claude Fable 5 Implementation</th></tr></thead><tbody>
+<tr><td>JWT authentication</td><td class="green">auth.py, extensions.py</td><td class="green">auth.py, extensions.py</td></tr>
+<tr><td>Rate limiting</td><td class="green">auth_routes.py</td><td class="green">rate_limit.py</td></tr>
+<tr><td>Input validation</td><td class="green">validators.py</td><td class="green">schemas.py</td></tr>
+<tr><td>Pagination</td><td class="green">models.py</td><td class="green">pagination.py</td></tr>
+<tr><td>Error handling</td><td class="green">errors.py</td><td class="green">errors.py</td></tr>
+<tr><td>Audit logging</td><td class="green">audit.py</td><td class="green">audit.py</td></tr>
+<tr><td>API versioning</td><td class="green">routes/v1/</td><td class="green">Blueprint /v1/</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> All 7 constraints implemented by both models. The verification is structural — not based on whether the model <em>mentioned</em> the constraint in reasoning, but whether it appeared in the generated code. DeepSeek separates reasoning into a low-cost structured channel. Claude narrates each constraint implementation in output tokens — billable at $10/Mtok.</div>
+</section>
+
+<!-- Token Cost Breakdown -->
+<section class="sec alt">
+<h2>Token Cost Breakdown</h2>
+<p class="lead">Where does the money go? Per-model cost split across input, output, reasoning, and cache tokens. Cache costs dominate for Anthropic (cache writes are billable). DeepSeek cache reads cost 1/20th of Anthropic's.</p>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Input $</th><th>Output $</th><th>Reasoning $</th><th>Cache $</th><th><strong>Total $</strong></th></tr></thead><tbody id="token-cost-tbody">
+<tr><td>claude-fable-5</td><td>$0.01</td><td>$24.26</td><td>$0.00</td><td class="amber">$18.26</td><td class="amber"><strong>$42.52</strong></td></tr>
+<tr><td>gpt-5.6</td><td>$0.00</td><td>$2.75</td><td>$0.19</td><td class="amber">$3.77</td><td><strong>$6.71</strong></td></tr>
+<tr><td>gpt-5.6-fast</td><td>$0.00</td><td>$1.46</td><td>$0.11</td><td class="amber">$2.40</td><td><strong>$3.98</strong></td></tr>
+<tr><td>gpt-5</td><td>$0.19</td><td>$0.48</td><td>$0.19</td><td>$0.89</td><td><strong>$1.75</strong></td></tr>
+<tr><td>deepseek-v4-pro</td><td class="green">$0.13</td><td>$0.42</td><td>$0.02</td><td>$1.15</td><td class="green"><strong>$1.73</strong></td></tr>
+<tr><td>gpt-5.5</td><td>$0.13</td><td>$0.31</td><td>$0.03</td><td>$0.38</td><td><strong>$0.85</strong></td></tr>
+<tr><td>gpt-5-mini</td><td>$0.03</td><td>$0.08</td><td>$0.02</td><td>$0.18</td><td><strong>$0.31</strong></td></tr>
+<tr><td>gpt-5-nano</td><td>$0.00</td><td>$0.01</td><td>$0.01</td><td>$0.02</td><td><strong>$0.03</strong></td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> Claude's $18.26 in cache costs (43% of its total spend) comes from 24K avg cache writes per session — Anthropic bills cache writes at premium rates. Every other model has near-zero cache write costs. DeepSeek's 239K avg cache reads cost only $1.15 total because its cache-hit pricing is $0.14/M tok. Cost components are proportionally split from the openCode DB using provider-specific pricing.</div>
+</section>
+
+<!-- Perturbation Response -->
+<section class="sec">
+<h2>Perturbation Response</h2>
+<p class="lead">10 calibrated perturbation operators applied across all models. Recovery multipliers measure how perturbation changes cost — below 1.0 means perturbation reduces cost (model explores instead of recovering). <strong style="color:var(--ac)">Think of these as "state shocks":</strong> requirements shift, dependencies break, logs spike. We measure how each model responds when the world changes under it &ndash; and what that response costs.</p>
+<div class="tbl"><table><thead><tr><th>Model</th><th>CONS</th><th>EXPL</th><th>Avg Escape</th><th>Recovery Mult</th><th>Primary Behavior</th></tr></thead><tbody>
+<tr><td>DeepSeek v4 Pro</td><td>79</td><td class="green">29</td><td class="green">0.25</td><td class="green">0.9&times;</td><td class="green">Explores under perturbation</td></tr>
+<tr><td>Claude Fable 5</td><td class="amber">27</td><td>12</td><td>0.24</td><td class="amber">1.1&times;</td><td class="amber">Recovers via narration</td></tr>
+<tr><td>GPT-5</td><td>3</td><td class="green">8</td><td class="green">0.52</td><td>—</td><td>Exploratory under perturbation</td></tr>
+<tr><td>GPT-5-mini</td><td class="amber">11</td><td>1</td><td>0.20</td><td class="amber">1.2&times;</td><td class="amber">Conservative; over-explains to recover</td></tr>
+<tr><td>GPT-5-nano</td><td>4</td><td>2</td><td>0.45</td><td>—</td><td>Mixed; high thinking ratio</td></tr>
+<tr><td>GPT-5.5</td><td>1</td><td>2</td><td class="green">0.64</td><td>—</td><td>Highest escape scores</td></tr>
+<tr><td>GPT-5.6</td><td class="amber">14</td><td>1</td><td>0.16</td><td class="amber">1.05&times;</td><td class="amber">Conservative; resists perturbation</td></tr>
+<tr><td>GPT-5.6-fast</td><td>2</td><td class="green">4</td><td class="green">0.59</td><td>—</td><td>Exploratory; high novelty</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> No model classified as WASTEFUL or EFFICIENT — every session that produced code is either CONSERVATIVE (63%) or EXPLORATORY (26%). EXPLORATORY sessions cluster around perturbation operators with escape scores averaging 0.70 vs 0.09 for conservative. Recovery multipliers are computed from cost deltas (perturbed vs baseline) — below 1.0 means perturbation reduces cost (the model explores more efficiently).</div>
+<h3 style="margin-top:1.5rem;color:var(--ac)">Manifold vs Semantic Perturbation Split</h3>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Manifold Escape</th><th>Manifold Correctness</th><th>Manifold Cost</th><th>Semantic Escape</th><th>Semantic Correctness</th><th>Semantic Cost</th></tr></thead><tbody>
+<tr><td><strong>DeepSeek v4 Pro</strong></td><td class="amber">0.76</td><td>77%</td><td class="green">$0.017</td><td class="green">0.18</td><td class="green">94%</td><td class="green">$0.016</td></tr>
+<tr><td><strong>Claude Fable 5</strong></td><td class="amber">0.62</td><td>87%</td><td class="amber">$1.29</td><td class="green">0.21</td><td class="green">88%</td><td class="amber">$1.07</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> Both models show high manifold escape (0.62–0.76) — pushing models off their linguistic surface works. But semantic grit tells the real story: DeepSeek's escape drops to 0.18 (vs Claude's 0.21) while correctness jumps to 94% (vs Claude's 88%). The model that explores more on manifold perturbations actually maintains <em>higher</em> correctness on semantic perturbations — at 69&times; lower cost.</div>
+</section>
+
+<!-- Cross-Model Rollup -->
+<section class="sec alt">
+<h2>Cross-Model Rollup</h2>
+<p class="lead">Measured across 203 game reports — not single-run data. DeepSeek delivers 1.3&times; more code per session at 1/69th the cost of Claude. 93.2% overall test pass rate (987/1059 tests) from real pytest/jest execution — no heuristic estimation.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody>
+<tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.45</td><td class="mono amber">$1.06</td><td class="mono">$0.29</td></tr>
+<tr><td>Test pass rate</td><td class="mono green">87%</td><td class="mono green">100%</td><td class="mono green">100%</td><td class="mono green">93%</td></tr>
+<tr><td>Avg thinking ratio</td><td class="mono green">8.2%</td><td class="mono">6.4%</td><td class="mono amber">0.0%</td><td class="mono">6.3%</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green">700</td><td class="mono">367</td><td class="mono">554</td><td class="mono">573</td></tr>
+<tr><td>Constraint score</td><td class="mono green">50%</td><td class="mono">71%</td><td class="mono">39%</td><td class="mono">47%</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>What changed:</strong> The original cross-domain table used single-run costs ($2.02 Claude vs $0.01 DeepSeek for task_manager). These per-session averages from 203 game reports are the more robust metric. The 69&times; gap is the measured average — not the architectural extreme, and not a cherry-picked single run.</div>
+
+</section>
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="locVsCostChart"></canvas></div>
+
+<!-- Multi-Language Expansion -->
+<section class="sec">
+<h2>Multi-Language Expansion</h2>
+<p class="lead">Initial TypeScript/Node.js baseline — 21 runs across 3 architectures on a static site generator task. <strong style="color:var(--am)">The cost gap widens in strictly-typed environments:</strong> from 69x on Python to 200x on TypeScript.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5</th><th>Claude F5</th><th>Gap (DS/Claude)</th></tr></thead><tbody>
+<tr><td>Per-session cost</td><td class="mono green">$0.0006</td><td class="mono">$0.015</td><td class="mono amber">$0.12</td><td class="mono amber">200&times;</td></tr>
+<tr><td>Avg correctness</td><td class="mono green">87%</td><td class="mono">77%</td><td class="mono amber">90%</td><td class="mono">—</td></tr>
+<tr><td>Avg tokens/session</td><td class="mono green">29K</td><td class="mono">19K</td><td class="mono">30K</td><td class="mono">1.0&times;</td></tr>
+<tr><td>Strategy archetypes</td><td class="mono green">efficient / exploratory</td><td class="mono">mixed</td><td class="mono">efficient / conservative</td><td class="mono">—</td></tr>
+</tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> The gap widens from 69x on Python to 200x on TypeScript — strictly-typed environments with compilation and type checking produce more code per session, compounding the architecture cost delta. DeepSeek's GRPO-latent reasoning produces efficient implementations at negligible cost ($0.004 total for 7 runs). Claude scores highest on correctness (90%) but at 200x the price. GPT-5 is most fragile: collapses to 20% correctness on the shift_framing perturbation while burning a 28% thinking ratio. Go and Rust baselines are configured for the next measurement cycle.</div>
+</section>
+
+<!-- Current Scope & Roadmap -->
+<section class="sec alt">
+<h2>Current Scope &amp; What's Next</h2>
+<p class="lead">This is v0.4 &ndash; the first open framework for AI FinOps. Here's what's validated today and what's on the roadmap.</p>
+<div class="cards">
+<div class="card"><div class="ctitle" style="color:var(--ac)">Covered Today</div><div class="cdesc">Python/Flask REST APIs, SQLite-backed CRUD apps, JWT auth flows, rate-limited endpoints, paginated responses, audit-logged systems, API versioning, pytest suites, real-time collaboration frontends. TypeScript/Node.js (initial: 3 variants, 21 cross-model runs). 10 prompt-level perturbation operators (4 manifold, 6 semantic). IEA-baseline EPM projection (1.6%/yr). Cost measurement: tokens, dollars, joules.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Planned (v0.4+)</div><div class="cdesc">Rust, Go validation. Structural perturbation operators (broken dependencies, AST corruption, production incident simulation). EPM sensitivity analysis (aggressive/optimistic/volatile scenarios). Human maintenance cost modeling. Pull requests welcome &ndash; the framework was designed for extensibility from day one.</div></div>
+<div class="card"><div class="ctitle">Not in Scope</div><div class="cdesc">The framework does not judge whether narration is wasteful or valuable. It measures the cost. If your team needs auditable reasoning trails for compliance or debugging, the Explanation Tax is insurance &ndash; not overhead. The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.</div></div>
+</div>
+<div class="cards" style="margin-top:1rem">
+<div class="card"><div class="ctitle" style="color:var(--ac)">Test Pass Rate Caveat</div><div class="cdesc">Sampled pytest results are environment-sensitive. Approximately 31% of failures resolve with correct dependency installation. The raw pass rate counts everything; the "with correct env" column estimates real code quality. DeepSeek's 69% corrected rate is comparable to Claude and GPT-5.6.</div></div>
+<div class="card"><div class="ctitle" style="color:var(--am)">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.4 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
+<div class="card"><div class="ctitle">Reproduce This</div><div class="cdesc">The instrument is open source. 34 configs, 10 operators, 6 recovery signals. Clone the repo, install the instrument, run a config. <a href="https://github.com/peparhugo/ai-finops-framework" style="color:var(--ac)">View on GitHub.</a> <a href="methodology.html" style="color:var(--ac)">See the methodology.</a></div></div>
+</div>
+</section>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.4</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
+<a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="roadmap.html">Roadmap</a>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var D = window.FRAMEWORK_DATA;
+  if (!D) return;
+
+  var labels = D.charts.labels;
+  var costData = D.charts.costData;
+  var narrData = D.charts.narrData;
+  var locData = D.charts.locData;
+  var reports = D.charts.reports;
+
+  var chartTextColor = '#a1a1aa';
+  var chartGridColor = 'rgba(161,161,170,0.12)';
+  var resolveColor = function (vals, thresholds) {
+    return vals.map(function (v) {
+      if (v <= thresholds[0]) return 'rgba(52,211,153,0.85)';
+      if (v <= thresholds[1]) return 'rgba(251,191,36,0.85)';
+      return 'rgba(239,68,68,0.85)';
+    });
+  };
+
+  // --- Cost Bar Chart ---
+  (function () {
+    var ctx = document.getElementById('costBarChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Avg Cost / Session ($)',
+          data: costData,
+          backgroundColor: resolveColor(costData, [0.05, 0.30]),
+          borderColor: resolveColor(costData, [0.05, 0.30]).map(function (c) { return c.replace('0.85','1'); }),
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Per-Session Cost by Model', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { display: false }
+        },
+        scales: {
+          x: { ticks: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 10 }, maxRotation: 45, minRotation: 0 }, grid: { color: chartGridColor } },
+          y: { title: { display: true, text: 'USD', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return '$' + v; } }, grid: { color: chartGridColor }, beginAtZero: true }
+        }
+      }
+    });
+  })();
+
+  // --- Narration Penalty Horizontal Bar ---
+  (function () {
+    var ctx = document.getElementById('narrationChart');
+    if (!ctx) return;
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Penalty Rate (%)',
+          data: narrData,
+          backgroundColor: resolveColor(narrData, [10, 30]).reverse(),
+          borderColor: resolveColor(narrData, [10, 30]).reverse().map(function (c) { return c.replace('0.85','1'); }),
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Narration Penalty Rate by Model (%)', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { display: false }
+        },
+        scales: {
+          x: { title: { display: true, text: '%', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return v + '%'; } }, grid: { color: chartGridColor }, beginAtZero: true, max: 100 },
+          y: { ticks: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 10 } }, grid: { color: chartGridColor } }
+        }
+      }
+    });
+  })();
+
+  // --- LOC vs Cost Scatter/Bubble ---
+  (function () {
+    var ctx = document.getElementById('locVsCostChart');
+    if (!ctx) return;
+    var points = labels.map(function (l, i) {
+      return { x: locData[i] || 0, y: D.charts.costY[i] || 0, r: Math.max(6, Math.sqrt(reports[i] || 1) * 2.2) };
+    });
+    var modelColors = [
+      'rgba(99,102,241,0.80)',  // DeepSeek
+      'rgba(239,68,68,0.80)',   // nano
+      'rgba(239,68,68,0.80)',   // mini
+      'rgba(251,191,36,0.80)',  // GPT-5
+      'rgba(251,191,36,0.80)',  // GPT-5.5
+      'rgba(251,191,36,0.80)',  // GPT-5.6
+      'rgba(251,191,36,0.80)',  // GPT-5.6-fast
+      'rgba(6,182,212,0.80)'    // Claude
+    ];
+    new Chart(ctx, {
+      type: 'bubble',
+      data: {
+        datasets: labels.map(function (l, i) {
+          return { label: l, data: [points[i]], backgroundColor: (modelColors[i] || 'rgba(161,161,170,0.80)'), borderColor: (modelColors[i] || 'rgba(161,161,170,0.80)').replace('0.80','1'), borderWidth: 1 };
+        })
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          title: { display: true, text: 'Code Output vs Cost', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          legend: { labels: { color: chartTextColor, font: { family: "'JetBrains Mono',monospace", size: 9 }, usePointStyle: true, padding: 12 } }
+        },
+        scales: {
+          x: { title: { display: true, text: 'Avg LOC / Session', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor }, grid: { color: chartGridColor }, beginAtZero: true },
+          y: { title: { display: true, text: 'Avg Cost / Session (USD)', color: chartTextColor, font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: chartTextColor, callback: function (v) { return '$' + v; } }, grid: { color: chartGridColor }, beginAtZero: true }
+        }
+      }
+    });
+  })();
+
+  // --- Populate data-driven tables ---
+  function fmtUSD(v) { return '$' + (typeof v === 'number' ? v.toFixed(2) : v); }
+  function pct(v) { return (typeof v === 'number' ? (v * 100).toFixed(0) + '%' : v); }
+
+  // Cost Efficiency Ranking table
+  var costTbl = document.querySelector('#cost-ranking-tbody');
+  if (costTbl && D.models) {
+    costTbl.innerHTML = '';
+    D.models.forEach(function(m) {
+      var cls = m.id.indexOf('claude') >= 0 ? 'amber' : (m.id.indexOf('deepseek') >= 0 || m.id.indexOf('nano') >= 0 ? 'green' : '');
+      costTbl.innerHTML += '<tr>' +
+        '<td>' + m.label + '</td>' +
+        '<td>' + m.reports + '</td>' +
+        '<td class="' + cls + '">' + fmtUSD(m.avg_cost) + '</td>' +
+        '<td class="' + cls + '">' + fmtUSD(m.total_cost) + '</td>' +
+        '<td>' + (m.pass_rate || 'N/A') + '</td>' +
+        '<td>C=' + m.strategy_cons + ' E=' + m.strategy_expl + '</td>' +
+        '</tr>';
+    });
+  }
+
+  // Token Cost Breakdown table
+  var tokTbl = document.querySelector('#token-cost-tbody');
+  if (tokTbl && D.models) {
+    tokTbl.innerHTML = '';
+    D.models.forEach(function(m) {
+      var shortId = m.id.replace(/^.*\//, '');
+      var cls = m.id.indexOf('claude') >= 0 ? 'amber' : (m.id.indexOf('deepseek') >= 0 || m.id.indexOf('nano') >= 0 ? 'green' : '');
+      tokTbl.innerHTML += '<tr>' +
+        '<td>' + shortId + '</td>' +
+        '<td>' + fmtUSD(m.cost_input) + '</td>' +
+        '<td>' + fmtUSD(m.cost_output) + '</td>' +
+        '<td>' + fmtUSD(m.cost_reasoning) + '</td>' +
+        '<td class="' + (m.cost_cache > 1 ? 'amber' : '') + '">' + fmtUSD(m.cost_cache) + '</td>' +
+        '<td class="' + cls + '"><strong>' + fmtUSD(m.total_cost) + '</strong></td>' +
+        '</tr>';
+    });
+  }
+
+  // Narration Penalty table
+  var narrTbl = document.querySelector('#narration-tbody');
+  if (narrTbl && D.models) {
+    narrTbl.innerHTML = '';
+    var narrDesc = {
+      'deepseek/deepseek-v4-pro': 'Silent inference — reasoning compressed into latent space',
+      'openai/gpt-5.6-fast': 'Efficient code generation, no wasted tokens',
+      'openai/gpt-5.5': 'Clean output, high constraint satisfaction',
+      'openai/gpt-5.6': 'Mostly clean, occasional over-explanation',
+      'openai/gpt-5': 'Some narration, moderate efficiency',
+      'anthropic/claude-fable-5': 'Narrates before coding — externalizes every reasoning step',
+      'openai/gpt-5-mini': 'Over-explains — generates more reasoning than code',
+      'openai/gpt-5-nano': 'Pure narration — 1.01 reasoning-to-output ratio, zero functional outputs'
+    };
+    D.models.forEach(function(m) {
+      var nr = m.narration_rate || 0;
+      var cls = nr > 30 ? 'amber' : (nr < 10 ? 'green' : '');
+      narrTbl.innerHTML += '<tr>' +
+        '<td>' + m.label + '</td>' +
+        '<td>' + m.reports + '</td>' +
+        '<td>' + m.reports_narrated + '</td>' +
+        '<td class="' + cls + '">' + nr + '%</td>' +
+        '<td class="' + (m.avg_cost > 0.5 ? 'amber' : cls) + '">' + fmtUSD(m.avg_cost) + '</td>' +
+        '<td>' + (narrDesc[m.id] || '') + '</td>' +
+        '</tr>';
+    });
+  }
+});
+</script>
+
+</body>
+</html>

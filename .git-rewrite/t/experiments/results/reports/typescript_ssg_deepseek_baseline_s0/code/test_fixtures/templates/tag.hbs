@@ -1,0 +1,8 @@
+{{#layout "main"}}
+<h1>Tag: {{currentTag}}</h1>
+<ul>
+{{#each taggedPages}}
+<li><a href="/{{slug}}.html">{{frontmatter.title}}</a></li>
+{{/each}}
+</ul>
+{{/layout}}

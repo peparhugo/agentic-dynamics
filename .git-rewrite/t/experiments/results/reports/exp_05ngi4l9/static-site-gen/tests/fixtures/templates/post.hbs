@@ -1,0 +1,8 @@
+<article>
+  <h1>{{frontmatter.title}}</h1>
+  {{#if frontmatter.date}}<time>{{formatDate frontmatter.date}}</time>{{/if}}
+  {{#if frontmatter.tags}}<p>Tags: {{tagList frontmatter.tags}}</p>{{/if}}
+  <div>
+    {{{html}}}
+  </div>
+</article>

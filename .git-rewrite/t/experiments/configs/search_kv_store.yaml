@@ -1,0 +1,28 @@
+# Experiment: Distributed key-value store for search engine
+name: search_kv_store
+task: >
+  Design a distributed key-value store optimized for a search engine.
+  Must handle billions of documents indexed by keyword. Low-latency
+  lookups, high write throughput for indexing, range queries. Handle
+  hot keys, replication, consistency tradeoffs. Support distributed
+  joins across shards.
+
+turns:
+  - [analyze, "Analyze requirements. How does a search engine's KV store differ from a generic one? 3-4 sentences."]
+  - [design, "Design the architecture. How do you shard by keyword while handling hot terms? Choose specific technologies. Address consistency vs availability tradeoffs."]
+  - [implement, "Write the data model. Show how an inverted index maps to your KV store. Include replication strategy."]
+  - [review, "Review your design. What fails under a sudden news event (flash crowd)? What would you change?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro

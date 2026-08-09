@@ -1,0 +1,29 @@
+# Experiment: Multi-step form wizard
+name: form_wizard
+task: >
+  Design a multi-step form wizard for a complex enterprise application
+  (e.g., insurance claims, loan applications, tax filing). 8+ steps
+  with conditional branching, file uploads, signature capture, real-time
+  validation, auto-save drafts, progress persistence across sessions,
+  responsive (mobile + desktop), accessible (screen readers, keyboard-only),
+  and undo/redo within and across steps. React with TypeScript.
+
+turns:
+  - [analyze, "Analyze requirements. What makes multi-step forms fundamentally harder than single-page forms? 3-4 key challenges."]
+  - [design, "Design the architecture. How do you handle conditional branching (step 3 depends on step 1 choices), draft persistence, and cross-step validation? Choose state management approach."]
+  - [implement, "Write the component tree and state flow. Show how changing a value in step 1 cascades to unhide/hide fields in steps 3 and 5."]
+  - [review, "Review your design. What happens when the user goes back to step 2 after completing step 6? What would you change for 50+ steps?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro

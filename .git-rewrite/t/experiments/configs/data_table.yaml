@@ -1,0 +1,29 @@
+# Experiment: Large-scale data table with virtual scrolling
+name: data_table
+task: >
+  Design a frontend data table component that can render 100,000+ rows
+  with 50+ columns. Must support virtual scrolling, column reordering,
+  multi-column sorting, client-side and server-side filtering, row
+  selection (single, multi, range), inline editing, column resizing,
+  export (CSV/Excel), and keyboard navigation. Accessible (WCAG 2.1 AA).
+  React with TypeScript.
+
+turns:
+  - [analyze, "Analyze requirements. What are the core rendering challenges with 100K rows and 50 columns? 3-4 key decisions."]
+  - [design, "Design the architecture. How do you handle virtual scrolling with dynamic row heights? How do you keep filtering responsive with 100K rows? Choose libraries or build from scratch."]
+  - [implement, "Write the component architecture and data flow. Show how a column sort triggers re-render without losing scroll position."]
+  - [review, "Review your design. What breaks when a user sorts while another edits a cell? What would you change for 1M rows?"]
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - reverse_causality
+  - inject_false_premise
+  - inject_phantom_success
+  - remove_critical_constraint
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5, 0.8]
+model: deepseek
+model_id: deepseek-v4-pro

@@ -1,0 +1,38 @@
+# Silent Mode sweep — measures natural vs forced-silent cost gap
+# Key experiment for decomposing the Explanation Tax:
+#   Natural gap = Architecture × Verbosity × (1 + Explanation Tax)
+#   Forced gap   = Architecture × Verbosity (tax removed)
+#   Explanation Tax = Natural gap / Forced gap
+name: silent_mode_sweep
+task: >
+  Build an authenticated REST API with these requirements:
+  1. JWT-based user auth with refresh tokens
+  2. Rate limiting on login endpoint (5 attempts/minute/IP)
+  3. Input validation on all endpoints
+  4. Paginated list responses (20 items/page, max 100)
+  5. Comprehensive error handling with proper HTTP status codes
+  6. Audit logging of all mutation operations
+  7. API versioning via URL prefix (/v1/...)
+  Use Python/Flask + SQLAlchemy + pytest.
+
+constraints:
+  - JWT auth with refresh tokens
+  - Rate limiting on login
+  - Input validation on all endpoints
+  - Paginated list responses
+  - Error handling with proper HTTP codes
+  - Audit logging of mutations
+  - API versioning via URL prefix
+
+operators:
+  - baseline
+  - remove_critical_constraint
+
+strengths: [0.5]
+repetitions: 1
+
+standardized:
+  enabled: true
+  enforce_pytest: true
+  thinking_budget_tokens: 0
+  silent_mode: null   # null = natural; override per run

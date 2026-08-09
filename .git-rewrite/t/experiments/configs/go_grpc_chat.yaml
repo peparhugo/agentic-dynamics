@@ -1,0 +1,41 @@
+# Go: gRPC Chat Service with Bidirectional Streaming
+# Roadmap Pillar 1 — Protocol buffers + streaming + concurrency stress test
+name: go_grpc_chat
+task: >
+  Build a real-time chat service in Go using gRPC with bidirectional streaming.
+  Define a .proto file with service methods: JoinRoom (server-side streaming of
+  messages), SendMessage (client-side streaming), Chat (bidirectional streaming
+  for real-time messaging). Rooms are identified by string IDs. Messages have
+  sender, text, and timestamp. The server must broadcast messages to all clients
+  in a room using goroutines and channels. Support message history retrieval
+  (unary RPC) with cursor-based pagination. Include TLS support via self-signed
+  certificates for the gRPC server. Write the proto definition, server and client
+  implementations, and comprehensive tests using a bufconn in-memory connection.
+  Use only the standard library plus google.golang.org/grpc. Be thorough.
+
+constraints:
+  - Proto definition with streaming RPCs
+  - Server-side streaming (JoinRoom)
+  - Bidirectional streaming (Chat)
+  - Room-based message broadcasting via channels
+  - Message history with cursor pagination
+  - TLS with self-signed certificates
+  - gRPC health check
+  - Tests using bufconn (in-memory gRPC)
+  - go.mod with dependencies
+
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_false_premise
+  - invert_constraint
+  - inject_competing_goal
+
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
+
+standardized:
+  enabled: true
+  enforce_pytest: false

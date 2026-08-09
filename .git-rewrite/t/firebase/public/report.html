@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>AI FinOps Framework — Executive Report</title>
+<meta name="description" content="Condensed executive report: the AI FinOps Framework — rules, evidence, methodology, and roadmap in one document.">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="base.css">
+<style>
+:root{--bg:#fff;--bg2:#f8f9fa;--t:#1a1a2e;--t2:#4a4a5a;--t3:#888;--ac:#6366F1;--am:#F59E0B;--cy:#14B8A6;--b:#e0e0e0}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:150;display:flex;justify-content:flex-end;gap:1.5rem;padding:0.7rem 1.5rem;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--b)}
+.topbar-link{color:var(--t3);text-decoration:none;font-size:0.72rem;font-weight:600;transition:color .2s}.topbar-link:hover{color:var(--ac)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--t);line-height:1.7;font-size:0.9rem}
+.container{max-width:800px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:2rem;font-weight:800;color:#111;margin-bottom:0.3rem}
+h2{font-size:1.3rem;font-weight:700;color:#111;margin:2rem 0 0.5rem;border-bottom:2px solid var(--ac);padding-bottom:0.3rem}
+h3{font-size:1rem;font-weight:700;margin:1.2rem 0 0.3rem}
+.lead{font-size:0.95rem;color:var(--t2);margin-bottom:1rem}
+.meta{font-size:0.75rem;color:var(--t3);margin-bottom:1.5rem}
+.rule{margin:0.8rem 0;padding:0.8rem 1rem;background:var(--bg2);border-left:3px solid var(--ac);border-radius:0 6px 6px 0}
+.rule h3{font-size:0.9rem;margin:0 0 0.2rem;color:var(--ac)}
+.rule p{font-size:0.8rem;color:var(--t2)}
+.tbl{overflow-x:auto;margin:0.8rem 0}
+.tbl table{width:100%;border-collapse:collapse;font-size:0.75rem}
+.tbl th{text-align:left;padding:0.4rem 0.5rem;background:var(--bg2);border-bottom:2px solid var(--b);font-size:0.65rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+.tbl td{padding:0.3rem 0.5rem;border-bottom:1px solid var(--b)}
+.mono{font-family:'JetBrains Mono',monospace;font-size:0.7rem}
+.stats{display:flex;gap:1.5rem;flex-wrap:wrap;margin:1rem 0}
+.stat{text-align:center;min-width:80px}
+.stat .v{font-size:1.4rem;font-weight:800;color:var(--ac)}
+.stat .l{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3)}
+footer{text-align:center;padding:1.5rem;color:var(--t3);font-size:0.7rem;border-top:1px solid var(--b);margin-top:2rem}
+.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
+@media print{.topbar{display:none}body{font-size:0.8rem}.page-break{page-break-before:always}}
+</style>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<div class="container">
+
+<h1>AI FinOps Framework</h1>
+<p class="lead">An evidence-based predictive model for AI costs. v0.4 — 203 game reports across 3 architectures, 8 variants. Includes 21 cross-model TypeScript runs. Executive Report.</p>
+<div class="stats">
+<div class="stat"><div class="v"><span data-stat="costgap">69x</span></div><div class="l">Cost Gap (Python)</div></div>
+<div class="stat"><div class="v">200x</div><div class="l">Cost Gap (TS)</div></div>
+<div class="stat"><div class="v"><span data-stat="reports">142</span></div><div class="l">Reports (Py)</div></div>
+<div class="stat"><div class="v">21</div><div class="l">Runs (TS)</div></div>
+<div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Cost</div></div>
+</div>
+<p class="meta">Generated August 2026 · Full site: <a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a></p>
+
+<h2>Executive Summary</h2>
+<p>We discovered a 69× cost gap between models that produce identical constraint-complete Python code. The gap is structural — not situational. DeepSeek v4 Pro uses GRPO-based latent reasoning (Silent Inference); Claude Fable 5 uses SFT imitation chain-of-thought (billed as output tokens). The framework measures the cost. You decide which model fits your context.</p>
+<p><strong>Your AI bill is a black box. This framework opens it.</strong></p>
+
+<h2>The Five Rules</h2>
+<div class="rule"><h3>Rule 1 — Grit (Ground-Truth Integrity)</h3><p>Default to the cheapest model that passes your test suite. Models with high Grit maintain correctness under degraded, contradictory, or incomplete instructions. Defaulting to Grit-tested models preserves budget runway for tasks that actually need explicit reasoning — database migrations, core architecture, security audits. Two-way door.</p></div>
+<div class="rule"><h3>Rule 2 — The Explanation Tax Rule</h3><p>Narration has a measurable cost (24–120%). Whether it's worth paying depends on your verification architecture. If automated tests validate output, route to silent models. If you need auditable reasoning, the tax is insurance.</p></div>
+<div class="rule"><h3>Rule 3 — The Snowball Rule</h3><p>Model cumulative cost before architectural commitments. Context inflation compounds quadratically: C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]. The β·v·N² term dominates long-run cost. One-way door.</p></div>
+<div class="rule"><h3>Rule 4 — The EPM Horizon Rule</h3><p>Energy costs are the inflation rate of AI compute. Local energy markets determine long-term prices. Find the year your geographic energy costs flip your model selection. EPM(t) = 1.00 + r(t−2024). Hedge before that point.</p></div>
+<div class="rule"><h3>Rule 5 — First-Pass Rule</h3><p>Track WOC = 1/(1+r). WOC ratio below 0.70 is critical — model replacement is cheaper than retry. At or above 0.90 = healthy. Price the outcome, not the prompt: CostPerOutcome(K,v) = C(K/P, v) / K.</p></div>
+<div class="rule"><h3>Rule 6 — Batch Discount</h3><p>Defer non-urgent work to 72-hour batch windows. Batch-eligible tasks at 50% cost open budget headroom. Two-way door.</p></div>
+<div class="rule"><h3>Rule 7 — Budget Ceiling</h3><p>Enforce per-model, per-workstream spend caps. Prevent reasoning models on trivial tasks. Track WOC ratio across teams.</p></div>
+<div class="rule"><h3>Rule 8 — Cascade Rule</h3><p>Route 78.6% of tasks to the cheapest tier that passes validation. Escalate only when quality gates fail. Two-way door.</p></div>
+<div class="rule"><h3>Rule 9 — SLA Buffer</h3><p>Reserve 15% of budget runway for SLA-critical escalations. The buffer absorbs reasoning model spikes without breaking the budget.</p></div>
+
+<h2>The Evidence</h2>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Architecture</th><th>Avg Cost</th><th>WTs</th><th>Reason Ratio</th><th>Test Pass (raw)</th><th>Route</th></tr></thead><tbody id="report-model-tbody"></tbody></table></div>
+<script>
+(function(){
+  var tbody=document.getElementById('report-model-tbody');
+  if(!tbody||tbody.children.length>0)return;
+  var D=window.FRAMEWORK_DATA;
+  if(!D||!D.models)return;
+  var archMap={deepseek:'MoE (GRPO)',anthropic:'Dense (SFT)',openai:'Dense (GPT)'};
+  var routeMap={'conservative':'Conservative','exploratory':'Exploratory','wasteful':'Wasteful','efficient':'Efficient'};
+  var getStrategy=function(m){
+    var max='conservative',maxv=m.strategy_cons||0;
+    if(m.strategy_expl>maxv){max='exploratory';maxv=m.strategy_expl;}
+    if(m.strategy_waste>maxv){max='wasteful';maxv=m.strategy_waste;}
+    if(m.strategy_efficient>maxv){max='efficient';}
+    return max;
+  };
+  D.models.forEach(function(m){
+    var tr=document.createElement('tr');
+    tr.innerHTML='<td>'+m.label+'</td><td>'+((archMap[m.provider])||m.provider)+'</td><td>$'+(m.avg_cost||0).toFixed(4)+'</td><td>'+(m.sessions||0)+'</td><td>'+(m.avg_thinking_ratio||0).toFixed(2)+'</td><td>'+m.pass_rate+'</td><td>'+(routeMap[getStrategy(m)]||'—')+'</td>';
+    tbody.appendChild(tr);
+  });
+})();
+</script>
+
+<h2>The Equation</h2>
+<p style="font-family:'JetBrains Mono',monospace;font-size:0.75rem;line-height:2;background:var(--bg2);padding:1rem;border-radius:8px">
+<strong>Cumulative:</strong> C(N,v) = C₀ × EPM(N) × [N + β·v·N(N−1)/2]<br>
+<strong>Per outcome:</strong> CostPerOutcome(K,v) = C(K/P, v) / K<br>
+<strong>Monthly:</strong> C<sub>mo</sub> = E × C₀ × EPM(N) × [N + β·v·N(N−1)/2]
+</p>
+
+<h2>Decision Framework</h2>
+<p><strong>Two-Way Doors</strong> (C₀ changes): Switch models per task type, toggle silent mode, adjust caching. Reversible. Preserves runway. Experiment freely.</p>
+<p><strong>One-Way Doors</strong> (β, v, EPM changes): Architecture selection, multi-year contracts, proprietary frameworks. These compound through N². Model cumulative cost over 36 months before committing.</p>
+
+<h2>Methodology</h2>
+<p>The instrument runs 10 perturbation operators (4 manifold, 6 semantic) across 34 YAML configs covering Python and TypeScript. Six recovery detection signals classify model behavior. Four strategy archetypes (Conservative, Exploratory, Wasteful, Efficient) characterize response patterns. Every session recorded in the opencode database.</p>
+
+<h2>Research Roadmap (v0.4+)</h2>
+<p><strong>Pillar 1:</strong> Multi-language AST expansion — TypeScript (in progress: 21 runs), Go, Rust, Java. <strong>Pillar 2:</strong> Task archetypes — bug-fixing, refactoring, security. <strong>Pillar 3:</strong> Model diversity — Gemini, Llama, Mistral. <strong>Pillar 4:</strong> Structural perturbations — dependency injection, AST corruption. <strong>Pillar 5:</strong> Maintenance tax — human-in-the-loop studies.</p>
+
+<h2>Current Scope &amp; Limitations</h2>
+<p>Validated on Python/Flask REST APIs, CRUD apps, and real-time collaboration frontends. TypeScript/Node.js baselines in progress (3 architectures, 21 cross-model runs). Not yet validated on Go, Rust, or non-code tasks. EPM uses IEA baseline (1.6%/yr). The framework measures inference cost only — it does not model human maintenance or debugging time. v0.4. Open for contributions.</p>
+
+<footer>
+<strong>The AI FinOps Framework &middot; v0.4</strong><br>
+<span data-stat="sessions">248</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://ai-finops-rulebook.web.app">ai-finops-rulebook.web.app</a> &middot; <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a>
+</footer>
+
+</div></body>
+</html>

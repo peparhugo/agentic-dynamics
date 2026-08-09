@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Autonomous workloads in the AI FinOps Framework — when AI works without human supervision: rules, economics, and operational model.">
+<title>Autonomous Workloads — AI FinOps Framework</title>
+<link rel="stylesheet" href="base.css">
+<style>
+body{min-height:100vh;display:flex;flex-direction:column}
+main{flex:1;max-width:960px;width:100%;margin:0 auto;padding:3rem 1.25rem 3rem}
+h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;color:var(--t)}
+h2{font-size:1.25rem;font-weight:600;margin:2rem 0 0.75rem;color:var(--t)}
+h3{font-size:1rem;font-weight:600;margin:1.25rem 0 0.5rem;color:var(--t2)}
+.sec{padding:1.5rem}
+ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
+li{margin-bottom:0.35rem}
+.sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
+.rule-num{font-family:"JetBrains Mono",monospace;color:var(--ac);font-size:0.8rem;font-weight:600}
+.formula{font-family:"JetBrains Mono",monospace;color:var(--am);font-size:0.9rem;display:block;padding:0.5rem 0}
+</style>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</head>
+<body>
+<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="roadmap.html" class="topbar-link">Roadmap</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="model-cards.html" class="topbar-link">Models</a><a href="provider-playbook.html" class="topbar-link">Playbook</a><a href="autonomous-workloads.html" class="topbar-link" style="color:var(--ac)">Autonomous</a><a href="executive-dashboard.html" class="topbar-link">Dashboard</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<main>
+<section class="sec alt">
+<h1>Autonomous Workloads</h1>
+<p class="sub">When AI works without human supervision — the rules, economics, and operational model</p>
+</section>
+
+<section class="sec">
+<h2>Rules 6–9 for Autonomous Workloads</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">These rules extend the core AI FinOps Framework (Rules 1–5) to systems where AI operates without human supervision — agentic coding, batch processing, automated PR review, CI/CD pipelines. Start with <a href="framework.html">Rules 1–5</a> for model selection and cost governance, then apply Rules 6–9 for unsupervised operations.</p>
+
+<h3><span class="rule-num">Rule 6</span> · The Batch Discount</h3>
+<p style="color:var(--t2);font-size:0.9rem">Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in under 4 hours, run in batch. Monitor queue depth to avoid SLA breaches. Batch discount: D(b) = 1 − b × 0.5.</p>
+<div class="highlight-box"><p><strong>Example:</strong> Running 5,000 test-generation jobs at batch fraction 70% saves $262/day vs on-demand. The tradeoff: results arrive in 8.2 hours instead of 4.3 minutes.</p></div>
+
+<h3><span class="rule-num">Rule 7</span> · The Budget Ceiling</h3>
+<p style="color:var(--t2);font-size:0.9rem">Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job × (1 + retry_rate)). Double your budget, double your capacity — zero hiring required.</p>
+
+<h3><span class="rule-num">Rule 8</span> · The Cascade Rule</h3>
+<p style="color:var(--t2);font-size:0.9rem">In autonomous workloads, failures auto-escalate through model tiers: Flash → Sonnet → Opus → Human. A 1% escalation to human review can double your total cost. Design for under 1% escalation. Measured multiplier: 28.2× (DeepSeek → GPT-5.6).</p>
+
+<h3><span class="rule-num">Rule 9</span> · The SLA Buffer</h3>
+<p style="color:var(--t2);font-size:0.9rem">Actual batch completion time = (Queue_length × Avg_job_time) + (Retry_buffer × retry_rate). Never batch jobs with an SLA less than 2× your observed queue depth. Always have an on-demand fallback for time-critical tasks.</p>
+
+
+</section>
+
+<section class="sec alt">
+<h2>How Grit Controls Autonomous Workloads</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">The Grit framework directly governs unsupervised AI operations. In autonomous mode, you can't review every output. You need models that self-correct when given bad context — because bad context is inevitable in real systems (stale documentation, conflicting requirements, incomplete specifications).</p>
+<ul style="margin-top:0.5rem">
+<li><strong>Flail Rate</strong> determines which models should NEVER be in autonomous cascades. GPT-5-nano (100% flail) and GPT-5-mini (58% flail) cannot be trusted unsupervised.</li>
+<li><strong>Recovery Cost</strong> compounds across thousands of autonomous sessions. Claude writes 22,500 tokens to cache per session at $15/Mtok. At 5,000 jobs/day, that's $1,688/day in cache overhead alone. Switch to cache-read for autonomous batch processing.</li>
+<li><strong>First-Pass Success (Rule 5) IS Grit</strong> in production. Track WOC by model, task type, and time of day.</li>
+</ul>
+</section>
+
+<section class="sec">
+<h2>Escalation Cascade</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Visual flow from cheapest to most expensive resolution path.</p>
+<div style="display:flex;flex-direction:column;gap:0.75rem;max-width:600px;margin:0 auto">
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--cy);color:var(--bg)">T1</span><strong style="color:var(--t)">Flash / DeepSeek v4 Pro</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;1.0 base cost</span></div>
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:var(--am);color:var(--bg)">T2</span><strong style="color:var(--t)">Sonnet / GPT-4o</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;8–12 cost</span></div>
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (measured)</span></div>
+<div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
+</div>
+<div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> 88.5% of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees &lt; 5% of all tasks.</p></div>
+</section>
+
+<section class="sec">
+<h2>WOC Ratio — Rule 5 (First-Pass)</h2>
+<p style="color:var(--t2);font-size:0.9rem">The Work Overhead Cost ratio tells you whether autonomy is actually saving money.</p>
+<span class="formula">WOC = (cost<sub>validation</sub> + cost<sub>retries</sub> + cost<sub>escalations</sub>) / cost<sub>primary</sub></span>
+<div class="row" style="margin-top:1rem">
+<div class="card">
+<h4>Healthy</h4>
+<p style="font-size:1.5rem;color:var(--cy);font-family:'JetBrains Mono',monospace">WOC &lt; 0.70</p>
+<p>Overhead is manageable. Scaling is safe.</p>
+</div>
+<div class="card">
+<h4>Investigate</h4>
+<p style="font-size:1.5rem;color:var(--am);font-family:'JetBrains Mono',monospace">WOC &lt; 0.85</p>
+<p>Retry or escalation rate rising. Tune thresholds.</p>
+</div>
+<div class="card">
+<h4>Critical</h4>
+<p style="font-size:1.5rem;color:#EF4444;font-family:'JetBrains Mono',monospace">WOC &ge; 0.85</p>
+<p>Overhead dominates. Pause autonomy until root cause found.</p>
+</div>
+</div>
+<div class="highlight-box" style="margin-top:1rem">
+<p><strong>Calculated:</strong> <span class="met">WOC = 0.90</span> from retry rate r=0.115 across 248 experiment sessions.</p>
+</div>
+</section>
+
+<section class="sec alt">
+<h2>72-Hour Horizon · Batch SLA Management</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Batch workloads don't need sub-second response times. A 72-hour window unlocks massive cost savings through scheduling optimization.</p>
+<div class="row">
+<div class="card">
+<h4>Queue Depth</h4>
+<p>Number of jobs waiting. If queue_depth &gt; 2 &times; daily throughput, you need more capacity or a longer window.</p>
+</div>
+<div class="card">
+<h4>Slack Buffer</h4>
+<p>Reserve 20% of the window for retries. At <span class="met">11.5%</span> retry rate, a 72h window needs ~14.4h of slack.</p>
+</div>
+<div class="card">
+<h4>Completion Time Formula</h4>
+<span class="formula">T<sub>complete</sub> = N<sub>jobs</sub> / R<sub>throughput</sub> + T<sub>slack</sub></span>
+<p style="margin-top:0.5rem">Guarantees delivery within the SLA window.</p>
+</div>
+</div>
+</section>
+
+<section class="sec">
+<h2>Workstream Capacity</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">How many jobs can you process per day at a given budget?</p>
+<span class="formula">Throughput = Budget / (cost<sub>per_job</sub> &times; (1 + retry_rate))</span>
+<div style="margin-top:1rem">
+<table>
+<tr><th>Scenario</th><th>Budget/Day</th><th>Cost/Job</th><th>Retry Rate</th><th>Jobs/Day</th></tr>
+<tr><td>Light coding tasks</td><td><code>$5.00</code></td><td><code>$0.015</code></td><td>11.5%</td><td><span class="met">274</span></td></tr>
+<tr><td>Code review + fix</td><td><code>$10.00</code></td><td><code>$0.08</code></td><td>11.5%</td><td><span class="met">103</span></td></tr>
+<tr><td>Architecture generation</td><td><code>$20.00</code></td><td><code>$0.42</code></td><td>11.5%</td><td><span class="met">39</span></td></tr>
+<tr><td>Full-stack PRD → deploy</td><td><code>$50.00</code></td><td><code>$1.01</code></td><td>11.5%</td><td><span class="met">41</span></td></tr>
+</table>
+</div>
+</section>
+
+<section class="sec alt">
+<h2>Real-World Autonomous Patterns</h2>
+<p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">Autonomous AI maps directly to established workforce management disciplines:</p>
+<ul>
+<li><strong>Call Center / Task Queue:</strong> AHT (average handle time) = steps per session. Service level = % of tasks resolved within SLA buffer (Rule 9).</li>
+<li><strong>Back-Office Processing:</strong> Batch window = 72-hour horizon (Rule 6). Throughput cap = budget / cost-per-job (Rule 7).</li>
+<li><strong>CI/CD Pipelines:</strong> Cascade routing = escalation chain (Rule 8). Grit determines which models auto-resolve vs escalate to human review.</li>
+<li><strong>Agentic Workflows:</strong> Multi-step autonomous tasks require high-Grit models that can recover from intermediate failures without flailing.</li>
+</ul>
+</section>
+
+<section class="sec alt">
+<h2>Batch vs On-Demand Decision Table</h2>
+<table>
+<tr><th>Task Type</th><th>Urgency</th><th>Complexity</th><th>Mode</th><th>Rationale</th></tr>
+<tr><td>Code review</td><td>&lt; 1 hour</td><td>Low–Medium</td><td><span style="color:var(--cy)">On-demand</span></td><td>Blocks developer workflow</td></tr>
+<tr><td>Test generation</td><td>&lt; 4 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Non-blocking, can queue</td></tr>
+<tr><td>PR description</td><td>&lt; 5 min</td><td>Low</td><td><span style="color:var(--cy)">On-demand</span></td><td>Trivial, no queuing benefit</td></tr>
+<tr><td>Refactoring sweep</td><td>&lt; 72 hours</td><td>High</td><td><span style="color:var(--am)">Batch</span></td><td>Large scope, schedule overnight</td></tr>
+<tr><td>Documentation gen</td><td>&lt; 24 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Non-urgent, perfect for idle windows</td></tr>
+<tr><td>Incident triage</td><td>&lt; 2 min</td><td>High</td><td><span style="color:var(--cy)">On-demand</span></td><td>Time-critical, needs fastest model</td></tr>
+<tr><td>Dependency updates</td><td>&lt; 72 hours</td><td>Low</td><td><span style="color:var(--am)">Batch</span></td><td>Can run weekly, huge cost savings</td></tr>
+<tr><td>Security audit</td><td>&lt; 72 hours</td><td>Medium</td><td><span style="color:var(--am)">Batch</span></td><td>Queue depth manageable, retry-safe</td></tr>
+</table>
+</section>
+</main>
+<footer>
+<p style="font-size:0.7rem;color:var(--t3);margin-top:1.5rem"><strong>The AI FinOps Framework &middot; v0.4 &middot; August 2026</strong><br><span data-stat="sessions">248</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed</p>
+</footer>
+</body>
+</html>

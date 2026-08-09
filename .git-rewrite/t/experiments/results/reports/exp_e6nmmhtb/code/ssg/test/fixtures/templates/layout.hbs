@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{page.frontmatter.title}} — {{context.config.title}}</title>
+</head>
+<body>
+  {{> partials/header}}
+  <main>{{{body}}}</main>
+  <footer>&copy; {{context.startTime}} — {{context.config.title}}</footer>
+</body>
+</html>

@@ -1,8 +1,8 @@
-/* Generated 2026-08-08 16:39:03 UTC by build_data.py */
+/* Generated 2026-08-08 17:08:44 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.FRAMEWORK_DATA = {
   "_meta": {
-    "generated_at": "2026-08-08T16:39:03.019440+00:00",
+    "generated_at": "2026-08-08T17:08:44.898023+00:00",
     "source_inventory": "/root/reasoning-instrument/experiments/inventory.json",
     "source_summary": "/root/reasoning-instrument/experiments/results/_results_summary.json",
     "source_db": "/root/.local/share/opencode/opencode.db",

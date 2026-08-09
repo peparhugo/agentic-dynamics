@@ -1,0 +1,9 @@
+{{!< default}}
+<article>
+  <h1>{{title}}</h1>
+  <p class="meta">
+    {{#if date}}<time datetime="{{isoDate date}}">{{formatDate date "MMMM DD, YYYY"}}</time>{{/if}}
+    {{#each tags}}<a class="tag" href="/tags/{{this}}/">#{{this}}</a> {{/each}}
+  </p>
+  {{{content}}}
+</article>
