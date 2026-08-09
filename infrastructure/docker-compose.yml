@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: neo4j
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:7687:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/password123
+      - NEO4J_PLUGINS=["apoc", "graph-data-science"]
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    networks:
+      - ai-infra
+
+  chromadb:
+    image: chromadb/chroma:1.0.13
+    container_name: chromadb
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=False
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ai-infra
+
+  opencode:
+    image: sprisa/opencode:latest
+    container_name: opencode-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4096:4096"
+    volumes:
+      - /path/to/your/project:/home/opencode/workspace
+      - opencode_config:/home/opencode/.config/opencode
+    environment:
+      - OPENCODE_PORT=4096
+      - OPENCODE_SERVER_HOST=0.0.0.0
+    stdin_open: true
+    tty: true
+    networks:
+      - ai-infra
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  chroma_data:
+  opencode_config:
+
+networks:
+  ai-infra:
+    driver: bridge
