@@ -23,7 +23,7 @@
 .fsec{padding:4rem 2rem;position:relative}
 .fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
 .inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
+.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
 .pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
@@ -32,9 +32,9 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .mcard:hover{border-color:var(--ba)}
 .mcard .mh{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:1rem;margin-bottom:1.2rem}
 .mcard .mname{font-size:1.4rem;font-weight:800;color:var(--t)}
-.mcard .march{display:inline-block;padding:0.2rem 0.7rem;border-radius:4px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.mcard .march{display:inline-block;padding:0.2rem 0.7rem;border-radius:4px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.15)}
 .mcard .march.moe{background:rgba(34,211,238,0.08);color:var(--cy);border:1px solid rgba(34,211,238,0.15)}
-.mcard .march.dense{background:rgba(99,102,241,0.08);color:var(--ac);border:1px solid rgba(99,102,241,0.15)}
+.mcard .march.dense{background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.15)}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.8rem}
 .mstat{background:var(--bg4);border-radius:10px;padding:0.9rem;text-align:center}
 .mstat .mv{font-size:1.2rem;font-weight:800;color:var(--ac);font-family:'JetBrains Mono',monospace}
@@ -44,11 +44,11 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .pan{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;font-size:0.78rem;color:var(--t2);line-height:1.7}
 .pan strong{color:var(--t)}
 .strats{display:flex;gap:0.5rem;flex-wrap:wrap;margin-top:0.8rem}
-.stag{padding:0.15rem 0.6rem;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(99,102,241,0.06);color:var(--ac);border:1px solid rgba(99,102,241,0.12)}
+.stag{padding:0.15rem 0.6rem;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;background:rgba(34,211,238,0.06);color:var(--ac);border:1px solid rgba(34,211,238,0.12)}
 .stag.cons{background:rgba(34,197,94,0.06);color:var(--success);border:1px solid rgba(34,197,94,0.12)}
 .stag.expl{background:rgba(251,191,36,0.06);color:var(--am);border:1px solid rgba(251,191,36,0.12)}
 .stag.waste{background:rgba(239,68,68,0.06);color:var(--danger);border:1px solid rgba(239,68,68,0.12)}
-.rec{font-size:0.85rem;color:var(--t);margin-top:0.8rem;padding:0.6rem 0.9rem;background:rgba(99,102,241,0.04);border-left:3px solid var(--ac);border-radius:0 8px 8px 0}
+.rec{font-size:0.85rem;color:var(--t);margin-top:0.8rem;padding:0.6rem 0.9rem;background:rgba(34,211,238,0.04);border-left:3px solid var(--ac);border-radius:0 8px 8px 0}
 .rec.amber{border-left-color:var(--am);background:rgba(251,191,36,0.04)}
 .rec.cyan{border-left-color:var(--cy);background:rgba(34,211,238,0.04)}
 .bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
@@ -363,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function () {
       return { x: locData[i] || 0, y: D.charts.costY[i] || 0, r: Math.max(6, Math.sqrt(reports[i] || 1) * 2.2) };
     });
     var modelColors = [
-      'rgba(99,102,241,0.80)',  // DeepSeek
+      'rgba(34,211,238,0.80)',  // DeepSeek
       'rgba(239,68,68,0.80)',   // nano
       'rgba(239,68,68,0.80)',   // mini
       'rgba(251,191,36,0.80)',  // GPT-5
