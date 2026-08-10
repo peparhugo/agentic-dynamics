@@ -1,0 +1,522 @@
+{
+  "metric": "perturbation_recovery_curve",
+  "data_sources": [
+    "lab_cross_model_reasoning.json \u2192 position_details (cross-model per-step distances)",
+    "lab_reasoning_divergence.json \u2192 per_model (baseline\u00d7perturbed mean distances)",
+    "lab_semantic_clusters.json \u2192 per_step_index (all-pairs per-step distances)"
+  ],
+  "interpretation": {
+    "V_curve": "Declining \u2014 model self-corrects toward consensus after perturbation.",
+    "L_curve": "Persistent \u2014 perturbation impact holds, no self-correction trend.",
+    "U_curve": "High\u2192drop\u2192rise \u2014 temporary recovery then exploratory wander.",
+    "J_curve": "Rising \u2014 compounding divergence; models start close, drift apart as code generation proceeds."
+  },
+  "by_model": {
+    "anthropic/claude-fable-5": {
+      "label": "Claude Fable 5",
+      "curve_shape": "L",
+      "step_distances": [
+        0.0923,
+        0.0971,
+        0.1362,
+        0.1202
+      ],
+      "recovery_point_step": 3,
+      "mean_terminal_distance": 0.1202,
+      "num_steps": 4,
+      "divergence_slope_per_step": 0.01228,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "deepseek/deepseek-v4-pro": {
+      "label": "DeepSeek v4 Pro",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0815,
+        0.0795,
+        0.1141,
+        0.1243,
+        0.1087,
+        0.1054,
+        0.1038,
+        0.1116,
+        0.1033,
+        0.1126,
+        0.1192,
+        0.139,
+        0.1605,
+        0.1478,
+        0.1252,
+        0.1318,
+        0.1502,
+        0.1691,
+        0.1709,
+        0.1631,
+        0.1583,
+        0.1628,
+        0.1594,
+        0.1688,
+        0.1555,
+        0.189,
+        0.2142,
+        0.2008,
+        0.2253
+      ],
+      "recovery_point_step": null,
+      "mean_terminal_distance": 0.2253,
+      "num_steps": 29,
+      "divergence_slope_per_step": 0.00403,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5": {
+      "label": "GPT-5",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0904,
+        0.0862,
+        0.0873,
+        0.0861,
+        0.0695,
+        0.0689,
+        0.0859,
+        0.0863,
+        0.1013,
+        0.1194,
+        0.1234,
+        0.1417,
+        0.176,
+        0.1731,
+        0.1698,
+        0.1718,
+        0.1732,
+        0.2229,
+        0.213,
+        0.216,
+        0.1605,
+        0.1951,
+        0.2002,
+        0.208
+      ],
+      "recovery_point_step": 20,
+      "mean_terminal_distance": 0.208,
+      "num_steps": 24,
+      "divergence_slope_per_step": 0.00683,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5-mini": {
+      "label": "GPT-5-mini",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0746,
+        0.0741,
+        0.0777,
+        0.0856,
+        0.0579,
+        0.0691,
+        0.0796,
+        0.0888,
+        0.0941,
+        0.1074,
+        0.1104,
+        0.129,
+        0.1478,
+        0.1195,
+        0.1215,
+        0.134,
+        0.2462,
+        0.2232,
+        0.2063,
+        0.2007,
+        0.1731,
+        0.1838,
+        0.2116,
+        0.2075,
+        0.2037,
+        0.2302,
+        0.2532,
+        0.2291
+      ],
+      "recovery_point_step": null,
+      "mean_terminal_distance": 0.2291,
+      "num_steps": 28,
+      "divergence_slope_per_step": 0.0071,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5-nano": {
+      "label": "GPT-5-nano",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0709,
+        0.073,
+        0.0843,
+        0.1114,
+        0.0685,
+        0.0758,
+        0.0894,
+        0.114,
+        0.0909,
+        0.0952,
+        0.1086,
+        0.1178,
+        0.1449,
+        0.129,
+        0.1215,
+        0.1348,
+        0.1537,
+        0.1557,
+        0.1556,
+        0.1557,
+        0.1321,
+        0.1539,
+        0.169,
+        0.1769,
+        0.1658,
+        0.1991,
+        0.2455,
+        0.2268,
+        0.2253
+      ],
+      "recovery_point_step": null,
+      "mean_terminal_distance": 0.2253,
+      "num_steps": 29,
+      "divergence_slope_per_step": 0.00529,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5.5": {
+      "label": "GPT-5.5",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0662,
+        0.0928,
+        0.1063,
+        0.1039,
+        0.0712,
+        0.0905,
+        0.0976,
+        0.1036,
+        0.0921,
+        0.1242,
+        0.1872,
+        0.187,
+        0.2164,
+        0.2013
+      ],
+      "recovery_point_step": null,
+      "mean_terminal_distance": 0.2013,
+      "num_steps": 14,
+      "divergence_slope_per_step": 0.01033,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5.6": {
+      "label": "GPT-5.6",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0901,
+        0.0714,
+        0.0779,
+        0.0843,
+        0.0536,
+        0.0565,
+        0.0745,
+        0.078,
+        0.0875,
+        0.0909,
+        0.1154,
+        0.1394,
+        0.1794,
+        0.22,
+        0.1882,
+        0.2095,
+        0.2146
+      ],
+      "recovery_point_step": 14,
+      "mean_terminal_distance": 0.2146,
+      "num_steps": 17,
+      "divergence_slope_per_step": 0.01017,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    },
+    "openai/gpt-5.6-fast": {
+      "label": "GPT-5.6-fast",
+      "curve_shape": "J",
+      "step_distances": [
+        0.0738,
+        0.0701,
+        0.0749,
+        0.0775,
+        0.0595,
+        0.0771,
+        0.0702,
+        0.0867,
+        0.0922,
+        0.0972,
+        0.1243,
+        0.1605,
+        0.2028
+      ],
+      "recovery_point_step": null,
+      "mean_terminal_distance": 0.2028,
+      "num_steps": 13,
+      "divergence_slope_per_step": 0.00856,
+      "note": "J = compounding divergence from cross-model consensus (models start close, diverge as they write different code). Lower slope = stays closer to shared solution manifold."
+    }
+  },
+  "perturbation_gaps": {
+    "anthropic/claude-fable-5": {
+      "label": "Claude Fable 5",
+      "baseline_baseline_mean_distance": 0.212,
+      "baseline_perturbed_mean_distance": 0.213,
+      "perturbation_gap": 0.001,
+      "perturbation_gap_ratio": 0.0047,
+      "recovery_quality": "minimal_impact",
+      "by_operator": {
+        "inject_alien_vocab": {
+          "perturbation_class": "manifold",
+          "mean_distance": 0.207,
+          "gap": -0.005,
+          "gap_ratio": -0.0236,
+          "count": 28
+        },
+        "inject_competing_goal": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2239,
+          "gap": 0.0119,
+          "gap_ratio": 0.0561,
+          "count": 28
+        },
+        "inject_phantom_success": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2112,
+          "gap": -0.0008,
+          "gap_ratio": -0.0038,
+          "count": 14
+        },
+        "invert_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2116,
+          "gap": -0.0004,
+          "gap_ratio": -0.0019,
+          "count": 28
+        },
+        "remove_critical_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2079,
+          "gap": -0.0041,
+          "gap_ratio": -0.0193,
+          "count": 14
+        }
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "label": "DeepSeek v4 Pro",
+      "baseline_baseline_mean_distance": 0.1892,
+      "baseline_perturbed_mean_distance": 0.2069,
+      "perturbation_gap": 0.0177,
+      "perturbation_gap_ratio": 0.0936,
+      "recovery_quality": "susceptible",
+      "by_operator": {
+        "inject_alien_vocab": {
+          "perturbation_class": "manifold",
+          "mean_distance": 0.2017,
+          "gap": 0.0125,
+          "gap_ratio": 0.0661,
+          "count": 360
+        },
+        "inject_competing_goal": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2096,
+          "gap": 0.0204,
+          "gap_ratio": 0.1078,
+          "count": 144
+        },
+        "inject_phantom_success": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.1995,
+          "gap": 0.0103,
+          "gap_ratio": 0.0544,
+          "count": 216
+        },
+        "invert_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2095,
+          "gap": 0.0203,
+          "gap_ratio": 0.1073,
+          "count": 288
+        },
+        "remove_critical_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2119,
+          "gap": 0.0227,
+          "gap_ratio": 0.12,
+          "count": 360
+        },
+        "shift_framing": {
+          "perturbation_class": "manifold",
+          "mean_distance": 0.2084,
+          "gap": 0.0192,
+          "gap_ratio": 0.1015,
+          "count": 360
+        }
+      }
+    },
+    "openai/gpt-5": {
+      "label": "GPT-5",
+      "baseline_baseline_mean_distance": 0.1976,
+      "baseline_perturbed_mean_distance": 0.2448,
+      "perturbation_gap": 0.0472,
+      "perturbation_gap_ratio": 0.2389,
+      "recovery_quality": "brittle",
+      "by_operator": {
+        "inject_competing_goal": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2448,
+          "gap": 0.0472,
+          "gap_ratio": 0.2389,
+          "count": 5
+        }
+      }
+    },
+    "openai/gpt-5-mini": {
+      "label": "GPT-5-mini",
+      "baseline_baseline_mean_distance": 0.2037,
+      "baseline_perturbed_mean_distance": null,
+      "perturbation_gap": null,
+      "perturbation_gap_ratio": null,
+      "recovery_quality": "no_data",
+      "by_operator": {}
+    },
+    "openai/gpt-5-nano": {
+      "label": "GPT-5-nano",
+      "baseline_baseline_mean_distance": 0.2081,
+      "baseline_perturbed_mean_distance": 0.2148,
+      "perturbation_gap": 0.0067,
+      "perturbation_gap_ratio": 0.0322,
+      "recovery_quality": "resilient",
+      "by_operator": {
+        "inject_phantom_success": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2127,
+          "gap": 0.0046,
+          "gap_ratio": 0.0221,
+          "count": 4
+        },
+        "remove_critical_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.217,
+          "gap": 0.0089,
+          "gap_ratio": 0.0428,
+          "count": 4
+        }
+      }
+    },
+    "openai/gpt-5.5": {
+      "label": "GPT-5.5",
+      "baseline_baseline_mean_distance": 0.1985,
+      "baseline_perturbed_mean_distance": null,
+      "perturbation_gap": null,
+      "perturbation_gap_ratio": null,
+      "recovery_quality": "no_data",
+      "by_operator": {}
+    },
+    "openai/gpt-5.6": {
+      "label": "GPT-5.6",
+      "baseline_baseline_mean_distance": 0.2164,
+      "baseline_perturbed_mean_distance": 0.2285,
+      "perturbation_gap": 0.0121,
+      "perturbation_gap_ratio": 0.0559,
+      "recovery_quality": "resilient",
+      "by_operator": {
+        "remove_critical_constraint": {
+          "perturbation_class": "semantic",
+          "mean_distance": 0.2285,
+          "gap": 0.0121,
+          "gap_ratio": 0.0559,
+          "count": 14
+        }
+      }
+    },
+    "openai/gpt-5.6-fast": {
+      "label": "GPT-5.6-fast",
+      "baseline_baseline_mean_distance": 0.2164,
+      "baseline_perturbed_mean_distance": null,
+      "perturbation_gap": null,
+      "perturbation_gap_ratio": null,
+      "recovery_quality": "no_data",
+      "by_operator": {}
+    },
+    "unknown": {
+      "label": "unknown",
+      "baseline_baseline_mean_distance": null,
+      "baseline_perturbed_mean_distance": null,
+      "perturbation_gap": null,
+      "perturbation_gap_ratio": null,
+      "recovery_quality": "no_data"
+    }
+  },
+  "by_perturbation_class": {
+    "semantic": {
+      "dominant_shape": "V",
+      "mean_gap_ratio": 0.065,
+      "mean_recovery_step": 3.0,
+      "num_operator_pairs": 12,
+      "models_classified_V": 3,
+      "models_classified_L": 2,
+      "shape_distribution": {
+        "V": 0.67,
+        "L": 0.33
+      }
+    },
+    "manifold": {
+      "dominant_shape": "L",
+      "mean_gap_ratio": 0.048,
+      "mean_recovery_step": null,
+      "num_operator_pairs": 3,
+      "models_classified_V": 1,
+      "models_classified_L": 1,
+      "shape_distribution": {
+        "V": 0.33,
+        "L": 0.67
+      }
+    }
+  },
+  "global_step_curve": {
+    "source": "all-pairs per-step-index (lab_semantic_clusters.json)",
+    "step_distances": [
+      0.2233,
+      0.2211,
+      0.2156,
+      0.2205,
+      0.2231,
+      0.2265,
+      0.2305,
+      0.2326,
+      0.2323,
+      0.2485,
+      0.2369,
+      0.2418,
+      0.2406,
+      0.2453,
+      0.2507,
+      0.249,
+      0.2547,
+      0.2489,
+      0.2473,
+      0.2508,
+      0.2656,
+      0.2572,
+      0.2622,
+      0.2527,
+      0.2564,
+      0.2561,
+      0.2785,
+      0.2709,
+      0.2795,
+      0.2453,
+      0.2657,
+      0.2786,
+      0.2935,
+      0.2751
+    ],
+    "slope": 0.00179,
+    "shape": "J",
+    "note": "All-pairs per-step distances: baseline\u00d7baseline + baseline\u00d7perturbed + perturbed\u00d7perturbed. Mildly rising \u2014 global compounding effect."
+  }
+}

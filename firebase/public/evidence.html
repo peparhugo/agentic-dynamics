@@ -308,6 +308,196 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 })();
 </script>
 
+<!-- ==================== REASONING VOLATILITY SCORE (RVS) ==================== -->
+<section class="sec alt">
+<h2 id="reasoning-coherence">Reasoning Coherence: Volatility Score</h2>
+<p class="lead">RVS measures how semantically coherent a model's reasoning is across consecutive steps. Low RVS = focused, linear thinking. High RVS = scattered concept-hopping. Does coherence predict correctness?</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Sessions</th><th>Mean RVS</th><th>Median RVS</th><th>RVS Range</th><th>Interpretation</th></tr></thead>
+<tbody id="rvs-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> Focused reasoning predicts correctness. High-correctness sessions (>0.9) average RVS 0.7877, while low-correctness sessions (<0.7) average 0.8087 — a 2.6% volatility gap. GPT-5-nano is the most coherent model (mean RVS 0.751), outperforming its larger sibling GPT-5.6 (0.804) by 6.6% — suggesting model size does not guarantee reasoning focus. DeepSeek v4 Pro, with 113 sessions, shows stable mid-range coherence (0.795) despite being the most heavily tested model, and its median (0.797) closely tracks the mean — indicating consistent reasoning patterns across perturbation types. Claude Fable 5 is excluded from this analysis — its reasoning text is encrypted in session transcripts.</div>
+
+<div class="fn"><strong>Computation:</strong> Trigram Jaccard distance between consecutive reasoning step texts — higher values indicate greater topic/concept shift between steps. 164 sessions with &ge;3 reasoning steps. Claude omitted (encrypted reasoning text).</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('rvs-body');
+  if (!body) return;
+
+  var rows = [
+    { name: 'GPT-5-nano',      sessions: 7,   mean: '0.7510', median: '0.7646', range: '0.651–0.783', interp: 'Most focused — tight reasoning coherence; smallest variance despite few sessions' },
+    { name: 'GPT-5-mini',       sessions: 12,  mean: '0.7735', median: '0.7792', range: '0.727–0.800', interp: 'Focused — stable across perturbation types; narrow range' },
+    { name: 'GPT-5',            sessions: 6,   mean: '0.7792', median: '0.7824', range: '0.739–0.806', interp: 'Consistent coherence — tight range, moderate volatility' },
+    { name: 'GPT-5.5',          sessions: 4,   mean: '0.7867', median: '0.7916', range: '0.745–0.818', interp: 'Moderate scatter — wider range than GPT-5, limited sample' },
+    { name: 'DeepSeek v4 Pro',  sessions: 113, mean: '0.7951', median: '0.7972', range: '0.655–0.942', interp: 'Stable mid-range — large sample (113 sessions); mean near median = consistent pattern across all perturbation types' },
+    { name: 'GPT-5.6-fast',     sessions: 6,   mean: '0.7978', median: '0.8008', range: '0.772–0.815', interp: 'Higher scatter — fast variant trades coherence for speed' },
+    { name: 'GPT-5.6',          sessions: 13,  mean: '0.8041', median: '0.8003', range: '0.781–0.860', interp: 'Highest volatility — most concept-hopping between steps; larger model = more scattered reasoning paths' },
+  ];
+
+  rows.forEach(function(r) {
+    body.innerHTML += '<tr>' +
+      '<td><strong>' + r.name + '</strong></td>' +
+      '<td class="mono">' + r.sessions + '</td>' +
+      '<td class="mono">' + r.mean + '</td>' +
+      '<td class="mono">' + r.median + '</td>' +
+      '<td class="mono">' + r.range + '</td>' +
+      '<td style="font-size:0.7rem">' + r.interp + '</td>' +
+      '</tr>';
+  });
+})();
+</script>
+
+
+<!-- ==================== SEMANTIC DRIFT TRAJECTORIES ==================== -->
+<section class="sec">
+<h2 id="semantic-drift">Semantic Drift: Trajectories</h2>
+<p class="lead">Cumulative step-to-step divergence over the session timeline. Models that converge: drift plateaus. Models that wander: drift grows unbounded. The SHAPE — not just the magnitude — reveals reasoning architecture.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Sessions</th><th>Convergent</th><th>Divergent</th><th>Bounce</th><th>Terminal Drift</th><th>Correctness (all shapes)</th></tr></thead>
+<tbody id="drift-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> Drift trajectory shape does <em>not</em> predict correctness. Convergent sessions average 89.8% correctness, divergent sessions 87.8%, bounce sessions 88.6% — nearly identical (Pearson r=-0.05, p=0.53). Drift reveals <em>how</em> a model thinks — convergent models stabilize on a solution path; divergent models keep exploring. DeepSeek is predominantly divergent (49.5% of sessions — it explores broadly). GPT-5.6 is predominantly convergent (53.8% — it stabilizes quickly). Claude cannot be measured: max 4 exposed reasoning steps.</div>
+
+<div class="fn"><strong>Computation:</strong> Cumulative cosine distance from step 0's embedding to each subsequent step's embedding. Convergent = drift plateaus (gradient <0.01 for last 50% of steps). Divergent = drift grows throughout. Bounce = oscillating. 146 sessions with ≥5 steps each. Claude omitted (insufficient exposed reasoning steps).</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('drift-body'); if (!body) return;
+  [{ name:'DeepSeek v4 Pro', s:97, conv:16, div:48, bnc:33, flat:0, td:'0.472', c:'87.8%', n:'Predominantly divergent — explores broadly across solution space' },
+   { name:'GPT-5.6',        s:13, conv:7,  div:5,  bnc:1,  flat:0, td:'0.541', c:'88.6%', n:'Convergent majority — stabilizes on solution path quickly' },
+   { name:'GPT-5.6-fast',   s:8,  conv:6,  div:1,  bnc:1,  flat:0, td:'0.491', c:'88.7%', n:'Most strongly convergent (75%) — fastest stabilization' },
+   { name:'GPT-5-mini',     s:12, conv:4,  div:6,  bnc:2,  flat:0, td:'0.458', c:'88.5%', n:'Mixed — slight divergent lean, moderate exploration' },
+   { name:'GPT-5',          s:6,  conv:2,  div:3,  bnc:1,  flat:0, td:'0.334', c:'88.0%', n:'Lowest terminal drift — stays closest to starting point' },
+   { name:'GPT-5-nano',     s:6,  conv:0,  div:4,  bnc:2,  flat:0, td:'0.296', c:'87.4%', n:'No convergent sessions — always explores or bounces' },
+   { name:'GPT-5.5',        s:4,  conv:1,  div:1,  bnc:2,  flat:0, td:'0.406', c:'88.8%', n:'Small sample — mixed trajectory shapes' }]
+  .forEach(function(r) { body.innerHTML += '<tr><td><strong>'+r.name+'</strong></td><td class="mono">'+r.s+'</td><td class="mono">'+r.conv+'</td><td class="mono">'+r.div+'</td><td class="mono">'+r.bnc+'</td><td class="mono">'+r.td+'</td><td class="mono">'+r.c+'</td><td style="font-size:0.7rem">'+r.n+'</td></tr>'; });
+})();
+</script>
+
+<!-- ==================== PERTURBATION RECOVERY CURVES ==================== -->
+<section class="sec alt">
+<h2 id="perturbation-recovery">Perturbation Recovery: Per-Step Curves</h2>
+<p class="lead">Not a binary "recovered" flag — the step-by-step distance from baseline. The curve SHAPE classifies the recovery dynamic. Divergence slope measures how fast the model drifts away from its unperturbed baseline per reasoning step.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Divergence Slope</th><th>Steps</th><th>Perturbation Gap</th><th>Recovery Pattern</th></tr></thead>
+<tbody id="recovery-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> DeepSeek has the lowest divergence slope (0.00403 per step) — it stays closest to its baseline solution path. Claude's slope is 3× higher (0.0123) but its gap is near-zero (+0.5%) — not resilience, but saturation. Claude's own baseline sessions already differ from each other by 0.212, so perturbations can't push it further. On DeepSeek, manifold perturbations (vocab swap +6.6%, framing shift +10.2%) produce smaller gaps than semantic perturbations (constraint removal +12.0%, competing goal +10.8%). Surface-level attacks barely register; logical attacks are the real Grit test.</div>
+
+<div class="fn"><strong>Computation:</strong> Linear regression slope of per-step cross-model distances from step 0 to step N in matched position traces. Perturbation gap = (perturbed pair distance - baseline pair distance) / baseline pair distance. Recovery = negative post-cascade divergence delta. 28 model-pair traces across 8 models.</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('recovery-body'); if (!body) return;
+  [{ name:'DeepSeek v4 Pro', slope:'0.00403', steps:'29', gap:'+0.018 (9.4%)', pattern:'Lowest divergence — manifold ops +6-10%, semantic ops +8-12%. Resilient — small shifts from perturbation.' },
+   { name:'GPT-5-nano',     slope:'0.00529', steps:'29', gap:'+0.007 (3.2%)', pattern:'Low divergence + minimal perturbation gap. Surprisingly resilient for size.' },
+   { name:'GPT-5',          slope:'0.00683', steps:'24', gap:'+0.047 (23.9%)', pattern:'Highest perturbation gap — perturbation produces large deviation. Brittle under stress.' },
+   { name:'GPT-5-mini',     slope:'0.00710', steps:'28', gap:'no data',          pattern:'Moderate slope. No perturbation gap data available for comparison.' },
+   { name:'GPT-5.6-fast',   slope:'0.00856', steps:'13', gap:'no data',          pattern:'Fast variant — fewer steps, higher per-step drift. Speed trades stability.' },
+   { name:'GPT-5.6',        slope:'0.01017', steps:'17', gap:'+0.012 (5.6%)',   pattern:'Higher drift than DS, but small perturbation gap — recovers well when pushed.' },
+   { name:'GPT-5.5',        slope:'0.01033', steps:'14', gap:'no data',          pattern:'Highest non-Claude slope — diverges aggressively. Limited sample (n=6).' },
+   { name:'Claude Fable 5', slope:'0.01228', steps:'4',  gap:'+0.001 (0.5%)',   pattern:'Highest slope but near-zero gap — intrinsic variance (0.212) saturates signal. Not resilience.' }]
+  .forEach(function(r) { body.innerHTML += '<tr><td><strong>'+r.name+'</strong></td><td class="mono">'+r.slope+'</td><td class="mono">'+r.steps+'</td><td class="mono">'+r.gap+'</td><td style="font-size:0.7rem">'+r.pattern+'</td></tr>'; });
+})();
+</script>
+
+<!-- ==================== THINK-DO COUPLING ==================== -->
+<section class="sec">
+<h2 id="think-do-coupling">Think-Do Alignment: Coupling Index</h2>
+<p class="lead">For each step: how similar is the model's thinking text to its actual tool call? High coupling = thinking drives action. Low coupling = narration and work are disconnected. The Explanation Tax is partly a coupling problem.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Sessions</th><th>TDCI</th><th>Correctness</th><th>Interpretation</th></tr></thead>
+<tbody id="coupling-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> Higher coupling does <em>not</em> predict higher correctness (r=-0.075). The models with the highest TDCI (GPT-5-mini 0.159, GPT-5-nano 0.154) have the lowest correctness (91%, 76%). GPT-5.6 achieves 100% correctness at only 0.061 TDCI — correct actions don't require narrated justification. Claude has the lowest coupling (0.048) — its thinking is most disconnected from its actions. The Explanation Tax is partly a coupling failure: narration that doesn't drive action is expensive opinion, not useful reasoning.</div>
+
+<div class="fn"><strong>Computation:</strong> TF-IDF cosine similarity between thinking-text and tool+observation text per step, averaged per session. 2,988 step-pairs across 209 sessions. Claude has 4 sessions at 0.000 TDCI (empty reasoning blocks).</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('coupling-body'); if (!body) return;
+  [{ name:'GPT-5-mini',     s:12, tdci:'0.1591', c:'91%', note:'Highest coupling — compact thinking tightly aligned with patch actions' },
+   { name:'GPT-5-nano',     s:6,  tdci:'0.1543', c:'76%', note:'High coupling — nano's small thinking space aligns with simple actions' },
+   { name:'GPT-5',          s:6,  tdci:'0.1404', c:'95%', note:'Above-average coupling — thinking and actions moderately aligned' },
+   { name:'GPT-5.5',        s:3,  tdci:'0.0714', c:'100%',note:'Low coupling but perfect correctness — actions don't need narration' },
+   { name:'GPT-5.6-fast',   s:6,  tdci:'0.0631', c:'100%',note:'Very low coupling — fast variant minimizes thinking, maximizes doing' },
+   { name:'GPT-5.6',        s:15, tdci:'0.0611', c:'100%',note:'Ultra-low coupling, perfect outcomes — reasoning is optional' },
+   { name:'DeepSeek v4 Pro',s:110,tdci:'0.0573', c:'89%',note:'Low coupling — elaborate reasoning dilutes tool-call text overlap' },
+   { name:'Claude Fable 5', s:35, tdci:'0.0484', c:'92%',note:'Lowest coupling — narrated reasoning is furthest from actual tool use'}]
+  .forEach(function(r) { body.innerHTML += '<tr><td><strong>'+r.name+'</strong></td><td class="mono">'+r.s+'</td><td class="mono">'+r.tdci+'</td><td class="mono">'+r.c+'</td><td style="font-size:0.7rem">'+r.note+'</td></tr>'; });
+})();
+</script>
+
+<!-- ==================== CLUSTER STABILITY ==================== -->
+<section class="sec alt">
+<h2 id="cluster-stability">Reasoning Stability: Cluster Transitions</h2>
+<p class="lead">Semantic clusters per reasoning step — does the model stay in one cluster or hop between approaches? Narrated failure looks like chaotic hopping. But the data says the opposite.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Sessions</th><th>Entropy</th><th>Switch Rate</th><th>Dominant %</th><th>Stability Score</th></tr></thead>
+<tbody id="stability-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> DeepSeek has nearly 3× the entropy of Claude (0.818 vs 0.291) — it spreads steps evenly across reasoning clusters. But the counterintuitive result: narration_failure sessions show <em>lower</em> entropy (0.42 vs 0.64) and <em>higher</em> dominant ratio (64% vs 50%). Flailing isn't chaotic hopping — it's the model locking into a single cluster and failing to escape. DeepSeek's low stability score (0.209) combined with 89% correctness proves that productive reasoning requires cluster diversity, not lock-in.</div>
+
+<div class="fn"><strong>Computation:</strong> BGE-M3 per-step embeddings clustered via k-means (5 clusters). Entropy = -Σp×log(p) of cluster distribution. Switch rate = cluster changes / total steps. Dominant % = fraction of steps in most common cluster. Stability = dominant_ratio × (1-switch_rate). 5 clusters from 2,215 step embeddings across 8 models.</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('stability-body'); if (!body) return;
+  [{ name:'DeepSeek v4 Pro', s:100, e:'0.818', sr:'0.502', d:'40.3%', st:'0.209', n:'Highest entropy — broadest reasoning diversity. Low stability = productive exploration' },
+   { name:'Claude Fable 5',  s:22,  e:'0.291', sr:'0.530', d:'71.6%', st:'0.439', n:'Lowest entropy — narrow reasoning. High switch rate despite low diversity' },
+   { name:'GPT-5.6',         s:15,  e:'0.421', sr:'0.547', d:'61.5%', st:'0.289', n:'Highest switch rate — hops most. Mid-range entropy' },
+   { name:'GPT-5.6-fast',    s:8,   e:'0.435', sr:'0.479', d:'59.4%', st:'0.308', n:'Similar to GPT-5.6 but slightly less switching' },
+   { name:'GPT-5-mini',      s:13,  e:'0.443', sr:'0.358', d:'63.5%', st:'0.418', n:'Lower switch rate — more committed to each cluster' },
+   { name:'GPT-5-nano',      s:7,   e:'0.351', sr:'0.194', d:'66.8%', st:'0.554', n:'Lowest switch rate — rarely changes approach. Highest stability' },
+   { name:'GPT-5',           s:7,   e:'0.329', sr:'0.293', d:'69.2%', st:'0.519', n:'Low entropy, low switching — consistent reasoning approach' },
+   { name:'GPT-5.5',         s:4,   e:'0.458', sr:'0.522', d:'57.3%', st:'0.273', n:'Small sample — high switching, low dominance. Inconsistent' }]
+  .forEach(function(r) { body.innerHTML += '<tr><td><strong>'+r.name+'</strong></td><td class="mono">'+r.s+'</td><td class="mono">'+r.e+'</td><td class="mono">'+r.sr+'</td><td class="mono">'+r.d+'</td><td class="mono">'+r.st+'</td><td style="font-size:0.7rem">'+r.n+'</td></tr>'; });
+})();
+</script>
+
+<!-- ==================== DIVERGENCE CASCADES ==================== -->
+<section class="sec">
+<h2 id="divergence-cascades">Divergence Cascades: Point of No Return</h2>
+<p class="lead">The step at which a model's reasoning permanently diverges from its baseline. Earlier cascade = harder to recover. The cascade step is the single best predictor of final correctness.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Cascade Step</th><th>% Early Cascade</th><th>% Recovered</th><th>Recovery Delta</th><th>Interpretation</th></tr></thead>
+<tbody id="cascade-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> Claude diverges earliest (step 1.14 — 86% cascade by step 1) and <em>never</em> recovers (0%). When Claude loses the thread, it's permanent. DeepSeek diverges later (step 1.86 — only 14% early cascade) and self-corrects 86% of the time. The cascade step is the single best predictor of robustness: models that survive past step 2 (GPT-5-mini 2.14, GPT-5-nano 2.00) are measurably more resilient. Claude's early and permanent cascade explains the Grit gap: it's not that Claude writes worse code — it's that once perturbed, it never finds its way back.</div>
+
+<div class="fn"><strong>Computation:</strong> Per-step cross-model distances from matched position traces in lab_cross_model_reasoning.json. Cascade threshold = cumulative divergence exceeds 1.5× mean per-step distance. Recovery = post-cascade divergence delta (negative = recovering). 28 model-pair traces, 8 models, 7 traces each.</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('cascade-body'); if (!body) return;
+  [{ name:'Claude Fable 5',  step:'1.14', early:'86%', rec:'0%',    delta:'+0.018', note:'Earliest cascade, never recovers. Permanent divergence = low Grit' },
+   { name:'GPT-5.6',         step:'1.86', early:'57%', rec:'86%',   delta:'-0.016', note:'Recovers reliably (86%) despite early cascade majority' },
+   { name:'GPT-5.6-fast',    step:'1.86', early:'57%', rec:'43%',   delta:'-0.003', note:'Lower recovery rate than GPT-5.6 — speed trades resilience' },
+   { name:'DeepSeek v4 Pro', step:'1.86', early:'14%', rec:'86%',   delta:'-0.020', note:'Latest cascade + highest recovery magnitude. Grit in action.' },
+   { name:'GPT-5-nano',      step:'2.00', early:'29%', rec:'86%',   delta:'-0.024', note:'Late cascade — survives past step 2 before diverging' },
+   { name:'GPT-5-mini',      step:'2.14', early:'14%', rec:'71%',   delta:'-0.024', note:'Latest cascade — most resistant to initial perturbation' }]
+  .forEach(function(r) { body.innerHTML += '<tr><td><strong>'+r.name+'</strong></td><td class="mono">'+r.step+'</td><td class="mono">'+r.early+'</td><td class="mono">'+r.rec+'</td><td class="mono">'+r.delta+'</td><td style="font-size:0.7rem">'+r.note+'</td></tr>'; });
+})();
+</script>
 <!-- ==================== CODE QUALITY UNDER PERTURBATION (SONAR DELTA) ==================== -->
 <section class="sec alt">
 <h2 id="sonar-impact">Code Quality Under Perturbation</h2>
@@ -365,6 +555,44 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="card" style="text-align:center"><div class="cdesc">Loading ranking...</div></div>
 </div>
 <div class="insight"><strong>Key insight:</strong> GPT-5.6-fast leads on J/LOC efficiency (4.66 J/LOC) despite high dollar cost — it generates compact, low-token code. DeepSeek v4 Pro's MoE architecture (37B active params) delivers 5.8 J/LOC at 69&times; lower dollar cost. Nano's 23.56 J/LOC reflects its 1.01 reasoning-to-output ratio. <strong style="color:var(--ac)">Energy efficiency &ne; cost efficiency.</strong> The two dimensions are only loosely correlated.</div>
+</section>
+
+<!-- ==================== SEMANTIC DRIFT TRAJECTORIES ==================== -->
+<section class="sec">
+<h2 id="drift-trajectories">Semantic Drift Trajectories</h2>
+<p class="lead">Within-session semantic drift: how far does a model's reasoning drift from its initial position over time? Cumulative cosine distance from step 0 to each successive step, computed from BGE-M3 embeddings of 146 sessions with &ge;5 reasoning steps. <span style="color:var(--t3)">[C] Computed from ChromaDB per-step reasoning embeddings via BGE-M3. Cosine distance = 1 &minus; cosine similarity between step-0 embedding and step-N embedding.</span></p>
+
+<div class="tbl"><table><thead><tr><th>Model</th><th>Sessions</th><th>Convergent</th><th>Divergent</th><th>Bounce</th><th>Flat</th><th>Mean Terminal Drift</th></tr></thead><tbody>
+<tr><td><strong>DeepSeek v4 Pro</strong></td><td class="mono">97</td><td class="mono">16</td><td class="mono amber">48</td><td class="mono">33</td><td class="mono">0</td><td class="mono">0.472</td></tr>
+<tr><td><strong>GPT-5.6</strong></td><td class="mono">13</td><td class="mono green">7</td><td class="mono">5</td><td class="mono">1</td><td class="mono">0</td><td class="mono">0.541</td></tr>
+<tr><td><strong>GPT-5.6-fast</strong></td><td class="mono">8</td><td class="mono green">6</td><td class="mono">1</td><td class="mono">1</td><td class="mono">0</td><td class="mono">0.491</td></tr>
+<tr><td><strong>GPT-5-mini</strong></td><td class="mono">12</td><td class="mono">4</td><td class="mono">6</td><td class="mono">2</td><td class="mono">0</td><td class="mono">0.458</td></tr>
+<tr><td><strong>GPT-5</strong></td><td class="mono">6</td><td class="mono">2</td><td class="mono">3</td><td class="mono">1</td><td class="mono">0</td><td class="mono">0.334</td></tr>
+<tr><td><strong>GPT-5-nano</strong></td><td class="mono">6</td><td class="mono">0</td><td class="mono">4</td><td class="mono">2</td><td class="mono">0</td><td class="mono">0.296</td></tr>
+<tr><td><strong>GPT-5.5</strong></td><td class="mono">4</td><td class="mono">1</td><td class="mono">1</td><td class="mono">2</td><td class="mono">0</td><td class="mono">0.406</td></tr>
+<tr style="color:var(--t3)"><td><strong>Claude Fable 5</strong></td><td class="mono">0</td><td colspan="4">Insufficient reasoning steps (max 4 per session)</td><td class="mono">N/A</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Key insight:</strong> Drift trajectory reveals reasoning architecture, not outcome quality. DeepSeek is predominantly <strong style="color:var(--am)">divergent</strong> (49.5%) — its reasoning wanders further from the initial position as sessions progress. GPT-5.6 and GPT-5.6-fast are predominantly <strong style="color:var(--success)">convergent</strong> (53.8% and 75%) — their reasoning stabilizes within a bounded distance. Yet both models achieve high correctness: DeepSeek 88.8% vs GPT-5.6 100%. <strong>The drift trajectory shape does NOT predict correctness</strong> (Pearson r=-0.05, p=0.53). Drift reveals <em>how</em> a model thinks — whether it explores (divergent) or stabilizes (convergent) — not whether it succeeds. Claude's within-session drift cannot be measured: its reasoning is exposed in at most 4 steps, making trajectory analysis impossible.</div>
+
+<div class="insight" style="border-left-color:var(--cy);margin-top:1rem"><strong style="color:var(--cy)">Perturbation class matters:</strong> Semantic perturbations (132 sessions) produce a balanced mix of divergent/convergent/bounce trajectories. Manifold perturbations (9 sessions) produce predominantly convergent drift (6/9) with zero bounce — linguistic disruption forces models to lock onto a reasoning path and stay there. Mean terminal drift is higher under manifold (0.521) than semantic (0.458) perturbation.</div>
+
+<details style="margin-top:1rem">
+<summary style="cursor:pointer;font-weight:700;color:var(--ac);font-size:0.82rem;padding:0.5rem 0">&#9654; Methodology: Drift Trajectory Classification</summary>
+<div style="font-size:0.78rem;color:var(--t2);line-height:1.7;padding:0.5rem 0">
+<p><strong style="color:var(--t)">Data:</strong> 146 sessions with &ge;5 reasoning steps, sourced from ChromaDB per-step BGE-M3 embeddings (2215 total step embeddings across 204 sessions). Script: <code>scripts/lab_drift_trajectories.py</code>. Output: <code>experiments/results/lab_drift.json</code>.</p>
+<p><strong style="color:var(--t)">Computation:</strong> For each session, extract step-0 embedding as the origin. Compute cumulative cosine distance (1 &minus; cosine similarity) from step-0 to each successive step-N. This produces a drift trajectory: [(0, 0.0), (1, d<sub>1</sub>), (2, d<sub>2</sub>), ..., (n, d<sub>n</sub>)].</p>
+<p><strong style="color:var(--t)">Classification:</strong> Each trajectory is classified by comparing first-half mean drift vs second-half mean drift, linear regression slope, and oscillation amplitude (standard deviation):</p>
+<ul style="margin:0.3rem 0 0.3rem 1.2rem">
+  <li><strong>Convergent:</strong> Mean drift shift &lt; &minus;0.04 (shrinking back toward origin) or negative linear slope with terminal drift below 70% of initial jump</li>
+  <li><strong>Divergent:</strong> Mean drift shift &gt; 0.06 AND positive linear slope &gt; 0.003 (meaningful growth away from origin)</li>
+  <li><strong>Bounce:</strong> Standard deviation &gt; 0.07 with no clear directional trend — high oscillation amplitude</li>
+  <li><strong>Flat:</strong> All drift values &lt; 0.1 (never leaves origin neighborhood)</li>
+</ul>
+<p><strong style="color:var(--t)">Claude exclusion:</strong> Claude Fable 5 sessions store at most 4 reasoning steps in ChromaDB (vs DeepSeek's typical 15+). This is not a data gap — it reflects architectural differences in how Claude structures its reasoning output. Within-session drift requires &ge;5 steps to classify a trajectory shape.</p>
+<p style="color:var(--t3);margin-top:0.5rem">Cosine distance range: 0.0 (identical) to 1.0 (orthogonal). Typical observed range: 0.14–0.71. Distance metric: 1 &minus; dot(A,B) / (||A|| · ||B||). Embedding model: BGE-M3 via Ollama, 1024-dimensional vectors.</p>
+</div>
+</details>
 </section>
 
 <!-- ==================== STRATEGY DISTRIBUTION ==================== -->

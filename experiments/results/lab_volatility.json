@@ -1,0 +1,1388 @@
+{
+  "metric": "reasoning_volatility_score",
+  "description": "Mean trigram overlap distance between consecutive reasoning steps \u2014 measures semantic coherence within a session",
+  "computation": {
+    "method": "Trigram Jaccard distance between consecutive reasoning step texts. Same metric across all sessions for consistency.",
+    "total_sessions_indexed": 255,
+    "valid_sessions": 164,
+    "skipped_insufficient_steps": 91
+  },
+  "by_model": {
+    "deepseek/deepseek-v4-pro": {
+      "mean_rvs": 0.795147,
+      "median_rvs": 0.797243,
+      "rvs_std": 0.059663,
+      "n_sessions": 113
+    },
+    "openai/gpt-5": {
+      "mean_rvs": 0.779153,
+      "median_rvs": 0.782385,
+      "rvs_std": 0.020603,
+      "n_sessions": 6
+    },
+    "openai/gpt-5-mini": {
+      "mean_rvs": 0.773491,
+      "median_rvs": 0.779197,
+      "rvs_std": 0.020871,
+      "n_sessions": 12
+    },
+    "openai/gpt-5-nano": {
+      "mean_rvs": 0.751023,
+      "median_rvs": 0.764552,
+      "rvs_std": 0.042591,
+      "n_sessions": 7
+    },
+    "openai/gpt-5.5": {
+      "mean_rvs": 0.786677,
+      "median_rvs": 0.791631,
+      "rvs_std": 0.027534,
+      "n_sessions": 4
+    },
+    "openai/gpt-5.6": {
+      "mean_rvs": 0.804054,
+      "median_rvs": 0.800298,
+      "rvs_std": 0.020552,
+      "n_sessions": 13
+    },
+    "openai/gpt-5.6-fast": {
+      "mean_rvs": 0.797781,
+      "median_rvs": 0.800796,
+      "rvs_std": 0.013794,
+      "n_sessions": 6
+    },
+    "unknown": {
+      "mean_rvs": 0.870498,
+      "median_rvs": 0.875856,
+      "rvs_std": 0.043483,
+      "n_sessions": 3
+    }
+  },
+  "by_correctness_bucket": {
+    "mid (0.7-0.9)": {
+      "mean_rvs": 0.800691,
+      "n": 39
+    },
+    "high (>0.9)": {
+      "mean_rvs": 0.787658,
+      "n": 107
+    },
+    "low (<0.7)": {
+      "mean_rvs": 0.808714,
+      "n": 18
+    }
+  },
+  "sessions": [
+    {
+      "session": "exp_05ngi4l9",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.85353,
+      "rvs_std": 0.087365,
+      "steps": 42,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_0mwneie4",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.781016,
+      "rvs_std": 0.009033,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_0s36_d3n",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.80271,
+      "rvs_std": 0.143457,
+      "steps": 27,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_0umx0pra",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.693034,
+      "rvs_std": 0.24935,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_1d30evhp",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.802286,
+      "rvs_std": 0.009319,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_1erxln69",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.827653,
+      "rvs_std": 0.110609,
+      "steps": 14,
+      "correctness": 0.756
+    },
+    {
+      "session": "exp_1ruzb3rc",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.783006,
+      "rvs_std": 0.062716,
+      "steps": 22,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_2dqodvt8",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.818498,
+      "rvs_std": 0.072963,
+      "steps": 4,
+      "correctness": 0.0
+    },
+    {
+      "session": "exp_2hoxdd8p",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.764552,
+      "rvs_std": 0.047906,
+      "steps": 27,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_2yyxp_8_",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.79914,
+      "rvs_std": 0.144943,
+      "steps": 30,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_34qst87v",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.765464,
+      "rvs_std": 0.168733,
+      "steps": 12,
+      "correctness": 0.938
+    },
+    {
+      "session": "exp_37jbey_e",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.889531,
+      "rvs_std": 0.097472,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_37z0nq68",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.793668,
+      "rvs_std": 0.199639,
+      "steps": 17,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_3uf12sxn",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.65086,
+      "rvs_std": 0.01043,
+      "steps": 3,
+      "correctness": 0
+    },
+    {
+      "session": "exp_3zxicj_v",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.798685,
+      "rvs_std": 0.11395,
+      "steps": 11,
+      "correctness": 0.894
+    },
+    {
+      "session": "exp_4f5g2wms",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.769304,
+      "rvs_std": 0.186807,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_4v4v2uq8",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.654874,
+      "rvs_std": 0.189074,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_5d0kt9ne",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.840259,
+      "rvs_std": 0.161517,
+      "steps": 16,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_6462vbw3",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.767787,
+      "rvs_std": 0.239845,
+      "steps": 17,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_6ij8p3sl",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.775131,
+      "rvs_std": 0.04718,
+      "steps": 16,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_6km9sho1",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.754673,
+      "rvs_std": 0.043482,
+      "steps": 16,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_6w9zsvwr",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.80397,
+      "rvs_std": 0.034712,
+      "steps": 7,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_7eir0g9s",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.72696,
+      "rvs_std": 0.070839,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_7eo89cdf",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.849112,
+      "rvs_std": 0.114273,
+      "steps": 34,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_7l_2qyd3",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.871944,
+      "rvs_std": 0.079466,
+      "steps": 15,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_82jg7qi3",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.800298,
+      "rvs_std": 0.018738,
+      "steps": 7,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_8ivd26c4",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.850055,
+      "rvs_std": 0.11196,
+      "steps": 3,
+      "correctness": 0
+    },
+    {
+      "session": "exp_965hk7_6",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.861434,
+      "rvs_std": 0.060401,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_96rfqfgd",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.807189,
+      "rvs_std": 0.099416,
+      "steps": 6,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_9o_y1a_8",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.793673,
+      "rvs_std": 0.153175,
+      "steps": 21,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_9uzjxitk",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.767828,
+      "rvs_std": 0.172986,
+      "steps": 17,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_9vkw4hu4",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.748556,
+      "rvs_std": 0.0955,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp__3wx7dg4",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.850102,
+      "rvs_std": 0.107103,
+      "steps": 15,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp__gihw__t",
+      "model": "openai/gpt-5.5",
+      "rvs": 0.818118,
+      "rvs_std": 0.010302,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp__l_pm4_4",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.797621,
+      "rvs_std": 0.02163,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp__ygf4hz3",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.682759,
+      "rvs_std": 0.229168,
+      "steps": 36,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_a90ybf13",
+      "model": "openai/gpt-5.5",
+      "rvs": 0.779691,
+      "rvs_std": 0.043215,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_aeomzucw",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.942104,
+      "rvs_std": 0.062303,
+      "steps": 4,
+      "correctness": 0
+    },
+    {
+      "session": "exp_agmqo28z",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.854568,
+      "rvs_std": 0.106697,
+      "steps": 12,
+      "correctness": 0.789
+    },
+    {
+      "session": "exp_aqqqi9v5",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.808302,
+      "rvs_std": 0.101778,
+      "steps": 18,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_ay66qv12",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.809426,
+      "rvs_std": 0.134452,
+      "steps": 15,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_azk0fzz7",
+      "model": "openai/gpt-5",
+      "rvs": 0.806293,
+      "rvs_std": 0.0259,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_b4kiud1q",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.913422,
+      "rvs_std": 0.104414,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ba8s0njl",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.799065,
+      "rvs_std": 0.040867,
+      "steps": 10,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_autocomplete_search_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.822931,
+      "rvs_std": 0.107391,
+      "steps": 7,
+      "correctness": 0.985
+    },
+    {
+      "session": "exp_batch_batch_collaborative_editor_baseline gpt_",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.805105,
+      "rvs_std": 0.026242,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_batch_data_table_baseline gpt_5_6",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.79847,
+      "rvs_std": 0.024166,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_batch_task_manager_baseline gpt_5_6",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.784808,
+      "rvs_std": 0.030482,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_batch_task_manager_baseline gpt_5_mini",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.756937,
+      "rvs_std": 0.057531,
+      "steps": 7,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_collaborative_editor_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.798487,
+      "rvs_std": 0.158108,
+      "steps": 10,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_data_table_g56",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.859604,
+      "rvs_std": 0.0055,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_data_table_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.800373,
+      "rvs_std": 0.092828,
+      "steps": 19,
+      "correctness": 0.6
+    },
+    {
+      "session": "exp_batch_factorial_compound_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.784758,
+      "rvs_std": 0.243502,
+      "steps": 9,
+      "correctness": 0.92
+    },
+    {
+      "session": "exp_batch_fastapi_maintenance_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.811621,
+      "rvs_std": 0.096082,
+      "steps": 28,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_form_wizard_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.742303,
+      "rvs_std": 0.126129,
+      "steps": 9,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_batch_mint_financial_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.770893,
+      "rvs_std": 0.137243,
+      "steps": 10,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_notification_system_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.807774,
+      "rvs_std": 0.156136,
+      "steps": 10,
+      "correctness": 0.6
+    },
+    {
+      "session": "exp_batch_search_kv_store_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.830165,
+      "rvs_std": 0.112833,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_batch_social_graph_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.744627,
+      "rvs_std": 0.247263,
+      "steps": 9,
+      "correctness": 0.978
+    },
+    {
+      "session": "exp_batch_task_manager_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.749074,
+      "rvs_std": 0.185581,
+      "steps": 8,
+      "correctness": 0.929
+    },
+    {
+      "session": "exp_batch_twitter_timeline_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.788776,
+      "rvs_std": 0.131886,
+      "steps": 9,
+      "correctness": 0.944
+    },
+    {
+      "session": "exp_batch_web_crawler_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.728254,
+      "rvs_std": 0.201568,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_bvv94cn2",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.714064,
+      "rvs_std": 0.170939,
+      "steps": 21,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_coqsg2pu",
+      "model": "unknown",
+      "rvs": 0.875856,
+      "rvs_std": 0.006089,
+      "steps": 3,
+      "correctness": 0
+    },
+    {
+      "session": "exp_cqc0vqav",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.764371,
+      "rvs_std": 0.163756,
+      "steps": 16,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_d0xsrs9k",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.743727,
+      "rvs_std": 0.122898,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_d6lkz5pg",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.826169,
+      "rvs_std": 0.105888,
+      "steps": 25,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_dalqefiq",
+      "model": "openai/gpt-5",
+      "rvs": 0.791949,
+      "rvs_std": 0.028928,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_dbzmm0qd",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.879658,
+      "rvs_std": 0.093398,
+      "steps": 19,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_dfyjk1mo",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.786976,
+      "rvs_std": 0.001981,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_dm1gxwnd",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.807734,
+      "rvs_std": 0.032351,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_dmot6oqc",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.724232,
+      "rvs_std": 0.127411,
+      "steps": 13,
+      "correctness": 0
+    },
+    {
+      "session": "exp_dw4oal4i",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.861896,
+      "rvs_std": 0.114825,
+      "steps": 18,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_e6nmmhtb",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.78109,
+      "rvs_std": 0.143116,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_eajrttu6",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.840661,
+      "rvs_std": 0.10522,
+      "steps": 19,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ejk4tssk",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.779194,
+      "rvs_std": 0.047626,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_epk792rd",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.894272,
+      "rvs_std": 0.055402,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_er1n2rx3",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.841356,
+      "rvs_std": 0.16668,
+      "steps": 13,
+      "correctness": 0.97
+    },
+    {
+      "session": "exp_erp5e4d9",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.782424,
+      "rvs_std": 0.055083,
+      "steps": 12,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_eyt9cssv",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.719067,
+      "rvs_std": 0.203475,
+      "steps": 17,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_f1cezegh",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.754382,
+      "rvs_std": 0.117142,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_fw57sbqz",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.743222,
+      "rvs_std": 0.136406,
+      "steps": 10,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_g56_sweep",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.800395,
+      "rvs_std": 0.031052,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ga7iubmt",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.817222,
+      "rvs_std": 0.157652,
+      "steps": 32,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_gmnl5d6g",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.831942,
+      "rvs_std": 0.134155,
+      "steps": 16,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_grgmkhc9",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.806983,
+      "rvs_std": 0.171684,
+      "steps": 17,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_h2zma6v0",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.813761,
+      "rvs_std": 0.099095,
+      "steps": 12,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_hcnattl6",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.76729,
+      "rvs_std": 0.188904,
+      "steps": 16,
+      "correctness": 0.778
+    },
+    {
+      "session": "exp_hn0qqsuf",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.794052,
+      "rvs_std": 0.159874,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_icyyq90k",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.744595,
+      "rvs_std": 0.240152,
+      "steps": 16,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_iedauets",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.857686,
+      "rvs_std": 0.174885,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ih5ct7z5",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.851971,
+      "rvs_std": 0.078284,
+      "steps": 12,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_ikhirync",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.796523,
+      "rvs_std": 0.138048,
+      "steps": 15,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_j5rhhp06",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.78771,
+      "rvs_std": 0.085317,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_k443ygtb",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.790442,
+      "rvs_std": 0.026802,
+      "steps": 4,
+      "correctness": 0
+    },
+    {
+      "session": "exp_kg2a1_b0",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.929918,
+      "rvs_std": 0.057497,
+      "steps": 11,
+      "correctness": 0.957
+    },
+    {
+      "session": "exp_kh2siwsa",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.878887,
+      "rvs_std": 0.058263,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_kpkjjdv3",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.798662,
+      "rvs_std": 0.038064,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_kqqzaabe",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.77794,
+      "rvs_std": 0.156315,
+      "steps": 8,
+      "correctness": 0.2
+    },
+    {
+      "session": "exp_l05r7o3a",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.780331,
+      "rvs_std": 0.048837,
+      "steps": 23,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_lw9zhue9",
+      "model": "openai/gpt-5",
+      "rvs": 0.739391,
+      "rvs_std": 0.022836,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_m3c9h6l0",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.797243,
+      "rvs_std": 0.147975,
+      "steps": 15,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_m3di3pys",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.820111,
+      "rvs_std": 0.257005,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_mho8njwt",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.781298,
+      "rvs_std": 0.121718,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_mmp26p5c",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.733269,
+      "rvs_std": 0.251157,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_mn5mnvtw",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.750417,
+      "rvs_std": 0.208342,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_mp0le40h",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.76813,
+      "rvs_std": 0.145627,
+      "steps": 15,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_n7psw3ue",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.765966,
+      "rvs_std": 0.268329,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_nbqsk827",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.745975,
+      "rvs_std": 0.193272,
+      "steps": 9,
+      "correctness": 0
+    },
+    {
+      "session": "exp_ner1874a",
+      "model": "openai/gpt-5",
+      "rvs": 0.772512,
+      "rvs_std": 0.026481,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_nlme9vjk",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.836141,
+      "rvs_std": 0.09725,
+      "steps": 16,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_nvn1kdwj",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.691241,
+      "rvs_std": 0.159125,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_nxb87bod",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.772093,
+      "rvs_std": 0.003128,
+      "steps": 3,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ot4ttmtr",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.787015,
+      "rvs_std": 0.208319,
+      "steps": 13,
+      "correctness": 0.629
+    },
+    {
+      "session": "exp_owxe4fim",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.772673,
+      "rvs_std": 0.06199,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_p31ut41o",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.825275,
+      "rvs_std": 0.121746,
+      "steps": 16,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_plz1xajw",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.826476,
+      "rvs_std": 0.115447,
+      "steps": 7,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_pqcfk5nr",
+      "model": "openai/gpt-5",
+      "rvs": 0.781805,
+      "rvs_std": 0.051229,
+      "steps": 23,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_pyo2sck7",
+      "model": "unknown",
+      "rvs": 0.814765,
+      "rvs_std": 0.11257,
+      "steps": 4,
+      "correctness": 0
+    },
+    {
+      "session": "exp_qpkpyt0z",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.794011,
+      "rvs_std": 0.141733,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_qqhhxsn1",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.813489,
+      "rvs_std": 0.164261,
+      "steps": 15,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_qtjyfkab",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.867431,
+      "rvs_std": 0.156457,
+      "steps": 11,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_quas142w",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.683903,
+      "rvs_std": 0.226127,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_rkpaq3gp",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.755701,
+      "rvs_std": 0.195434,
+      "steps": 12,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_rt6ocba2",
+      "model": "openai/gpt-5",
+      "rvs": 0.782965,
+      "rvs_std": 0.038275,
+      "steps": 15,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ru1v2479",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.760368,
+      "rvs_std": 0.141001,
+      "steps": 15,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_rz0gn48h",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.715539,
+      "rvs_std": 0.187904,
+      "steps": 22,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_s73ost4b",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.687925,
+      "rvs_std": 0.125759,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_selbvg5r",
+      "model": "openai/gpt-5.5",
+      "rvs": 0.803571,
+      "rvs_std": 0.046506,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_siw0dufk",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.741278,
+      "rvs_std": 0.051276,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_sweep_gpt_5_6_np",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.787759,
+      "rvs_std": 0.013418,
+      "steps": 6,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_fb",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.779201,
+      "rvs_std": 0.05967,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_fp",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.799935,
+      "rvs_std": 0.050124,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_nb",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.776673,
+      "rvs_std": 0.052089,
+      "steps": 25,
+      "correctness": 0.75
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_np",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.779919,
+      "rvs_std": 0.076075,
+      "steps": 11,
+      "correctness": 0.75
+    },
+    {
+      "session": "exp_tjlvdunl",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.884717,
+      "rvs_std": 0.079536,
+      "steps": 7,
+      "correctness": 0.375
+    },
+    {
+      "session": "exp_tqnuch_d",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.695264,
+      "rvs_std": 0.183386,
+      "steps": 13,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_u9zvdibz",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.82943,
+      "rvs_std": 0.106467,
+      "steps": 23,
+      "correctness": 0.795
+    },
+    {
+      "session": "exp_uaqvwo_n",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.69082,
+      "rvs_std": 0.154757,
+      "steps": 12,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_uc2lmxka",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.817114,
+      "rvs_std": 0.016975,
+      "steps": 4,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ue8nk4wv",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.93272,
+      "rvs_std": 0.086421,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_uiem8t3d",
+      "model": "openai/gpt-5.6",
+      "rvs": 0.830214,
+      "rvs_std": 0.01592,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_ujzch41n",
+      "model": "openai/gpt-5-nano",
+      "rvs": 0.748607,
+      "rvs_std": 0.05344,
+      "steps": 16,
+      "correctness": 0.75
+    },
+    {
+      "session": "exp_uzrxy1t2",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.750995,
+      "rvs_std": 0.141424,
+      "steps": 11,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_v0u6d7t1",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.723275,
+      "rvs_std": 0.199171,
+      "steps": 14,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_vtp26dz3",
+      "model": "openai/gpt-5.6-fast",
+      "rvs": 0.814827,
+      "rvs_std": 0.023163,
+      "steps": 5,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_vx4gb129",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.851627,
+      "rvs_std": 0.116401,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_w8ayd_ci",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.670143,
+      "rvs_std": 0.159586,
+      "steps": 9,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_wa776dmx",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.838155,
+      "rvs_std": 0.098691,
+      "steps": 14,
+      "correctness": 0.985
+    },
+    {
+      "session": "exp_wkclt_vt",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.747598,
+      "rvs_std": 0.229424,
+      "steps": 12,
+      "correctness": 0.981
+    },
+    {
+      "session": "exp_wmysu1lk",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.739057,
+      "rvs_std": 0.166557,
+      "steps": 13,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_wo07wfxb",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.739136,
+      "rvs_std": 0.227294,
+      "steps": 17,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_x5tqss1y",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.817986,
+      "rvs_std": 0.135111,
+      "steps": 14,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_x8g28_k8",
+      "model": "openai/gpt-5-mini",
+      "rvs": 0.787637,
+      "rvs_std": 0.064313,
+      "steps": 12,
+      "correctness": 0.7
+    },
+    {
+      "session": "exp_xbxssi1k",
+      "model": "openai/gpt-5.5",
+      "rvs": 0.745327,
+      "rvs_std": 0.04698,
+      "steps": 3,
+      "correctness": 0
+    },
+    {
+      "session": "exp_xszdrm2e",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.808497,
+      "rvs_std": 0.164803,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_z13l8zhz",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.839577,
+      "rvs_std": 0.122397,
+      "steps": 8,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_zbc1mgbx",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.860745,
+      "rvs_std": 0.10151,
+      "steps": 6,
+      "correctness": 0.316
+    },
+    {
+      "session": "exp_ze0y99pc",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.812455,
+      "rvs_std": 0.157315,
+      "steps": 20,
+      "correctness": 0.8
+    },
+    {
+      "session": "exp_zfgdwu49",
+      "model": "unknown",
+      "rvs": 0.920872,
+      "rvs_std": 0.060181,
+      "steps": 4,
+      "correctness": 0
+    },
+    {
+      "session": "exp_zg0opvwm",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.793635,
+      "rvs_std": 0.137664,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_zjb30bfm",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.910198,
+      "rvs_std": 0.057816,
+      "steps": 14,
+      "correctness": 1.0
+    },
+    {
+      "session": "exp_zmwy64er",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.759305,
+      "rvs_std": 0.156149,
+      "steps": 5,
+      "correctness": 0
+    },
+    {
+      "session": "exp_zwdvkm4q",
+      "model": "deepseek/deepseek-v4-pro",
+      "rvs": 0.740035,
+      "rvs_std": 0.163954,
+      "steps": 12,
+      "correctness": 1.0
+    }
+  ]
+}

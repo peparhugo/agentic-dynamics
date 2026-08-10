@@ -1,0 +1,405 @@
+{
+  "_meta": {
+    "experiment_id": "lab_cluster_stability",
+    "total_step_embeddings": 2215,
+    "n_clusters": 5,
+    "n_sessions": 179,
+    "cluster_sizes": [
+      615,
+      309,
+      511,
+      424,
+      356
+    ],
+    "embedding_source": "BGE-M3 via ChromaDB",
+    "method": "k-means on per-step reasoning embeddings, then within-session cluster transition analysis"
+  },
+  "global_summary": {
+    "mean_entropy_norm": 0.6245,
+    "mean_switch_rate": 0.4812,
+    "mean_dominant_ratio": 0.5129,
+    "mean_stability_score": 0.2905
+  },
+  "by_model": {
+    "anthropic/claude-fable-5": {
+      "dominant_ratio": {
+        "mean": 0.7159,
+        "std": 0.2379,
+        "n": 22
+      },
+      "entropy": {
+        "mean": 0.2912,
+        "std": 0.2435,
+        "n": 22
+      },
+      "stability_score": {
+        "mean": 0.4394,
+        "std": 0.451,
+        "n": 22
+      },
+      "switch_rate": {
+        "mean": 0.5303,
+        "std": 0.454,
+        "n": 22
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "dominant_ratio": {
+        "mean": 0.4027,
+        "std": 0.1242,
+        "n": 100
+      },
+      "entropy": {
+        "mean": 0.818,
+        "std": 0.1628,
+        "n": 100
+      },
+      "stability_score": {
+        "mean": 0.2088,
+        "std": 0.1293,
+        "n": 100
+      },
+      "switch_rate": {
+        "mean": 0.5021,
+        "std": 0.1659,
+        "n": 100
+      }
+    },
+    "openai/gpt-5": {
+      "dominant_ratio": {
+        "mean": 0.6917,
+        "std": 0.1714,
+        "n": 7
+      },
+      "entropy": {
+        "mean": 0.3285,
+        "std": 0.1454,
+        "n": 7
+      },
+      "stability_score": {
+        "mean": 0.5187,
+        "std": 0.2875,
+        "n": 7
+      },
+      "switch_rate": {
+        "mean": 0.2929,
+        "std": 0.3162,
+        "n": 7
+      }
+    },
+    "openai/gpt-5-mini": {
+      "dominant_ratio": {
+        "mean": 0.6349,
+        "std": 0.118,
+        "n": 13
+      },
+      "entropy": {
+        "mean": 0.4433,
+        "std": 0.0917,
+        "n": 13
+      },
+      "stability_score": {
+        "mean": 0.4183,
+        "std": 0.1683,
+        "n": 13
+      },
+      "switch_rate": {
+        "mean": 0.3581,
+        "std": 0.2166,
+        "n": 13
+      }
+    },
+    "openai/gpt-5-nano": {
+      "dominant_ratio": {
+        "mean": 0.6676,
+        "std": 0.1485,
+        "n": 7
+      },
+      "entropy": {
+        "mean": 0.3508,
+        "std": 0.1447,
+        "n": 7
+      },
+      "stability_score": {
+        "mean": 0.554,
+        "std": 0.2152,
+        "n": 7
+      },
+      "switch_rate": {
+        "mean": 0.1941,
+        "std": 0.1385,
+        "n": 7
+      }
+    },
+    "openai/gpt-5.5": {
+      "dominant_ratio": {
+        "mean": 0.5734,
+        "std": 0.06,
+        "n": 4
+      },
+      "entropy": {
+        "mean": 0.4582,
+        "std": 0.0749,
+        "n": 4
+      },
+      "stability_score": {
+        "mean": 0.2732,
+        "std": 0.0739,
+        "n": 4
+      },
+      "switch_rate": {
+        "mean": 0.5221,
+        "std": 0.1262,
+        "n": 4
+      }
+    },
+    "openai/gpt-5.6": {
+      "dominant_ratio": {
+        "mean": 0.6152,
+        "std": 0.0933,
+        "n": 15
+      },
+      "entropy": {
+        "mean": 0.421,
+        "std": 0.066,
+        "n": 15
+      },
+      "stability_score": {
+        "mean": 0.2887,
+        "std": 0.1309,
+        "n": 15
+      },
+      "switch_rate": {
+        "mean": 0.5466,
+        "std": 0.166,
+        "n": 15
+      }
+    },
+    "openai/gpt-5.6-fast": {
+      "dominant_ratio": {
+        "mean": 0.5938,
+        "std": 0.0535,
+        "n": 8
+      },
+      "entropy": {
+        "mean": 0.4353,
+        "std": 0.0581,
+        "n": 8
+      },
+      "stability_score": {
+        "mean": 0.3079,
+        "std": 0.0838,
+        "n": 8
+      },
+      "switch_rate": {
+        "mean": 0.4789,
+        "std": 0.1471,
+        "n": 8
+      }
+    },
+    "unknown": {
+      "dominant_ratio": {
+        "mean": 0.5833,
+        "std": 0.1434,
+        "n": 3
+      },
+      "entropy": {
+        "mean": 0.4743,
+        "std": 0.1311,
+        "n": 3
+      },
+      "stability_score": {
+        "mean": 0.2071,
+        "std": 0.1467,
+        "n": 3
+      },
+      "switch_rate": {
+        "mean": 0.6905,
+        "std": 0.2208,
+        "n": 3
+      }
+    }
+  },
+  "by_strategy": {
+    "conservative": {
+      "dominant_ratio": {
+        "mean": 0.4967,
+        "std": 0.1882,
+        "n": 120
+      },
+      "entropy": {
+        "mean": 0.6523,
+        "std": 0.2656,
+        "n": 120
+      },
+      "stability_score": {
+        "mean": 0.283,
+        "std": 0.2251,
+        "n": 120
+      },
+      "switch_rate": {
+        "mean": 0.4778,
+        "std": 0.2318,
+        "n": 120
+      }
+    },
+    "exploratory": {
+      "dominant_ratio": {
+        "mean": 0.5201,
+        "std": 0.1847,
+        "n": 45
+      },
+      "entropy": {
+        "mean": 0.6113,
+        "std": 0.277,
+        "n": 45
+      },
+      "stability_score": {
+        "mean": 0.3076,
+        "std": 0.2392,
+        "n": 45
+      },
+      "switch_rate": {
+        "mean": 0.4535,
+        "std": 0.2463,
+        "n": 45
+      }
+    },
+    "wasteful": {
+      "dominant_ratio": {
+        "mean": 0.5,
+        "std": 0.0,
+        "n": 1
+      },
+      "entropy": {
+        "mean": 0.4307,
+        "std": 0.0,
+        "n": 1
+      },
+      "stability_score": {
+        "mean": 0.0,
+        "std": 0.0,
+        "n": 1
+      },
+      "switch_rate": {
+        "mean": 1.0,
+        "std": 0.0,
+        "n": 1
+      }
+    }
+  },
+  "by_correctness_bucket": {
+    "high (>=0.9)": {
+      "dominant_ratio": {
+        "mean": 0.5163,
+        "std": 0.1908,
+        "n": 120
+      },
+      "entropy": {
+        "mean": 0.6167,
+        "std": 0.2733,
+        "n": 120
+      },
+      "stability_score": {
+        "mean": 0.2948,
+        "std": 0.2354,
+        "n": 120
+      },
+      "switch_rate": {
+        "mean": 0.4721,
+        "std": 0.2401,
+        "n": 120
+      }
+    },
+    "low (<0.7)": {
+      "dominant_ratio": {
+        "mean": 0.499,
+        "std": 0.1351,
+        "n": 8
+      },
+      "entropy": {
+        "mean": 0.6387,
+        "std": 0.2019,
+        "n": 8
+      },
+      "stability_score": {
+        "mean": 0.2305,
+        "std": 0.1678,
+        "n": 8
+      },
+      "switch_rate": {
+        "mean": 0.5696,
+        "std": 0.2348,
+        "n": 8
+      }
+    },
+    "medium (0.7-0.9)": {
+      "dominant_ratio": {
+        "mean": 0.4621,
+        "std": 0.1782,
+        "n": 38
+      },
+      "entropy": {
+        "mean": 0.7131,
+        "std": 0.2544,
+        "n": 38
+      },
+      "stability_score": {
+        "mean": 0.2786,
+        "std": 0.2204,
+        "n": 38
+      },
+      "switch_rate": {
+        "mean": 0.4614,
+        "std": 0.2313,
+        "n": 38
+      }
+    }
+  },
+  "by_narration_outcome": {
+    "narration_failure": {
+      "dominant_ratio": {
+        "mean": 0.6377,
+        "std": 0.1886,
+        "n": 12
+      },
+      "entropy": {
+        "mean": 0.416,
+        "std": 0.2493,
+        "n": 12
+      },
+      "stability_score": {
+        "mean": 0.336,
+        "std": 0.3295,
+        "n": 12
+      },
+      "switch_rate": {
+        "mean": 0.5468,
+        "std": 0.3367,
+        "n": 12
+      }
+    },
+    "success": {
+      "dominant_ratio": {
+        "mean": 0.5039,
+        "std": 0.1876,
+        "n": 167
+      },
+      "entropy": {
+        "mean": 0.6395,
+        "std": 0.2687,
+        "n": 167
+      },
+      "stability_score": {
+        "mean": 0.2873,
+        "std": 0.2286,
+        "n": 167
+      },
+      "switch_rate": {
+        "mean": 0.4764,
+        "std": 0.2377,
+        "n": 167
+      }
+    }
+  }
+}

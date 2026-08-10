@@ -1,0 +1,1911 @@
+{
+  "metric": "think_do_coupling_index",
+  "description": "Cosine similarity between the model's thinking text (reasoning + narration) and the subsequent tool call (name + input + output). High coupling means the model's stated reasoning aligns with its actions. Low coupling means narration is disconnected from the work being done.",
+  "methodology": {
+    "text_representation": "TF-IDF with ngram_range=(1,3), max_features=10000, sublinear_tf=True",
+    "similarity": "cosine similarity between TF-IDF vectors",
+    "pairing": "Each tool call is paired with all reasoning+text entries in the same step",
+    "session_tdci": "Mean coupling across all step-pairs in the session"
+  },
+  "by_model": {
+    "Claude Fable 5": {
+      "model_id": "anthropic/claude-fable-5",
+      "mean_tdci": 0.0484,
+      "median_tdci": 0.0303,
+      "std_tdci": 0.0494,
+      "min_tdci": 0.0,
+      "max_tdci": 0.1897,
+      "n_sessions": 35,
+      "tdci_values": [
+        0.0558,
+        0.0075,
+        0.0655,
+        0.0811,
+        0.0889,
+        0.0615,
+        0.0289,
+        0.0137,
+        0.0,
+        0.0329,
+        0.1387,
+        0.0,
+        0.1897,
+        0.0493,
+        0.0729,
+        0.1738,
+        0.0296,
+        0.0498,
+        0.0221,
+        0.0,
+        0.0394,
+        0.0345,
+        0.0169,
+        0.0108,
+        0.0132,
+        0.1619,
+        0.0303,
+        0.0149,
+        0.0281,
+        0.0385,
+        0.0257,
+        0.0236,
+        0.021,
+        0.0,
+        0.0744
+      ],
+      "mean_correctness": 0.9171,
+      "median_correctness": 1.0
+    },
+    "DeepSeek v4 Pro": {
+      "model_id": "deepseek/deepseek-v4-pro",
+      "mean_tdci": 0.0573,
+      "median_tdci": 0.0538,
+      "std_tdci": 0.0225,
+      "min_tdci": 0.0188,
+      "max_tdci": 0.1326,
+      "n_sessions": 110,
+      "tdci_values": [
+        0.1018,
+        0.0788,
+        0.0598,
+        0.0582,
+        0.0733,
+        0.0805,
+        0.0809,
+        0.0668,
+        0.0503,
+        0.0776,
+        0.046,
+        0.0348,
+        0.0406,
+        0.033,
+        0.0969,
+        0.0881,
+        0.0822,
+        0.0255,
+        0.0631,
+        0.0501,
+        0.0666,
+        0.0658,
+        0.0655,
+        0.0653,
+        0.0826,
+        0.0384,
+        0.0466,
+        0.0529,
+        0.0315,
+        0.0567,
+        0.0535,
+        0.0394,
+        0.0943,
+        0.0505,
+        0.0967,
+        0.0893,
+        0.0486,
+        0.0255,
+        0.0714,
+        0.0466,
+        0.0509,
+        0.052,
+        0.0527,
+        0.0307,
+        0.0798,
+        0.092,
+        0.0663,
+        0.0619,
+        0.095,
+        0.0651,
+        0.0349,
+        0.0473,
+        0.0458,
+        0.0204,
+        0.1326,
+        0.0644,
+        0.0596,
+        0.0731,
+        0.0507,
+        0.037,
+        0.0472,
+        0.0421,
+        0.1132,
+        0.031,
+        0.042,
+        0.0289,
+        0.0261,
+        0.0353,
+        0.0299,
+        0.0635,
+        0.0647,
+        0.0188,
+        0.0594,
+        0.0876,
+        0.0472,
+        0.0839,
+        0.0886,
+        0.0718,
+        0.0743,
+        0.0558,
+        0.034,
+        0.039,
+        0.0545,
+        0.0428,
+        0.0211,
+        0.0455,
+        0.0639,
+        0.0315,
+        0.0871,
+        0.0246,
+        0.0752,
+        0.0541,
+        0.0351,
+        0.0448,
+        0.0704,
+        0.0404,
+        0.0303,
+        0.0706,
+        0.0514,
+        0.0449,
+        0.0566,
+        0.0582,
+        0.0385,
+        0.0514,
+        0.0414,
+        0.0765,
+        0.0943,
+        0.0748,
+        0.0235,
+        0.0266
+      ],
+      "mean_correctness": 0.8884,
+      "median_correctness": 1.0
+    },
+    "GPT-5": {
+      "model_id": "openai/gpt-5",
+      "mean_tdci": 0.1404,
+      "median_tdci": 0.1382,
+      "std_tdci": 0.0789,
+      "min_tdci": 0.0524,
+      "max_tdci": 0.2442,
+      "n_sessions": 6,
+      "tdci_values": [
+        0.0847,
+        0.1917,
+        0.0524,
+        0.0766,
+        0.1931,
+        0.2442
+      ],
+      "mean_correctness": 0.95,
+      "median_correctness": 1.0
+    },
+    "GPT-5-mini": {
+      "model_id": "openai/gpt-5-mini",
+      "mean_tdci": 0.1591,
+      "median_tdci": 0.1553,
+      "std_tdci": 0.0369,
+      "min_tdci": 0.0915,
+      "max_tdci": 0.2292,
+      "n_sessions": 12,
+      "tdci_values": [
+        0.1893,
+        0.1426,
+        0.1964,
+        0.1674,
+        0.1558,
+        0.1117,
+        0.0915,
+        0.1549,
+        0.1491,
+        0.1758,
+        0.2292,
+        0.145
+      ],
+      "mean_correctness": 0.9083,
+      "median_correctness": 1.0
+    },
+    "GPT-5-nano": {
+      "model_id": "openai/gpt-5-nano",
+      "mean_tdci": 0.1543,
+      "median_tdci": 0.1425,
+      "std_tdci": 0.0295,
+      "min_tdci": 0.1292,
+      "max_tdci": 0.2048,
+      "n_sessions": 6,
+      "tdci_values": [
+        0.1328,
+        0.1381,
+        0.1742,
+        0.1292,
+        0.147,
+        0.2048
+      ],
+      "mean_correctness": 0.7583,
+      "median_correctness": 0.7
+    },
+    "GPT-5.5": {
+      "model_id": "openai/gpt-5.5",
+      "mean_tdci": 0.0714,
+      "median_tdci": 0.0702,
+      "std_tdci": 0.0129,
+      "min_tdci": 0.0592,
+      "max_tdci": 0.0848,
+      "n_sessions": 3,
+      "tdci_values": [
+        0.0592,
+        0.0702,
+        0.0848
+      ],
+      "mean_correctness": 1.0,
+      "median_correctness": 1.0
+    },
+    "GPT-5.6": {
+      "model_id": "openai/gpt-5.6",
+      "mean_tdci": 0.0611,
+      "median_tdci": 0.0577,
+      "std_tdci": 0.0289,
+      "min_tdci": 0.0279,
+      "max_tdci": 0.1381,
+      "n_sessions": 15,
+      "tdci_values": [
+        0.0487,
+        0.0354,
+        0.0747,
+        0.097,
+        0.0485,
+        0.0676,
+        0.0813,
+        0.067,
+        0.0361,
+        0.0609,
+        0.042,
+        0.0279,
+        0.0335,
+        0.0577,
+        0.1381
+      ],
+      "mean_correctness": 1.0,
+      "median_correctness": 1.0
+    },
+    "GPT-5.6-fast": {
+      "model_id": "openai/gpt-5.6-fast",
+      "mean_tdci": 0.0631,
+      "median_tdci": 0.0608,
+      "std_tdci": 0.0198,
+      "min_tdci": 0.0419,
+      "max_tdci": 0.0946,
+      "n_sessions": 6,
+      "tdci_values": [
+        0.0419,
+        0.0946,
+        0.0733,
+        0.0472,
+        0.0521,
+        0.0694
+      ],
+      "mean_correctness": 1.0,
+      "median_correctness": 1.0
+    }
+  },
+  "by_perturbation_class": {
+    "manifold": {
+      "mean_tdci": 0.0513,
+      "median_tdci": 0.0501,
+      "n_sessions": 15
+    },
+    "semantic": {
+      "mean_tdci": 0.0697,
+      "median_tdci": 0.0579,
+      "n_sessions": 178
+    }
+  },
+  "by_model_perturbation_class": {
+    "Claude Fable 5|manifold": {
+      "mean_tdci": 0.016,
+      "n_sessions": 3
+    },
+    "Claude Fable 5|semantic": {
+      "mean_tdci": 0.0515,
+      "n_sessions": 32
+    },
+    "DeepSeek v4 Pro|manifold": {
+      "mean_tdci": 0.0601,
+      "n_sessions": 12
+    },
+    "DeepSeek v4 Pro|semantic": {
+      "mean_tdci": 0.057,
+      "n_sessions": 98
+    },
+    "GPT-5|semantic": {
+      "mean_tdci": 0.1404,
+      "n_sessions": 6
+    },
+    "GPT-5-mini|semantic": {
+      "mean_tdci": 0.1591,
+      "n_sessions": 12
+    },
+    "GPT-5-nano|semantic": {
+      "mean_tdci": 0.1543,
+      "n_sessions": 6
+    },
+    "GPT-5.5|semantic": {
+      "mean_tdci": 0.0714,
+      "n_sessions": 3
+    },
+    "GPT-5.6|semantic": {
+      "mean_tdci": 0.0611,
+      "n_sessions": 15
+    },
+    "GPT-5.6-fast|semantic": {
+      "mean_tdci": 0.0631,
+      "n_sessions": 6
+    }
+  },
+  "tdci_vs_correctness_correlation": -0.0749,
+  "tdci_vs_narration_penalty_correlation": 0.3523,
+  "sessions": [
+    {
+      "session": "exp_05ngi4l9",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.10184674621055735
+    },
+    {
+      "session": "exp_0mwneie4",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0487378135639328
+    },
+    {
+      "session": "exp_0s36_d3n",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0788225904554466
+    },
+    {
+      "session": "exp_0umx0pra",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05983287160323121
+    },
+    {
+      "session": "exp_1d30evhp",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03542239761616682
+    },
+    {
+      "session": "exp_1erxln69",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.756,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05822553584147969
+    },
+    {
+      "session": "exp_1q13yzyh",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05581970627274094
+    },
+    {
+      "session": "exp_1ruzb3rc",
+      "model": "openai/gpt-5-nano",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.13282674280439138
+    },
+    {
+      "session": "exp_1spl4mgd",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0074872478955512415
+    },
+    {
+      "session": "exp_27doc_o4",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06554735076004031
+    },
+    {
+      "session": "exp_2dqodvt8",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.07331075616801574
+    },
+    {
+      "session": "exp_2hoxdd8p",
+      "model": "openai/gpt-5-nano",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.13807885187697816
+    },
+    {
+      "session": "exp_2yyxp_8_",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.0804673605536059
+    },
+    {
+      "session": "exp_34qst87v",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.938,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08094448019088817
+    },
+    {
+      "session": "exp_37jbey_e",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06675052209982565
+    },
+    {
+      "session": "exp_37z0nq68",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05032360330360651
+    },
+    {
+      "session": "exp_3hlb2bus",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08107244726554802
+    },
+    {
+      "session": "exp_3j2vrct4",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08894776946742905
+    },
+    {
+      "session": "exp_3zxicj_v",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.894,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07759749005835184
+    },
+    {
+      "session": "exp_4f5g2wms",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.046038593346109886
+    },
+    {
+      "session": "exp_4jvdqhzs",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04187019734063924
+    },
+    {
+      "session": "exp_4v4v2uq8",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03478399297724583
+    },
+    {
+      "session": "exp_5d0kt9ne",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.040634613863410524
+    },
+    {
+      "session": "exp_6462vbw3",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.033047068018989614
+    },
+    {
+      "session": "exp_6ij8p3sl",
+      "model": "openai/gpt-5-nano",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.1741752076937364
+    },
+    {
+      "session": "exp_6km9sho1",
+      "model": "openai/gpt-5-nano",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.12915751917327484
+    },
+    {
+      "session": "exp_6w9zsvwr",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09455583729129445
+    },
+    {
+      "session": "exp_6wexzcci",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0614531251508261
+    },
+    {
+      "session": "exp_6xzauw79",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.028940991599466965
+    },
+    {
+      "session": "exp_73hs5n35",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.013711826852019098
+    },
+    {
+      "session": "exp_7eir0g9s",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.18930690406258036
+    },
+    {
+      "session": "exp_7eo89cdf",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09685718034492455
+    },
+    {
+      "session": "exp_7l_2qyd3",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0881236444574565
+    },
+    {
+      "session": "exp_82jg7qi3",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07472020555129086
+    },
+    {
+      "session": "exp_965hk7_6",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08216521025806685
+    },
+    {
+      "session": "exp_96rfqfgd",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.025459168145446427
+    },
+    {
+      "session": "exp_9o_y1a_8",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06313533205954663
+    },
+    {
+      "session": "exp_9tfs606s",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0
+    },
+    {
+      "session": "exp_9u9p6onc",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.03286701285403293
+    },
+    {
+      "session": "exp_9uzjxitk",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.05008598906661003
+    },
+    {
+      "session": "exp_9vkw4hu4",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06659486250639608
+    },
+    {
+      "session": "exp__3wx7dg4",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06583316531208051
+    },
+    {
+      "session": "exp__gihw__t",
+      "model": "openai/gpt-5.5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05916346782558281
+    },
+    {
+      "session": "exp__l_pm4_4",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07327973813688533
+    },
+    {
+      "session": "exp__ygf4hz3",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06547303419835578
+    },
+    {
+      "session": "exp_a90ybf13",
+      "model": "openai/gpt-5.5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0701843024564976
+    },
+    {
+      "session": "exp_agmqo28z",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.789,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06528472127573277
+    },
+    {
+      "session": "exp_aqqqi9v5",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08257142249240174
+    },
+    {
+      "session": "exp_arc_7as6",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.2,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0384256072709393
+    },
+    {
+      "session": "exp_ay66qv12",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04659891520715466
+    },
+    {
+      "session": "exp_azk0fzz7",
+      "model": "openai/gpt-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08466017066206591
+    },
+    {
+      "session": "exp_b48bnosz",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.13871051571365758
+    },
+    {
+      "session": "exp_b4kiud1q",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05289853355101195
+    },
+    {
+      "session": "exp_ba8s0njl",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.14263719843869704
+    },
+    {
+      "session": "exp_batch_autocomplete_search_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.985,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03148009515070114
+    },
+    {
+      "session": "exp_batch_batch_collaborative_editor_baseline clau",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.0
+    },
+    {
+      "session": "exp_batch_batch_collaborative_editor_baseline gpt_",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09702190294356536
+    },
+    {
+      "session": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.18967496943699227
+    },
+    {
+      "session": "exp_batch_batch_data_table_baseline gpt_5_6",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04851445400505363
+    },
+    {
+      "session": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.049251854311597655
+    },
+    {
+      "session": "exp_batch_batch_task_manager_baseline gpt_5_6",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06760493887309846
+    },
+    {
+      "session": "exp_batch_batch_task_manager_baseline gpt_5_mini",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.19639407290611993
+    },
+    {
+      "session": "exp_batch_collaborative_editor_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05671505327560792
+    },
+    {
+      "session": "exp_batch_data_table_g56",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08132850576443273
+    },
+    {
+      "session": "exp_batch_data_table_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.6,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05350186336282984
+    },
+    {
+      "session": "exp_batch_factorial_compound_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.92,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03943456539046792
+    },
+    {
+      "session": "exp_batch_fastapi_maintenance_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0942965219689812
+    },
+    {
+      "session": "exp_batch_form_wizard_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.050523859100565956
+    },
+    {
+      "session": "exp_batch_mint_financial_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09665600086223716
+    },
+    {
+      "session": "exp_batch_notification_system_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.6,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08934614306396461
+    },
+    {
+      "session": "exp_batch_search_kv_store_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04859076586900205
+    },
+    {
+      "session": "exp_batch_social_graph_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.978,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0254779200447763
+    },
+    {
+      "session": "exp_batch_task_manager_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.929,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07135331610382398
+    },
+    {
+      "session": "exp_batch_twitter_timeline_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.944,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.046603327794935936
+    },
+    {
+      "session": "exp_batch_web_crawler_natural",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05089375978562484
+    },
+    {
+      "session": "exp_bvv94cn2",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05201826431212757
+    },
+    {
+      "session": "exp_cqc0vqav",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05268204120185647
+    },
+    {
+      "session": "exp_d0xsrs9k",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.030705515409603163
+    },
+    {
+      "session": "exp_d6lkz5pg",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07982139012876889
+    },
+    {
+      "session": "exp_dalqefiq",
+      "model": "openai/gpt-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.19170024747342293
+    },
+    {
+      "session": "exp_dbzmm0qd",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.09201189069879666
+    },
+    {
+      "session": "exp_dfyjk1mo",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06698049806634296
+    },
+    {
+      "session": "exp_dm1gxwnd",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04722218094574238
+    },
+    {
+      "session": "exp_dw4oal4i",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06631984296487908
+    },
+    {
+      "session": "exp_e6nmmhtb",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.06185456535077451
+    },
+    {
+      "session": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07286420165376971
+    },
+    {
+      "session": "exp_eajrttu6",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09503328150120606
+    },
+    {
+      "session": "exp_ednngz36",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.17377265973053194
+    },
+    {
+      "session": "exp_ejk4tssk",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.16739516602263393
+    },
+    {
+      "session": "exp_epk792rd",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.0651066121169014
+    },
+    {
+      "session": "exp_er1n2rx3",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.97,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03493682892458563
+    },
+    {
+      "session": "exp_erp5e4d9",
+      "model": "openai/gpt-5-mini",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.15582573443662046
+    },
+    {
+      "session": "exp_eyt9cssv",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.047342243901894066
+    },
+    {
+      "session": "exp_f1cezegh",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04582609993060052
+    },
+    {
+      "session": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.029553479268187553
+    },
+    {
+      "session": "exp_fw57sbqz",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.020357733907063157
+    },
+    {
+      "session": "exp_g56_sweep",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0361096441280051
+    },
+    {
+      "session": "exp_ga7iubmt",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.13261086966786872
+    },
+    {
+      "session": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04984922950300277
+    },
+    {
+      "session": "exp_gmnl5d6g",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06437389710200352
+    },
+    {
+      "session": "exp_grgmkhc9",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.059622733061154586
+    },
+    {
+      "session": "exp_h2zma6v0",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07312301296349258
+    },
+    {
+      "session": "exp_hcnattl6",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.778,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05074424459297852
+    },
+    {
+      "session": "exp_hn0qqsuf",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03702321660888064
+    },
+    {
+      "session": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.022058661286076663
+    },
+    {
+      "session": "exp_icyyq90k",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04722777523397371
+    },
+    {
+      "session": "exp_iedauets",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04212724547476769
+    },
+    {
+      "session": "exp_ih5ct7z5",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.11317500438372391
+    },
+    {
+      "session": "exp_ikhirync",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.031009681843902296
+    },
+    {
+      "session": "exp_j5rhhp06",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04200049742589589
+    },
+    {
+      "session": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0
+    },
+    {
+      "session": "exp_kg2a1_b0",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.957,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.028855072383393687
+    },
+    {
+      "session": "exp_kh2siwsa",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02613056480908107
+    },
+    {
+      "session": "exp_kpkjjdv3",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06091166510030226
+    },
+    {
+      "session": "exp_kqqzaabe",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.2,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03526579975342958
+    },
+    {
+      "session": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03935241215786729
+    },
+    {
+      "session": "exp_l05r7o3a",
+      "model": "openai/gpt-5-nano",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.14700650598790815
+    },
+    {
+      "session": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03454014636910748
+    },
+    {
+      "session": "exp_lw9zhue9",
+      "model": "openai/gpt-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.052365951476425206
+    },
+    {
+      "session": "exp_m3c9h6l0",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.029905388789281173
+    },
+    {
+      "session": "exp_m3di3pys",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06354198991610603
+    },
+    {
+      "session": "exp_mho8njwt",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06472733439724546
+    },
+    {
+      "session": "exp_mmp26p5c",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.018804428910406144
+    },
+    {
+      "session": "exp_mn5mnvtw",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05940269490150119
+    },
+    {
+      "session": "exp_mp0le40h",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08758535840226886
+    },
+    {
+      "session": "exp_n7psw3ue",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04723266467554809
+    },
+    {
+      "session": "exp_ner1874a",
+      "model": "openai/gpt-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0766137694705979
+    },
+    {
+      "session": "exp_nlme9vjk",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08389197778821426
+    },
+    {
+      "session": "exp_nvn1kdwj",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08858685037881536
+    },
+    {
+      "session": "exp_nxb87bod",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.052103115689241676
+    },
+    {
+      "session": "exp_ot4ttmtr",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.629,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07176722676373504
+    },
+    {
+      "session": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.0169473382277606
+    },
+    {
+      "session": "exp_owxe4fim",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.1117105538623698
+    },
+    {
+      "session": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.010807436128728299
+    },
+    {
+      "session": "exp_p31ut41o",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.07425008575081904
+    },
+    {
+      "session": "exp_plz1xajw",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.055814636981955934
+    },
+    {
+      "session": "exp_pqcfk5nr",
+      "model": "openai/gpt-5",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.19314347014859842
+    },
+    {
+      "session": "exp_pqk11z7c",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.01315554729731334
+    },
+    {
+      "session": "exp_pt6mynpf",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.1618619686346471
+    },
+    {
+      "session": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03030001239643008
+    },
+    {
+      "session": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.014894900782384186
+    },
+    {
+      "session": "exp_qpkpyt0z",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03397992613251172
+    },
+    {
+      "session": "exp_qqhhxsn1",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03899956077746563
+    },
+    {
+      "session": "exp_qtjyfkab",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.054476148545745076
+    },
+    {
+      "session": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02813946047885314
+    },
+    {
+      "session": "exp_quas142w",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.042750420784269334
+    },
+    {
+      "session": "exp_rkpaq3gp",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02110106473434064
+    },
+    {
+      "session": "exp_rt6ocba2",
+      "model": "openai/gpt-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.2441649786426507
+    },
+    {
+      "session": "exp_ru1v2479",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.045510592488953575
+    },
+    {
+      "session": "exp_rz0gn48h",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06394171037408798
+    },
+    {
+      "session": "exp_s73ost4b",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03150767986257798
+    },
+    {
+      "session": "exp_selbvg5r",
+      "model": "openai/gpt-5.5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08484083712652835
+    },
+    {
+      "session": "exp_siw0dufk",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09147809502785306
+    },
+    {
+      "session": "exp_sweep_gpt_5_6_fb",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.042037699702376675
+    },
+    {
+      "session": "exp_sweep_gpt_5_6_fp",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02791263560723044
+    },
+    {
+      "session": "exp_sweep_gpt_5_6_np",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.033487872647480016
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_fb",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.15486369254133767
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_fp",
+      "model": "openai/gpt-5-mini",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.14914705604080536
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_nb",
+      "model": "openai/gpt-5-mini",
+      "correctness": 0.75,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.17576275745408004
+    },
+    {
+      "session": "exp_sweep_gpt_5_mini_np",
+      "model": "openai/gpt-5-mini",
+      "correctness": 0.75,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.22915317762753443
+    },
+    {
+      "session": "exp_swp_Claude_F_fp",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.038498935609674656
+    },
+    {
+      "session": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.09999999999999998,
+      "narration_penalty": 0.5,
+      "perturbation_class": "semantic",
+      "tdci": 0.025658610541336207
+    },
+    {
+      "session": "exp_tjlvdunl",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.375,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.08707409945865263
+    },
+    {
+      "session": "exp_tqnuch_d",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02457637403844139
+    },
+    {
+      "session": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.023625948108518386
+    },
+    {
+      "session": "exp_u9zvdibz",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.795,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07524005416710734
+    },
+    {
+      "session": "exp_uaqvwo_n",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05405528789760258
+    },
+    {
+      "session": "exp_uc2lmxka",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05766795209155762
+    },
+    {
+      "session": "exp_ue8nk4wv",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.035139379047540796
+    },
+    {
+      "session": "exp_uiem8t3d",
+      "model": "openai/gpt-5.6",
+      "correctness": 1.0,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.13809744287028455
+    },
+    {
+      "session": "exp_ujzch41n",
+      "model": "openai/gpt-5-nano",
+      "correctness": 0.75,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.20479946427866755
+    },
+    {
+      "session": "exp_uzrxy1t2",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.044751846691534675
+    },
+    {
+      "session": "exp_v0u6d7t1",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.07039258682746842
+    },
+    {
+      "session": "exp_vtp26dz3",
+      "model": "openai/gpt-5.6-fast",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.06943347021411263
+    },
+    {
+      "session": "exp_vx4gb129",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.040441194874440166
+    },
+    {
+      "session": "exp_w8ayd_ci",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03029439284432407
+    },
+    {
+      "session": "exp_wa776dmx",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.985,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.0706282981909393
+    },
+    {
+      "session": "exp_wkclt_vt",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.981,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.051438374980878665
+    },
+    {
+      "session": "exp_wmysu1lk",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.04493312187449338
+    },
+    {
+      "session": "exp_wo07wfxb",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05661851854680961
+    },
+    {
+      "session": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.020998545137689093
+    },
+    {
+      "session": "exp_x5tqss1y",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05817961832576594
+    },
+    {
+      "session": "exp_x8g28_k8",
+      "model": "openai/gpt-5-mini",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.14503220015313625
+    },
+    {
+      "session": "exp_xszdrm2e",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.03851980018381423
+    },
+    {
+      "session": "exp_ygblv0tb",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 0.7,
+      "narration_penalty": 0.3,
+      "perturbation_class": "semantic",
+      "tdci": 0.0
+    },
+    {
+      "session": "exp_yl5gcl6d",
+      "model": "anthropic/claude-fable-5",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07441976037779019
+    },
+    {
+      "session": "exp_z13l8zhz",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.05137898347687475
+    },
+    {
+      "session": "exp_zbc1mgbx",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.316,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.04135170764790661
+    },
+    {
+      "session": "exp_ze0y99pc",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0.8,
+      "narration_penalty": 0.0,
+      "perturbation_class": "manifold",
+      "tdci": 0.07646235941528978
+    },
+    {
+      "session": "exp_zg0opvwm",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.09431075737092119
+    },
+    {
+      "session": "exp_zjb30bfm",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.07478170303768546
+    },
+    {
+      "session": "exp_zmwy64er",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 0,
+      "narration_penalty": 0.5,
+      "perturbation_class": "semantic",
+      "tdci": 0.023527553151048944
+    },
+    {
+      "session": "exp_zwdvkm4q",
+      "model": "deepseek/deepseek-v4-pro",
+      "correctness": 1.0,
+      "narration_penalty": 0.0,
+      "perturbation_class": "semantic",
+      "tdci": 0.02662709616826401
+    }
+  ]
+}
