@@ -14,11 +14,8 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <style>
-body{min-height:100vh;display:flex;flex-direction:column}
-main{flex:1;max-width:960px;width:100%;margin:0 auto;padding:3rem 1.25rem 3rem}
-h1{font-size:1.75rem;font-weight:700;margin-bottom:0.25rem;color:var(--t)}
-h2{font-size:1.25rem;font-weight:600;margin:2rem 0 0.75rem;color:var(--t)}
-h3{font-size:1rem;font-weight:600;margin:1.25rem 0 0.5rem;color:var(--t2)}
+body{display:flex;flex-direction:column}
+main{flex:1;max-width:1040px;width:100%;margin:0 auto;padding:5rem 1.5rem 3rem}
 .sec{padding:1.5rem}
 ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;margin-bottom:1rem}
 li{margin-bottom:0.35rem}
@@ -88,6 +85,10 @@ li{margin-bottom:0.35rem}
 .metric-value{font-family:"JetBrains Mono",monospace;font-size:1.1rem;color:var(--t);margin-bottom:0.75rem}
 .kpi{display:flex;flex-direction:column}
 
+.constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0}
+.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.55rem 0.8rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b);font-size:0.78rem}
+.cr.head{background:var(--bg4);font-weight:600;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
+.cr .nm{font-weight:500;color:var(--t)}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--t3);line-height:1.45}.cr .ck{text-align:center}
 @media(max-width:768px){
   .timeline-step{grid-template-columns:80px 1fr}
   .timeline-label{font-size:0.7rem}
