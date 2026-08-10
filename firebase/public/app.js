@@ -84,76 +84,58 @@
   });
 })();
 
-/* --- Page Table of Contents (auto-generated from headings) --- */
+/* --- Floating Table of Contents (bottom-right button → slide panel) --- */
 (function() {
-  var toc = document.getElementById('page-toc');
-  if (!toc) return;
-  document.body.classList.add('has-toc');
-
-  var header = document.createElement('div');
-  header.className = 'page-toc-header';
-  header.textContent = 'On this page';
-  toc.appendChild(header);
-
-  // Collect h2 and h3 with content
+  // Auto-enable on pages with sufficient headings
   var headings = document.querySelectorAll('h2, h3');
-  var tocItems = [];
+  if (headings.length < 3) return;
+
+  // Collect headings
+  var headings = document.querySelectorAll('h2, h3');
+  var items = [];
   headings.forEach(function(h) {
     var text = h.textContent.trim();
-    if (!text || text.length < 2) return;
-    // Generate id if missing
+    if (!text || text.length < 3) return;
     if (!h.id) {
-      h.id = text.toLowerCase()
-        .replace(/[^a-z0-9\u00d7\s-]+/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
+      h.id = text.toLowerCase().replace(/[^a-z0-9\s-]+/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
     }
-    tocItems.push({ tag: h.tagName, id: h.id, text: text });
+    items.push({ tag: h.tagName, id: h.id, text: text });
+  });
+  if (items.length < 3) return;
+
+  // Build panel HTML
+  var panelLinks = '';
+  items.forEach(function(item) {
+    var cls = item.tagName === 'H3' ? ' class="toc-h3"' : '';
+    var display = item.text.length > 32 ? item.text.substring(0, item.text.lastIndexOf(' ', 32)) + '\u2026' : item.text;
+    panelLinks += '<a href="#' + item.id + '"' + cls + ' data-target="' + item.id + '">' + display + '</a>';
   });
 
-  if (tocItems.length === 0) { toc.style.display = 'none'; return; }
+  // Inject DOM
+  var overlay = document.createElement('div'); overlay.className = 'toc-overlay'; document.body.appendChild(overlay);
+  var panel = document.createElement('nav'); panel.className = 'toc-panel'; panel.innerHTML = '<div class="toc-panel-header">On this page</div>' + panelLinks; document.body.appendChild(panel);
+  var btn = document.createElement('button'); btn.className = 'toc-float'; btn.setAttribute('aria-label','Contents'); btn.innerHTML = '\u2261'; document.body.appendChild(btn);
 
-  var html = '';
-  tocItems.forEach(function(item) {
-    var cls = item.tagName === 'H3' ? ' toc-h3' : (item.tagName === 'H4' ? ' toc-h4' : '');
-    var displayText = item.text;
-    if (displayText.length > 28) {
-      var cut = displayText.lastIndexOf(' ', 28);
-      if (cut < 20) cut = 28;
-      displayText = displayText.substring(0, cut) + '\u2026';
-    }
-    html += '<a href="#' + item.id + '" class="toc-link' + cls + '" data-target="' + item.id + '" title="' + item.text.replace(/"/g, '&quot;') + '">' + displayText + '</a>';
+  // Show button after scrolling
+  var showBtn = function() { btn.classList.toggle('visible', window.scrollY > 400); };
+  window.addEventListener('scroll', showBtn, { passive: true });
+
+  // Toggle panel
+  var close = function() { overlay.classList.remove('open'); panel.classList.remove('open'); };
+  var open = function() { overlay.classList.add('open'); panel.classList.add('open'); };
+  btn.onclick = function() { overlay.classList.contains('open') ? close() : open(); };
+  overlay.onclick = close;
+
+  // Close panel on link click + scroll to target
+  panel.querySelectorAll('a').forEach(function(a) {
+    a.onclick = function(e) {
+      e.preventDefault();
+      var target = document.getElementById(a.dataset.target);
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      close();
+    };
   });
-  toc.innerHTML = html;
 
-  // Highlight current section on scroll
-  var links = toc.querySelectorAll('.toc-link');
-  if (links.length === 0) return;
-
-  var scrollHandler = function() {
-    var viewportMid = window.innerHeight * 0.3;
-    var activeFound = false;
-    for (var i = links.length - 1; i >= 0; i--) {
-      var target = document.getElementById(links[i].dataset.target);
-      if (!target) continue;
-      var rect = target.getBoundingClientRect();
-      if (rect.top <= viewportMid) {
-        if (!activeFound) {
-          links[i].classList.add('active');
-          if (links[i].offsetTop > toc.scrollTop + toc.clientHeight - 40 || links[i].offsetTop < toc.scrollTop) {
-            toc.scrollTop = links[i].offsetTop - toc.clientHeight / 3;
-          }
-          activeFound = true;
-        } else {
-          links[i].classList.remove('active');
-        }
-      } else {
-        links[i].classList.remove('active');
-      }
-    }
-  };
-
-  window.addEventListener('scroll', scrollHandler, { passive: true });
-  scrollHandler(); // initial highlight
+  // Close on Escape
+  document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close(); });
 })();
