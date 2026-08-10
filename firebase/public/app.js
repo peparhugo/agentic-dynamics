@@ -1,5 +1,5 @@
 /* === AI FinOps Framework — Shared JavaScript === */
-/* v0.3 */
+/* v0.4 */
 
 /* --- Theme Toggle --- */
 (function() {
@@ -27,6 +27,14 @@
 
     function fmtUSD(v) { return (typeof v === 'number' ? v.toFixed(2) : v); }
 
+    function findModel(D, idPart) {
+      var ms = D.models || [];
+      for (var mi = 0; mi < ms.length; mi++) {
+        if (ms[mi].id.indexOf(idPart) >= 0) return ms[mi];
+      }
+      return {};
+    }
+
     var statMap = {
       'sessions': function() { return D.summary.sessions_total; },
       'worktrees': function() { return D.summary.worktrees_total; },
@@ -41,6 +49,14 @@
       'total_tests': function() { return D.derived.total_tests_passed + '/' + D.derived.total_tests_run; },
       'woc': function() { return D.calculator.woc_ratio.toFixed(2); },
       'woc_percent': function() { return Math.round(D.calculator.woc_ratio * 100) + '%'; },
+      'deepseek_cost_per': function() { return fmtUSD(findModel(D, 'deepseek').avg_cost); },
+      'claude_cost_per': function() { return fmtUSD(findModel(D, 'claude').avg_cost); },
+      'gpt56_cost_per': function() { return fmtUSD(findModel(D, 'gpt-5.6').avg_cost); },
+      'deepseek_narration': function() { var m = findModel(D, 'deepseek'); return (m.narration_rate || 0) + '%'; },
+      'claude_narration': function() { var m = findModel(D, 'claude'); return (m.narration_rate || 0) + '%'; },
+      'nano_narration': function() { var m = findModel(D, 'nano'); return (m.narration_rate || 0) + '%'; },
+      'deepseek_penalty': function() { return ((findModel(D, 'deepseek').avg_narration_penalty || 0) * 100).toFixed(1) + '%'; },
+      'claude_penalty': function() { return ((findModel(D, 'claude').avg_narration_penalty || 0) * 100).toFixed(1) + '%'; },
     };
 
     var els = document.querySelectorAll('[data-stat]');

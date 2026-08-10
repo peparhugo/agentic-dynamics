@@ -14,12 +14,6 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.fsec{padding:4rem 2rem;position:relative}
-.fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
-.inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
-.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
 h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
 .exec{background:rgba(11,17,26,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(34,211,238,0.12);border-radius:14px;padding:1.8rem;margin:2rem 0;text-align:left}
@@ -34,9 +28,6 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0.3rem 0;background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.15)}
 .card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
 .card .ctag.cyan{background:rgba(34,211,238,0.08);color:var(--cy);border:1px solid rgba(34,211,238,0.15)}
-.bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
-.bar .fill{height:100%;border-radius:2px;transition:width .5s;background:var(--ac)}
-.bar .fill.amber{background:var(--am)}.bar .fill.cyan{background:var(--cy)}
 .wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7}
 .wtm strong{color:var(--t)}
 .constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0;max-width:650px;margin-left:auto;margin-right:auto}
@@ -336,9 +327,9 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <div style="text-align:center;margin-top:1rem"><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.4 &middot; August 2026</strong><br>
-<span data-stat="sessions">249</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
-  <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> &middot; <a href="framework.html">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a> &middot; <a href="#playbook">Playbook</a>
+<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+  <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
 </footer>
 
 <script>

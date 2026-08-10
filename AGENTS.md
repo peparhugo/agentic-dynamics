@@ -64,8 +64,8 @@ opencode.db ──→ inventory.py refresh          ──→ inventory.json
 |-----------|----------|---------|
 | `src/instrument/` | 21 Python modules — measurement apparatus | `src/instrument/CONTEXT.md` |
 | `scripts/` | 35 Python scripts + 1 `.sh` — runners, analyzers, pipeline, 14 lab books | `scripts/CONTEXT.md` |
-| `experiments/` | 34 YAML configs, results, 14 lab books, 6 reviews | `experiments/CONTEXT.md` |
-| `firebase/` | Public website (7 HTML pages + data.js) | `firebase/CONTEXT.md` |
+| `experiments/` | 34 YAML configs, results, 13 lab books, 6 reviews | `experiments/CONTEXT.md` |
+| `firebase/` | Public website (8 HTML pages + data.js) | `firebase/CONTEXT.md` |
 | `tests/` | pytest suite for adapter, perturb, pricing, recovery | — |
 | `infrastructure/` | Test suite (4 modules), Docker Compose (Neo4j + ChromaDB) | — |
 | `.opencode/skills/` | 3 opencode skills for common workflows | — |

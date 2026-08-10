@@ -1,5 +1,5 @@
 /* === AI FinOps Framework — Shared Base Styles === */
-/* v0.2 — Extracted from 10 individual pages */
+/* v0.4 — Extracted from 10 individual pages */
 
 /* --- Design Tokens --- */
 :root {
@@ -294,6 +294,18 @@ td code{color:var(--ac)}
 .chapter{display:grid;grid-template-columns:4rem 1fr;gap:1rem;padding:1rem 1.1rem;border:1px solid var(--b);border-radius:16px;background:rgba(16,23,34,0.86);text-align:left}
 .chapter-num{font-family:"JetBrains Mono",monospace;color:var(--ac);font-size:1.45rem;font-weight:850;line-height:1}
 .chapter h3{margin:0 0 0.25rem}.chapter p{margin:0;font-size:0.86rem;color:var(--t2)}
+
+/* === Shared page components (consolidated from page <style> blocks) === */
+
+.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
+.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.fsec{padding:4rem 2rem;position:relative}
+.fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
+.inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
+.bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
+.bar .fill{height:100%;border-radius:2px;transition:width .5s;background:var(--ac)}
+.bar .fill.amber{background:var(--am)}.bar .fill.cyan{background:var(--cy)}
 
 /* --- Print --- */
 @media print{

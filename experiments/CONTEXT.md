@@ -1,6 +1,6 @@
 # `experiments/` — Experiment Ecosystem
 
-34 YAML configs, 224+ game reports, 8 lab books, 6 peer reviews.
+34 YAML configs, 224+ game reports, 13 lab books, 6 peer reviews.
 
 ## `experiments/configs/` — 34 Experiment Definitions
 
@@ -72,14 +72,14 @@ Each YAML defines: task description, constraints, perturbation operators, streng
 | `_trajectory_summary.json` | Per-transcript trajectory metrics |
 | `_trajectory_aggregate.json` | Per-model comparable trajectory aggregates |
 | `typescript_ssg_*.json` | Per-model SSG results (deepseek, claude, gpt5) |
-| `lab_*.json` | Lab book analysis outputs (8 files) |
+| `lab_*.json` | Lab book analysis outputs (13 files) |
 | `README.md` | Dataset access instructions (inventory CLI) |
 | `reports/` | **224+ game reports** — per-experiment Markdown + artifact directories |
 
-## `experiments/lab_books/` — 8 Experiment Plans
+## `experiments/lab_books/` — 13 Experiment Plans
 
 Methodology documents defining hypothesis, data sources, analysis steps, interpretation.
-Implemented by the 8 `scripts/lab_*.py` scripts.
+Implemented by the 14 `scripts/lab_*.py` scripts.
 
 | Document | Question |
 |----------|----------|
@@ -91,6 +91,11 @@ Implemented by the 8 `scripts/lab_*.py` scripts.
 | `lab_task_routing.md` | Optimal model-per-task routing |
 | `lab_basin_topology.md` | Attractor basin classification |
 | `lab_survival_horizon.md` | Sessions-to-bankruptcy analysis |
+| `lab_reasoning_divergence.md` | Reasoning trajectory divergence under perturbation |
+| `lab_semantic_clusters.md` | Semantic clustering of reasoning patterns |
+| `lab_cross_model_reasoning.md` | Cross-model reasoning comparison |
+| `lab_basin_topology_neo4j.md` | Basin topology via Neo4j graph analysis |
+| `lab_opencode_meta_analysis.md` | Meta-analysis of opencode experiment patterns |
 
 ## `experiments/reviews/` — 6 Peer Review Documents
 

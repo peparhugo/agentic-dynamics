@@ -8,6 +8,13 @@ Uses thread-level timeout so stuck LLM calls don't block experiments.
 
 from __future__ import annotations
 
+import warnings
+warnings.warn(
+    "instrument.adapter is deprecated. The current pipeline uses "
+    "scripts/run.py with instrument.opencode.run_opencode_agentic directly.",
+    DeprecationWarning, stacklevel=2
+)
+
 import concurrent.futures
 import time
 from dataclasses import dataclass, field

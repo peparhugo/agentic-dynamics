@@ -4,6 +4,7 @@
 #   Forced gap   = Architecture × Verbosity (tax removed)
 #   Explanation Tax = Natural gap / Forced gap
 name: silent_mode_sweep
+model: deepseek
 task: >
   Build an authenticated REST API with these requirements:
   1. JWT-based user auth with refresh tokens

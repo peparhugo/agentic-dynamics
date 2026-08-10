@@ -9,6 +9,13 @@ The research question: does perturbation class predict correctness/cost variance
 
 from __future__ import annotations
 
+import warnings
+warnings.warn(
+    "instrument.experiment is deprecated. The current pipeline uses "
+    "scripts/run.py with instrument.opencode.run_opencode_agentic directly.",
+    DeprecationWarning, stacklevel=2
+)
+
 import json
 import math
 import time

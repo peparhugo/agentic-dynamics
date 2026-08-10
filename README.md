@@ -57,7 +57,7 @@ This framework provides the calibrated measurements, governance rules, and repro
 | Measured cost gap | 69× |
 | Total experiment cost | $64.98 |
 | Session transcripts analyzed | 255 |
-| Lab books completed | 8 |
+| Lab books completed | 13 |
 
 Run `python scripts/inventory.py list` for a live breakdown.
 

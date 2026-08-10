@@ -36,7 +36,9 @@ from instrument import (
     run_sonar_analysis, compute_sonar_diff, sonar_quality_score,
 )
 
-OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci
+
+OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 REPORTS_DIR = RESULTS_DIR / "reports"
 CONFIGS_DIR = PROJECT_ROOT / "experiments" / "configs"
@@ -163,14 +165,22 @@ def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
         passed = int(re.search(r'(\d+)\s+passed', out).group(1)) if re.search(r'(\d+)\s+passed', out) else 0
         failed = int(re.search(r'(\d+)\s+failed', out).group(1)) if re.search(r'(\d+)\s+failed', out) else 0
         total = passed + failed
+        if total == 0 and r.returncode == 0:
+            return {
+                "ok": True, "passed": 0, "failed": 0, "total": 0,
+                "duration_s": round(dur, 1),
+                "pass_rate": 0,
+                "note": "No test counts parsed from output",
+                "runner": runner,
+            }
         if total == 0:
-            total = len(test_files)
+            return None
         return {
             "ok": r.returncode == 0,
-            "passed": passed, "failed": failed or (r.returncode != 0 and 1 or 0),
-            "errors": 0, "total": max(total, len(test_files)),
+            "passed": passed, "failed": failed,
+            "errors": 0, "total": total,
             "duration_s": round(dur, 1),
-            "pass_rate": round(passed / max(total, 1), 3) if total > 0 else (1.0 if r.returncode == 0 else 0),
+            "pass_rate": round(passed / max(total, 1), 3),
             "runner": runner,
         }
     except _sp.TimeoutExpired:
@@ -538,6 +548,9 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     pert_class = "manifold" if any(k in exp_name for k in
                                     ["alien_vocab", "shift_framing", "reverse_causality",
                                      "force_abandonment"]) else "semantic"
+    # Parse actual perturbation strength from worktree name (_s0.3, _s0.5, _s0.7)
+    strength_match = re.search(r'_s(\d+\.\d+)', worktree_path)
+    actual_strength = float(strength_match.group(1)) if strength_match else 0.5
     no_baseline = not baseline_code
     if no_baseline:
         # No baseline available — mark as "no baseline" instead of self-comparison
@@ -545,7 +558,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         basin = _BM(
             perturbation_operator=info.get("operator", "baseline"),
             perturbation_class=pert_class,
-            perturbation_strength=0.5,
+            perturbation_strength=actual_strength,
             model=session.get("model_id", "") if session else "",
             cost_usd=db_cost if db_cost > 0 else None,
             correctness=solution.correctness_score,
@@ -594,7 +607,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         reasoning_tokens=reasoning_tok,
         perturbation_operator=info.get("operator", "baseline"),
         perturbation_class=pert_class,
-        perturbation_strength=0.5,
+        perturbation_strength=actual_strength,
         model=session.get("model_id", "") if session else "",
         cost_usd=db_cost if db_cost > 0 else None,
         sonar_diff=sonar_diff_data,
@@ -1028,14 +1041,9 @@ def main():
 
     # Filter to only ones with sessions and experiment-like titles
     exp_wts = [wt for wt in worktrees if wt.get("session")]
-    EXP_PATTERNS = ["flask", "api", "rest", "task", "url", "sweep", "batch", "config",
-                     "silent", "constraint", "recovery", "baseline", "perturb", "inject",
-                     "phantom", "remove_critical", "invert", "shift_framing", "alien",
-                     "false_premise", "competing", "data_table", "collaborat"]
-
     analyzed = [wt for wt in exp_wts if any(
         p in (wt.get("session", {}).get("title", "") or "").lower()
-        for p in EXP_PATTERNS
+        for p in EXPERIMENT_SESSION_PATTERNS
     ) or ((wt.get("session", {}).get("title", "") or "").startswith("["))]
     print(f"  {len(analyzed)} experiment worktrees")
 
@@ -1292,21 +1300,6 @@ def main():
                 by_operator_model[key] = []
             by_operator_model[key].append(r)
 
-        def _bootstrap_ci(vals, n_resamples=1000, ci=95):
-            """Compute bootstrap confidence interval for the mean."""
-            import random as _rnd
-            if len(vals) < 2:
-                return None, None
-            _rng = _rnd.Random(42)
-            means = []
-            for _ in range(n_resamples):
-                sample = [_rng.choice(vals) for _ in range(len(vals))]
-                means.append(sum(sample) / len(sample))
-            means.sort()
-            lo_idx = int((100 - ci) / 2 * n_resamples / 100)
-            hi_idx = n_resamples - lo_idx - 1
-            return round(means[lo_idx], 4), round(means[hi_idx], 4)
-
         def _agg(entries, fields):
             agg = {"n": len(entries)}
             for f in fields:
@@ -1317,10 +1310,10 @@ def main():
                     agg[f"{f}_sum"] = round(sum(vals), 4)
                     agg[f"{f}_min"] = round(min(vals), 4)
                     agg[f"{f}_max"] = round(max(vals), 4)
-                    ci_lo, ci_hi = _bootstrap_ci(vals)
-                    if ci_lo is not None:
-                        agg[f"{f}_ci95_lo"] = ci_lo
-                        agg[f"{f}_ci95_hi"] = ci_hi
+                    result = bootstrap_ci(vals)
+                    if result is not None:
+                        agg[f"{f}_ci95_lo"] = result[0]
+                        agg[f"{f}_ci95_hi"] = result[1]
                     agg[f"{f}_n"] = len(vals)
             return agg
 

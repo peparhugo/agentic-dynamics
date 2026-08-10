@@ -15,16 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_grit_matrix.json"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
+from _constants import MODEL_LABELS
 
 MODEL_COLORS = {
     "deepseek/deepseek-v4-pro": "rgba(52,211,153,0.75)",

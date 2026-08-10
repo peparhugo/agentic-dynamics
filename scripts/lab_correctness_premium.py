@@ -16,18 +16,12 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_correctness_premium.json"
 
+from _constants import normalize_task
+
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"
 
 GPT56_ID = "openai/gpt-5.6"
-
-
-def normalize_task(experiment: str) -> str:
-    exp = experiment
-    for suffix in ["_s0.5", "_s0.3", "_s0.7", "_r1", "_r2", "_r3", "_r4"]:
-        if exp.endswith(suffix):
-            exp = exp[: -len(suffix)]
-    return exp
 
 
 def compute():

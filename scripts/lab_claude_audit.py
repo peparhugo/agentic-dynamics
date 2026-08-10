@@ -18,27 +18,10 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_claude_audit.json"
 
+from _constants import MODEL_LABELS, PROVIDER_PRICING, normalize_task
+
 DEEPSEEK_ID = "deepseek/deepseek-v4-pro"
 CLAUDE_ID = "anthropic/claude-fable-5"
-
-MODEL_LABELS = {
-    DEEPSEEK_ID: "DeepSeek v4 Pro",
-    CLAUDE_ID: "Claude Fable 5",
-}
-
-PROVIDER_PRICING = {
-    "deepseek": {"input": 0.27, "output": 1.10, "reasoning": 0.14, "cache_read": 0.14, "cache_write": 0.27},
-    "anthropic": {"input": 3.00, "output": 15.00, "reasoning": 15.00, "cache_read": 3.00, "cache_write": 15.00},
-}
-
-
-def normalize_task(experiment: str) -> str:
-    """Strip perturbation strength and repetition suffixes."""
-    exp = experiment
-    for suffix in ["_s0.5", "_s0.3", "_s0.7", "_r1", "_r2", "_r3", "_r4"]:
-        if exp.endswith(suffix):
-            exp = exp[: -len(suffix)]
-    return exp
 
 
 def compute():

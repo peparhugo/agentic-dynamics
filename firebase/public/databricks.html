@@ -98,7 +98,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-box">
   <div class="tag ours">This framework</div>
   <h4>Our measurement</h4>
-  <p><strong class="mono" style="color:#34d399">$0.016/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$1.08/session (Claude).</strong> <strong style="color:var(--ac)">69× cost gap.</strong> On 12 of 15 overlapping tasks, the cheaper model is MORE correct. Same generated token volume (~11K tokens/session). The gap is pricing architecture, not capability.</p>
+  <p><strong class="mono" style="color:#34d399">$<span data-stat="deepseek_cost_per">0.02</span>/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$<span data-stat="claude_cost_per">1.08</span>/session (Claude).</strong> <strong style="color:var(--ac)">69× cost gap.</strong> On 12 of 15 overlapping tasks, the cheaper model is MORE correct. Same generated token volume (~11K tokens/session). The gap is pricing architecture, not capability.</p>
 </div>
 </div>
 <div class="gap-box"><strong>Where they stop short:</strong> They compare price/intelligence. We measure integrity under stress. A model can be cheap AND smart on a benchmark — and collapse completely when given inverted constraints. Grit captures this. The Efficiency Frontier doesn't.</div>
@@ -130,7 +130,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-box">
   <div class="tag ours">This framework</div>
   <h4>Our measurement</h4>
-  <p><strong>WOC = 0.90</strong> — measured first-pass success rate across 227 experiments. Rule 7: Budget Ceiling (T<sub>max</sub> = Budget / C<sub>job</sub>). Rule 8: Cascade Rule (escalate only on Grit failure). Their "downshifting" = our cascade. Their "spend gates" = our WOC alerts.</p>
+  <p><strong>WOC = <span data-stat-fmt="woc">0.90</span></strong> — measured first-pass success rate across 227 experiments. Rule 7: Budget Ceiling (T<sub>max</sub> = Budget / C<sub>job</sub>). Rule 8: Cascade Rule (escalate only on Grit failure). Their "downshifting" = our cascade. Their "spend gates" = our WOC alerts.</p>
 </div>
 </div>
 <div class="gap-box"><strong>Where they stop short:</strong> Reactive budgeting — they detect overspend after it happens. We forecast costs before they compound. The Snowball Rule (N²) and EPM Horizon model 3-year cost trajectories. Their playbook optimizes this month's bill. Our framework models next year's.</div>
@@ -193,10 +193,10 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 </article>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.4</strong><br>
-<span data-stat="sessions">249</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
-<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
-<a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
+<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
+<a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 <script src="app.js"></script>

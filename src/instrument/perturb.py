@@ -88,6 +88,7 @@ class Perturbation:
     vocab_domain: str = ""
     injected_tokens: list[str] = field(default_factory=list)
     description: str = ""
+    noop_reason: str = ""  # set when operator silently returns prompt unchanged
 
 
 @dataclass
@@ -110,7 +111,7 @@ class PerturbationOperator:
 # ── Operator implementations ──
 
 
-def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> str:
+def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> tuple[str, list[str], str]:
     """Replace domain terminology with cross-domain vocabulary as directional noise.
 
     Alien words act as latent-space navigation hints — they push the
@@ -157,6 +158,7 @@ def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> str
             found_terms.append((m.group(0), m.start(), m.end(), tech, alts))
 
     result = prompt
+    replaced_terms: list[str] = []
     n_replace = min(n_tokens, len(found_terms))
 
     if n_replace > 0:
@@ -165,6 +167,7 @@ def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> str
         for orig, start, end, tech, alts in sorted(selected, key=lambda x: x[1], reverse=True):
             replacement = rng.choice(alts)
             result = result[:start] + replacement + result[end:]
+            replaced_terms.append(tech)
     else:
         # Fallback: if no tech terms found, inject wrapped alien terms
         injected = rng.sample(words, min(n_tokens, len(words)))
@@ -174,7 +177,7 @@ def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> str
         )
         result = prompt + "\n\n" + noise_block
 
-    return result
+    return result, replaced_terms, domain
 
 
 def _inject_false_premise(prompt: str, strength: float, rng: random.Random) -> str:
@@ -317,10 +320,15 @@ def _insert_contradiction(prompt: str, strength: float, rng: random.Random) -> s
     }
 
     # Pick contradiction domain based on prompt content
+    # Filter stopwords from constraint keywords to prevent false matches
+    _stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                  'of', 'with', 'from', 'by', 'as', 'is', 'was', 'are', 'be', 'been',
+                  'it', 'its', 'use', 'all', 'this', 'that', 'has', 'have', 'not', 'no'}
     all_domains = []
     for domain, pairs in domain_contradictions.items():
         for a, b in pairs:
-            if any(kw.lower() in prompt.lower() for kw in a.lower().split()[:3]):
+            keywords = [w for w in a.lower().split()[:5] if w not in _stopwords]
+            if keywords and any(kw.lower() in prompt.lower() for kw in keywords):
                 all_domains = pairs
                 break
     if not all_domains:
@@ -686,20 +694,35 @@ def perturb_prompt(
         )
 
     if operator_name not in ops:
-        return base_prompt, Perturbation(
-            operator=operator_name,
-            strength=strength,
-            description=f"Unknown operator '{operator_name}' — prompt returned unmodified",
+        raise ValueError(
+            f"Unknown perturbation operator: {operator_name!r}. Available: {sorted(ops.keys())}"
         )
 
     op = ops[operator_name]
     perturbed = op.apply_fn(base_prompt, strength, rng)
+
+    # Unpack alien_vocab's extended return (prompt, injected_tokens, vocab_domain)
+    injected_tokens: list[str] = []
+    vocab_domain = ""
+    if isinstance(perturbed, tuple):
+        perturbed, injected_tokens, vocab_domain = perturbed
 
     record = Perturbation(
         operator=operator_name,
         strength=strength,
         perturbation_class=op.perturbation_class,
         description=op.description,
+        injected_tokens=injected_tokens,
+        vocab_domain=vocab_domain,
     )
+
+    # Detect silent no-ops: operator returned prompt unchanged
+    if perturbed == base_prompt:
+        if operator_name == "invert_constraint":
+            record.noop_reason = "invert_constraint: no constraint-form sentences matched regex"
+        elif operator_name == "remove_critical_constraint":
+            record.noop_reason = "remove_critical_constraint: no constraint candidates found in prompt"
+        else:
+            record.noop_reason = f"{operator_name}: prompt returned unchanged"
 
     return perturbed, record

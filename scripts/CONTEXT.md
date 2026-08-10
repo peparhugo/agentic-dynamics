@@ -1,6 +1,6 @@
 # `scripts/` — Scripts Reference
 
-25 scripts across 4 categories: experiment runners, post-hoc analysis, data pipeline, and 14 lab books.
+35 Python scripts + 1 `.sh` across 4 categories: experiment runners, post-hoc analysis, data pipeline, and 14 lab books.
 
 ## Primary Entry Points
 
@@ -37,13 +37,14 @@
 | Script | Lines | Purpose |
 |--------|-------|---------|
 | `inventory.py` | 402 | Reads opencode.db, worktrees, results JSONs, config YAMLs. Commands: `refresh`, `list`, `stats`, `worktrees`, `report`. |
+| `_constants.py` | 30 | Shared constants (DB path, result dirs, model configs). Imported by inventory, analyze, and lab scripts. |
 | `build_data.py` | 562 | Produces `window.FRAMEWORK_DATA` with provenance-tagged [M]/[C]/[H]/[X] measurements for the website. |
 | `backfill_artifacts.py` | 263 | Copies generated code from `/tmp/exp_*` to `experiments/results/reports/`. Extracts session transcripts from SQLite. |
 | `regen_typescript_ssg.py` | 172 | Reconstructs TypeScript SSG worktrees from opencode DB part records. |
 | `batch_analyze_ts_ssg.py` | 159 | Runs `analyze_worktrees` on just the typescript_ssg worktrees. |
 | `recovery_cost_table.py` | 99 | Extracts baseline vs perturbed cost by operator×strength from DB. |
 
-## Lab Books (8 scripts)
+## Lab Books (14 scripts)
 
 | Script | Question Answered | Key Output |
 |--------|-------------------|------------|
@@ -55,3 +56,9 @@
 | `lab_task_routing.py` | What's the optimal model-per-task routing? | 3 routing strategies simulated across 30 task types |
 | `lab_basin_topology.py` | What is each model's attractor basin topology? | Shallow/broad, deep/narrow, multi-modal, flat classifications |
 | `lab_survival_horizon.py` | How many sessions before bankruptcy? | Sessions-to-exhaustion per model, per budget |
+| `lab_reasoning_divergence.py` | How do reasoning trajectories diverge? | Pairwise trajectory distance + perturbation sensitivity |
+| `lab_semantic_clusters.py` | What semantic clusters emerge? | Embedding cluster analysis of reasoning patterns |
+| `lab_cross_model_reasoning.py` | How does reasoning differ across models? | Cross-model trajectory comparison metrics |
+| `lab_basin_topology_neo4j.py` | What is basin topology via Neo4j? | Graph-based attractor basin classification |
+| `lab_opencode_meta_analysis.py` | What patterns in opencode experiments? | Meta-analysis of experiment structure + outcomes |
+| `lab_sonar_quality.py` | What code quality signals exist? | Sonar-based code quality analysis |

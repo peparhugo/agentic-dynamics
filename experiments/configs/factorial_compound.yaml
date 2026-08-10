@@ -66,5 +66,5 @@ operators:
   - inject_alien_vocab
 
 strengths: [0.5]
-model: deepseek
+model: deepseek  # overridden by design.factors.model (full-factorial sweeps both deepseek and claude)
 model_id: deepseek/deepseek-v4-pro

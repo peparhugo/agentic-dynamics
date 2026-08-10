@@ -14,9 +14,7 @@
 <link rel="stylesheet" href="base.css">
 <style>
 .sec.wide{max-width:1100px}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.68rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1rem;text-transform:uppercase}
-.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.pulse{font-size:0.68rem;margin-bottom:1rem}
 .pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin:2rem 0}
 .pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:center;position:relative}
 .pipe-step .ps-num{font-size:2rem;font-weight:800;color:var(--ac);opacity:0.3;margin-bottom:0.3rem}
@@ -98,17 +96,18 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>Perturbation Operators</h2>
 <p class="lead">10 calibrated operators probe two dimensions of the reasoning topology. <strong style="color:var(--ac)">Manifold</strong> operators push the model off its typical linguistic surface — testing search dynamics. <strong style="color:var(--am)">Semantic</strong> operators inject contradictions within the reasoning manifold — testing truth-seeking and coherence policies.</p>
 <div class="cards">
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Inject Alien Vocabulary</div><div class="cdesc">Replace domain terminology with vocabulary from unrelated fields (biology, music, astronomy, warfare). Tests whether the model maps alien terms back to correct concepts or gets lost in translation.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject False Premise</div><div class="cdesc">Insert a plausible but incorrect assumption into the context. Tests whether the model identifies and rejects false premises or rationalizes them into the solution.</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Shift Framing</div><div class="cdesc">Reframe the task from "build this" to "find the flaws in this approach." Tests epistemic flexibility — can the model invert its stance under perturbation?</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Invert Constraint</div><div class="cdesc">Flip a requirement to its opposite (e.g., "must be fast" → "must be slow"). Tests whether the model identifies the absurdity or complies blindly.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Insert Contradiction</div><div class="cdesc">Place two mutually exclusive requirements in the prompt. Tests conflict resolution — which does the model prioritize?</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Remove Critical Constraint</div><div class="cdesc">Silently drop a defining requirement (e.g., JWT auth from a REST API). Tests whether the model flags underspecification or confabulates missing pieces.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Phantom Success</div><div class="cdesc">Assert that an intermediate step already passed when it hasn't. Tests truth-seeking vs coherence — does the model question false results?</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Reverse Causality</div><div class="cdesc">Present the solution before the problem statement. Tests non-linear reasoning and structural flexibility under temporal inversion.</div></div>
-<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Competing Goal</div><div class="cdesc">Add a conflicting requirement. Tests trade-off recognition — does the model commit to one path or hedge between both?</div></div>
-<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Force Abandonment</div><div class="cdesc">Force generation and immediate discard of solutions. Directly measures attractor basin depth — how strongly the model returns to its default solution structure.</div></div>
+<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Inject Alien Vocabulary</div><div class="cdesc">Replace domain terminology with vocabulary from unrelated fields (biology, music, astronomy, warfare). Uses a built-in synonym replacement map for recognized software terms (api→gateway, database→archive, etc.); alien-domain vocabulary is applied only as fallback when no tech terms are detected in the prompt. Tests whether the model maps alien terms back to correct concepts or gets lost in translation.</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject False Premise</div><div class="cdesc">Insert a plausible but incorrect assumption into the context. Pool size: ~6 fixed stimuli (2 mild, 2 medium, 2 strong). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests whether the model identifies and rejects false premises or rationalizes them into the solution.</div></div>
+<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Shift Framing</div><div class="cdesc">Reframe the task from "build this" to "find the flaws in this approach." Pool size: 3 fixed stimuli. Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests epistemic flexibility — can the model invert its stance under perturbation?</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Invert Constraint</div><div class="cdesc">Flip a requirement to its opposite (e.g., "must be fast" → "must be slow"). Operates via regex rewrite of constraint-form sentences (must→must NOT, secure→insecure, etc.); may be a silent no-op if no constraint-form sentences match the regex patterns. Tests whether the model identifies the absurdity or complies blindly.</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Insert Contradiction</div><div class="cdesc">Place two mutually exclusive requirements in the prompt. Domain targeting is approximate (keyword match on task description's first words with stopword filtering; falls back to a general pool when no keyword match). Contradiction pairs drawn from 4 domain-specific pools (api, database, security, general). Tests conflict resolution — which does the model prioritize?</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Remove Critical Constraint</div><div class="cdesc">Silently drop a defining requirement (e.g., JWT auth from a REST API) via string replacement. At high strength (≥0.8), removes the most critical-severity constraints by keyword scoring (auth, token, rate, limit, etc.). May be a silent no-op if no constraint candidates are found. Tests whether the model flags underspecification or confabulates missing pieces.</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Phantom Success</div><div class="cdesc">Assert that an intermediate step already passed when it hasn't. Pool size: ~6 fixed stimuli (2 subtle, 2 blatant, 2 obvious). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests truth-seeking vs coherence — does the model question false results?</div></div>
+<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Reverse Causality</div><div class="cdesc">Present the solution before the problem statement. Section reordering at high strength (≥0.8: full inversion — constraints → expected output → task description); at ≥0.4: constraints moved before task description; at lower strengths: simple second-half-first swap or instruction prepend. Tests non-linear reasoning and structural flexibility under temporal inversion.</div></div>
+<div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject Competing Goal</div><div class="cdesc">Add a conflicting requirement. Pool size: ~5 fixed stimuli (2 mild, 2 sharp, 1 direct). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests trade-off recognition — does the model commit to one path or hedge between both?</div></div>
+<div class="card"><div class="ctag">Manifold</div><div class="ctitle">Force Abandonment</div><div class="cdesc">Force generation and immediate discard of solutions via prepended instruction (1–4 rounds, scaled by strength as rounds = 1 + ⌊strength × 3⌋). Directly measures attractor basin depth — how strongly the model returns to its default solution structure.</div></div>
 </div>
+<div class="wtm"><strong>Strength calibration note:</strong> For semantic (append-only) operators — inject_false_premise, inject_phantom_success, inject_competing_goal, and shift_framing — strength selects a severity tier from a discrete pool of ~3–6 fixed stimuli rather than acting as a continuous dial. Manifold operators (reverse_causality, force_abandonment) use strength as a continuous parameter to scale the magnitude of structural transformation.</div>
 </section>
 
 <!-- Recovery -->
@@ -256,17 +255,18 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <section class="sec alt wide">
 <h2>Limitations</h2>
 <p class="lead" style="font-size:0.82rem;color:var(--t2);line-height:1.7;max-width:900px;margin:0 auto">
-227 experiments is statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q3 2026 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.
+227 experiments is statistically meaningful but not exhaustive — confidence intervals widen for per-model-per-task breakdowns. Validated on Python/Flask REST APIs and TypeScript/Node.js (21 cross-model runs). Not yet validated on Go, Rust, Java, or non-code tasks. Provider pricing and model behavior change — this is a Q3 2026 snapshot. The instrument is open source; independent replication welcome. EPM projections use IEA baseline (1.6%/yr); real energy markets may diverge.<br><br>
+Known methodological constraints: <strong>insert_contradiction</strong> domain matching relies on keyword overlap with task descriptions and is sensitive to stopword filtering — mismatches default to the general contradiction pool. <strong>inject_alien_vocab</strong> provenance fields track which tech terms were replaced but do not record domain-level attribution for fallback injections. <strong>invert_constraint</strong> and <strong>remove_critical_constraint</strong> may produce passive runs (no-op) when the prompt contains no constraint-form sentences matching their regex patterns — these are recorded as such in the Perturbation metadata but may go unnoticed in aggregate summaries.
 </p>
 </section>
 
 <div style="text-align:center;margin-top:1rem"><a href="evidence.html" class="cta-btn">View the Evidence →</a></div>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.4</strong><br>
-<span data-stat="sessions">249</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
-<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
-  <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
+<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
+  <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 <script src="app.js"></script>

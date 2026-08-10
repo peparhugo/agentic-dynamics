@@ -16,24 +16,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_PATH = ROOT / "experiments" / "results" / "_trajectory_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_flail_triggers.json"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
-
-
-def normalize_task(experiment: str) -> str:
-    exp = experiment
-    for suffix in ["_s0.5", "_s0.3", "_s0.7", "_r1", "_r2", "_r3", "_r4"]:
-        if exp.endswith(suffix):
-            exp = exp[: -len(suffix)]
-    return exp
+from _constants import MODEL_LABELS, normalize_task
 
 
 def compute():

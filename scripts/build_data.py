@@ -23,16 +23,7 @@ REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
+from _constants import MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
 
 MODEL_DISPLAY_ORDER = [
     "deepseek/deepseek-v4-pro",
@@ -44,13 +35,6 @@ MODEL_DISPLAY_ORDER = [
     "openai/gpt-5.6-fast",
     "anthropic/claude-fable-5",
 ]
-
-PROVIDER_PRICING = {
-    "deepseek": {"input": 0.27, "output": 1.10, "cache_read": 0.14, "cache_write": 0.27},
-    "anthropic": {"input": 3.00, "output": 15.00, "cache_read": 0.30, "cache_write": 3.75},
-    "openai": {"input": 1.25, "output": 10.00, "cache_read": 0.625, "cache_write": 2.50},
-}
-
 
 def _fmt_usd(v):
     return round(v, 4)
@@ -64,22 +48,6 @@ def _parse_model_id(model_str):
         if mid in model_str:
             return mid
     return model_str
-
-
-def _bootstrap_ci(vals, n_resamples=1000, ci=95):
-    """Compute bootstrap confidence interval for the mean."""
-    import random as _rnd
-    if len(vals) < 2:
-        return None, None
-    _rng = _rnd.Random(42)
-    means = []
-    for _ in range(n_resamples):
-        sample = [_rng.choice(vals) for _ in range(len(vals))]
-        means.append(sum(sample) / len(sample))
-    means.sort()
-    lo_idx = int((100 - ci) / 2 * n_resamples / 100)
-    hi_idx = n_resamples - lo_idx - 1
-    return round(means[lo_idx], 4), round(means[hi_idx], 4)
 
 
 def load_inventory():
@@ -247,7 +215,7 @@ def compute_model_data(inventory, summary, db_breakdown):
             "reports_narrated": len(narrated),
             "avg_cost": avg_cost,
             "total_cost": total_cost,
-            "cost_ci95": list(_bootstrap_ci([r.get("cost", 0) for r in valid])) if len(valid) >= 5 else None,
+            "cost_ci95": bootstrap_ci([r.get("cost", 0) for r in valid]) if len(valid) >= 5 else None,
             "pass_rate": pass_rate_val or "N/A",
             "strategy_cons": strategies["conservative"],
             "strategy_expl": strategies["exploratory"],
@@ -505,11 +473,11 @@ def build():
                 "n": n,
                 "low_n": n < 5,
                 "avg_cost": round(sum(pb["costs"]) / n, 4),
-                "cost_ci95": list(_bootstrap_ci(pb["costs"])) if n >= 5 else None,
+                "cost_ci95": bootstrap_ci(pb["costs"]) if n >= 5 else None,
                 "avg_escape": round(sum(pb["escapes"]) / n, 2),
-                "escape_ci95": list(_bootstrap_ci(pb["escapes"])) if n >= 5 else None,
+                "escape_ci95": bootstrap_ci(pb["escapes"]) if n >= 5 else None,
                 "avg_correctness": round(sum(pb["correctness"]) / n, 2),
-                "correctness_ci95": list(_bootstrap_ci(pb["correctness"])) if n >= 5 else None,
+                "correctness_ci95": bootstrap_ci(pb["correctness"]) if n >= 5 else None,
                 "avg_thinking_ratio": round(sum(pb["thinking_ratios"]) / n, 3),
                 "avg_loc": round(sum(pb["locs"]) / n),
                 "avg_tokens": round(sum(pb["tokens"]) / n),

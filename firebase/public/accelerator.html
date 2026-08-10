@@ -21,9 +21,7 @@ ul,ol{padding-left:1.25rem;color:var(--t2);font-size:0.9rem;line-height:1.6;marg
 li{margin-bottom:0.35rem}
 .sub{color:var(--t2);font-size:0.95rem;margin-bottom:1rem}
 
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1rem;text-transform:uppercase}
-.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.pulse{margin-bottom:1rem}
 
 /* Numbered problem cards */
 .problem-list{display:flex;flex-direction:column;gap:0}
@@ -318,7 +316,7 @@ li{margin-bottom:0.35rem}
   </table></div>
 
   <h3>WOC Ratio — Rule 5 (First-Pass)</h3>
-  <p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. Higher WOC = better (more first-pass success). Measured: WOC = 0.90 from r=0.115.</span>
+  <p style="color:var(--t2);font-size:0.9rem">WOC = 1/(1+r) where r is retry rate. Higher WOC = better (more first-pass success). Measured: WOC = <span data-stat-fmt="woc">0.90</span> from r=0.115.</p>
   <div class="row" style="margin-top:1rem">
   <div class="card">
   <h4>Healthy</h4>
@@ -337,7 +335,7 @@ li{margin-bottom:0.35rem}
   </div>
   </div>
   <div class="highlight-box" style="margin-top:1rem">
-  <p><strong>Calculated:</strong> <span class="met">WOC = 0.90</span> from retry rate r=0.115 across 249 experiment sessions.</p>
+  <p><strong>Calculated:</strong> <span class="met">WOC = <span data-stat-fmt="woc">0.90</span></span> from retry rate r=0.115 across 249 experiment sessions.</p>
   </div>
 
   <h3>Escalation Cascade</h3>
@@ -348,7 +346,7 @@ li{margin-bottom:0.35rem}
   <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg3);border:1px solid var(--b);border-radius:8px"><span class="tag" style="background:#EF4444;color:var(--bg)">T3</span><strong style="color:var(--t)">Opus / GPT-5.6</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">&times;28.2 cost (price ratio)</span></div>
   <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--bg4);border:1px dashed var(--ba);border-radius:8px"><span class="tag">Human</span><strong style="color:var(--t)">Human Review</strong><span style="margin-left:auto;color:var(--t3);font-size:0.8rem">$25–150/hr context-switch cost</span></div>
   </div>
-  <div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> 88.5% of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees &lt; 5% of all tasks.</p></div>
+  <div class="highlight-box" style="margin-top:1.25rem"><p><strong>Key insight:</strong> <span class="tip" title="[C] Computed: 1 - retry_rate = 1 - 0.115 = 88.5%">88.5%</span> of tasks resolve at T1. Only 11.5% escalate. Of those that escalate, most resolve at T2. The human sees < 5% of all tasks.</p></div>
 
   <h3>Workstream Capacity</h3>
   <p style="color:var(--t2);font-size:0.9rem;margin-bottom:1rem">How many jobs can you process per day at a given budget?</p>

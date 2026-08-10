@@ -1,6 +1,6 @@
 # TypeScript/Node.js: CLI Static Site Generator with Live Reload
 # Roadmap Pillar 1 — File system + streaming + AST manipulation in TS
-name: typescript_ssg
+name: typescript_ssg_gpt5
 task: >
   Build a static site generator CLI in TypeScript. Accept a source directory of
   Markdown files with YAML frontmatter and a template directory of Handlebars

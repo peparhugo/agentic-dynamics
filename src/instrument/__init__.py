@@ -10,44 +10,47 @@ H1: Manifold perturbations produce systematically higher trajectory
     deviation than semantic perturbations.
 """
 
-from .perturb import Perturbation, PerturbationOperator, build_operators, perturb_prompt
-from .trajectory import ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance
+# Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
+from .perturb import build_operators, perturb_prompt
+# Deprecated: ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance — not used by current scripts
 from .basin import BasinMetrics, measure_basin_escape
-from .recovery import SegmentClassification, classify_trajectory_segments, recovery_token_ratio
-from .adapter import InstrumentedAdapter, InvokeTimeoutError
-from .experiment import ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment
-from .lab_book import build_hypothesis, build_methodology, persist_to_lab_book
+# Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
 from .solution import SolutionMetrics, evaluate_solution
 from .efficiency import EfficiencyMetrics, compute_efficiency
-from .strategy import StrategyReport, StrategyType, classify_strategy
+# Deprecated: StrategyType — not used by current scripts
+from .strategy import StrategyReport, classify_strategy
 from .game_report import GameReport
 from .sonar import SonarMetrics, run_sonar_analysis, compute_sonar_diff, sonar_quality_score
-from .recovery_cost import RecoveryCost, compute_recovery_cost, recovery_summary_table
-from .constraint_detection import ConstraintDetection, DetectionReport, detect_constraints, detection_summary
-from .semantic_validation import analyze_markers, analyze_ast, analyze_escape, MarkerProfile, marker_validation_summary
-from .embeddings import EmbeddingClient, ChromaStore, extract_session_text, extract_session_steps
+# Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
+from .recovery_cost import compute_recovery_cost
+# Deprecated: ConstraintDetection, DetectionReport, detection_summary — not used by current scripts
+from .constraint_detection import detect_constraints
+# Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
+from .semantic_validation import analyze_markers, analyze_ast
+# Deprecated: EmbeddingClient, extract_session_text — not used by current scripts
+from .embeddings import ChromaStore, extract_session_steps
+# Deprecated: InstrumentedAdapter, InvokeTimeoutError — old pipeline; run_opencode_agentic replaces adapter.py
+# Deprecated: ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment — old pipeline; not used by current scripts
+# Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
 from .graph import Neo4jClient
 from .ollama_analyzer import OllamaAnalyzer, load_summary_data
-from .opencode_analyzer import OpencodeAnalyzer
+from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
+from .opencode import run_opencode_agentic, AgenticResult
 
 __all__ = [
-    "Perturbation", "PerturbationOperator", "build_operators", "perturb_prompt",
-    "ReasoningTrajectory", "TrajectoryStep", "compute_trajectory_distance",
+    "build_operators", "perturb_prompt",
     "BasinMetrics", "measure_basin_escape",
-    "SegmentClassification", "classify_trajectory_segments", "recovery_token_ratio",
-    "InstrumentedAdapter", "InvokeTimeoutError",
-    "ExperimentConfig", "ExperimentRun", "ExperimentResult", "run_experiment",
-    "build_hypothesis", "build_methodology", "persist_to_lab_book",
     "SolutionMetrics", "evaluate_solution",
     "EfficiencyMetrics", "compute_efficiency",
-    "StrategyReport", "StrategyType", "classify_strategy",
+    "StrategyReport", "classify_strategy",
     "GameReport",
     "SonarMetrics", "run_sonar_analysis", "compute_sonar_diff", "sonar_quality_score",
-    "RecoveryCost", "compute_recovery_cost", "recovery_summary_table",
-    "ConstraintDetection", "DetectionReport", "detect_constraints", "detection_summary",
-    "analyze_markers", "analyze_ast", "analyze_escape", "MarkerProfile", "marker_validation_summary",
-    "EmbeddingClient", "ChromaStore", "extract_session_text",
+    "compute_recovery_cost",
+    "detect_constraints",
+    "analyze_markers", "analyze_ast",
+    "ChromaStore", "extract_session_steps",
     "Neo4jClient",
     "OllamaAnalyzer", "load_summary_data",
-    "OpencodeAnalyzer",
+    "OpencodeAnalyzer", "REPORTS_DIR",
+    "run_opencode_agentic", "AgenticResult",
 ]

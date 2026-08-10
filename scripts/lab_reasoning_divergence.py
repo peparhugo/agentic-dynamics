@@ -20,16 +20,7 @@ from instrument.embeddings import ChromaStore
 
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_reasoning_divergence.json"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
+from _constants import MODEL_LABELS
 
 
 def _cosine_distance(a, b) -> float:

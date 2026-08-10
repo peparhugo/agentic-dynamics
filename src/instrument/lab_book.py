@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+import warnings
+warnings.warn(
+    "instrument.lab_book is deprecated. Lab scripts bypass this module; "
+    "use instrument.opencode_analyzer for current pipeline.",
+    DeprecationWarning, stacklevel=2
+)
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any

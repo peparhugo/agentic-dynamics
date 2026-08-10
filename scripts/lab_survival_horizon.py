@@ -16,18 +16,8 @@ ROOT = Path(__file__).resolve().parent.parent
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_survival_horizon.json"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
+from _constants import MODEL_LABELS
 
-# Scenario configurations
 SCENARIOS = [
     {"label": "Low perturbation (5%) | $1,000 budget", "perturbation_rate": 0.05, "budget": 1000},
     {"label": "Moderate perturbation (20%) | $10,000 budget", "perturbation_rate": 0.20, "budget": 10000},

@@ -20,12 +20,6 @@
 .card .cval.amber{color:var(--am)}.card .cval.cyan{color:var(--cy)}
 .insight{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 8px 8px 0;padding:0.8rem 1.2rem;margin:1rem 0;font-size:0.78rem;color:var(--t2);line-height:1.6}
 .insight strong{color:var(--t)}
-.fsec{padding:4rem 2rem;position:relative}
-.fsec:nth-child(even){background:var(--bg2)}.fsec:nth-child(odd){background:var(--bg)}
-.inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}.inr.wide{max-width:1100px}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
-.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
 h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
 .mcard{background:var(--bg3);border:1px solid var(--b);border-radius:14px;padding:1.8rem;margin:1.2rem 0;text-align:left}
@@ -51,15 +45,12 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .rec{font-size:0.85rem;color:var(--t);margin-top:0.8rem;padding:0.6rem 0.9rem;background:rgba(34,211,238,0.04);border-left:3px solid var(--ac);border-radius:0 8px 8px 0}
 .rec.amber{border-left-color:var(--am);background:rgba(251,191,36,0.04)}
 .rec.cyan{border-left-color:var(--cy);background:rgba(34,211,238,0.04)}
-.bar{height:4px;border-radius:2px;margin:0.5rem 0;background:rgba(255,255,255,0.06);overflow:hidden}
-.bar .fill{height:100%;border-radius:2px;transition:width .5s;background:var(--ac)}
-.bar .fill.amber{background:var(--am)}.bar .fill.cyan{background:var(--cy)}
 .ptable{width:100%;border-collapse:collapse;font-size:0.75rem;margin:0.5rem 0}
 .ptable th,.ptable td{padding:0.35rem 0.6rem;text-align:center;border-bottom:1px solid var(--b);color:var(--t2)}
 .ptable th{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
 .ptable td.mono{font-family:'JetBrains Mono',monospace;font-size:0.72rem}
 @media(max-width:768px){.fsec{padding:3rem 1rem}.mgrid{grid-template-columns:1fr 1fr}.pan{grid-template-columns:1fr}.mcard .mh{flex-direction:column}}
-@media(max-width:550px){.mgrid{grid-template-columns:1fr}}
+.tip{border-bottom:1px dotted var(--t3);cursor:help}.fn{font-size:0.72rem;color:var(--t3);line-height:1.6;padding:0.6rem 1rem;background:rgba(16,23,34,0.72);border:1px solid var(--b);border-radius:10px;margin:0.5rem 0}.fn strong{color:var(--t2)}@media(max-width:550px){.mgrid{grid-template-columns:1fr}}
 </style>
 <script src="data.js"></script>
 </head>
@@ -75,18 +66,21 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="card" style="text-align:center"><div class="cval" data-stat="worktrees">251</div><div class="cdesc" style="text-align:center">Worktrees on disk</div></div>
 <div class="card" style="text-align:center"><div class="cval" data-stat="reports">224</div><div class="cdesc" style="text-align:center">Game reports</div></div>
 <div class="card" style="text-align:center"><div class="cval">21</div><div class="cdesc" style="text-align:center">TS runs (3 models)</div></div>
-<div class="card" style="text-align:center"><div class="cval">$<span data-stat="cost">64.98</span></div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
+<div class="card" style="text-align:center" title="[M] Measured: Sum of all API charges in database"><div class="cval">$<span data-stat="cost">64.98</span></div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
 </div>
 </section>
 
 <details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence shows</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested across <strong style="color:var(--ac)">227 experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. <strong style="color:var(--am)">69&times; different cost.</strong> The gap is pricing architecture, not token volume. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
+<p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested across <strong style="color:var(--ac)">227 experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. <strong style="color:var(--am)" title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; different cost.</strong> The gap is pricing architecture, not token volume. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
 </div>
 </details>
 
 <!-- ==================== THE GRIT SPECTRUM ==================== -->
+<div class="provenance-legend note" style="max-width:960px;margin:0 auto 1.5rem;padding:0.5rem 1rem;font-size:0.72rem;color:var(--t3);border-left:3px solid var(--b)">
+  [M] Measured &middot; [C] Computed &middot; [H] Heuristic &middot; [X] External source
+</div>
 <section class="sec alt">
 <h2>The Grit Spectrum</h2>
 <p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models — 4 manifold operators that push the model off its typical linguistic surface, and 6 semantic operators that inject contradictions within the reasoning manifold. Grit is measured by escape rate (how often the model diverges from its default solution) at a given correctness threshold.</p>
@@ -136,17 +130,10 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <h3 style="margin-top:2rem;color:var(--ac)">Cost Efficiency Ranking</h3>
 <p class="lead">Per-session cost averaged across all reports. The right-hand columns show what you're paying for: code density (LOC per output token), constraint completion, and the narration penalty rate.</p>
-<div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Avg Cost</th><th>Total Cost</th><th>Correctness</th><th>Strategy</th></tr></thead><tbody id="cost-ranking-tbody">
-<tr><td>GPT-5-nano</td><td>6</td><td class="green">$0.006</td><td>$0.03</td><td>76% (1/2)</td><td>C=4 E=2</td></tr>
-<tr><td>DeepSeek v4 Pro</td><td>110</td><td class="green">$0.016</td><td>$1.73</td><td>87% (438/506)</td><td>C=79 E=29</td></tr>
-<tr><td>GPT-5-mini</td><td>12</td><td>$0.026</td><td>$0.31</td><td>94% (30/32)</td><td>C=11 E=1</td></tr>
-<tr><td>GPT-5</td><td>11</td><td>$0.16</td><td>$1.75</td><td>100% (5/5)</td><td>C=3 E=8</td></tr>
-<tr><td>GPT-5.5</td><td>3</td><td>$0.28</td><td>$0.85</td><td>100% (27/27)</td><td>C=1 E=2</td></tr>
-<tr><td>GPT-5.6</td><td>15</td><td>$0.45</td><td>$6.71</td><td class="green">100% (166/166)</td><td>C=14 E=1</td></tr>
-<tr><td>GPT-5.6-fast</td><td>6</td><td>$0.66</td><td>$3.98</td><td class="green">100% (73/73)</td><td>C=2 E=4</td></tr>
-<tr><td>Claude Fable 5</td><td>40</td><td class="amber">$1.06</td><td class="amber">$42.52</td><td>100% (240/241)</td><td>C=27 E=12</td></tr>
+<div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Avg Cost</th><th>95% CI</th><th>Total Cost</th><th>Correctness</th><th>Strategy</th></tr></thead><tbody id="cost-ranking-tbody">
+<tr id="no-data-row"><td colspan="7" class="t3">Loading data...</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.06) while producing 1.26&times; more code (713 vs 568 LOC). Total Claude spend ($47.54) exceeds all other models combined. Correctness data is from actual pytest/jest execution — 88.7% overall across 1572/1772 tests. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.06) while producing 1.26&times; more code (713 vs 568 LOC). Total Claude spend (<span class="tip" title="[M] Total spend across all 47 sessions including 5 narration-failure runs and 3 sessions without game reports.">$47.54</span>) exceeds all other models combined. Correctness data is from actual pytest/jest execution — <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall across 1572/1772 tests</span>. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
 <div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. DeepSeek separates reasoning into a low-cost structured channel. GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). DeepSeek's 7% thinking ratio reflects GRPO-compressed latent reasoning. 204/249 sessions analyzed with game reports — 26 narration failures, 19 unanalyzed.</div>
 
 <div class="insight"><strong>The Cache Tax:</strong> Claude writes 20,000 tokens to cache per session at $3.75/Mtok. DeepSeek writes zero — instead reads 197,000 tokens from cache at $0.14/Mtok. Same context management capability. <strong style="color:var(--am)">26.8&times; pricing difference.</strong> Cache strategy is a two-way door. Measure your hit rate. If under 50%, use cache-read. If over 80%, cache-write pays for itself.</div>
@@ -185,7 +172,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <h2>Token Cost Breakdown</h2>
 <p class="lead">Where does the money go? Per-model cost split across input, output, reasoning, and cache tokens. Cache costs dominate for Anthropic (cache writes are billable). DeepSeek cache reads cost 1/20th of Anthropic's.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Input $</th><th>Output $</th><th>Reasoning $</th><th>Cache $</th><th><strong>Total $</strong></th></tr></thead><tbody id="token-cost-tbody">
-<tr><td>claude-fable-5</td><td>$0.01</td><td>$24.26</td><td>$0.00</td><td class="amber">$18.26</td><td class="amber"><strong>$42.52</strong></td></tr>
+<tr><td>claude-fable-5</td><td>$0.01</td><td>$24.26</td><td>$0.00</td><td class="amber">$18.26</td><td class="amber"><strong class="tip" title="[M] Sum of rounded cost components (input+output+cache) from 44 game-report sessions. Full total across all 47 sessions (incl. 3 unanalyzed): $47.54. Data.js components: $0.01 + $24.21 + $0.00 + $18.08 = $42.30.">$42.52</strong></td></tr>
 <tr><td>gpt-5.6</td><td>$0.00</td><td>$2.75</td><td>$0.19</td><td class="amber">$3.77</td><td><strong>$6.71</strong></td></tr>
 <tr><td>gpt-5.6-fast</td><td>$0.00</td><td>$1.46</td><td>$0.11</td><td class="amber">$2.40</td><td><strong>$3.98</strong></td></tr>
 <tr><td>gpt-5</td><td>$0.19</td><td>$0.48</td><td>$0.19</td><td>$0.89</td><td><strong>$1.75</strong></td></tr>
@@ -196,6 +183,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> Claude's $18.26 in cache costs (43% of its total spend) comes from 20K avg cache writes per session — Anthropic bills cache writes at premium rates. Every other model has near-zero cache write costs. DeepSeek's 197K avg cache reads cost only $1.15 total because its cache-hit pricing is $0.14/M tok. Cost components are proportionally split from the openCode DB using provider-specific pricing.</div>
 </section>
+
+<div class="fn"><strong>Claude cost reconciliation:</strong> <span class="tip" title="[M] Total across all 47 sessions">$47.54</span> = total spend across all 47 Claude sessions (5 narration-failure + 3 unanalyzed + 39 valid). <span class="tip" title="[M] Sum of cost components from 44 game-report sessions">$42.52</span> = sum of rounded cost components (input + output + cache) from the 44 sessions with game reports. The $5.02 gap covers 3 sessions without full component data. Narration-failure sessions produce zero testable code but incur compute cost — they are included in the $47.54 total and excluded from the component breakdown. See <a href="data.js">data.js</a> lines 718–770 for authoritative values.</div>
 
 <!-- Perturbation Response -->
 <section class="sec">
@@ -223,15 +212,15 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- Cross-Model Rollup -->
 <section class="sec alt">
 <h2>Cross-Model Rollup</h2>
-<p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.26&times; more code per session at 1/69th the cost of Claude. 88.7% overall test pass rate (1572/1772 tests) from real pytest/jest execution.</p>
-<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody>
-<tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.45</td><td class="mono amber">$1.06</td><td class="mono">$0.29</td></tr>
-<tr><td>Test pass rate</td><td class="mono green">87%</td><td class="mono green">100%</td><td class="mono green">100%</td><td class="mono green">93%</td></tr>
-<tr><td>Avg thinking ratio</td><td class="mono green">8.2%</td><td class="mono">6.4%</td><td class="mono amber">0.0%</td><td class="mono">6.3%</td></tr>
-<tr><td>Avg LOC/session</td><td class="mono green">700</td><td class="mono">367</td><td class="mono">554</td><td class="mono">573</td></tr>
-<tr><td>Constraint score</td><td class="mono green">50%</td><td class="mono">71%</td><td class="mono">39%</td><td class="mono">47%</td></tr>
+<p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.26&times; more code per session at 1/69th the cost of Claude. <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall test pass rate (1572/1772 tests)</span> from real pytest/jest execution.</p>
+<div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody id="rollup-tbody">
+<tr><td>Per-session cost</td><td class="mono green" data-stat="rollup-ds-cost">$0.016</td><td class="mono" data-stat="rollup-g56-cost">$0.45</td><td class="mono amber" data-stat="rollup-claude-cost">$1.06</td><td class="mono" data-stat="rollup-all-cost">$0.29</td></tr>
+<tr><td>Test pass rate</td><td class="mono green" data-stat="rollup-ds-pass">87%</td><td class="mono green" data-stat="rollup-g56-pass">100%</td><td class="mono green" data-stat="rollup-claude-pass">100%</td><td class="mono green" data-stat="rollup-all-pass">93%</td></tr>
+<tr><td>Avg thinking ratio</td><td class="mono green" data-stat="rollup-ds-think">8.2%</td><td class="mono" data-stat="rollup-g56-think">6.4%</td><td class="mono amber" data-stat="rollup-claude-think">0.0%</td><td class="mono" data-stat="rollup-all-think">6.3%</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green" data-stat="rollup-ds-loc">700</td><td class="mono" data-stat="rollup-g56-loc">367</td><td class="mono" data-stat="rollup-claude-loc">554</td><td class="mono" data-stat="rollup-all-loc">573</td></tr>
+<tr><td>Constraint score</td><td class="mono green" data-stat="rollup-ds-constraint">50%</td><td class="mono" data-stat="rollup-g56-constraint">71%</td><td class="mono" data-stat="rollup-claude-constraint">39%</td><td class="mono" data-stat="rollup-all-constraint">47%</td></tr>
 </tbody></table></div>
-<div class="insight">These per-session averages from <span data-stat="reports">224</span> game reports are the most robust metric. The 69&times; gap is the measured average across the full corpus — not the architectural extreme, not a cherry-picked single run.</div>
+<div class="insight">These per-session averages from <span data-stat="reports">224</span> game reports are the most robust metric. The <span title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; gap</span> is the measured average across the full corpus — not the architectural extreme, not a cherry-picked single run.</div>
 
 </section>
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="locVsCostChart"></canvas></div>
@@ -255,18 +244,66 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- ==================== MODEL CARDS ==================== -->
 <section class="fsec"><div class="inr wide">
 <div class="pulse"><span class="dot"></span> Model Cards</div>
-<h1>Detailed Model Profiles</h1>
+<h2>Detailed Model Profiles</h2>
 <p class="lead">All 8 model variants, 3 architectures. Populated from data.js with hardcoded fallbacks. Data provenance: <span data-stat="sessions">249</span> experiment sessions across <span data-stat="reports">224</span> game reports. <a href="methodology.html">See methodology</a>.</p>
 <div id="model-cards-root"></div>
 </div></section>
 
+<!-- ==================== OPERATOR IMPACT ==================== -->
+<section class="sec alt">
+<h2>Operator Impact</h2>
+<p class="lead">Per-operator, per-model cost and correctness breakdown from perturbation experiments. Cost delta = perturbed cost / baseline cost. Higher deltas mean the operator triggers more recovery behavior — and cost.</p>
+<div class="tbl" style="overflow-x:auto"><table id="operator-impact-tbl"><thead><tr><th>Class</th><th>Model</th><th>N</th><th>Pert. Cost</th><th>Baseline Cost</th><th>Cost Delta</th><th>Correctness</th><th>Escape</th></tr></thead><tbody id="operator-impact-body"><tr><td colspan="8" class="t3">Loading...</td></tr></tbody></table></div>
+<div class="insight"><strong>Key insight:</strong> Cost delta reveals the economic signature of each perturbation operator. Manifold operators (alien vocab, framing shifts) trigger higher escape rates and recovery costs. Semantic operators test reasoning integrity — lower escape = higher grit. <span style="color:var(--t3)">[C] Computed from experiment session data.</span></div>
+</section>
+
+<!-- ==================== ENERGY EFFICIENCY RANKING ==================== -->
+<section class="sec">
+<h2>Energy Efficiency Ranking</h2>
+<p class="lead">Models ranked by joules per line of code — the most direct measure of energy productivity. Energy estimates use TokenPowerBench constants (Niu et al., AAAI 2026): 0.08 J/prompt-token, 0.23 J/output-token, 0.47 J/reasoning-token. <span style="color:var(--t3)">[C] Computed from token counts × energy-per-token constants. [X] Energy constants externally sourced.</span></p>
+<div class="cards" id="energy-ranking-cards" style="margin-top:1.2rem">
+<div class="card" style="text-align:center"><div class="cdesc">Loading ranking...</div></div>
+</div>
+<div class="insight"><strong>Key insight:</strong> GPT-5.6-fast leads on J/LOC efficiency (4.66 J/LOC) despite high dollar cost — it generates compact, low-token code. DeepSeek v4 Pro's MoE architecture (37B active params) delivers 5.8 J/LOC at 69&times; lower dollar cost. Nano's 23.56 J/LOC reflects its 1.01 reasoning-to-output ratio. <strong style="color:var(--ac)">Energy efficiency &ne; cost efficiency.</strong> The two dimensions are only loosely correlated.</div>
+</section>
+
+<!-- ==================== STRATEGY DISTRIBUTION ==================== -->
+<section class="sec alt">
+<h2>Strategy Distribution</h2>
+<p class="lead">How models respond to perturbation: strategy archetypes classified by escape rate, recovery behavior, and output quality. <span style="color:var(--t3)">[C] Computed from 227 classified experiment sessions.</span></p>
+<div id="strategy-distribution"></div>
+<div class="insight"><strong>Key insight:</strong> Conservative dominates (62%), consistent with models defaulting to familiar patterns under perturbation. Only 3 sessions (1.3%) classified as wasteful — models rarely produce low-quality output with high exploration. The 24 "unknown" sessions lack sufficient signal for classification (typically narration failures or zero-code outputs). No sessions classified as EFFICIENT — the archetype requires both high exploration AND high quality at low cost, a rare combination.</div>
+</section>
+
+<!-- ==================== DATA SOURCES ==================== -->
+<details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> Data Sources &amp; Design Parameters</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.82rem;color:var(--t2);line-height:1.8">
+<div style="margin-bottom:1.2rem"><strong style="color:var(--t)">Energy Constants</strong> <span style="font-size:0.65rem;color:var(--t3)">[X] External source</span><br>
+TokenPowerBench (Niu et al., AAAI 2026):<br>
+&mdash; 0.08 J/prompt-token &middot; 0.23 J/output-token &middot; 0.47 J/reasoning-token</div>
+<div style="margin-bottom:1.2rem"><strong style="color:var(--t)">EPM Projections</strong> <span style="font-size:0.65rem;color:var(--t3)">[X] External source</span><br>
+Baseline: 1.6%/yr — IEA World Energy Outlook 2024<br>
+Aggressive: 2.5%/yr — Aggressive scenario</div>
+<div style="margin-bottom:1.2rem"><strong style="color:var(--t)">Model Architecture Estimates</strong> <span style="font-size:0.65rem;color:var(--t3)">[X] External source</span><br>
+Claude Fable 5: ~500B active params (conservative estimate)<br>
+DeepSeek v4 Pro: ~37B active params (MoE, ~3% active at inference)</div>
+<div style="margin-bottom:1.2rem"><strong style="color:var(--t)">Design Parameters</strong> <span style="font-size:0.65rem;color:var(--t3)">[H] Heuristic / design choice</span><br>
+Context inflation rate (&beta;): 0.001 &middot; WOC healthy: 0.85 &middot; WOC critical: 0.7<br>
+Composite weights: correctness 35% &middot; constraint 30% &middot; quality 20% &middot; novelty 15%<br>
+Strategy thresholds: correctness &ge; 0.7, escape &ge; 0.5, novelty &ge; 0.4</div>
+<div><strong style="color:var(--t)">Provider Pricing</strong> <span style="font-size:0.65rem;color:var(--t3)">[M] Measured from API billing</span><br>
+All cost values measured directly from provider API responses via the openCode database. Per-session costs include input tokens, output tokens, reasoning tokens, and cache read/write operations at provider-specific rates.</div>
+</div>
+</details>
+
 <div style="text-align:center;margin-top:1rem"><a href="methodology.html" class="cta-btn">Run the Instrument on Your Data →</a></div>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.4</strong><br>
-<span data-stat="sessions">249</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
-<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
-  <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
+<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
+  <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 <script>
@@ -517,18 +554,29 @@ document.addEventListener('DOMContentLoaded', function () {
   // Cost Efficiency Ranking table
   var costTbl = document.querySelector('#cost-ranking-tbody');
   if (costTbl && D.models) {
-    costTbl.innerHTML = '';
-    D.models.forEach(function(m) {
-      var cls = m.id.indexOf('claude') >= 0 ? 'amber' : (m.id.indexOf('deepseek') >= 0 || m.id.indexOf('nano') >= 0 ? 'green' : '');
-      costTbl.innerHTML += '<tr>' +
-        '<td>' + m.label + '</td>' +
-        '<td>' + m.reports + '</td>' +
-        '<td class="' + cls + '">' + fmtUSD(m.avg_cost) + '</td>' +
-        '<td class="' + cls + '">' + fmtUSD(m.total_cost) + '</td>' +
-        '<td>' + (m.pass_rate || 'N/A') + '</td>' +
-        '<td>C=' + m.strategy_cons + ' E=' + m.strategy_expl + '</td>' +
-        '</tr>';
-    });
+    if (D.models.length === 0) {
+      costTbl.innerHTML = '<tr id="no-data-row"><td colspan="7" class="t3">Data unavailable &mdash; run build_data.py to regenerate</td></tr>';
+    } else {
+      costTbl.innerHTML = '';
+      D.models.forEach(function(m) {
+        var cls = m.id.indexOf('claude') >= 0 ? 'amber' : (m.id.indexOf('deepseek') >= 0 || m.id.indexOf('nano') >= 0 ? 'green' : '');
+        var ci95 = '';
+        if (m.cost_ci95 && m.cost_ci95[0] != null) {
+          ci95 = '<td class="mono" data-stat="ci95">[' + fmtUSD(m.cost_ci95[0]) + '\u2013' + fmtUSD(m.cost_ci95[1]) + ']</td>';
+        } else {
+          ci95 = '<td class="mono" data-stat="ci95" style="color:var(--t3)">\u2014</td>';
+        }
+        costTbl.innerHTML += '<tr>' +
+          '<td>' + m.label + '</td>' +
+          '<td>' + m.reports + '</td>' +
+          '<td class="' + cls + '">' + fmtUSD(m.avg_cost) + '</td>' +
+          ci95 +
+          '<td class="' + cls + '">' + fmtUSD(m.total_cost) + '</td>' +
+          '<td>' + (m.pass_rate || 'N/A') + '</td>' +
+          '<td>C=' + m.strategy_cons + ' E=' + m.strategy_expl + '</td>' +
+          '</tr>';
+      });
+    }
   }
 
   // Token Cost Breakdown table
@@ -659,6 +707,12 @@ document.addEventListener('DOMContentLoaded', function () {
   var html = '';
   fb.forEach(function(m){
     var d = m._data || {};
+    var prov = d._provenance || {};
+    function provBadge(field) {
+      var p = prov[field];
+      if (!p) return '';
+      return ' <span style="font-size:0.58rem;color:var(--t3);font-weight:400" title="[' + p + '] ' + ({M:'Measured via API/session data', C:'Computed from measurements', H:'Heuristic estimate', X:'External source'})[p] + '">' + p + '</span>';
+    }
     var costPerSes = d.avg_cost || m.cost;
     var totalCost = d.total_cost || m.total;
     var sessions = d.sessions || m.sessions;
@@ -679,12 +733,12 @@ document.addEventListener('DOMContentLoaded', function () {
     html += '<div class="mcard">';
     html += '<div class="mh"><div><span class="mname">'+m.name+'</span> &nbsp; <span class="march '+m.archTag+'">'+m.arch+'</span> &nbsp; <span style="font-size:0.7rem;color:var(--t3)">'+m.provider+'</span></div></div>';
     html += '<div class="mgrid">';
-    html += '<div class="mstat"><div class="mv" style="color:var(--'+archColor+')">$'+costPerSes.toFixed(3)+'</div><div class="ml">Cost / Session</div><div class="ms">$'+totalCost.toFixed(2)+' total · '+sessions+' sessions</div></div>';
-    html += '<div class="mstat"><div class="mv">'+(m.tokensPerSes>=1000?(m.tokensPerSes/1000).toFixed(0)+'K':m.tokensPerSes)+'</div><div class="ml">Tokens / Session</div><div class="ms">Input+output+reasoning avg</div></div>';
-    html += '<div class="mstat"><div class="mv '+gritColor+'">'+gritRate+'%</div><div class="ml">Narration Rate</div><div class="ms">Failure rate under perturbation (lower = better grit)</div></div>';
-    html += '<div class="mstat"><div class="mv amber">'+(thinking*100).toFixed(1)+'%</div><div class="ml">Explanation Tax &epsilon;</div><div class="ms">Thinking ratio to output</div></div>';
-    html += '<div class="mstat"><div class="mv">'+loc+'</div><div class="ml">LOC / Session</div><div class="ms">Avg lines of code generated</div></div>';
-    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'%</div><div class="ml">Correctness</div><div class="ms">Test pass rate</div></div>';
+    html += '<div class="mstat"><div class="mv" style="color:var(--'+archColor+')">$'+costPerSes.toFixed(3)+'</div><div class="ml">Cost / Session' + provBadge('avg_cost') + '</div><div class="ms">$'+totalCost.toFixed(2)+' total · '+sessions+' sessions</div></div>';
+    html += '<div class="mstat"><div class="mv">'+(m.tokensPerSes>=1000?(m.tokensPerSes/1000).toFixed(0)+'K':m.tokensPerSes)+'</div><div class="ml">Tokens / Session' + provBadge('tokens_input') + '</div><div class="ms">Input+output+reasoning avg</div></div>';
+    html += '<div class="mstat"><div class="mv '+gritColor+'">'+gritRate+'%</div><div class="ml">Narration Rate' + provBadge('narration_rate') + '</div><div class="ms">Failure rate under perturbation (lower = better grit)</div></div>';
+    html += '<div class="mstat"><div class="mv amber">'+(thinking*100).toFixed(1)+'%</div><div class="ml">Explanation Tax &epsilon;' + provBadge('avg_thinking_ratio') + '</div><div class="ms">Thinking ratio to output</div></div>';
+    html += '<div class="mstat"><div class="mv">'+loc+'</div><div class="ml">LOC / Session' + provBadge('avg_loc') + '</div><div class="ms">Avg lines of code generated</div></div>';
+    html += '<div class="mstat"><div class="mv '+passColor+'">'+passRate+'%</div><div class="ml">Correctness' + provBadge('pass_rate') + '</div><div class="ms">Test pass rate</div></div>';
     html += '</div>';
 
     html += '<div class="pan"><div>';
@@ -717,5 +771,109 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="app.js"></script>
+<script>
+(function(){
+  var D = window.FRAMEWORK_DATA;
+  if (!D) return;
+
+  var fmtUSD = function(v) { return '$' + (typeof v === 'number' ? v.toFixed(4) : v); };
+  var pct = function(v) { return (typeof v === 'number' ? (v * 100).toFixed(0) + '%' : '\u2014'); };
+
+  // --- Operator Impact Table ---
+  var opBody = document.getElementById('operator-impact-body');
+  if (opBody && D.operator_comparison) {
+    var classes = ['perturbed', 'unknown', 'baseline'];
+    var rows = '';
+    var processed = {};
+    classes.forEach(function(cls) {
+      var group = D.operator_comparison[cls];
+      if (!group || !group.models) return;
+      var models = group.models;
+      var clsLabel = group.perturbation_class || cls;
+      Object.keys(models).sort().forEach(function(modelName) {
+        var pm = models[modelName];
+        if (processed[modelName + '|' + cls]) return;
+        processed[modelName + '|' + cls] = true;
+        var corrColor = pm.avg_correctness != null ? (pm.avg_correctness >= 0.9 ? 'green' : pm.avg_correctness >= 0.7 ? 'amber' : 'red') : '';
+        var escapeColor = pm.avg_escape != null ? (pm.avg_escape > 0.6 ? 'amber' : pm.avg_escape < 0.3 ? 'green' : '') : '';
+        if (cls === 'unknown') {
+          rows += '<tr>' +
+            '<td style="color:var(--t3)">' + clsLabel + '</td>' +
+            '<td style="color:var(--t3)">' + modelName + '</td>' +
+            '<td style="color:var(--t3)">' + pm.n + '</td>' +
+            '<td class="mono" style="color:var(--t3)">' + (pm.avg_cost != null ? fmtUSD(pm.avg_cost) : '\u2014') + '</td>' +
+            '<td class="mono" style="color:var(--t3)">\u2014</td>' +
+            '<td style="color:var(--t3)">\u2014</td>' +
+            '<td style="color:var(--t3)">\u2014</td>' +
+            '<td style="color:var(--t3)">\u2014</td>' +
+            '</tr>';
+        } else {
+          var bm = (D.operator_comparison.baseline && D.operator_comparison.baseline.models) ? D.operator_comparison.baseline.models[modelName] : null;
+          var pCost = pm.avg_cost;
+          var bCost = bm ? bm.avg_cost : null;
+          var delta = bCost && bCost > 0 ? (pCost / bCost).toFixed(2) + '\u00d7' : '\u2014';
+          var deltaCls = bCost && bCost > 0 ? (pCost / bCost > 1.5 ? 'amber' : pCost / bCost < 0.9 ? 'green' : '') : '';
+          rows += '<tr>' +
+            '<td>' + (cls === 'baseline' ? '<strong style="color:var(--t)">' + clsLabel + '</strong>' : clsLabel) + '</td>' +
+            '<td>' + (cls === 'baseline' ? '<strong style="color:var(--t)">' + modelName + '</strong>' : '<strong>' + modelName + '</strong>') + '</td>' +
+            '<td>' + pm.n + '</td>' +
+            '<td class="mono">' + (pCost != null ? fmtUSD(pCost) : '\u2014') + '</td>' +
+            '<td class="mono">' + (bCost != null ? fmtUSD(bCost) : '\u2014') + '</td>' +
+            '<td class="' + deltaCls + '">' + delta + '</td>' +
+            '<td class="' + corrColor + '">' + pct(pm.avg_correctness) + '</td>' +
+            '<td class="' + escapeColor + '">' + pct(pm.avg_escape) + '</td>' +
+            '</tr>';
+        }
+      });
+    });
+    opBody.innerHTML = rows || '<tr><td colspan="8" class="t3">No operator data available.</td></tr>';
+  }
+
+  // --- Energy Efficiency Ranking ---
+  var energyCards = document.getElementById('energy-ranking-cards');
+  if (energyCards && D.energy_ranking && D.energy_ranking.length) {
+    var best = D.energy_ranking[0];
+    var html = '';
+    D.energy_ranking.forEach(function(m, i) {
+      var isBest = m.label === best.label;
+      var jPerDollar = m.avg_cost > 0 ? (m.avg_energy_j / m.avg_cost).toFixed(0) : '\u2014';
+      html += '<div class="card" style="text-align:center">' +
+        '<div class="ctitle">#' + (i+1) + ' ' + m.label + (isBest ? ' <span style="color:var(--cy)">&starf;</span>' : '') + '</div>' +
+        '<div class="cval' + (isBest ? ' cyan' : '') + '">' + m.avg_energy_j_per_loc.toFixed(1) + '</div>' +
+        '<div class="cdesc" style="text-align:center">J/LOC</div>' +
+        '<div style="font-size:0.7rem;color:var(--t3);margin-top:0.3rem">' +
+          m.avg_energy_j.toFixed(0) + ' J/sess &middot; ' + m.avg_loc + ' LOC &middot; ' + jPerDollar + ' J/$' +
+        '</div>' +
+        '</div>';
+    });
+    energyCards.innerHTML = html;
+  }
+
+  // --- Strategy Distribution ---
+  var stratDiv = document.getElementById('strategy-distribution');
+  if (stratDiv && D.strategy_distribution) {
+    var sd = D.strategy_distribution;
+    var total = (sd.conservative||0) + (sd.exploratory||0) + (sd.wasteful||0) + (sd['?']||0);
+    if (total === 0) return;
+    var items = [
+      { key: 'conservative', pct: sd.conservative / total * 100, cls: 'cons', bg: 'rgba(34,197,94,0.4)', color: 'var(--success)', label: 'CONS' },
+      { key: 'exploratory', pct: sd.exploratory / total * 100, cls: 'expl', bg: 'rgba(251,191,36,0.4)', color: 'var(--am)', label: 'EXPL' },
+      { key: 'wasteful', pct: sd.wasteful / total * 100, cls: 'waste', bg: 'rgba(239,68,68,0.4)', color: 'var(--danger)', label: 'WASTE' },
+      { key: '?', pct: (sd['?']||0) / total * 100, cls: '', bg: 'rgba(161,161,170,0.3)', color: 'var(--t3)', label: '?' }
+    ];
+    var barParts = '';
+    var tagParts = '';
+    items.forEach(function(it) {
+      var val = it.key === '?' ? (sd['?']||0) : sd[it.key];
+      var pctStr = it.pct.toFixed(1);
+      barParts += '<div style="width:' + pctStr + '%;background:' + it.bg + ';display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:' + it.color + '" title="' + it.key + ': ' + val + '">' + (it.pct > 5 ? it.label + ' ' + val : '') + '</div>';
+      tagParts += '<span class="stag' + (it.cls ? ' ' + it.cls : '') + '">' + it.key.charAt(0).toUpperCase() + it.key.slice(1) + ': ' + val + ' (' + pctStr + '%)</span>';
+    });
+    var barHtml = '<div style="display:flex;height:32px;border-radius:6px;overflow:hidden;margin:1rem 0;border:1px solid var(--b)">' + barParts + '</div>';
+    var tagsHtml = '<div style="display:flex;gap:0.8rem;flex-wrap:wrap;margin:0.5rem 0;font-size:0.75rem;color:var(--t2)">' + tagParts + '</div>';
+    stratDiv.innerHTML = barHtml + tagsHtml;
+  }
+})();
+</script>
 </body>
 </html>

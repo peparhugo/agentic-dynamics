@@ -90,12 +90,15 @@ def classify_trajectory_segments(
             perturbed_step_to_tool_idx[_i] = _tool_pos
             _tool_pos += 1
 
-    baseline_step_to_tool_idx: dict[int, int] = {}
-    _tool_pos = 0
-    for _i, _s in enumerate(baseline.steps):
+    # Tool-sequence-position matching (not step-index matching).
+    # Agentic transcripts naturally have variable step counts between
+    # tool calls. Matching by tool occurrence order (0th tool vs 0th tool)
+    # is more robust than matching by step index.
+    # Map tool-sequence-position → tool_name for baseline.
+    baseline_tool_by_pos: list[str] = []
+    for _s in baseline.steps:
         if _s.tool_name:
-            baseline_step_to_tool_idx[_i] = _tool_pos
-            _tool_pos += 1
+            baseline_tool_by_pos.append(_s.tool_name)
 
     classifications: list[SegmentClassification] = []
 
@@ -112,15 +115,14 @@ def classify_trajectory_segments(
         # Signal 2: behavioral convergence — using same tools as baseline
         if step.tool_name and step.tool_name in baseline_tools_set:
             pt_idx = perturbed_step_to_tool_idx.get(i)
-            bt_idx = baseline_step_to_tool_idx.get(i)
-            baseline_has_at_index = (
+            # Match by tool occurrence order, not step index
+            baseline_match = (
                 pt_idx is not None
-                and bt_idx is not None
                 and pt_idx < len(perturbed_tool_seq)
-                and bt_idx < len(baseline_tool_seq)
-                and perturbed_tool_seq[pt_idx] == baseline_tool_seq[bt_idx]
+                and pt_idx < len(baseline_tool_by_pos)
+                and perturbed_tool_seq[pt_idx] == baseline_tool_by_pos[pt_idx]
             )
-            if not baseline_has_at_index:
+            if not baseline_match:
                 signals.append((0.4, f"tool '{step.tool_name}' converges toward baseline"))
 
         # Signal 3: step text contains qualification/hedging

@@ -63,12 +63,14 @@ Prompt ──→ perturb.py ──→ adapter.py ──→ [LLM] ──→ traje
 
 | Script | Modules Used |
 |--------|-------------|
-| `scripts/run.py` | experiment, adapter, perturb, all measurement modules |
-| `scripts/analyze_worktrees.py` | solution, basin, efficiency, strategy, game_report |
+| `scripts/run.py` | opencode (run_opencode_agentic), perturb, all measurement modules |
+| `scripts/analyze_worktrees.py` | solution, basin, efficiency, strategy, game_report, opencode_analyzer |
 | `scripts/analyze_trajectories.py` | trajectory |
 | `scripts/validate_session.py` | solution (test pass/fail) |
-| `scripts/lab_*.py` (all 8) | efficiency, solution, strategy, basin |
+| `scripts/lab_*.py` (all 14) | efficiency, solution, strategy, basin, sonar, embeddings, graph, ollama_analyzer |
 | `scripts/build_data.py` | (reads JSON output, not Python modules directly) |
+
+Note: `experiment.py`, `adapter.py`, and `lab_book.py` are deprecated (Phase 1B added deprecation warnings). Use `opencode.py` / `run_opencode_agentic()` for running experiments.
 
 ## Key Design Decisions
 

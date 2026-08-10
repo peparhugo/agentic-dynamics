@@ -40,17 +40,7 @@ def _fmt_int(v):
     return f"{v:,}"
 
 
-EXPERIMENT_TITLE_PATTERNS = [
-    "flask", "api", "rest", "task", "url", "probe", "std_", "sweep", "batch", "config",
-    "silent", "constraint", "recovery", "baseline", "perturb", "inject", "phantom",
-    "remove_critical", "invert", "shift_framing", "alien", "false_premise", "competing",
-    "force_abandonment", "reverse_causality", "contradiction", "data_table",
-    "collaborat", "url_shortener", "iterative", "cross-domain", "standardized",
-    "silent_mode", "factorial", "architecture_redesign", "search_kv", "web_crawler",
-    "notification", "autocomplete", "twitter", "form_wizard", "social_graph",
-    "mint_financial", "fastapi_maintenance", "flask_maintenance", "comparative",
-    "r1]", "r2]", "r3]", "s0.5", "s0.8", "s1.0", "2rep",
-]
+from _constants import EXPERIMENT_SESSION_PATTERNS
 
 
 def _is_experiment_title(title: str) -> bool:
@@ -60,7 +50,7 @@ def _is_experiment_title(title: str) -> bool:
         return False
     if t.startswith("["):
         return True
-    return any(k in t for k in EXPERIMENT_TITLE_PATTERNS)
+    return any(k in t for k in EXPERIMENT_SESSION_PATTERNS)
 
 
 def refresh():

@@ -17,16 +17,7 @@ SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 TRAJECTORY_AGG_PATH = ROOT / "experiments" / "results" / "_trajectory_aggregate.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "lab_tool_archetypes.json"
 
-MODEL_LABELS = {
-    "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
-    "openai/gpt-5-nano": "GPT-5-nano",
-    "openai/gpt-5-mini": "GPT-5-mini",
-    "openai/gpt-5": "GPT-5",
-    "openai/gpt-5.5": "GPT-5.5",
-    "openai/gpt-5.6": "GPT-5.6",
-    "openai/gpt-5.6-fast": "GPT-5.6-fast",
-    "anthropic/claude-fable-5": "Claude Fable 5",
-}
+from _constants import MODEL_LABELS
 
 
 def classify_archetype(write_pct, bash_pct):

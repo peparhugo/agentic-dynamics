@@ -108,7 +108,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p>The measurement produced two dimensions:</p>
 <div class="highlight" style="padding:1.3rem">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%.</li>
+<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: <span data-stat="claude_narration">11%</span>. DeepSeek: <span data-stat="deepseek_narration">8%</span>. GPT-5-nano: <span data-stat="nano_narration">14%</span>.</li>
 <li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead (0.0% penalty). Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate (sessions producing zero code). Measured from 227 experiments.</li>
 </ul>
 </div>
@@ -119,7 +119,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>We call this the <strong style="color:var(--ac)">Silent Inference Principle</strong>. The model's ability to reason in latent space and act, rather than narrating every step as billable output. It's a structural property of the training architecture, not a parameter you can toggle.</p>
 
-<p>Later analysis revealed the deeper layer: both models generate ~11,000 tokens per session. Identical computational effort. Claude's tokens just cost 13.6&times; more per unit ($15.00 vs $1.10 per 1M output tokens). And Claude writes 22,500 tokens to cache per session at $3.75/Mtok — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
+<p>Later analysis revealed the deeper layer: both models generate <span class="tip" title="[M] Measured — avg output+reasoning tokens per session">~11,000 tokens per session</span>. Identical computational effort. Claude's tokens just cost 13.6&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$15.00 vs $1.10 per 1M output tokens</span>). And Claude writes 20.0K tokens to cache per session at <span class="tip" title="[X] External — provider list pricing">$3.75/Mtok</span> — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 
 <div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
@@ -192,10 +192,10 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">See the Evidence →</a></div>
 
 <footer>
-<strong>The AI FinOps Framework &middot; v0.4</strong><br>
-<span data-stat="sessions">249</span> experiment sessions &middot; <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants &middot; <span data-stat="reports">224</span> game reports &middot; $<span data-stat="cost">64.98</span> analyzed<br>
-<a href="https://github.com/peparhugo/ai-finops-framework">github.com/peparhugo/ai-finops-framework</a><br>
-  <a href="/">Framework</a> &middot; <a href="story.html">Story</a> &middot; <a href="methodology.html">Methodology</a> &middot; <a href="evidence.html">Evidence</a>
+<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
+  <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 <script src="app.js"></script>
