@@ -2,9 +2,28 @@
 
 import os
 import pytest
+import socket
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from instrument.embeddings import EmbeddingClient, ChromaStore, extract_session_text
+
+# Skip entire module if Ollama or ChromaDB is unreachable
+try:
+    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    _OLLAMA_OK = True
+except Exception:
+    _OLLAMA_OK = False
+try:
+    s = socket.create_connection(("localhost", 8000), timeout=2); s.close()
+    _CHROMA_OK = True
+except Exception:
+    _CHROMA_OK = False
+
+NEEDS_OLLAMA = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434")
+NEEDS_CHROMA = pytest.mark.skipif(not _CHROMA_OK, reason="ChromaDB not available on localhost:8000")
+
+
+pytestmark = NEEDS_OLLAMA
 
 
 TEST_DIR = Path(__file__).resolve().parent

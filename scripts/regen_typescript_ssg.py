@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 DB_PATH = os.path.expanduser("~/.local/share/opencode/opencode.db")
-REPORTS_DIR = Path("/root/reasoning-instrument/experiments/results/reports")
+REPORTS_DIR = Path("/home/drseuss/ai-finops-framework/experiments/results/reports")
 
 
 def main():

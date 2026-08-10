@@ -6,6 +6,7 @@ the old dreamlab/recall fallback.
 """
 
 import pytest
+import socket
 from instrument.trajectory import (
     TrajectoryStep,
     ReasoningTrajectory,
@@ -13,6 +14,14 @@ from instrument.trajectory import (
     _content_distance,
     _embedding_distance,
 )
+
+try:
+    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    _OLLAMA_OK = True
+except Exception:
+    _OLLAMA_OK = False
+
+pytestmark = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434")
 
 
 def make_trajectory(run_id, actions):

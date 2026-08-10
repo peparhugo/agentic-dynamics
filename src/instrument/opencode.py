@@ -19,13 +19,13 @@ from pathlib import Path
 from typing import Any
 
 # Resolve opencode binary: env override or default ~/.opencode/bin/opencode
-_OPENSCODE_BIN = os.environ.get("OPENCODE_BIN", "")
-if _OPENSCODE_BIN:
-    OPENSCODE_BIN = _OPENSCODE_BIN
+_OPENCODE_BIN = os.environ.get("OPENCODE_BIN", "")
+if _OPENCODE_BIN:
+    OPENCODE_BIN = _OPENCODE_BIN
 elif Path.home().exists():
-    OPENSCODE_BIN = str(Path.home() / ".opencode/bin/opencode")
+    OPENCODE_BIN = str(Path.home() / ".opencode/bin/opencode")
 else:
-    OPENSCODE_BIN = "opencode"  # fall back to $PATH
+    OPENCODE_BIN = "opencode"  # fall back to $PATH
 
 
 
@@ -226,7 +226,7 @@ def run_opencode_agentic(
     files_before = _list_files(workdir)
 
     cmd = [
-        OPENSCODE_BIN, "run",
+        OPENCODE_BIN, "run",
         "--model", model,
         "--format", "json",
         "--auto",

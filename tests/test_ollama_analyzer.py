@@ -3,8 +3,17 @@
 import json
 import tempfile
 import pytest
+import socket
 from pathlib import Path
 from instrument.ollama_analyzer import OllamaAnalyzer, load_summary_data
+
+try:
+    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    _OLLAMA_OK = True
+except Exception:
+    _OLLAMA_OK = False
+
+pytestmark = pytest.mark.skipif(not _OLLAMA_OK, reason="Ollama not available on localhost:11434")
 
 
 class TestOllamaAnalyzer:
