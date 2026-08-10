@@ -101,7 +101,20 @@ def load_summary():
     return {"entries": data, "by_model": {}, "by_operator": {}, "by_operator_model": {}, "strategy_distribution": {}}
 
 
+def _load_grit_matrix():
+    """Load lab_grit_matrix.json for the Grit bubble chart."""
+    grit_path = ROOT / "experiments" / "results" / "lab_grit_matrix.json"
+    if not grit_path.exists():
+        return []
+    try:
+        data = json.loads(grit_path.read_text())
+        return data.get("points", [])
+    except Exception:
+        return []
+
+
 def count_game_reports():
+
     if not REPORTS_DIR.exists():
         return 0
     return len([f for f in REPORTS_DIR.iterdir() if f.suffix == ".md"])
@@ -194,8 +207,17 @@ def compute_model_data(inventory, summary, db_breakdown):
 
         avg_energy = round(sum(r.get("energy_total_j", 0) for r in valid) / max(len(valid), 1), 1)
         avg_energy_per_loc = round(avg_energy / max(avg_loc, 1), 2)
-        avg_cost_per_joule = round(sum(r.get("correctness_per_dollar", 0) for r in valid) / max(len(valid), 1), 4)
+        correctness_per_dollar = round(sum(r.get("correctness_per_dollar", 0) for r in valid) / max(len(valid), 1), 4)
         avg_joules_per_loc = round(sum(r.get("quality_per_joule", 0) for r in valid) / max(len(valid), 1), 4)
+
+        # AST-derived aggregates
+        ast_files = round(sum((r.get("ast", {}) or {}).get("py_files", 0) + (r.get("ast", {}) or {}).get("ts_files", 0) for r in valid) / max(len(valid), 1), 1)
+        ast_functions = round(sum((r.get("ast", {}) or {}).get("total_functions", 0) for r in valid) / max(len(valid), 1))
+        ast_classes = round(sum((r.get("ast", {}) or {}).get("total_classes", 0) for r in valid) / max(len(valid), 1))
+        ast_type_hint_pct = round(sum((r.get("ast", {}) or {}).get("type_hint_pct", 0) for r in valid) / max(len(valid), 1)) if valid else 0
+        ast_docstring_pct = round(sum((r.get("ast", {}) or {}).get("docstring_pct", 0) for r in valid) / max(len(valid), 1)) if valid else 0
+        avg_constraints_met = round(sum(r.get("constraints_met", 0) for r in valid) / max(len(valid), 1), 1)
+        avg_constraints_total = round(sum(r.get("constraints_total", 0) for r in valid) / max(len(valid), 1), 1)
 
         cost_in = _fmt_usd(sum(r.get("cost_input_usd", 0) for r in valid))
         cost_out = _fmt_usd(sum(r.get("cost_output_usd", 0) for r in valid))
@@ -211,15 +233,6 @@ def compute_model_data(inventory, summary, db_breakdown):
         cache_w = sum(r.get("tokens_cache_write", 0) for r in valid)
 
         total_tok = tokens_in + tokens_out + tokens_reason
-        if total_tok > 0:
-            cost_input = _fmt_usd(total_cost * tokens_in / total_tok) if tokens_in else 0
-            cost_output = _fmt_usd(total_cost * tokens_out / total_tok) if tokens_out else 0
-            cost_reasoning = _fmt_usd(total_cost * tokens_reason / total_tok) if tokens_reason else 0
-            cost_cache = _fmt_usd(total_cost - cost_input - cost_output - cost_reasoning)
-            if cost_cache < 0:
-                cost_cache = 0
-        else:
-            cost_input = cost_output = cost_reasoning = cost_cache = 0
 
         models.append({
             "id": mid,
@@ -251,9 +264,16 @@ def compute_model_data(inventory, summary, db_breakdown):
             "avg_comment_ratio": avg_comment_ratio,
             "avg_energy_j": avg_energy,
             "avg_energy_j_per_loc": avg_energy_per_loc,
-            "avg_cost_per_joule": avg_cost_per_joule,
+            "correctness_per_dollar": correctness_per_dollar,
             "avg_quality_per_joule": avg_joules_per_loc,
             "narration_rate": narration_rate,
+            "ast_files": ast_files,
+            "ast_functions": ast_functions,
+            "ast_classes": ast_classes,
+            "ast_type_hint_pct": ast_type_hint_pct,
+            "ast_docstring_pct": ast_docstring_pct,
+            "avg_constraints_met": avg_constraints_met,
+            "avg_constraints_total": avg_constraints_total,
             "cost_input": cost_in,
             "cost_output": cost_out,
             "cost_reasoning": cost_reason,
@@ -275,6 +295,9 @@ def compute_model_data(inventory, summary, db_breakdown):
                 "avg_composite_score": "C", "avg_code_quality": "C", "avg_comment_ratio": "C",
                 "avg_energy_j": "C", "avg_energy_j_per_loc": "C",
                 "avg_cost_per_joule": "C", "avg_quality_per_joule": "C",
+                "correctness_per_dollar": "C", "ast_files": "C", "ast_functions": "C",
+                "ast_classes": "C", "ast_type_hint_pct": "C", "ast_docstring_pct": "C",
+                "avg_constraints_met": "C", "avg_constraints_total": "C",
                 "narration_rate": "C",
                 "cost_input": "C", "cost_output": "C", "cost_reasoning": "C", "cost_cache": "C",
                 "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C", "strategy_efficient": "C",
@@ -534,6 +557,7 @@ def build():
         "perturbation_class_breakdown": pert_class_summary,
         "energy_ranking": energy_ranking,
         "strategy_distribution": summary.get("strategy_distribution", {}),
+        "grit_matrix": _load_grit_matrix(),
         "design_parameters": {
             "beta": {"value": 0.001, "provenance": "design", "note": "Context inflation rate — calibrate to your codebase"},
             "woc_healthy": {"value": 0.85, "provenance": "design"},

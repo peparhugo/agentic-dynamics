@@ -153,19 +153,9 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- AST Code Quality -->
 <section class="sec alt">
 <h2>AST Code Quality Analysis</h2>
-<p class="lead">224 game reports across 8 model variants. Every function, class, decorator, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
-<div class="tbl"><table><thead><tr><th>Metric</th><th>DS v4 Pro</th><th>Claude F5</th><th>GPT-5.6</th><th>GPT-5-mini</th><th>GPT-5.6-fast</th><th>GPT-5.5</th><th>GPT-5</th><th>GPT-5-nano</th></tr></thead><tbody>
-<tr><td><strong>Reports</strong></td><td class="green">68</td><td>27</td><td>15</td><td>12</td><td>6</td><td>3</td><td>5</td><td>6</td></tr>
-<tr><td><strong>Avg LOC/worktree</strong></td><td class="green">691</td><td>412</td><td>367</td><td>264</td><td>343</td><td>262</td><td>300</td><td>199</td></tr>
-<tr><td><strong>Avg files/worktree</strong></td><td class="green">28</td><td>8</td><td>4</td><td>5</td><td>3</td><td>3</td><td>8</td><td>3</td></tr>
-<tr><td><strong>Avg functions</strong></td><td class="green">119</td><td>44</td><td>35</td><td>25</td><td>33</td><td>33</td><td>21</td><td>21</td></tr>
-<tr><td><strong>Avg classes</strong></td><td class="green">21</td><td>9</td><td>2</td><td>3</td><td>2</td><td>1</td><td>2</td><td>2</td></tr>
-<tr><td><strong>Type hints</strong></td><td>16%</td><td>27%</td><td>5%</td><td>9%</td><td>28%</td><td class="green">37%</td><td class="green">40%</td><td>27%</td></tr>
-<tr><td><strong>Docstrings</strong></td><td>3%</td><td class="green">8%</td><td>0%</td><td>1%</td><td>0%</td><td>0%</td><td>2%</td><td>0%</td></tr>
-<tr><td><strong>Constraint score</strong></td><td class="green">3.2/7</td><td>2.3/6</td><td>3.1/6</td><td>1.4/7</td><td>3.3/7</td><td class="green">5.7/7</td><td>2.6/7</td><td class="amber">0.0/7</td></tr>
-<tr><td><strong>Avg thinking ratio</strong></td><td>7%</td><td class="green">0%</td><td>6%</td><td>7%</td><td>7%</td><td class="green">2%</td><td>7%</td><td class="amber">19%</td></tr>
-</tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> DeepSeek produces the most modular code (avg 28 files, 119 functions, 21 classes per worktree) — 3.5x Claude's file count. GPT-5 and GPT-5.5 lead on type hints (37-40%) but produce far fewer worktrees. GPT-5-nano has the highest thinking ratio (19%) and produces zero constraint-complete outputs — the only model that fundamentally fails on task completion rather than just cost.</div>
+<p class="lead">224 game reports across 8 model variants. Every function, class, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
+<div class="tbl"><table><thead id="ast-metric-head"><tr><th>Metric</th></tr></thead><tbody id="ast-metric-body"></tbody></table></div>
+<div class="insight" id="ast-insight"><strong>Key insight:</strong> Loading...</div>
 </section>
 
 <!-- Constraint Detection — DeepSeek vs Claude -->
@@ -402,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function () {
   (function () {
     var ctx = document.getElementById('gritMatrixChart');
     if (!ctx) return;
-    var gritData = (D && D.perturbation_class_breakdown) ? D : null;
+    var gritData = (D && D.grit_matrix && D.grit_matrix.length) ? D.grit_matrix : null;
 
     var modelColors = {
       'DeepSeek v4 Pro': 'rgba(52,211,153,0.70)',
@@ -416,17 +406,17 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     // Fallback: mimic lab_grit_matrix output structure
-    var gritPoints = [
-      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, pc:'semantic' },
-      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, pc:'manifold' },
-      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, pc:'semantic' },
-      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, pc:'manifold' },
-      { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, pc:'semantic' },
-      { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, pc:'semantic' },
-      { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, pc:'semantic' },
-      { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, pc:'semantic' },
-      { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, pc:'semantic' },
-      { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, pc:'semantic' }
+    var gritPoints = gritData || [
+      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic' },
+      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, perturbation_class:'manifold' },
+      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic' },
+      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, perturbation_class:'manifold' },
+      { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, perturbation_class:'semantic' },
+      { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, perturbation_class:'semantic' },
+      { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, perturbation_class:'semantic' },
+      { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, perturbation_class:'semantic' },
+      { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic' },
+      { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, perturbation_class:'semantic' }
     ];
 
     var datasets = {};
@@ -468,6 +458,48 @@ document.addEventListener('DOMContentLoaded', function () {
   // --- Populate data-driven tables ---
   function fmtUSD(v) { return '$' + (typeof v === 'number' ? v.toFixed(2) : v); }
   function pct(v) { return (typeof v === 'number' ? (v * 100).toFixed(0) + '%' : v); }
+
+  // --- AST Code Quality Table ---
+  (function() {
+    var headRow = document.querySelector('#ast-metric-head tr');
+    var body = document.querySelector('#ast-metric-body');
+    var insight = document.querySelector('#ast-insight');
+    if (!headRow || !body || !D || !D.models) return;
+
+    var models = D.models.slice().sort(function(a, b) { return b.reports - a.reports; });
+    var rows = [
+      { name: 'Reports', key: 'reports', fmt: function(v) { return v; }, best: 'max' },
+      { name: 'Avg LOC/worktree', key: 'avg_loc', fmt: function(v) { return v; }, best: 'max' },
+      { name: 'Avg files/worktree', key: 'ast_files', fmt: function(v) { return v.toFixed(1); }, best: 'max' },
+      { name: 'Avg functions', key: 'ast_functions', fmt: function(v) { return v; }, best: 'max' },
+      { name: 'Avg classes', key: 'ast_classes', fmt: function(v) { return v; }, best: 'max' },
+      { name: 'Type hints', key: 'ast_type_hint_pct', fmt: function(v) { return v + '%'; }, best: 'max' },
+      { name: 'Docstrings', key: 'ast_docstring_pct', fmt: function(v) { return v + '%'; }, best: 'max' },
+      { name: 'Constraint score', key: 'constraint_score', fmt: function(v) { return v; }, best: 'max' },
+      { name: 'Avg thinking ratio', key: 'avg_thinking_ratio', fmt: function(v) { return (v * 100).toFixed(0) + '%'; }, best: 'min' },
+    ];
+
+    // Header
+    headRow.innerHTML = '<th>Metric</th>' + models.map(function(m) { return '<th>' + m.label.split(' ').slice(0,2).join(' ') + '</th>'; }).join('');
+
+    // Body
+    rows.forEach(function(r) {
+      var vals = models.map(function(m) { return r.key === 'constraint_score' ? (m.avg_constraints_met||0) + '/' + (m.avg_constraints_total||7) : (m[r.key] != null ? m[r.key] : 0); });
+      var bestVal = r.best === 'max' ? Math.max.apply(null, vals.filter(function(v) { return typeof v === 'number'; })) : Math.min.apply(null, vals.filter(function(v) { return typeof v === 'number'; }));
+      body.innerHTML += '<tr><td><strong>' + r.name + '</strong></td>' +
+        vals.map(function(v, i) {
+          var cls = (r.fmt(v) === r.fmt(bestVal) && bestVal > 0) ? ' class="green"' : '';
+          return '<td' + cls + '>' + r.fmt(v) + '</td>';
+        }).join('') + '</tr>';
+    });
+
+    // Insight
+    var topLoc = models[0];
+    var topHints = models.slice().sort(function(a,b){ return (b.ast_type_hint_pct||0) - (a.ast_type_hint_pct||0); })[0];
+    if (insight && topLoc) {
+      insight.innerHTML = '<strong>Key insight:</strong> ' + topLoc.label + ' produces the most modular code (avg ' + topLoc.ast_files.toFixed(1) + ' files, ' + topLoc.ast_functions + ' functions, ' + topLoc.ast_classes + ' classes per worktree). ' + topHints.label + ' leads on type hints (' + topHints.ast_type_hint_pct + '%). Generated from live experiment data.';
+    }
+  })();
 
   // Cost Efficiency Ranking table
   var costTbl = document.querySelector('#cost-ranking-tbody');
@@ -618,7 +650,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var totalCost = d.total_cost || m.total;
     var sessions = d.sessions || m.sessions;
     var passRate = (d.pass_rate || m.pass).replace(/[ \[\]H]/g,'');
-    var gritRate = d.narration_rate !== undefined ? d.narration_rate : m.narrationRate;
+    var gritRate = d.narration_rate !== undefined ? d.narration_rate : m.grit;
     var loc = d.avg_loc || m.locPerSes;
     var thinking = d.avg_thinking_ratio || m.thinkingRatio;
     var quality = d.avg_code_quality || m.quality;
