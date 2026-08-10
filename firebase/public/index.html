@@ -14,126 +14,126 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-.topbar-link.active{color:var(--ac)}
-.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:5rem 2rem 3rem;position:relative}
-.hero::before{background:radial-gradient(ellipse 60% 50% at 50% 25%,rgba(99,102,241,0.06),transparent);content:'';position:absolute;inset:0;pointer-events:none}
-.hero .inr{position:relative;z-index:1;max-width:960px;width:100%;margin:0 auto}
-.pulse{display:inline-flex;align-items:center;gap:0.5rem;padding:0.3rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:100px;font-size:0.72rem;font-weight:600;letter-spacing:0.5px;color:var(--ac);margin-bottom:1.5rem;text-transform:uppercase}
-.pulse .dot{width:6px;height:6px;border-radius:50%;background:var(--ac);animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
-section{padding:4rem 2rem;text-align:center}
-section>.inner{max-width:960px;margin:0 auto}
-section>.inner.wide{max-width:1100px}
-section.alt{background:var(--bg2)}
-.constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0;max-width:650px;margin-left:auto;margin-right:auto}
-.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.45rem 0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--b);font-size:0.78rem}
-.cr.head{background:var(--bg4);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
-.cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--t3)}
-.wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7;text-align:left}
-.wtm strong{color:var(--t)}.refs{font-size:0.72rem;color:var(--t3);line-height:1.7;margin:1rem 0;text-align:center}.refs strong{color:var(--t2)}
-.entry-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin:2rem auto;max-width:960px}
-.entry-card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.5rem;text-align:left;transition:border-color .2s,transform .2s;text-decoration:none;display:block;color:inherit}
-.entry-card:hover{border-color:rgba(99,102,241,0.3);transform:translateY(-3px);text-decoration:none}
-.entry-card h3{color:var(--ac);margin:0 0 0.4rem;font-size:0.95rem}
-.entry-card p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
-.trust-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1.5rem 0}
-.trust-card{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left;transition:border-color .2s,transform .2s}
-.trust-card:hover{transform:translateY(-2px);border-color:var(--ba)}
-.trust-card h4{font-size:0.88rem;color:var(--t);margin-bottom:0.5rem;font-family:"JetBrains Mono",monospace}
-.trust-card p,.trust-card li{font-size:0.78rem;color:var(--t2);line-height:1.55;margin:0}.trust-card ul{list-style:none;padding:0;margin:0}.trust-card li{margin:0.3rem 0}
-.link-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.5rem;margin:1.5rem auto;max-width:700px}
-.link-grid a{background:var(--bg3);border:1px solid var(--b);border-radius:8px;padding:0.7rem 1rem;text-align:center;font-size:0.78rem;font-weight:600;transition:border-color .2s,transform .2s;text-decoration:none;color:var(--ac)}
-.link-grid a:hover{border-color:var(--ba);transform:translateY(-2px);text-decoration:none}
-@media(max-width:768px){.hero{padding:4rem 1rem 2rem}section{padding:3rem 1rem}.cr{font-size:0.68rem}.cr .fl{font-size:0.6rem}.entry-cards,.trust-grid{grid-template-columns:1fr}}
+.home-hero h1{max-width:780px}
+.hero-actions{display:flex;gap:0.8rem;flex-wrap:wrap;margin-top:1.5rem}
+.source-note{display:inline-flex;align-items:center;gap:0.5rem;margin-top:1.1rem;padding:0.55rem 0.8rem;border:1px solid var(--b);border-radius:999px;color:var(--t3);font-size:0.76rem;background:rgba(16,23,34,0.68)}
+.source-note strong{color:var(--t2)}
+.lever-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+.lever-card{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
+.lever-card .lever-name{font-family:'JetBrains Mono',monospace;font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--am);margin-bottom:0.7rem}
+.lever-card .lever-measure{font-weight:800;color:var(--t);font-size:1rem;margin-bottom:0.45rem;letter-spacing:-0.02em}
+.lever-card p{font-size:0.84rem;margin:0;color:var(--t2)}
+.mechanism-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1rem;margin-top:1.5rem}
+.mechanism{display:flex;flex-direction:column;min-height:100%;background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.2rem;text-align:left}
+.mechanism .num{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:800;color:var(--ac);margin-bottom:0.75rem}
+.mechanism h3{margin:0 0 0.5rem;font-size:1rem}.mechanism p{margin:0;font-size:0.83rem;color:var(--t2);line-height:1.6}
+.cost-contrast{display:grid;grid-template-columns:minmax(0,0.75fr) minmax(320px,1fr);gap:1.4rem;align-items:stretch;margin-top:1.5rem}
+.cost-panel{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:22px;padding:1.4rem;text-align:left;box-shadow:var(--panel-shadow)}
+.cost-panel h3{font-family:'JetBrains Mono',monospace;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--t3);margin:0 0 1rem}
+.model-row{display:grid;grid-template-columns:1fr auto auto;gap:1rem;align-items:center;padding:0.85rem 0;border-bottom:1px solid var(--b);font-size:0.86rem;color:var(--t2)}
+.model-row:last-child{border-bottom:none}.model-row strong{color:var(--t)}.model-row .price{font-family:'JetBrains Mono',monospace;color:var(--ac);font-weight:800}.model-row .high{color:var(--am)}
+.route-panel{border:1px solid var(--ba);border-left:4px solid var(--ac);border-radius:0 18px 18px 0;padding:1.25rem;background:rgba(34,211,238,0.045);text-align:left}
+.route-panel p{margin:0;color:var(--t2);font-size:0.94rem}.route-panel strong{color:var(--t)}
+body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel{background:linear-gradient(180deg,#ffffff,#f8fafc)}
+body.light .route-panel{background:rgba(34,211,238,0.08)}
+@media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
+@media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.model-row{grid-template-columns:1fr;gap:0.25rem}}
 </style>
 <script src="data.js"></script>
 </head>
-<body>
+<body class="home">
 
 <nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
-<section class="hero"><div class="inr">
-  <div class="pulse"><span class="dot"></span> v0.4 · Open Framework · <span data-stat="sessions">249</span> Experiments · 3 Architectures, 8 Variants · <a href="databricks.html" style="color:var(--ac)">Our experiments support what Databricks found</a></div>
-  <h1>The AI FinOps Framework</h1>
-  <h2 style="font-size:1.15rem;font-weight:600;color:var(--ac);margin-bottom:1rem;letter-spacing:0">On August 7, 2026, a $40B company published the same conclusions. We have the experiments to support it.</h2>
-  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. They arrived at four cost levers: shift to efficient models, smart routing, progressive budgeting, and reducing token overhead. We stress-tested 8 models across 227 experiments with 10 calibrated perturbation operators — arriving at the same four conclusions through <strong style="color:var(--ac)">controlled experiments, not industry surveys.</strong></p>
-  <div class="constraints">
-    <div class="cr head"><div class="nm">Databricks Lever</div><div class="fl">Their Estimate</div><div class="fl">Our Measurement</div></div>
-    <div class="cr"><div class="nm">Shift to efficient models</div><div class="fl">~50% savings (survey)</div><div class="fl"><strong style="color:var(--ac)">69× gap:</strong> $0.016 vs $1.08/session, 227 experiments</div></div>
-    <div class="cr"><div class="nm">Smart routing</div><div class="fl">~30% savings (internal)</div><div class="fl"><strong style="color:var(--ac)">95% correctness</strong> at $0.12/session, 17 task types</div></div>
-    <div class="cr"><div class="nm">Progressive budgeting</div><div class="fl">~10% savings</div><div class="fl"><strong style="color:var(--ac)">WOC = 0.90:</strong> measured first-pass success rate</div></div>
-    <div class="cr"><div class="nm">Reduce token overhead</div><div class="fl">~10% + 50% token cut</div><div class="fl"><strong style="color:var(--ac)">Cache pricing asymmetry:</strong> $3.75/Mtok vs $0.14/Mtok</div></div>
+<section class="dossier-hero home-hero"><div class="hero-grid">
+  <div>
+    <div class="eyebrow">Market validation · measurement instrument</div>
+    <h1>Databricks named the AI coding cost levers. This framework measures the mechanism.</h1>
+    <p class="thesis">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. This framework stress-tested 8 models across 227 experiments with 10 calibrated perturbation operators. Same four cost levers. Different evidence base: controlled experiments, full traces, inspectable costs.</p>
+    <div class="hero-actions"><a href="databricks.html" class="cta-btn big">See What Databricks Missed</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="methodology.html" class="cta-btn ghost">Run the Instrument →</a></div>
+    <div class="source-note"><strong>Open framework</strong> <span data-stat="sessions">249</span> sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · every number provenance-tagged</div>
   </div>
-  <div class="stats">
-    <div class="stat"><div class="v">10</div><div class="l">Decision Rules</div><div class="s">5 measured · 5 framework extensions</div></div>
-    <div class="stat"><div class="v"><span data-stat="costgap">69×</span></div><div class="l">Measured Cost Gap</div><div class="s">Per-session average across <span data-stat="reports">224</span> game reports</div></div>
-    <div class="stat"><div class="v"><span data-stat="passrate">88.7%</span></div><div class="l">Test Pass Rate</div><div class="s"><span data-stat="total_tests">—</span> tests across <span data-stat="reports">224</span> reports</div></div>
-    <div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Research Cost</div><div class="s">Every session recorded and inspectable</div></div>
-  </div>
-  <p style="font-size:0.8rem;color:var(--t2);max-width:680px;margin:0.5rem auto 0;line-height:1.5">From a $20 API key on a train from Rome to Naples &rarr; 249 experiments &rarr; a 69&times; cost gap &rarr; this framework.</p>
-  <div class="cta-bar"><a href="framework.html" class="cta-btn big">Start with the Rules</a><a href="accelerator.html" class="cta-btn ghost">Deploy the Accelerator →</a><a href="evidence.html" class="cta-btn ghost">Verify the Data →</a></div>
+  <aside class="proof-ledger" aria-label="Evidence ledger">
+    <h3>Evidence Ledger</h3>
+    <div class="proof-card market"><div><span class="label">External validation</span><span class="detail">Databricks identified the same four levers from enterprise surveys.</span></div><div class="value">4</div></div>
+    <div class="proof-card"><div><span class="label">Controlled experiments</span><span class="detail">Stress tests across model architectures and variants.</span></div><div class="value"><span data-stat="sessions">249</span></div></div>
+    <div class="proof-card success"><div><span class="label">Measured cost gap</span><span class="detail">Per-session average across <span data-stat="reports">224</span> game reports.</span></div><div class="value"><span data-stat="costgap">69×</span></div></div>
+    <div class="proof-card"><div><span class="label">Verified outcomes</span><span class="detail"><span data-stat="total_tests">—</span> tests across <span data-stat="reports">224</span> reports.</span></div><div class="value"><span data-stat="passrate">88.7%</span></div></div>
+  </aside>
 </div></section>
 
-<section class="alt"><div class="inner">
-  <h2>AI adoption is rising. Productivity is stalling.<br>It's not a capability problem. It's an economics problem.</h2>
-  <div class="trust-grid" style="margin-top:1.5rem">
-    <div class="trust-card"><h4>Finance cuts token budgets. AI stops working.</h4><p>Token caps, restricted reasoning models, truncated context — every cost-control move strips the context that made AI effective. You asked your best architect to redesign a system after reading a fraction of the docs.</p></div>
-    <div class="trust-card"><h4>Models are priced as if every session starts from zero.</h4><p>The same task. Three models. $0.016, $0.43, $1.08. Same generated tokens. Different pricing architectures. Most organizations pay the highest price by default — not because it's better, but because they never measured the alternative.</p></div>
-    <div class="trust-card"><h4>The organizations that win won't make AI think less.</h4><p>They'll measure cost-per-outcome and route work to models that deliver results without overpaying. The 69× gap isn't a benchmark — it's your budget.</p></div>
+<section class="dossier-section alt"><div class="dossier-inner">
+  <div class="split-copy">
+    <div>
+      <div class="section-kicker">From playbook to instrument</div>
+      <h2>Databricks made this urgent. The framework makes it measurable.</h2>
+    </div>
+    <div class="comparison-panel">
+      <div><h3>Databricks</h3><p><strong>Survey evidence.</strong> Efficient models, smart routing, progressive budgets, and token overhead reduction. Directional savings from scaled enterprise AI programs.</p></div>
+      <div><h3>This Framework</h3><p><strong>Instrumented evidence.</strong> 10 perturbation operators, recovery signals, AST analysis, cost traces, and model-level behavior under degraded input.</p></div>
+    </div>
+  </div>
+  <div class="lever-grid">
+    <div class="lever-card"><div class="lever-name">Shift to efficient models</div><div class="lever-measure">69× measured cost gap</div><p>$0.016 vs $1.08 per session across the experiment corpus. The gap is pricing architecture, not capability.</p></div>
+    <div class="lever-card"><div class="lever-name">Smart routing</div><div class="lever-measure">95% correctness at $0.12/session</div><p>Grit-routed model selection turns routing from vendor preference into measured policy.</p></div>
+    <div class="lever-card"><div class="lever-name">Progressive budgeting</div><div class="lever-measure">WOC = <span data-stat-fmt="woc">0.90</span></div><p>First-pass success becomes the operating metric. Track retry drag before budget overruns compound.</p></div>
+    <div class="lever-card"><div class="lever-name">Reduce token overhead</div><div class="lever-measure">$3.75/Mtok vs $0.14/Mtok</div><p>Cache write/read asymmetry and narration behavior explain why identical generated token volumes bill differently.</p></div>
   </div>
 </div></section>
 
-<section class="alt"><div class="inner">
-  <h2>How the framework works</h2>
-  <div class="trust-grid" style="margin-top:1.5rem">
-    <div class="trust-card"><h4>1. Measure</h4><p>Every model defaults to being a chatbot. When you give it degraded instructions — wrong specs, missing requirements — some maintain integrity. Most don't. Grit measures which ones recover and what recovery costs.</p></div>
-    <div class="trust-card"><h4>2. Route</h4><p>Apply the 10 rules. Route routine work to high-Grit, low-cost models. Escalate only when reasoning is worth paying for. Cache intelligently — measure hit rates before choosing write vs read strategy.</p></div>
-    <div class="trust-card"><h4>3. Compound</h4><p>Pricing compounds. A 69× cost gap doesn't shrink with volume — it multiplies. Route routine work to efficient models. Escalate only when reasoning depth is worth the premium. Measure what works.</p></div>
+<section class="dossier-section"><div class="dossier-inner">
+  <div class="section-kicker">Original contribution</div>
+  <h2>What the survey cannot tell you: how models behave when the input degrades.</h2>
+  <p class="lead">Every LLM can look competent on a clean benchmark. Production is not clean. Requirements are incomplete, stale, contradictory, or framed in unfamiliar language. This framework measures whether a model preserves ground truth under that stress, and what recovery costs.</p>
+  <div class="mechanism-grid">
+    <div class="mechanism"><div class="num">01</div><h3>Grit</h3><p>Ground-Truth Integrity: correctness maintained under degraded, contradictory, or incomplete instructions.</p></div>
+    <div class="mechanism"><div class="num">02</div><h3>Explanation Tax</h3><p>The cost of narration, flailing, and recovery when a model externalizes reasoning instead of acting.</p></div>
+    <div class="mechanism"><div class="num">03</div><h3>WOC</h3><p>Work-outcome conversion: first-pass success as the budgeting metric, not cost per prompt.</p></div>
+    <div class="mechanism"><div class="num">04</div><h3>Snowball Rule</h3><p>Codebase growth compounds future context cost. The N² term turns small routing choices into runway risk.</p></div>
   </div>
-  <div class="cta-bar"><a href="framework.html" class="cta-btn">Start with the Framework</a><a href="accelerator.html" class="cta-btn ghost">Deploy the Accelerator →</a></div>
 </div></section>
 
-<section><div class="inner wide">
-  <h2>Same output. 69&times; different cost.</h2>
-  <p class="lead" style="max-width:720px;margin-left:auto;margin-right:auto">Every LLM defaults to being a chatbot. When you give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested 8 models across 227 experiments with 10 stress tests. Both models produce similar generated token volumes (~11K/session). At identical volumes, per-token pricing creates a 69&times; cost gap — not capability, but pricing architecture.</p>
-  <div class="tbl" style="margin-top:1rem"><table>
-    <thead><tr><th>Metric</th><th>DeepSeek v4 Pro</th><th>Claude Fable 5</th><th>GPT-5.6</th></tr></thead>
-    <tbody>
-      <tr><td>Avg $ per session</td><td class="mono green">$0.015</td><td class="mono amber">$1.01</td><td class="mono">$0.43</td></tr>
-      <tr><td>Avg LOC/session</td><td class="mono green">691</td><td class="mono amber">412</td><td class="mono">367</td></tr>
-      <tr><td>Narration penalty</td><td class="mono green">8%</td><td class="mono amber">11%</td><td class="mono">7%</td></tr>
-    </tbody>
-  </table></div>
-  <div class="cta-bar"><a href="evidence.html" class="cta-btn ghost">See the full evidence →</a></div>
-</div></section>
-
-<section><div class="inner">
-  <h2>How we know what we know</h2>
-  <div class="trust-grid">
-    <div class="trust-card"><h4>Transparent methodology</h4><p>10 perturbation operators, 6 recovery signals, fully documented protocols. Every measurement traceable to original session data.</p></div>
-    <div class="trust-card"><h4>Multi-model</h4><p>8 variants across 3 architectures &mdash; GPT dense, DeepSeek MoE, Claude dense. Cross-architecture comparison at the AST level.</p></div>
-    <div class="trust-card"><h4>Replicable</h4><p>Fully open source under Apache 2.0 license. 34 configs, 249 sessions. The instrument runs locally &mdash; no API keys required to verify.</p></div>
+<section class="dossier-section alt"><div class="dossier-inner">
+  <div class="split-copy">
+    <div>
+      <div class="section-kicker">Evidence receipts</div>
+      <h2>Not a benchmark. A calibrated measurement record.</h2>
+      <p class="lead">Every major claim is backed by session data, generated artifacts, cost traces, or documented methodology. The site should feel like an evidence file because that is what it is.</p>
+    </div>
+    <div class="receipt-grid">
+      <div class="receipt success"><div class="claim">Measured gap</div><div class="measure green"><span data-stat="costgap">69×</span></div><p>Per-session average cost gap across <span data-stat="reports">224</span> game reports.</p></div>
+      <div class="receipt"><div class="claim">Experiment scale</div><div class="measure ac"><span data-stat="sessions">249</span></div><p>Instrumented sessions across <span data-stat="architectures">3</span> architectures and <span data-stat="variants">8</span> variants.</p></div>
+      <div class="receipt cyan"><div class="claim">Outcome checks</div><div class="measure ac"><span data-stat="passrate">88.7%</span></div><p>Test pass rate with every result traceable to reports and generated code.</p></div>
+      <div class="receipt market"><div class="claim">Research cost</div><div class="measure amber">$<span data-stat="cost">64.98</span></div><p>Total analyzed experiment cost. Every session recorded and inspectable.</p></div>
+    </div>
   </div>
-  <div class="cta-bar"><a href="methodology.html" class="cta-btn ghost">Read the full methodology →</a></div>
 </div></section>
 
-<section><div class="inner">
-  <h2>Where would you like to start?</h2>
+<section class="dossier-section"><div class="dossier-inner">
+  <div class="section-kicker">Cost mechanics</div>
+  <h2>Same output. 69× different cost.</h2>
+  <div class="cost-contrast">
+    <div class="route-panel"><p><strong>The important finding changed:</strong> this is not simply “one model uses fewer tokens.” DeepSeek and Claude produce similar generated token volumes. The difference is what gets billed, how cache is priced, and how each model recovers under perturbation.</p></div>
+    <div class="cost-panel">
+      <h3>Per-session comparison</h3>
+      <div class="model-row"><strong>DeepSeek v4 Pro</strong><span>691 LOC/session</span><span class="price">$0.015</span></div>
+      <div class="model-row"><strong>GPT-5.6</strong><span>367 LOC/session</span><span class="price">$0.43</span></div>
+      <div class="model-row"><strong>Claude Fable 5</strong><span>412 LOC/session</span><span class="price high">$1.01</span></div>
+    </div>
+  </div>
+  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a><a href="framework.html#calculator" class="cta-btn ghost">Calculate Your Costs →</a></div>
+</div></section>
+
+<section class="dossier-section alt"><div class="dossier-inner">
+  <div class="section-kicker">Choose the proof path</div>
+  <h2>Start with the question your reader already has.</h2>
   <div class="entry-cards">
-    <a href="framework.html" class="entry-card"><h3>I want to understand the rules</h3><p>The 10 rules, cost equation, interactive calculator, decision framework.</p></a>
-    <a href="evidence.html" class="entry-card"><h3>I want to verify the data</h3><p>Full evidence: 227 experiments, AST analysis, perturbation response.</p></a>
-    <a href="accelerator.html" class="entry-card"><h3>I want to deploy this</h3><p>Enterprise bridge, maturity ladder, projections, autonomous workloads.</p></a>
+    <a href="databricks.html" class="entry-card"><h3>What did Databricks miss?</h3><p>Map each Databricks lever to the framework's measured mechanism.</p></a>
+    <a href="evidence.html" class="entry-card"><h3>Can I verify the data?</h3><p>Review the 227 experiments, AST analysis, token economics, and perturbation response.</p></a>
+    <a href="framework.html" class="entry-card"><h3>How do I operationalize it?</h3><p>The 10 rules, cost equation, interactive calculator, and provider playbook.</p></a>
   </div>
-</div></section>
-
-<section><div class="inner" style="text-align:center">
-  <h2>The data is open.</h2>
-  <p class="lead" style="max-width:700px;margin-left:auto;margin-right:auto">34 configs. 10 perturbation operators. 249 sessions across 8 models. Full AST analysis across 25+ file extensions. Every session recorded, every measurement inspectable. The instrument is open source. If you find a gap — extend it.</p>
-  <div class="cta-bar"><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn big">View the Instrument on GitHub</a></div>
-  <div class="link-grid">
-    <a href="story.html">Story</a><a href="methodology.html">Methodology</a><a href="evidence.html">Evidence</a>
-    <a href="framework.html">Framework</a><a href="accelerator.html">Accelerator</a><a href="glossary.html">Glossary</a>
-  </div>
+  <div class="pullquote">Databricks validated the AI cost problem. This framework gives you the measurement system to govern it.</div>
+  <div class="hero-actions"><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">View the Instrument on GitHub</a></div>
 </div></section>
 
 <footer>

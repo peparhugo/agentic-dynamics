@@ -13,29 +13,35 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <style>
-article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
-.subtitle{font-size:0.95rem;color:var(--t2);margin-bottom:1rem;line-height:1.6}
-.ext-link{display:inline-flex;align-items:center;gap:0.4rem;padding:0.4rem 1rem;background:rgba(99,102,241,0.06);border:1px solid rgba(99,102,241,0.15);border-radius:8px;font-size:0.75rem;font-weight:600;color:var(--ac);text-decoration:none;margin-bottom:2rem;transition:border-color .2s}
-.ext-link:hover{border-color:rgba(99,102,241,0.3);text-decoration:none}
-.section-hd{border-left:3px solid var(--ac);padding-left:1rem;margin:2.5rem 0 1rem}
+article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
+.db-hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,0.72fr);gap:2rem;align-items:stretch;margin-bottom:3rem}
+.db-hero-copy{padding:1rem 0}.db-hero-copy h1{max-width:760px}
+.subtitle{font-size:1.05rem;color:var(--t2);margin:1rem 0 1.25rem;line-height:1.7;max-width:760px}
+.db-ledger{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(7,10,15,0.96));border:1px solid var(--ba);border-radius:24px;padding:1.2rem;box-shadow:var(--panel-shadow)}
+.db-ledger h3{font-family:'JetBrains Mono',monospace;font-size:0.76rem;text-transform:uppercase;letter-spacing:0.09em;color:var(--t3);margin:0 0 1rem}
+.db-row{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;border-top:1px solid var(--b);padding:0.85rem 0}.db-row:first-of-type{border-top:none;padding-top:0}
+.db-row span{font-size:0.8rem;color:var(--t2)}.db-row strong{font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:1rem;text-align:right}.db-row.market strong{color:var(--am)}
+.ext-link{display:inline-flex;align-items:center;gap:0.4rem;padding:0.55rem 1rem;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.22);border-radius:999px;font-size:0.75rem;font-weight:700;color:var(--am);text-decoration:none;margin-top:0.25rem;transition:border-color .2s,background .2s}
+.ext-link:hover{border-color:rgba(245,158,11,0.42);background:rgba(245,158,11,0.12);text-decoration:none}
+.section-hd{border-left:3px solid var(--ac);padding-left:1rem;margin:2.8rem 0 1rem}
 .section-hd.amber{border-left-color:var(--am)}
 .claim-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
-.claim-box{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.2rem;text-align:left}
+.claim-box{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:18px;padding:1.25rem;text-align:left;box-shadow:0 1px 0 rgba(255,255,255,0.03) inset}
 .claim-box h4{font-size:0.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin:0 0 0.5rem}
 .claim-box .tag{display:inline-block;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
-.claim-box .tag.their{background:rgba(6,182,212,0.08);color:var(--cy);border:1px solid rgba(6,182,212,0.15)}
-.claim-box .tag.ours{background:rgba(52,211,153,0.08);color:#34d399;border:1px solid rgba(52,211,153,0.15)}
+.claim-box .tag.their{background:rgba(245,158,11,0.08);color:var(--am);border:1px solid rgba(245,158,11,0.18)}
+.claim-box .tag.ours{background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.18)}
 .claim-box p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
 .mono{font-family:'JetBrains Mono',monospace}
-.gap-box{background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);border-left:3px solid var(--am);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:0.8rem 0;font-size:0.8rem;color:var(--t2);line-height:1.6}
+.gap-box{background:rgba(245,158,11,0.055);border:1px solid rgba(245,158,11,0.16);border-left:3px solid var(--am);border-radius:0 16px 16px 0;padding:1rem 1.2rem;margin:0.8rem 0;font-size:0.82rem;color:var(--t2);line-height:1.65}
 .gap-box strong{color:var(--am)}
 .miss-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1rem 0}
-.miss-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
+.miss-card{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:16px;padding:1rem;text-align:left}
 .miss-card h4{font-size:0.85rem;color:var(--t);margin:0 0 0.3rem}
 .miss-card p{font-size:0.76rem;color:var(--t2);line-height:1.5;margin:0}
-.bottom{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1.2rem 1.5rem;margin:2rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7}
+.bottom{background:linear-gradient(135deg,rgba(34,211,238,0.07),rgba(245,158,11,0.06));border:1px solid var(--ba);border-left:3px solid var(--ac);border-radius:0 18px 18px 0;padding:1.3rem 1.5rem;margin:2rem 0;font-size:0.88rem;color:var(--t2);line-height:1.7}
 .bottom strong{color:var(--t)}
-@media(max-width:768px){article{padding:3rem 1.5rem 2rem}.claim-grid{grid-template-columns:1fr}}
+@media(max-width:768px){article{padding:5rem 1rem 2rem}.db-hero,.claim-grid{grid-template-columns:1fr}.db-hero{gap:1rem}}
 </style>
 <script src="data.js"></script>
 </head>
@@ -45,10 +51,21 @@ article{max-width:800px;margin:0 auto;padding:5rem 2rem 4rem}
 
 <article>
 
-<h1>The Databricks Playbook vs. The AI FinOps Framework</h1>
+<section class="db-hero">
+<div class="db-hero-copy">
+<div class="eyebrow">Databricks playbook · AI FinOps instrument</div>
+<h1>From AI cost playbook to measurement system.</h1>
 <p class="subtitle">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. We stress-tested 8 models across 227 experiments. Both arrived at the same four cost levers through different methods — their production data and our controlled experiments converge. The framework adds a dimension their playbook doesn't address: model integrity under degraded input.</p>
-
-<a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original: Databricks — Managing AI Coding Costs at Scale (Aug 7, 2026) →</a>
+<a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" class="ext-link" target="_blank">Read the original Databricks post →</a>
+</div>
+<aside class="db-ledger">
+<h3>Where the evidence differs</h3>
+<div class="db-row market"><span>Databricks source</span><strong>Enterprise surveys</strong></div>
+<div class="db-row"><span>Framework source</span><strong>227 experiments</strong></div>
+<div class="db-row"><span>Stress method</span><strong>10 operators</strong></div>
+<div class="db-row"><span>Added dimension</span><strong>Grit</strong></div>
+</aside>
+</section>
 
 <!-- Section 1: Efficiency Frontier = Grit -->
 <div class="section-hd"><h2>The Efficiency Frontier = Grit</h2></div>
