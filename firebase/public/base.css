@@ -312,17 +312,17 @@ body.light .cta-btn:hover{box-shadow:0 16px 42px rgba(8,145,178,0.28)}
 
 /* === Floating Table of Contents (bottom-right button + slide panel) === */
 .toc-float {
-  position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+  position: fixed; bottom: 1.5rem; right: 4.5rem; z-index: 190;
   width: 44px; height: 44px; border-radius: 50%;
   background: var(--bg3); border: 1px solid var(--ba);
-  color: var(--t2); font-size: 1.1rem; cursor: pointer;
+  color: var(--t2); font-size: 1.4rem; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 4px 16px rgba(0,0,0,0.35);
   transition: opacity 0.2s, transform 0.2s;
   opacity: 0; transform: translateY(10px); pointer-events: none;
 }
-.toc-float.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
-.toc-float:hover { background: var(--bg4); color: var(--ac); }
+.toc-float.visible { opacity: 0.85; transform: translateY(0); pointer-events: auto; }
+.toc-float.visible:hover { opacity: 1; background: var(--bg4); color: var(--ac); }
 
 .toc-overlay {
   position: fixed; inset: 0; z-index: 199;

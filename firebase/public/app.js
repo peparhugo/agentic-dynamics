@@ -114,11 +114,12 @@
   // Inject DOM
   var overlay = document.createElement('div'); overlay.className = 'toc-overlay'; document.body.appendChild(overlay);
   var panel = document.createElement('nav'); panel.className = 'toc-panel'; panel.innerHTML = '<div class="toc-panel-header">On this page</div>' + panelLinks; document.body.appendChild(panel);
-  var btn = document.createElement('button'); btn.className = 'toc-float'; btn.setAttribute('aria-label','Contents'); btn.innerHTML = '\u2261'; document.body.appendChild(btn);
+  var btn = document.createElement('button'); btn.className = 'toc-float'; btn.setAttribute('aria-label','Contents'); btn.innerHTML = '\u2630'; document.body.appendChild(btn);
 
   // Show button after scrolling
-  var showBtn = function() { btn.classList.toggle('visible', window.scrollY > 400); };
+  var showBtn = function() { btn.classList.toggle('visible', window.scrollY > 300); };
   window.addEventListener('scroll', showBtn, { passive: true });
+  showBtn(); // initial check
 
   // Toggle panel
   var close = function() { overlay.classList.remove('open'); panel.classList.remove('open'); };
