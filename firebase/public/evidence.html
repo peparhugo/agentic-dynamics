@@ -452,16 +452,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var datasets = {};
     gritPoints.forEach(function(p) {
-      if (!datasets[p.label]) datasets[p.label] = [];
-      datasets[p.label].push({ x: p.escape, y: p.correctness, r: Math.max(5, p.cost * 20) });
+      var key = p.label + '|' + (p.perturbation_class || 'semantic');
+      if (!datasets[key]) datasets[key] = { label: p.label, pc: p.perturbation_class, xs: [], ys: [], costs: [] };
+      datasets[key].xs.push(p.escape != null ? p.escape : 0);
+      datasets[key].ys.push(p.correctness != null ? p.correctness : 0);
+      datasets[key].costs.push(p.cost || 0);
     });
 
     var ds = [];
-    Object.keys(datasets).forEach(function(label) {
-      var color = modelColors[label] || 'rgba(161,161,170,0.70)';
+    Object.keys(datasets).forEach(function(key) {
+      var g = datasets[key];
+      var cx = g.xs.reduce(function(a,b){return a+b;},0) / g.xs.length;
+      var cy = g.ys.reduce(function(a,b){return a+b;},0) / g.ys.length;
+      var ccost = g.costs.reduce(function(a,b){return a+b;},0) / g.costs.length;
+      var color = modelColors[g.label] || 'rgba(161,161,170,0.70)';
       ds.push({
-        label: label,
-        data: datasets[label],
+        label: g.label + ' (' + g.pc + ')',
+        data: [{ x: cx, y: cy, r: Math.max(8, Math.sqrt(g.xs.length) * 10) }],
         backgroundColor: color,
         borderColor: color.replace('0.70','1').replace('0.85','1').replace('0.60','1').replace('0.50','1'),
         borderWidth: 1
