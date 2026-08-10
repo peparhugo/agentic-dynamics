@@ -1,11 +1,8 @@
-/* Generated 2026-08-10 13:35:08 UTC by build_data.py */
+/* Generated 2026-08-10 14:24:26 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.FRAMEWORK_DATA = {
   "_meta": {
-    "generated_at": "2026-08-10T13:35:07.999046+00:00",
-    "source_inventory": "/home/drseuss/ai-finops-framework/experiments/inventory.json",
-    "source_summary": "/home/drseuss/ai-finops-framework/experiments/results/_results_summary.json",
-    "source_db": "/home/drseuss/.local/share/opencode/opencode.db",
+    "generated_at": "2026-08-10T14:24:26.773374+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -51,10 +48,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 706,
       "avg_thinking_ratio": 0.087,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.0,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.615,
       "avg_code_quality": 0.246,
       "avg_comment_ratio": 0.02,
@@ -151,10 +148,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 199,
       "avg_thinking_ratio": 0.19,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.3,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.688,
       "avg_code_quality": 0.487,
       "avg_comment_ratio": 0.072,
@@ -251,10 +248,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 264,
       "avg_thinking_ratio": 0.066,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.18,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.694,
       "avg_code_quality": 0.407,
       "avg_comment_ratio": 0.063,
@@ -351,10 +348,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 403,
       "avg_thinking_ratio": 0.083,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.03,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.639,
       "avg_code_quality": 0.273,
       "avg_comment_ratio": 0.063,
@@ -548,10 +545,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 367,
       "avg_thinking_ratio": 0.064,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.02,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.726,
       "avg_code_quality": 0.37,
       "avg_comment_ratio": 0.009,
@@ -748,10 +745,10 @@ window.FRAMEWORK_DATA = {
       "strategy_efficient": 0,
       "avg_loc": 568,
       "avg_thinking_ratio": 0.0,
-      "avg_escape": NaN,
+      "avg_escape": null,
       "avg_narration_penalty": 0.08,
-      "avg_arch_divergence": NaN,
-      "avg_struct_divergence": NaN,
+      "avg_arch_divergence": null,
+      "avg_struct_divergence": null,
       "avg_composite_score": 0.636,
       "avg_code_quality": 0.278,
       "avg_comment_ratio": 0.033,
@@ -1283,10 +1280,10 @@ window.FRAMEWORK_DATA = {
             0.0134,
             0.0165
           ],
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": [
-            NaN,
-            NaN
+            null,
+            null
           ],
           "avg_correctness": 0.8988,
           "correctness_ci95": [
@@ -1304,10 +1301,10 @@ window.FRAMEWORK_DATA = {
             0.6883,
             1.1929
           ],
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": [
-            NaN,
-            NaN
+            null,
+            null
           ],
           "avg_correctness": 0.924,
           "correctness_ci95": [
@@ -1322,7 +1319,7 @@ window.FRAMEWORK_DATA = {
           "n": 1,
           "avg_cost": 0.0037,
           "cost_ci95": null,
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": null,
           "avg_correctness": 0.7,
           "correctness_ci95": null,
@@ -1337,10 +1334,10 @@ window.FRAMEWORK_DATA = {
             0.4159,
             0.6236
           ],
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": [
-            NaN,
-            NaN
+            null,
+            null
           ],
           "avg_correctness": 1.0,
           "correctness_ci95": [
@@ -1358,10 +1355,10 @@ window.FRAMEWORK_DATA = {
             0.0219,
             0.0435
           ],
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": [
-            NaN,
-            NaN
+            null,
+            null
           ],
           "avg_correctness": 0.8667,
           "correctness_ci95": [
@@ -1379,10 +1376,10 @@ window.FRAMEWORK_DATA = {
             0.1773,
             0.2201
           ],
-          "avg_escape": NaN,
+          "avg_escape": null,
           "escape_ci95": [
-            NaN,
-            NaN
+            null,
+            null
           ],
           "avg_correctness": 0.8333,
           "correctness_ci95": [
@@ -1406,10 +1403,10 @@ window.FRAMEWORK_DATA = {
           0.0144,
           0.017
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
-          NaN,
-          NaN
+          null,
+          null
         ],
         "avg_correctness": 0.91,
         "correctness_ci95": [
@@ -1429,10 +1426,10 @@ window.FRAMEWORK_DATA = {
           0.3763,
           0.5175
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
-          NaN,
-          NaN
+          null,
+          null
         ],
         "avg_correctness": 1.0,
         "correctness_ci95": [
@@ -1452,10 +1449,10 @@ window.FRAMEWORK_DATA = {
           0.8761,
           1.2718
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
-          NaN,
-          NaN
+          null,
+          null
         ],
         "avg_correctness": 0.95,
         "correctness_ci95": [
@@ -1475,10 +1472,10 @@ window.FRAMEWORK_DATA = {
           0.0044,
           0.0072
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
           0.4464,
-          NaN
+          null
         ],
         "avg_correctness": 0.76,
         "correctness_ci95": [
@@ -1521,10 +1518,10 @@ window.FRAMEWORK_DATA = {
           0.0206,
           0.0333
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
-          NaN,
-          NaN
+          null,
+          null
         ],
         "avg_correctness": 0.91,
         "correctness_ci95": [
@@ -1544,10 +1541,10 @@ window.FRAMEWORK_DATA = {
           0.1241,
           0.1865
         ],
-        "avg_escape": NaN,
+        "avg_escape": null,
         "escape_ci95": [
-          NaN,
-          NaN
+          null,
+          null
         ],
         "avg_correctness": 0.95,
         "correctness_ci95": [

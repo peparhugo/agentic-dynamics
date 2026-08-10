@@ -4,6 +4,11 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>How I Discovered the AI FinOps Framework — The Story</title>
 <meta name="description" content="The personal story behind the AI FinOps Framework. From a $20 DeepSeek API key to a predictive model covering 8 models and 224 game reports.">
+<meta property="og:title" content="AI FinOps Framework">
+<meta property="og:description" content="Calibrated measurement instrument for AI inference costs. 227 experiments across 8 models.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <style>
@@ -103,7 +108,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div class="highlight" style="padding:1.3rem">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
 <li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%.</li>
-<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? Claude: ~50% overhead at $15 per million output tokens. DeepSeek: ~3% overhead at $1.10 per million output tokens.</li>
+<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead (0.3% penalty). Claude: 8.5% narration penalty on successful sessions, plus 11.4% flail rate (sessions producing zero code). Measured from 227 experiments.</li>
 </ul>
 </div>
 
@@ -113,7 +118,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>We call this the <strong style="color:var(--ac)">Silent Inference Principle</strong>. The model's ability to reason in latent space and act, rather than narrating every step as billable output. It's a structural property of the training architecture, not a parameter you can toggle.</p>
 
-<p>Later analysis revealed the deeper layer: both models generate ~11,000 tokens per session. Identical computational effort. Claude's tokens just cost 25× more per unit. And Claude writes 22,500 tokens to cache per session at $3.75/Mtok — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
+<p>Later analysis revealed the deeper layer: both models generate ~11,000 tokens per session. Identical computational effort. Claude's tokens just cost 13.6&times; more per unit ($15.00 vs $1.10 per 1M output tokens). And Claude writes 22,500 tokens to cache per session at $3.75/Mtok — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 
 <div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
@@ -142,7 +147,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>This became a cumulative framework for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
 </div>
 
-<p>What I didn't expect: When we first published this framework, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't. It uses the SAME number of generated tokens as Claude. The difference is that each of Claude's tokens costs 25× more. And the cache write tax — 22,500 tokens written to cache at $3.75/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
+<p>What I didn't expect: When we first published this framework, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't. It uses the SAME number of generated tokens as Claude. The difference is that each of Claude's tokens costs 13.6&times; more. And the cache write tax — 22,500 tokens written to cache at $3.75/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
 
 <h2>Why I was the person who could build this.</h2>
 

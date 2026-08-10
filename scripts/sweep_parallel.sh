@@ -4,7 +4,7 @@
 # Collects results from DB after completion
 
 set -e
-cd /root/reasoning-instrument
+cd ~/ai-finops-framework
 
 TASK="Build an authenticated REST API with these requirements:
 1. JWT-based user auth with refresh tokens
@@ -36,7 +36,6 @@ SILENT_FORCED="[STANDARDIZED CONSTRAINTS — APPLY TO ALL MODELS]
 - At the END of your response, state EXACTLY on one line: \"TESTS: N passed, M failed\"
 
 $TASK"
-"  # dupe, remove
 
 # Build run command for a single cell
 run_cell() {
@@ -51,7 +50,7 @@ run_cell() {
     local existing
     existing=$(python3 -c "
 import sqlite3
-c=sqlite3.connect('/root/.local/share/opencode/opencode.db')
+c=sqlite3.connect('~/.local/share/opencode/opencode.db')
 c.execute('SELECT cost FROM session WHERE title = ? ORDER BY time_created DESC LIMIT 1', ('$title',))
 r=c.fetchone()
 print(r[0] if r else 0)" 2>/dev/null)
@@ -76,7 +75,7 @@ print(r[0] if r else 0)" 2>/dev/null)
     fi
 
     echo "[RUN] $title"
-    /root/.opencode/bin/opencode run \
+    ~/.opencode/bin/opencode run \
         --model "$model_id" \
         --title "$title" \
         --format json \
@@ -131,7 +130,7 @@ echo "=== SWEEP COMPLETE ==="
 # Print summary from DB
 python3 -c "
 import sqlite3
-c=sqlite3.connect('/root/.local/share/opencode/opencode.db')
+c=sqlite3.connect('~/.local/share/opencode/opencode.db')
 c.execute('''SELECT title,cost,json_extract(model,\"\$.providerID\") FROM session 
     WHERE title LIKE \"%silent_sweep%\" ORDER BY title''')
 rows=c.fetchall()

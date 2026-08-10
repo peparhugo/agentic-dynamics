@@ -37,7 +37,7 @@ What are you doing?
 | **Semantic operators** | Probe reasoning coherence (false premises, contradictions, etc.) |
 | **Basin** | Attractor basin — the solution space a model defaults to. Escape = divergence from baseline. |
 | **Recovery** | Tokens burned returning to familiar patterns after perturbation |
-| **Strategy archetype** | Conservative / Exploratory / Exploitative / Flailing (from basin + cost + correctness) |
+| **Strategy archetype** | CONSERVATIVE / EXPLORATORY / EFFICIENT / WASTEFUL (from basin + cost + correctness) |
 | **Explanation Tax** | Overhead cost of narrated reasoning (Claude ~50%, DeepSeek ~3%) |
 | **Game Report** | Markdown artifact summarizing a single experiment run's dynamics + cost + quality |
 
@@ -62,9 +62,9 @@ opencode.db ──→ inventory.py refresh          ──→ inventory.json
 
 | Directory | Contains | CONTEXT |
 |-----------|----------|---------|
-| `src/instrument/` | 16 Python modules — measurement apparatus | `src/instrument/CONTEXT.md` |
-| `scripts/` | 25 scripts (24 `.py` + 1 `.sh`) — runners, analyzers, pipeline, 8 lab books | `scripts/CONTEXT.md` |
-| `experiments/` | 34 YAML configs, results, 8 lab books, 6 reviews | `experiments/CONTEXT.md` |
+| `src/instrument/` | 21 Python modules — measurement apparatus | `src/instrument/CONTEXT.md` |
+| `scripts/` | 35 Python scripts + 1 `.sh` — runners, analyzers, pipeline, 14 lab books | `scripts/CONTEXT.md` |
+| `experiments/` | 34 YAML configs, results, 14 lab books, 6 reviews | `experiments/CONTEXT.md` |
 | `firebase/` | Public website (7 HTML pages + data.js) | `firebase/CONTEXT.md` |
 | `tests/` | pytest suite for adapter, perturb, pricing, recovery | — |
 | `infrastructure/` | Test suite (4 modules), Docker Compose (Neo4j + ChromaDB) | — |

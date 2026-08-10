@@ -37,7 +37,7 @@ class Neo4jClient:
     """Manage Neo4j graph population and queries."""
 
     def __init__(self, uri: str = "bolt://localhost:7687", user: str = "neo4j",
-                 password: str = "password123"):
+                 password: str = "password123"):  # local dev only — override via ENV for prod
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):

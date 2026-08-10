@@ -19,7 +19,7 @@ On August 7, 2026, Databricks published their playbook for reducing AI coding co
 
 They call the core concept the **Efficiency Frontier.** We call it **Grit (Ground-Truth Integrity):** how well a model maintains correctness when given degraded, contradictory, or incomplete instructions.
 
-Both models produce ~11,000 generated tokens per session. Same computational effort. One costs **$0.016.** The other costs **$1.08.** That's a **69× gap** on identical output.
+Both models produce ~11,000 generated tokens per session. Same computational effort. One costs **$0.016.** The other costs **$1.08.** That's a **69× gap** on comparable output. DeepSeek produces 1.26× more code per session (713 vs 568 LOC) at 88.7% correctness vs Claude's 88%.
 
 This framework provides the calibrated measurements, governance rules, and reproducible methodology behind those numbers.
 

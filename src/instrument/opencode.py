@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 # Resolve opencode binary: env override or default ~/.opencode/bin/opencode
-_OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", "")
+_OPENSCODE_BIN = os.environ.get("OPENCODE_BIN", "")
 if _OPENSCODE_BIN:
     OPENSCODE_BIN = _OPENSCODE_BIN
 elif Path.home().exists():

@@ -583,9 +583,23 @@ def build():
         },
     }
 
+    import math
+    # Strip NaN values (replace with null) and remove local paths
+    def _clean_value(obj):
+        if isinstance(obj, float) and math.isnan(obj):
+            return None
+        if isinstance(obj, dict):
+            return {k: _clean_value(v) for k, v in obj.items() if k not in ('source_inventory', 'source_summary', 'source_db')}
+        if isinstance(obj, list):
+            return [_clean_value(v) for v in obj]
+        if isinstance(obj, str):
+            return obj.replace(str(ROOT), '.').replace(str(Path.home()), '~')
+        return obj
+    clean_data = _clean_value(data)
+
     js = f"/* Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} by build_data.py */\n"
     js += "/* DO NOT EDIT — regenerate with: python scripts/build_data.py */\n"
-    js += "window.FRAMEWORK_DATA = " + json.dumps(data, indent=2, default=str) + ";\n"
+    js += "window.FRAMEWORK_DATA = " + json.dumps(clean_data, indent=2, default=str) + ";\n"
 
     return js, data
 

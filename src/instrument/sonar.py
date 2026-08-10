@@ -19,8 +19,8 @@ from pathlib import Path
 from typing import Any
 
 SONAR_URL_DEFAULT = "http://localhost:9000"
-SONAR_USER_DEFAULT = "admin"
-SONAR_PASSWORD_DEFAULT = "admin"
+SONAR_USER_DEFAULT = "admin"    # local dev only — override via ENV for prod
+SONAR_PASSWORD_DEFAULT = "admin"  # local dev only — override via ENV for prod
 
 
 @dataclass
