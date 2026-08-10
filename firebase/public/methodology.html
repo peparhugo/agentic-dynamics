@@ -114,7 +114,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <!-- Recovery -->
 <section class="sec alt wide">
 <h2>Recovery Classification</h2>
-<p class="lead">When perturbed, models either <strong style="color:var(--ac)">escape</strong> the basin (produce genuinely different solutions) or <strong style="color:var(--am)">recover</strong> (return to the baseline). Six detection signals classify each reasoning segment as EXPLORATION or RECOVERY.</p>
+<p class="lead">When perturbed, models either <strong style="color:var(--ac)">escape</strong> the basin (produce genuinely different solutions) or <strong style="color:var(--am)">recover</strong> (return to the baseline). Seven detection signals classify each reasoning segment as EXPLORATION or RECOVERY.</p>
 <div class="cards">
 <div class="card"><div class="ctitle">1. Recovery Markers</div><div class="cdesc">Text patterns like "let me explain," "in other words," "to clarify," "here's why" signal the model is justifying a return to familiar territory. 18 marker patterns scanned.</div></div>
 <div class="card"><div class="ctitle">2. Tool Convergence</div><div class="cdesc">Does the tool-call sequence converge toward the baseline set? Scored by Jaccard similarity between perturbed and baseline tool invocations.</div></div>

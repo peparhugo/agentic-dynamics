@@ -146,7 +146,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-box">
   <div class="tag ours">This framework</div>
   <h4>Our measurement</h4>
-  <p><strong>Explanation Tax:</strong> Claude flails on 11.4% of sessions (zero code, narration only) vs DeepSeek 8.4%. When models succeed, DeepSeek carries negligible narration overhead (0.3% penalty), Claude carries 8.5%. <strong>Cache Tax:</strong> $3.75/Mtok writes vs $0.14/Mtok reads — <strong>26.8&times; pricing asymmetry.</strong> Claude writes 22.5K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
+  <p><strong>Explanation Tax:</strong> Claude flails on 11% of sessions (zero code, narration only) vs DeepSeek 8%. When models succeed, DeepSeek carries negligible narration overhead (0.0% penalty), Claude carries 8.5%. <strong>Cache Tax:</strong> $3.75/Mtok writes vs $0.14/Mtok reads — <strong>26.8&times; pricing asymmetry.</strong> Claude writes 20.0K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
 </div>
 </div>
 <div class="gap-box"><strong>Where they stop short:</strong> They found token overhead exists. We measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation. That's actionable at the model selection level, not just the harness tuning level. If you're tuning a harness to make Claude less chatty, you're fighting its training distribution. If you route to DeepSeek, the problem disappears.</div>

@@ -1,8 +1,8 @@
-/* Generated 2026-08-10 14:55:49 UTC by build_data.py */
+/* Generated 2026-08-10 17:31:44 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.FRAMEWORK_DATA = {
   "_meta": {
-    "generated_at": "2026-08-10T14:55:49.565857+00:00",
+    "generated_at": "2026-08-10T17:31:44.118147+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -102,7 +102,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -202,7 +201,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -302,7 +300,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -402,7 +399,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -499,7 +495,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -599,7 +594,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -699,7 +693,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",
@@ -799,7 +792,6 @@ window.FRAMEWORK_DATA = {
         "avg_comment_ratio": "C",
         "avg_energy_j": "C",
         "avg_energy_j_per_loc": "C",
-        "avg_cost_per_joule": "C",
         "avg_quality_per_joule": "C",
         "correctness_per_dollar": "C",
         "ast_files": "C",

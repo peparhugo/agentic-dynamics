@@ -30,7 +30,7 @@ This framework provides the calibrated measurements, governance rules, and repro
 | # | Rule | What It Tells You |
 |---|------|-------------------|
 | 1 | **Grit (Ground-Truth Integrity)** | Default to models that maintain correctness under degraded input. If a model flails — producing zero code — it has low Grit. |
-| 2 | **The Explanation Tax** | Rule 1 selects models that CAN code. Rule 2 measures what resilience COSTS. Measured: Claude flails on 11.4% of sessions (zero code), 8.5% narration penalty when successful. DeepSeek: 8.4% flail, 0.3% penalty. |
+| 2 | **The Explanation Tax** | Rule 1 selects models that CAN code. Rule 2 measures what resilience COSTS. Measured: Claude flails on 11% of sessions (zero code), 8.5% narration penalty when successful. DeepSeek: 8% flail, 0.0% penalty. |
 | 3 | **The Snowball Rule** | Codebase growth compounds quadratically (N²). Model the curve before architectural commitments. |
 | 4 | **The EPM Horizon Rule** | Energy costs are the inflation rate of AI compute. Find the year your local prices flip your model selection. |
 | 5 | **The First-Pass Rule** | Price the outcome, not the prompt. WOC = 1/(1+r). Track by task type, model, and time of day. |

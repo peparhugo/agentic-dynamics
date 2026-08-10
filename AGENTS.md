@@ -38,7 +38,7 @@ What are you doing?
 | **Basin** | Attractor basin — the solution space a model defaults to. Escape = divergence from baseline. |
 | **Recovery** | Tokens burned returning to familiar patterns after perturbation |
 | **Strategy archetype** | CONSERVATIVE / EXPLORATORY / EFFICIENT / WASTEFUL (from basin + cost + correctness) |
-| **Explanation Tax** | Overhead cost of narrated reasoning (Claude 11.4% flail + 8.5% penalty; DeepSeek 8.4% flail + 0.3% penalty) |
+| **Explanation Tax** | Overhead cost of narrated reasoning (Claude 11% flail + 8% penalty; DeepSeek 8% flail + 0.0% penalty) |
 | **Game Report** | Markdown artifact summarizing a single experiment run's dynamics + cost + quality |
 
 ## Data Pipeline

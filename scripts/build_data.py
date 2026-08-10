@@ -294,7 +294,7 @@ def compute_model_data(inventory, summary, db_breakdown):
                 "avg_arch_divergence": "C", "avg_struct_divergence": "C",
                 "avg_composite_score": "C", "avg_code_quality": "C", "avg_comment_ratio": "C",
                 "avg_energy_j": "C", "avg_energy_j_per_loc": "C",
-                "avg_cost_per_joule": "C", "avg_quality_per_joule": "C",
+                "avg_quality_per_joule": "C",
                 "correctness_per_dollar": "C", "ast_files": "C", "ast_functions": "C",
                 "ast_classes": "C", "ast_type_hint_pct": "C", "ast_docstring_pct": "C",
                 "avg_constraints_met": "C", "avg_constraints_total": "C",
