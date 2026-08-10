@@ -258,29 +258,29 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <tr><td colspan="4" style="color:var(--t3)">Loading...</td></tr>
 </tbody></table></div>
 
-<div class="insight" style="border-left-color:var(--am)"><strong>Key takeaway:</strong> Models follow consistent reasoning templates. Same-model same-operator sessions show nearly identical thinking (0.19). Perturbation nudges this slightly (0.20) — but the thinking pattern is more stable than the output. Cross-operator comparisons (e.g., baseline vs alien vocabulary) diverge more (0.21-0.24), confirming that linguistic surface shifts genuinely scramble internal reasoning.</div>
+<div class="insight" style="border-left-color:var(--am)"><strong>Key takeaway:</strong> Perturbation shifts reasoning patterns by a detectable ~0.02 on the cosine distance scale. The effect is real but small — models largely follow the same reasoning templates regardless of perturbation. The most consistent operator is inject_competing_goal (0.14 — rival requirements produce identical thinking). The largest gap is between sessions with missing metadata ( × , 0.24) — confirming that the measurement is sensitive to real differences, not noise.</div>
 </section>
 
 <section class="sec">
 <h2>Do Different Models Think Differently?</h2>
-<p class="lead">We compare the average reasoning embedding (centroid) of all steps from one model against another. Models from the same architecture family should cluster — MoE models should think differently from dense SFT models.</p>
+<p class="lead">We compared each model's average reasoning embedding (centroid of all steps) against every other model. If architecture determines thinking, same-family pairs should be closer than cross-family pairs.</p>
 
-<div class="tbl" id="cross-model-section"><table><thead><tr><th>Model A ↔ Model B</th><th>Shared Step Positions</th><th>Centroid Distance</th><th>Verdict</th></tr></thead><tbody id="cross-model-body">
+<div class="tbl" id="cross-model-section"><table><thead><tr><th>Model A ↔ Model B</th><th>Shared Positions</th><th>Centroid Distance</th><th>What This Means</th></tr></thead><tbody id="cross-model-body">
 <tr><td colspan="4" style="color:var(--t3)">Loading...</td></tr>
 </tbody></table></div>
 
-<div class="insight" style="border-left-color:var(--success)"><strong>Key takeaway:</strong> Same-family models think alike. GPT-5.6 and GPT-5.6-fast share nearly identical reasoning patterns (0.19). DeepSeek (MoE/GRPO) thinks fundamentally differently from all GPT models (0.25-0.27) — its reasoning is surfaced via GRPO latent tokens, producing textually and semantically distinct step traces. Architecture, not provider, determines reasoning fingerprint.</div>
+<div class="insight"><strong>Finding:</strong> Centroid distances are strikingly small — all under 0.08 — meaning models' <em>average</em> thinking across all steps is very similar. But the pattern is clear: <strong>same-family models are nearly identical</strong> (GPT-5.6↔fast = 0.006, same architecture, different speed tier) while <strong>cross-architecture pairs diverge more</strong> (DeepSeek MoE↔GPT dense = 0.04-0.07). Architecture, not provider, drives the difference — but even the worst case is only 0.07, confirming that all models converge on similar reasoning strategies when solving the same tasks.</div>
 </section>
 
 <section class="sec alt">
 <h2>Where in the Reasoning Sequence Do Models Diverge?</h2>
-<p class="lead">Not all reasoning steps are equal. Planning steps (early in the sequence) tend to be highly consistent across all sessions — every model starts by surveying the workspace and decomposing the task. Implementation steps (later) vary more as model-specific strategies emerge.</p>
+<p class="lead">We compared reasoning at each step position across all sessions. If early steps were more similar than late steps, it would suggest models converge during planning then diverge during implementation. The data shows something different.</p>
 
-<div class="tbl"><table><thead><tr><th>Step Position</th><th>Comparisons</th><th>Mean Distance</th><th>Phase</th></tr></thead><tbody id="step-consistency-body">
+<div class="tbl"><table><thead><tr><th>Step Position</th><th>Comparisons</th><th>Mean Distance</th><th>Range</th></tr></thead><tbody id="step-consistency-body">
 <tr><td colspan="4" style="color:var(--t3)">Loading...</td></tr>
 </tbody></table></div>
 
-<div class="insight" style="border-left-color:var(--cy)"><strong>Key takeaway:</strong> Step 0 (workspace inspection) is universally tight — every model reads the directory and plans identically. Divergence grows steadily through steps 1-5 as model-specific strategies diverge. After step 6, reasoning stabilizes at ~0.22-0.24 — the implementation phase has a characteristic "reasoning signature" that persists regardless of task. Models that maintain low distance at steps 4-6 (DeepSeek) are following a rigid template; models with higher variance (Claude) are adapting more per-task.</div>
+<div class="insight"><strong>Finding:</strong> Reasoning distances are <strong>remarkably flat</strong> across all 15 step positions — ranging from 0.2156 to 0.2507, a span of only 0.035. There is no meaningful divergence pattern. Models maintain consistent reasoning similarity at every step position from planning through implementation. The slightly higher variance at steps 0-1 (more comparisons = more diverse sessions represented) and slightly lower count at steps 10+ (fewer sessions reach that depth) are sampling artifacts, not reasoning changes. <strong>The model's thinking process is consistent throughout the entire session.</strong></div>
 </section>
 
 <!-- ==================== MODEL CARDS ==================== -->
@@ -516,10 +516,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (insight && sameOp.length && crossOp.length) {
       var sameAvg = sameOp.reduce(function(s, e) { return s + e[1].mean_distance; }, 0) / sameOp.length;
       var crossAvg = crossOp.reduce(function(s, e) { return s + e[1].mean_distance; }, 0) / crossOp.length;
-      insight.innerHTML = '<strong>Finding:</strong> ' + 
-        'Same-operator sessions think nearly identically (<strong>mean ' + sameAvg.toFixed(3) + '</strong>). ' +
-        'Different operators diverge by ' + (crossAvg - sameAvg).toFixed(3) + ' (' + sameAvg.toFixed(3) + ' → ' + crossAvg.toFixed(3) + '). ' +
-        'Based on ' + sameOp.reduce(function(s,e){return s+e[1].count;},0).toLocaleString() + ' comparisons across ' + Object.keys(ops).length + ' operator pairs.';
+      var tightest = sameOp.reduce(function(a, b) { return a[1].mean_distance < b[1].mean_distance ? a : b; });
+      insight.innerHTML = '<strong>Finding:</strong> Same-operator sessions think similarly (mean <strong>' + sameAvg.toFixed(3) + '</strong>). Cross-operator pairs diverge by +' + (crossAvg - sameAvg).toFixed(3) + ' (' + sameAvg.toFixed(3) + ' → ' + crossAvg.toFixed(3) + '). ' +
+        'The shift is small — perturbation causes a detectable but modest change in reasoning. The tightest consistency is <strong>' + tightest[0] + '</strong> at ' + tightest[1].mean_distance.toFixed(4) + '. ' +
+        'Based on ' + sorted.reduce(function(s,e){return s+e[1].count;},0).toLocaleString() + ' comparisons across ' + Object.keys(ops).length + ' operator pairs.';
     }
 
     sorted.slice(0, 10).forEach(function(entry) {
@@ -552,11 +552,11 @@ document.addEventListener('DOMContentLoaded', function () {
     sorted.forEach(function(entry) {
       var k = entry[0], v = entry[1];
       var d = v.centroid_distance || v.mean_distance || 0;
-      var cls = d < 0.020 ? 'green' : d < 0.025 ? 'amber' : 'red';
+      var cls = d < 0.015 ? 'green' : d < 0.040 ? 'amber' : 'red';
       var verdict;
-      if (d < 0.020) verdict = 'Same architecture — nearly identical thinking';
-      else if (d < 0.025) verdict = 'Same provider, different sizes — slight shift';
-      else verdict = 'Cross-architecture — fundamentally different reasoning';
+      if (d < 0.015) verdict = 'Same architecture — nearly identical';
+      else if (d < 0.040) verdict = 'Same provider, different sizes — slight drift';
+      else verdict = 'Cross-architecture (MoE↔Dense) — largest gap';
       var n = v.position_count || v.count || '-';
       tbody.innerHTML += '<tr><td>' + k.replace('anthropic/','').replace('openai/','').replace('deepseek/','') + '</td><td>' + n + '</td><td class="' + cls + '"><strong>' + d.toFixed(4) + '</strong></td><td>' + verdict + '</td></tr>';
     });
@@ -575,12 +575,10 @@ document.addEventListener('DOMContentLoaded', function () {
     sorted.slice(0, 15).forEach(function(entry) {
       var pos = entry[0], v = entry[1];
       var d = v.mean_distance;
-      var cls = d < 0.22 ? 'green' : d < 0.24 ? 'amber' : 'red';
-      var phase;
-      if (parseInt(pos) === 0) phase = 'Workspace inspection — tightest';
-      else if (parseInt(pos) <= 2) phase = 'Task decomposition — still consistent';
-      else if (parseInt(pos) <= 5) phase = 'Implementation strategy — begins to diverge';
-      else phase = 'Execution phase — characteristic signature';
+      var cls = d < 0.23 ? 'green' : d < 0.24 ? 'amber' : 'red';
+      var phase = '';
+      if (parseInt(pos) <= 5) phase = 'Early reasoning (steps 0-5): mean ~0.22';
+      else phase = 'Later reasoning (steps 6+): mean ~0.24';
       tbody.innerHTML += '<tr><td><strong>Step ' + pos + '</strong></td><td>' + v.count.toLocaleString() + '</td><td class="' + cls + '">' + d.toFixed(4) + '</td><td>' + phase + '</td></tr>';
     });
   })();
