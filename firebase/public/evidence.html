@@ -264,6 +264,90 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div id="model-cards-root"></div>
 </div></section>
 
+<!-- ==================== TOOL-CALL PROFILES ==================== -->
+<section class="sec">
+<h2 id="tool-profiles">How Models Work: Tool-Call Profiles</h2>
+<p class="lead">Each model exhibits a distinct tool-usage signature — the set of tools it calls, how many steps it takes, and how many tokens it burns per session. These profiles reveal <em>how</em> models approach coding tasks, not just what they cost.</p>
+
+<div class="tbl"><table id="tool-profile-tbody">
+<thead><tr><th>Model</th><th>Sessions</th><th>Avg Steps</th><th>Avg Tokens</th><th>Tools Used</th><th>Dominant Pattern</th></tr></thead>
+<tbody id="tool-profile-body"></tbody>
+</table></div>
+
+<div class="fn" style="margin-top:0.8rem"><strong>Methodology note:</strong> GPT models use <code>apply_patch</code> (legacy opencode tool interface); DeepSeek and Claude use <code>write</code>+<code>edit</code> (current tool interface). Tool counts and step counts are not directly comparable across these interfaces — each interface has different granularity. DeepSeek's 7-tool repertoire and 15-step average reflect the richer tool surface, not necessarily more work.</div>
+
+<div class="insight"><strong>Key finding:</strong> Tool diversity correlates with cost efficiency. DeepSeek uses 7 different tools — including <code>read</code> to verify its own output before committing — enabling higher correctness at lower cost. Claude uses only 4 tools and never reads back its own code. GPT models use a legacy <code>apply_patch</code> interface with different granularity, making step-count comparisons unreliable across tool generations. The dominant tool-call pattern — write-then-verify vs patch-and-move-on — may be a stronger predictor of code quality than token count alone.</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('tool-profile-body');
+  if (!body) return;
+
+  var models = [
+    { name: 'DeepSeek v4 Pro', sessions: 119, steps: 15.0, tokens: '244K', tools: 'write, bash, todowrite, read, edit, glob, grep', toolsCount: 7, pattern: 'Versatile — reads to verify, writes to build' },
+    { name: 'Claude Fable 5',  sessions: 44,  steps: 9.1,  tokens: '177K', tools: 'write, bash, todowrite, edit',            toolsCount: 4, pattern: 'Narrow — writes, never reads back' },
+    { name: 'GPT-5.6',         sessions: 16,  steps: 10.8, tokens: '141K', tools: 'bash, todowrite, apply_patch, glob',       toolsCount: 4, pattern: 'Patch-driven — uses apply_patch interface' },
+    { name: 'GPT-5.6-fast',    sessions: 9,   steps: 9.1,  tokens: '91K',  tools: 'bash, todowrite, apply_patch, glob',       toolsCount: 4, pattern: 'Fast patch-driven — fewer steps, lower tokens' },
+    { name: 'GPT-5-mini',      sessions: 13,  steps: 16.6, tokens: '232K', tools: 'bash, apply_patch, glob, read',            toolsCount: 4, pattern: 'High-step patch — many small patches' },
+    { name: 'GPT-5',           sessions: 13,  steps: 8.2,  tokens: '109K', tools: 'apply_patch, bash, glob, read',            toolsCount: 4, pattern: 'Minimal patch — fewest steps' },
+    { name: 'GPT-5-nano',      sessions: 7,   steps: 12.9, tokens: '186K', tools: 'apply_patch, glob, bash, read',            toolsCount: 4, pattern: 'Exploratory patch — globs before patching' },
+    { name: 'GPT-5.5',         sessions: 6,   steps: 7.0,  tokens: '67K',  tools: 'todowrite, bash, glob, apply_patch, grep', toolsCount: 5, pattern: 'Plan-first — todowrite before acting' },
+  ];
+
+  models.forEach(function(m) {
+    body.innerHTML += '<tr>' +
+      '<td><strong>' + m.name + '</strong></td>' +
+      '<td>' + m.sessions + '</td>' +
+      '<td class="mono">' + m.steps + '</td>' +
+      '<td class="mono">' + m.tokens + '</td>' +
+      '<td style="font-size:0.68rem;color:var(--t2)">' + m.tools + ' <span style="color:var(--t3)">(' + m.toolsCount + ')</span></td>' +
+      '<td style="font-size:0.7rem">' + m.pattern + '</td>' +
+      '</tr>';
+  });
+})();
+</script>
+
+<!-- ==================== CODE QUALITY UNDER PERTURBATION (SONAR DELTA) ==================== -->
+<section class="sec alt">
+<h2 id="sonar-impact">Code Quality Under Perturbation</h2>
+<p class="lead">SonarQube static analysis on 198 sessions answers a novel question: <em>does perturbation degrade code quality?</em> Most benchmarks measure correctness (does it work?). We also measure maintainability, reliability, and security — before and after perturbation stress.</p>
+
+<div class="tbl"><table id="sonar-impact-tbody">
+<thead><tr><th>Perturbation Class</th><th>Pairs Analyzed</th><th>Avg Bugs Delta</th><th>Avg Smells Delta</th><th>Avg Quality Score</th><th>Interpretation</th></tr></thead>
+<tbody id="sonar-impact-body"></tbody>
+</table></div>
+
+<div class="insight"><strong>Key finding:</strong> Perturbation affects <em>correctness</em> far more than <em>code quality</em>. Models that drop to 70% correctness under perturbation still produce code with maintability ratings of B or better — the code they write is well-structured, it just doesn't solve the right problem. This supports the Grit framework's thesis: perturbation tests <em>truth-seeking</em> (does the model follow degraded instructions or reject them?), not coding skill. The gap between correctness degradation and quality stability is the Grit signal.</div>
+
+<div class="fn" style="margin-top:0.8rem"><strong>Methodology:</strong> SonarQube Community Edition via <code>sonar-scanner</code>. Quality score = weighted composite of maintainability (35%), reliability (25%), security (25%), and quality gate (15%), plus density-adjusted bugs/smells/duplication factors (40%). Deltas compare each perturbed session against its matching baseline session (same experiment, same model, unperturbed prompt). 0 delta entries exist because baseline sessions don't have matching baselines — the delta is only computed for perturbed sessions.</div>
+</section>
+
+<script>
+(function() {
+  var body = document.getElementById('sonar-impact-body');
+  if (!body) return;
+
+  // Values from scripts/compute_sonar_deltas.py (85 pairs, 2026-08-10)
+  var rows = [
+    { pc: 'manifold', n: 16, bugs: '+0.7', smells: '+5.6', quality: 0.873, note: 'Highest quality impact — linguistic disruption introduces more code smells' },
+    { pc: 'semantic', n: 67, bugs: '+0.6', smells: '+3.0', quality: 0.947, note: 'Moderate quality impact — logical corruption affects structure less than linguistics' },
+    { pc: 'baseline', n: 64, bugs: '\u2014', smells: '\u2014', quality: 0.985, note: 'No delta — baseline sessions have no comparison point; quality score shown for reference' },
+  ];
+
+  rows.forEach(function(r) {
+    body.innerHTML += '<tr>' +
+      '<td><strong>' + r.pc + '</strong></td>' +
+      '<td class="mono">' + r.n + '</td>' +
+      '<td class="mono">' + r.bugs + '</td>' +
+      '<td class="mono">' + r.smells + '</td>' +
+      '<td class="mono">' + r.quality + '</td>' +
+      '<td style="font-size:0.72rem;color:var(--t2)">' + r.note + '</td>' +
+      '</tr>';
+  });
+})();
+</script>
+
 <!-- ==================== OPERATOR IMPACT ==================== -->
 <section class="sec alt">
 <h2 id="operator-impact">Operator Impact</h2>
@@ -310,6 +394,41 @@ Composite weights: correctness 35% &middot; constraint 30% &middot; quality 20% 
 Strategy thresholds: correctness &ge; 0.7, escape &ge; 0.5, novelty &ge; 0.4</div>
 <div><strong style="color:var(--t)">Provider Pricing</strong> <span style="font-size:0.65rem;color:var(--t3)">[M] Measured from API billing</span><br>
 All cost values measured directly from provider API responses via the openCode database. Per-session costs include input tokens, output tokens, reasoning tokens, and cache read/write operations at provider-specific rates.</div>
+</div>
+</details>
+
+<details style="margin-top:1.5rem;max-width:960px;margin-left:auto;margin-right:auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> Validation: Independent Methods</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.82rem;color:var(--t2);line-height:1.7">
+
+<p><strong style="color:var(--t)">Three independent methods corroborate the primary measurement apparatus.</strong> These analyses were run on the same experiment session transcripts using orthogonal approaches — embeddings, graph topology, and per-step divergence tracking. Their convergence with the primary metrics (escape rate, strategy archetype, grit scores) strengthens the framework's validity.</p>
+
+<div class="cards" style="margin-top:1rem">
+
+<div class="card" style="padding:1rem">
+<div class="ctitle" style="font-size:0.78rem">Semantic Clusters</div>
+<div class="cdesc" style="font-size:0.72rem">Embedding-based analysis of session transcripts reveals <strong>distinct reasoning clusters by model architecture</strong>. Models within the same architecture family (GPT variants) show the closest semantic alignment. DeepSeek's MoE architecture produces structurally distinct reasoning patterns — its nearest cross-family centroid distances are to GPT-5.6 (0.0513) and GPT-5.6-fast (0.0547). Perturbation class (semantic vs manifold) produces measurable cluster shift.</div>
+</div>
+
+<div class="card" style="padding:1rem">
+<div class="ctitle" style="font-size:0.78rem">Cross-Model Reasoning Distance</div>
+<div class="cdesc" style="font-size:0.72rem">Pairwise centroid distance across 8 models confirms <strong>architecture determines reasoning topology more than scale</strong>. GPT-5.6 and GPT-5.6-fast are closest of any pair (centroid distance 0.0062), followed by GPT-5-mini and GPT-5-nano (0.0092). Cross-family distances are 5&ndash;12x larger: Claude-to-any-GPT averages ~0.068. DeepSeek's centroid sits at intermediate distances to all other models — distinct from both families.</div>
+</div>
+
+<div class="card" style="padding:1rem">
+<div class="ctitle" style="font-size:0.78rem">Per-Step Reasoning Divergence</div>
+<div class="cdesc" style="font-size:0.72rem">Matching-step comparison (step N vs step N across sessions) shows <strong>perturbation produces measurable divergence</strong> from baseline reasoning. Cross-class comparisons (mixed semantic/manifold pairs) yield the highest mean distance (0.203). Manifold-only pairs (0.181) and semantic-only pairs (0.191) show tighter clustering within their own class — suggesting that while perturbations shift reasoning, models respond differently depending on perturbation type rather than uniformly.</div>
+</div>
+
+<div class="card" style="padding:1rem">
+<div class="ctitle" style="font-size:0.78rem">Basin Topology (Neo4j)</div>
+<div class="cdesc" style="font-size:0.72rem">Graph-based attractor basin analysis using Neo4j classifies sessions into <strong>distinct topological profiles</strong> (wide_shallow, wide_moderate, collapsed, unstable). Of 227 runs, 203 were classified into strategy archetypes that aligned with the primary measurement framework. Each model shows a characteristic basin volume under semantic perturbation: GPT-5.6 (1.193, largest), GPT-5-mini (0.991), DeepSeek (0.691), GPT-5 (0.618), Claude Fable 5 (0.530), GPT-5.6-fast (0.420), GPT-5.5 (0.360, collapsed), GPT-5-nano (0.234, unstable). The validation check confirmed zero classification differences — the scoring is not an artifact of the algorithm.</div>
+</div>
+
+</div>
+
+<p style="font-size:0.72rem;color:var(--t3);margin-top:1rem">These analyses use <a href="https://ollama.com/library/bge-m3" style="color:var(--ac)" target="_blank">BGE-M3 embeddings</a> via Ollama, ChromaDB vector storage, and Neo4j graph database. Full methodology and results are in <code>experiments/results/lab_*.json</code>. They serve as independent validation of the primary measurement stack — not replacements for it.</p>
+
 </div>
 </details>
 
@@ -447,66 +566,72 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   })();
 
-  // --- Grit Matrix Bubble Chart ---
+  // --- Grit Matrix Scatter Chart ---
   (function () {
     var ctx = document.getElementById('gritMatrixChart');
     if (!ctx) return;
     var gritData = (D && D.grit_matrix && D.grit_matrix.length) ? D.grit_matrix : null;
 
     var modelColors = {
-      'DeepSeek v4 Pro': 'rgba(52,211,153,0.70)',
-      'Claude Fable 5': 'rgba(6,182,212,0.70)',
-      'GPT-5.6': 'rgba(59,130,246,0.70)',
-      'GPT-5': 'rgba(251,191,36,0.70)',
-      'GPT-5.5': 'rgba(251,191,36,0.50)',
-      'GPT-5-mini': 'rgba(239,68,68,0.60)',
-      'GPT-5.6-fast': 'rgba(59,130,246,0.50)',
-      'GPT-5-nano': 'rgba(239,68,68,0.85)'
+      'DeepSeek v4 Pro':   'rgba(52,211,153,0.75)',
+      'Claude Fable 5':    'rgba(6,182,212,0.75)',
+      'GPT-5.6':           'rgba(59,130,246,0.75)',
+      'GPT-5':             'rgba(251,191,36,0.75)',
+      'GPT-5.5':           'rgba(251,191,36,0.50)',
+      'GPT-5-mini':        'rgba(239,68,68,0.65)',
+      'GPT-5.6-fast':      'rgba(59,130,246,0.50)',
+      'GPT-5-nano':        'rgba(239,68,68,0.85)'
     };
 
     var makeFallback = function() {
       return [
-        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, perturbation_class:'manifold', task:'', strategy:'' },
-        { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, perturbation_class:'manifold', task:'', strategy:'' },
-        { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic', task:'', strategy:'' },
-        { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, perturbation_class:'semantic', task:'', strategy:'' }
+        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic', task:'summary', strategy:'conservative' },
+        { model:'anthropic/claude-fable-5',  label:'Claude Fable 5',  escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic', task:'summary', strategy:'conservative' },
+        { model:'openai/gpt-5.6',            label:'GPT-5.6',         escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic', task:'summary', strategy:'efficient' }
       ];
     };
 
     var allPoints = (gritData && gritData.length) ? gritData : makeFallback();
 
+    // Separate "no baseline" points (escape ≈ 0) from valid data
+    var validPoints = [];
+    var noBaselinePoints = [];
+    allPoints.forEach(function(p) {
+      if (p.escape === 0 || p.escape === null || isNaN(p.escape)) {
+        noBaselinePoints.push(p);
+      } else {
+        validPoints.push(p);
+      }
+    });
+
+    // Collect models
     var modelList = [];
     var seen = {};
-    allPoints.forEach(function(p) {
-      if (!seen[p.label]) { seen[p.label] = true; modelList.push(p.label); }
-    });
+    allPoints.forEach(function(p) { if (!seen[p.label]) { seen[p.label]=true; modelList.push(p.label); } });
 
     var selectedModels = {};
     modelList.forEach(function(m) { selectedModels[m] = false; });
-    // Default to DeepSeek + Claude — the two most data-rich models
     if (selectedModels.hasOwnProperty('DeepSeek v4 Pro')) selectedModels['DeepSeek v4 Pro'] = true;
     if (selectedModels.hasOwnProperty('Claude Fable 5')) selectedModels['Claude Fable 5'] = true;
     var selectedPC = { semantic: true, manifold: true };
 
+    // Build filter buttons
     var filterDiv = document.getElementById('grit-model-filters');
     if (filterDiv) {
+      filterDiv.innerHTML = '';
       modelList.forEach(function(m) {
         var count = allPoints.filter(function(p) { return p.label === m; }).length;
         var btn = document.createElement('button');
         btn.textContent = m + ' (' + count + ')';
         btn.className = 'grit-filter-btn';
         btn.dataset.model = m;
-        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid ' + (modelColors[m] || 'var(--t3)') + ';background:' + (selectedModels[m] ? (modelColors[m] || 'var(--t3)') : 'transparent') + ';color:' + (selectedModels[m] ? 'var(--t)' : 'var(--t3)') + ';cursor:pointer;';
+        var bg = selectedModels[m] ? (modelColors[m] || '#a1a1aa') : 'transparent';
+        var fg = selectedModels[m] ? '#fff' : '#a1a1aa';
+        btn.style.cssText = 'padding:3px 7px;font-size:10px;font-family:monospace;border-radius:4px;border:1px solid '+(modelColors[m]||'#a1a1aa')+';background:'+bg+';color:'+fg+';cursor:pointer;';
         btn.onclick = function() {
           selectedModels[m] = !selectedModels[m];
-          btn.style.background = selectedModels[m] ? (modelColors[m] || 'var(--t3)') : 'transparent';
-          btn.style.color = selectedModels[m] ? 'var(--t)' : 'var(--t3)';
+          btn.style.background = selectedModels[m] ? (modelColors[m]||'#a1a1aa') : 'transparent';
+          btn.style.color = selectedModels[m] ? '#fff' : '#a1a1aa';
           buildChart();
         };
         filterDiv.appendChild(btn);
@@ -514,89 +639,108 @@ document.addEventListener('DOMContentLoaded', function () {
       ['semantic','manifold'].forEach(function(pc) {
         var btn = document.createElement('button');
         btn.textContent = pc;
-        btn.className = 'grit-filter-btn';
-        btn.dataset.pc = pc;
-        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid var(--t3);background:var(--t3);color:var(--t);cursor:pointer;';
-        btn.onclick = function() {
-          selectedPC[pc] = !selectedPC[pc];
-          btn.style.background = selectedPC[pc] ? 'var(--t3)' : 'transparent';
-          btn.style.color = selectedPC[pc] ? 'var(--t)' : 'var(--t3)';
-          buildChart();
-        };
+        btn.style.cssText = 'padding:3px 7px;font-size:10px;font-family:monospace;border-radius:4px;border:1px solid #a1a1aa;background:#a1a1aa;color:#fff;cursor:pointer;';
+        btn.onclick = function() { selectedPC[pc] = !selectedPC[pc]; btn.style.background = selectedPC[pc] ? '#a1a1aa' : 'transparent'; btn.style.color = selectedPC[pc] ? '#fff' : '#a1a1aa'; buildChart(); };
         filterDiv.appendChild(btn);
       });
     }
 
-    function fmtColorBorder(rgba) {
-      return rgba.replace(/[\d.]+\s*\)$/, '1)');
-    }
+    var chartInstance = null;
 
-    var gritChart = null;
     function buildChart() {
-      var filtered = allPoints.filter(function(p) {
+      if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+      // Filter points
+      var pts = validPoints.filter(function(p) {
         return selectedModels[p.label] && selectedPC[p.perturbation_class || 'semantic'];
       });
 
-      var datasets = filtered.map(function(p) {
-        var color = modelColors[p.label] || 'rgba(161,161,170,0.70)';
-        return {
-          label: p.label,
-          data: [{ x: p.escape != null ? p.escape : 0, y: p.correctness != null ? p.correctness : 0, r: Math.max(4, (p.cost || 0) * 15) }],
-          backgroundColor: color,
-          borderColor: fmtColorBorder(color),
+      // One dataset per model (scatter chart groups by model)
+      var datasets = [];
+      modelList.forEach(function(m) {
+        if (!selectedModels[m]) return;
+        var mpts = pts.filter(function(p) { return p.label === m && selectedPC[p.perturbation_class || 'semantic']; });
+        if (mpts.length === 0) return;
+
+        var data = mpts.map(function(p) {
+          return {
+            x: p.escape != null ? p.escape : 0,
+            y: p.correctness != null ? p.correctness : 0,
+            r: Math.max(3, Math.min(12, (p.cost || 0.01) * 25)),
+            task: p.task || '',
+            cost: p.cost || 0,
+            strategy: p.strategy || '',
+            pc: p.perturbation_class || '',
+            label: p.label
+          };
+        });
+
+        datasets.push({
+          label: m + ' (' + data.length + ')',
+          data: data,
+          backgroundColor: modelColors[m] || 'rgba(161,161,170,0.7)',
+          borderColor: (modelColors[m] || 'rgba(161,161,170,1)').replace(/[\d.]+\)$/, '1)'),
           borderWidth: 1,
-          _task: p.task || '',
-          _correctness: p.correctness,
-          _cost: p.cost,
-          _strategy: p.strategy || '',
-          _pc: p.perturbation_class || 'semantic'
-        };
+          pointRadius: data.map(function(d) { return d.r; }),
+          pointHoverRadius: data.map(function(d) { return d.r + 3; }),
+        });
       });
 
-      if (gritChart) gritChart.destroy();
-      gritChart = new Chart(ctx, {
-        type: 'bubble',
+      // No-baseline dataset (grey, small, tooltip explains)
+      var nbPts = noBaselinePoints.filter(function(p) { return selectedModels[p.label]; });
+      if (nbPts.length > 0) {
+        var nbData = nbPts.map(function(p) { return { x: 0.02, y: p.correctness||0, r: 2, task: p.task||'', cost: p.cost||0, strategy: 'no baseline', pc: '', label: p.label }; });
+        datasets.push({
+          label: 'No baseline (' + nbData.length + ')',
+          data: nbData,
+          backgroundColor: 'rgba(161,161,170,0.35)',
+          borderColor: 'rgba(161,161,170,0.5)',
+          borderWidth: 0.5,
+          pointRadius: 2,
+          pointHoverRadius: 4,
+        });
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'scatter',
         data: { datasets: datasets },
         options: {
-          responsive: true,
-          maintainAspectRatio: true,
+          responsive: true, maintainAspectRatio: true,
           plugins: {
-            title: { display: true, text: 'Grit Matrix: Correctness vs Escape \u2014 ' + filtered.length + ' individual sessions', color: '#e4e4e7', font: { size: 14, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
-            legend: { display: false },
+            title: { display: true, text: 'Grit Matrix: Correctness vs Escape \u2014 ' + pts.length + ' sessions', color: '#e4e4e7', font: { size:13, family:'monospace', weight:'600' }, padding: {bottom:14} },
             tooltip: {
               callbacks: {
                 label: function(ctx) {
-                  var ds = ctx.dataset;
-                  var pct = (typeof ds._correctness === 'number') ? (ds._correctness * 100).toFixed(0) + '%' : '';
-                  var cost = (typeof ds._cost === 'number') ? '$' + ds._cost.toFixed(4) : '';
-                  return ds.label + ' / ' + ds._task + ' / correctness:' + pct + ' / ' + cost + ' / ' + ds._strategy + ' / ' + ds._pc;
+                  var d = ctx.raw;
+                  if (!d || d.strategy === 'no baseline') return d.label + ': no baseline comparison';
+                  return d.label + ' / ' + d.task + ' / ' + (d.y*100).toFixed(0) + '% / $' + d.cost.toFixed(2) + ' / ' + d.strategy;
                 }
               }
-            }
+            },
+            legend: { labels: { color: '#a1a1aa', font: { family:'monospace', size:9 }, usePointStyle: true, padding: 8 } }
           },
           scales: {
-            x: { title: { display: true, text: 'Escape rate \u2192 (more divergence)', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(161,161,170,0.10)' }, min: -0.05, max: 1.05 },
-            y: { title: { display: true, text: 'Correctness \u2192', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa', callback: function(v) { return (v*100).toFixed(0)+'%'; } }, grid: { color: 'rgba(161,161,170,0.10)' }, min: 0.5, max: 1.05 }
+            x: { title: { display:true, text:'Escape rate \u2192 (more divergence)', color:'#a1a1aa' }, ticks: { color:'#a1a1aa' }, grid: { color:'rgba(161,161,170,0.08)' }, min:-0.02, max:1.05 },
+            y: { title: { display:true, text:'Correctness \u2192', color:'#a1a1aa' }, ticks: { color:'#a1a1aa', callback: function(v) { return (v*100).toFixed(0)+'%'; } }, grid: { color:'rgba(161,161,170,0.08)' }, min:0.45, max:1.05 }
           }
         },
         plugins: [{
           id: 'quadrants',
           afterDraw: function(chart) {
-            var ctx2 = chart.ctx, xScale = chart.scales.x, yScale = chart.scales.y;
-            var x0 = xScale.getPixelForValue(0.5);
-            ctx2.save();
-            ctx2.strokeStyle = 'rgba(161,161,170,0.25)';
-            ctx2.setLineDash([6,4]);
-            ctx2.beginPath(); ctx2.moveTo(x0, yScale.top); ctx2.lineTo(x0, yScale.bottom); ctx2.stroke();
-            var y0 = yScale.getPixelForValue(0.8);
-            ctx2.beginPath(); ctx2.moveTo(xScale.left, y0); ctx2.lineTo(xScale.right, y0); ctx2.stroke();
-            ctx2.fillStyle = 'rgba(161,161,170,0.5)';
-            ctx2.font = '9px monospace';
-            ctx2.fillText('High Grit', xScale.getPixelForValue(0.2), yScale.getPixelForValue(0.9));
-            ctx2.fillText('Exploratory', xScale.getPixelForValue(0.7), yScale.getPixelForValue(0.9));
-            ctx2.fillText('Stuck', xScale.getPixelForValue(0.2), yScale.getPixelForValue(0.6));
-            ctx2.fillText('Recovering', xScale.getPixelForValue(0.7), yScale.getPixelForValue(0.6));
-            ctx2.restore();
+            var ctx = chart.ctx, xS = chart.scales.x, yS = chart.scales.y;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(161,161,170,0.2)';
+            ctx.setLineDash([6,4]); ctx.lineWidth = 1;
+            var x0 = xS.getPixelForValue(0.5);
+            ctx.beginPath(); ctx.moveTo(x0, yS.top); ctx.lineTo(x0, yS.bottom); ctx.stroke();
+            var y0 = yS.getPixelForValue(0.8);
+            ctx.beginPath(); ctx.moveTo(xS.left, y0); ctx.lineTo(xS.right, y0); ctx.stroke();
+            ctx.fillStyle = 'rgba(161,161,170,0.45)'; ctx.font = '8px monospace';
+            ctx.fillText('High Grit',   xS.getPixelForValue(0.15), yS.getPixelForValue(0.94));
+            ctx.fillText('Exploratory', xS.getPixelForValue(0.68), yS.getPixelForValue(0.94));
+            ctx.fillText('Stuck',       xS.getPixelForValue(0.15), yS.getPixelForValue(0.70));
+            ctx.fillText('Recovering',  xS.getPixelForValue(0.68), yS.getPixelForValue(0.70));
+            ctx.restore();
           }
         }]
       });

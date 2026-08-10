@@ -90,6 +90,11 @@
   if (!toc) return;
   document.body.classList.add('has-toc');
 
+  var header = document.createElement('div');
+  header.className = 'page-toc-header';
+  header.textContent = 'On this page';
+  toc.appendChild(header);
+
   // Collect h2 and h3 with content
   var headings = document.querySelectorAll('h2, h3');
   var tocItems = [];
@@ -112,7 +117,13 @@
   var html = '';
   tocItems.forEach(function(item) {
     var cls = item.tagName === 'H3' ? ' toc-h3' : (item.tagName === 'H4' ? ' toc-h4' : '');
-    html += '<a href="#' + item.id + '" class="toc-link' + cls + '" data-target="' + item.id + '">' + item.text + '</a>';
+    var displayText = item.text;
+    if (displayText.length > 28) {
+      var cut = displayText.lastIndexOf(' ', 28);
+      if (cut < 20) cut = 28;
+      displayText = displayText.substring(0, cut) + '\u2026';
+    }
+    html += '<a href="#' + item.id + '" class="toc-link' + cls + '" data-target="' + item.id + '" title="' + item.text.replace(/"/g, '&quot;') + '">' + displayText + '</a>';
   });
   toc.innerHTML = html;
 
@@ -121,13 +132,18 @@
   if (links.length === 0) return;
 
   var scrollHandler = function() {
-    var scrollPos = window.scrollY + 120;
+    var viewportMid = window.innerHeight * 0.3;
     var activeFound = false;
     for (var i = links.length - 1; i >= 0; i--) {
       var target = document.getElementById(links[i].dataset.target);
-      if (target && target.offsetTop <= scrollPos) {
+      if (!target) continue;
+      var rect = target.getBoundingClientRect();
+      if (rect.top <= viewportMid) {
         if (!activeFound) {
           links[i].classList.add('active');
+          if (links[i].offsetTop > toc.scrollTop + toc.clientHeight - 40 || links[i].offsetTop < toc.scrollTop) {
+            toc.scrollTop = links[i].offsetTop - toc.clientHeight / 3;
+          }
           activeFound = true;
         } else {
           links[i].classList.remove('active');
