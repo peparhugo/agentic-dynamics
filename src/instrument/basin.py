@@ -150,6 +150,7 @@ def measure_basin_escape(
     run_id: str = "",
     cost_usd: float | None = None,
     sonar_diff: dict[str, Any] | None = None,
+    constraint_count: int | None = None,
 ) -> BasinMetrics:
     """Measure how much the model's output diverged from baseline.
 
@@ -231,7 +232,7 @@ def measure_basin_escape(
 
     m.correctness = perturbed_correctness
     m.constraints_met = perturbed_constraints_met
-    m.constraints_total = max(baseline_constraints_met, perturbed_constraints_met)
+    m.constraints_total = constraint_count if constraint_count is not None else max(baseline_constraints_met, perturbed_constraints_met)
     m.lines_of_code = perturbed_loc
 
     # Quality metric — the one that matters

@@ -552,8 +552,9 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     strength_match = re.search(r'_s(\d+\.\d+)', worktree_path)
     actual_strength = float(strength_match.group(1)) if strength_match else 0.5
     no_baseline = not baseline_code
-    if no_baseline:
-        # No baseline available — mark as "no baseline" instead of self-comparison
+    self_comparison = bool(baseline_code) and baseline_code == code
+    if no_baseline or self_comparison:
+        # No baseline available or baseline == perturbed
         from instrument.basin import BasinMetrics as _BM
         basin = _BM(
             perturbation_operator=info.get("operator", "baseline"),
@@ -576,7 +577,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
             quality_per_dollar=float('nan'),
             quality_per_joule=float('nan'),
             converged_back=None,
-            verdict="no baseline",
+            verdict="self-comparison" if self_comparison else "no baseline",
         )
     else:
         sonar_diff_data = None
@@ -611,6 +612,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         model=session.get("model_id", "") if session else "",
         cost_usd=db_cost if db_cost > 0 else None,
         sonar_diff=sonar_diff_data,
+        constraint_count=solution.constraints_total,
     )
 
     # ── Strategy ──

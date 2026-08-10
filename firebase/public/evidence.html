@@ -81,6 +81,15 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="provenance-legend note" style="max-width:960px;margin:0 auto 1.5rem;padding:0.5rem 1rem;font-size:0.72rem;color:var(--t3);border-left:3px solid var(--b)">
   [M] Measured &middot; [C] Computed &middot; [H] Heuristic &middot; [X] External source
 </div>
+<div class="note" style="margin-top:1rem;font-size:0.72rem;color:var(--t3);line-height:1.5">
+  <strong style="color:var(--t2)">Limitations.</strong>
+  Per-model session counts are imbalanced: DeepSeek 119, Claude 44, GPT-5.6 18, GPT-5.6-fast 9, GPT-5-nano 7,
+  GPT-5-mini 7, GPT-5 7, GPT-5.5 6. Cross-model comparisons should account for this asymmetry.
+  No multiple-comparison correction has been applied across 8 models &times; 10 perturbation operators.
+  Correctness scores for the 116 sessions without executed test suites are heuristic estimates
+  (keyword-based code structure analysis, tagged [H] in data.js).
+  Statistical significance is not asserted — this is an observational measurement corpus, not a controlled experiment.
+</div>
 <section class="sec alt">
 <h2>The Grit Spectrum</h2>
 <p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models — 4 manifold operators that push the model off its typical linguistic surface, and 6 semantic operators that inject contradictions within the reasoning manifold. Grit is measured by escape rate (how often the model diverges from its default solution) at a given correctness threshold.</p>
@@ -255,6 +264,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <p class="lead">Per-operator, per-model cost and correctness breakdown from perturbation experiments. Cost delta = perturbed cost / baseline cost. Higher deltas mean the operator triggers more recovery behavior — and cost.</p>
 <div class="tbl" style="overflow-x:auto"><table id="operator-impact-tbl"><thead><tr><th>Class</th><th>Model</th><th>N</th><th>Pert. Cost</th><th>Baseline Cost</th><th>Cost Delta</th><th>Correctness</th><th>Escape</th></tr></thead><tbody id="operator-impact-body"><tr><td colspan="8" class="t3">Loading...</td></tr></tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> Cost delta reveals the economic signature of each perturbation operator. Manifold operators (alien vocab, framing shifts) trigger higher escape rates and recovery costs. Semantic operators test reasoning integrity — lower escape = higher grit. <span style="color:var(--t3)">[C] Computed from experiment session data.</span></div>
+<p class="fn" style="font-size:0.7rem;color:var(--t3)">Faded cells have fewer than 5 sessions — treat as directional indicators, not precise measurements.</p>
 </section>
 
 <!-- ==================== ENERGY EFFICIENCY RANKING ==================== -->
@@ -813,7 +823,9 @@ document.addEventListener('DOMContentLoaded', function () {
           var bCost = bm ? bm.avg_cost : null;
           var delta = bCost && bCost > 0 ? (pCost / bCost).toFixed(2) + '\u00d7' : '\u2014';
           var deltaCls = bCost && bCost > 0 ? (pCost / bCost > 1.5 ? 'amber' : pCost / bCost < 0.9 ? 'green' : '') : '';
-          rows += '<tr>' +
+          var lowN = pm.low_n;
+          var trAttr = lowN ? ' style="opacity:0.4" title="n < 5 sessions \u2014 estimate is directionally useful but numerically unstable"' : '';
+          rows += '<tr' + trAttr + '>' +
             '<td>' + (cls === 'baseline' ? '<strong style="color:var(--t)">' + clsLabel + '</strong>' : clsLabel) + '</td>' +
             '<td>' + (cls === 'baseline' ? '<strong style="color:var(--t)">' + modelName + '</strong>' : '<strong>' + modelName + '</strong>') + '</td>' +
             '<td>' + pm.n + '</td>' +

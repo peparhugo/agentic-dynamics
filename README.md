@@ -100,7 +100,7 @@ Run `python scripts/inventory.py list` for a live breakdown.
 ├── experiments/
 │   ├── configs/              # 34 YAML experiment definitions
 │   ├── results/              # Game reports, summaries, lab outputs
-│   └── lab_books/            # 8 structured experiment plans
+│   └── lab_books/            # 13 structured experiment plans
 ├── firebase/public/          # Website source (8 pages, data pipeline)
 ├── pyproject.toml
 ├── CONTRIBUTING.md

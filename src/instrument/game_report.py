@@ -12,6 +12,7 @@ Every experiment is a controlled game. The game report records:
 
 from __future__ import annotations
 
+import statistics
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -244,9 +245,13 @@ class GameReport:
                 f"| Quality/J [C] | {e.quality_per_joule:.6f} |",
             ]
             if self.repetitions > 1:
-                lines += [
-                    f"| Mean cost (±σ) | ${self.mean_cost:.6f} ± ${self.mean_cost * (self.std_escape / max(self.mean_escape, 0.01)):.6f} |",
-                ]
+                costs = [rep.get('cost', 0) for rep in self.per_repetition if rep.get('cost') is not None]
+                if len(costs) >= 2:
+                    std_cost = statistics.stdev(costs)
+                    mean_cost = statistics.mean(costs)
+                    lines.append(f"| Mean cost (±σ) | ${mean_cost:.6f} ± ${std_cost:.6f} |")
+                else:
+                    lines.append("| Mean cost (±σ) | Insufficient repetitions for cost CI |")
 
         # Per-repetition table for multi-rep runs
         if self.per_repetition and len(self.per_repetition) > 1:
