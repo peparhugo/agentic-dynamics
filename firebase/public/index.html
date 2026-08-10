@@ -61,6 +61,52 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   </aside>
 </div></section>
 
+<section class="sec alt">
+<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+<a href="framework.html#rule-1" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
+<div class="ctitle" style="font-size:0.78rem">1. Grit <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Default to models that maintain correctness under degraded input. Low flail rate = high grit.</div>
+</a>
+<a href="framework.html#rule-2" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
+<div class="ctitle" style="font-size:0.78rem">2. Explanation Tax <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Measure what resilience costs. Claude: 11% flail + 8.5% narration penalty. DeepSeek: 8% flail, zero penalty.</div>
+</a>
+<a href="framework.html#rule-3" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
+<div class="ctitle" style="font-size:0.78rem">3. Snowball Rule <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Codebase growth compounds quadratically (N²). Model the curve before architectural commitments.</div>
+</a>
+<a href="framework.html#rule-4" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
+<div class="ctitle" style="font-size:0.78rem">4. EPM Horizon <span style="font-size:0.58rem;color:var(--t3)">[X]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Energy costs are the inflation rate of AI compute. Find the year prices flip your model selection.</div>
+</a>
+<a href="framework.html#rule-5" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
+<div class="ctitle" style="font-size:0.78rem">5. First-Pass Rule <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Price the outcome, not the prompt. WOC = 1/(1+r). Measured WOC = <span data-stat-fmt="woc">0.90</span>.</div>
+</a>
+<a href="framework.html#rule-6" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
+<div class="ctitle" style="font-size:0.78rem">6. Batch Discount <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Batch processing is 50% cheaper. 72-hour horizon. Modeled from WFM principles.</div>
+</a>
+<a href="framework.html#rule-7" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
+<div class="ctitle" style="font-size:0.78rem">7. Budget Ceiling <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Max jobs/day = Budget / (Cost × (1+r)). Throughput is budget-constrained, not infra-constrained.</div>
+</a>
+<a href="framework.html#rule-8" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
+<div class="ctitle" style="font-size:0.78rem">8. Cascade Rule <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Failures auto-escalate through model tiers. Design for &lt;1% human escalation. Modeled from WFM tiered support.</div>
+</a>
+<a href="framework.html#rule-9" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
+<div class="ctitle" style="font-size:0.78rem">9. SLA Buffer <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Batch completion = queue depth × avg time + retry buffer. Never batch within 2× queue depth of SLA.</div>
+</a>
+<a href="framework.html#rule-10" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
+<div class="ctitle" style="font-size:0.78rem">10. Outcome Multiplier <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
+<div class="cdesc" style="font-size:0.7rem">Maximize outcomes per dollar. BVI = Total Successful Outcomes / Total AI + Human Cost.</div>
+</a>
+</div>
+<p style="text-align:center;margin-top:1rem;font-size:0.72rem;color:var(--t3)"><a href="framework.html#rules" style="color:var(--ac)">Full rules with calculators and playbook →</a></p>
+</section>
+
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">Cost mechanics</div>
   <h2>Same output. 69× different cost.</h2>

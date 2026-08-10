@@ -83,3 +83,61 @@
     }
   });
 })();
+
+/* --- Page Table of Contents (auto-generated from headings) --- */
+(function() {
+  var toc = document.getElementById('page-toc');
+  if (!toc) return;
+  document.body.classList.add('has-toc');
+
+  // Collect h2 and h3 with content
+  var headings = document.querySelectorAll('h2, h3');
+  var tocItems = [];
+  headings.forEach(function(h) {
+    var text = h.textContent.trim();
+    if (!text || text.length < 2) return;
+    // Generate id if missing
+    if (!h.id) {
+      h.id = text.toLowerCase()
+        .replace(/[^a-z0-9\u00d7\s-]+/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
+    tocItems.push({ tag: h.tagName, id: h.id, text: text });
+  });
+
+  if (tocItems.length === 0) { toc.style.display = 'none'; return; }
+
+  var html = '';
+  tocItems.forEach(function(item) {
+    var cls = item.tagName === 'H3' ? ' toc-h3' : (item.tagName === 'H4' ? ' toc-h4' : '');
+    html += '<a href="#' + item.id + '" class="toc-link' + cls + '" data-target="' + item.id + '">' + item.text + '</a>';
+  });
+  toc.innerHTML = html;
+
+  // Highlight current section on scroll
+  var links = toc.querySelectorAll('.toc-link');
+  if (links.length === 0) return;
+
+  var scrollHandler = function() {
+    var scrollPos = window.scrollY + 120;
+    var activeFound = false;
+    for (var i = links.length - 1; i >= 0; i--) {
+      var target = document.getElementById(links[i].dataset.target);
+      if (target && target.offsetTop <= scrollPos) {
+        if (!activeFound) {
+          links[i].classList.add('active');
+          activeFound = true;
+        } else {
+          links[i].classList.remove('active');
+        }
+      } else {
+        links[i].classList.remove('active');
+      }
+    }
+  };
+
+  window.addEventListener('scroll', scrollHandler, { passive: true });
+  scrollHandler(); // initial highlight
+})();

@@ -55,6 +55,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <script src="data.js"></script>
 </head>
 <body>
+<nav class="page-toc" id="page-toc"></nav>
 
 <nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
@@ -91,7 +92,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
   Statistical significance is not asserted — this is an observational measurement corpus, not a controlled experiment.
 </div>
 <section class="sec alt">
-<h2>The Grit Spectrum</h2>
+<h2 id="grit-spectrum">The Grit Spectrum</h2>
 <p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models — 4 manifold operators that push the model off its typical linguistic surface, and 6 semantic operators that inject contradictions within the reasoning manifold. Grit is measured by escape rate (how often the model diverges from its default solution) at a given correctness threshold.</p>
 
 <div class="cards" style="margin-top:1.2rem">
@@ -120,7 +121,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <div class="insight" style="border-left-color:var(--cy);margin-top:1.5rem"><strong style="color:var(--cy)">Our experiments support what Databricks found:</strong> On August 7, 2026, Databricks published their playbook for reducing AI coding costs at scale (Wendell et al., Aug 2026). Their four cost levers — shifting to efficient models, dynamic routing, progressive budgeting, and reducing token overhead — map directly to rules in this framework. They call the core concept the <strong>"Efficiency Frontier"</strong>: the set of models with the best price point for a given level of intelligence. We call it Grit. They surveyed companies. We stress-tested models with 10 perturbation operators across 227 experiments.</div>
 
-<h3 style="margin-top:2rem">Grit: The Flail Rate</h3>
+<h3 id="flail-rate" style="margin-top:2rem">Grit: The Flail Rate</h3>
 <p class="lead">When the model can't figure out the correct requirement, it flails — producing tokens but zero code. This is the flail rate. Measured per-worktree: what fraction of a model's sessions produced tokens that went to narration instead of code? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced. <strong>Measured Narration Penalty:</strong> Claude flails on 11% of sessions (code-free narration) — 36% more often than DeepSeek's 8.4%. When models succeed, DeepSeek carries a negligible narration overhead (0.0% penalty), Claude carries 8.5%.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Narration Failures</th><th>Penalty Rate</th><th>Avg Cost/Session</th><th>What's Happening</th></tr></thead><tbody id="narration-tbody">
 <tr><td>DeepSeek v4 Pro</td><td>68</td><td>2</td><td class="green">8%</td><td class="green">$0.015</td><td>Silent inference — reasoning compressed into latent space</td></tr>
@@ -139,10 +140,10 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- ==================== SAME OUTPUT, DIFFERENT COST ==================== -->
 <section class="sec">
-<h2>Same Output, Different Cost</h2>
+<h2 id="cost-efficiency">Same Output, Different Cost</h2>
 <p class="lead">Both DeepSeek and Claude generate <strong style="color:var(--t)">~11,000 output+reasoning tokens per session</strong>. DeepSeek produces <strong style="color:var(--ac)">74 LOC per 1K tokens</strong>. Claude produces <strong style="color:var(--am)">55 LOC per 1K tokens</strong>. That's 39% more code per token — at <strong style="color:var(--ac)">69&times; less cost</strong>. The gap is not about which model is smarter. It's about which tokens you're billed for.</p>
 
-<h3 style="margin-top:2rem;color:var(--ac)">Cost Efficiency Ranking</h3>
+<h3 id="cost-ranking" style="margin-top:2rem;color:var(--ac)">Cost Efficiency Ranking</h3>
 <p class="lead">Per-session cost averaged across all reports. The right-hand columns show what you're paying for: code density (LOC per output token), constraint completion, and the narration penalty rate.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Avg Cost</th><th>95% CI</th><th>Total Cost</th><th>Correctness</th><th>Strategy</th></tr></thead><tbody id="cost-ranking-tbody">
 <tr id="no-data-row"><td colspan="7" class="t3">Loading data...</td></tr>
@@ -159,7 +160,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- AST Code Quality -->
 <section class="sec alt">
-<h2>AST Code Quality Analysis</h2>
+<h2 id="ast-analysis">AST Code Quality Analysis</h2>
 <p class="lead">224 game reports across 8 model variants. Every function, class, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
 <div class="tbl"><table><thead id="ast-metric-head"><tr><th>Metric</th></tr></thead><tbody id="ast-metric-body"></tbody></table></div>
 <div class="insight" id="ast-insight"><strong>Key insight:</strong> Loading...</div>
@@ -167,7 +168,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- Constraint Detection — DeepSeek vs Claude -->
 <section class="sec">
-<h2>Constraint Detection — DeepSeek vs Claude</h2>
+<h2 id="constraint-detection">Constraint Detection — DeepSeek vs Claude</h2>
 <p class="lead">Dual-signal verification: scanned both reasoning text and generated <code>.py</code> files for all 7 required constraints. Both models implemented every constraint — the 69&times; gap is in how they produce the code, not whether they can.</p>
 <div class="tbl"><table><thead><tr><th>Constraint</th><th>DeepSeek Implementation</th><th>Claude Fable 5 Implementation</th></tr></thead><tbody>
 <tr><td>JWT authentication</td><td class="green">auth.py, extensions.py</td><td class="green">auth.py, extensions.py</td></tr>
@@ -183,7 +184,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- Token Cost Breakdown -->
 <section class="sec alt">
-<h2>Token Cost Breakdown</h2>
+<h2 id="token-costs">Token Cost Breakdown</h2>
 <p class="lead">Where does the money go? Per-model cost split across input, output, reasoning, and cache tokens. Cache costs dominate for Anthropic (cache writes are billable). DeepSeek cache reads cost 1/20th of Anthropic's.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Input $</th><th>Output $</th><th>Reasoning $</th><th>Cache $</th><th><strong>Total $</strong></th></tr></thead><tbody id="token-cost-tbody">
 <tr><td>claude-fable-5</td><td>$0.01</td><td>$24.26</td><td>$0.00</td><td class="amber">$18.26</td><td class="amber"><strong class="tip" title="[M] Sum of rounded cost components (input+output+cache) from 44 game-report sessions. Full total across all 47 sessions (incl. 3 unanalyzed): $47.54. Data.js components: $0.01 + $24.21 + $0.00 + $18.08 = $42.30.">$42.52</strong></td></tr>
@@ -202,7 +203,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- Perturbation Response -->
 <section class="sec">
-<h2>Perturbation Response</h2>
+<h2 id="perturbation-response">Perturbation Response</h2>
 <p class="lead">10 calibrated perturbation operators applied across all models. Recovery multipliers measure how perturbation changes cost — below 1.0 means perturbation reduces cost (model explores instead of recovering). <strong style="color:var(--ac)">Think of these as "state shocks":</strong> requirements shift, dependencies break, logs spike. We measure how each model responds when the world changes under it &ndash; and what that response costs.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>CONS</th><th>EXPL</th><th>Avg Escape</th><th>Recovery Mult</th><th>Primary Behavior</th></tr></thead><tbody>
 <tr><td>DeepSeek v4 Pro</td><td>79</td><td class="green">29</td><td class="green">0.25</td><td class="green">0.9&times;</td><td class="green">Explores under perturbation</td></tr>
@@ -215,7 +216,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <tr><td>GPT-5.6-fast</td><td>2</td><td class="green">4</td><td class="green">0.59</td><td>—</td><td>Exploratory; high novelty</td></tr>
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> No model classified as WASTEFUL or EFFICIENT — every session that produced code is either CONSERVATIVE (63%) or EXPLORATORY (26%). EXPLORATORY sessions cluster around perturbation operators with escape scores averaging 0.70 vs 0.09 for conservative. Recovery multipliers are computed from cost deltas (perturbed vs baseline) — below 1.0 means perturbation reduces cost (the model explores more efficiently).</div>
-<h3 style="margin-top:1.5rem;color:var(--ac)">Manifold vs Semantic Perturbation Split</h3>
+<h3 id="perturbation-split" style="margin-top:1.5rem;color:var(--ac)">Manifold vs Semantic Perturbation Split</h3>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Manifold Escape</th><th>Manifold Correctness</th><th>Manifold Cost</th><th>Semantic Escape</th><th>Semantic Correctness</th><th>Semantic Cost</th></tr></thead><tbody>
 <tr><td><strong>DeepSeek v4 Pro</strong></td><td class="amber">0.76</td><td>77%</td><td class="green">$0.017</td><td class="green">0.18</td><td class="green">94%</td><td class="green">$0.016</td></tr>
 <tr><td><strong>Claude Fable 5</strong></td><td class="amber">0.62</td><td>87%</td><td class="amber">$1.29</td><td class="green">0.21</td><td class="green">88%</td><td class="amber">$1.07</td></tr>
@@ -225,7 +226,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- Cross-Model Rollup -->
 <section class="sec alt">
-<h2>Cross-Model Rollup</h2>
+<h2 id="cross-model-rollup">Cross-Model Rollup</h2>
 <p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.26&times; more code per session at 1/69th the cost of Claude. <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall test pass rate (1572/1772 tests)</span> from real pytest/jest execution.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody id="rollup-tbody">
 <tr><td>Per-session cost</td><td class="mono green" data-stat="rollup-ds-cost">$0.016</td><td class="mono" data-stat="rollup-g56-cost">$0.45</td><td class="mono amber" data-stat="rollup-claude-cost">$1.06</td><td class="mono" data-stat="rollup-all-cost">$0.29</td></tr>
@@ -258,14 +259,14 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- ==================== MODEL CARDS ==================== -->
 <section class="fsec"><div class="inr wide">
 <div class="pulse"><span class="dot"></span> Model Cards</div>
-<h2>Detailed Model Profiles</h2>
+<h2 id="model-profiles">Detailed Model Profiles</h2>
 <p class="lead">All 8 model variants, 3 architectures. Populated from data.js with hardcoded fallbacks. Data provenance: <span data-stat="sessions">249</span> experiment sessions across <span data-stat="reports">224</span> game reports. <a href="methodology.html">See methodology</a>.</p>
 <div id="model-cards-root"></div>
 </div></section>
 
 <!-- ==================== OPERATOR IMPACT ==================== -->
 <section class="sec alt">
-<h2>Operator Impact</h2>
+<h2 id="operator-impact">Operator Impact</h2>
 <p class="lead">Per-operator, per-model cost and correctness breakdown from perturbation experiments. Cost delta = perturbed cost / baseline cost. Higher deltas mean the operator triggers more recovery behavior — and cost.</p>
 <div class="tbl" style="overflow-x:auto"><table id="operator-impact-tbl"><thead><tr><th>Class</th><th>Model</th><th>N</th><th>Pert. Cost</th><th>Baseline Cost</th><th>Cost Delta</th><th>Correctness</th><th>Escape</th></tr></thead><tbody id="operator-impact-body"><tr><td colspan="8" class="t3">Loading...</td></tr></tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> Cost delta reveals the economic signature of each perturbation operator. Manifold operators (alien vocab, framing shifts) trigger higher escape rates and recovery costs. Semantic operators test reasoning integrity — lower escape = higher grit. <span style="color:var(--t3)">[C] Computed from experiment session data.</span></div>
@@ -274,7 +275,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- ==================== ENERGY EFFICIENCY RANKING ==================== -->
 <section class="sec">
-<h2>Energy Efficiency Ranking</h2>
+<h2 id="energy-ranking">Energy Efficiency Ranking</h2>
 <p class="lead">Models ranked by joules per line of code — the most direct measure of energy productivity. Energy estimates use TokenPowerBench constants (Niu et al., AAAI 2026): 0.08 J/prompt-token, 0.23 J/output-token, 0.47 J/reasoning-token. <span style="color:var(--t3)">[C] Computed from token counts × energy-per-token constants. [X] Energy constants externally sourced.</span></p>
 <div class="cards" id="energy-ranking-cards" style="margin-top:1.2rem">
 <div class="card" style="text-align:center"><div class="cdesc">Loading ranking...</div></div>
@@ -284,14 +285,14 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- ==================== STRATEGY DISTRIBUTION ==================== -->
 <section class="sec alt">
-<h2>Strategy Distribution</h2>
+<h2 id="strategy-distribution">Strategy Distribution</h2>
 <p class="lead">How models respond to perturbation: strategy archetypes classified by escape rate, recovery behavior, and output quality. <span style="color:var(--t3)">[C] Computed from 227 classified experiment sessions.</span></p>
 <div id="strategy-distribution"></div>
 <div class="insight"><strong>Key insight:</strong> Conservative dominates (62%), consistent with models defaulting to familiar patterns under perturbation. Only 3 sessions (1.3%) classified as wasteful — models rarely produce low-quality output with high exploration. The 24 "unknown" sessions lack sufficient signal for classification (typically narration failures or zero-code outputs). No sessions classified as EFFICIENT — the archetype requires both high exploration AND high quality at low cost, a rare combination.</div>
 </section>
 
 <!-- ==================== DATA SOURCES ==================== -->
-<details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<details id="data-sources" style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> Data Sources &amp; Design Parameters</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.82rem;color:var(--t2);line-height:1.8">
 <div style="margin-bottom:1.2rem"><strong style="color:var(--t)">Energy Constants</strong> <span style="font-size:0.65rem;color:var(--t3)">[X] External source</span><br>
@@ -501,11 +502,11 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.textContent = m + ' (' + count + ')';
         btn.className = 'grit-filter-btn';
         btn.dataset.model = m;
-        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid ' + (modelColors[m] || '#a1a1aa') + ';background:' + (selectedModels[m] ? (modelColors[m] || '#a1a1aa') : 'transparent') + ';color:' + (selectedModels[m] ? '#fff' : '#a1a1aa') + ';cursor:pointer;';
+        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid ' + (modelColors[m] || 'var(--t3)') + ';background:' + (selectedModels[m] ? (modelColors[m] || 'var(--t3)') : 'transparent') + ';color:' + (selectedModels[m] ? 'var(--t)' : 'var(--t3)') + ';cursor:pointer;';
         btn.onclick = function() {
           selectedModels[m] = !selectedModels[m];
-          btn.style.background = selectedModels[m] ? (modelColors[m] || '#a1a1aa') : 'transparent';
-          btn.style.color = selectedModels[m] ? '#fff' : '#a1a1aa';
+          btn.style.background = selectedModels[m] ? (modelColors[m] || 'var(--t3)') : 'transparent';
+          btn.style.color = selectedModels[m] ? 'var(--t)' : 'var(--t3)';
           buildChart();
         };
         filterDiv.appendChild(btn);
@@ -515,11 +516,11 @@ document.addEventListener('DOMContentLoaded', function () {
         btn.textContent = pc;
         btn.className = 'grit-filter-btn';
         btn.dataset.pc = pc;
-        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid #a1a1aa;background:#a1a1aa;color:#fff;cursor:pointer;';
+        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid var(--t3);background:var(--t3);color:var(--t);cursor:pointer;';
         btn.onclick = function() {
           selectedPC[pc] = !selectedPC[pc];
-          btn.style.background = selectedPC[pc] ? '#a1a1aa' : 'transparent';
-          btn.style.color = selectedPC[pc] ? '#fff' : '#a1a1aa';
+          btn.style.background = selectedPC[pc] ? 'var(--t3)' : 'transparent';
+          btn.style.color = selectedPC[pc] ? 'var(--t)' : 'var(--t3)';
           buildChart();
         };
         filterDiv.appendChild(btn);
