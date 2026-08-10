@@ -21,6 +21,7 @@
       "avg_write_pct": 59.9,
       "avg_bash_pct": 18.5,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.0242,
       "tool_call_distribution": {
         "todowrite": 317,
         "bash": 431,
@@ -47,6 +48,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 10.7,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.106,
       "tool_call_distribution": {
         "bash": 30,
         "apply_patch": 71,
@@ -70,6 +72,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 39.0,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.045,
       "tool_call_distribution": {
         "todowrite": 55,
         "glob": 27,
@@ -94,6 +97,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 46.3,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.0993,
       "tool_call_distribution": {
         "todowrite": 27,
         "glob": 10,
@@ -118,6 +122,7 @@
       "avg_write_pct": 62.1,
       "avg_bash_pct": 18.1,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.0763,
       "tool_call_distribution": {
         "todowrite": 67,
         "bash": 105,
@@ -141,6 +146,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 12.8,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.0923,
       "tool_call_distribution": {
         "glob": 20,
         "read": 14,
@@ -164,6 +170,7 @@
       "avg_write_pct": 1.8,
       "avg_bash_pct": 3.5,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.2556,
       "tool_call_distribution": {
         "read": 7,
         "glob": 24,
@@ -187,6 +194,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 46.2,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.0482,
       "tool_call_distribution": {
         "bash": 103,
         "apply_patch": 89,
@@ -210,6 +218,7 @@
       "avg_write_pct": 0.0,
       "avg_bash_pct": 16.9,
       "total_parse_errors": 0,
+      "avg_reasoning_distance": 0.1453,
       "tool_call_distribution": {
         "todowrite": 15,
         "glob": 9,

@@ -129,7 +129,10 @@ def run_sonar_docker(project_key: str, code_dir: Path) -> bool:
 
 
 def backfill(limit: int = 0, dry_run: bool = False):
-    summary = json.loads(SUMMARY_PATH.read_text())
+    input_path = OUTPUT_PATH if OUTPUT_PATH.exists() else SUMMARY_PATH
+    if input_path == OUTPUT_PATH:
+        print(f"Resuming from existing: {OUTPUT_PATH}")
+    summary = json.loads(input_path.read_text())
     entries = summary.get("entries", [])
 
     code_dirs_found = 0
@@ -146,6 +149,10 @@ def backfill(limit: int = 0, dry_run: bool = False):
             continue
 
         code_dirs_found += 1
+
+        if entry.get("sonar_analyzed"):
+            continue
+
         if limit and analyzed >= limit:
             break
 
@@ -197,14 +204,15 @@ def backfill(limit: int = 0, dry_run: bool = False):
         print(f"{bugs}b {smells}s {ncloc}loc gate={gate} score={score:.3f}")
 
     # Write to NEW file — never overwrites the original
+    total_enriched = sum(1 for e in entries if e.get("sonar_analyzed"))
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    summary["_meta"]["sonar_backfilled"] = analyzed
+    summary["_meta"]["sonar_backfilled"] = total_enriched
     summary["_meta"]["sonar_backfilled_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ")
     if dry_run:
         print(f"\n[DRY RUN] Would enrich {analyzed} entries with sonar data → {OUTPUT_PATH}")
     else:
         OUTPUT_PATH.write_text(json.dumps(summary, indent=2, default=str))
-        print(f"\nEnriched {analyzed} entries ({skipped} skipped, {code_dirs_found} code dirs found)")
+        print(f"\nEnriched {analyzed} new entries ({skipped} skipped, {total_enriched} total, {code_dirs_found} code dirs found)")
         print(f"Wrote: {OUTPUT_PATH}")
 
     print(f"\nOriginal file UNCHANGED: {SUMMARY_PATH}")

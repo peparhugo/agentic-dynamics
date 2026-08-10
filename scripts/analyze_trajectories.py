@@ -337,7 +337,7 @@ def enrich_with_embeddings(results, model_map):
         chroma_embeddings = chroma.get("embeddings", [])
         chroma_metadatas = chroma.get("metadatas", [])
 
-        if not chroma_embeddings:
+        if len(chroma_embeddings) == 0:
             print("  (ChromaDB empty — skipping embedding enrichment)")
             return
 
@@ -351,7 +351,7 @@ def enrich_with_embeddings(results, model_map):
 
         session_centroids: dict[str, list] = {}
         for sid, embeds in session_steps.items():
-            if embeds:
+            if len(embeds) > 0:
                 avg = np.mean(embeds, axis=0).tolist()
                 session_centroids[sid] = avg
 
