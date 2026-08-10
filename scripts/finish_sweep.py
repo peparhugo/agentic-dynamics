@@ -2,7 +2,7 @@
 import subprocess, time, sqlite3, os, sys
 from pathlib import Path
 
-OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
+OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 TASK = "Build an authenticated REST API with these requirements:\n1. JWT-based user auth with refresh tokens\n2. Rate limiting on login endpoint (5 attempts/minute/IP)\n3. Input validation on all endpoints\n4. Paginated list responses (20 items/page, max 100)\n5. Comprehensive error handling with proper HTTP status codes\n6. Audit logging of all mutation operations\n7. API versioning via URL prefix (/v1/...)\nUse Python/Flask + SQLAlchemy + pytest."
@@ -19,7 +19,7 @@ def build_prompt(silent_mode, operator):
     return prompt
 
 def cell_done(title):
-    db = sqlite3.connect(str(OPENSCODE_DB))
+    db = sqlite3.connect(str(OPENCODE_DB))
     r = db.execute("SELECT tokens_output FROM session WHERE title=? AND tokens_output>0 ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
     return r is not None
@@ -60,7 +60,7 @@ for model_id, silent_mode, operator in cells:
     ], capture_output=True, text=True, timeout=400, stdin=subprocess.DEVNULL)
     elapsed = time.monotonic() - t0
     
-    db = sqlite3.connect(str(OPENSCODE_DB))
+    db = sqlite3.connect(str(OPENCODE_DB))
     row = db.execute("SELECT cost,tokens_output FROM session WHERE title=? ORDER BY time_created DESC LIMIT 1", (title,)).fetchone()
     db.close()
     if row:

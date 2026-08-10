@@ -25,3 +25,4 @@ INTERNAL.md
 .git-rewrite/
 _results_summary.json.bak
 _results_summary_sonar.json
+audit.md

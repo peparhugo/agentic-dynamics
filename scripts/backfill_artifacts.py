@@ -21,7 +21,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 REPORTS_DIR = PROJECT_ROOT / "experiments" / "results" / "reports"
-OPENSCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
+OPENCODE_DB = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 
 SKIP_DIRS = {
     "__pycache__", ".git", "venv", ".venv", "env", "site-packages",
@@ -32,9 +32,9 @@ SKIP_DIRS = {
 
 def build_session_map() -> dict[str, str]:
     """Build mapping from worktree path -> session_id from the opencode DB."""
-    if not OPENSCODE_DB.exists():
+    if not OPENCODE_DB.exists():
         return {}
-    db = sqlite3.connect(str(OPENSCODE_DB))
+    db = sqlite3.connect(str(OPENCODE_DB))
     rows = db.execute(
         "SELECT directory, id FROM session WHERE directory LIKE '/tmp/exp_%'"
     ).fetchall()
@@ -44,9 +44,9 @@ def build_session_map() -> dict[str, str]:
 
 def extract_session_transcript(session_id: str) -> str:
     """Extract the full session transcript as JSONL from the opencode DB."""
-    if not OPENSCODE_DB.exists():
+    if not OPENCODE_DB.exists():
         return ""
-    db = sqlite3.connect(str(OPENSCODE_DB))
+    db = sqlite3.connect(str(OPENCODE_DB))
     parts = db.execute(
         "SELECT data FROM part WHERE session_id = ? ORDER BY time_created",
         (session_id,),
