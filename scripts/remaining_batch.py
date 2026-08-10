@@ -1,6 +1,7 @@
 """Run remaining experiment cells — one at a time, no parallelism, no fuss."""
 import subprocess, time, sqlite3, os, yaml, sys
 from pathlib import Path
+from _constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
@@ -30,7 +31,7 @@ def run_cell(model_id, title, config_file, timeout=400):
     
     task = load_task(config_file)
     prompt = f"[STANDARDIZED CONSTRAINTS]\n- Write ALL code files. Run pytest. Fix failures until all tests pass.\n- End with EXACTLY: \"TESTS: N passed, M failed\"\n\n{task}"
-    workdir = f"/tmp/exp_batch_{title.replace('[','').replace(']','').replace(':','_')[:40]}"
+    workdir = f"{WORKTREE_ROOT}/exp_batch_{title.replace('[','').replace(']','').replace(':','_')[:40]}"
     os.makedirs(workdir, exist_ok=True)
     
     print(f"RUN: {title}", flush=True)

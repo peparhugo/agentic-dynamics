@@ -47,38 +47,33 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
-    <div class="eyebrow">Market validation · measurement instrument</div>
-    <h1>Databricks named the AI coding cost levers. This framework measures the mechanism.</h1>
-    <p class="thesis">Databricks surveyed Stripe, Coinbase, Uber, and Ramp. This framework stress-tested 8 models across 227 experiments with 10 calibrated perturbation operators. Same four cost levers. Different evidence base: controlled experiments, full traces, inspectable costs.</p>
+    <h1>AI inference costs vary <strong style="color:var(--ac)">69×</strong> for comparable output. Nobody is measuring the <em>why</em>.</h1>
+    <p class="lead">This framework does. 249 experiment sessions. 8 models. 10 calibrated perturbation operators. Every measurement provenance-tagged.</p>
     <div class="hero-actions"><a href="databricks.html" class="cta-btn big">See What Databricks Missed</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="methodology.html" class="cta-btn ghost">Run the Instrument →</a></div>
-    <div class="source-note"><strong>Open framework</strong> <span data-stat="sessions">249</span> sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · every number provenance-tagged</div>
+    <p class="source-note">Independently converged with <a href="databricks.html">Databricks' July 2026 playbook</a> — they surveyed Stripe, Coinbase, Uber, and Ramp and arrived at the same four conclusions. We got there through controlled stress tests.</p>
   </div>
   <aside class="proof-ledger" aria-label="Evidence ledger">
     <h3>Evidence Ledger</h3>
-    <div class="proof-card market"><div><span class="label">External validation</span><span class="detail">Databricks identified the same four levers from enterprise surveys.</span></div><div class="value">4</div></div>
-    <div class="proof-card"><div><span class="label">Controlled experiments</span><span class="detail">Stress tests across model architectures and variants.</span></div><div class="value"><span data-stat="sessions">249</span></div></div>
-    <div class="proof-card success"><div><span class="label">Measured cost gap</span><span class="detail">Per-session average across <span data-stat="reports">224</span> game reports.</span></div><div class="value"><span data-stat="costgap">69×</span></div></div>
-    <div class="proof-card"><div><span class="label">Verified outcomes</span><span class="detail"><span data-stat="total_tests">—</span> tests across <span data-stat="reports">224</span> reports.</span></div><div class="value"><span data-stat="passrate">88.7%</span></div></div>
+    <div class="proof-card"><span class="label">Cost gap</span><div class="value"><span data-stat="costgap">69×</span></div></div>
+    <div class="proof-card"><span class="label">Sessions</span><div class="value"><span data-stat="sessions">249</span></div></div>
+    <div class="proof-card success"><span class="label">Correctness</span><div class="value"><span data-stat="passrate">88.7%</span></div></div>
+    <div class="proof-card"><span class="label">Total cost</span><div class="value">$<span data-stat="cost">64.98</span></div></div>
   </aside>
 </div></section>
 
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="split-copy">
-    <div>
-      <div class="section-kicker">From playbook to instrument</div>
-      <h2>Databricks made this urgent. The framework makes it measurable.</h2>
-    </div>
-    <div class="comparison-panel">
-      <div><h3>Databricks</h3><p><strong>Survey evidence.</strong> Efficient models, smart routing, progressive budgets, and token overhead reduction. Directional savings from scaled enterprise AI programs.</p></div>
-      <div><h3>This Framework</h3><p><strong>Instrumented evidence.</strong> 10 perturbation operators, recovery signals, AST analysis, cost traces, and model-level behavior under degraded input.</p></div>
+  <div class="section-kicker">Cost mechanics</div>
+  <h2>Same output. 69× different cost.</h2>
+  <div class="cost-contrast">
+    <div class="route-panel"><p><strong>The important finding changed:</strong> this is not simply "one model uses fewer tokens." DeepSeek and Claude produce similar generated token volumes. The difference is what gets billed, how cache is priced, and how each model recovers under perturbation.</p></div>
+    <div class="cost-panel">
+      <h3>Per-session comparison</h3>
+      <div class="model-row"><strong>DeepSeek v4 Pro</strong><span>706 LOC/session</span><span class="price">$<span data-stat="deepseek_cost_per">0.02</span></span></div>
+      <div class="model-row"><strong>GPT-5.6</strong><span>367 LOC/session</span><span class="price">$<span data-stat="gpt56_cost_per">0.45</span></span></div>
+      <div class="model-row"><strong>Claude Fable 5</strong><span>568 LOC/session</span><span class="price high">$<span data-stat="claude_cost_per">1.08</span></span></div>
     </div>
   </div>
-  <div class="lever-grid">
-    <div class="lever-card"><div class="lever-name">Shift to efficient models</div><div class="lever-measure">69× measured cost gap</div><p>$0.016 vs $1.08 per session across the experiment corpus. The gap is pricing architecture, not capability.</p></div>
-    <div class="lever-card"><div class="lever-name">Smart routing</div><div class="lever-measure">95% correctness at $0.12/session</div><p>Grit-routed model selection turns routing from vendor preference into measured policy.</p></div>
-    <div class="lever-card"><div class="lever-name">Progressive budgeting</div><div class="lever-measure">WOC = <span data-stat-fmt="woc">0.90</span></div><p>First-pass success becomes the operating metric. Track retry drag before budget overruns compound.</p></div>
-    <div class="lever-card"><div class="lever-name">Reduce token overhead</div><div class="lever-measure">$3.75/Mtok vs $0.14/Mtok</div><p>Cache write/read asymmetry and narration behavior explain why identical generated token volumes bill differently.</p></div>
-  </div>
+  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a><a href="framework.html#calculator" class="cta-btn ghost">Calculate Your Costs →</a></div>
 </div></section>
 
 <section class="dossier-section"><div class="dossier-inner">
@@ -110,18 +105,15 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 </div></section>
 
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">Cost mechanics</div>
-  <h2>Same output. 69× different cost.</h2>
-  <div class="cost-contrast">
-    <div class="route-panel"><p><strong>The important finding changed:</strong> this is not simply “one model uses fewer tokens.” DeepSeek and Claude produce similar generated token volumes. The difference is what gets billed, how cache is priced, and how each model recovers under perturbation.</p></div>
-    <div class="cost-panel">
-      <h3>Per-session comparison</h3>
-      <div class="model-row"><strong>DeepSeek v4 Pro</strong><span>706 LOC/session</span><span class="price">$<span data-stat="deepseek_cost_per">0.02</span></span></div>
-      <div class="model-row"><strong>GPT-5.6</strong><span>367 LOC/session</span><span class="price">$<span data-stat="gpt56_cost_per">0.45</span></span></div>
-      <div class="model-row"><strong>Claude Fable 5</strong><span>568 LOC/session</span><span class="price high">$<span data-stat="claude_cost_per">1.08</span></span></div>
-    </div>
+  <div class="section-kicker">External validation</div>
+  <h2>Databricks arrived at the same four levers through enterprise surveys.</h2>
+  <p class="lead">Databricks' July 2026 playbook surveyed Stripe, Coinbase, Uber, and Ramp and identified the same four AI coding cost levers. Theirs is survey evidence. Ours is instrument evidence — 10 perturbation operators, recovery signals, full cost traces across 249 sessions. <a href="databricks.html">Read the full mapping →</a></p>
+  <div class="lever-grid">
+    <div class="lever-card"><div class="lever-name">Shift to efficient models</div><div class="lever-measure">69× measured cost gap</div><p>$0.016 vs $1.08 per session across the experiment corpus. The gap is pricing architecture, not capability.</p></div>
+    <div class="lever-card"><div class="lever-name">Smart routing</div><div class="lever-measure">95% correctness at $0.12/session</div><p>Grit-routed model selection turns routing from vendor preference into measured policy.</p></div>
+    <div class="lever-card"><div class="lever-name">Progressive budgeting</div><div class="lever-measure">WOC = <span data-stat-fmt="woc">0.90</span></div><p>First-pass success becomes the operating metric. Track retry drag before budget overruns compound.</p></div>
+    <div class="lever-card"><div class="lever-name">Reduce token overhead</div><div class="lever-measure">$3.75/Mtok vs $0.14/Mtok</div><p>Cache write/read asymmetry and narration behavior explain why identical generated token volumes bill differently.</p></div>
   </div>
-  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a><a href="framework.html#calculator" class="cta-btn ghost">Calculate Your Costs →</a></div>
 </div></section>
 
 <section class="dossier-section alt"><div class="dossier-inner">

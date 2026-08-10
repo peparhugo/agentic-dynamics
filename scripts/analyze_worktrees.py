@@ -28,6 +28,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
+from _constants import WORKTREE_GLOB
 
 from instrument import (
     evaluate_solution, compute_efficiency, measure_basin_escape,
@@ -746,7 +747,7 @@ def discover_worktrees(sessions_by_dir: dict) -> list[dict]:
     """Discover experiment worktrees and match to DB sessions."""
     import glob
     worktrees = []
-    for path in sorted(glob.glob("/tmp/exp_*")):
+    for path in sorted(glob.glob(str(WORKTREE_GLOB))):
         wt = {"path": path, "name": Path(path).name}
         if path in sessions_by_dir:
             wt["session"] = sessions_by_dir[path]

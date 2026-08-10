@@ -1,6 +1,7 @@
 """Run remaining silent sweep cells — one at a time, properly."""
 import subprocess, time, sqlite3, os, sys
 from pathlib import Path
+from _constants import WORKTREE_ROOT
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
@@ -42,7 +43,7 @@ for model_id, silent_mode, operator in cells:
         print(f"SKIP: {title}")
         continue
     
-    workdir = f"/tmp/exp_sweep_{slug}_{silent_mode[0]}{operator[0]}"
+    workdir = f"{WORKTREE_ROOT}/exp_sweep_{slug}_{silent_mode[0]}{operator[0]}"
     os.makedirs(workdir, exist_ok=True)
     prompt = build_prompt(silent_mode, operator)
     

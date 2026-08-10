@@ -4,6 +4,7 @@ No fragile imports. No serial blocking. Just spawn and wait.
 import subprocess, time, json, os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from _constants import WORKTREE_ROOT
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
@@ -45,7 +46,7 @@ def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
     if cell_done(title):
         return {"title": title, "status": "skipped", "duration": 0}
 
-    workdir = f"/tmp/exp_swp_{label_slug[:8]}_{silent_mode[0]}{operator[0]}"
+    workdir = f"{WORKTREE_ROOT}/exp_swp_{label_slug[:8]}_{silent_mode[0]}{operator[0]}"
     Path(workdir).mkdir(parents=True, exist_ok=True)
 
     prompt = build_prompt(silent_mode, operator)

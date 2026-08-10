@@ -111,6 +111,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> DeepSeek's semantic grit (0.18 escape, 94% correctness at $0.016) stands out. When false signals are injected <em>within</em> the reasoning manifold — the harder test — both models perform similarly on correctness (94% vs 88%), but DeepSeek does it at <strong style="color:var(--ac)">69&times; lower cost</strong>. Claude's gap is not capability; it's pricing architecture. DeepSeek separates reasoning into a low-cost structured channel. Claude bills reasoning as output tokens at $15/Mtok.</div>
 
+<div id="grit-model-filters" style="margin-bottom:0.5rem;display:flex;flex-wrap:wrap;gap:6px;justify-content:center"></div>
 <div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="gritMatrixChart"></canvas></div>
 
 <div class="insight" style="border-left-color:var(--cy);margin-top:1.5rem"><strong style="color:var(--cy)">Our experiments support what Databricks found:</strong> On August 7, 2026, Databricks published their playbook for reducing AI coding costs at scale (Wendell et al., Aug 2026). Their four cost levers — shifting to efficient models, dynamic routing, progressive budgeting, and reducing token overhead — map directly to rules in this framework. They call the core concept the <strong>"Efficiency Frontier"</strong>: the set of models with the best price point for a given level of intelligence. We call it Grit. They surveyed companies. We stress-tested models with 10 perturbation operators across 227 experiments.</div>
@@ -458,61 +459,142 @@ document.addEventListener('DOMContentLoaded', function () {
       'GPT-5-nano': 'rgba(239,68,68,0.85)'
     };
 
-    // Fallback: mimic lab_grit_matrix output structure
-    var gritPoints = gritData || [
-      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic' },
-      { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, perturbation_class:'manifold' },
-      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic' },
-      { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, perturbation_class:'manifold' },
-      { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, perturbation_class:'semantic' },
-      { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, perturbation_class:'semantic' },
-      { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, perturbation_class:'semantic' },
-      { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, perturbation_class:'semantic' },
-      { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic' },
-      { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, perturbation_class:'semantic' }
-    ];
+    var makeFallback = function() {
+      return [
+        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.25, correctness:0.92, cost:0.0158, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'deepseek/deepseek-v4-pro', label:'DeepSeek v4 Pro', escape:0.76, correctness:0.77, cost:0.0167, perturbation_class:'manifold', task:'', strategy:'' },
+        { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.24, correctness:0.88, cost:1.0847, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'anthropic/claude-fable-5', label:'Claude Fable 5', escape:0.62, correctness:0.87, cost:1.2892, perturbation_class:'manifold', task:'', strategy:'' },
+        { model:'openai/gpt-5-nano', label:'GPT-5-nano', escape:0.45, correctness:0.70, cost:0.0057, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'openai/gpt-5-mini', label:'GPT-5-mini', escape:0.20, correctness:0.83, cost:0.0258, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'openai/gpt-5', label:'GPT-5', escape:0.52, correctness:0.88, cost:0.159, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'openai/gpt-5.5', label:'GPT-5.5', escape:0.64, correctness:1.0, cost:0.282, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'openai/gpt-5.6', label:'GPT-5.6', escape:0.16, correctness:0.94, cost:0.4474, perturbation_class:'semantic', task:'', strategy:'' },
+        { model:'openai/gpt-5.6-fast', label:'GPT-5.6-fast', escape:0.59, correctness:1.0, cost:0.6625, perturbation_class:'semantic', task:'', strategy:'' }
+      ];
+    };
 
-    var datasets = {};
-    gritPoints.forEach(function(p) {
-      var key = p.label + '|' + (p.perturbation_class || 'semantic');
-      if (!datasets[key]) datasets[key] = { label: p.label, pc: p.perturbation_class, xs: [], ys: [], costs: [] };
-      datasets[key].xs.push(p.escape != null ? p.escape : 0);
-      datasets[key].ys.push(p.correctness != null ? p.correctness : 0);
-      datasets[key].costs.push(p.cost || 0);
+    var allPoints = (gritData && gritData.length) ? gritData : makeFallback();
+
+    var modelList = [];
+    var seen = {};
+    allPoints.forEach(function(p) {
+      if (!seen[p.label]) { seen[p.label] = true; modelList.push(p.label); }
     });
 
-    var ds = [];
-    Object.keys(datasets).forEach(function(key) {
-      var g = datasets[key];
-      var cx = g.xs.reduce(function(a,b){return a+b;},0) / g.xs.length;
-      var cy = g.ys.reduce(function(a,b){return a+b;},0) / g.ys.length;
-      var ccost = g.costs.reduce(function(a,b){return a+b;},0) / g.costs.length;
-      var color = modelColors[g.label] || 'rgba(161,161,170,0.70)';
-      ds.push({
-        label: g.label + ' (' + g.pc + ')',
-        data: [{ x: cx, y: cy, r: Math.max(5, ccost * 20) }],
-        backgroundColor: color,
-        borderColor: color.replace('0.70','1').replace('0.85','1').replace('0.60','1').replace('0.50','1'),
-        borderWidth: 1
+    var selectedModels = {};
+    modelList.forEach(function(m) { selectedModels[m] = true; });
+    var selectedPC = { semantic: true, manifold: true };
+
+    var filterDiv = document.getElementById('grit-model-filters');
+    if (filterDiv) {
+      modelList.forEach(function(m) {
+        var count = allPoints.filter(function(p) { return p.label === m; }).length;
+        var btn = document.createElement('button');
+        btn.textContent = m + ' (' + count + ')';
+        btn.className = 'grit-filter-btn';
+        btn.dataset.model = m;
+        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid ' + (modelColors[m] || '#a1a1aa') + ';background:' + (modelColors[m] || '#a1a1aa') + ';color:#fff;cursor:pointer;';
+        btn.onclick = function() {
+          selectedModels[m] = !selectedModels[m];
+          btn.style.background = selectedModels[m] ? (modelColors[m] || '#a1a1aa') : 'transparent';
+          btn.style.color = selectedModels[m] ? '#fff' : '#a1a1aa';
+          buildChart();
+        };
+        filterDiv.appendChild(btn);
       });
-    });
+      ['semantic','manifold'].forEach(function(pc) {
+        var btn = document.createElement('button');
+        btn.textContent = pc;
+        btn.className = 'grit-filter-btn';
+        btn.dataset.pc = pc;
+        btn.style.cssText = 'padding:3px 8px;font-size:10px;font-family:\'JetBrains Mono\',monospace;border-radius:4px;border:1px solid #a1a1aa;background:#a1a1aa;color:#fff;cursor:pointer;';
+        btn.onclick = function() {
+          selectedPC[pc] = !selectedPC[pc];
+          btn.style.background = selectedPC[pc] ? '#a1a1aa' : 'transparent';
+          btn.style.color = selectedPC[pc] ? '#fff' : '#a1a1aa';
+          buildChart();
+        };
+        filterDiv.appendChild(btn);
+      });
+    }
 
-    new Chart(ctx, {
-      type: 'bubble',
-      data: { datasets: ds },
-      options: {
-        responsive: true,
-        maintainAspectRatio: true,
-        plugins: {
-          title: { display: true, text: 'Grit Matrix: Correctness vs Escape (bubble = avg cost, grouped centroids)', color: '#e4e4e7', font: { size: 14, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
-          legend: { labels: { color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace", size: 9 }, usePointStyle: true, padding: 10 } }
+    function fmtColorBorder(rgba) {
+      return rgba.replace(/[\d.]+\s*\)$/, '1)');
+    }
+
+    var gritChart = null;
+    function buildChart() {
+      var filtered = allPoints.filter(function(p) {
+        return selectedModels[p.label] && selectedPC[p.perturbation_class || 'semantic'];
+      });
+
+      var datasets = filtered.map(function(p) {
+        var color = modelColors[p.label] || 'rgba(161,161,170,0.70)';
+        return {
+          label: p.label,
+          data: [{ x: p.escape != null ? p.escape : 0, y: p.correctness != null ? p.correctness : 0, r: Math.max(4, (p.cost || 0) * 15) }],
+          backgroundColor: color,
+          borderColor: fmtColorBorder(color),
+          borderWidth: 1,
+          _task: p.task || '',
+          _correctness: p.correctness,
+          _cost: p.cost,
+          _strategy: p.strategy || '',
+          _pc: p.perturbation_class || 'semantic'
+        };
+      });
+
+      if (gritChart) gritChart.destroy();
+      gritChart = new Chart(ctx, {
+        type: 'bubble',
+        data: { datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: true,
+          plugins: {
+            title: { display: true, text: 'Grit Matrix: Correctness vs Escape \u2014 ' + filtered.length + ' individual sessions', color: '#e4e4e7', font: { size: 14, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(ctx) {
+                  var ds = ctx.dataset;
+                  var pct = (typeof ds._correctness === 'number') ? (ds._correctness * 100).toFixed(0) + '%' : '';
+                  var cost = (typeof ds._cost === 'number') ? '$' + ds._cost.toFixed(4) : '';
+                  return ds.label + ' / ' + ds._task + ' / correctness:' + pct + ' / ' + cost + ' / ' + ds._strategy + ' / ' + ds._pc;
+                }
+              }
+            }
+          },
+          scales: {
+            x: { title: { display: true, text: 'Escape rate \u2192 (more divergence)', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(161,161,170,0.10)' }, min: -0.05, max: 1.05 },
+            y: { title: { display: true, text: 'Correctness \u2192', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa', callback: function(v) { return (v*100).toFixed(0)+'%'; } }, grid: { color: 'rgba(161,161,170,0.10)' }, min: 0.5, max: 1.05 }
+          }
         },
-        scales: {
-          x: { title: { display: true, text: 'Escape rate (← less divergence)', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa' }, grid: { color: 'rgba(161,161,170,0.10)' }, min: -0.05, max: 1.05 },
-          y: { title: { display: true, text: 'Correctness →', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa', callback: function(v) { return (v*100).toFixed(0)+'%'; } }, grid: { color: 'rgba(161,161,170,0.10)' }, min: 0.5, max: 1.05 }
-        }
-      }
-    });
+        plugins: [{
+          id: 'quadrants',
+          afterDraw: function(chart) {
+            var ctx2 = chart.ctx, xScale = chart.scales.x, yScale = chart.scales.y;
+            var x0 = xScale.getPixelForValue(0.5);
+            ctx2.save();
+            ctx2.strokeStyle = 'rgba(161,161,170,0.25)';
+            ctx2.setLineDash([6,4]);
+            ctx2.beginPath(); ctx2.moveTo(x0, yScale.top); ctx2.lineTo(x0, yScale.bottom); ctx2.stroke();
+            var y0 = yScale.getPixelForValue(0.8);
+            ctx2.beginPath(); ctx2.moveTo(xScale.left, y0); ctx2.lineTo(xScale.right, y0); ctx2.stroke();
+            ctx2.fillStyle = 'rgba(161,161,170,0.5)';
+            ctx2.font = '9px monospace';
+            ctx2.fillText('High Grit', xScale.getPixelForValue(0.2), yScale.getPixelForValue(0.9));
+            ctx2.fillText('Exploratory', xScale.getPixelForValue(0.7), yScale.getPixelForValue(0.9));
+            ctx2.fillText('Stuck', xScale.getPixelForValue(0.2), yScale.getPixelForValue(0.6));
+            ctx2.fillText('Recovering', xScale.getPixelForValue(0.7), yScale.getPixelForValue(0.6));
+            ctx2.restore();
+          }
+        }]
+      });
+    }
+
+    buildChart();
   })();
 
   // --- Populate data-driven tables ---

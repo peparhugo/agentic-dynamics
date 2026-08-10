@@ -2,6 +2,7 @@
 import yaml, subprocess, time, sqlite3, os
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from _constants import WORKTREE_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
@@ -42,7 +43,7 @@ def run_experiment(config_name, operator="baseline", silent=None):
     if operator == "perturbed":
         prompt += "\n\nNOTE: A previous developer built part of this. JWT auth module already exists and passes tests. Focus on remaining work."
     
-    workdir = f"/tmp/exp_batch_{exp_name}_{sm_tag}"
+    workdir = f"{WORKTREE_ROOT}/exp_batch_{exp_name}_{sm_tag}"
     os.makedirs(workdir, exist_ok=True)
     
     t0 = time.monotonic()

@@ -10,6 +10,7 @@ import argparse, json, os, re, subprocess, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from _constants import WORKTREE_ROOT, WORKTREE_GLOB
 
 
 def find_test_files(workdir: str) -> list[str]:
@@ -90,7 +91,7 @@ if __name__ == "__main__":
     else:
         # Scan for recent experiment worktrees
         import glob
-        workdirs = sorted(glob.glob("/tmp/probe_*") + glob.glob("/tmp/exp_*"), 
+        workdirs = sorted(glob.glob(f"{WORKTREE_ROOT}/probe_*") + glob.glob(str(WORKTREE_GLOB)), 
                          key=os.path.getmtime, reverse=True)[:10]
         for wd in workdirs:
             results = validate_session(wd)

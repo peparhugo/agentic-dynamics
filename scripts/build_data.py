@@ -23,7 +23,7 @@ REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
-from _constants import MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
+from _constants import WORKTREE_ROOT, MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
 
 MODEL_DISPLAY_ORDER = [
     "deepseek/deepseek-v4-pro",
@@ -101,7 +101,7 @@ def query_token_breakdown():
         "SUM(tokens_reasoning) as total_reasoning, "
         "SUM(tokens_cache_read) as cache_read, SUM(tokens_cache_write) as cache_write, "
         "SUM(cost) as total_cost, COUNT(*) as sessions "
-        "FROM session WHERE directory LIKE '/tmp/exp_%' AND cost > 0 "
+        f"FROM session WHERE directory LIKE '{WORKTREE_ROOT}/exp_%' AND cost > 0 "
         "GROUP BY 1 ORDER BY SUM(cost) ASC"
     ).fetchall()
     conn.close()
