@@ -1,0 +1,2615 @@
+{
+  "_meta": {
+    "experiment_id": "lab_reasoning_divergence",
+    "total_pairs": 5443,
+    "total_step_embeddings": 2215,
+    "models_analyzed": 9,
+    "data_source": "ChromaDB \u2014 per-step reasoning embeddings via bge-m3",
+    "method": "Compares matching step positions (step N vs step N) across session pairs",
+    "metric": "cosine distance between matching reasoning step embeddings"
+  },
+  "per_operator_pair": {
+    "baseline \u00d7 baseline": {
+      "operator_pair": "baseline \u00d7 baseline",
+      "mean_distance": 0.1913,
+      "std_dev": 0.0293,
+      "count": 2838
+    },
+    "baseline \u00d7 remove_critical_constraint": {
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "mean_distance": 0.2124,
+      "std_dev": 0.02,
+      "count": 392
+    },
+    "baseline \u00d7 inject_alien_vocab": {
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "mean_distance": 0.202,
+      "std_dev": 0.0236,
+      "count": 388
+    },
+    "baseline \u00d7 shift_framing": {
+      "operator_pair": "baseline \u00d7 shift_framing",
+      "mean_distance": 0.2084,
+      "std_dev": 0.0217,
+      "count": 360
+    },
+    " \u00d7 baseline": {
+      "operator_pair": " \u00d7 baseline",
+      "mean_distance": 0.2355,
+      "std_dev": 0.047,
+      "count": 324
+    },
+    "baseline \u00d7 invert_constraint": {
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "mean_distance": 0.2097,
+      "std_dev": 0.023,
+      "count": 316
+    },
+    "baseline \u00d7 inject_phantom_success": {
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "mean_distance": 0.2004,
+      "std_dev": 0.0229,
+      "count": 234
+    },
+    "baseline \u00d7 inject_competing_goal": {
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "mean_distance": 0.2129,
+      "std_dev": 0.0245,
+      "count": 177
+    },
+    "inject_alien_vocab \u00d7 remove_critical_constraint": {
+      "operator_pair": "inject_alien_vocab \u00d7 remove_critical_constraint",
+      "mean_distance": 0.1782,
+      "std_dev": 0.0332,
+      "count": 27
+    },
+    "remove_critical_constraint \u00d7 shift_framing": {
+      "operator_pair": "remove_critical_constraint \u00d7 shift_framing",
+      "mean_distance": 0.1985,
+      "std_dev": 0.0172,
+      "count": 25
+    },
+    "inject_alien_vocab \u00d7 shift_framing": {
+      "operator_pair": "inject_alien_vocab \u00d7 shift_framing",
+      "mean_distance": 0.1819,
+      "std_dev": 0.0277,
+      "count": 25
+    },
+    "inject_alien_vocab \u00d7 invert_constraint": {
+      "operator_pair": "inject_alien_vocab \u00d7 invert_constraint",
+      "mean_distance": 0.1898,
+      "std_dev": 0.0261,
+      "count": 24
+    },
+    "invert_constraint \u00d7 remove_critical_constraint": {
+      "operator_pair": "invert_constraint \u00d7 remove_critical_constraint",
+      "mean_distance": 0.2068,
+      "std_dev": 0.0195,
+      "count": 22
+    },
+    " \u00d7 remove_critical_constraint": {
+      "operator_pair": " \u00d7 remove_critical_constraint",
+      "mean_distance": 0.2477,
+      "std_dev": 0.0444,
+      "count": 21
+    },
+    " \u00d7 inject_alien_vocab": {
+      "operator_pair": " \u00d7 inject_alien_vocab",
+      "mean_distance": 0.2446,
+      "std_dev": 0.0463,
+      "count": 20
+    },
+    "invert_constraint \u00d7 shift_framing": {
+      "operator_pair": "invert_constraint \u00d7 shift_framing",
+      "mean_distance": 0.1978,
+      "std_dev": 0.0235,
+      "count": 20
+    },
+    " \u00d7 shift_framing": {
+      "operator_pair": " \u00d7 shift_framing",
+      "mean_distance": 0.2433,
+      "std_dev": 0.0431,
+      "count": 20
+    },
+    "inject_phantom_success \u00d7 remove_critical_constraint": {
+      "operator_pair": "inject_phantom_success \u00d7 remove_critical_constraint",
+      "mean_distance": 0.1712,
+      "std_dev": 0.0283,
+      "count": 17
+    },
+    "inject_alien_vocab \u00d7 inject_phantom_success": {
+      "operator_pair": "inject_alien_vocab \u00d7 inject_phantom_success",
+      "mean_distance": 0.1643,
+      "std_dev": 0.0291,
+      "count": 17
+    },
+    " \u00d7 invert_constraint": {
+      "operator_pair": " \u00d7 invert_constraint",
+      "mean_distance": 0.2405,
+      "std_dev": 0.0459,
+      "count": 16
+    },
+    "inject_phantom_success \u00d7 shift_framing": {
+      "operator_pair": "inject_phantom_success \u00d7 shift_framing",
+      "mean_distance": 0.181,
+      "std_dev": 0.0275,
+      "count": 15
+    },
+    "inject_phantom_success \u00d7 invert_constraint": {
+      "operator_pair": "inject_phantom_success \u00d7 invert_constraint",
+      "mean_distance": 0.1911,
+      "std_dev": 0.0269,
+      "count": 14
+    },
+    "inject_alien_vocab \u00d7 inject_competing_goal": {
+      "operator_pair": "inject_alien_vocab \u00d7 inject_competing_goal",
+      "mean_distance": 0.1897,
+      "std_dev": 0.0268,
+      "count": 14
+    },
+    " \u00d7 inject_phantom_success": {
+      "operator_pair": " \u00d7 inject_phantom_success",
+      "mean_distance": 0.2442,
+      "std_dev": 0.0513,
+      "count": 13
+    },
+    "inject_competing_goal \u00d7 invert_constraint": {
+      "operator_pair": "inject_competing_goal \u00d7 invert_constraint",
+      "mean_distance": 0.1879,
+      "std_dev": 0.0219,
+      "count": 12
+    },
+    "inject_competing_goal \u00d7 remove_critical_constraint": {
+      "operator_pair": "inject_competing_goal \u00d7 remove_critical_constraint",
+      "mean_distance": 0.215,
+      "std_dev": 0.0142,
+      "count": 12
+    },
+    "inject_alien_vocab \u00d7 inject_alien_vocab": {
+      "operator_pair": "inject_alien_vocab \u00d7 inject_alien_vocab",
+      "mean_distance": 0.1607,
+      "std_dev": 0.0334,
+      "count": 11
+    },
+    "remove_critical_constraint \u00d7 remove_critical_constraint": {
+      "operator_pair": "remove_critical_constraint \u00d7 remove_critical_constraint",
+      "mean_distance": 0.1914,
+      "std_dev": 0.0177,
+      "count": 10
+    },
+    "shift_framing \u00d7 shift_framing": {
+      "operator_pair": "shift_framing \u00d7 shift_framing",
+      "mean_distance": 0.2009,
+      "std_dev": 0.0212,
+      "count": 10
+    },
+    "inject_competing_goal \u00d7 shift_framing": {
+      "operator_pair": "inject_competing_goal \u00d7 shift_framing",
+      "mean_distance": 0.2064,
+      "std_dev": 0.013,
+      "count": 10
+    },
+    " \u00d7 inject_competing_goal": {
+      "operator_pair": " \u00d7 inject_competing_goal",
+      "mean_distance": 0.2525,
+      "std_dev": 0.0435,
+      "count": 9
+    },
+    "inject_competing_goal \u00d7 inject_phantom_success": {
+      "operator_pair": "inject_competing_goal \u00d7 inject_phantom_success",
+      "mean_distance": 0.1929,
+      "std_dev": 0.0146,
+      "count": 8
+    },
+    "invert_constraint \u00d7 invert_constraint": {
+      "operator_pair": "invert_constraint \u00d7 invert_constraint",
+      "mean_distance": 0.1829,
+      "std_dev": 0.0415,
+      "count": 7
+    },
+    " \u00d7 ": {
+      "operator_pair": " \u00d7 ",
+      "mean_distance": 0.2431,
+      "std_dev": 0.047,
+      "count": 7
+    },
+    "inject_phantom_success \u00d7 inject_phantom_success": {
+      "operator_pair": "inject_phantom_success \u00d7 inject_phantom_success",
+      "mean_distance": 0.1451,
+      "std_dev": 0.0123,
+      "count": 3
+    },
+    "? \u00d7 ?": {
+      "operator_pair": "? \u00d7 ?",
+      "mean_distance": 0.2317,
+      "std_dev": 0.0321,
+      "count": 3
+    },
+    "inject_competing_goal \u00d7 inject_competing_goal": {
+      "operator_pair": "inject_competing_goal \u00d7 inject_competing_goal",
+      "mean_distance": 0.1431,
+      "std_dev": 0.0649,
+      "count": 2
+    }
+  },
+  "per_class": {
+    "": {
+      "class": "",
+      "mean_distance": 0.1999,
+      "count": 1696
+    },
+    "?": {
+      "class": "?",
+      "mean_distance": 0.2317,
+      "count": 3
+    },
+    "manifold": {
+      "class": "manifold",
+      "mean_distance": 0.181,
+      "count": 46
+    },
+    "mixed": {
+      "class": "mixed",
+      "mean_distance": 0.203,
+      "count": 3018
+    },
+    "semantic": {
+      "class": "semantic",
+      "mean_distance": 0.1912,
+      "count": 680
+    }
+  },
+  "per_model": {
+    "anthropic/claude-fable-5": {
+      "model_id": "anthropic/claude-fable-5",
+      "label": "Claude Fable 5",
+      "sessions_with_steps": 39,
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.212,
+        "count": 91
+      },
+      "baseline \u00d7 inject_alien_vocab": {
+        "mean_distance": 0.207,
+        "count": 28
+      },
+      "baseline \u00d7 inject_competing_goal": {
+        "mean_distance": 0.2239,
+        "count": 28
+      },
+      "baseline \u00d7 inject_phantom_success": {
+        "mean_distance": 0.2112,
+        "count": 14
+      },
+      "baseline \u00d7 invert_constraint": {
+        "mean_distance": 0.2116,
+        "count": 28
+      },
+      "baseline \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2079,
+        "count": 14
+      },
+      "inject_alien_vocab \u00d7 inject_alien_vocab": {
+        "mean_distance": 0.1161,
+        "count": 1
+      },
+      "inject_alien_vocab \u00d7 inject_competing_goal": {
+        "mean_distance": 0.1975,
+        "count": 4
+      },
+      "inject_alien_vocab \u00d7 inject_phantom_success": {
+        "mean_distance": 0.1848,
+        "count": 2
+      },
+      "inject_alien_vocab \u00d7 invert_constraint": {
+        "mean_distance": 0.1978,
+        "count": 4
+      },
+      "inject_alien_vocab \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.1189,
+        "count": 2
+      },
+      "inject_competing_goal \u00d7 inject_competing_goal": {
+        "mean_distance": 0.0782,
+        "count": 1
+      },
+      "inject_competing_goal \u00d7 inject_phantom_success": {
+        "mean_distance": 0.2088,
+        "count": 2
+      },
+      "inject_competing_goal \u00d7 invert_constraint": {
+        "mean_distance": 0.1623,
+        "count": 4
+      },
+      "inject_competing_goal \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2387,
+        "count": 2
+      },
+      "inject_phantom_success \u00d7 invert_constraint": {
+        "mean_distance": 0.2126,
+        "count": 2
+      },
+      "inject_phantom_success \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.1907,
+        "count": 1
+      },
+      "invert_constraint \u00d7 invert_constraint": {
+        "mean_distance": 0.0888,
+        "count": 1
+      },
+      "invert_constraint \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2175,
+        "count": 2
+      }
+    },
+    "deepseek/deepseek-v4-pro": {
+      "model_id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "sessions_with_steps": 101,
+      " \u00d7 ": {
+        "mean_distance": 0.2464,
+        "count": 6
+      },
+      " \u00d7 baseline": {
+        "mean_distance": 0.2349,
+        "count": 288
+      },
+      " \u00d7 inject_alien_vocab": {
+        "mean_distance": 0.2446,
+        "count": 20
+      },
+      " \u00d7 inject_competing_goal": {
+        "mean_distance": 0.2455,
+        "count": 8
+      },
+      " \u00d7 inject_phantom_success": {
+        "mean_distance": 0.2415,
+        "count": 12
+      },
+      " \u00d7 invert_constraint": {
+        "mean_distance": 0.2405,
+        "count": 16
+      },
+      " \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2462,
+        "count": 20
+      },
+      " \u00d7 shift_framing": {
+        "mean_distance": 0.2433,
+        "count": 20
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.1892,
+        "count": 2556
+      },
+      "baseline \u00d7 inject_alien_vocab": {
+        "mean_distance": 0.2017,
+        "count": 360
+      },
+      "baseline \u00d7 inject_competing_goal": {
+        "mean_distance": 0.2096,
+        "count": 144
+      },
+      "baseline \u00d7 inject_phantom_success": {
+        "mean_distance": 0.1995,
+        "count": 216
+      },
+      "baseline \u00d7 invert_constraint": {
+        "mean_distance": 0.2095,
+        "count": 288
+      },
+      "baseline \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2119,
+        "count": 360
+      },
+      "baseline \u00d7 shift_framing": {
+        "mean_distance": 0.2084,
+        "count": 360
+      },
+      "inject_alien_vocab \u00d7 inject_alien_vocab": {
+        "mean_distance": 0.1651,
+        "count": 10
+      },
+      "inject_alien_vocab \u00d7 inject_competing_goal": {
+        "mean_distance": 0.1865,
+        "count": 10
+      },
+      "inject_alien_vocab \u00d7 inject_phantom_success": {
+        "mean_distance": 0.1615,
+        "count": 15
+      },
+      "inject_alien_vocab \u00d7 invert_constraint": {
+        "mean_distance": 0.1882,
+        "count": 20
+      },
+      "inject_alien_vocab \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.183,
+        "count": 25
+      },
+      "inject_alien_vocab \u00d7 shift_framing": {
+        "mean_distance": 0.1819,
+        "count": 25
+      },
+      "inject_competing_goal \u00d7 inject_competing_goal": {
+        "mean_distance": 0.208,
+        "count": 1
+      },
+      "inject_competing_goal \u00d7 inject_phantom_success": {
+        "mean_distance": 0.1875,
+        "count": 6
+      },
+      "inject_competing_goal \u00d7 invert_constraint": {
+        "mean_distance": 0.2007,
+        "count": 8
+      },
+      "inject_competing_goal \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2102,
+        "count": 10
+      },
+      "inject_competing_goal \u00d7 shift_framing": {
+        "mean_distance": 0.2064,
+        "count": 10
+      },
+      "inject_phantom_success \u00d7 inject_phantom_success": {
+        "mean_distance": 0.1451,
+        "count": 3
+      },
+      "inject_phantom_success \u00d7 invert_constraint": {
+        "mean_distance": 0.1875,
+        "count": 12
+      },
+      "inject_phantom_success \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.1671,
+        "count": 15
+      },
+      "inject_phantom_success \u00d7 shift_framing": {
+        "mean_distance": 0.181,
+        "count": 15
+      },
+      "invert_constraint \u00d7 invert_constraint": {
+        "mean_distance": 0.1986,
+        "count": 6
+      },
+      "invert_constraint \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2058,
+        "count": 20
+      },
+      "invert_constraint \u00d7 shift_framing": {
+        "mean_distance": 0.1978,
+        "count": 20
+      },
+      "remove_critical_constraint \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.1914,
+        "count": 10
+      },
+      "remove_critical_constraint \u00d7 shift_framing": {
+        "mean_distance": 0.1985,
+        "count": 25
+      },
+      "shift_framing \u00d7 shift_framing": {
+        "mean_distance": 0.2009,
+        "count": 10
+      }
+    },
+    "openai/gpt-5": {
+      "model_id": "openai/gpt-5",
+      "label": "GPT-5",
+      "sessions_with_steps": 7,
+      " \u00d7 baseline": {
+        "mean_distance": 0.2908,
+        "count": 5
+      },
+      " \u00d7 inject_competing_goal": {
+        "mean_distance": 0.3088,
+        "count": 1
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.1976,
+        "count": 10
+      },
+      "baseline \u00d7 inject_competing_goal": {
+        "mean_distance": 0.2448,
+        "count": 5
+      }
+    },
+    "openai/gpt-5-mini": {
+      "model_id": "openai/gpt-5-mini",
+      "label": "GPT-5-mini",
+      "sessions_with_steps": 13,
+      " \u00d7 baseline": {
+        "mean_distance": 0.2781,
+        "count": 12
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.2037,
+        "count": 66
+      }
+    },
+    "openai/gpt-5-nano": {
+      "model_id": "openai/gpt-5-nano",
+      "label": "GPT-5-nano",
+      "sessions_with_steps": 7,
+      " \u00d7 baseline": {
+        "mean_distance": 0.2646,
+        "count": 4
+      },
+      " \u00d7 inject_phantom_success": {
+        "mean_distance": 0.2768,
+        "count": 1
+      },
+      " \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2777,
+        "count": 1
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.2081,
+        "count": 6
+      },
+      "baseline \u00d7 inject_phantom_success": {
+        "mean_distance": 0.2127,
+        "count": 4
+      },
+      "baseline \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.217,
+        "count": 4
+      },
+      "inject_phantom_success \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2141,
+        "count": 1
+      }
+    },
+    "openai/gpt-5.5": {
+      "model_id": "openai/gpt-5.5",
+      "label": "GPT-5.5",
+      "sessions_with_steps": 6,
+      " \u00d7 baseline": {
+        "mean_distance": 0.186,
+        "count": 3
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.1985,
+        "count": 3
+      }
+    },
+    "openai/gpt-5.6": {
+      "model_id": "openai/gpt-5.6",
+      "label": "GPT-5.6",
+      "sessions_with_steps": 16,
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.2164,
+        "count": 91
+      },
+      "baseline \u00d7 remove_critical_constraint": {
+        "mean_distance": 0.2285,
+        "count": 14
+      }
+    },
+    "openai/gpt-5.6-fast": {
+      "model_id": "openai/gpt-5.6-fast",
+      "label": "GPT-5.6-fast",
+      "sessions_with_steps": 9,
+      " \u00d7 ": {
+        "mean_distance": 0.2237,
+        "count": 1
+      },
+      " \u00d7 baseline": {
+        "mean_distance": 0.1867,
+        "count": 12
+      },
+      "baseline \u00d7 baseline": {
+        "mean_distance": 0.2164,
+        "count": 15
+      }
+    },
+    "unknown": {
+      "model_id": "unknown",
+      "label": "unknown",
+      "sessions_with_steps": 6,
+      "? \u00d7 ?": {
+        "mean_distance": 0.2317,
+        "count": 3
+      }
+    }
+  },
+  "pairs": [
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_3hlb2bus",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1809
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_3j2vrct4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1967
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_6xzauw79",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2492
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_9u9p6onc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2426
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2112
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2465
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1851
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1802
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "invert_constraint \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2204
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "invert_constraint \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.0888
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2108
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2713
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1661
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.223
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2349
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_phantom_success \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2074
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1647
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2114
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2626
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1625
+    },
+    {
+      "session_a": "exp_1q13yzyh",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2003
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_3j2vrct4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1223
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_6xzauw79",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2566
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_9u9p6onc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2378
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2239
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2275
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1951
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.217
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1965
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1724
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1891
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2532
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2153
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2182
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2215
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2013
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1865
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1876
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2253
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2011
+    },
+    {
+      "session_a": "exp_3hlb2bus",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2173
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_6xzauw79",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2393
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_9u9p6onc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2263
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2194
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2002
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1556
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2092
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1876
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1632
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.105
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.278
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2235
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2039
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2134
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2061
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1947
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1554
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2167
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1905
+    },
+    {
+      "session_a": "exp_3j2vrct4",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2222
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_9u9p6onc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.0177
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2175
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2116
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2124
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2609
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2453
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2404
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2229
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2367
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2483
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.09
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2206
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2277
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2287
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2371
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2404
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2611
+    },
+    {
+      "session_a": "exp_6xzauw79",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2581
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2029
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2045
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1999
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2607
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2357
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2268
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2151
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.242
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2477
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.0838
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.212
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2257
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2218
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2252
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2359
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2527
+    },
+    {
+      "session_a": "exp_9u9p6onc",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2528
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_batch_batch_task_manager_baseline claude_fable",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2044
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2193
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2242
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2022
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2035
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1978
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2623
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1966
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2118
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.193
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1991
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2076
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1888
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2631
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2142
+    },
+    {
+      "session_a": "exp_batch_batch_data_table_baseline claude_fable_5",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2306
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_e8bbu37m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2182
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2056
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1721
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 4,
+      "mean_distance": 0.2308
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1824
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2566
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 4,
+      "mean_distance": 0.2322
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2207
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1794
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.188
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2304
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1481
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2306
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 3,
+      "mean_distance": 0.201
+    },
+    {
+      "session_a": "exp_batch_batch_task_manager_baseline claude_fable",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 4,
+      "mean_distance": 0.2309
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_fhxfescx",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2198
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.222
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1885
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1826
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2628
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2008
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1994
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2422
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2084
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1845
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2035
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2248
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1866
+    },
+    {
+      "session_a": "exp_e8bbu37m",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1875
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_gfjpa3ah",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2357
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1516
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1874
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2614
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.0782
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2575
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2145
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.207
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1531
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.183
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2621
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2097
+    },
+    {
+      "session_a": "exp_fhxfescx",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2319
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_icd406w9",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "invert_constraint \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2147
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1621
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.264
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2417
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2409
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1329
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_phantom_success \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1907
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2256
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1268
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2483
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1048
+    },
+    {
+      "session_a": "exp_gfjpa3ah",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 remove_critical_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1815
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_jcrbm3rt",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1778
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2732
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 4,
+      "mean_distance": 0.1513
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2012
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.213
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_phantom_success \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2178
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1544
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1693
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2608
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1807
+    },
+    {
+      "session_a": "exp_icd406w9",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 invert_constraint",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 4,
+      "mean_distance": 0.2059
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_kt9lwfj8",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2451
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1992
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.206
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1735
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.175
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1871
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1102
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2175
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1529
+    },
+    {
+      "session_a": "exp_jcrbm3rt",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2188
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_lk5zq3vn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.277
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2558
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.239
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_phantom_success",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2517
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2938
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.246
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_swp_Claude_F_np",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2908
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_trdn7iwn",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_alien_vocab",
+      "class_a": "",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2639
+    },
+    {
+      "session_a": "exp_kt9lwfj8",
+      "session_b": "exp_wo0bkk9m",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 baseline",
+      "class_a": "",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.282
+    },
+    {
+      "session_a": "exp_lk5zq3vn",
+      "session_b": "exp_ovy9g9b5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2463
+    },
+    {
+      "session_a": "exp_lk5zq3vn",
+      "session_b": "exp_oylan6wf",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_alien_vocab \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "manifold",
+      "overlapping_steps": 2,
+      "mean_distance": 0.2107
+    },
+    {
+      "session_a": "exp_lk5zq3vn",
+      "session_b": "exp_q8yr7jw4",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "inject_competing_goal \u00d7 inject_phantom_success",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.2106
+    },
+    {
+      "session_a": "exp_lk5zq3vn",
+      "session_b": "exp_q9ckxin5",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 3,
+      "mean_distance": 0.1621
+    },
+    {
+      "session_a": "exp_lk5zq3vn",
+      "session_b": "exp_qu6tc1zc",
+      "model": "anthropic/claude-fable-5",
+      "operator_pair": "baseline \u00d7 inject_competing_goal",
+      "class_a": "semantic",
+      "class_b": "semantic",
+      "overlapping_steps": 2,
+      "mean_distance": 0.1943
+    }
+  ]
+}

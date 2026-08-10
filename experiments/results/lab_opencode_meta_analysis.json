@@ -1,0 +1,87 @@
+{
+  "_meta": {
+    "experiment_id": "lab_opencode_meta_analysis",
+    "total_tasks": 6,
+    "completed_tasks": 6,
+    "analysis_model": "deepseek/deepseek-v4-flash",
+    "infrastructure": "opencode_analyzer.py \u2192 run_opencode_agentic()",
+    "total_cost_usd": 0.000434,
+    "total_tokens": 72751,
+    "total_duration_s": 78.6,
+    "note": "Each analysis session is a measured opencode run. The analysis itself is traceable."
+  },
+  "analysis_sessions": [
+    {
+      "task_id": "session_deepdive",
+      "task_name": "Session Deep-Dive",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 32.9,
+      "total_tokens": 13099,
+      "estimated_cost_usd": 7.1e-05,
+      "error": "",
+      "final_response_preview": "Analysis written to `analysis.md`.\n\nKey findings: the session was token-efficient (good cache reuse, ~$0.78/1k tokens, low 0.11 thinking ratio) but outcome-poor \u2014 2/7 constraints met against a 1.00 correctness score is the dominant red flag, pointing to a \"conservative\" strategy that optimized spend",
+      "files_created": [
+        "analysis.md"
+      ]
+    },
+    {
+      "task_id": "pairwise_comparison",
+      "task_name": "Pairwise Comparison",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 30.4,
+      "total_tokens": 14335,
+      "estimated_cost_usd": 9.4e-05,
+      "error": "",
+      "final_response_preview": "The session directories aren't present locally, so I'll base the analysis on the provided data and transcripts.\nWrote `comparison.md`. Summary:\n\n- **Behavior**: Perturbation flipped strategy from conservative (plan-first, `todowrite`, staged) to exploratory (action-first, one-shot bulk `apply_patch`",
+      "files_created": [
+        "comparison.md"
+      ]
+    },
+    {
+      "task_id": "strategy_analysis",
+      "task_name": "Strategy Analysis",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 15.3,
+      "total_tokens": 8711,
+      "estimated_cost_usd": 5e-05,
+      "error": "",
+      "final_response_preview": "The workspace is empty (no commits/files), so I'll create `analysis.md` from the provided run data.\nWrote `analysis.md`. Key finding: wasteful runs burn budget with no correctness payoff \u2014 cost varies ~21x (run 3 vs run 2) while correctness stays at or below 0.20, and escapes are NaN except in the c",
+      "files_created": [
+        "analysis.md"
+      ]
+    },
+    {
+      "task_id": "cost_anomalies",
+      "task_name": "Cost Anomaly Detection",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 17.1,
+      "total_tokens": 9586,
+      "estimated_cost_usd": 5.4e-05,
+      "final_response_preview": "Written to `analysis.md`. Key takeaway: all 15 runs exceed $0.50; the drivers are (1) conservative strategy's extra verification rounds (#1\u2013#4 are the top 4), (2) task complexity/length (#1 `collaborative_editor` is costliest), and (3) exploratory inject runs staying cheap by resolving in one pass."
+    },
+    {
+      "task_id": "perturbation_compare",
+      "task_name": "Perturbation Class Comparison",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 36.8,
+      "total_tokens": 13088,
+      "estimated_cost_usd": 6.9e-05,
+      "final_response_preview": "Written to `analysis.md`. Summary: manifold (vocab swap) produces more escape (~0.88 avg) and lower correctness (avg 0.50), but semantic (constraint removal) produces far higher cost ($0.0335\u2013$0.93 vs $0.004\u2013$0.028) \u2014 so no single class dominates all three metrics."
+    },
+    {
+      "task_id": "cross_model_synthesis",
+      "task_name": "Cross-Model Synthesis",
+      "model": "deepseek/deepseek-v4-flash",
+      "exit_code": 0,
+      "duration_s": 41.2,
+      "total_tokens": 13932,
+      "estimated_cost_usd": 9.6e-05,
+      "final_response_preview": "Empty repo \u2014 no prior code context, so this is a pure data analysis. Computing the key aggregates, then writing the file.\nWrote `analysis.md`. Summary:\n\n- **Best value:** deepseek-v4-pro \u2014 0.85 avg correctness at ~$0.02/run; gpt-5-nano is cheaper but half-reliable (run 22: 0.00 at $0.0005).\n- **Hard"
+    }
+  ]
+}
