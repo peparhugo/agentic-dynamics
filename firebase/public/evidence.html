@@ -468,7 +468,7 @@ document.addEventListener('DOMContentLoaded', function () {
       var color = modelColors[g.label] || 'rgba(161,161,170,0.70)';
       ds.push({
         label: g.label + ' (' + g.pc + ')',
-        data: [{ x: cx, y: cy, r: Math.max(8, Math.sqrt(g.xs.length) * 10) }],
+        data: [{ x: cx, y: cy, r: Math.max(5, ccost * 20) }],
         backgroundColor: color,
         borderColor: color.replace('0.70','1').replace('0.85','1').replace('0.60','1').replace('0.50','1'),
         borderWidth: 1
@@ -482,7 +482,7 @@ document.addEventListener('DOMContentLoaded', function () {
         responsive: true,
         maintainAspectRatio: true,
         plugins: {
-          title: { display: true, text: 'Grit Matrix: Correctness vs Escape', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+          title: { display: true, text: 'Grit Matrix: Correctness vs Escape (bubble = avg cost, grouped centroids)', color: '#e4e4e7', font: { size: 14, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
           legend: { labels: { color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace", size: 9 }, usePointStyle: true, padding: 10 } }
         },
         scales: {
