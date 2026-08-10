@@ -20,7 +20,7 @@ from .perturb import Perturbation, build_operators, perturb_prompt
 from .basin import BasinMetrics, measure_basin_escape
 from .solution import SolutionMetrics, evaluate_solution
 from .efficiency import EfficiencyMetrics, compute_efficiency
-from .strategy import StrategyReport, StrategyType, classify_strategy
+from .strategy import StrategyReport, classify_strategy
 
 
 @dataclass

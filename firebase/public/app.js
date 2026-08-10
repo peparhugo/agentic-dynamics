@@ -34,15 +34,13 @@
       'cost': function() { return fmtUSD(D.summary.total_cost); },
       'architectures': function() { return D.summary.architectures; },
       'variants': function() { return D.summary.variants; },
-      'configs': function() { return D.summary.configs; },
       'costgap': function() { return D.derived.cost_gap; },
       'passrate': function() { return D.derived.overall_pass_rate; },
       'deepseek_cost': function() { return fmtUSD(D.derived.total_cost_deepseek); },
       'claude_cost': function() { return fmtUSD(D.derived.total_cost_claude); },
-      'total_cost_all': function() { return fmtUSD(D.derived.total_cost_all_models); },
       'total_tests': function() { return D.derived.total_tests_passed + '/' + D.derived.total_tests_run; },
-      'narrated': function() { return D.derived.total_narrated; },
-      'valid_reports': function() { return D.derived.total_valid_reports; },
+      'woc': function() { return D.calculator.woc_ratio.toFixed(2); },
+      'woc_percent': function() { return Math.round(D.calculator.woc_ratio * 100) + '%'; },
     };
 
     var els = document.querySelectorAll('[data-stat]');

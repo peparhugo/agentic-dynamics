@@ -677,6 +677,14 @@ def perturb_prompt(
     ops = operators if operators is not None else build_operators()
     rng = random.Random(rng_seed)
 
+    if operator_name == "baseline":
+        return base_prompt, Perturbation(
+            operator="baseline",
+            strength=0.0,
+            perturbation_class="baseline",
+            description="No perturbation — baseline control run",
+        )
+
     if operator_name not in ops:
         return base_prompt, Perturbation(
             operator=operator_name,

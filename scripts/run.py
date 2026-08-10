@@ -22,7 +22,7 @@ from instrument import (
     evaluate_solution, compute_efficiency,
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
-    detect_constraints, compute_recovery_cost,
+    detect_constraints,
 )
 from instrument.opencode import run_opencode_agentic
 

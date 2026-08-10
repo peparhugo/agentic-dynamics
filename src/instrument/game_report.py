@@ -19,8 +19,8 @@ from typing import Any
 
 from .basin import BasinMetrics
 from .solution import SolutionMetrics
-from .efficiency import EfficiencyMetrics, compute_efficiency
-from .strategy import StrategyReport, StrategyType, classify_strategy
+from .efficiency import EfficiencyMetrics
+from .strategy import StrategyReport, classify_strategy
 
 
 @dataclass

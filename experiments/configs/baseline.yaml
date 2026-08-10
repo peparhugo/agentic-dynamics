@@ -25,5 +25,5 @@ operators:
 
 strengths: [0.5, 0.8]
 model: deepseek
-model_id: deepseek-v4-pro
+model_id: deepseek/deepseek-v4-pro
 rng_seed: 42

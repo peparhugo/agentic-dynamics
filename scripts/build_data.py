@@ -264,6 +264,22 @@ def compute_model_data(inventory, summary, db_breakdown):
             "tokens_reasoning": tokens_reason,
             "tokens_cache_read": cache_r,
             "tokens_cache_write": cache_w,
+            "_provenance": {
+                "sessions": "M", "n_reports": "M", "n_valid": "M", "n_narrated": "M",
+                "total_cost": "M", "tokens_input": "M", "tokens_output": "M",
+                "tokens_reasoning": "M", "tokens_cache_read": "M", "tokens_cache_write": "M",
+                "tokens_total": "M",
+                "avg_cost": "C", "cost_ci95": "C", "avg_loc": "C",
+                "avg_thinking_ratio": "C", "avg_escape": "C", "avg_narration_penalty": "C",
+                "avg_arch_divergence": "C", "avg_struct_divergence": "C",
+                "avg_composite_score": "C", "avg_code_quality": "C", "avg_comment_ratio": "C",
+                "avg_energy_j": "C", "avg_energy_j_per_loc": "C",
+                "avg_cost_per_joule": "C", "avg_quality_per_joule": "C",
+                "narration_rate": "C",
+                "cost_input": "C", "cost_output": "C", "cost_reasoning": "C", "cost_cache": "C",
+                "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C", "strategy_efficient": "C",
+                "pass_rate": "M",
+            }
         })
 
     return models
@@ -375,6 +391,14 @@ def compute_derived(models, inventory, report_count):
         "total_narrated": total_narrated,
         "total_valid_reports": total_valid,
         "total_reports_analyzed": total_reports,
+        "_provenance": {
+            "cost_gap": "C", "overall_pass_rate": "C",
+            "total_tests_passed": "M", "total_tests_run": "M",
+            "total_cost_all_models": "M", "total_cost_deepseek": "M",
+            "total_cost_claude": "M",
+            "total_narrated": "M", "total_valid_reports": "M",
+            "total_reports_analyzed": "M",
+        },
     }
 
 
@@ -497,6 +521,10 @@ def build():
             "architectures": 3,
             "variants": 8,
             "configs": counts.get("config_files", 0),
+            "_provenance": {
+                "worktrees_total": "M", "sessions_total": "M", "game_reports": "M",
+                "total_cost": "M", "architectures": "M", "variants": "M", "configs": "M",
+            },
         },
         "models": models,
         "charts": charts,

@@ -38,4 +38,6 @@ __all__ = [
     "StrategyReport", "StrategyType", "classify_strategy",
     "GameReport",
     "RecoveryCost", "compute_recovery_cost", "recovery_summary_table",
+    "ConstraintDetection", "DetectionReport", "detect_constraints", "detection_summary",
+    "analyze_markers", "analyze_ast", "analyze_escape", "MarkerProfile", "marker_validation_summary",
 ]

@@ -101,7 +101,7 @@ Run `python scripts/inventory.py list` for a live breakdown.
 │   ├── configs/              # 34 YAML experiment definitions
 │   ├── results/              # Game reports, summaries, lab outputs
 │   └── lab_books/            # 8 structured experiment plans
-├── firebase/public/          # Website source (7 pages, data pipeline)
+├── firebase/public/          # Website source (8 pages, data pipeline)
 ├── pyproject.toml
 ├── CONTRIBUTING.md
 └── CODE_OF_CONDUCT.md
@@ -115,9 +115,17 @@ The website at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) 
 
 ```
 opencode.db ──→ inventory.py refresh          ──→ inventory.json
-/tmp/exp_* ──→ analyze_worktrees.py (227)     ──→ _results_summary.json
-                                                 ──→ build_data.py ──→ data.js (24KB)
-session.jsonl ──→ analyze_trajectories.py (255) ──→ _trajectory_aggregate.json
+       │
+       ├──→ analyze_worktrees.py ──→ _results_summary.json ──┐
+       │         │                                             │
+/tmp/exp_* ──┘   ├──→ reports/*.md (game reports)            │
+                 └──→ reports/*/session.jsonl                 │
+                                       │                      │
+                                       ↓                      ↓
+                          analyze_trajectories.py      build_data.py
+                                       │                      │
+                                       ↓                      ↓
+                          _trajectory_aggregate.json   firebase/public/data.js (~31KB)
 ```
 
 All numbers on the website are live-generated. Every measurement is provenance-tagged: [M] measured, [C] computed, [H] heuristic, [X] external.

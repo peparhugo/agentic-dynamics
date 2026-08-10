@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Evidence — AI FinOps Framework</title>
-<meta name="description" content="Full evidence: 251 worktrees, 248 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
+<meta name="description" content="Full evidence: 251 worktrees, 249 experiment sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -153,7 +153,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- AST Code Quality -->
 <section class="sec alt">
 <h2>AST Code Quality Analysis</h2>
-<p class="lead">203 game reports across 8 model variants. Every function, class, decorator, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
+<p class="lead">224 game reports across 8 model variants. Every function, class, decorator, type hint, and docstring counted per worktree by <code>scripts/analyze_worktrees.py</code>. Averages across all reports per model.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DS v4 Pro</th><th>Claude F5</th><th>GPT-5.6</th><th>GPT-5-mini</th><th>GPT-5.6-fast</th><th>GPT-5.5</th><th>GPT-5</th><th>GPT-5-nano</th></tr></thead><tbody>
 <tr><td><strong>Reports</strong></td><td class="green">68</td><td>27</td><td>15</td><td>12</td><td>6</td><td>3</td><td>5</td><td>6</td></tr>
 <tr><td><strong>Avg LOC/worktree</strong></td><td class="green">691</td><td>412</td><td>367</td><td>264</td><td>343</td><td>262</td><td>300</td><td>199</td></tr>
@@ -227,7 +227,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- Cross-Model Rollup -->
 <section class="sec alt">
 <h2>Cross-Model Rollup</h2>
-<p class="lead">Measured across 203 game reports — not single-run data. DeepSeek delivers 1.3&times; more code per session at 1/69th the cost of Claude. 93.2% overall test pass rate (1572/1772 tests) from real pytest/jest execution.</p>
+<p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.3&times; more code per session at 1/69th the cost of Claude. 93.2% overall test pass rate (1572/1772 tests) from real pytest/jest execution.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody>
 <tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.45</td><td class="mono amber">$1.06</td><td class="mono">$0.29</td></tr>
 <tr><td>Test pass rate</td><td class="mono green">87%</td><td class="mono green">100%</td><td class="mono green">100%</td><td class="mono green">93%</td></tr>

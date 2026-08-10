@@ -30,9 +30,10 @@ operators:
 
 strengths: [0.5]
 repetitions: 1
+model_id: deepseek/deepseek-v4-pro
 
 standardized:
   enabled: true
   enforce_pytest: true
   thinking_budget_tokens: 0
-  silent_mode: null   # null = natural; override per run
+  silent_mode: null
