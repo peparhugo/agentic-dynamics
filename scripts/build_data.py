@@ -113,6 +113,42 @@ def _load_grit_matrix():
         return []
 
 
+def _load_reasoning_data():
+    """Load all reasoning lab book JSONs and return structured data."""
+    result = {
+        "divergence": None,
+        "cross_model": None,
+        "step_clusters": None,
+        "embedding_model": "bge-m3:latest",
+        "embedding_dim": 1024,
+        "indexed_steps": 0,
+        "sessions_indexed": 0,
+    }
+
+    for file_name, key in [
+        ("lab_reasoning_divergence.json", "divergence"),
+        ("lab_cross_model_reasoning.json", "cross_model"),
+        ("lab_semantic_clusters.json", "step_clusters"),
+    ]:
+        path = ROOT / "experiments" / "results" / file_name
+        if path.exists():
+            try:
+                data = json.loads(path.read_text())
+                meta = data.get("_meta", {})
+                result[key] = {
+                    "meta": meta,
+                    "data": {k: v for k, v in data.items() if not k.startswith("_")},
+                }
+                result["indexed_steps"] = max(result["indexed_steps"],
+                                               meta.get("total_step_embeddings", 0) or meta.get("total_pairs", 0))
+                result["sessions_indexed"] = max(result["sessions_indexed"],
+                                                  meta.get("sessions_analyzed", 0) or meta.get("sessions", 0))
+            except Exception:
+                pass
+
+    return result
+
+
 def count_game_reports():
 
     if not REPORTS_DIR.exists():
@@ -558,6 +594,7 @@ def build():
         "energy_ranking": energy_ranking,
         "strategy_distribution": summary.get("strategy_distribution", {}),
         "grit_matrix": _load_grit_matrix(),
+        "reasoning": _load_reasoning_data(),
         "design_parameters": {
             "beta": {"value": 0.001, "provenance": "design", "note": "Context inflation rate — calibrate to your codebase"},
             "woc_healthy": {"value": 0.85, "provenance": "design"},
