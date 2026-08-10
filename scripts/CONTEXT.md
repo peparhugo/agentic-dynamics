@@ -1,6 +1,6 @@
 # `scripts/` — Scripts Reference
 
-25 scripts across 4 categories: experiment runners, post-hoc analysis, data pipeline, and 8 lab books.
+25 scripts across 4 categories: experiment runners, post-hoc analysis, data pipeline, and 14 lab books.
 
 ## Primary Entry Points
 

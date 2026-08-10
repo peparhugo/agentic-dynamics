@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CONFIG_DIR = PROJECT_ROOT / "experiments/configs"
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
-OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
+OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 MODEL = "deepseek/deepseek-v4-pro"
 TIMEOUT = 250
 
@@ -47,7 +47,7 @@ def run_experiment(config_name, operator="baseline", silent=None):
     
     t0 = time.monotonic()
     r = subprocess.run([
-        OPENSCODE_BIN, "run",
+        OPENCODE_BIN, "run",
         "--model", MODEL, "--title", title,
         "--format", "json", "--auto",
         "--dir", workdir, prompt,

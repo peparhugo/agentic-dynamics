@@ -3,7 +3,7 @@ import subprocess, time, sqlite3, os, sys
 from pathlib import Path
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
-OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
+OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 TASK = "Build an authenticated REST API with these requirements:\n1. JWT-based user auth with refresh tokens\n2. Rate limiting on login endpoint (5 attempts/minute/IP)\n3. Input validation on all endpoints\n4. Paginated list responses (20 items/page, max 100)\n5. Comprehensive error handling with proper HTTP status codes\n6. Audit logging of all mutation operations\n7. API versioning via URL prefix (/v1/...)\nUse Python/Flask + SQLAlchemy + pytest."
 
@@ -50,7 +50,7 @@ for model_id, silent_mode, operator in cells:
     sys.stdout.flush()
     t0 = time.monotonic()
     r = subprocess.run([
-        OPENSCODE_BIN, "run",
+        OPENCODE_BIN, "run",
         "--model", model_id,
         "--title", title,
         "--format", "json",

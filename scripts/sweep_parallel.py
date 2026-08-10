@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
-OPENSCODE_BIN = os.environ.get("OPENSCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
+OPENCODE_BIN = os.environ.get("OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode"))
 
 MODELS = [
     ("deepseek/deepseek-v4-pro", "DeepSeek_v4_Pro"),
@@ -50,7 +50,7 @@ def run_cell(model_id, silent_mode, operator, label_slug, timeout=200):
 
     prompt = build_prompt(silent_mode, operator)
     cmd = [
-        OPENSCODE_BIN, "run",
+        OPENCODE_BIN, "run",
         "--model", model_id,
         "--title", title,
         "--format", "json",

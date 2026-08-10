@@ -1,6 +1,6 @@
 # `src/instrument/` — Measurement Apparatus
 
-16 Python modules that form the core library. Measures search dynamics (not outputs): basin escape
+21 Python modules that form the core library. Measures search dynamics (not outputs): basin escape
 rates, recovery cost, attractor strength, strategy classification. Pip-installable as `reasoning-instrument`.
 
 ## Architecture
