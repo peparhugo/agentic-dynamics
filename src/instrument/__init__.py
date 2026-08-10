@@ -24,6 +24,10 @@ from .game_report import GameReport
 from .recovery_cost import RecoveryCost, compute_recovery_cost, recovery_summary_table
 from .constraint_detection import ConstraintDetection, DetectionReport, detect_constraints, detection_summary
 from .semantic_validation import analyze_markers, analyze_ast, analyze_escape, MarkerProfile, marker_validation_summary
+from .embeddings import EmbeddingClient, ChromaStore, extract_session_text, extract_session_steps
+from .graph import Neo4jClient
+from .ollama_analyzer import OllamaAnalyzer, load_summary_data
+from .opencode_analyzer import OpencodeAnalyzer
 
 __all__ = [
     "Perturbation", "PerturbationOperator", "build_operators", "perturb_prompt",
@@ -40,4 +44,8 @@ __all__ = [
     "RecoveryCost", "compute_recovery_cost", "recovery_summary_table",
     "ConstraintDetection", "DetectionReport", "detect_constraints", "detection_summary",
     "analyze_markers", "analyze_ast", "analyze_escape", "MarkerProfile", "marker_validation_summary",
+    "EmbeddingClient", "ChromaStore", "extract_session_text",
+    "Neo4jClient",
+    "OllamaAnalyzer", "load_summary_data",
+    "OpencodeAnalyzer",
 ]

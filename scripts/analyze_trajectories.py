@@ -233,6 +233,8 @@ def analyze_all(limit=0, model_filter=None):
 
     print(f"\nProcessed {len(results)} transcripts")
 
+    enrich_with_embeddings(results, model_map)
+
     model_aggregates = {}
     for model_id, entries in by_model.items():
         agg = {
@@ -251,6 +253,7 @@ def analyze_all(limit=0, model_filter=None):
             "avg_write_pct": 0,
             "avg_bash_pct": 0,
             "total_parse_errors": 0,
+            "avg_reasoning_distance": 0,
             "tool_call_distribution": Counter(),
         }
         if entries:
@@ -269,6 +272,10 @@ def analyze_all(limit=0, model_filter=None):
             agg["avg_write_pct"] = round(sum(e.get("write_pct", 0) for e in entries) / n, 1)
             agg["avg_bash_pct"] = round(sum(e.get("bash_pct", 0) for e in entries) / n, 1)
             agg["total_parse_errors"] = sum(e["parse_errors"] for e in entries)
+            rd = [e["reasoning_distance"] for e in entries
+                   if e.get("reasoning_distance") is not None]
+            if rd:
+                agg["avg_reasoning_distance"] = round(sum(rd) / len(rd), 4)
             for e in entries:
                 agg["tool_call_distribution"].update(e["tool_call_counts"])
         model_aggregates[model_id] = agg
@@ -315,6 +322,80 @@ def analyze_all(limit=0, model_filter=None):
             "total_parse_errors": sum(r["parse_errors"] for r in results),
         },
     }
+
+
+def enrich_with_embeddings(results, model_map):
+    """Query ChromaDB for step embeddings and add reasoning_distance per session."""
+    try:
+        import sys
+        sys.path.insert(0, str(ROOT / "src"))
+        from instrument.embeddings import ChromaStore
+        import numpy as np
+
+        store = ChromaStore()
+        chroma = store.collection.get(include=["embeddings", "metadatas"])
+        chroma_embeddings = chroma.get("embeddings", [])
+        chroma_metadatas = chroma.get("metadatas", [])
+
+        if not chroma_embeddings:
+            print("  (ChromaDB empty — skipping embedding enrichment)")
+            return
+
+        session_steps: dict[str, list] = {}
+        for i, meta in enumerate(chroma_metadatas):
+            sid = meta.get("session_id", "")
+            if sid and meta.get("embedding_source") == "reasoning_step":
+                if sid not in session_steps:
+                    session_steps[sid] = []
+                session_steps[sid].append(chroma_embeddings[i])
+
+        session_centroids: dict[str, list] = {}
+        for sid, embeds in session_steps.items():
+            if embeds:
+                avg = np.mean(embeds, axis=0).tolist()
+                session_centroids[sid] = avg
+
+        baselines = {}
+        for r in results:
+            if r.get("detected_operator") == "baseline" and r["report_name"] in session_centroids:
+                baselines[r["report_name"]] = session_centroids[r["report_name"]]
+
+        enriched = 0
+        for r in results:
+            name = r["report_name"]
+            if name in session_centroids:
+                r["reasoning_embedding_available"] = True
+                r["reasoning_step_count"] = len(session_steps.get(name, []))
+            else:
+                r["reasoning_embedding_available"] = False
+                r["reasoning_distance"] = None
+                continue
+
+            op = r.get("detected_operator", "")
+            if op != "baseline" and baselines:
+                centroid = session_centroids[name]
+                nearest_baseline = None
+                nearest_dist = float("inf")
+                for bname, bcent in baselines.items():
+                    d = float(
+                        1.0
+                        - np.dot(centroid, bcent)
+                        / (np.linalg.norm(centroid) * np.linalg.norm(bcent))
+                    )
+                    if d < nearest_dist:
+                        nearest_dist = d
+                        nearest_baseline = bname
+                r["reasoning_distance"] = round(nearest_dist, 4)
+                r["nearest_baseline"] = nearest_baseline
+                enriched += 1
+            else:
+                r["reasoning_distance"] = 0.0
+
+        print(f"  Enriched {enriched} sessions with reasoning distances "
+              f"({len(baselines)} baselines, {len(session_centroids)} centroids)")
+
+    except Exception as e:
+        print(f"  (Embedding enrichment unavailable: {e})")
 
 
 def main():

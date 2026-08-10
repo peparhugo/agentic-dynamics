@@ -250,64 +250,21 @@ def _embedding_distance(
     perturbed: ReasoningTrajectory,
     n: int,
 ) -> float | None:
-    """Compute cosine distance between trajectory steps using TEI embeddings.
+    """Compute cosine distance between trajectory steps using bge-m3 embeddings.
+
+    Uses the local EmbeddingClient (Ollama + bge-m3) for true semantic
+    distance. Falls back to the heuristic trigram approach in _content_distance
+    when embeddings are unavailable.
 
     Returns distance in [0.0, 1.0], or None if embeddings unavailable.
     """
-    import math
-
-    texts: list[str] = []
-    for i in range(n):
-        bt = baseline.steps[i].action.strip()
-        pt = perturbed.steps[i].action.strip()
-        if bt:
-            texts.append(bt)
-        if pt:
-            texts.append(pt)
-
-    if not texts:
-        return None
+    baseline_texts = [baseline.steps[i].action.strip() for i in range(n)]
+    perturbed_texts = [perturbed.steps[i].action.strip() for i in range(n)]
 
     try:
-        from dreamlab.recall.embedding import get_embeddings
-    except ImportError:
-        try:
-            from recall.embedding import get_embeddings
-        except ImportError:
-            return None  # no embedding access, fall back to heuristic
+        from .embeddings import EmbeddingClient
 
-    try:
-        all_embeddings = get_embeddings(texts)
-
-        per_step_dists: list[float] = []
-        ei = 0
-        for i in range(n):
-            bt = baseline.steps[i].action.strip()
-            pt = perturbed.steps[i].action.strip()
-
-            if not bt or not pt:
-                continue
-
-            be = all_embeddings[ei] if ei < len(all_embeddings) else None
-            pe = all_embeddings[ei + 1] if (ei + 1) < len(all_embeddings) else None
-            ei += 2
-
-            if be and pe and len(be) > 0 and len(pe) > 0:
-                dot = sum(a * b for a, b in zip(be, pe))
-                mag_b = math.sqrt(sum(a * a for a in be))
-                mag_p = math.sqrt(sum(b * b for b in pe))
-                if mag_b > 0 and mag_p > 0:
-                    cos_sim = dot / (mag_b * mag_p)
-                    cos_dist = (1.0 - cos_sim) / 2.0  # map [-1,1] to [0,1]
-                    per_step_dists.append(max(0.0, min(1.0, cos_dist)))
-                else:
-                    return None
-            else:
-                return None
-
-        if not per_step_dists:
-            return None
-        return sum(per_step_dists) / len(per_step_dists)
-
+        client = EmbeddingClient()
+        return client.embedding_distance(baseline_texts, perturbed_texts)
     except Exception:
         return None
