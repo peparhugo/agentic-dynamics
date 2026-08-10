@@ -45,6 +45,20 @@ class SolutionMetrics:
     # Composite
     composite_score: float = 0.0
 
+    # SonarQube static analysis (optional — only when sonar-scanner available)
+    sonar_analyzed: bool = False
+    sonar_bugs: int = 0
+    sonar_vulnerabilities: int = 0
+    sonar_code_smells: int = 0
+    sonar_cognitive_complexity: int = 0
+    sonar_duplicated_lines_density: float = 0.0
+    sonar_ncloc: int = 0
+    sonar_maintainability_rating: str = ""
+    sonar_reliability_rating: str = ""
+    sonar_security_rating: str = ""
+    sonar_quality_gate: str = ""
+    sonar_quality_score: float = 0.5
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "tests_passed": self.tests_passed,
@@ -58,6 +72,18 @@ class SolutionMetrics:
             "code_quality_score": round(self.code_quality_score, 4),
             "novelty_score": round(self.novelty_score, 4),
             "composite_score": round(self.composite_score, 4),
+            "sonar_analyzed": self.sonar_analyzed,
+            "sonar_bugs": self.sonar_bugs,
+            "sonar_vulnerabilities": self.sonar_vulnerabilities,
+            "sonar_code_smells": self.sonar_code_smells,
+            "sonar_cognitive_complexity": self.sonar_cognitive_complexity,
+            "sonar_duplicated_lines_density": round(self.sonar_duplicated_lines_density, 1),
+            "sonar_ncloc": self.sonar_ncloc,
+            "sonar_maintainability_rating": self.sonar_maintainability_rating,
+            "sonar_reliability_rating": self.sonar_reliability_rating,
+            "sonar_security_rating": self.sonar_security_rating,
+            "sonar_quality_gate": self.sonar_quality_gate,
+            "sonar_quality_score": round(self.sonar_quality_score, 4),
         }
 
 
@@ -117,12 +143,21 @@ def evaluate_solution(
         m.novelty_score = 0.5
 
     # ── Composite ──
-    m.composite_score = (
-        0.35 * m.correctness_score
-        + 0.30 * m.constraint_score
-        + 0.20 * m.code_quality_score
-        + 0.15 * m.novelty_score
-    )
+    if m.sonar_analyzed:
+        m.composite_score = (
+            0.30 * m.correctness_score
+            + 0.25 * m.constraint_score
+            + 0.20 * m.sonar_quality_score
+            + 0.15 * m.code_quality_score
+            + 0.10 * m.novelty_score
+        )
+    else:
+        m.composite_score = (
+            0.35 * m.correctness_score
+            + 0.30 * m.constraint_score
+            + 0.20 * m.code_quality_score
+            + 0.15 * m.novelty_score
+        )
 
     return m
 

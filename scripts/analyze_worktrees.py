@@ -33,6 +33,7 @@ from instrument import (
     evaluate_solution, compute_efficiency, measure_basin_escape,
     classify_strategy, GameReport, SolutionMetrics, EfficiencyMetrics, BasinMetrics,
     StrategyReport, analyze_ast,
+    run_sonar_analysis, compute_sonar_diff, sonar_quality_score,
 )
 
 OPENSCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
@@ -44,6 +45,11 @@ PYTEST_DEPS = ["flask", "pytest", "sqlalchemy", "flask-jwt-extended", "flask-lim
                "flask-cors", "flask-migrate"]
 
 run_tests_enabled = True
+sonar_enabled = True
+_sonar_url = "http://localhost:9000"
+_sonar_user = "admin"
+_sonar_password = "admin"
+_sonar_timeout = 120
 _test_timeout = 120
 _test_venv_ready = False
 
@@ -361,13 +367,14 @@ def parse_session_title_info(title: str) -> dict:
 # ── Analysis ─────────────────────────────────────────────────────────────────
 
 def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: str = "",
-                     config_name: str = ""):
+                     config_name: str = "", run_sonar: bool = False,
+                     baseline_path: str = ""):
     """Run the full analysis pipeline on a single worktree.
 
     Returns:
         (GameReport, dict of metrics) or (None, error_dict)
     """
-    global run_tests_enabled
+    global run_tests_enabled, sonar_enabled, _sonar_url, _sonar_user, _sonar_password, _sonar_timeout
     wt = Path(worktree_path)
     if not wt.exists():
         return None, {"error": "worktree not found"}
@@ -461,6 +468,41 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         solution.constraints_met = 0
         solution.constraint_score = 0.0
 
+    # ── SonarQube Analysis ──
+    baseline_sm = None
+    if run_sonar and sonar_enabled:
+        sm = run_sonar_analysis(
+            worktree_path, sonar_url=_sonar_url,
+            sonar_user=_sonar_user, sonar_password=_sonar_password,
+            timeout_sec=_sonar_timeout,
+        )
+        if sm.analyzed:
+            solution.sonar_analyzed = True
+            solution.sonar_bugs = sm.bugs
+            solution.sonar_vulnerabilities = sm.vulnerabilities
+            solution.sonar_code_smells = sm.code_smells
+            solution.sonar_cognitive_complexity = sm.cognitive_complexity
+            solution.sonar_duplicated_lines_density = sm.duplicated_lines_density
+            solution.sonar_ncloc = sm.ncloc
+            solution.sonar_maintainability_rating = sm.maintainability_rating
+            solution.sonar_reliability_rating = sm.reliability_rating
+            solution.sonar_security_rating = sm.security_rating
+            solution.sonar_quality_gate = sm.quality_gate
+            solution.sonar_quality_score = sonar_quality_score(sm)
+            solution.composite_score = (
+                0.30 * solution.correctness_score
+                + 0.25 * solution.constraint_score
+                + 0.20 * solution.sonar_quality_score
+                + 0.15 * solution.code_quality_score
+                + 0.10 * solution.novelty_score
+            )
+        if baseline_path and baseline_path != worktree_path:
+            baseline_sm = run_sonar_analysis(
+                baseline_path, sonar_url=_sonar_url,
+                sonar_user=_sonar_user, sonar_password=_sonar_password,
+                timeout_sec=_sonar_timeout,
+            )
+
     # ── Efficiency ──
     prompt_tok = session.get("tokens_input", 0) or 0 if session else 0
     completion_tok = session.get("tokens_output", 0) or 0 if session else 0
@@ -524,6 +566,20 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
             verdict="no baseline",
         )
     else:
+        sonar_diff_data = None
+        if baseline_sm and baseline_sm.analyzed and solution.sonar_analyzed:
+            from instrument.sonar import SonarMetrics as _SM
+            perturbed_sm = _SM(
+                analyzed=True, bugs=solution.sonar_bugs,
+                vulnerabilities=solution.sonar_vulnerabilities,
+                code_smells=solution.sonar_code_smells,
+                cognitive_complexity=solution.sonar_cognitive_complexity,
+                complexity=0, duplicated_lines_density=solution.sonar_duplicated_lines_density,
+                maintainability_rating=solution.sonar_maintainability_rating,
+                reliability_rating=solution.sonar_reliability_rating,
+                security_rating=solution.sonar_security_rating,
+            )
+            sonar_diff_data = compute_sonar_diff(baseline_sm, perturbed_sm)
         basin = measure_basin_escape(
             baseline_code=baseline_code,
             perturbed_code=code,
@@ -541,6 +597,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         perturbation_strength=0.5,
         model=session.get("model_id", "") if session else "",
         cost_usd=db_cost if db_cost > 0 else None,
+        sonar_diff=sonar_diff_data,
     )
 
     # ── Strategy ──
@@ -643,6 +700,28 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "non_python_files": non_python_files,
         "has_tests": ast_profile.get("has_tests", False),
         "test_results": test_results,
+        "sonar_analyzed": solution.sonar_analyzed,
+        "sonar_bugs": solution.sonar_bugs,
+        "sonar_vulnerabilities": solution.sonar_vulnerabilities,
+        "sonar_code_smells": solution.sonar_code_smells,
+        "sonar_cognitive_complexity": solution.sonar_cognitive_complexity,
+        "sonar_duplicated_lines_density": solution.sonar_duplicated_lines_density,
+        "sonar_ncloc": solution.sonar_ncloc,
+        "sonar_maintainability_rating": solution.sonar_maintainability_rating,
+        "sonar_reliability_rating": solution.sonar_reliability_rating,
+        "sonar_security_rating": solution.sonar_security_rating,
+        "sonar_quality_gate": solution.sonar_quality_gate,
+        "sonar_quality_score": solution.sonar_quality_score,
+        "sonar_bugs_delta": basin.sonar_bugs_delta if hasattr(basin, 'sonar_bugs_delta') else 0,
+        "sonar_vulnerabilities_delta": basin.sonar_vulnerabilities_delta if hasattr(basin, 'sonar_vulnerabilities_delta') else 0,
+        "sonar_code_smells_delta": basin.sonar_code_smells_delta if hasattr(basin, 'sonar_code_smells_delta') else 0,
+        "sonar_cognitive_complexity_delta": basin.sonar_cognitive_complexity_delta if hasattr(basin, 'sonar_cognitive_complexity_delta') else 0,
+        "sonar_complexity_delta": basin.sonar_complexity_delta if hasattr(basin, 'sonar_complexity_delta') else 0,
+        "sonar_duplication_delta": basin.sonar_duplication_delta if hasattr(basin, 'sonar_duplication_delta') else 0.0,
+        "sonar_maintainability_delta": basin.sonar_maintainability_delta if hasattr(basin, 'sonar_maintainability_delta') else 0,
+        "sonar_security_delta": basin.sonar_security_delta if hasattr(basin, 'sonar_security_delta') else 0,
+        "sonar_baseline_bugs": basin.sonar_baseline_bugs if hasattr(basin, 'sonar_baseline_bugs') else 0,
+        "sonar_perturbed_bugs": basin.sonar_perturbed_bugs if hasattr(basin, 'sonar_perturbed_bugs') else 0,
     }
 
 
@@ -910,13 +989,24 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="Show what would be analyzed")
     ap.add_argument("--baseline", help="Baseline worktree path for comparison")
     ap.add_argument("--no-tests", action="store_true", help="Skip pytest in worktrees (faster)")
+    ap.add_argument("--no-sonar", action="store_true", help="Skip SonarQube analysis")
+    ap.add_argument("--sonar-url", default="http://localhost:9000", help="SonarQube server URL")
+    ap.add_argument("--sonar-user", default="admin", help="SonarQube login user")
+    ap.add_argument("--sonar-password", default="admin", help="SonarQube login password")
+    ap.add_argument("--sonar-timeout", type=int, default=120, help="Sonar scanner timeout in seconds")
     ap.add_argument("--tests", action="store_true", default=True, help="Run tests (default)")
     ap.add_argument("--timeout", type=int, default=120, help="Test timeout in seconds (default 120)")
     args = ap.parse_args()
 
-    global run_tests_enabled, _test_timeout
+    global run_tests_enabled, sonar_enabled, _sonar_url, _sonar_user, _sonar_password, _sonar_timeout, _test_timeout
     if args.no_tests:
         run_tests_enabled = False
+    if args.no_sonar:
+        sonar_enabled = False
+    _sonar_url = args.sonar_url
+    _sonar_user = args.sonar_user
+    _sonar_password = args.sonar_password
+    _sonar_timeout = args.sonar_timeout
     _test_timeout = args.timeout
     if run_tests_enabled:
         ensure_test_venv()
@@ -983,10 +1073,26 @@ def main():
 
         # Find matching baseline via smart index
         baseline_code = find_baseline_code(title, s, baseline_index, worktree_path=wt["path"])
+        baseline_path = ""
+        if baseline_code:
+            info = parse_session_title_info(title)
+            exp = info.get("experiment", "")
+            ms = info.get("model_short", "")
+            prov = s.get("provider", "")
+            mid = s.get("model_id", "")
+            for key in [f"{exp}|{ms}", f"{exp}|{prov}/{mid}"]:
+                entry = baseline_index.get(key)
+                if entry:
+                    baseline_path = entry.get("path", "")
+                    break
         if args.baseline and not baseline_code:
             baseline_code = read_worktree_code(args.baseline)
+            baseline_path = args.baseline
 
-        report, metrics = analyze_worktree(wt["path"], s, baseline_code=baseline_code)
+        report, metrics = analyze_worktree(
+            wt["path"], s, baseline_code=baseline_code,
+            run_sonar=sonar_enabled, baseline_path=baseline_path,
+        )
 
         safe_name = wt["name"].replace("/", "_")[:60]
 
@@ -1226,7 +1332,11 @@ def main():
                       "structure_divergence", "strategy_score", "exploration_premium",
                       "thermal_efficiency", "composite_score", "novelty_score",
                       "code_quality_score", "solution_density", "correctness_per_dollar",
-                      "quality_per_joule"]
+                      "quality_per_joule", "sonar_bugs", "sonar_vulnerabilities",
+                      "sonar_code_smells", "sonar_cognitive_complexity",
+                      "sonar_duplicated_lines_density", "sonar_quality_score",
+                      "sonar_bugs_delta", "sonar_code_smells_delta",
+                      "sonar_cognitive_complexity_delta", "sonar_duplication_delta",]
 
         strategy_counts = {}
         for r in results:

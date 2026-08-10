@@ -21,6 +21,7 @@ from .solution import SolutionMetrics, evaluate_solution
 from .efficiency import EfficiencyMetrics, compute_efficiency
 from .strategy import StrategyReport, StrategyType, classify_strategy
 from .game_report import GameReport
+from .sonar import SonarMetrics, run_sonar_analysis, compute_sonar_diff, sonar_quality_score
 from .recovery_cost import RecoveryCost, compute_recovery_cost, recovery_summary_table
 from .constraint_detection import ConstraintDetection, DetectionReport, detect_constraints, detection_summary
 from .semantic_validation import analyze_markers, analyze_ast, analyze_escape, MarkerProfile, marker_validation_summary
@@ -41,6 +42,7 @@ __all__ = [
     "EfficiencyMetrics", "compute_efficiency",
     "StrategyReport", "StrategyType", "classify_strategy",
     "GameReport",
+    "SonarMetrics", "run_sonar_analysis", "compute_sonar_diff", "sonar_quality_score",
     "RecoveryCost", "compute_recovery_cost", "recovery_summary_table",
     "ConstraintDetection", "DetectionReport", "detect_constraints", "detection_summary",
     "analyze_markers", "analyze_ast", "analyze_escape", "MarkerProfile", "marker_validation_summary",

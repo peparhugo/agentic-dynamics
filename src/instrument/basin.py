@@ -50,6 +50,22 @@ class BasinMetrics:
     quality_per_dollar: float = 0.0
     quality_per_joule: float = 0.0
 
+    # Sonar differential quality (optional — available when sonar-scanner runs)
+    sonar_analyzed: bool = False
+    sonar_bugs_delta: int = 0
+    sonar_vulnerabilities_delta: int = 0
+    sonar_code_smells_delta: int = 0
+    sonar_cognitive_complexity_delta: int = 0
+    sonar_complexity_delta: int = 0
+    sonar_duplication_delta: float = 0.0
+    sonar_maintainability_delta: int = 0
+    sonar_reliability_delta: int = 0
+    sonar_security_delta: int = 0
+    sonar_baseline_bugs: int = 0
+    sonar_baseline_smells: int = 0
+    sonar_perturbed_bugs: int = 0
+    sonar_perturbed_smells: int = 0
+
     # Verdict
     converged_back: bool | None = None
     verdict: str = ""
@@ -91,6 +107,20 @@ class BasinMetrics:
             "lines_of_code": self.lines_of_code,
             "quality_per_dollar": round(self.quality_per_dollar, 2),
             "quality_per_joule": round(self.quality_per_joule, 4),
+            "sonar_analyzed": self.sonar_analyzed,
+            "sonar_bugs_delta": self.sonar_bugs_delta,
+            "sonar_vulnerabilities_delta": self.sonar_vulnerabilities_delta,
+            "sonar_code_smells_delta": self.sonar_code_smells_delta,
+            "sonar_cognitive_complexity_delta": self.sonar_cognitive_complexity_delta,
+            "sonar_complexity_delta": self.sonar_complexity_delta,
+            "sonar_duplication_delta": round(self.sonar_duplication_delta, 1),
+            "sonar_maintainability_delta": self.sonar_maintainability_delta,
+            "sonar_reliability_delta": self.sonar_reliability_delta,
+            "sonar_security_delta": self.sonar_security_delta,
+            "sonar_baseline_bugs": self.sonar_baseline_bugs,
+            "sonar_baseline_smells": self.sonar_baseline_smells,
+            "sonar_perturbed_bugs": self.sonar_perturbed_bugs,
+            "sonar_perturbed_smells": self.sonar_perturbed_smells,
             "converged_back": self.converged_back,
             "verdict": self.get_verdict(),
             "model": self.model,
@@ -119,6 +149,7 @@ def measure_basin_escape(
     task: str = "",
     run_id: str = "",
     cost_usd: float | None = None,
+    sonar_diff: dict[str, Any] | None = None,
 ) -> BasinMetrics:
     """Measure how much the model's output diverged from baseline.
 
@@ -166,7 +197,27 @@ def measure_basin_escape(
     # Composite escape: how much did the output diverge?
     m.escape_score = 0.4 * m.architecture_divergence + 0.3 * m.structure_divergence + 0.3 * m.novelty_score
 
-    # Resource tracking
+    if sonar_diff:
+        m.sonar_analyzed = True
+        m.sonar_bugs_delta = sonar_diff.get("sonar_bugs_delta", 0)
+        m.sonar_vulnerabilities_delta = sonar_diff.get("sonar_vulnerabilities_delta", 0)
+        m.sonar_code_smells_delta = sonar_diff.get("sonar_code_smells_delta", 0)
+        m.sonar_cognitive_complexity_delta = sonar_diff.get("sonar_cognitive_complexity_delta", 0)
+        m.sonar_complexity_delta = sonar_diff.get("sonar_complexity_delta", 0)
+        m.sonar_duplication_delta = sonar_diff.get("sonar_duplication_delta", 0.0)
+        m.sonar_maintainability_delta = sonar_diff.get("sonar_maintainability_delta", 0)
+        m.sonar_reliability_delta = sonar_diff.get("sonar_reliability_delta", 0)
+        m.sonar_security_delta = sonar_diff.get("sonar_security_delta", 0)
+        m.sonar_baseline_bugs = sonar_diff.get("sonar_baseline_bugs", 0)
+        m.sonar_baseline_smells = sonar_diff.get("sonar_baseline_smells", 0)
+        m.sonar_perturbed_bugs = sonar_diff.get("sonar_perturbed_bugs", 0)
+        m.sonar_perturbed_smells = sonar_diff.get("sonar_perturbed_smells", 0)
+        nb = min(m.sonar_bugs_delta / max(m.sonar_baseline_bugs, 1), 1.0)
+        ns = min(m.sonar_code_smells_delta / max(m.sonar_baseline_smells, 1), 1.0)
+        nm = m.sonar_maintainability_delta / 3.0
+        sonar_div = 0.4 * nb + 0.3 * ns + 0.3 * nm
+        sonar_div = max(0.0, min(sonar_div, 1.0))
+        m.escape_score = 0.35 * m.architecture_divergence + 0.25 * m.structure_divergence + 0.20 * m.novelty_score + 0.20 * sonar_div
     m.total_tokens = prompt_tokens + completion_tokens + reasoning_tokens
     m.reasoning_tokens = reasoning_tokens
     m.thinking_ratio = reasoning_tokens / max(m.total_tokens, 1)

@@ -169,6 +169,49 @@ class GameReport:
                     f"| Mean correctness (±σ) | {self.mean_correctness:.3f} ± {self.std_correctness:.3f} |",
                 ]
 
+        if sol and sol.sonar_analyzed:
+            lines += [
+                "",
+                "---",
+                "",
+                "## SonarQube Quality [X]",
+                "",
+                f"| Metric | Value |",
+                f"|--------|-------|",
+                f"| Bugs | {sol.sonar_bugs} |",
+                f"| Vulnerabilities | {sol.sonar_vulnerabilities} |",
+                f"| Code smells | {sol.sonar_code_smells} |",
+                f"| Cognitive complexity | {sol.sonar_cognitive_complexity} |",
+                f"| Duplications | {sol.sonar_duplicated_lines_density:.1f}% |",
+                f"| Lines of code (NCLOC) | {sol.sonar_ncloc} |",
+                f"| Maintainability | {sol.sonar_maintainability_rating} |",
+                f"| Reliability | {sol.sonar_reliability_rating} |",
+                f"| Security | {sol.sonar_security_rating} |",
+                f"| Quality gate | {sol.sonar_quality_gate} |",
+                f"| Sonar quality score [C] | {sol.sonar_quality_score:.3f} |",
+            ]
+
+        if r and r.sonar_analyzed:
+            lines += [
+                "",
+                "---",
+                "",
+                "## SonarQube Diff Quality [X]",
+                "",
+                f"**Perturbation quality degradation — how much code quality was lost.**",
+                "",
+                f"| Metric | Baseline | Perturbed | Delta |",
+                f"|--------|----------|-----------|-------|",
+                f"| Bugs | {r.sonar_baseline_bugs} | {r.sonar_perturbed_bugs} | +{r.sonar_bugs_delta} |",
+                f"| Code smells | {r.sonar_baseline_smells} | {r.sonar_perturbed_smells} | +{r.sonar_code_smells_delta} |",
+                f"| Vulnerabilities | — | — | +{r.sonar_vulnerabilities_delta} |",
+                f"| Cognitive complexity | — | — | +{r.sonar_cognitive_complexity_delta} |",
+                f"| Duplications | — | — | +{r.sonar_duplication_delta:.1f}% |",
+                f"| Maintainability rating | — | — | {_rating_delta_str(r.sonar_maintainability_delta)} |",
+                f"| Reliability rating | — | — | {_rating_delta_str(r.sonar_reliability_delta)} |",
+                f"| Security rating | — | — | {_rating_delta_str(r.sonar_security_delta)} |",
+            ]
+
         lines += [
             "",
             "---",
@@ -261,3 +304,11 @@ class GameReport:
                 lines.append("*No code output — this session was narration-only.*")
 
         return "\n".join(lines)
+
+
+def _rating_delta_str(delta: int) -> str:
+    if delta == 0:
+        return "unchanged"
+    if delta > 0:
+        return f"degraded by {delta} levels"
+    return f"improved by {abs(delta)} levels"
