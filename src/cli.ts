@@ -13,9 +13,14 @@ program
   .description("Generate the static site")
   .option("--content <dir>", "Content directory", "./content")
   .option("--output <dir>", "Output directory", "./dist")
-  .action(async (options: { content: string; output: string }) => {
+  .option("--templates <dir>", "Templates directory", "./templates")
+  .action(async (options: { content: string; output: string; templates: string }) => {
     try {
-      await build({ contentDir: options.content, outputDir: options.output });
+      await build({
+        contentDir: options.content,
+        outputDir: options.output,
+        templatesDir: options.templates,
+      });
       console.log("Build complete");
     } catch (err) {
       console.error("Error:", (err as Error).message);

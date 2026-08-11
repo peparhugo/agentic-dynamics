@@ -3,7 +3,8 @@ import path from "path";
 import matter from "gray-matter";
 import yaml from "js-yaml";
 import MarkdownIt from "markdown-it";
-import { PageData, Frontmatter } from "./types";
+import { PageData, Frontmatter, BuildOptions } from "./types";
+import { createTemplateEngine, TemplateEngine } from "./template-engine";
 
 const md = new MarkdownIt();
 
@@ -130,12 +131,14 @@ ${items}
 </html>`;
 }
 
-export async function build(options: {
-  contentDir: string;
-  outputDir: string;
-}): Promise<void> {
+export async function build(options: BuildOptions): Promise<void> {
   const contentDir = path.resolve(options.contentDir);
   const outputDir = path.resolve(options.outputDir);
+  const templatesDir = options.templatesDir
+    ? path.resolve(options.templatesDir)
+    : path.resolve("templates");
+
+  const engine: TemplateEngine | null = await createTemplateEngine(templatesDir);
 
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -151,10 +154,27 @@ export async function build(options: {
     const outDir = path.dirname(fullOutPath);
     await fs.mkdir(outDir, { recursive: true });
 
-    const pageHtml = generatePageHtml(page);
+    let pageHtml: string;
+    if (engine) {
+      pageHtml = engine.renderPage(
+        page.frontmatter,
+        page.html
+      );
+    } else {
+      pageHtml = generatePageHtml(page);
+    }
+
     await fs.writeFile(fullOutPath, pageHtml, "utf-8");
   }
 
-  const indexHtml = generateIndexHtml(pages);
+  let indexHtml: string;
+  if (engine) {
+    indexHtml = engine.renderIndex(pages);
+    if (!indexHtml) {
+      indexHtml = generateIndexHtml(pages);
+    }
+  } else {
+    indexHtml = generateIndexHtml(pages);
+  }
   await fs.writeFile(path.join(outputDir, "index.html"), indexHtml, "utf-8");
 }

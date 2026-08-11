@@ -5,3 +5,9 @@ export interface PageData {
   frontmatter: Frontmatter;
   html: string;
 }
+
+export interface BuildOptions {
+  contentDir: string;
+  outputDir: string;
+  templatesDir?: string;
+}
