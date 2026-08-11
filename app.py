@@ -14,6 +14,7 @@ import jwt
 import bcrypt
 from functools import wraps
 from celery_config import send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 
@@ -104,23 +105,12 @@ def require_auth(f):
 
 
 def create_user(username: str, password: str) -> dict:
-    with get_db() as conn:
-        password_hash = hash_password(password)
-        try:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
-            )
-            conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
-        except sqlite3.IntegrityError:
-            return None
+    password_hash = hash_password(password)
+    return UserRepository(DATABASE).create(username, password_hash)
 
 
 def get_user_by_username(username: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        return dict(row) if row else None
+    return UserRepository(DATABASE).get_by_username(username)
 
 
 def authenticate_user(username: str, password: str) -> dict | None:
@@ -133,9 +123,7 @@ def authenticate_user(username: str, password: str) -> dict | None:
 
 
 def get_user_by_id(user_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(row) if row else None
+    return UserRepository(DATABASE).get_by_id(user_id)
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -152,44 +140,15 @@ def _notify_admin(task_id, action):
 
 
 def create_task(title: str, owner_id: int = None) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    return TaskRepository(DATABASE).create(title, owner_id)
 
 
 def get_tasks(owner_id: int = None):
-    with get_db() as conn:
-        if owner_id is not None:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+    return TaskRepository(DATABASE).get_all(owner_id)
 
 
 def get_task(task_id: int, owner_id: int = None) -> dict | None:
-    with get_db() as conn:
-        if owner_id is not None:
-            row = conn.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, owner_id),
-            ).fetchone()
-        else:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+    return TaskRepository(DATABASE).get_by_id(task_id, owner_id)
 
 
 def fetch_task(task_id: int) -> dict | None:
@@ -198,25 +157,7 @@ def fetch_task(task_id: int) -> dict | None:
 
 
 def update_task(task_id: int, owner_id: int = None, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return TaskRepository(DATABASE).update(task_id, owner_id, title, status)
 
 
 # ── Auth Routes ─────────────────────────────────────────────────
