@@ -1,8 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import { Page, BuildOptions, Frontmatter, PluginContext } from './types';
+import { Page, BuildOptions, Frontmatter, PluginContext, BuildStats } from './types';
 import { loadPlugins } from './plugin';
+import { computeHash, computeTemplateHash, CacheManager } from './cache';
 
 function readPages(contentDir: string): Page[] {
   const absDir = path.resolve(contentDir);
@@ -75,13 +76,31 @@ function readPages(contentDir: string): Page[] {
   return pages;
 }
 
-export function build(options: BuildOptions): void {
+export function build(options: BuildOptions): BuildStats {
   const plugins = loadPlugins();
 
   const ctx: PluginContext = { options, pages: [] };
 
   for (const plugin of plugins) {
     plugin.onStart?.(ctx);
+  }
+
+  const templatesDir = path.resolve(options.templatesDir || './templates');
+  const templateHash = computeTemplateHash(templatesDir);
+
+  const contentDir = path.resolve(options.contentDir);
+  const cacheFile = path.resolve(contentDir, '..', '.ssg-cache.json');
+  const cacheManager = new CacheManager(cacheFile);
+
+  const incremental = !!options.incremental;
+  const clean = !!options.clean;
+
+  if (clean) {
+    cacheManager.clear();
+  }
+
+  if (incremental && !clean) {
+    cacheManager.load();
   }
 
   for (const plugin of plugins) {
@@ -94,10 +113,35 @@ export function build(options: BuildOptions): void {
   const absOutputDir = path.resolve(options.outputDir);
   fs.mkdirSync(absOutputDir, { recursive: true });
 
+  const absContentDir = path.resolve(options.contentDir);
+  let pagesBuilt = 0;
+  let pagesSkipped = 0;
+
   for (const page of pages) {
+    const filePath = path.join(absContentDir, `${page.slug}.md`);
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const contentHash = computeHash(raw);
+
+    if (incremental && !clean) {
+      const cached = cacheManager.get(filePath, contentHash, templateHash);
+      if (cached) {
+        page.html = cached.html;
+        pagesSkipped++;
+        continue;
+      }
+    }
+
     for (const plugin of plugins) {
       plugin.onFile?.(page, ctx);
     }
+    pagesBuilt++;
+
+    if (incremental && !clean && page.html !== undefined) {
+      cacheManager.set(filePath, contentHash, templateHash, page.html);
+    }
+  }
+
+  for (const page of pages) {
     if (page.html !== undefined) {
       const outPath = path.join(absOutputDir, `${page.slug}.html`);
       fs.writeFileSync(outPath, page.html, 'utf-8');
@@ -121,4 +165,15 @@ export function build(options: BuildOptions): void {
   for (const plugin of plugins) {
     plugin.onEnd?.(ctx);
   }
+
+  if (incremental && !clean) {
+    cacheManager.updateTemplateHash(templateHash);
+    cacheManager.save();
+  }
+
+  return {
+    pagesBuilt,
+    pagesSkipped,
+    totalPages: pages.length,
+  };
 }

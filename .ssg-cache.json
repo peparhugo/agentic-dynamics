@@ -1,0 +1,75 @@
+{
+  "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+  "pages": {
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935312/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935312/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935483/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935483/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935511/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935511/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935545/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935545/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935573/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935573/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935602/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935602/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935630/hello.md": {
+      "contentHash": "31e3e4b4a92f24d6c52a0d9f4412304b92508004682ff6efb1a0bfad940807e9",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>Hello World</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>Hello World</h1><div><h1>Hello</h1>\n</div></article></body></html>"
+    },
+    "/tmp/story_ecb7095c6c25/serve-content-1786468935630/about.md": {
+      "contentHash": "d70eba4449bec57256d624ba85e1a5f6500885b0f67e3c8be9da75841ab1e44e",
+      "templateHash": "8587d4db8d095b8e89fd90f9045b5b06dd49f9e5681e922b1cfaf5b4baed7dd2",
+      "html": "<!DOCTYPE html><html><head><title>About</title></head><body><nav><a href=\"index.html\">Home</a></nav><article><h1>About</h1><div><h2>About Us</h2>\n</div></article></body></html>"
+    }
+  }
+}

@@ -17,6 +17,8 @@ export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir?: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export interface ServeOptions {
@@ -38,4 +40,21 @@ export interface Plugin {
 export interface PluginContext extends Record<string, any> {
   options: BuildOptions;
   pages: Page[];
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  totalPages: number;
+}
+
+export interface CacheEntry {
+  contentHash: string;
+  templateHash: string;
+  html: string;
+}
+
+export interface CacheManifest {
+  templateHash: string;
+  pages: Record<string, CacheEntry>;
 }

@@ -41,7 +41,7 @@ export function createDevServer(options: ServeOptions): http.Server {
   const resolvedOutputDir = path.resolve(outputDir);
   const resolvedTemplatesDir = path.resolve(templatesDir || './templates');
 
-  build({ contentDir, outputDir, templatesDir });
+  build({ contentDir, outputDir, templatesDir, incremental: true });
 
   const server = http.createServer((req, res) => {
     const url = req.url || '/';
@@ -118,7 +118,7 @@ export function createDevServer(options: ServeOptions): http.Server {
     if (rebuildTimeout) clearTimeout(rebuildTimeout);
     rebuildTimeout = setTimeout(() => {
       try {
-        build({ contentDir, outputDir, templatesDir });
+        build({ contentDir, outputDir, templatesDir, incremental: true });
         console.log('[rebuilt]');
         for (const client of clients) {
           if (client.readyState === WebSocket.OPEN) {
