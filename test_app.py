@@ -8,6 +8,9 @@ os.environ["DATABASE"] = db_path
 import pytest
 import jwt
 from app import app, init_db, get_db
+from celery_config import celery_app
+
+celery_app.conf.task_always_eager = True
 
 
 @pytest.fixture(autouse=True)
@@ -299,3 +302,62 @@ class TestUserIsolation:
             headers=bob_header,
         )
         assert resp.status_code == 404
+
+
+class TestNotificationTrigger:
+    def test_notification_sent_when_status_changes_to_completed(self, client, auth_header):
+        from unittest.mock import patch
+        create_resp = client.post("/tasks", json={"title": "Task to complete"}, headers=auth_header)
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_header,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_called_once_with("testuser@example.com", "Task to complete")
+
+    def test_notification_not_sent_for_non_completed_status(self, client, auth_header):
+        from unittest.mock import patch
+        create_resp = client.post("/tasks", json={"title": "Task"}, headers=auth_header)
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "done"},
+                headers=auth_header,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_notification_not_sent_when_title_only(self, client, auth_header):
+        from unittest.mock import patch
+        create_resp = client.post("/tasks", json={"title": "Old"}, headers=auth_header)
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"title": "New title"},
+                headers=auth_header,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_notification_not_sent_when_already_completed(self, client, auth_header):
+        from unittest.mock import patch
+        create_resp = client.post("/tasks", json={"title": "Already done"}, headers=auth_header)
+        task_id = create_resp.get_json()["id"]
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers=auth_header,
+        )
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_header,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()

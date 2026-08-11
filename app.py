@@ -12,6 +12,7 @@ import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from celery_config import send_notification_email
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-key")
@@ -230,14 +231,19 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    old_task = get_task(task_id, g.user_id)
+    if old_task is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         g.user_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+    new_status = data.get("status")
+    if new_status == "completed" and old_task["status"] != "completed":
+        user_email = f"{g.username}@example.com"
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
