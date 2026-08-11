@@ -1,10 +1,13 @@
 import os
 import sqlite3
+import time
 from functools import wraps
 
 import jwt
 from celery_config import celery_app, send_notification_email
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from repositories import TaskRepository, UserRepository
@@ -13,6 +16,42 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+RATE_LIMIT_STORAGE = os.environ.get(
+    "RATE_LIMIT_STORAGE", "redis://localhost:6379"
+)
+
+
+def rate_limit_key():
+    token = None
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+    if token:
+        try:
+            payload = jwt.decode(token, app.secret_key, algorithms=["HS256"])
+            return f"user:{payload['user_id']}"
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            pass
+    return get_remote_address()
+
+
+def on_breach_handler(request_limit):
+    retry_after = max(1, int(request_limit.reset_at - time.time()))
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=[RATE_LIMIT],
+    storage_uri=RATE_LIMIT_STORAGE,
+    on_breach=on_breach_handler,
+    app=app,
+)
 
 
 def get_db():
@@ -118,9 +157,23 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = min(limit, 100)
+
     db = get_db()
     task_repo = TaskRepository(db)
-    return jsonify(task_repo.list_by_owner(g.user_id))
+    tasks = task_repo.list_by_owner_paginated(
+        g.user_id, cursor=cursor, limit=limit + 1
+    )
+    has_more = len(tasks) > limit
+    if has_more:
+        tasks = tasks[:limit]
+
+    total = task_repo.count_by_owner(g.user_id)
+    next_cursor = tasks[-1]["id"] if has_more and tasks else None
+
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
