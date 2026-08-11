@@ -5,9 +5,10 @@
 <title>Glossary — AI FinOps Framework</title>
 <meta name="description" content="Every coined term in the AI FinOps Framework, defined in one place.">
 <meta property="og:title" content="AI FinOps Framework">
-<meta property="og:description" content="Calibrated measurement instrument for AI inference costs. 227 experiments across 8 models.">
+<meta property="og:description" content="Terminology reference for the coding-agent economics instrument">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/glossary.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -24,7 +25,7 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link" style="color:var(--ac)">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="sec" style="padding-top:6rem">
 <h1>Glossary</h1>
@@ -36,7 +37,7 @@
 
 <div class="gcard">
 <div class="gname">Grit (Ground-Truth Integrity)</div>
-<div class="gdef">How well a model maintains correctness when given degraded, contradictory, or incomplete instructions. Measured by 10 perturbation operators across two dimensions (semantic and manifold). Two sub-measurements: Flail Rate (sessions producing zero code) and Recovery Cost &epsilon; (overhead when code IS produced).</div>
+<div class="gdef">How well verified task success is preserved as specification quality degrades. Operational definition: Grit(s) = P(verified&nbsp;success | perturbation&nbsp;strength=s). Retention R(s) = Grit(s)/Grit(0). Recovery premium &Delta;C = C(successful&nbsp;perturbed)/C(successful&nbsp;baseline). Measured by 10 perturbation operators across three classes: specification corruption, objective mutation, and process perturbation.</div>
 </div>
 
 <div class="gcard">
@@ -46,7 +47,7 @@
 
 <div class="gcard">
 <div class="gname">Silent Inference</div>
-<div class="gdef">A model's ability to reason in structured latent space rather than through explicit chain-of-thought narration billed as output tokens. DeepSeek's GRPO architecture separates reasoning (1,800 tokens/session in a low-cost channel) from output (7,800 tokens/session).</div>
+<div class="gdef">An observed pattern where some models produce fewer billable reasoning tokens while maintaining performance. Whether this is caused by training architecture (e.g. GRPO), provider-side caching, or some combination is not yet determined by this experiment.</div>
 </div>
 
 <div class="gcard">
@@ -71,12 +72,12 @@
 
 <div class="gcard">
 <div class="gname">GRPO (Group Relative Policy Optimization)</div>
-<div class="gdef">DeepSeek's reinforcement learning method that optimizes for correct answers rather than imitating human-like reasoning paths. Reasoning exists as vectors in latent space, not as words. This is what enables Silent Inference &mdash; the model doesn't need to narrate its reasoning because the reasoning was never the point. Contrasts with SFT imitation chain-of-thought used by GPT and Claude.</div>
+<div class="gdef">DeepSeek's reinforcement learning method that optimizes for correct answers rather than imitating human-like reasoning paths. May contribute to lower reasoning-token overhead (hypothesis, not confirmed by this experiment). Contrasts with supervised fine-tuning (SFT) approaches used by other providers.</div>
 </div>
 
 <div class="gcard">
 <div class="gname">Attractor Basin</div>
-<div class="gdef">A model's default solution topology &mdash; the structural pattern it falls into when unconstrained. Measured by comparing perturbed vs baseline code structure (module count, class hierarchy, dependency graph). Models with deep attractor basins (Claude, GPT-5.6) resist perturbation and recover to familiar patterns. Models with shallow basins (DeepSeek) explore novel solutions.</div>
+<div class="gdef">A model's default solution topology — the structural pattern it falls into when unconstrained. Measured by comparing perturbed vs baseline code structure (module count, class hierarchy, dependency graph). Models with deep attractor basins resist perturbation and recover to familiar patterns. Models with shallow basins explore novel solutions. Architecture labels ("dense", "MoE") are inferred from public information and may not be verifiable for closed models.</div>
 </div>
 
 <div class="gcard">
@@ -91,7 +92,7 @@
 
 <div class="gcard">
 <div class="gname">Strategy Archetypes</div>
-<div class="gdef">Four computed classifications based on exploration-to-recovery token ratios: CONSERVATIVE (low explore, high recover &mdash; Claude, GPT-5.6), EXPLORATORY (high escape, low recover &mdash; DeepSeek), WASTEFUL (high explore, low quality &mdash; GPT-5-nano, GPT-5-mini), EFFICIENT (high explore, high quality, low cost &mdash; DeepSeek in forced-silent mode).</div>
+<div class="gdef">Four computed classifications based on exploration-to-recovery token ratios: CONSERVATIVE (low explore, high recover), EXPLORATORY (high escape, low recover), WASTEFUL (high explore, low quality), EFFICIENT (high explore, high quality, low cost). Per-model classifications depend on the regenerated corpus and should not be taken as fixed; they shift with each new experiment.</div>
 </div>
 
 <div class="gcard">

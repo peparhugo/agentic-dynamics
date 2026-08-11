@@ -101,7 +101,7 @@ def run_pytest(worktree_path: str, timeout_sec: int = 120) -> dict:
         total = passed + failed
 
         return {
-            "ok": total > 0,
+            "ok": r.returncode == 0 and total > 0,
             "passed": passed, "failed": failed, "errors": errors,
             "total": total, "duration_s": round(dur, 1),
             "pass_rate": round(passed / max(total, 1), 3) if total > 0 else 0,
@@ -168,10 +168,10 @@ def run_ts_tests(worktree_path: str, timeout_sec: int = 30) -> dict:
         total = passed + failed
         if total == 0 and r.returncode == 0:
             return {
-                "ok": True, "passed": 0, "failed": 0, "total": 0,
+                "ok": False, "passed": 0, "failed": 0, "total": 0,
                 "duration_s": round(dur, 1),
                 "pass_rate": 0,
-                "note": "No test counts parsed from output",
+                "note": "No test counts parsed from output — likely no tests executed",
                 "runner": runner,
             }
         if total == 0:
@@ -203,10 +203,10 @@ def _now(): return datetime.now(timezone.utc).isoformat()
 
 def load_db_sessions():
     """Load all sessions with cost data from the opencode DB."""
-    if not OPENSCODE_DB.exists():
-        print("Error: opencode DB not found at", OPENSCODE_DB)
+    if not OPENCODE_DB.exists():
+        print("Error: opencode DB not found at", OPENCODE_DB)
         return []
-    db = sqlite3.connect(str(OPENSCODE_DB))
+    db = sqlite3.connect(str(OPENCODE_DB))
     db.row_factory = sqlite3.Row
     rows = db.execute("""
         SELECT id, directory, title, cost, tokens_input, tokens_output, tokens_reasoning,
@@ -416,6 +416,7 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── Solution Evaluation ──
     solution = evaluate_solution(code, constraints, baseline_code=baseline_code)
+    solution.evaluator_source = "heuristic"
 
     # ── Code Density Check — detect narration without code ──
     import ast
@@ -500,13 +501,6 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
             solution.sonar_security_rating = sm.security_rating
             solution.sonar_quality_gate = sm.quality_gate
             solution.sonar_quality_score = sonar_quality_score(sm)
-            solution.composite_score = (
-                0.30 * solution.correctness_score
-                + 0.25 * solution.constraint_score
-                + 0.20 * solution.sonar_quality_score
-                + 0.15 * solution.code_quality_score
-                + 0.10 * solution.novelty_score
-            )
         if baseline_path and baseline_path != worktree_path:
             baseline_sm = run_sonar_analysis(
                 baseline_path, sonar_url=_sonar_url,
@@ -533,7 +527,6 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         solution=solution,
     )
     if db_cost > 0:
-        # Override total with actual DB cost; proportionally split across components
         est_total = efficiency.total_cost_usd
         if est_total > 0:
             scale = db_cost / est_total
@@ -544,18 +537,67 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         efficiency.total_cost_usd = db_cost
         efficiency.cost_is_estimated = False
 
+    # ── AST Profiling ──
+    ast_profile = ast_profile_worktree(worktree_path)
+    ast_comparison = None
+    if baseline_code and code:
+        ast_comparison = analyze_ast(baseline_code, code,
+                                     operator=info.get("operator", ""),
+                                     perturbation_class=pert_class)
+
+    # ── Test Results (run before basin/strategy so they consume canonical correctness) ──
+    test_results = None
+    if run_tests_enabled:
+        if ast_profile.get("py_files", 0) > 0:
+            test_results = run_pytest(worktree_path, timeout_sec=_test_timeout)
+        elif ast_profile.get("ts_files", 0) + ast_profile.get("tsx_files", 0) > 0:
+            test_results = run_ts_tests(worktree_path, timeout_sec=_test_timeout)
+        if test_results and test_results.get("total", 0) > 0:
+            solution.tests_passed = test_results["passed"]
+            solution.tests_total = test_results["total"]
+            solution.correctness_score = test_results["pass_rate"]
+            solution.evaluator_source = "agent_authored_test"
+            solution.evaluator_independent = False
+
+    # ── Recompute composite score after canonical correctness is established ──
+    if solution.sonar_analyzed:
+        solution.composite_score = (
+            0.30 * solution.correctness_score
+            + 0.25 * solution.constraint_score
+            + 0.20 * solution.sonar_quality_score
+            + 0.15 * solution.code_quality_score
+            + 0.10 * solution.novelty_score
+        )
+    else:
+        solution.composite_score = (
+            0.35 * solution.correctness_score
+            + 0.30 * solution.constraint_score
+            + 0.20 * solution.code_quality_score
+            + 0.15 * solution.novelty_score
+        )
+
     # ── Basin Escape ──
     exp_name = info.get("experiment", "") or ""
-    pert_class = "manifold" if any(k in exp_name for k in
-                                    ["alien_vocab", "shift_framing", "reverse_causality",
-                                     "force_abandonment"]) else "semantic"
-    # Parse actual perturbation strength from worktree name (_s0.3, _s0.5, _s0.7)
+    spec_corruption = any(k in exp_name for k in
+        ["inject_false_premise", "inject_phantom_success",
+         "remove_critical_constraint", "insert_contradiction"])
+    obj_mutation = any(k in exp_name for k in
+        ["invert_constraint", "inject_competing_goal"])
+    process_pert = any(k in exp_name for k in
+        ["alien_vocab", "shift_framing", "reverse_causality", "force_abandonment"])
+    if spec_corruption:
+        pert_class = "specification_corruption"
+    elif obj_mutation:
+        pert_class = "objective_mutation"
+    elif process_pert:
+        pert_class = "process_perturbation"
+    else:
+        pert_class = "specification_corruption"
     strength_match = re.search(r'_s(\d+\.\d+)', worktree_path)
     actual_strength = float(strength_match.group(1)) if strength_match else 0.5
     no_baseline = not baseline_code
     self_comparison = bool(baseline_code) and baseline_code == code
     if no_baseline or self_comparison:
-        # No baseline available or baseline == perturbed
         from instrument.basin import BasinMetrics as _BM
         basin = _BM(
             perturbation_operator=info.get("operator", "baseline"),
@@ -618,26 +660,6 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── Strategy ──
     strategy = classify_strategy(basin, solution, efficiency, pert_class)
-
-    # ── AST Profiling ──
-    ast_profile = ast_profile_worktree(worktree_path)
-    ast_comparison = None
-    if baseline_code and code:
-        ast_comparison = analyze_ast(baseline_code, code,
-                                     operator=info.get("operator", ""),
-                                     perturbation_class=pert_class)
-
-    # ── Test Results (if --run-tests) ──
-    test_results = None
-    if run_tests_enabled:
-        if ast_profile.get("py_files", 0) > 0:
-            test_results = run_pytest(worktree_path, timeout_sec=_test_timeout)
-        elif ast_profile.get("ts_files", 0) + ast_profile.get("tsx_files", 0) > 0:
-            test_results = run_ts_tests(worktree_path, timeout_sec=_test_timeout)
-        if test_results and test_results.get("ok") and test_results.get("total", 0) > 0:
-            solution.tests_passed = test_results["passed"]
-            solution.tests_total = test_results["total"]
-            solution.correctness_score = test_results["pass_rate"]
 
     # ── Game Report ──
     experiment_id = info.get("experiment", wt.name) or wt.name
@@ -715,6 +737,8 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         "is_frontend": is_frontend,
         "non_python_files": non_python_files,
         "has_tests": ast_profile.get("has_tests", False),
+        "evaluator_source": solution.evaluator_source,
+        "evaluator_independent": solution.evaluator_independent,
         "test_results": test_results,
         "sonar_analyzed": solution.sonar_analyzed,
         "sonar_bugs": solution.sonar_bugs,

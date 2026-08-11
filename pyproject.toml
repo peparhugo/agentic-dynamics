@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reasoning-instrument"
 version = "0.4.0"
-description = "Reasoning topology instrument — probe how language models explore unfamiliar reasoning trajectories"
+description = "Agent economics measurement instrument — how does coding-agent cost and outcome change as specification quality degrades?"
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
@@ -13,6 +13,8 @@ dependencies = [
     "ollama>=0.3.0",
     "neo4j>=5.20",
     "numpy>=1.22",
+    "scikit-learn>=1.3",
+    "pytest>=7.0",
 ]
 
 [tool.setuptools.packages.find]

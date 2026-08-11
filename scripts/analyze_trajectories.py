@@ -12,7 +12,7 @@ metrics that are COMPARABLE ACROSS ALL MODELS:
 Per-session metrics like thinking_density and code_density are kept in
 the per-transcript output for inspection but are NOT aggregated across
 models because different architectures emit different event types:
-  - DeepSeek emits "reasoning" events (GRPO latent reasoning surfaced as text)
+  - DeepSeek emits "reasoning" events (GRPO reasoning surfaced as exposed text events (causal mechanism not confirmed by this experiment))
   - Claude emits "text" events (chain-of-thought embedded in output tokens)
   - These are fundamentally different and not comparable cross-model.
 
@@ -31,6 +31,9 @@ from pathlib import Path
 from collections import Counter, defaultdict
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
+from instrument.opencode import normalize_opencode_event
+
 REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 OUTPUT_PATH = ROOT / "experiments" / "results" / "_trajectory_summary.json"
@@ -104,11 +107,12 @@ def parse_session_jsonl(path):
                 if not line:
                     continue
                 try:
-                    event = json.loads(line)
+                    raw_event = json.loads(line)
                 except json.JSONDecodeError:
                     result["parse_errors"] += 1
                     continue
 
+                event = normalize_opencode_event(raw_event)
                 etype = event.get("type", "")
 
                 if etype == "reasoning":

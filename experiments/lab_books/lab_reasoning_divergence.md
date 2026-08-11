@@ -88,7 +88,7 @@ reasoning_divergence = mean(per_step_distances)  # averaged across all compared 
 
 - **Manifold > semantic reasoning divergence:** Confirms that linguistic surface shifts scramble internal reasoning more than semantic perturbations, even when output divergence is similar
 - **High Δ for DeepSeek:** GRPO-trained reasoning is explicitly surfaced as text — embedding distance captures real process change, not just output drift
-- **Low Δ for Claude:** SFT/dense models may show less reasoning divergence because chain-of-thought is implicit (not surfaced in reasoning events)
+- **Low Δ for Claude:** SFT-trained models may show less reasoning divergence because chain-of-thought is implicit (not surfaced in reasoning events)
 - **Operator ranking:** Operators that induce highest reasoning divergence likely test different cognitive systems than highest-output-divergence operators
 
 ## Expected Findings

@@ -3,9 +3,11 @@
 Replaces text-similarity-based escape with output-based divergence:
 did the model build a structurally different solution from baseline?
 
-A "high escape" now means: the model chose a genuinely different
-architecture, technology stack, or design pattern — not just
-different words to describe the same thing.
+Grit operational definition:
+    Grit(s) = P(verified_success | perturbation_strength=s)
+    Grit retention: R(s) = G(s) / G(0)
+    Grit AUC: area under outcome-retention curve
+    Recovery premium: ΔC = C(successful_perturbed) / C(successful_baseline)
 """
 
 from __future__ import annotations
@@ -18,9 +20,9 @@ from typing import Any
 class BasinMetrics:
     """How did the model's output diverge from baseline under perturbation?
 
-    H0: Perturbation class has no effect on solution divergence or cost.
-    H1: Manifold perturbations produce more divergent solutions at
-        comparable cost than semantic perturbations.
+    Basin escape is a behavioral measure — it describes divergence from
+    baseline solution patterns. It may or may not correlate with robustness
+    (Grit). Escape is explanatory; correctness is the primary endpoint.
     """
 
     perturbation_strength: float = 0.0

@@ -5,9 +5,10 @@
 <title>The Evidence — AI FinOps Framework</title>
 <meta name="description" content="Full evidence: 227 experiments, 249 sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
 <meta property="og:title" content="The Evidence — AI FinOps Framework">
-<meta property="og:description" content="227 experiments, 8 models, 10 stress tests. 88.7% test pass rate. 69x cost gap between DeepSeek and Claude. Every number provenance-tagged.">
+<meta property="og:description" content="Full evidence: 249 sessions, 8 model variants, provenance-tagged measurements">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/evidence.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -56,12 +57,12 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link" style="color:var(--ac)">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>The Evidence</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)">227 experiment runs with game reports across 249 sessions, 3 architectures, and 8 variants. Numbers are tagged by provenance: [M] measured from API/session data &middot; [C] computed from measurements &middot; [H] heuristic estimate &middot; [X] externally sourced. <span style="color:var(--t3)">The 8 variants span 3 architectures: DeepSeek MoE (1), Claude dense (1), and GPT dense (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Each variant was tested independently because reasoning behavior varies significantly even within the same architecture family. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
+<p class="lead" style="font-size:1rem;color:var(--t)">227 experiment runs with game reports across 249 sessions and 8 model variants from 3 provider families. Numbers are tagged by provenance: [M] measured from API/session data &middot; [C] computed from measurements &middot; [H] heuristic estimate &middot; [X] externally sourced. <span style="color:var(--t3)">The 8 variants span 3 provider families: DeepSeek (1), Anthropic (1), and OpenAI (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Architecture internals ("MoE", "dense") are disclosed for some providers but not independently verifiable for closed models. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
 <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
 <div class="card" style="text-align:center"><div class="cval" data-stat="worktrees">251</div><div class="cdesc" style="text-align:center">Worktrees on disk</div></div>
 <div class="card" style="text-align:center"><div class="cval" data-stat="reports">224</div><div class="cdesc" style="text-align:center">Game reports</div></div>
@@ -88,15 +89,16 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
   No multiple-comparison correction has been applied across 8 models &times; 10 perturbation operators.
   Correctness scores for the 116 sessions without executed test suites are heuristic estimates
   (keyword-based code structure analysis, tagged [H] in data.js).
-  Statistical significance is not asserted — this is an observational measurement corpus, not a controlled experiment.
+  Statistical significance is not asserted — this is an observational measurement corpus, not a controlled experiment. Differences between model families may be due to architecture, post-training, provider accounting, harness interaction, or some combination — this experiment does not identify causal mechanisms.
 </div>
 <section class="sec alt">
 <h2 id="grit-spectrum">The Grit Spectrum</h2>
-<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models — 4 manifold operators that push the model off its typical linguistic surface, and 6 semantic operators that inject contradictions within the reasoning manifold. Grit is measured by escape rate (how often the model diverges from its default solution) at a given correctness threshold.</p>
+<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models, across three perturbation classes: specification corruption (4 operators that degrade information quality), objective mutation (2 operators that change the requested target), and process perturbation (4 operators that alter the search process). Grit is measured as the probability of verified success at a given perturbation strength.</p>
 
 <div class="cards" style="margin-top:1.2rem">
-<div class="card"><div class="ctitle">Manifold Operators (4)</div><div class="cdesc">Push the model off its typical linguistic surface — alien vocabulary injection, framing shifts, causality reversal, forced abandonment. Test search dynamics.</div></div>
-<div class="card"><div class="ctitle">Semantic Operators (6)</div><div class="cdesc">Inject contradictions within the reasoning manifold — false premises, inverted constraints, phantom successes, competing goals, removed critical constraints, contradiction insertion. Test truth-seeking policies.</div></div>
+<div class="card"><div class="ctitle">Specification Corruption (4)</div><div class="cdesc">Degrade information quality while preserving intended ground truth. False premises, removed constraints, phantom successes, contradictory requirements. Simulate realistic incomplete requirements.</div></div>
+<div class="card"><div class="ctitle">Objective Mutation (2)</div><div class="cdesc">Change the requested target itself. Inverted constraints, competing goals. Tests whether the model notices the specification changed.</div></div>
+<div class="card"><div class="ctitle">Process Perturbation (4)</div><div class="cdesc">Alter the search process. Alien vocabulary, framing shifts, causality reversal, forced abandonment. Tests how the model navigates under unfamiliar constraints.</div></div>
 <div class="card"><div class="ctitle">Detector: Recovery Signals (7)</div><div class="cdesc">Markers, tool convergence, qualifier patterns, tech stack convergence, output length ratio, reasoning structure overlap. Classify every segment as EXPLORATION or RECOVERY.</div></div>
 <div class="card"><div class="ctitle">Detector: Strategy Archetypes (4)</div><div class="cdesc">CONSERVATIVE (low explore, high recover), EXPLORATORY (high escape, low recover), WASTEFUL (high explore, low quality), EFFICIENT (high explore, high quality, low cost).</div></div>
 </div>
@@ -123,7 +125,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <h3 id="flail-rate" style="margin-top:2rem">Grit: The Flail Rate</h3>
 <p class="lead">When the model can't figure out the correct requirement, it flails — producing tokens but zero code. This is the flail rate. Measured per-worktree: what fraction of a model's sessions produced tokens that went to narration instead of code? A session is penalized when output tokens exceed code lines by >20x or when zero code files were produced. <strong>Measured Narration Penalty:</strong> Claude flails on 11% of sessions (code-free narration) — 36% more often than DeepSeek's 8.4%. When models succeed, DeepSeek carries a negligible narration overhead (0.0% penalty), Claude carries 8.5%.</p>
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Narration Failures</th><th>Penalty Rate</th><th>Avg Cost/Session</th><th>What's Happening</th></tr></thead><tbody id="narration-tbody">
-<tr><td>DeepSeek v4 Pro</td><td>68</td><td>2</td><td class="green">8%</td><td class="green">$0.015</td><td>Silent inference — reasoning compressed into latent space</td></tr>
+<tr><td>DeepSeek v4 Pro</td><td>68</td><td>2</td><td class="green">8%</td><td class="green">$0.015</td><td>Low reasoning-token overhead (observed pattern; causal mechanism not confirmed)</td></tr>
 <tr><td>GPT-5.6-fast</td><td>6</td><td>3</td><td>33%</td><td>$0.49</td><td>Some narration, moderate efficiency</td></tr>
 <tr><td>GPT-5.5</td><td>3</td><td>3</td><td class="amber">50%</td><td>$0.16</td><td>Narrates heavily under perturbation</td></tr>
 <tr><td>GPT-5.6</td><td>15</td><td>1</td><td>6%</td><td>$0.43</td><td>Mostly clean, occasional over-explanation</td></tr>
@@ -148,7 +150,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <tr id="no-data-row"><td colspan="7" class="t3">Loading data...</td></tr>
 </tbody></table></div>
 <div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.06) while producing 1.26&times; more code (713 vs 568 LOC). Total Claude spend (<span class="tip" title="[M] Total spend across all 47 sessions including 5 narration-failure runs and 3 sessions without game reports.">$47.54</span>) exceeds all other models combined. Correctness data is from actual pytest/jest execution — <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall across 1572/1772 tests</span>. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
-<div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. DeepSeek separates reasoning into a low-cost structured channel. GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). DeepSeek's 7% thinking ratio reflects GRPO-compressed latent reasoning. 204/249 sessions analyzed with game reports — 26 narration failures, 19 unanalyzed.</div>
+<div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. Some model families show lower reasoning-token ratios (observed pattern; the causal mechanism — whether GRPO architecture, provider-side caching, or other factors — is not confirmed by this experiment). GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). 204/249 sessions analyzed with game reports — 26 narration failures, 19 unanalyzed.</div>
 
 <div class="insight"><strong>The Cache Tax:</strong> Claude writes 20,000 tokens to cache per session at $3.75/Mtok. DeepSeek writes zero — instead reads 197,000 tokens from cache at $0.14/Mtok. Same context management capability. <strong style="color:var(--am)">26.8&times; pricing difference.</strong> Cache strategy is a two-way door. Measure your hit rate. If under 50%, use cache-read. If over 80%, cache-write pays for itself.</div>
 </section>
@@ -306,6 +308,13 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
   });
 })();
 </script>
+
+<!-- ================================================================== -->
+<!-- RESEARCH NOTEBOOK — exploratory metrics, not primary evidence     -->
+<!-- ================================================================== -->
+<div class="insight" style="border-left-color:var(--am);background:rgba(251,191,36,0.04);margin:2rem 0">
+<strong style="color:var(--am)">Research Notebook — Exploratory Metrics:</strong> The following sections (RVS, reasoning drift, recovery curves, think/do coupling, cluster transition, divergence cascades) are research hypotheses under development. They are not yet established measurement constructs and should not be read with the same confidence as measured billing telemetry above. Raw cost, token, and test-pass data carry higher evidentiary weight.
+</div>
 
 <!-- ==================== REASONING VOLATILITY SCORE (RVS) ==================== -->
 <section class="sec alt">
@@ -546,6 +555,11 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <p class="fn" style="font-size:0.7rem;color:var(--t3)">Faded cells have fewer than 5 sessions — treat as directional indicators, not precise measurements.</p>
 </section>
 
+<!-- ==================== MODELING EXTENSIONS ==================== -->
+<div class="insight" style="border-left-color:var(--am);background:rgba(251,191,36,0.04);margin:2rem 0">
+<strong style="color:var(--am)">Modeling Extensions:</strong> Energy estimates (joules, EPM) depend on assumptions about GPU type, active parameters, and per-token energy constants. Dollar cost and token counts are measured. Energy is a modeled estimate. Architecture constants for closed-model providers are not independently verifiable.
+</div>
+
 <!-- ==================== ENERGY EFFICIENCY RANKING ==================== -->
 <section class="sec">
 <h2 id="energy-ranking">Energy Efficiency Ranking</h2>
@@ -553,7 +567,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="cards" id="energy-ranking-cards" style="margin-top:1.2rem">
 <div class="card" style="text-align:center"><div class="cdesc">Loading ranking...</div></div>
 </div>
-<div class="insight"><strong>Key insight:</strong> GPT-5.6-fast leads on J/LOC efficiency (4.66 J/LOC) despite high dollar cost — it generates compact, low-token code. DeepSeek v4 Pro's MoE architecture (37B active params) delivers 5.8 J/LOC at 69&times; lower dollar cost. Nano's 23.56 J/LOC reflects its 1.01 reasoning-to-output ratio. <strong style="color:var(--ac)">Energy efficiency &ne; cost efficiency.</strong> The two dimensions are only loosely correlated.</div>
+<div class="insight"><strong>Key insight:</strong> GPT-5.6-fast leads on J/LOC efficiency (4.66 J/LOC) despite high dollar cost — it generates compact, low-token code. DeepSeek v4 Pro delivers 5.8 J/LOC at substantially lower dollar cost. Nano's 23.56 J/LOC reflects its 1.01 reasoning-to-output ratio. <strong style="color:var(--ac)">Energy efficiency &ne; cost efficiency.</strong> The two dimensions are only loosely correlated. Energy estimates are modeled scenarios — dollar costs and token counts are the measured quantities.</div>
 </section>
 
 <!-- ==================== SEMANTIC DRIFT TRAJECTORIES ==================== -->
@@ -1073,7 +1087,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (narrTbl && D.models) {
     narrTbl.innerHTML = '';
     var narrDesc = {
-      'deepseek/deepseek-v4-pro': 'Silent inference — reasoning compressed into latent space',
+      'deepseek/deepseek-v4-pro': 'Lower reasoning-token overhead (observed; causal mechanism not confirmed)',
       'openai/gpt-5.6-fast': 'Efficient code generation, no wasted tokens',
       'openai/gpt-5.5': 'Clean output, high constraint satisfaction',
       'openai/gpt-5.6': 'Mostly clean, occasional over-explanation',
@@ -1101,56 +1115,56 @@ document.addEventListener('DOMContentLoaded', function () {
 <script>
 (function(){
   var fb = [
-    { id:"deepseek-v4-pro", name:"DeepSeek v4 Pro", arch:"MoE", archTag:"moe", provider:"DeepSeek",
+    { id:"deepseek-v4-pro", name:"DeepSeek v4 Pro", arch:"Provider family (publicly disclosed)", archTag:"moe", provider:"DeepSeek",
       cost:0.0158, total:2.04, sessions:133, tokensPerSes:18520, grit:8, locPerSes:706,
       pass:"92%", quality:0.246, commentRatio:0.02, thinkingRatio:0.087,
       strats:{cons:78,expl:29,waste:2,eff:0},
       rec:"Default route for routine Python/Flask tasks. Lowest cost per successful outcome. Silent Inference via GRPO.",
       recType:"", perturbation:{semantic:{n:97,avg_cost:0.0157,avg_correctness:0.94,avg_escape:0.18},manifold:{n:12,avg_cost:0.0167,avg_correctness:0.77,avg_escape:0.76}},
       perturbNote: "Best-in-class semantic correctness (94%). Manifold perturbation drops to 77% — still leading relative to peers at 13× lower cost per session." },
-    { id:"gpt-5-nano", name:"GPT-5-nano", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5-nano", name:"GPT-5-nano", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.0057, total:0.03, sessions:7, tokensPerSes:21840, grit:14, locPerSes:199,
       pass:"70%", quality:0.487, commentRatio:0.072, thinkingRatio:0.19,
       strats:{cons:4,expl:2,waste:0,eff:0},
       rec:"Test-only use. Lowest absolute cost but highest Grit (flail rate) and lowest correctness. Not suitable for unsupervised work.",
       recType:"cyan", perturbation:{semantic:{n:6,avg_cost:0.0057,avg_correctness:0.7,avg_escape:0.45},manifold:{n:0,avg_cost:null,avg_correctness:null,avg_escape:null}},
       perturbNote:"45% escape rate under semantic perturbation — worst in class. Highest comment ratio (7.2%) suggests over-explanation." },
-    { id:"gpt-5-mini", name:"GPT-5-mini", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5-mini", name:"GPT-5-mini", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.0258, total:0.41, sessions:16, tokensPerSes:21220, grit:8, locPerSes:264,
       pass:"82%", quality:0.407, commentRatio:0.063, thinkingRatio:0.066,
       strats:{cons:11,expl:1,waste:0,eff:0},
       rec:"Fallback route when v4 Pro is unavailable. Acceptable cost at 1.6× premium. Low Grit (8%) but moderate correctness.",
       recType:"amber", perturbation:{semantic:{n:12,avg_cost:0.0258,avg_correctness:0.83,avg_escape:0.2},manifold:{n:0,avg_cost:null,avg_correctness:null,avg_escape:null}},
       perturbNote:"Solid semantic resilience (83% correctness, 20% escape). No manifold data — insufficient tests under linguistic distortion." },
-    { id:"gpt-5", name:"GPT-5", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5", name:"GPT-5", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.159, total:1.79, sessions:13, tokensPerSes:27610, grit:15, locPerSes:403,
       pass:"88%", quality:0.273, commentRatio:0.063, thinkingRatio:0.083,
       strats:{cons:3,expl:8,waste:0,eff:0},
       rec:"Exploratory tasks only. High Grit (15%) with moderate correctness. Exploratory-dominant strategy profile.",
       recType:"amber", perturbation:{semantic:{n:10,avg_cost:0.158,avg_correctness:0.89,avg_escape:0.5},manifold:{n:1,avg_cost:0.1685,avg_correctness:0.8,avg_escape:0.7}},
       perturbNote:"50–70% escape under perturbation — highly fragile. Falls apart on alien vocabulary. Avoid in production pipelines." },
-    { id:"gpt-5.5", name:"GPT-5.5", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5.5", name:"GPT-5.5", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.282, total:0.97, sessions:6, tokensPerSes:10500, grit:50, locPerSes:262,
       pass:"100%", quality:0.383, commentRatio:0.01, thinkingRatio:0.021,
       strats:{cons:1,expl:2,waste:0,eff:0},
       rec:"Evaluate further. 50% Grit is worst in class — flails on half of perturbed inputs. 100% correctness but at what cost?",
       recType:"cyan", perturbation:{semantic:{n:3,avg_cost:0.282,avg_correctness:1.0,avg_escape:0.64},manifold:{n:0,avg_cost:null,avg_correctness:null,avg_escape:null}},
       perturbNote:"64% escape under perturbation — highest in class. Perfect correctness on baseline but extreme fragility. Small sample (n=3)." },
-    { id:"gpt-5.6", name:"GPT-5.6", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5.6", name:"GPT-5.6", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.4474, total:7.82, sessions:18, tokensPerSes:7780, grit:6, locPerSes:367,
       pass:"94%", quality:0.37, commentRatio:0.009, thinkingRatio:0.064,
       strats:{cons:14,expl:1,waste:0,eff:0},
       rec:"Escalation route when v4 Pro fails. 28.2× escalation cost. Conservative-dominant strategy. Validated for Python CRUD.",
       recType:"amber", perturbation:{semantic:{n:15,avg_cost:0.4474,avg_correctness:0.94,avg_escape:0.16},manifold:{n:0,avg_cost:null,avg_correctness:null,avg_escape:null}},
       perturbNote:"Excellent resilience — 94% correctness with only 16% escape under semantic perturbation. Low Grit (6%). Strong escalation candidate." },
-    { id:"gpt-5.6-fast", name:"GPT-5.6-fast", arch:"Dense", archTag:"dense", provider:"OpenAI",
+    { id:"gpt-5.6-fast", name:"GPT-5.6-fast", arch:"Provider family", archTag:"provider", provider:"OpenAI",
       cost:0.6625, total:4.38, sessions:9, tokensPerSes:4330, grit:33, locPerSes:343,
       pass:"100%", quality:0.299, commentRatio:0.008, thinkingRatio:0.071,
       strats:{cons:2,expl:4,waste:0,eff:0},
       rec:"Avoid for routine. 41.9× escalation cost with 33% Grit. Speed tier at speed-tier prices. Use only when latency is paramount.",
       recType:"amber", perturbation:{semantic:{n:6,avg_cost:0.6625,avg_correctness:1.0,avg_escape:0.58},manifold:{n:0,avg_cost:null,avg_correctness:null,avg_escape:null}},
       perturbNote:"58% escape under perturbation despite perfect correctness — the model runs but at high cost. Exploratory-dominant strategy bias." },
-    { id:"claude-fable-5", name:"Claude Fable 5", arch:"Dense", archTag:"dense", provider:"Anthropic",
+    { id:"claude-fable-5", name:"Claude Fable 5", arch:"Provider family", archTag:"provider", provider:"Anthropic",
       cost:1.0847, total:47.54, sessions:47, tokensPerSes:10320, grit:11, locPerSes:568,
       pass:"88%", quality:0.278, commentRatio:0.033, thinkingRatio:0.0,
       strats:{cons:27,expl:12,waste:0,eff:0},

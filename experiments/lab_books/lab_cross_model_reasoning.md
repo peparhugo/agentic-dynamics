@@ -27,7 +27,7 @@ infrastructure:
 
 The Grit Matrix (lab_grit_matrix) shows that DeepSeek and Claude produce similar outputs but at radically different costs. The Basin Topology (lab_basin_topology) shows they have different attractor topology. But we've never measured whether they *think* differently.
 
-Using the same embedding infrastructure that powers reasoning divergence measurement, we can compare reasoning traces across models on identical tasks. This reveals whether architectural differences (GRPO vs SFT, MoE vs Dense) produce measurably different reasoning approaches — or whether all models converge on the same thinking patterns.
+Using the same embedding infrastructure that powers reasoning divergence measurement, we can compare reasoning traces across models on identical tasks. This reveals whether architectural differences (GRPO vs SFT, provider family differences) produce measurably different reasoning approaches — or whether all models converge on the same thinking patterns.
 
 ## Methodology
 
@@ -104,7 +104,7 @@ Using the same embedding infrastructure that powers reasoning divergence measure
 
 1. Claude and GPT-5 cluster closer together (both SFT/Dense) than either does to DeepSeek (GRPO/MoE)
 2. GPT-5 ↔ GPT-5-mini have the lowest reasoning distance (same provider, similar training)
-3. DeepSeek has the most distinctive reasoning signature (surfaced GRPO latent reasoning is textually unique)
+3. DeepSeek has the most distinctive reasoning signature (observed reasoning-text patterns; causal architecture not established)
 4. Within a model family (DeepSeek only), reasoning is highly consistent across tasks
 5. Tool sequence divergence is higher than reasoning divergence — models execute differently even when thinking similarly
 6. Reasoning distance correlates weakly with cost (expensive models don't think "better")

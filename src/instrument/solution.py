@@ -28,6 +28,10 @@ class SolutionMetrics:
     tests_total: int = 0
     correctness_score: float = 0.0
 
+    # Evaluator provenance
+    evaluator_source: str = "unavailable"
+    evaluator_independent: bool = False
+
     # Constraint satisfaction
     constraints_met: int = 0
     constraints_total: int = 0
@@ -64,6 +68,8 @@ class SolutionMetrics:
             "tests_passed": self.tests_passed,
             "tests_total": self.tests_total,
             "correctness_score": round(self.correctness_score, 4),
+            "evaluator_source": self.evaluator_source,
+            "evaluator_independent": self.evaluator_independent,
             "constraints_met": self.constraints_met,
             "constraints_total": self.constraints_total,
             "constraint_score": round(self.constraint_score, 4),

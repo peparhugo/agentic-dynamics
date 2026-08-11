@@ -13,16 +13,16 @@ from typing import Any
 from .solution import SolutionMetrics
 
 
-# Architecture constants — publicly disclosed
-DEEPSEEK_ACTIVE_PARAMS = 37e9    # 37B active (MoE, 5.5% of 671B)
+# Architecture constants — publicly disclosed where available.
+# DeepSeek: 49B active parameters (MoE V4 Pro, publicly disclosed).
+# Claude: undisclosed — placeholder for energy model estimation only.
+# GPT: undisclosed.
+# Energy estimates are modeled scenarios, not measured quantities.
+DEEPSEEK_ACTIVE_PARAMS = 49e9    # 49B active (MoE V4 Pro, publicly disclosed)
 DEEPSEEK_GPU_TDP = 350           # H800 TDP (W)
-CLAUDE_EST_ACTIVE_PARAMS = 500e9 # Dense, undisclosed — conservative estimate
-CLAUDE_EST_GPU_TDP = 700         # H100 TDP (W) — Anthropic uses AWS/GCP
-
-# Energy per forward pass scales roughly with active parameters.
-# Ratio of active params gives the architectural energy ratio per token.
-ARCH_RATIO = CLAUDE_EST_ACTIVE_PARAMS / DEEPSEEK_ACTIVE_PARAMS  # ~14x
-HARDWARE_RATIO = CLAUDE_EST_GPU_TDP / DEEPSEEK_GPU_TDP           # ~2x
+CLAUDE_EST_ACTIVE_PARAMS = None  # Not independently verifiable — do not use for claims
+CLAUDE_EST_GPU_TDP = None        # Not independently verifiable
+_ENERGY_MODEL_AVAILABLE = False  # Energy model uses undisclosed architecture estimates
 
 # Energy constants — per-token Joules
 # Based on TokenPowerBench (Niu et al., AAAI 2026): 0.1-2.0 J/tok range
@@ -31,9 +31,11 @@ ENERGY_PER_PROMPT_TOKEN = 0.08    # Joules per input token
 ENERGY_PER_OUTPUT_TOKEN = 0.23   # Joules per output token
 ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 
-# Provider pricing — approximate public rates per 1M tokens
-# Actual costs include cache, batch discounts, and tier-specific pricing.
-# Use DB cost for total; these rates provide approximate component breakdowns.
+# Provider pricing — historical snapshot from experiment billing date.
+# Actual DB costs were billed at these rates. Don't retroactively change.
+# For current pricing, see CURRENT_REFERENCE_PRICING below.
+#
+# Pricing snapshot: 2026-03 (experiment billing date)
 PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
         "input": 0.27, "output": 1.10, "reasoning": 0.14,
@@ -46,6 +48,24 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "openai": {
         "input": 1.25, "output": 10.00, "reasoning": 10.00,
         "cache_read": 0.625, "cache_write": 2.50,
+    },
+}
+
+# Current reference pricing (2026-08) — for comparison only. Experiment billing
+# uses PROVIDER_PRICING above. These are provider-disclosed rates and may not
+# reflect actual billed amounts (cache, batch discounts, tier pricing apply).
+CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
+    "deepseek": {
+        "input": 0.435, "output": 0.87, "reasoning": 0.435,
+        "cache_read": 0.14, "cache_write": 0.435,
+    },
+    "anthropic": {
+        "input": 10.00, "output": 50.00, "reasoning": 50.00,
+        "cache_read": 1.00, "cache_write": 12.50,
+    },
+    "openai": {
+        "input": 5.00, "output": 30.00, "reasoning": 30.00,
+        "cache_read": 2.50, "cache_write": 10.00,
     },
 }
 
@@ -237,14 +257,12 @@ def estimate_bounded_energy(
     total_observable = prompt_tokens + completion_tokens + reasoning_tokens
     total_with_cache = total_observable + cache_read_tokens + cache_write_tokens
 
-    # For DeepSeek: use as reference (1x)
-    # For Claude: apply architectural and hardware bounds
     if provider in ("deepseek",):
         arch_mult = 1.0
         hw_mult = 1.0
     else:
-        arch_mult = ARCH_RATIO   # ~14x more active params per token
-        hw_mult = HARDWARE_RATIO # ~2x higher TDP per GPU
+        arch_mult = 1.0   # architecture multiplier not independently verifiable for closed models
+        hw_mult = 1.0     # hardware multiplier not independently verifiable for closed models
 
     lower_bound_j = total_observable * J_PER_TOKEN_FLOOR
     mid_bound_j = total_with_cache * J_PER_TOKEN_FLOOR * arch_mult
@@ -259,6 +277,7 @@ def estimate_bounded_energy(
         "energy_lower_bound_j": round(lower_bound_j, 0),
         "energy_mid_bound_j": round(mid_bound_j, 0),
         "energy_upper_bound_j": round(upper_bound_j, 0),
-        "energy_ratio_range": f"{arch_mult:.0f}x–{arch_mult * hw_mult:.0f}x (architectural + hardware)",
+        "energy_ratio_range": f"{arch_mult:.0f}x (energy model uses undisclosed architecture estimates)",
         "joules_per_token": J_PER_TOKEN_FLOOR,
+        "energy_model_note": "Energy estimates are modeled scenarios, not measured quantities. Architecture constants for closed models are not verifiable.",
     }

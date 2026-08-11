@@ -1,13 +1,9 @@
-"""Reasoning topology instrument — stochastic perturbation as measurement.
+"""Agent economics measurement instrument.
 
-The apparatus for probing how language models explore unfamiliar
-reasoning trajectories. Unlike a benchmark (which measures outputs),
-this instrument measures *search dynamics*: basin escape rates,
-recovery ratios, and attractor strength.
-
-H0: Perturbation type has no effect on exploration behavior.
-H1: Manifold perturbations produce systematically higher trajectory
-    deviation than semantic perturbations.
+Measures how coding-agent cost and verified outcome change as
+specification quality degrades. Uses controlled perturbation operators
+to turn specification quality into an experimental independent variable,
+then observes agent behavior, cost, and correctness under degraded input.
 """
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
@@ -35,7 +31,7 @@ from .embeddings import ChromaStore, extract_session_steps
 from .graph import Neo4jClient
 from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
-from .opencode import run_opencode_agentic, AgenticResult
+from .opencode import run_opencode_agentic, AgenticResult, normalize_opencode_event
 
 __all__ = [
     "build_operators", "perturb_prompt",
@@ -52,5 +48,5 @@ __all__ = [
     "Neo4jClient",
     "OllamaAnalyzer", "load_summary_data",
     "OpencodeAnalyzer", "REPORTS_DIR",
-    "run_opencode_agentic", "AgenticResult",
+    "run_opencode_agentic", "AgenticResult", "normalize_opencode_event",
 ]

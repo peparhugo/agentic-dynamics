@@ -75,7 +75,7 @@ GPT-5.6 escalation: P tasks (P% of total)
 
 ## Interpretation Guide
 
-- If DeepSeek-only beats Claude-only on BOTH cost AND correctness: the null hypothesis is rejected — Claude is never the right default
+- If DeepSeek-only beats Claude-only on BOTH cost AND correctness: the decision rule is not met — Claude is never the right default
 - If Grit-routed adds marginal correctness at minimal marginal cost: the routing strategy is optimal
 - If only 1-2 tasks justify Claude escalation: the framework's "use Claude for mission-critical" recommendation applies to a very narrow set of perturbation types
 - The decision table becomes a routing ruleset: "for tasks of type X, use model Y; if correctness drops below Z, escalate to model W"

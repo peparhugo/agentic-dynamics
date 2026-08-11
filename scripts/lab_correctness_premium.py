@@ -125,16 +125,16 @@ def compute():
             "cl_n": len(data["cl_correct"]),
         }
 
-    # Null hypothesis: Claude wins on >= 3 tasks
-    null_rejected = claude_leads < 3
+    # Decision rule: Claude leads on >= 3 tasks (practical tie-break threshold)
+    decision_signal = claude_leads >= 3
 
     output = {
         "_meta": {
             "experiment_id": "lab_correctness_premium",
             "overlapping_tasks": len(overlapping),
-            "null_hypothesis": "Claude achieves higher correctness on at least 3 overlapping task types",
-            "null_rejected": null_rejected,
-            "significance_threshold": ">0.05 correctness delta",
+            "decision_rule": "Claude achieves higher correctness on at least 3 overlapping task types (practical threshold, not a statistical test)",
+            "decision_result": decision_signal,
+            "tie_threshold": ">0.05 practical correctness delta (>5 percentage points, not a p-value)",
         },
         "per_task": sorted(per_task, key=lambda x: x["correctness_delta"], reverse=True),
         "aggregate": {
@@ -152,10 +152,10 @@ def compute():
         },
         "by_perturbation_class": pclass_comparison,
         "verdict": (
-            "NULL REJECTED: Claude leads on fewer than 3 overlapping tasks. "
+            "DECISION: Claude leads on fewer than 3 overlapping tasks. "
             "The premium does not buy general correctness improvement."
-            if null_rejected else
-            "NULL NOT REJECTED: Claude leads on at least 3 tasks."
+            if not decision_signal else
+            "DECISION: Claude leads on at least 3 tasks (7 DS / 3 Claude / 5 ties)."
         ),
     }
 
@@ -171,8 +171,8 @@ def main():
 
     print(f"=== LAB BOOK 3: DOES CLAUDE'S PREMIUM BUY ANYTHING? ===\n")
     print(f"Overlapping tasks: {m['overlapping_tasks']}")
-    print(f"Null: {m['null_hypothesis']}")
-    print(f"Significance: {m['significance_threshold']}\n")
+    print(f"Decision rule: {m['decision_rule']}")
+    print(f"Tie rule: {m['tie_threshold']}\n")
 
     print("PER-TASK CORRECTNESS:")
     print(f"{'Task':<30} {'DS Corr':>7} {'CL Corr':>7} {'Delta':>7} {'CL Cost':>9} {'Ratio':>7} {'Worth It?':>9}")

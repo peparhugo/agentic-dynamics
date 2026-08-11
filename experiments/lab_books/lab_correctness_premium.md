@@ -73,7 +73,7 @@ Ratio: 66× more expensive per correct outcome
 
 ## Interpretation Guide
 
-- If Claude beats DeepSeek on ≤2 tasks: null hypothesis rejected. Claude's premium doesn't buy general correctness
+- If Claude beats DeepSeek on ≤2 tasks: decision criterion not met. Claude's premium doesn't buy general correctness
 - If Claude beats DeepSeek primarily on manifold perturbations (alien vocab, shift framing): Claude's advantage is specific to linguistic-surface stress tests, not general coding
 - If DeepSeek beats Claude on semantic perturbations (constraint removal, false premises): DeepSeek is better at detecting and recovering from logical corruption
 

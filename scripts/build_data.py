@@ -147,13 +147,19 @@ def compute_model_data(inventory, summary, db_breakdown):
         pass_rate_val = None
         total_tests = 0
         total_passed = 0
+        n_tested = 0
+        n_heuristic = 0
         for r in valid:
             tr = r.get("test_results")
             if tr and tr.get("total", 0) > 0:
                 total_tests += tr["total"]
                 total_passed += tr["passed"]
+                n_tested += 1
+            elif r.get("evaluator_source") == "heuristic":
+                n_heuristic += 1
         if total_tests > 0:
-            pass_rate_val = f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests})"
+            tag = " [mixed]" if n_heuristic > 0 else " [tests]"
+            pass_rate_val = f"{total_passed / total_tests:.0%} ({total_passed}/{total_tests}){tag}"
         elif valid:
             pass_rate_val = f"{(sum(r['correctness'] for r in valid) / len(valid)):.0%} [H]"
 
@@ -269,7 +275,7 @@ def compute_model_data(inventory, summary, db_breakdown):
                 "narration_rate": "C",
                 "cost_input": "C", "cost_output": "C", "cost_reasoning": "C", "cost_cache": "C",
                 "strategy_cons": "C", "strategy_expl": "C", "strategy_waste": "C", "strategy_efficient": "C",
-                "pass_rate": "M",
+                "pass_rate": "H" if total_tests == 0 else ("M/C" if n_heuristic > 0 else "M"),
             }
         })
 
@@ -350,7 +356,8 @@ def compute_derived(models, inventory, report_count):
                 pass
 
     if total_tests_sum > 0:
-        overall_pass_rate = f"{valid_tests / total_tests_sum:.1%} ({valid_tests}/{total_tests_sum})"
+        tag = " [mixed]" if total_model_weight > 0 else " [tests]"
+        overall_pass_rate = f"{valid_tests / total_tests_sum:.1%} ({valid_tests}/{total_tests_sum}){tag}"
     elif total_model_weight > 0:
         avg_correctness = total_model_correctness / total_model_weight
         overall_pass_rate = f"{avg_correctness:.1%} [H]"

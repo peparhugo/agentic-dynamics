@@ -133,7 +133,7 @@ def compute():
             "overlapping_tasks": len(overlapping),
             "total_ds_entries": total_ds_n,
             "total_cl_entries": total_cl_n,
-            "rounding_note": "Correctness delta thresholds: >0.05 = Claude wins, <-0.05 = DeepSeek wins, else Tie",
+            "tie_threshold_note": "Correctness delta thresholds: >0.05 = Claude leads, <-0.05 = DeepSeek leads, else Tie. 0.05 is a practical delta threshold (5 percentage points), not a statistical significance test.",
         },
         "per_task": sorted(per_task, key=lambda x: x["cost_ratio"], reverse=True),
         "aggregate": {

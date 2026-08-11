@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI FinOps — The Framework</title>
-<meta name="description" content="Your AI bill is a black box. This framework opens it. 227 experiments, 10 stress tests, 224 game reports across 3 architectures, 8 variants. Not a benchmark.">
-<meta property="og:title" content="AI FinOps — The Framework">
-<meta property="og:description" content="Your AI bill is a black box. 227 experiments across 8 models. 10 perturbation operators. 69x cost gap. Every number provenance-tagged.">
+<meta name="description" content="An open instrument measuring coding-agent economics as specification quality degrades. 249 sessions, 10 perturbation operators, 8 model variants.">
+<meta property="og:title" content="Coding-agent economics — what does a task cost when the spec is wrong?">
+<meta property="og:description" content="Coding-agent economics — what does a task cost when the spec is wrong?">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -34,153 +35,157 @@
 .model-row:last-child{border-bottom:none}.model-row strong{color:var(--t)}.model-row .price{font-family:'JetBrains Mono',monospace;color:var(--ac);font-weight:800}.model-row .high{color:var(--am)}
 .route-panel{border:1px solid var(--ba);border-left:4px solid var(--ac);border-radius:0 18px 18px 0;padding:1.25rem;background:rgba(34,211,238,0.045);text-align:left}
 .route-panel p{margin:0;color:var(--t2);font-size:0.94rem}.route-panel strong{color:var(--t)}
-body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel{background:linear-gradient(180deg,#ffffff,#f8fafc)}
+.pipeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.6rem;margin:1.5rem 0}
+.pipe-step{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem;text-align:center;font-size:0.72rem;color:var(--t2)}
+.pipe-step .ps-label{font-weight:700;color:var(--ac);font-size:0.7rem;margin-bottom:0.25rem;text-transform:uppercase;letter-spacing:0.5px}
+.finding{background:linear-gradient(180deg,rgba(16,23,34,0.96),rgba(11,17,26,0.96));border:1px solid var(--b);border-radius:14px;padding:1.3rem;margin:0.8rem 0;text-align:left}
+.finding .fn{font-family:'JetBrains Mono',monospace;font-size:0.7rem;color:var(--ac);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem}
+.finding h3{font-size:0.95rem;margin:0 0 0.3rem;color:var(--t)}
+.finding p{font-size:0.82rem;color:var(--t2);line-height:1.55;margin:0}
+.op-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.8rem;margin:1rem 0}
+.op-card{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;text-align:left}
+.op-card h4{font-size:0.78rem;color:var(--t);margin:0 0 0.4rem}
+.op-card ul{list-style:none;padding:0;margin:0}
+.op-card li{font-size:0.7rem;color:var(--t2);padding:0.15rem 0}
+body.light .source-note,body.light .lever-card,body.light .mechanism,body.light .cost-panel,body.light .finding,body.light .op-card,body.light .pipe-step{background:linear-gradient(180deg,#ffffff,#f8fafc)}
 body.light .route-panel{background:rgba(34,211,238,0.08)}
-@media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
+@media(max-width:900px){.lever-grid,.mechanism-grid,.cost-contrast,.op-grid{grid-template-columns:1fr}.mechanism-grid{gap:0.8rem}}
 @media(max-width:768px){.hero-actions{flex-direction:column}.hero-actions .cta-btn{justify-content:center}.source-note{border-radius:14px;align-items:flex-start}.model-row{grid-template-columns:1fr;gap:0.25rem}}
 </style>
 <script src="data.js"></script>
 </head>
 <body class="home">
 
-<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link" style="color:var(--ac)">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
-    <h1>AI inference costs vary <strong style="color:var(--ac)">69×</strong> for comparable output. Nobody is measuring the <em>why</em>.</h1>
-    <p class="lead">This framework does. 249 experiment sessions. 8 models. 10 calibrated perturbation operators. Every measurement provenance-tagged.</p>
-    <div class="hero-actions"><a href="databricks.html" class="cta-btn big">See What Databricks Missed</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="methodology.html" class="cta-btn ghost">Run the Instrument →</a></div>
-    <p class="source-note">Independently converged with <a href="databricks.html">Databricks' July 2026 playbook</a> — they surveyed Stripe, Coinbase, Uber, and Ramp and arrived at the same four conclusions. We got there through controlled stress tests.</p>
+    <h1>What does an AI coding task cost when the <strong style="color:var(--ac)">specification is wrong?</strong></h1>
+    <p class="lead">Cost per token doesn't answer that. This is an open instrument that deliberately degrades engineering specifications, runs coding agents against them, and measures what happens to verified outcomes and cost.</p>
+    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">How the Instrument Works</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="story.html" class="cta-btn ghost">Read the Story →</a></div>
   </div>
-  <aside class="proof-ledger" aria-label="Evidence ledger">
-    <h3>Evidence Ledger</h3>
-    <div class="proof-card"><span class="label">Cost gap</span><div class="value"><span data-stat="costgap">69×</span></div></div>
+  <aside class="proof-ledger" aria-label="Key numbers">
+    <h3>Measured Corpus</h3>
     <div class="proof-card"><span class="label">Sessions</span><div class="value"><span data-stat="sessions">249</span></div></div>
-    <div class="proof-card success"><span class="label">Correctness</span><div class="value"><span data-stat="passrate">88.7%</span></div></div>
-    <div class="proof-card"><span class="label">Total cost</span><div class="value">$<span data-stat="cost">64.98</span></div></div>
+    <div class="proof-card"><span class="label">Perturbation operators</span><div class="value">10</div></div>
+    <div class="proof-card"><span class="label">Model variants</span><div class="value"><span data-stat="variants">8</span></div></div>
+    <div class="proof-card success"><span class="label">Total experiment cost</span><div class="value">$<span data-stat="cost">64.98</span></div></div>
   </aside>
 </div></section>
 
-<section class="sec alt">
-<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
-<a href="framework.html#rule-1" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
-<div class="ctitle" style="font-size:0.78rem">1. Grit <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Default to models that maintain correctness under degraded input. Low flail rate = high grit.</div>
-</a>
-<a href="framework.html#rule-2" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
-<div class="ctitle" style="font-size:0.78rem">2. Explanation Tax <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Measure what resilience costs. Claude: 11% flail + 8.5% narration penalty. DeepSeek: 8% flail, zero penalty.</div>
-</a>
-<a href="framework.html#rule-3" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
-<div class="ctitle" style="font-size:0.78rem">3. Snowball Rule <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Codebase growth compounds quadratically (N²). Model the curve before architectural commitments.</div>
-</a>
-<a href="framework.html#rule-4" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
-<div class="ctitle" style="font-size:0.78rem">4. EPM Horizon <span style="font-size:0.58rem;color:var(--t3)">[X]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Energy costs are the inflation rate of AI compute. Find the year prices flip your model selection.</div>
-</a>
-<a href="framework.html#rule-5" class="card" style="text-decoration:none;border-left:3px solid var(--ac)">
-<div class="ctitle" style="font-size:0.78rem">5. First-Pass Rule <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Price the outcome, not the prompt. WOC = 1/(1+r). Measured WOC = <span data-stat-fmt="woc">0.90</span>.</div>
-</a>
-<a href="framework.html#rule-6" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
-<div class="ctitle" style="font-size:0.78rem">6. Batch Discount <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Batch processing is 50% cheaper. 72-hour horizon. Modeled from WFM principles.</div>
-</a>
-<a href="framework.html#rule-7" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
-<div class="ctitle" style="font-size:0.78rem">7. Budget Ceiling <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Max jobs/day = Budget / (Cost × (1+r)). Throughput is budget-constrained, not infra-constrained.</div>
-</a>
-<a href="framework.html#rule-8" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
-<div class="ctitle" style="font-size:0.78rem">8. Cascade Rule <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Failures auto-escalate through model tiers. Design for &lt;1% human escalation. Modeled from WFM tiered support.</div>
-</a>
-<a href="framework.html#rule-9" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
-<div class="ctitle" style="font-size:0.78rem">9. SLA Buffer <span style="font-size:0.58rem;color:var(--t3)">[M]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Batch completion = queue depth × avg time + retry buffer. Never batch within 2× queue depth of SLA.</div>
-</a>
-<a href="framework.html#rule-10" class="card" style="text-decoration:none;border-left:3px solid var(--am)">
-<div class="ctitle" style="font-size:0.78rem">10. Outcome Multiplier <span style="font-size:0.58rem;color:var(--t3)">[C]</span></div>
-<div class="cdesc" style="font-size:0.7rem">Maximize outcomes per dollar. BVI = Total Successful Outcomes / Total AI + Human Cost.</div>
-</a>
-</div>
-<p style="text-align:center;margin-top:1rem;font-size:0.72rem;color:var(--t3)"><a href="framework.html#rules" style="color:var(--ac)">Full rules with calculators and playbook →</a></p>
-</section>
-
+<!-- Section 2: The missing variable -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">Cost mechanics</div>
-  <h2>Same output. 69× different cost.</h2>
-  <div class="cost-contrast">
-    <div class="route-panel"><p><strong>The important finding changed:</strong> this is not simply "one model uses fewer tokens." DeepSeek and Claude produce similar generated token volumes. The difference is what gets billed, how cache is priced, and how each model recovers under perturbation.</p></div>
-    <div class="cost-panel">
-      <h3>Per-session comparison</h3>
-      <div class="model-row"><strong>DeepSeek v4 Pro</strong><span>706 LOC/session</span><span class="price">$<span data-stat="deepseek_cost_per">0.02</span></span></div>
-      <div class="model-row"><strong>GPT-5.6</strong><span>367 LOC/session</span><span class="price">$<span data-stat="gpt56_cost_per">0.45</span></span></div>
-      <div class="model-row"><strong>Claude Fable 5</strong><span>568 LOC/session</span><span class="price high">$<span data-stat="claude_cost_per">1.08</span></span></div>
+  <div class="section-kicker">The missing variable</div>
+  <h2>Real specifications are not benchmarks.</h2>
+  <p class="lead">Requirements are incomplete. Constraints conflict. Context is stale. Previous steps are reported as successful when they aren't. Most coding-agent benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>what happens when the input itself degrades?</em></p>
+  <div class="op-grid">
+    <div class="op-card">
+      <h4>Specification corruption</h4>
+      <ul>
+        <li>Inject false premises into requirements</li>
+        <li>Remove critical constraints silently</li>
+        <li>Insert phantom "successful" intermediate results</li>
+        <li>Add contradictory requirements</li>
+      </ul>
+    </div>
+    <div class="op-card">
+      <h4>Objective mutation</h4>
+      <ul>
+        <li>Invert constraints ("fast" → "slow")</li>
+        <li>Insert competing goals that can't both be satisfied</li>
+      </ul>
+    </div>
+    <div class="op-card">
+      <h4>Process perturbation</h4>
+      <ul>
+        <li>Inject alien vocabulary from unrelated domains</li>
+        <li>Shift the framing stance (construction → falsification)</li>
+        <li>Reverse causality (solution before problem)</li>
+        <li>Force abandonment of initial approaches</li>
+      </ul>
     </div>
   </div>
-  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a><a href="framework.html#calculator" class="cta-btn ghost">Calculate Your Costs →</a></div>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">10 deterministic perturbation operators. Each controlled by a strength parameter (0.0–1.0). Not prompt engineering tricks — experimental interventions.</p>
 </div></section>
 
+<!-- Section 3: The instrument -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">Original contribution</div>
-  <h2>What the survey cannot tell you: how models behave when the input degrades.</h2>
-  <p class="lead">Every LLM can look competent on a clean benchmark. Production is not clean. Requirements are incomplete, stale, contradictory, or framed in unfamiliar language. This framework measures whether a model preserves ground truth under that stress, and what recovery costs.</p>
-  <div class="mechanism-grid">
-    <div class="mechanism"><div class="num">01</div><h3>Grit</h3><p>Ground-Truth Integrity: correctness maintained under degraded, contradictory, or incomplete instructions.</p></div>
-    <div class="mechanism"><div class="num">02</div><h3>Explanation Tax</h3><p>The cost of narration, flailing, and recovery when a model externalizes reasoning instead of acting.</p></div>
-    <div class="mechanism"><div class="num">03</div><h3>WOC</h3><p>Work-outcome conversion: first-pass success as the budgeting metric, not cost per prompt.</p></div>
-    <div class="mechanism"><div class="num">04</div><h3>Snowball Rule</h3><p>Codebase growth compounds future context cost. The N² term turns small routing choices into runway risk.</p></div>
+  <div class="section-kicker">How it works</div>
+  <h2>The measurement pipeline.</h2>
+  <div class="pipeline">
+    <div class="pipe-step"><div class="ps-label">Clean task</div>Coding problem with explicit constraints</div>
+    <div class="pipe-step"><div class="ps-label">Perturbation</div>Controlled spec degradation</div>
+    <div class="pipe-step"><div class="ps-label">Agent + harness</div>Isolated workdir, OpenCode harness</div>
+    <div class="pipe-step"><div class="ps-label">Trace capture</div>Reasoning, tool calls, token accounting</div>
+    <div class="pipe-step"><div class="ps-label">Generated artifact</div>Code, tests, docs — frozen for evaluation</div>
+    <div class="pipe-step"><div class="ps-label">Evaluator</div>Agent-authored tests executed; heuristic fallback tagged [H]</div>
+    <div class="pipe-step"><div class="ps-label">Cost + outcome</div>Measured $, verified correctness, divergence from baseline</div>
   </div>
+  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Full Instrument Spec →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Source Code →</a></div>
 </div></section>
 
+<!-- Section 4: Three findings -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="split-copy">
-    <div>
-      <div class="section-kicker">Evidence receipts</div>
-      <h2>Not a benchmark. A calibrated measurement record.</h2>
-      <p class="lead">Every major claim is backed by session data, generated artifacts, cost traces, or documented methodology. The site should feel like an evidence file because that is what it is.</p>
-    </div>
-    <div class="receipt-grid">
-      <div class="receipt success"><div class="claim">Measured gap</div><div class="measure green"><span data-stat="costgap">69×</span></div><p>Per-session average cost gap across <span data-stat="reports">224</span> game reports.</p></div>
-      <div class="receipt"><div class="claim">Experiment scale</div><div class="measure ac"><span data-stat="sessions">249</span></div><p>Instrumented sessions across <span data-stat="architectures">3</span> architectures and <span data-stat="variants">8</span> variants.</p></div>
-      <div class="receipt cyan"><div class="claim">Outcome checks</div><div class="measure ac"><span data-stat="passrate">88.7%</span></div><p>Test pass rate with every result traceable to reports and generated code.</p></div>
-      <div class="receipt market"><div class="claim">Research cost</div><div class="measure amber">$<span data-stat="cost">64.98</span></div><p>Total analyzed experiment cost. Every session recorded and inspectable.</p></div>
-    </div>
+  <div class="section-kicker">What the corpus shows</div>
+  <h2>Three findings from 249 instrumented sessions.</h2>
+  <div class="finding">
+    <div class="fn">Finding 1</div>
+    <h3>Per-token price does not tell you task economics.</h3>
+    <p>Models produce similar generated token volumes yet bill at ratios that have nothing to do with token count. Token pricing, cache write policies, and provider architecture stack into a <span data-stat="costgap">69&times;</span> per-session gap on comparable output. The measured cost is a function of provider economics, not model capability.</p>
   </div>
+  <div class="finding">
+    <div class="fn">Finding 2</div>
+    <h3>Agent reliability changes differently as specification quality degrades.</h3>
+    <p>When specifications are corrupted — missing constraints, false premises, contradictory requirements — models don't just get "worse." They exhibit materially different recovery behavior, output patterns, and cost trajectories. Some explore novel solutions. Some narrate their way back to familiar territory at billable token rates.</p>
+  </div>
+  <div class="finding">
+    <div class="fn">Finding 3</div>
+    <h3>Recovery itself has a cost signature.</h3>
+    <p>When a model succeeds under perturbation, the overhead is measurable — both as extra tokens (Explanation Tax) and as retry/narration cost. Recovery premium varies by model family and perturbation class. Understanding this premium is the difference between pricing a prompt and pricing an outcome.</p>
+  </div>
+  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a></div>
 </div></section>
 
+<!-- Section 5: Grit -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">External validation</div>
-  <h2>Databricks arrived at the same four levers through enterprise surveys.</h2>
-  <p class="lead">Databricks' July 2026 playbook surveyed Stripe, Coinbase, Uber, and Ramp and identified the same four AI coding cost levers. Theirs is survey evidence. Ours is instrument evidence — 10 perturbation operators, recovery signals, full cost traces across 249 sessions. <a href="databricks.html">Read the full mapping →</a></p>
-  <div class="lever-grid">
-    <div class="lever-card"><div class="lever-name">Shift to efficient models</div><div class="lever-measure">69× measured cost gap</div><p>$0.016 vs $1.08 per session across the experiment corpus. The gap is pricing architecture, not capability.</p></div>
-    <div class="lever-card"><div class="lever-name">Smart routing</div><div class="lever-measure">95% correctness at $0.12/session</div><p>Grit-routed model selection turns routing from vendor preference into measured policy.</p></div>
-    <div class="lever-card"><div class="lever-name">Progressive budgeting</div><div class="lever-measure">WOC = <span data-stat-fmt="woc">0.90</span></div><p>First-pass success becomes the operating metric. Track retry drag before budget overruns compound.</p></div>
-    <div class="lever-card"><div class="lever-name">Reduce token overhead</div><div class="lever-measure">$3.75/Mtok vs $0.14/Mtok</div><p>Cache write/read asymmetry and narration behavior explain why identical generated token volumes bill differently.</p></div>
-  </div>
+  <div class="section-kicker">The concept</div>
+  <h2>Grit = Ground-Truth Integrity.</h2>
+  <p class="lead">Grit measures how well verified task success is preserved as specification quality degrades. Defined operationally:</p>
+  <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
+    Grit(s) = P(verified&nbsp;success | perturbation&nbsp;strength&nbsp;=s)<br>
+    Retention: R(s) = Grit(s) / Grit(0)<br>
+    Recovery&nbsp;premium: &Delta;C = C(successful&nbsp;perturbed) / C(successful&nbsp;baseline)
+  </p>
+  <p>This is not "latent reasoning topology." It is an empirically measurable quantity: the probability of verified success under controlled degradation. Escape (structural divergence from baseline) is an explanatory behavioral measure — it may or may not correlate with robustness.</p>
+  <div class="hero-actions"><a href="evidence.html#grit-spectrum" class="cta-btn">Explore the Grit Spectrum →</a></div>
 </div></section>
 
+<!-- Section 6: Why FinOps cares -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">Choose the proof path</div>
-  <h2>Start with the question your reader already has.</h2>
-  <div class="entry-cards">
-    <a href="databricks.html" class="entry-card"><h3>What did Databricks miss?</h3><p>Map each Databricks lever to the framework's measured mechanism.</p></a>
-    <a href="evidence.html" class="entry-card"><h3>Can I verify the data?</h3><p>Review the 227 experiments, AST analysis, token economics, and perturbation response.</p></a>
-    <a href="framework.html" class="entry-card"><h3>How do I operationalize it?</h3><p>The 10 rules, cost equation, interactive calculator, and provider playbook.</p></a>
+  <div class="section-kicker">Why this matters</div>
+  <h2>Task economics, not vendor preference.</h2>
+  <p class="lead">Once you can measure verified outcome &times; cost &times; specification quality, model routing can be based on task economics rather than vendor preference. This connects naturally to established FinOps <a href="https://www.finops.org/wg/finops-for-ai-tools-services-considerations/" style="color:var(--ac)">use-case economics</a> — total cost of achieving a specific business outcome per unit — without claiming to have invented that concept. The contribution is the <em>degraded specification</em> dimension.</p>
+  <div class="hero-actions"><a href="framework.html" class="cta-btn">Operational Framework →</a><a href="evidence.html" class="cta-btn ghost">Evidence →</a></div>
+</div></section>
+
+<!-- Bottom links -->
+<section class="dossier-section"><div class="dossier-inner">
+  <div style="display:flex;gap:2rem;flex-wrap:wrap;justify-content:center;font-size:0.85rem">
+    <a href="evidence.html" style="color:var(--ac)">Evidence</a>
+    <a href="methodology.html" style="color:var(--ac)">Instrument</a>
+    <a href="framework.html" style="color:var(--ac)">Framework</a>
+    <a href="story.html" style="color:var(--ac)">Story</a>
+    <a href="https://github.com/peparhugo/ai-finops-framework" style="color:var(--ac)">GitHub</a>
+    <a href="databricks.html" style="color:var(--t3)">Related Work</a>
   </div>
-  <div class="hero-actions"><a href="framework.html" class="cta-btn big">Start with the Rules</a><a href="accelerator.html" class="cta-btn ghost">Deploy the Accelerator →</a><a href="evidence.html" class="cta-btn ghost">Verify the Data →</a></div>
-  <div class="pullquote">Databricks validated the AI cost problem. This framework gives you the measurement system to govern it.</div>
-  <div class="hero-actions"><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">View the Instrument on GitHub</a></div>
 </div></section>
 
 <footer>
-  <strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
-  <span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+  <strong>Coding-Agent Economics Instrument · v0.4 · August 2026</strong><br>
+  <span data-stat="sessions">249</span> experiment sessions · <span data-stat="variants">8</span> model variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
-  <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> ·
-  <a href="evidence.html">Evidence</a>
+  <a href="story.html">Story</a> · <a href="methodology.html">Instrument</a> ·
+  <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>
 </footer>
 
 <script src="app.js"></script>

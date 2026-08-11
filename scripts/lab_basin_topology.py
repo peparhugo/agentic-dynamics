@@ -50,7 +50,7 @@ def classify_basin(escape, correctness, recovery_mult, flail_rate):
     if escape < 0.25 and correctness >= 0.85 and recovery_mult < 1.5:
         return "wide_shallow", "Wide, shallow basin — explores efficiently at low cost. GRPO/MoE signature."
     if escape < 0.25 and correctness >= 0.85 and recovery_mult >= 1.5:
-        return "narrow_deep", "Narrow, deep basin — stays close to familiar patterns. Recovery is expensive. SFT/Dense signature."
+        return "narrow_deep", "Narrow, deep basin — stays close to familiar patterns. Recovery is expensive. SFT/single-provider cluster."
     if escape >= 0.25 and correctness >= 0.80 and recovery_mult < 1.5:
         return "wide_moderate", "Wide, moderate basin — explores but maintains correctness. Reasonable recovery cost."
     if escape >= 0.25 and correctness >= 0.80 and recovery_mult >= 1.5:
@@ -154,7 +154,7 @@ def compute():
             "reference": "Munshi et al., 'Manifold of Failure: Behavioral Attraction Basins in Language Models,' arXiv:2602.22291, 2026",
             "basin_types": {
                 "wide_shallow": "Low escape, high correctness, low recovery cost — explores efficiently (GRPO/MoE signature)",
-                "narrow_deep": "Low escape, high correctness, high recovery cost — stays close to patterns (SFT/Dense signature)",
+                "narrow_deep": "Low escape, high correctness, high recovery cost — stays close to patterns (SFT/single-provider cluster)",
                 "wide_moderate": "Moderate escape, good correctness, reasonable recovery cost",
                 "deep_expensive": "Moderate escape, high recovery cost — exploration is expensive",
                 "unstable": "Cannot maintain correctness under perturbation",

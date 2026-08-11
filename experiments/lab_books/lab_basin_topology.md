@@ -55,7 +55,7 @@ reference: "Munshi et al., 'Manifold of Failure: Behavioral Attraction Basins in
 **Architecture signatures confirmed:**
 - GRPO/MoE (DeepSeek): wide_shallow — explores efficiently, low recovery cost
 - SFT/Dense (Claude): wide_shallow under semantic, wide_moderate under manifold — higher recovery cost
-- Small dense models (nano, GPT-5.5): unstable or collapsed — cannot maintain integrity under perturbation
+- Small provider-family models (nano, GPT-5.5): unstable or collapsed — cannot maintain integrity under perturbation
 
 ## Artifacts
 

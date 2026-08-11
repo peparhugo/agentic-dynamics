@@ -419,3 +419,108 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
         if "passed" in str(result.test_output).lower():
             result.tests_total = max(result.tests_total, 1)
             result.tests_passed = max(result.tests_passed, 1)
+
+
+def normalize_opencode_event(event: dict, schema_version: int | None = None) -> dict:
+    """Normalize an opencode JSONL event to a canonical v1-compatible format.
+
+    Handles two schema versions:
+      v1 (historical): flat structure — {"type":"tool","tool":"write","state":{...}},
+          {"type":"reasoning","text":"..."}, {"type":"step-finish","tokens":{...}}
+      v2 (current): nested structure — {"type":"tool_use","part":{"tool":"write",...}},
+          {"type":"step_finish","part":{"tokens":{...}}}, {"type":"text","part":{"text":"..."}}
+
+    Detection: v2 events have a ``part`` key containing nested fields.
+    v1 events have top-level ``tool``, ``tokens``, ``text`` fields directly.
+
+    Returns a canonical dict with:
+      - ``type``: "reasoning" | "tool" | "text" | "step-finish" | "step-start" |
+        "tool_result" | "step_follow"
+      - ``_schema``: detected schema version (1 or 2)
+      - Top-level fields: ``tool``, ``text``, ``tokens``, ``state`` (flattened from part if v2)
+      - ``_raw_part``: original part dict preserved for v2 events (None for v1)
+    """
+    if not isinstance(event, dict):
+        return {"type": "unknown", "_schema": 0, "_error": "not a dict"}
+
+    # Detect schema if not provided
+    if schema_version is None:
+        etype = event.get("type", "")
+        part = event.get("part")
+        has_part = isinstance(part, dict)
+
+        # v2 detection: type matches v2 naming convention (tool_use, step_start, etc.)
+        # or has a non-empty part dict
+        v2_types = {"tool_use", "tool_result", "step_follow", "step_start", "step_finish"}
+        if etype in v2_types or (has_part and etype == "text"):
+            schema_version = 2
+        else:
+            schema_version = 1
+
+    canonical = {"_schema": schema_version, "_raw_part": event.get("part")}
+
+    if schema_version == 2:
+        part = event.get("part", {})
+        if not isinstance(part, dict):
+            part = {}
+        etype = event.get("type", "")
+
+        if etype == "tool_use":
+            canonical["type"] = "tool"
+            canonical["tool"] = part.get("tool", "")
+            state = part.get("state", {})
+            canonical["state"] = state if isinstance(state, dict) else {}
+            canonical["callID"] = part.get("callID", "")
+
+        elif etype == "step_finish":
+            canonical["type"] = "step-finish"
+            tokens = part.get("tokens", {})
+            canonical["tokens"] = tokens if isinstance(tokens, dict) else {}
+            cost = part.get("cost", 0)
+            canonical["cost"] = float(cost) if isinstance(cost, (int, float)) else 0.0
+
+        elif etype == "text":
+            canonical["type"] = "text"
+            canonical["text"] = str(part.get("text", ""))
+
+        elif etype == "step_start":
+            canonical["type"] = "step-start"
+
+        elif etype in ("tool_result", "step_follow"):
+            canonical["type"] = etype
+
+        else:
+            canonical["type"] = etype
+
+    else:
+        # v1 — already flat, keep as-is
+        etype = event.get("type", "")
+
+        # Normalize type names for consistency
+        type_map = {
+            "tool": "tool",
+            "reasoning": "reasoning",
+            "text": "text",
+            "step-finish": "step-finish",
+            "step-start": "step-start",
+            "tool_result": "tool_result",
+            "step_follow": "step_follow",
+        }
+        canonical["type"] = type_map.get(etype, etype)
+
+        if etype in ("reasoning", "text"):
+            canonical["text"] = str(event.get("text", ""))
+        if etype == "tool":
+            canonical["tool"] = event.get("tool", "")
+            state = event.get("state", {})
+            canonical["state"] = state if isinstance(state, dict) else {}
+        if etype == "step-finish":
+            tokens = event.get("tokens", {})
+            canonical["tokens"] = tokens if isinstance(tokens, dict) else {}
+
+        # Preserve original event metadata
+        for k in ("timestamp", "sessionID"):
+            if k in event:
+                canonical[k] = event[k]
+
+    return canonical

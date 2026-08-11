@@ -5,9 +5,10 @@
 <title>Databricks Playbook vs AI FinOps Framework</title>
 <meta name="description" content="On August 7, 2026, Databricks published their AI cost playbook. We arrived at the same four conclusions through 227 controlled experiments. This page maps every claim to calibrated measurements.">
 <meta property="og:title" content="AI FinOps Framework">
-<meta property="og:description" content="Calibrated measurement instrument for AI inference costs. 227 experiments across 8 models.">
+<meta property="og:description" content="Related work: Databricks coding-agent benchmark and FinOps Foundation">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/related-work.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -47,7 +48,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <article>
 
@@ -98,7 +99,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
 <div class="claim-box">
   <div class="tag ours">This framework</div>
   <h4>Our measurement</h4>
-  <p><strong class="mono" style="color:var(--success)">$<span data-stat="deepseek_cost_per">0.02</span>/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$<span data-stat="claude_cost_per">1.08</span>/session (Claude).</strong> <strong style="color:var(--ac)">69× cost gap.</strong> On 12 of 15 overlapping tasks, the cheaper model is MORE correct. Same generated token volume (~11K tokens/session). The gap is pricing architecture, not capability.</p>
+  <p><strong class="mono" style="color:var(--success)">$<span data-stat="deepseek_cost_per">0.02</span>/session (DeepSeek)</strong> vs <strong class="mono" style="color:var(--am)">$<span data-stat="claude_cost_per">1.08</span>/session (Claude).</strong> <strong style="color:var(--ac)">69× measured cost gap.</strong> Same generated token volumes (~11K tokens/session). The gap is pricing architecture, not capability. Head-to-head correctness across overlapping task types when regrouped shows different model-rankings across perturbation classes — no single provider dominates.</p>
 </div>
 </div>
 <div class="gap-box"><strong>Where they complement each other:</strong> Their survey focused on price/intelligence tradeoffs from enterprise deployment data. Our controlled experiments measure integrity under stress — revealing that a model can be cheap and smart on a benchmark yet collapse under inverted constraints. Grit captures something the Efficiency Frontier wasn't designed to measure.</div>

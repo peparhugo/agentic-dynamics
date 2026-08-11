@@ -1,44 +1,57 @@
-# AI FinOps Framework
+# Coding-Agent Economics Instrument
 
 <p align="center">
-  <strong>Grit = Ground-Truth Integrity. An open framework for measuring and governing AI inference costs.</strong><br>
-  Not a benchmark. Not a cost tracker. A calibrated measurement instrument backed by 227 stress tests across 8 models.
+  <strong>An open instrument measuring how coding-agent cost and verified outcome change as specification quality degrades.</strong><br>
+  249 sessions, 10 perturbation operators, 8 model variants. $64.98 measured API spend.
 </p>
 
 <p align="center">
   <a href="https://ai-finops-rulebook.web.app"><img src="https://img.shields.io/badge/website-ai--finops--rulebook.web.app-%236366F1" alt="Website"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
-  <a href="https://ai-finops-rulebook.web.app/databricks.html"><img src="https://img.shields.io/badge/independently%20arrived%20at-Databricks%20conclusions-%2306B6D4" alt="Databricks"></a>
 </p>
 
 ---
 
 ## What This Is
 
-On August 7, 2026, Databricks published their playbook for reducing AI coding costs at scale — arriving at the same four conclusions through surveys of Stripe, Coinbase, Uber, and Ramp. We arrived at the same conclusions independently through **227 controlled stress tests** across 8 models and 3 architectures.
+A measurement instrument that deliberately degrades engineering specifications — missing constraints, false premises, contradictory requirements, alien vocabulary — then runs coding agents against them and measures:
 
-They call the core concept the **Efficiency Frontier.** We call it **Grit (Ground-Truth Integrity):** how well a model maintains correctness when given degraded, contradictory, or incomplete instructions.
+- **Verified correctness** (agent-authored tests executed against generated artifacts)
+- **Task economics** (actual billed cost, token breakdown, cache behavior)
+- **Behavioral divergence** (structural escape from baseline solution patterns)
 
-Both models produce ~11,000 generated tokens per session. Same computational effort. One costs **$0.016.** The other costs **$1.08.** That's a **69× gap** on comparable output. DeepSeek produces 1.26× more code per session (713 vs 568 LOC) at 88.7% correctness vs Claude's 88%.
+Most coding-agent benchmarks ask: can the model solve a clean task? This instrument asks: **what happens when the specification itself degrades?**
 
-This framework provides the calibrated measurements, governance rules, and reproducible methodology behind those numbers.
+The approach: controlled perturbation as an experimental independent variable. Each of 10 operators applies a specific, repeatable degradation to the prompt before the coding agent sees it. The instrument captures the full execution trace, generated artifact, and cost telemetry.
 
 ---
 
-## The 10 Rules
+## Three Key Findings
 
-| # | Rule | What It Tells You |
-|---|------|-------------------|
-| 1 | **Grit (Ground-Truth Integrity)** | Default to models that maintain correctness under degraded input. If a model flails — producing zero code — it has low Grit. |
-| 2 | **The Explanation Tax** | Rule 1 selects models that CAN code. Rule 2 measures what resilience COSTS. Measured: Claude flails on 11% of sessions (zero code), 8.5% narration penalty when successful. DeepSeek: 8% flail, 0.0% penalty. |
-| 3 | **The Snowball Rule** | Codebase growth compounds quadratically (N²). Model the curve before architectural commitments. |
-| 4 | **The EPM Horizon Rule** | Energy costs are the inflation rate of AI compute. Find the year your local prices flip your model selection. |
-| 5 | **The First-Pass Rule** | Price the outcome, not the prompt. WOC = 1/(1+r). Track by task type, model, and time of day. |
-| 6 | **The Batch Discount** | Batch processing is 50% cheaper. 72-hour horizon. Measure queue depth. |
-| 7 | **The Budget Ceiling** | Max jobs/day = Budget / (Cost × (1 + retry_rate)). Throughput is budget-constrained, not infra-constrained. |
-| 8 | **The Cascade Rule** | Failures auto-escalate through model tiers. Design for <1% escalation to human. |
-| 9 | **The SLA Buffer** | Batch completion = queue depth × avg time + retry buffer. Never batch within 2× queue depth of SLA. |
-| 10 | **The Outcome Multiplier** | Maximize outcomes per dollar. BVI = Total Successful Outcomes / Total AI + Human Cost. |
+**1. Per-token price does not tell you task economics.**
+Models produce similar generated token volumes yet bill at ratios driven by provider pricing architecture, not capability.
+
+**2. Agent reliability changes differently as specification quality degrades.**
+When specifications are corrupted, models exhibit materially different recovery behavior, output patterns, and cost trajectories. Grit (Ground-Truth Integrity) measures this: `G(s) = P(verified_success | perturbation_strength=s)`.
+
+**3. Recovery itself has a cost signature.**
+When a model succeeds under perturbation, the overhead is measurable — both as extra tokens and as retry/narration cost. Recovery premium varies by provider family and perturbation class.
+
+---
+
+## Operational Framework
+
+Observed from the experiment corpus:
+
+| Metric | Description |
+|--------|-------------|
+| Cost-per-task variation | Token pricing, cache write policies, and provider economics stack into cost gaps |
+| Outcome retention under perturbation | Grit: `G(s) = P(verified_success \| perturbation_strength=s)` |
+| Recovery overhead | Explanation Tax — tokens and cost burned returning to familiar patterns |
+
+Derived metrics: WOC ratio (first-pass success), cost per verified outcome.
+
+Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy price projection), batch/cascade/SLA — modeled, not independently tested.
 
 ---
 
@@ -47,17 +60,18 @@ This framework provides the calibrated measurements, governance rules, and repro
 | Metric | Value |
 |--------|-------|
 | Experiment sessions | 249 |
-| Worktrees analyzed | 251 |
 | Game reports | 224 |
-| Models tested | 8 (3 architectures) |
+| Model variants | 8 (3 provider families) |
 | Experiment configs | 34 |
-| Perturbation operators | 10 (4 manifold, 6 semantic) |
-| Recovery signals | 6 |
-| Strategy archetypes | 4 |
-| Measured cost gap | 69× |
+| Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
 | Total experiment cost | $64.98 |
-| Session transcripts analyzed | 255 |
-| Lab books completed | 13 |
+
+---
+
+## Related Work
+
+- [Databricks coding-agent benchmark](https://www.databricks.com/blog/benchmarking-coding-agents-databricks-multi-million-line-codebase) (July 2026) — enterprise-scale coding-agent evaluation using held-out tests
+- [FinOps Foundation: AI tools & services](https://www.finops.org/wg/finops-for-ai-tools-services-considerations/) — use-case economics and model right-sizing
 
 Run `python scripts/inventory.py list` for a live breakdown.
 

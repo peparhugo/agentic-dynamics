@@ -76,16 +76,16 @@ class Neo4jClient:
 
     def load_operators(self) -> None:
         operators = [
-            ("inject_alien_vocab", "manifold"),
-            ("shift_framing", "manifold"),
-            ("swap_modality", "manifold"),
-            ("parse_structural_shift", "manifold"),
-            ("remove_critical_constraint", "semantic"),
-            ("invert_constraint", "semantic"),
-            ("inject_phantom_success", "semantic"),
-            ("inject_competing_goal", "semantic"),
-            ("inject_false_premises", "semantic"),
-            ("inject_recursion", "semantic"),
+            ("inject_alien_vocab", "process_perturbation"),
+            ("shift_framing", "process_perturbation"),
+            ("reverse_causality", "process_perturbation"),
+            ("force_abandonment", "process_perturbation"),
+            ("remove_critical_constraint", "specification_corruption"),
+            ("invert_constraint", "objective_mutation"),
+            ("inject_phantom_success", "specification_corruption"),
+            ("inject_competing_goal", "objective_mutation"),
+            ("inject_false_premise", "specification_corruption"),
+            ("insert_contradiction", "specification_corruption"),
         ]
         for name, cls in operators:
             self._run(

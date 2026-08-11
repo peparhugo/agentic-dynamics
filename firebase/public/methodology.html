@@ -5,9 +5,10 @@
 <title>The Methodology — AI FinOps Framework</title>
 <meta name="description" content="How the AI FinOps Framework was built. 249 sessions, 8 models, 10 perturbation operators, 7 recovery signals. The instrument behind the unified framework.">
 <meta property="og:title" content="The Methodology — AI FinOps Framework">
-<meta property="og:description" content="10 perturbation operators. 7 recovery signals. 4 strategy archetypes. How we built a calibrated measurement instrument for AI inference costs.">
+<meta property="og:description" content="How the measurement instrument works — 10 perturbation operators, pipeline, methodology">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/instrument.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -35,13 +36,13 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <div class="pulse"><span class="dot"></span> Research Methodology</div>
 <h1>The AI FinOps Framework</h1>
-<p class="lead" style="font-size:1.05rem;color:var(--t)">How the AI FinOps Framework was built. Not a blog post. Not marketing. An instrument &ndash; a calibrated measurement apparatus that probes how language models explore unfamiliar reasoning topologies, how they recover from perturbation, and what that costs.</p>
+<p class="lead" style="font-size:1.05rem;color:var(--t)">How the measurement instrument was built. A calibrated measurement apparatus that measures how coding-agent cost and verified outcome change as specification quality degrades, using controlled perturbation operators as experimental independent variables.</p>
 <div class="stats">
 <div class="stat"><div class="v">10</div><div class="l">Perturbation Operators</div></div>
 <div class="stat"><div class="v">6</div><div class="l">Recovery Signals</div></div>
@@ -94,7 +95,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <!-- Operators -->
 <section class="sec wide">
 <h2>Perturbation Operators</h2>
-<p class="lead">10 calibrated operators probe two dimensions of the reasoning topology. <strong style="color:var(--ac)">Manifold</strong> operators push the model off its typical linguistic surface — testing search dynamics. <strong style="color:var(--am)">Semantic</strong> operators inject contradictions within the reasoning manifold — testing truth-seeking and coherence policies.</p>
+<p class="lead">10 calibrated operators across three perturbation classes. <strong style="color:var(--ac)">Specification corruption</strong> degrades information quality while preserving intended ground truth. <strong style="color:var(--am)">Objective mutation</strong> changes the requested target. <strong style="color:var(--cy)">Process perturbation</strong> forces a different search process.</p>
 <div class="cards">
 <div class="card"><div class="ctag">Manifold</div><div class="ctitle">Inject Alien Vocabulary</div><div class="cdesc">Replace domain terminology with vocabulary from unrelated fields (biology, music, astronomy, warfare). Uses a built-in synonym replacement map for recognized software terms (api→gateway, database→archive, etc.); alien-domain vocabulary is applied only as fallback when no tech terms are detected in the prompt. Tests whether the model maps alien terms back to correct concepts or gets lost in translation.</div></div>
 <div class="card"><div class="ctag amber">Semantic</div><div class="ctitle">Inject False Premise</div><div class="cdesc">Insert a plausible but incorrect assumption into the context. Pool size: ~6 fixed stimuli (2 mild, 2 medium, 2 strong). Strength selects severity tier from a discrete pool rather than acting as a continuous dial. Tests whether the model identifies and rejects false premises or rationalizes them into the solution.</div></div>
@@ -155,7 +156,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <h2>Efficiency Measurement</h2>
 <p class="lead">Every session is measured along three resource axes — tokens, dollars, and joules. These measurements are the empirical foundation for every parameter in the unified cost equation.</p>
 <div class="cards">
-<div class="card"><div class="ctitle">Token Efficiency</div><div class="cdesc">Input tokens, output tokens, and reasoning tokens tracked per session. The code-to-reasoning token ratio is the primary signal for Silent Inference detection. DeepSeek: 37B active parameters (MoE), Claude: ~500B active (dense).</div></div>
+<div class="card"><div class="ctitle">Token Efficiency</div><div class="cdesc">Input tokens, output tokens, and reasoning tokens tracked per session. The code-to-reasoning token ratio is the primary cost-driver signal. Provider architecture internals (parameter counts, GPU TDP) are not independently verifiable for closed models.</div></div>
 <div class="card"><div class="ctitle">finops</div><div class="cdesc">USD cost computed from provider pricing at time of inference. Builds-per-dollar, cost-per-pass, and Explanation Tax all derived directly from session cost data. Not estimated — measured.</div></div>
 <div class="card"><div class="ctitle">Energy Efficiency</div><div class="cdesc">Joule estimates computed from GPU TDP, active parameters, and token counts. DeepSeek H800 TDP: 350W. Claude H100 TDP: 700W. Architectural efficiency compounds with token efficiency — The 69× cost gap is driven by per-token output pricing: Claude charges ~$15/Mtok for output tokens; DeepSeek charges ~$1.10/Mtok. Generated token volumes are near-identical (~11K output+reasoning tokens per session for both). The pricing architecture is the dominant lever, not token efficiency..</div></div>
 </div>
@@ -178,7 +179,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="card"><div class="ctitle">Code Scan</div><div class="cdesc">Analyzes generated source files (Python, TypeScript, Go, Rust — 25+ file extensions) for actual implementations. Detects auth decorators, rate limiter imports, pagination logic, error handler registrations, audit logging calls, API versioning structures, and domain-specific patterns across languages.</div></div>
 <div class="card"><div class="ctitle">AST Analysis</div><div class="cdesc">Parses generated Python into abstract syntax trees. Compares perturbed vs baseline AST node count and structure. Finding: perturbed output is 112.6% of baseline nodes — structurally identical code with minimal variance.</div></div>
 </div>
-<div class="wtm"><strong>What this suggests:</strong> The 69× cost gap does not appear to be a capability gap. Both model classes produce structurally equivalent code for the same constraints. The delta appears to be in how they produce it — silent latent reasoning vs. narrated chain-of-thought billed at per-token rates.</div>
+<div class="wtm"><strong>What this suggests:</strong> The measured cost gap does not appear to be a capability gap. Both provider families produce structurally equivalent code for the same constraints. The delta appears to be in pricing architecture and per-token provider economics. Observed differences in reasoning-token overhead between model families may be caused by training architecture, provider-side caching, or some combination — this experiment does not identify the causal mechanism.</div>
 </section>
 
 <!-- Reproduce This -->
@@ -225,7 +226,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <!-- The Framework -->
 <section class="sec alt" style="text-align:center">
 <h2>The Unified Framework</h2>
-<p class="lead" style="margin:0 auto">The perturbation operators test reasoning topology. The recovery signals classify behavior. The strategy taxonomy maps behavior to cost. The efficiency metrics quantify the cost. Together, they produce a single equation that predicts AI delivery costs under any assumptions.</p>
+<p class="lead" style="margin:0 auto">The perturbation operators test specification resilience. The recovery signals classify behavior. The strategy taxonomy maps behavior to cost. The efficiency metrics quantify the cost. Together, they produce a measurement instrument for coding-agent economics under degraded input.</p>
 <div class="stats" style="max-width:800px;margin:2rem auto">
 <div class="stat"><div class="v">69×</div><div class="l">Measured Cost Gap</div></div>
 <div class="stat"><div class="v">6–50%</div><div class="l">Flail Rate Range</div></div>

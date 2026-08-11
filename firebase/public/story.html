@@ -5,9 +5,10 @@
 <title>How I Discovered the AI FinOps Framework — The Story</title>
 <meta name="description" content="The personal story behind the AI FinOps Framework. From a $20 DeepSeek API key to a predictive model covering 8 models and 224 game reports.">
 <meta property="og:title" content="AI FinOps Framework">
-<meta property="og:description" content="Calibrated measurement instrument for AI inference costs. 227 experiments across 8 models.">
+<meta property="og:description" content="The personal story: how a $20 API key became a measurement instrument">
+<meta property="og:url" content="https://ai-finops-rulebook.web.app/story.html">
 <meta property="og:type" content="website">
-<meta property="og:image" content="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'%3E%3Crect width='1200' height='630' fill='%2318181b'/%3E%3Ctext x='60' y='120' font-family='monospace' font-size='52' fill='%23fff' font-weight='bold'%3EAI FinOps Framework%3C/text%3E%3Ctext x='60' y='210' font-family='monospace' font-size='28' fill='%23a1a1aa'%3ECalibrated measurement for AI inference costs%3C/text%3E%3Ctext x='60' y='330' font-family='monospace' font-size='72' fill='%236366f1' font-weight='bold'%3E69× Cost Gap%3C/text%3E%3Ctext x='60' y='420' font-family='monospace' font-size='24' fill='%23a1a1aa'%3E227 experiments · 8 models · 10 stress tests · 88.7% pass rate%3C/text%3E%3Ctext x='60' y='560' font-family='monospace' font-size='20' fill='%2352525a'%3Eai-finops-rulebook.web.app%3C/text%3E%3C/svg%3E">
+<meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>⚡</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -43,7 +44,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Framework</a><a href="story.html" class="topbar-link" style="color:var(--ac)">Story</a><a href="methodology.html" class="topbar-link">Methodology</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="accelerator.html" class="topbar-link">Accelerator</a><a href="glossary.html" class="topbar-link">Glossary</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link" style="color:var(--ac)">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <article>
 
@@ -101,7 +102,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>Here is what I learned. It turned a personal budgeting hack into a framework that governs AI costs at scale.</p>
 
-<p>The experiments revealed something I didn't expect. When we deliberately broke the instructions — inverted constraints ('must be fast' → 'must be slow'), removed critical requirements, injected alien vocabulary — the models' true nature emerged. Claude didn't just 'narrate more.' Claude couldn't resist its training distribution. It was trained to be a conversational assistant. When confused, it defaulted to talking. DeepSeek was trained through GRPO to optimize for outcomes. When confused, it explored silently in latent space, then acted.</p>
+<p>The experiments revealed something I didn't expect. When we deliberately broke the instructions — inverted constraints, removed critical requirements, injected alien vocabulary — the models produced materially different recovery and output behavior. I initially thought the cost difference was simply token volume. It wasn't. That led me to start perturbing specifications and measuring how the agents behaved.</p>
 
 <p>I'm calling this <strong style="color:var(--ac)">Grit</strong>: Ground-Truth Integrity. How well does a model maintain correctness when the input is degraded?</p>
 
@@ -113,11 +114,11 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </ul>
 </div>
 
-<p><strong>Supervised fine-tuning with imitation chain-of-thought.</strong> When you train a model through SFT imitation, you are showing it what good reasoning looks like and asking it to copy that pattern. The model learns a path and cannot leave it. When perturbed, it narrates its way back to familiar territory — and every recovery step is a billable token.</p>
+<p>We observe materially different recovery and output behavior across provider families. Differences may be explained by model architecture, post-training, provider-side optimizations, harness interaction, or some combination. This experiment does not identify the causal mechanism.</p>
 
-<p><strong>Reinforcement learning in latent space does the opposite.</strong> DeepSeek's GRPO doesn't learn what reasoning should look like. It learns to get to the right answer, and the path is incidental. The reasoning exists as vectors, not words. When perturbed, DeepSeek explores. It finds new paths. It doesn't need to narrate the journey because the journey was never the point — the destination was.</p>
+<p>One hypothesis is that DeepSeek's GRPO reinforcement learning approach may contribute to its lower reasoning-token overhead, while SFT-trained models may produce more billed reasoning tokens under perturbation. But this remains a hypothesis — the experiment measures outcomes and cost, not training architecture internals.</p>
 
-<p>We call this the <strong style="color:var(--ac)">Silent Inference Principle</strong>. The model's ability to reason in latent space and act, rather than narrating every step as billable output. It's a structural property of the training architecture, not a parameter you can toggle.</p>
+<p>We observe an interesting pattern: some models produce fewer reasoning tokens while maintaining performance. Whether this is caused by GRPO training architecture, provider-side caching, or some combination is not yet determined.</p>
 
 <p>Later analysis revealed the deeper layer: both models generate <span class="tip" title="[M] Measured — avg output+reasoning tokens per session">~11,000 tokens per session</span>. Identical computational effort. Claude's tokens just cost 13.6&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$15.00 vs $1.10 per 1M output tokens</span>). And Claude writes 20.0K tokens to cache per session at <span class="tip" title="[X] External — provider list pricing">$3.75/Mtok</span> — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 

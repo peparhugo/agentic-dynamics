@@ -13,6 +13,8 @@ MODEL_LABELS = {
     "openai/gpt-5.6-fast": "GPT-5.6-fast",
 }
 
+# Historical pricing snapshot: 2026-03 (experiment billing date)
+# DB costs were billed at these rates. Don't retroactively change.
 PROVIDER_PRICING = {
     "deepseek": {
         "input": 0.27, "output": 1.10, "reasoning": 0.14,
