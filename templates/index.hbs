@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Index</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 2rem; line-height: 1.6; color: #222; }
+    .date { color: #666; font-size: 0.9rem; }
+    h1 { margin-bottom: 0.5rem; }
+    ul { padding-left: 1.2rem; }
+    li { margin-bottom: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>All Pages</h1>
+  <ul>
+    {{#each pages}}
+      <li><a href="{{slug}}.html">{{title}}</a>{{#if date}} <span class="date">&mdash; {{date}}</span>{{/if}}</li>
+    {{/each}}
+  </ul>
+  {{#unless pages.length}}<p>No pages found.</p>{{/unless}}
+</body>
+</html>
