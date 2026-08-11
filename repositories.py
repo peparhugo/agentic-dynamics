@@ -84,6 +84,49 @@ class TaskRepository(BaseRepository):
                 ).fetchone()
             return dict(row) if row else None
 
+    def count(self, owner_id: int = None) -> int:
+        with self._get_connection() as conn:
+            if owner_id is not None:
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+                ).fetchone()
+            else:
+                row = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()
+            return row[0] if row else 0
+
+    def get_paginated(self, owner_id: int = None, cursor: int = None, limit: int = 20) -> tuple[list[dict], int]:
+        actual_limit = min(limit, 100)
+        with self._get_connection() as conn:
+            if owner_id is not None:
+                count_row = conn.execute(
+                    "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+                ).fetchone()
+                if cursor is not None:
+                    rows = conn.execute(
+                        "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                        (owner_id, cursor, actual_limit + 1),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                        (owner_id, actual_limit + 1),
+                    ).fetchall()
+            else:
+                count_row = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()
+                if cursor is not None:
+                    rows = conn.execute(
+                        "SELECT * FROM tasks WHERE id < ? ORDER BY id DESC LIMIT ?",
+                        (cursor, actual_limit + 1),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        "SELECT * FROM tasks ORDER BY id DESC LIMIT ?",
+                        (actual_limit + 1,),
+                    ).fetchall()
+            total = count_row[0] if count_row else 0
+            items = [dict(r) for r in rows]
+            return items, total
+
     def update(self, task_id: int, owner_id: int = None, title: str | None = None, status: str | None = None) -> dict | None:
         existing = self.get_by_id(task_id, owner_id)
         if existing is None:

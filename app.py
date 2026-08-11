@@ -5,7 +5,9 @@ A single-file Flask app with clean structure: models, routes, error handling.
 Designed as a baseline for multi-session stories.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 import sqlite3
 import os
@@ -22,12 +24,39 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
+RATE_LIMIT_STORAGE = os.environ.get("RATE_LIMIT_STORAGE", "redis://localhost:6379")
 
 
 def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        payload = decode_token(token)
+        if payload:
+            return f"user:{payload['user_id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=RATE_LIMIT_STORAGE,
+)
+limiter.init_app(app)
+
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    retry_after = 60
+    response = make_response(jsonify({"error": "rate limit exceeded"}), 429)
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 def init_db():
@@ -204,7 +233,19 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(owner_id=request.current_user_id))
+    cursor = request.args.get("cursor", None, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = min(max(limit, 1), 100)
+    items, total = TaskRepository(DATABASE).get_paginated(
+        owner_id=request.current_user_id, cursor=cursor, limit=limit
+    )
+    has_more = len(items) > limit
+    if has_more:
+        items = items[:limit]
+        next_cursor = str(items[-1]["id"]) if items else None
+    else:
+        next_cursor = None
+    return jsonify({"data": items, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
