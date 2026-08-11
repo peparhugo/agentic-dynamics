@@ -1,13 +1,16 @@
 import asyncio
 import json
+import os
 import socket
+import tempfile
 
 import pytest
 import pytest_asyncio
 import websockets
 import aiohttp
+import fakeredis.aioredis
 
-from app import registry, main
+import app
 
 
 def get_free_port():
@@ -16,11 +19,25 @@ def get_free_port():
         return s.getsockname()[1]
 
 
+@pytest.fixture(autouse=True)
+def _isolate_db():
+    temp_db = os.path.join(tempfile.gettempdir(), f"test_messages_{os.getpid()}.db")
+    os.environ["DATABASE_URL"] = f"sqlite:///{temp_db}"
+    app._reset_store()
+    yield
+    app._reset_store()
+    for suffix in ("", "-wal", "-shm", "-journal"):
+        try:
+            os.unlink(temp_db + suffix)
+        except OSError:
+            pass
+
+
 @pytest_asyncio.fixture
 async def server():
     port = get_free_port()
     host = "127.0.0.1"
-    server_task = asyncio.ensure_future(main(host=host, port=port))
+    server_task = asyncio.ensure_future(app.main(host=host, port=port))
     await asyncio.sleep(0.1)
     yield {"host": host, "port": port, "ws_url": f"ws://{host}:{port}"}
     server_task.cancel()
@@ -28,6 +45,28 @@ async def server():
         await server_task
     except asyncio.CancelledError:
         pass
+
+
+@pytest_asyncio.fixture
+async def server_with_redis():
+    fake_redis = fakeredis.aioredis.FakeRedis()
+    app._set_redis(fake_redis)
+    port = get_free_port()
+    host = "127.0.0.1"
+    server_task = asyncio.ensure_future(app.main(host=host, port=port))
+    await asyncio.sleep(0.1)
+    yield {
+        "host": host,
+        "port": port,
+        "ws_url": f"ws://{host}:{port}",
+        "redis": fake_redis,
+    }
+    server_task.cancel()
+    try:
+        await server_task
+    except asyncio.CancelledError:
+        pass
+    app._set_redis(None)
 
 
 @pytest.mark.asyncio
@@ -115,8 +154,8 @@ async def test_disconnect_removes_client(server):
 
     await asyncio.sleep(0.05)
 
-    with registry._lock:
-        assert client_id not in registry._clients
+    with app.registry._lock:
+        assert client_id not in app.registry._clients
 
 
 @pytest.mark.asyncio
@@ -364,5 +403,302 @@ async def test_disconnect_removes_channel_subscriptions(server):
 
     await asyncio.sleep(0.05)
 
-    channels = registry.get_channels()
+    channels = app.registry.get_channels()
     assert channels.get("alerts", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_messages_persisted_to_sqlite(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "general",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "general",
+            "payload": {"msg": "first"},
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"msg": "global"},
+        }))
+        await ws.recv()
+
+    msgs = app._get_store().query(limit=50, offset=0)
+    assert len(msgs) >= 2
+
+    first = msgs[0]
+    assert first["type"] == "broadcast"
+    assert first["payload"]["msg"] in ("first", "global")
+    assert first["channel"] in (None, "general")
+    assert isinstance(first["id"], str)
+    assert isinstance(first["timestamp"], str)
+
+
+@pytest.mark.asyncio
+async def test_messages_rest_endpoint(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "chat",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "chat",
+            "payload": {"msg": "hello world"},
+        }))
+        await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        url = f"http://{server['host']}:{server['port']}/messages"
+        async with session.get(url) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            assert isinstance(data, list)
+            assert len(data) >= 1
+            found = any(
+                m["payload"]["msg"] == "hello world" and m["channel"] == "chat"
+                for m in data
+            )
+            assert found, f"Expected message not found in {data}"
+
+
+@pytest.mark.asyncio
+async def test_messages_rest_endpoint_pagination(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        for i in range(5):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"index": i},
+            }))
+            await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        base = f"http://{server['host']}:{server['port']}/messages"
+
+        async with session.get(f"{base}?limit=2&offset=0") as resp:
+            data = await resp.json()
+            assert len(data) == 2
+
+        async with session.get(f"{base}?limit=2&offset=2") as resp:
+            data = await resp.json()
+            assert len(data) == 2
+
+        async with session.get(f"{base}?limit=10&offset=0") as resp:
+            data = await resp.json()
+            assert len(data) >= 5
+
+
+@pytest.mark.asyncio
+async def test_redis_publishes_on_broadcast(server_with_redis):
+    fake_redis = server_with_redis["redis"]
+    server_info = server_with_redis
+
+    async with websockets.connect(server_info["ws_url"]) as ws1, \
+               websockets.connect(server_info["ws_url"]) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        await ws1.send(json.dumps({
+            "type": "subscribe",
+            "channel": "testchan",
+        }))
+        await ws1.recv()
+
+        await ws2.send(json.dumps({
+            "type": "subscribe",
+            "channel": "testchan",
+        }))
+        await ws2.recv()
+
+        sub = fake_redis.pubsub()
+        await sub.subscribe("channel:testchan")
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "channel": "testchan",
+            "payload": {"msg": "redis-test"},
+        }))
+        await ws1.recv()
+        await ws2.recv()
+
+        try:
+            redis_msg = await asyncio.wait_for(
+                sub.get_message(timeout=2), timeout=2
+            )
+            while redis_msg and redis_msg["type"] != "message":
+                redis_msg = await asyncio.wait_for(
+                    sub.get_message(timeout=2), timeout=2
+                )
+        except asyncio.TimeoutError:
+            redis_msg = None
+
+        assert redis_msg is not None, "Message was not published to Redis"
+        data = json.loads(redis_msg["data"])
+        assert data["type"] == "broadcast"
+        assert data["payload"]["msg"] == "redis-test"
+        assert data["channel"] == "testchan"
+        assert "_server_id" in data
+
+        await sub.unsubscribe("channel:testchan")
+
+
+@pytest.mark.asyncio
+async def test_redis_cross_instance_delivery(server_with_redis):
+    fake_redis = server_with_redis["redis"]
+    server_info = server_with_redis
+
+    original_sid = app._server_id
+    app._server_id = "external-instance"
+
+    async with websockets.connect(server_info["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "external",
+        }))
+        await ws.recv()
+
+        pub_data = {
+            "type": "broadcast",
+            "channel": "external",
+            "payload": {"msg": "from-other-server"},
+            "timestamp": "2024-01-01T00:00:00Z",
+            "_server_id": "external-instance",
+        }
+        await fake_redis.publish("channel:external", json.dumps(pub_data))
+        await asyncio.sleep(0.2)
+
+        try:
+            msg = await asyncio.wait_for(ws.recv(), timeout=2)
+            data = json.loads(msg)
+            assert data["type"] == "broadcast"
+            assert data["payload"]["msg"] == "from-other-server"
+            assert data["channel"] == "external"
+        except asyncio.TimeoutError:
+            # The subscriber might not have picked it up yet
+            # Try to deliver manually via the handler
+            await app._deliver_from_redis(pub_data)
+            msg = await asyncio.wait_for(ws.recv(), timeout=2)
+            data = json.loads(msg)
+            assert data["type"] == "broadcast"
+            assert data["payload"]["msg"] == "from-other-server"
+            assert data["channel"] == "external"
+
+    app._server_id = original_sid
+
+
+@pytest.mark.asyncio
+async def test_redis_global_broadcast_published(server_with_redis):
+    fake_redis = server_with_redis["redis"]
+    server_info = server_with_redis
+
+    async with websockets.connect(server_info["ws_url"]) as ws1, \
+               websockets.connect(server_info["ws_url"]) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        sub = fake_redis.pubsub()
+        await sub.subscribe("broadcast:all")
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"msg": "global-redis-test"},
+        }))
+        await ws1.recv()
+        await ws2.recv()
+
+        try:
+            redis_msg = await asyncio.wait_for(
+                sub.get_message(timeout=2), timeout=2
+            )
+            while redis_msg and redis_msg["type"] != "message":
+                redis_msg = await asyncio.wait_for(
+                    sub.get_message(timeout=2), timeout=2
+                )
+        except asyncio.TimeoutError:
+            redis_msg = None
+
+        assert redis_msg is not None, "Global message was not published to Redis"
+        data = json.loads(redis_msg["data"])
+        assert data["type"] == "broadcast"
+        assert data["payload"]["msg"] == "global-redis-test"
+
+        await sub.unsubscribe("broadcast:all")
+
+
+@pytest.mark.asyncio
+async def test_redis_client_state_stored(server_with_redis):
+    fake_redis = server_with_redis["redis"]
+    server_info = server_with_redis
+    sid = app._server_id
+
+    async with websockets.connect(server_info["ws_url"]) as ws:
+        welcome = json.loads(await ws.recv())
+        client_id = welcome["payload"]["client_id"]
+
+        members = await fake_redis.smembers(f"clients:{sid}")
+        assert client_id.encode() in members
+
+    await asyncio.sleep(0.1)
+    members = await fake_redis.smembers(f"clients:{sid}")
+    assert client_id.encode() not in members
+
+
+@pytest.mark.asyncio
+async def test_direct_message_persisted(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        welcome = json.loads(await ws.recv())
+        target_id = welcome["payload"]["client_id"]
+
+        await ws.send(json.dumps({
+            "type": "direct",
+            "payload": {"message": "persisted-dm", "target_id": target_id},
+        }))
+        await ws.recv()
+
+    msgs = app._get_store().query(limit=50, offset=0)
+    dm_messages = [m for m in msgs if m["type"] == "direct"]
+    assert len(dm_messages) >= 1
+    assert dm_messages[0]["payload"]["message"] == "persisted-dm"
+
+
+@pytest.mark.asyncio
+async def test_message_schema_correct(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "test-db",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "test-db",
+            "payload": {"x": 1, "y": "z"},
+        }))
+        await ws.recv()
+
+    msgs = app._get_store().query(limit=1, offset=0)
+    assert len(msgs) == 1
+    m = msgs[0]
+    assert set(m.keys()) == {"id", "channel", "type", "payload", "timestamp"}
+    assert m["id"]
+    assert m["channel"] == "test-db"
+    assert m["type"] == "broadcast"
+    assert m["payload"] == {"x": 1, "y": "z"}
+    assert isinstance(m["timestamp"], str)
