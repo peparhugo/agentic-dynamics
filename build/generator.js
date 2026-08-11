@@ -7,6 +7,7 @@ exports.generateSite = generateSite;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const handlebars_1 = __importDefault(require("handlebars"));
+const cache_1 = require("./cache");
 function htmlEncode(str) {
     return str
         .replace(/&/g, '&amp;')
@@ -152,14 +153,66 @@ function loadTemplates(templateDir) {
         },
     };
 }
-function generateSite(pages, outputDir, templateDir) {
+function generateSite(pages, outputDir, templateDir, cache, stats) {
     const engine = templateDir ? loadTemplates(templateDir) : null;
     fs_1.default.mkdirSync(outputDir, { recursive: true });
-    for (const page of pages) {
-        const html = engine ? engine.renderPage(page) : renderPageHtml(page);
-        fs_1.default.writeFileSync(path_1.default.join(outputDir, `${page.slug}.html`), html, 'utf-8');
+    const expectedFiles = new Set(pages.map((p) => `${p.slug}.html`));
+    expectedFiles.add('index.html');
+    const existingFiles = fs_1.default.readdirSync(outputDir).filter((f) => f.endsWith('.html'));
+    for (const file of existingFiles) {
+        if (!expectedFiles.has(file)) {
+            fs_1.default.unlinkSync(path_1.default.join(outputDir, file));
+        }
     }
-    const indexHtml = engine ? engine.renderIndex(pages) : renderIndexHtml(pages);
-    fs_1.default.writeFileSync(path_1.default.join(outputDir, 'index.html'), indexHtml, 'utf-8');
+    const currentTemplateHash = templateDir
+        ? cache_1.BuildCache.computeTemplateHash(templateDir)
+        : '';
+    const cachePopulated = cache && cache.isPopulated();
+    const cachedTemplateHash = cache ? cache.getTemplateHash() : '';
+    for (const page of pages) {
+        let html;
+        const slug = page.slug;
+        if (cachePopulated &&
+            currentTemplateHash === cachedTemplateHash &&
+            currentTemplateHash !== '' &&
+            cache.getCachedPage(slug)) {
+            html = cache.getCachedPage(slug).html;
+            if (stats)
+                stats.skipped++;
+        }
+        else {
+            html = engine ? engine.renderPage(page) : renderPageHtml(page);
+            if (stats)
+                stats.built++;
+            if (cache) {
+                cache.setCachedPage(slug, { page, html });
+            }
+        }
+        fs_1.default.writeFileSync(path_1.default.join(outputDir, `${slug}.html`), html, 'utf-8');
+    }
+    if (cache) {
+        cache.setTemplateHash(currentTemplateHash);
+    }
+    const currentSlugs = pages.map((p) => p.slug).sort();
+    const cachedSlugs = cache ? (cache.getIndexSlugs() || []).sort() : [];
+    const slugsMatch = currentSlugs.length === cachedSlugs.length &&
+        currentSlugs.every((s, i) => s === cachedSlugs[i]);
+    if (cachePopulated &&
+        currentTemplateHash === cachedTemplateHash &&
+        currentTemplateHash !== '' &&
+        slugsMatch &&
+        cache.getIndexHtml()) {
+        fs_1.default.writeFileSync(path_1.default.join(outputDir, 'index.html'), cache.getIndexHtml(), 'utf-8');
+    }
+    else {
+        const indexHtml = engine
+            ? engine.renderIndex(pages)
+            : renderIndexHtml(pages);
+        fs_1.default.writeFileSync(path_1.default.join(outputDir, 'index.html'), indexHtml, 'utf-8');
+        if (cache) {
+            cache.setIndexHtml(indexHtml);
+            cache.setIndexSlugs(currentSlugs);
+        }
+    }
 }
 //# sourceMappingURL=generator.js.map

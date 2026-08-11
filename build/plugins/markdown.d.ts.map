@@ -1,1 +1,1 @@
-{"version":3,"file":"markdown.d.ts","sourceRoot":"","sources":["../../src/plugins/markdown.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,MAAM,EAAE,aAAa,EAAE,MAAM,WAAW,CAAC;AAElD,qBAAa,cAAe,YAAW,MAAM;IAC3C,IAAI,SAAc;IAElB,WAAW,CAAC,OAAO,EAAE,aAAa,GAAG,IAAI;CAG1C"}
+{"version":3,"file":"markdown.d.ts","sourceRoot":"","sources":["../../src/plugins/markdown.ts"],"names":[],"mappings":"AACA,OAAO,EAAE,MAAM,EAAE,aAAa,EAAE,MAAM,WAAW,CAAC;AAElD,qBAAa,cAAe,YAAW,MAAM;IAC3C,IAAI,SAAc;IAElB,WAAW,CAAC,OAAO,EAAE,aAAa,GAAG,IAAI;CAQ1C"}

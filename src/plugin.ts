@@ -1,15 +1,21 @@
 import { Page } from './types';
+import { BuildCache, BuildStats } from './cache';
 
 export interface SSGOptions {
   content: string;
   output: string;
   templates: string;
   port: number;
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
 }
 
 export interface PluginContext {
   pages: Page[];
   options: SSGOptions;
+  cache?: BuildCache;
+  stats?: BuildStats;
 }
 
 export interface Plugin {

@@ -1,15 +1,21 @@
 import { Page } from './types';
 import { Plugin, PluginContext, SSGOptions } from './plugin';
+import { BuildCache, BuildStats } from './cache';
 import { DevServerPlugin, ServerInstance } from './plugins/devserver';
 
 export class SSGEngine {
   private plugins: Plugin[] = [];
   private context: PluginContext;
+  private cache: BuildCache;
 
   constructor(options: SSGOptions) {
+    const cacheFile = options.cacheFile || '.ssg-cache.json';
+    this.cache = new BuildCache(cacheFile);
     this.context = {
       pages: [],
       options,
+      cache: this.cache,
+      stats: { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 },
     };
   }
 
@@ -17,11 +23,24 @@ export class SSGEngine {
     return this.context.pages;
   }
 
+  get stats(): BuildStats | undefined {
+    return this.context.stats;
+  }
+
   register(plugin: Plugin): void {
     this.plugins.push(plugin);
   }
 
   async build(): Promise<void> {
+    const startTime = Date.now();
+    const options = this.context.options;
+
+    if (options.clean) {
+      this.cache.clear();
+    } else if (options.incremental) {
+      this.cache.load();
+    }
+
     await this.runHook('onStart');
     await this.runHook('beforeBuild');
 
@@ -30,6 +49,20 @@ export class SSGEngine {
     }
 
     await this.runHook('afterBuild');
+
+    if (options.incremental || options.clean) {
+      this.cache.save();
+    }
+
+    const elapsed = Date.now() - startTime;
+
+    if (this.context.stats && options.incremental) {
+      this.context.stats.timeSavedMs = elapsed;
+      console.log(
+        `Site generated: ${this.context.stats.pagesBuilt} pages built, ` +
+          `${this.context.stats.pagesSkipped} pages skipped`
+      );
+    }
   }
 
   async serve(): Promise<ServerInstance> {

@@ -5,7 +5,7 @@ import { SSGEngine } from './engine';
 import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/template';
 import { DevServerPlugin } from './plugins/devserver';
-import { Plugin } from './plugin';
+import { Plugin, SSGOptions } from './plugin';
 
 function getDefaultPlugins(): Plugin[] {
   return [
@@ -36,11 +36,15 @@ function parseArgs(args: string[]): {
   output: string;
   templates: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 } {
   let content = 'content';
   let output = 'dist';
   let templates = 'templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
   let i = 0;
 
   while (i < args.length) {
@@ -56,35 +60,60 @@ function parseArgs(args: string[]): {
     } else if (args[i] === '--port' && i + 1 < args.length) {
       port = parseInt(args[i + 1], 10);
       i += 2;
+    } else if (args[i] === '--incremental') {
+      incremental = true;
+      i++;
+    } else if (args[i] === '--clean') {
+      clean = true;
+      i++;
     } else {
       i++;
     }
   }
 
-  return { content, output, templates, port };
+  return { content, output, templates, port, incremental, clean };
 }
 
 const command = process.argv[2];
 
 async function main(): Promise<void> {
   if (command === 'build') {
-    const { content, output, templates } = parseArgs(process.argv.slice(3));
+    const {
+      content,
+      output,
+      templates,
+      incremental,
+      clean,
+    } = parseArgs(process.argv.slice(3));
     const plugins = loadConfigPlugins(process.cwd());
 
-    const engine = new SSGEngine({ content, output, templates, port: 3000 });
+    const options: SSGOptions = {
+      content,
+      output,
+      templates,
+      port: 3000,
+      incremental,
+      clean,
+    };
+
+    const engine = new SSGEngine(options);
     for (const plugin of plugins) {
       engine.register(plugin);
     }
 
     await engine.build();
-    console.log(`Site generated in ${output} (${engine.pages.length} pages)`);
+    if (!incremental) {
+      console.log(`Site generated in ${output} (${engine.pages.length} pages)`);
+    }
   } else if (command === 'serve') {
     const { content, output, templates, port } = parseArgs(
       process.argv.slice(3)
     );
     const plugins = loadConfigPlugins(process.cwd());
 
-    const engine = new SSGEngine({ content, output, templates, port });
+    const options: SSGOptions = { content, output, templates, port };
+
+    const engine = new SSGEngine(options);
     for (const plugin of plugins) {
       engine.register(plugin);
     }

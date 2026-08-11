@@ -37,6 +37,8 @@ function parseArgs(args) {
     let output = 'dist';
     let templates = 'templates';
     let port = 3000;
+    let incremental = false;
+    let clean = false;
     let i = 0;
     while (i < args.length) {
         if (args[i] === '--content' && i + 1 < args.length) {
@@ -55,28 +57,47 @@ function parseArgs(args) {
             port = parseInt(args[i + 1], 10);
             i += 2;
         }
+        else if (args[i] === '--incremental') {
+            incremental = true;
+            i++;
+        }
+        else if (args[i] === '--clean') {
+            clean = true;
+            i++;
+        }
         else {
             i++;
         }
     }
-    return { content, output, templates, port };
+    return { content, output, templates, port, incremental, clean };
 }
 const command = process.argv[2];
 async function main() {
     if (command === 'build') {
-        const { content, output, templates } = parseArgs(process.argv.slice(3));
+        const { content, output, templates, incremental, clean, } = parseArgs(process.argv.slice(3));
         const plugins = loadConfigPlugins(process.cwd());
-        const engine = new engine_1.SSGEngine({ content, output, templates, port: 3000 });
+        const options = {
+            content,
+            output,
+            templates,
+            port: 3000,
+            incremental,
+            clean,
+        };
+        const engine = new engine_1.SSGEngine(options);
         for (const plugin of plugins) {
             engine.register(plugin);
         }
         await engine.build();
-        console.log(`Site generated in ${output} (${engine.pages.length} pages)`);
+        if (!incremental) {
+            console.log(`Site generated in ${output} (${engine.pages.length} pages)`);
+        }
     }
     else if (command === 'serve') {
         const { content, output, templates, port } = parseArgs(process.argv.slice(3));
         const plugins = loadConfigPlugins(process.cwd());
-        const engine = new engine_1.SSGEngine({ content, output, templates, port });
+        const options = { content, output, templates, port };
+        const engine = new engine_1.SSGEngine(options);
         for (const plugin of plugins) {
             engine.register(plugin);
         }

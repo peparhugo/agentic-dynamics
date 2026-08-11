@@ -7,7 +7,8 @@ class MarkdownPlugin {
         this.name = 'markdown';
     }
     beforeBuild(context) {
-        context.pages = (0, parser_1.parseDirectory)(context.options.content);
+        const parseStats = { parsed: 0, skipped: 0 };
+        context.pages = (0, parser_1.parseDirectory)(context.options.content, context.cache, parseStats);
     }
 }
 exports.MarkdownPlugin = MarkdownPlugin;
