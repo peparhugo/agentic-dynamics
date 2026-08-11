@@ -1,20 +1,12 @@
 import { promises as fs } from "fs";
 import path from "path";
-import matter from "gray-matter";
-import yaml from "js-yaml";
-import MarkdownIt from "markdown-it";
-import { PageData, Frontmatter, BuildOptions } from "./types";
-import { createTemplateEngine, TemplateEngine } from "./template-engine";
+import { PageData, BuildOptions } from "./types";
+import { Plugin, runHook, runFilePipeline } from "./plugin";
+import { createMarkdownPlugin } from "./plugins/markdown";
+import { createTemplatePlugin } from "./plugins/template";
 
-const md = new MarkdownIt();
-
-const matterOptions = {
-  engines: {
-    yaml: {
-      parse: (input: string) => yaml.load(input, { schema: yaml.FAILSAFE_SCHEMA }) as Record<string, unknown>,
-    },
-  },
-};
+export { generatePageHtml, generateIndexHtml } from "./html-generator";
+export { parseMarkdownFile } from "./plugins/markdown";
 
 async function walkDir(
   dir: string,
@@ -55,90 +47,21 @@ export async function getMarkdownFiles(
   return files.sort();
 }
 
-export async function parseMarkdownFile(
-  contentDir: string,
-  filePath: string
-): Promise<PageData> {
-  const absPath = path.join(contentDir, filePath);
-  const raw = await fs.readFile(absPath, "utf-8");
-  const { data, content } = matter(raw, matterOptions);
-  const html = md.render(content);
-
-  const frontmatter: Frontmatter = {};
-  for (const [key, value] of Object.entries(data)) {
-    frontmatter[key] = String(value ?? "");
-  }
-
-  return { path: filePath, frontmatter, html };
-}
-
-export function generatePageHtml(page: PageData): string {
-  let title = page.frontmatter.title || page.path;
-  const date = page.frontmatter.date
-    ? `<p class="date">${page.frontmatter.date}</p>`
-    : "";
-  const tags = page.frontmatter.tags
-    ? `<p class="tags">Tags: ${page.frontmatter.tags}</p>`
-    : "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title}</title>
-</head>
-<body>
-${date}
-${tags}
-${page.html}
-</body>
-</html>`;
-}
-
-export function generateIndexHtml(pages: PageData[]): string {
-  const items = pages
-    .map((page) => {
-      const href = page.path.replace(/\.md$/, ".html");
-      const title = page.frontmatter.title || page.path;
-      const date = page.frontmatter.date
-        ? `<span class="date">${page.frontmatter.date}</span>`
-        : "";
-      const tags = page.frontmatter.tags
-        ? `<span class="tags">Tags: ${page.frontmatter.tags}</span>`
-        : "";
-      return `    <li>
-      <a href="${href}">${title}</a>
-      ${date}
-      ${tags}
-    </li>`;
-    })
-    .join("\n");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Site Index</title>
-</head>
-<body>
-<h1>Pages</h1>
-<ul>
-${items}
-</ul>
-</body>
-</html>`;
+function getBuiltinPlugins(): Plugin[] {
+  return [
+    createMarkdownPlugin(),
+    createTemplatePlugin(),
+  ];
 }
 
 export async function build(options: BuildOptions): Promise<void> {
   const contentDir = path.resolve(options.contentDir);
   const outputDir = path.resolve(options.outputDir);
-  const templatesDir = options.templatesDir
-    ? path.resolve(options.templatesDir)
-    : path.resolve("templates");
 
-  const engine: TemplateEngine | null = await createTemplateEngine(templatesDir);
+  const plugins = getBuiltinPlugins();
+
+  await runHook(plugins, "onStart", options);
+  await runHook(plugins, "beforeBuild", options);
 
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -146,35 +69,17 @@ export async function build(options: BuildOptions): Promise<void> {
   const pages: PageData[] = [];
 
   for (const file of files) {
-    const page = await parseMarkdownFile(contentDir, file);
+    let page: PageData = { path: file, frontmatter: {}, html: "" };
+    page = await runFilePipeline(plugins, page, options);
     pages.push(page);
 
     const outPath = file.replace(/\.md$/, ".html");
     const fullOutPath = path.join(outputDir, outPath);
     const outDir = path.dirname(fullOutPath);
     await fs.mkdir(outDir, { recursive: true });
-
-    let pageHtml: string;
-    if (engine) {
-      pageHtml = engine.renderPage(
-        page.frontmatter,
-        page.html
-      );
-    } else {
-      pageHtml = generatePageHtml(page);
-    }
-
-    await fs.writeFile(fullOutPath, pageHtml, "utf-8");
+    await fs.writeFile(fullOutPath, page.html, "utf-8");
   }
 
-  let indexHtml: string;
-  if (engine) {
-    indexHtml = engine.renderIndex(pages);
-    if (!indexHtml) {
-      indexHtml = generateIndexHtml(pages);
-    }
-  } else {
-    indexHtml = generateIndexHtml(pages);
-  }
-  await fs.writeFile(path.join(outputDir, "index.html"), indexHtml, "utf-8");
+  await runHook(plugins, "afterBuild", options, pages);
+  await runHook(plugins, "onEnd", options);
 }

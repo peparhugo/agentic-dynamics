@@ -15,7 +15,8 @@ program
   .option("--content <dir>", "Content directory", "./content")
   .option("--output <dir>", "Output directory", "./dist")
   .option("--templates <dir>", "Templates directory", "./templates")
-  .action(async (options: { content: string; output: string; templates: string }) => {
+  .option("--config <file>", "Config file", "ssg.config.ts")
+  .action(async (options: { content: string; output: string; templates: string; config: string }) => {
     try {
       await build({
         contentDir: options.content,
@@ -36,7 +37,8 @@ program
   .option("--output <dir>", "Output directory", "./dist")
   .option("--templates <dir>", "Templates directory", "./templates")
   .option("--port <number>", "Port to listen on", "3000")
-  .action(async (options: { content: string; output: string; templates: string; port: string }) => {
+  .option("--config <file>", "Config file", "ssg.config.ts")
+  .action(async (options: { content: string; output: string; templates: string; port: string; config: string }) => {
     try {
       await startDevServer({
         contentDir: options.content,
