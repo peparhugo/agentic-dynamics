@@ -16,6 +16,7 @@ import secrets
 import jwt as pyjwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from celery_tasks import send_notification_email
+from repositories import UserRepository, TaskRepository, ItemsRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -129,17 +130,12 @@ def register():
     if len(password) < 8:
         return jsonify({"error": "password must be at least 8 characters"}), 400
     with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        user_repo = UserRepository(conn)
+        existing = user_repo.find_by_username(username)
         if existing:
             return jsonify({"error": "username already taken"}), 409
         now = datetime.utcnow().isoformat()
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) "
-            "VALUES (?, ?, 'user', ?)",
-            (username, hash_password(password), now),
-        )
+        user_repo.create_user(username, hash_password(password), now)
         conn.commit()
     return jsonify({"message": "user registered", "username": username}), 201
 
@@ -152,10 +148,8 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
     with get_db() as conn:
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
+        user_repo = UserRepository(conn)
+        user = user_repo.find_by_username(username)
     if user is None or not verify_password(password, user["password_hash"]):
         return jsonify({"error": "invalid credentials"}), 401
     token = create_jwt(dict(user))
@@ -171,10 +165,8 @@ items_bp = Blueprint("items", __name__, url_prefix="/items")
 @require_auth
 def list_items(user: dict):
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM items WHERE user_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
+        items_repo = ItemsRepository(conn)
+        rows = items_repo.find_items_by_user(user["id"])
     return jsonify([dict(r) for r in rows])
 
 
@@ -186,15 +178,14 @@ def create_item(user: dict):
     if not name:
         return jsonify({"error": "name is required"}), 400
     with get_db() as conn:
+        items_repo = ItemsRepository(conn)
         now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO items (user_id, name, description, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user["id"], name, data.get("description", ""), now),
+        item_id = items_repo.create_item(
+            user["id"], name, data.get("description", ""), now
         )
         conn.commit()
         return jsonify({
-            "id": cursor.lastrowid,
+            "id": item_id,
             "name": name,
             "description": data.get("description", ""),
             "created_at": now,
@@ -205,10 +196,8 @@ def create_item(user: dict):
 @require_auth
 def get_item(user: dict, item_id: int):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
-        ).fetchone()
+        items_repo = ItemsRepository(conn)
+        row = items_repo.find_item_by_id_and_user(item_id, user["id"])
     if row is None:
         return jsonify({"error": "item not found"}), 404
     return jsonify(dict(row))
@@ -218,13 +207,11 @@ def get_item(user: dict, item_id: int):
 @require_auth
 def delete_item(user: dict, item_id: int):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
-        ).fetchone()
+        items_repo = ItemsRepository(conn)
+        row = items_repo.item_exists(item_id, user["id"])
         if row is None:
             return jsonify({"error": "item not found"}), 404
-        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+        items_repo.delete_item_by_id(item_id)
         conn.commit()
     return jsonify({"message": "item deleted"})
 
@@ -243,13 +230,11 @@ def create_task(user: dict):
         return jsonify({"error": "title is required"}), 400
     now = datetime.utcnow().isoformat()
     with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, owner_id, created_at) VALUES (?, 'pending', ?, ?)",
-            (title, user["id"], now),
-        )
+        task_repo = TaskRepository(conn)
+        task_id = task_repo.create_task(title, user["id"], now)
         conn.commit()
         return jsonify({
-            "id": cursor.lastrowid,
+            "id": task_id,
             "title": title,
             "status": "pending",
             "created_at": now,
@@ -260,10 +245,8 @@ def create_task(user: dict):
 @require_auth
 def list_tasks(user: dict):
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
+        task_repo = TaskRepository(conn)
+        rows = task_repo.find_tasks_by_owner(user["id"])
     return jsonify([dict(r) for r in rows])
 
 
@@ -271,10 +254,8 @@ def list_tasks(user: dict):
 @require_auth
 def get_task(user: dict, task_id: int):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
+        task_repo = TaskRepository(conn)
+        row = task_repo.find_task_by_id_and_owner(task_id, user["id"])
     if row is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(dict(row))
@@ -284,10 +265,8 @@ def get_task(user: dict, task_id: int):
 @require_auth
 def update_task(user: dict, task_id: int):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
+        task_repo = TaskRepository(conn)
+        row = task_repo.find_task_by_id_and_owner(task_id, user["id"])
         if row is None:
             return jsonify({"error": "task not found"}), 404
         data = request.get_json(silent=True) or {}
@@ -297,13 +276,11 @@ def update_task(user: dict, task_id: int):
             title = title.strip()
             if not title:
                 return jsonify({"error": "title cannot be empty"}), 400
-            conn.execute("UPDATE tasks SET title = ? WHERE id = ?", (title, task_id))
+            task_repo.update_task_title(task_id, title)
         if status is not None:
-            conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
+            task_repo.update_task_status(task_id, status)
         conn.commit()
-        row = conn.execute(
-            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ?", (task_id,)
-        ).fetchone()
+        row = task_repo.find_task_by_id(task_id)
         task_data = dict(row)
     if status is not None and status == "completed":
         send_notification_email.delay(user["username"], task_data["title"])
@@ -321,9 +298,8 @@ def list_users(user: dict):
     if user.get("role") != "admin":
         return jsonify({"error": "admin access required"}), 403
     with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, username, role, created_at FROM users ORDER BY created_at"
-        ).fetchall()
+        user_repo = UserRepository(conn)
+        rows = user_repo.get_all_users()
     return jsonify([dict(r) for r in rows])
 
 
