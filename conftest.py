@@ -18,3 +18,19 @@ def client():
 
     os.unlink(db_path)
     os.environ.pop("DATABASE", None)
+
+
+@pytest.fixture
+def auth_headers(client):
+    client.post(
+        "/auth/register",
+        data='{"username":"testuser","password":"testpass"}',
+        content_type="application/json",
+    )
+    resp = client.post(
+        "/auth/login",
+        data='{"username":"testuser","password":"testpass"}',
+        content_type="application/json",
+    )
+    token = resp.get_json()["token"]
+    return {"Authorization": "Bearer " + token}
