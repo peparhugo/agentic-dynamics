@@ -12,6 +12,8 @@ from websockets.http11 import Headers, Response
 class ClientRegistry:
     def __init__(self):
         self._clients = {}
+        self._channels = {}
+        self._client_channels = {}
         self._lock = threading.Lock()
 
     def add(self, websocket):
@@ -23,6 +25,32 @@ class ClientRegistry:
     def remove(self, client_id):
         with self._lock:
             self._clients.pop(client_id, None)
+            channels = self._client_channels.pop(client_id, set())
+            for ch in channels:
+                if ch in self._channels:
+                    self._channels[ch].discard(client_id)
+                    if not self._channels[ch]:
+                        del self._channels[ch]
+
+    def subscribe(self, client_id, channel):
+        with self._lock:
+            if channel not in self._channels:
+                self._channels[channel] = set()
+            self._channels[channel].add(client_id)
+            if client_id not in self._client_channels:
+                self._client_channels[client_id] = set()
+            self._client_channels[client_id].add(channel)
+
+    def unsubscribe(self, client_id, channel):
+        with self._lock:
+            if channel in self._channels:
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+            if client_id in self._client_channels:
+                self._client_channels[client_id].discard(channel)
+                if not self._client_channels[client_id]:
+                    del self._client_channels[client_id]
 
     @property
     def count(self):
@@ -32,6 +60,14 @@ class ClientRegistry:
     def get_all(self):
         with self._lock:
             return dict(self._clients)
+
+    def get_subscribers(self, channel):
+        with self._lock:
+            return set(self._channels.get(channel, set()))
+
+    def get_channels(self):
+        with self._lock:
+            return {name: len(subs) for name, subs in self._channels.items()}
 
 
 registry = ClientRegistry()
@@ -47,6 +83,19 @@ async def _broadcast(message):
     tasks = []
     for ws in clients.values():
         tasks.append(asyncio.create_task(ws.send(message_str)))
+    if tasks:
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def _broadcast_to_channel(channel, message):
+    message_str = json.dumps(message)
+    subscribers = registry.get_subscribers(channel)
+    clients = registry.get_all()
+    tasks = []
+    for cid in subscribers:
+        ws = clients.get(cid)
+        if ws is not None:
+            tasks.append(asyncio.create_task(ws.send(message_str)))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -82,7 +131,39 @@ async def handler(websocket):
             payload = data.get("payload", {})
             timestamp = _make_timestamp()
 
-            if msg_type == "direct":
+            if msg_type == "subscribe":
+                channel = data.get("channel")
+                if channel:
+                    registry.subscribe(client_id, channel)
+                    await websocket.send(
+                        json.dumps(
+                            {
+                                "type": "system",
+                                "payload": {
+                                    "message": f"subscribed to {channel}",
+                                    "channel": channel,
+                                },
+                                "timestamp": timestamp,
+                            }
+                        )
+                    )
+            elif msg_type == "unsubscribe":
+                channel = data.get("channel")
+                if channel:
+                    registry.unsubscribe(client_id, channel)
+                    await websocket.send(
+                        json.dumps(
+                            {
+                                "type": "system",
+                                "payload": {
+                                    "message": f"unsubscribed from {channel}",
+                                    "channel": channel,
+                                },
+                                "timestamp": timestamp,
+                            }
+                        )
+                    )
+            elif msg_type == "direct":
                 target = payload.get("target")
                 if target is not None:
                     await _send_direct(
@@ -97,13 +178,16 @@ async def handler(websocket):
                         },
                     )
             else:
-                await _broadcast(
-                    {
-                        "type": msg_type,
-                        "payload": {"from": client_id, **payload},
-                        "timestamp": timestamp,
-                    }
-                )
+                channel = data.get("channel")
+                message = {
+                    "type": msg_type,
+                    "payload": {"from": client_id, **payload},
+                    "timestamp": timestamp,
+                }
+                if channel:
+                    await _broadcast_to_channel(channel, message)
+                else:
+                    await _broadcast(message)
     except ConnectionClosed:
         pass
     finally:
@@ -122,6 +206,23 @@ async def process_request(connection, request):
         body = json.dumps({"connected_clients": registry.count}).encode()
         headers = Headers({"Content-Type": "application/json"})
         return Response(200, "OK", headers, body)
+
+    if request.path == "/channels":
+        body = json.dumps(registry.get_channels()).encode()
+        headers = Headers({"Content-Type": "application/json"})
+        return Response(200, "OK", headers, body)
+
+    if request.path.startswith("/channels/"):
+        parts = request.path.split("/")
+        if len(parts) >= 4 and parts[3] == "subscribers":
+            channel_name = parts[2]
+            subscribers = registry.get_subscribers(channel_name)
+            body = json.dumps(
+                {"channel": channel_name, "subscribers": list(subscribers)}
+            ).encode()
+            headers = Headers({"Content-Type": "application/json"})
+            return Response(200, "OK", headers, body)
+
     return None
 
 
