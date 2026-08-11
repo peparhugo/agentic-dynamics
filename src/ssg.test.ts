@@ -1,9 +1,13 @@
 import fs from 'fs';
 import path from 'path';
+import http from 'http';
+import { WebSocket } from 'ws';
 import { parseFiles } from './parser';
 import { generateSite } from './generator';
 import { TemplateEngine } from './templates';
 import { PageData } from './types';
+import { startDevServer } from './server';
+import { parseArgs } from './index';
 
 const tmpDir = path.join(__dirname, '..', '.test-tmp');
 
@@ -42,6 +46,27 @@ function setupTemplatesDir(files: Record<string, string>): string {
     fs.writeFileSync(fullPath, body);
   }
   return templatesDir;
+}
+
+function getFreePort(): Promise<number> {
+  return new Promise((resolve) => {
+    const srv = http.createServer();
+    srv.listen(0, () => {
+      const address = srv.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+function httpGet(url: string): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    http.get(url, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode || 0, body }));
+    }).on('error', reject);
+  });
 }
 
 beforeEach(() => {
@@ -436,5 +461,176 @@ Custom template content.`,
 
     const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf-8');
     expect(indexHtml).toContain('<a href="post.html">Custom Template Post</a>');
+  });
+});
+
+describe('dev server', () => {
+  let server: http.Server;
+  let port: number;
+  let contentDir: string;
+  let templatesDir: string;
+  let dist: string;
+
+  beforeEach(async () => {
+    contentDir = setupContentDir({
+      'post.md': `---
+title: My Post
+date: 2024-03-10
+tags:
+  - blog
+---
+# My Post
+
+Content here.`,
+    });
+    templatesDir = setupTemplatesDir({});
+    dist = outputDir();
+    port = await getFreePort();
+    server = undefined as unknown as http.Server;
+  });
+
+  afterEach(async () => {
+    if (server) {
+      let timer: NodeJS.Timeout;
+      const closePromise = new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+      const timeoutPromise = new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, 2000);
+      });
+      await Promise.race([closePromise, timeoutPromise]);
+      clearTimeout(timer!);
+      server = undefined as unknown as http.Server;
+    }
+  });
+
+  it('serves HTML files from the dist directory', async () => {
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const { status, body } = await httpGet(`http://localhost:${port}/post.html`);
+    expect(status).toBe(200);
+    expect(body).toContain('<!DOCTYPE html>');
+    expect(body).toContain('My Post');
+  });
+
+  it('injects live-reload WebSocket script into HTML responses', async () => {
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const { body } = await httpGet(`http://localhost:${port}/post.html`);
+    expect(body).toContain("WebSocket('ws://' + location.host)");
+    expect(body).toContain("msg.data === 'reload'");
+    expect(body).toContain('location.reload()');
+  });
+
+  it('serves index.html for the root path', async () => {
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const { status, body } = await httpGet(`http://localhost:${port}/`);
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Blog</h1>');
+    expect(body).toContain("WebSocket('ws://' + location.host)");
+  });
+
+  it('falls back to index.html for unknown paths', async () => {
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const { status, body } = await httpGet(`http://localhost:${port}/nonexistent`);
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Blog</h1>');
+  });
+
+  it('does not inject script into non-HTML responses', async () => {
+    const cssContent = 'body { color: red; }';
+    fs.mkdirSync(dist, { recursive: true });
+    fs.writeFileSync(path.join(dist, 'style.css'), cssContent);
+
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const { body } = await httpGet(`http://localhost:${port}/style.css`);
+    expect(body).toBe(cssContent);
+    expect(body).not.toContain('WebSocket');
+  });
+
+  it('returns 404 when no matching file and no index.html', async () => {
+    const emptyContent = path.join(tmpDir, 'empty-content');
+    fs.mkdirSync(emptyContent, { recursive: true });
+    const emptyDist = path.join(tmpDir, 'empty-dist');
+    fs.mkdirSync(emptyDist, { recursive: true });
+    const emptyTemplates = path.join(tmpDir, 'empty-templates');
+    fs.mkdirSync(emptyTemplates, { recursive: true });
+
+    server = startDevServer({
+      contentDir: emptyContent,
+      outputDir: emptyDist,
+      templatesDir: emptyTemplates,
+      port,
+    });
+    await new Promise((r) => server.on('listening', r));
+
+    const indexPath = path.join(emptyDist, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      fs.unlinkSync(indexPath);
+    }
+
+    const { status } = await httpGet(`http://localhost:${port}/nonexistent`);
+    expect(status).toBe(404);
+  });
+
+  it('rebuilds on content change and notifies WebSocket clients', async () => {
+    server = startDevServer({ contentDir, outputDir: dist, templatesDir, port });
+    await new Promise((r) => server.on('listening', r));
+
+    const ws = new WebSocket(`ws://localhost:${port}`);
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('WebSocket connection timeout')), 3000);
+      ws.on('open', () => { clearTimeout(timeout); resolve(); });
+      ws.on('error', (err) => { clearTimeout(timeout); reject(err); });
+    });
+
+    const msgPromise = new Promise<string>((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error('No reload message received')), 5000);
+      ws.on('message', (data) => {
+        clearTimeout(timeout);
+        resolve(data.toString());
+      });
+      ws.on('error', (err) => {
+        clearTimeout(timeout);
+        reject(err);
+      });
+    });
+
+    await new Promise((r) => setTimeout(r, 100));
+
+    fs.writeFileSync(path.join(contentDir, 'new-post.md'), `---
+title: New Post
+date: 2024-08-01
+---
+# New Content`);
+
+    const msg = await msgPromise;
+    expect(msg).toBe('reload');
+
+    ws.close();
+
+    const distFile = path.join(dist, 'new-post.html');
+    expect(fs.existsSync(distFile)).toBe(true);
+    const html = fs.readFileSync(distFile, 'utf-8');
+    expect(html).toContain('New Post');
+  }, 15000);
+
+  it('parseArgs handles --port flag', () => {
+    const result = parseArgs(['serve', '--port', '8080']);
+    expect(result.command).toBe('serve');
+    expect(result.port).toBe(8080);
+  });
+
+  it('parseArgs uses default port 3000', () => {
+    const result = parseArgs(['serve']);
+    expect(result.port).toBe(3000);
   });
 });

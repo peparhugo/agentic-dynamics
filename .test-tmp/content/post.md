@@ -1,9 +1,9 @@
 ---
-title: Custom Template Post
-date: 2024-05-01
-template: fancy
-layout: fancy-layout
+title: My Post
+date: 2024-03-10
+tags:
+  - blog
 ---
-# Fancy
+# My Post
 
-Custom template content.
+Content here.
