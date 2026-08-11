@@ -101,6 +101,13 @@ from .value_score import (
     compute_story_dvs,
     dvs_verdict_to_emoji,
 )
+from .lsp_diagnostics import (
+    LSPDiagnostic,
+    LSPReport,
+    run_diagnostics,
+    diagnostics_delta,
+    available_tools,
+)
 
 __all__ = [
     "build_operators", "perturb_prompt",
@@ -134,4 +141,6 @@ __all__ = [
     "build_graph", "compute_metrics", "compute_graph_delta",
     "DurableValueScore", "compute_dvs", "compute_story_dvs",
     "dvs_verdict_to_emoji",
+    "LSPDiagnostic", "LSPReport", "run_diagnostics",
+    "diagnostics_delta", "available_tools",
 ]

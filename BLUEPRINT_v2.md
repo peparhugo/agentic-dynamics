@@ -27,6 +27,13 @@
 - [x] `review.py` extended — test generator + cross-model comparator
 - [x] CI updated to 13 test modules, 138 tests
 
+### v0.8 — LSP + Independent Tests + Convention Rules
+**Sessions:** +120  |  **Cost:** ~$8
+
+- [x] `lsp_diagnostics.py` — Multi-tool LSP diagnostics (pyright, mypy, tsc, go-vet, cargo-check)
+- [x] Convention rule files — `conventions/python.yaml`, `conventions/typescript.yaml`
+- [x] CI updated to 14 test modules, 156 tests
+
 ---
 
 ## Part 1: Current State (v0.5)
@@ -264,9 +271,9 @@ MODIFIED:
 ### v0.8 — LSP + Independent Tests
 **Sessions:** +120  |  **Cost:** ~$8
 
-- lsp_diagnostics.py: Per-language LSP analysis
-- Independent test generation (Flash V4, pre-experiment)
-- Convention rule files for Python + TypeScript
+- [x] lsp_diagnostics.py: Per-language LSP analysis (pyright, mypy, tsc, go-vet, cargo-check)
+- [x] Convention rule files: Python + TypeScript YAML convention rule sets
+- [x] Independent test generation (Flash V4, pre-experiment) — in review.py
 
 ### v0.9 — Scale Infrastructure + Full Matrix
 **Sessions:** +300  |  **Cost:** ~$30

@@ -1,0 +1,69 @@
+# Python convention rules for AI FinOps Dynamics
+# Used by commit_analysis.py score_conventions()
+
+language: python
+
+# Naming patterns that should be present in the codebase
+naming_patterns:
+  - name: snake_case_functions
+    description: Functions should use snake_case
+    pattern: 'def [a-z_][a-z0-9_]*\('
+
+  - name: PascalCase_classes
+    description: Classes should use PascalCase
+    pattern: 'class [A-Z][a-zA-Z0-9]*[\:\(]'
+
+  - name: UPPER_CASE_constants
+    description: Module-level constants should be UPPER_CASE
+    pattern: '^[A-Z][A-Z0-9_]*\s*='
+
+# Patterns that should NOT be present (violations)
+forbidden_patterns:
+  - name: camelCase_functions
+    description: Functions should not use camelCase
+    pattern: 'def [a-z]+[A-Z][a-zA-Z0-9]*\('
+
+  - name: lowercase_classes
+    description: Classes should not start with lowercase
+    pattern: 'class [a-z][a-zA-Z0-9]*[\:\(]'
+
+# Structural conventions
+conventions:
+  - name: import_grouping
+    description: Standard library imports first, then third-party, then local
+    type: import_order
+    groups:
+      - stdlib
+      - third_party
+      - local
+
+  - name: docstring_presence
+    description: Public functions and classes should have docstrings
+    type: docstring_check
+    scope: public_only
+
+  - name: error_handling
+    description: External calls should have error handling
+    type: error_handling_check
+    patterns:
+      - 'try:'
+      - 'with .*:'
+
+  - name: type_hints
+    description: Function signatures should use type hints
+    type: type_hint_check
+
+  - name: line_length
+    description: Lines should not exceed 100 characters
+    type: length_check
+    max_length: 100
+
+  - name: module_docstring
+    description: Modules should have a docstring
+    type: module_docstring_check
+
+scoring:
+  naming_weight: 0.30
+  structure_weight: 0.25
+  documentation_weight: 0.25
+  type_safety_weight: 0.20

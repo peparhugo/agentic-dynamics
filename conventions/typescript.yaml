@@ -1,0 +1,74 @@
+# TypeScript convention rules for AI FinOps Dynamics
+# Used by commit_analysis.py score_conventions()
+
+language: typescript
+
+# Naming patterns that should be present in the codebase
+naming_patterns:
+  - name: camelCase_functions
+    description: Functions should use camelCase
+    pattern: 'function [a-z][a-zA-Z0-9]*\('
+
+  - name: PascalCase_classes
+    description: Classes should use PascalCase
+    pattern: 'class [A-Z][a-zA-Z0-9]*[\{|<]'
+
+  - name: PascalCase_interfaces
+    description: Interfaces should use PascalCase
+    pattern: 'interface [A-Z][a-zA-Z0-9]*[\{|<]'
+
+  - name: UPPER_CASE_constants
+    description: Constants should be UPPER_CASE
+    pattern: 'const [A-Z][A-Z0-9_]*\s*[=:]'
+
+# Patterns that should NOT be present
+forbidden_patterns:
+  - name: snake_case_functions
+    description: Functions should not use snake_case
+    pattern: 'function [a-z_][a-z0-9_]*\('
+
+  - name: any_type
+    description: Avoid using 'any' type
+    pattern: ':\s*any\b'
+
+  - name: var_keyword
+    description: Use const or let instead of var
+    pattern: '\bvar\s+'
+
+# Structural conventions
+conventions:
+  - name: import_grouping
+    description: External imports first, then local
+    type: import_order
+    groups:
+      - external
+      - local
+
+  - name: interface_over_type
+    description: Prefer interface over type alias for object shapes
+    type: preference_check
+
+  - name: explicit_return_types
+    description: Public functions should have explicit return types
+    type: return_type_check
+
+  - name: strict_null_checks
+    description: Handle null/undefined explicitly
+    type: null_check
+    patterns:
+      - 'if \(.*=== null'
+      - 'if \(.*=== undefined'
+      - 'if \(!.*\)'
+
+  - name: error_handling
+    description: Async operations should have error handling
+    type: error_handling_check
+    patterns:
+      - 'try \{'
+      - '\.catch\('
+
+scoring:
+  naming_weight: 0.30
+  structure_weight: 0.25
+  type_safety_weight: 0.25
+  error_handling_weight: 0.20
