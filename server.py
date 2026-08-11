@@ -12,6 +12,7 @@ from websockets.exceptions import ConnectionClosed
 class ClientRegistry:
     def __init__(self):
         self._clients = {}
+        self._subscriptions = {}
         self._lock = asyncio.Lock()
 
     async def register(self, websocket):
@@ -36,6 +37,43 @@ class ClientRegistry:
         async with self._lock:
             return self._clients.get(websocket)
 
+    async def subscribe(self, websocket, channel):
+        async with self._lock:
+            if channel not in self._subscriptions:
+                self._subscriptions[channel] = set()
+            self._subscriptions[channel].add(websocket)
+
+    async def unsubscribe(self, websocket, channel):
+        async with self._lock:
+            if channel in self._subscriptions:
+                self._subscriptions[channel].discard(websocket)
+                if not self._subscriptions[channel]:
+                    del self._subscriptions[channel]
+
+    async def unsubscribe_all(self, websocket):
+        async with self._lock:
+            for subs in list(self._subscriptions.values()):
+                subs.discard(websocket)
+            self._subscriptions = {
+                k: v for k, v in self._subscriptions.items() if v
+            }
+
+    async def get_channels(self):
+        async with self._lock:
+            return {
+                channel: len(subs)
+                for channel, subs in self._subscriptions.items()
+            }
+
+    async def get_channel_subscribers(self, channel):
+        async with self._lock:
+            subs = self._subscriptions.get(channel, set())
+            return [self._clients[ws] for ws in subs if ws in self._clients]
+
+    async def get_channel_websockets(self, channel):
+        async with self._lock:
+            return list(self._subscriptions.get(channel, set()))
+
 
 registry = ClientRegistry()
 
@@ -56,6 +94,17 @@ async def broadcast(message_str, exclude=None):
         try:
             await ws.send(message_str)
         except ConnectionClosed:
+            await registry.unsubscribe_all(ws)
+            await registry.unregister(ws)
+
+
+async def broadcast_to_channel(message_str, channel):
+    subs = await registry.get_channel_websockets(channel)
+    for ws in subs:
+        try:
+            await ws.send(message_str)
+        except ConnectionClosed:
+            await registry.unsubscribe_all(ws)
             await registry.unregister(ws)
 
 
@@ -82,9 +131,28 @@ async def handler(websocket):
                 continue
             msg_type = data.get("type", "broadcast")
             payload = data.get("payload", {})
+
+            if msg_type == "subscribe":
+                channel = data.get("channel")
+                if channel:
+                    await registry.subscribe(websocket, channel)
+                continue
+
+            if msg_type == "unsubscribe":
+                channel = data.get("channel")
+                if channel:
+                    await registry.unsubscribe(websocket, channel)
+                continue
+
             msg = message(msg_type, payload)
-            await broadcast(msg)
+
+            channel = data.get("channel")
+            if channel:
+                await broadcast_to_channel(msg, channel)
+            else:
+                await broadcast(msg)
     finally:
+        await registry.unsubscribe_all(websocket)
         await registry.unregister(websocket)
         leave_msg = message("system", {
             "client_id": client_id,
@@ -100,6 +168,22 @@ async def process_request(connection, request):
         response = connection.respond(HTTPStatus.OK, body)
         response.headers["Content-Type"] = "application/json"
         return response
+
+    if request.path == "/channels":
+        channels = await registry.get_channels()
+        body = json.dumps(channels)
+        response = connection.respond(HTTPStatus.OK, body)
+        response.headers["Content-Type"] = "application/json"
+        return response
+
+    if request.path.startswith("/channels/") and request.path.endswith("/subscribers"):
+        channel_name = request.path[len("/channels/"):-len("/subscribers")]
+        subscribers = await registry.get_channel_subscribers(channel_name)
+        body = json.dumps(subscribers)
+        response = connection.respond(HTTPStatus.OK, body)
+        response.headers["Content-Type"] = "application/json"
+        return response
+
     return None
 
 
