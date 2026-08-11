@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import { TemplateEngine } from './templates';
 
 interface Page {
   title: string;
@@ -9,6 +10,8 @@ interface Page {
   tags: string[];
   content: string;
   slug: string;
+  layout?: string;
+  template?: string;
 }
 
 export function parseMarkdownFile(filePath: string): Page | null {
@@ -31,6 +34,8 @@ export function parseMarkdownFile(filePath: string): Page | null {
     tags: data.tags || [],
     content: html,
     slug,
+    layout: data.layout || undefined,
+    template: data.template || undefined,
   };
 }
 
@@ -107,7 +112,7 @@ ${listItems}
 </html>`;
 }
 
-export function generateSite(contentDir: string, outputDir: string): number {
+export function generateSite(contentDir: string, outputDir: string, templatesDir?: string): number {
   const pages = readContentDirectory(contentDir);
 
   if (pages.length === 0) {
@@ -117,12 +122,19 @@ export function generateSite(contentDir: string, outputDir: string): number {
 
   fs.mkdirSync(outputDir, { recursive: true });
 
+  const engine = templatesDir ? new TemplateEngine(templatesDir) : null;
+  const useTemplates = engine && engine.initialized;
+
   for (const page of pages) {
-    const html = renderPage(page);
+    const html = useTemplates
+      ? (engine!.render(page) || renderPage(page))
+      : renderPage(page);
     fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), html);
   }
 
-  const indexHtml = renderIndex(pages);
+  const indexHtml = useTemplates
+    ? (engine!.renderIndex(pages) || renderIndex(pages))
+    : renderIndex(pages);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml);
 
   console.log(`Generated ${pages.length + 1} files in ${outputDir}`);
