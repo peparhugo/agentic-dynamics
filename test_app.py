@@ -702,3 +702,256 @@ async def test_message_schema_correct(server):
     assert m["type"] == "broadcast"
     assert m["payload"] == {"x": 1, "y": "z"}
     assert isinstance(m["timestamp"], str)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded(server_with_redis):
+    old_limit = os.environ.get("RATE_LIMIT")
+    os.environ["RATE_LIMIT"] = "3"
+    try:
+        async with websockets.connect(server_with_redis["ws_url"]) as ws:
+            await ws.recv()
+
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"msg": f"msg{i}"},
+                }))
+                resp = json.loads(await ws.recv())
+                assert resp["type"] == "broadcast"
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"msg": "should-fail"},
+            }))
+            resp = json.loads(await ws.recv())
+            assert resp["type"] == "error"
+            assert "Rate limit" in resp["payload"]["message"]
+            assert "timestamp" in resp
+    finally:
+        if old_limit is not None:
+            os.environ["RATE_LIMIT"] = old_limit
+        else:
+            os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_message_format(server_with_redis):
+    old_limit = os.environ.get("RATE_LIMIT")
+    os.environ["RATE_LIMIT"] = "1"
+    try:
+        async with websockets.connect(server_with_redis["ws_url"]) as ws:
+            await ws.recv()
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"msg": "first"},
+            }))
+            await ws.recv()
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"msg": "second"},
+            }))
+            resp = json.loads(await ws.recv())
+            assert resp["type"] == "error"
+            assert set(resp.keys()) == {"type", "payload", "timestamp"}
+            assert isinstance(resp["payload"], dict)
+            assert "message" in resp["payload"]
+            assert isinstance(resp["timestamp"], str)
+    finally:
+        if old_limit is not None:
+            os.environ["RATE_LIMIT"] = old_limit
+        else:
+            os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_returns_messages(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "general",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "general",
+            "payload": {"msg": "history-test"},
+        }))
+        await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        url = f"http://{server['host']}:{server['port']}/history"
+        async with session.get(url) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            assert "messages" in data
+            assert "has_more" in data
+            assert isinstance(data["messages"], list)
+            assert isinstance(data["has_more"], bool)
+            assert len(data["messages"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_channel_filter(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "ch-a",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "ch-a",
+            "payload": {"msg": "alpha"},
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "ch-b",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "ch-b",
+            "payload": {"msg": "beta"},
+        }))
+        await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        url = f"http://{server['host']}:{server['port']}/history?channel=ch-a"
+        async with session.get(url) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            for m in data["messages"]:
+                assert m["channel"] == "ch-a"
+            assert any(m["payload"]["msg"] == "alpha" for m in data["messages"])
+            assert not any(m["payload"]["msg"] == "beta" for m in data["messages"])
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_chronological_order(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "ordered",
+        }))
+        await ws.recv()
+
+        for i in range(3):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "channel": "ordered",
+                "payload": {"seq": i},
+            }))
+            await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        url = f"http://{server['host']}:{server['port']}/history?channel=ordered"
+        async with session.get(url) as resp:
+            assert resp.status == 200
+            data = await resp.json()
+            timestamps = [m["timestamp"] for m in data["messages"]]
+            assert timestamps == sorted(timestamps), "Messages should be in chronological order"
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_pagination(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "paginated",
+        }))
+        await ws.recv()
+
+        for i in range(5):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "channel": "paginated",
+                "payload": {"seq": i},
+            }))
+            await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        base = f"http://{server['host']}:{server['port']}/history?channel=paginated"
+
+        async with session.get(f"{base}&limit=2") as resp:
+            data = await resp.json()
+            assert len(data["messages"]) == 2
+            assert data["has_more"] is True
+
+        async with session.get(f"{base}&limit=10") as resp:
+            data = await resp.json()
+            assert len(data["messages"]) == 5
+            assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_since_filter(server):
+    async with websockets.connect(server["ws_url"]) as ws:
+        await ws.recv()
+        await ws.send(json.dumps({
+            "type": "subscribe",
+            "channel": "time-chan",
+        }))
+        await ws.recv()
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "time-chan",
+            "payload": {"msg": "first"},
+        }))
+        await ws.recv()
+
+        import time
+        time.sleep(0.1)
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "time-chan",
+            "payload": {"msg": "second"},
+        }))
+        await ws.recv()
+
+    async with aiohttp.ClientSession() as session:
+        from datetime import datetime, timezone
+        now_str = datetime.now(timezone.utc).isoformat()
+
+        url = f"http://{server['host']}:{server['port']}/history?channel=time-chan&since={now_str}"
+        async with session.get(url) as resp:
+            data = await resp.json()
+            assert len(data["messages"]) == 0
+
+        old_time = "2020-01-01T00:00:00+00:00"
+        url2 = f"http://{server['host']}:{server['port']}/history?channel=time-chan&since={old_time}"
+        async with session.get(url2) as resp:
+            data2 = await resp.json()
+            assert len(data2["messages"]) >= 2
+
+
+@pytest.mark.asyncio
+async def test_message_cleanup_deletes_old_messages(server):
+    from datetime import timedelta
+
+    store = app._get_store()
+    old_ts = (app.datetime.now(app.timezone.utc) - timedelta(days=30)).isoformat()
+    recent_ts = (app.datetime.now(app.timezone.utc) - timedelta(days=1)).isoformat()
+
+    store.save("old-msg", "general", "broadcast", {"msg": "old"}, old_ts)
+    store.save("recent-msg", "general", "broadcast", {"msg": "recent"}, recent_ts)
+
+    store.delete_older_than(days=7)
+
+    msgs, _ = store.query_history(channel="general", limit=50)
+    msg_ids = [m["id"] for m in msgs]
+    assert "old-msg" not in msg_ids
+    assert "recent-msg" in msg_ids

@@ -70,6 +70,46 @@ class MessageStore:
                 for r in rows
             ]
 
+    def query_history(self, channel=None, since=None, limit=50):
+        with self._lock:
+            conn = sqlite3.connect(self._db_path)
+            sql = "SELECT id, channel, type, payload, timestamp FROM messages WHERE 1=1"
+            params = []
+            if channel:
+                sql += " AND channel = ?"
+                params.append(channel)
+            if since:
+                sql += " AND timestamp > ?"
+                params.append(since)
+            sql += " ORDER BY timestamp ASC LIMIT ?"
+            params.append(limit + 1)
+            cursor = conn.execute(sql, params)
+            rows = cursor.fetchall()
+            conn.close()
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+            messages = [
+                {
+                    "id": r[0],
+                    "channel": r[1] or None,
+                    "type": r[2],
+                    "payload": json.loads(r[3]),
+                    "timestamp": r[4],
+                }
+                for r in rows
+            ]
+            return messages, has_more
+
+    def delete_older_than(self, days):
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._lock:
+            conn = sqlite3.connect(self._db_path)
+            conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            conn.commit()
+            conn.close()
+
 
 _store_instance = None
 
@@ -271,6 +311,32 @@ def _reset_transport():
     _transport = None
 
 
+async def _check_rate_limit(client_id):
+    redis_conn = await _get_redis()
+    if redis_conn is None:
+        return True
+    limit = int(os.environ.get("RATE_LIMIT", "100"))
+    key = f"rate:{client_id}"
+    try:
+        count = await redis_conn.incr(key)
+        if count == 1:
+            await redis_conn.expire(key, 60)
+        return count <= limit
+    except Exception:
+        return True
+
+
+async def _message_cleanup_task():
+    ttl_days = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+    store = _get_store()
+    while True:
+        try:
+            store.delete_older_than(ttl_days)
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
 async def _deliver_from_redis(data):
     transport = _get_transport()
     channel = data.get("channel")
@@ -420,6 +486,15 @@ async def handler(websocket):
             except json.JSONDecodeError:
                 continue
 
+            if not await _check_rate_limit(client_id):
+                error_msg = json.dumps({
+                    "type": "error",
+                    "payload": {"message": "Rate limit exceeded. Try again later."},
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                })
+                await transport.send_message(websocket, error_msg)
+                continue
+
             msg_type = data.get("type", "broadcast")
 
             if msg_type == "broadcast":
@@ -471,6 +546,21 @@ async def process_request(connection, request):
             200, "OK", Headers({"Content-Type": "application/json"}), body
         )
 
+    if path == "/history":
+        channel = qs.get("channel", [None])[0]
+        since = qs.get("since", [None])[0]
+        try:
+            limit = int(qs.get("limit", ["50"])[0])
+        except (ValueError, IndexError):
+            limit = 50
+        msgs, has_more = _get_store().query_history(
+            channel=channel, since=since, limit=limit
+        )
+        body = json.dumps({"messages": msgs, "has_more": has_more}).encode()
+        return Response(
+            200, "OK", Headers({"Content-Type": "application/json"}), body
+        )
+
     if path == "/messages":
         try:
             limit = int(qs.get("limit", ["50"])[0])
@@ -488,6 +578,7 @@ async def process_request(connection, request):
 
 
 async def main(host="127.0.0.1", port=8765):
+    cleanup_task = asyncio.create_task(_message_cleanup_task())
     redis_task = asyncio.create_task(_redis_subscriber())
     try:
         async with serve(handler, host, port, process_request=process_request):
@@ -496,6 +587,11 @@ async def main(host="127.0.0.1", port=8765):
         redis_task.cancel()
         try:
             await redis_task
+        except asyncio.CancelledError:
+            pass
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
         except asyncio.CancelledError:
             pass
 
