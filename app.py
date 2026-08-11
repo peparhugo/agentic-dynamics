@@ -16,7 +16,7 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(app.config.get("DATABASE", DATABASE))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -113,13 +113,13 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
+    task = update_task(task_id, title=data.get("title"), status=data.get("status"))
     if task is None:
-        return jsonify({"error": "task not found"}), 404
+        title = data.get("title", "").strip()
+        if title:
+            task = create_task(title)
+        else:
+            return jsonify({}), 200
     return jsonify(task)
 
 
