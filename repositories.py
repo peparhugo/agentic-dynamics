@@ -50,6 +50,25 @@ class TaskRepository(BaseRepository):
             (owner_id,),
         )
 
+    def find_paginated_by_owner(self, owner_id, cursor=None, limit=20):
+        total_row = self._fetchone(
+            "SELECT COUNT(*) FROM tasks WHERE owner_id = ?",
+            (owner_id,),
+        )
+        total = total_row[0] if total_row else 0
+        fetch_limit = limit + 1
+        if cursor is not None:
+            rows = self._fetchall(
+                "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                (owner_id, cursor, fetch_limit),
+            )
+        else:
+            rows = self._fetchall(
+                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                (owner_id, fetch_limit),
+            )
+        return rows, total
+
     def update(self, task_id, owner_id, title, status):
         self._execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",

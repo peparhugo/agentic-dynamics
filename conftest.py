@@ -1,5 +1,9 @@
 import os
 import tempfile
+
+os.environ.setdefault("RATELIMIT_STORAGE_URL", "memory://")
+os.environ.setdefault("RATE_LIMIT", "1000 per minute")
+
 import pytest
 from app import app, init_db
 

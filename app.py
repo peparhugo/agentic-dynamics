@@ -5,11 +5,36 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import sqlite3
 import os
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+
+
+def get_rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{payload['user_id']}"
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+def _rate_limit():
+    return os.environ.get("RATE_LIMIT", "100 per minute")
+
+
+limiter = Limiter(
+    key_func=get_rate_limit_key,
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URL", "redis://localhost:6379/0"),
+    app=app,
+)
 
 
 def get_db():
@@ -73,6 +98,7 @@ def token_required(f):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit(_rate_limit)
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -92,6 +118,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit(_rate_limit)
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -113,6 +140,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit(_rate_limit)
 @token_required
 def create_task():
     data = request.get_json(silent=True) or {}
@@ -131,13 +159,28 @@ def create_task():
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit(_rate_limit)
 @token_required
 def list_tasks():
-    rows = task_repo.find_all_by_owner(request.user_id)
-    return jsonify([dict(r) for r in rows])
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = max(1, min(limit, 100))
+    rows, total = task_repo.find_paginated_by_owner(request.user_id, cursor=cursor, limit=limit)
+    tasks = [dict(r) for r in rows]
+    if len(tasks) > limit:
+        next_cursor = str(tasks[limit - 1]["id"])
+        tasks = tasks[:limit]
+    else:
+        next_cursor = None
+    return jsonify({
+        "data": tasks,
+        "next_cursor": next_cursor,
+        "total": total,
+    })
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit(_rate_limit)
 @token_required
 def get_task(task_id):
     row = task_repo.find_by_id(task_id, request.user_id)
@@ -147,6 +190,7 @@ def get_task(task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit(_rate_limit)
 @token_required
 def update_task(task_id):
     row = task_repo.find_by_id(task_id, request.user_id)
@@ -167,6 +211,15 @@ def update_task(task_id):
 
     updated = task_repo.find_by_id(task_id, request.user_id)
     return jsonify(dict(updated))
+
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    retry_after = getattr(e, "retry_after", 60)
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 if __name__ == "__main__":
