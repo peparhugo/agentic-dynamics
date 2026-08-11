@@ -1,3 +1,4 @@
+import abc
 import asyncio
 import json
 import os
@@ -208,7 +209,70 @@ async def _redis_subscriber():
         pass
 
 
+class BaseTransport(abc.ABC):
+    @abc.abstractmethod
+    async def on_connect(self, client_id, connection):
+        pass
+
+    @abc.abstractmethod
+    async def on_disconnect(self, client_id):
+        pass
+
+    @abc.abstractmethod
+    async def send_message(self, connection, message):
+        pass
+
+    @abc.abstractmethod
+    async def broadcast(self, targets, message):
+        pass
+
+
+class WebSocketTransport(BaseTransport):
+    async def on_connect(self, client_id, connection):
+        pass
+
+    async def on_disconnect(self, client_id):
+        pass
+
+    async def send_message(self, connection, message):
+        try:
+            await connection.send(message)
+        except websockets.exceptions.ConnectionClosedOK:
+            pass
+        except websockets.exceptions.ConnectionClosedError:
+            pass
+
+    async def broadcast(self, targets, message):
+        for client_id, ws in targets:
+            try:
+                await ws.send(message)
+            except websockets.exceptions.ConnectionClosedOK:
+                registry.unregister(client_id)
+            except websockets.exceptions.ConnectionClosedError:
+                registry.unregister(client_id)
+
+
+_transport = None
+
+
+def _get_transport():
+    global _transport
+    if _transport is None:
+        transport_type = os.environ.get("TRANSPORT", "websocket")
+        if transport_type == "websocket":
+            _transport = WebSocketTransport()
+        else:
+            raise ValueError(f"Unknown transport: {transport_type}")
+    return _transport
+
+
+def _reset_transport():
+    global _transport
+    _transport = None
+
+
 async def _deliver_from_redis(data):
+    transport = _get_transport()
     channel = data.get("channel")
     payload = data.get("payload", {})
     msg_type = data.get("type", "broadcast")
@@ -229,13 +293,7 @@ async def _deliver_from_redis(data):
     else:
         targets = registry.get_all()
 
-    for client_id, ws in targets:
-        try:
-            await ws.send(message)
-        except websockets.exceptions.ConnectionClosedOK:
-            registry.unregister(client_id)
-        except websockets.exceptions.ConnectionClosedError:
-            registry.unregister(client_id)
+    await transport.broadcast(targets, message)
 
 
 async def _publish_to_redis(channel, message_dict):
@@ -251,55 +309,7 @@ async def _publish_to_redis(channel, message_dict):
         pass
 
 
-async def handler(websocket):
-    client_id = str(uuid.uuid4())
-    registry.register(client_id, websocket)
-
-    redis_conn = await _get_redis()
-    if redis_conn:
-        try:
-            await redis_conn.sadd(f"clients:{_server_id}", client_id)
-        except Exception:
-            pass
-
-    try:
-        welcome = json.dumps({
-            "type": "system",
-            "payload": {"client_id": client_id, "event": "connected"},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        await websocket.send(welcome)
-
-        async for raw_message in websocket:
-            try:
-                data = json.loads(raw_message)
-            except json.JSONDecodeError:
-                continue
-
-            msg_type = data.get("type", "broadcast")
-
-            if msg_type == "broadcast":
-                await _handle_broadcast(data)
-            elif msg_type == "direct":
-                await _handle_direct(data)
-            elif msg_type == "system":
-                await _handle_system(data, websocket)
-            elif msg_type == "subscribe":
-                await _handle_subscribe(data, client_id, websocket)
-            elif msg_type == "unsubscribe":
-                await _handle_unsubscribe(data, client_id, websocket)
-    finally:
-        registry.unsubscribe_all(client_id)
-        registry.unregister(client_id)
-
-        if redis_conn:
-            try:
-                await redis_conn.srem(f"clients:{_server_id}", client_id)
-            except Exception:
-                pass
-
-
-async def _handle_broadcast(data):
+async def _handle_broadcast(data, transport):
     channel = data.get("channel")
     payload = data.get("payload", {})
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -319,13 +329,7 @@ async def _handle_broadcast(data):
     else:
         targets = registry.get_all()
 
-    for client_id, ws in targets:
-        try:
-            await ws.send(message)
-        except websockets.exceptions.ConnectionClosedOK:
-            registry.unregister(client_id)
-        except websockets.exceptions.ConnectionClosedError:
-            registry.unregister(client_id)
+    await transport.broadcast(targets, message)
 
     msg_id = str(uuid.uuid4())
     _get_store().save(msg_id, channel or "", "broadcast", payload, timestamp)
@@ -333,7 +337,7 @@ async def _handle_broadcast(data):
     await _publish_to_redis(channel, message_dict)
 
 
-async def _handle_direct(data):
+async def _handle_direct(data, transport):
     target_id = data.get("payload", {}).get("target_id")
     if not target_id:
         return
@@ -347,31 +351,23 @@ async def _handle_direct(data):
     })
     for client_id, ws in registry.get_all():
         if client_id == target_id:
-            try:
-                await ws.send(message)
-            except (websockets.exceptions.ConnectionClosedOK,
-                    websockets.exceptions.ConnectionClosedError):
-                registry.unregister(client_id)
+            await transport.send_message(ws, message)
             break
 
     msg_id = str(uuid.uuid4())
     _get_store().save(msg_id, "", "direct", payload, timestamp)
 
 
-async def _handle_system(data, websocket):
+async def _handle_system(data, connection, transport):
     message = json.dumps({
         "type": "system",
         "payload": data.get("payload", {}),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    try:
-        await websocket.send(message)
-    except (websockets.exceptions.ConnectionClosedOK,
-            websockets.exceptions.ConnectionClosedError):
-        pass
+    await transport.send_message(connection, message)
 
 
-async def _handle_subscribe(data, client_id, websocket):
+async def _handle_subscribe(data, client_id, connection, transport):
     channel = data.get("channel")
     if not channel:
         return
@@ -381,14 +377,10 @@ async def _handle_subscribe(data, client_id, websocket):
         "payload": {"event": "subscribed", "channel": channel},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
-    try:
-        await websocket.send(message)
-    except (websockets.exceptions.ConnectionClosedOK,
-            websockets.exceptions.ConnectionClosedError):
-        pass
+    await transport.send_message(connection, message)
 
 
-async def _handle_unsubscribe(data, client_id, websocket):
+async def _handle_unsubscribe(data, client_id, connection, transport):
     channel = data.get("channel")
     if not channel:
         return
@@ -398,11 +390,58 @@ async def _handle_unsubscribe(data, client_id, websocket):
         "payload": {"event": "unsubscribed", "channel": channel},
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
+    await transport.send_message(connection, message)
+
+
+async def handler(websocket):
+    transport = _get_transport()
+    client_id = str(uuid.uuid4())
+    registry.register(client_id, websocket)
+    await transport.on_connect(client_id, websocket)
+
+    redis_conn = await _get_redis()
+    if redis_conn:
+        try:
+            await redis_conn.sadd(f"clients:{_server_id}", client_id)
+        except Exception:
+            pass
+
     try:
-        await websocket.send(message)
-    except (websockets.exceptions.ConnectionClosedOK,
-            websockets.exceptions.ConnectionClosedError):
-        pass
+        welcome = json.dumps({
+            "type": "system",
+            "payload": {"client_id": client_id, "event": "connected"},
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+        await transport.send_message(websocket, welcome)
+
+        async for raw_message in websocket:
+            try:
+                data = json.loads(raw_message)
+            except json.JSONDecodeError:
+                continue
+
+            msg_type = data.get("type", "broadcast")
+
+            if msg_type == "broadcast":
+                await _handle_broadcast(data, transport)
+            elif msg_type == "direct":
+                await _handle_direct(data, transport)
+            elif msg_type == "system":
+                await _handle_system(data, websocket, transport)
+            elif msg_type == "subscribe":
+                await _handle_subscribe(data, client_id, websocket, transport)
+            elif msg_type == "unsubscribe":
+                await _handle_unsubscribe(data, client_id, websocket, transport)
+    finally:
+        registry.unsubscribe_all(client_id)
+        registry.unregister(client_id)
+        await transport.on_disconnect(client_id)
+
+        if redis_conn:
+            try:
+                await redis_conn.srem(f"clients:{_server_id}", client_id)
+            except Exception:
+                pass
 
 
 async def process_request(connection, request):
