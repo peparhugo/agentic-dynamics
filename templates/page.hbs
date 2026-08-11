@@ -1,0 +1,9 @@
+<h1>{{title}}</h1>
+{{#if date}}
+<p>Date: {{date}}</p>
+{{/if}}
+{{#if tags.length}}
+<p>Tags: {{#each tags}}{{this}}{{#unless @last}}, {{/unless}}{{/each}}</p>
+{{/if}}
+{{{content}}}
+<p><a href="index.html">Back to index</a></p>
