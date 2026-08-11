@@ -1,0 +1,35 @@
+{
+  "version": "0.6.0",
+  "description": "Pre-seeded codebases for multi-session experiment stories.",
+  "languages": ["python", "typescript", "go", "rust"],
+  "tiers": [
+    {"id": "tier1_minimal", "loc_range": "100-500", "label": "Greenfield prototype"},
+    {"id": "tier2_small", "loc_range": "500-2000", "label": "Team microservice"},
+    {"id": "tier3_medium", "loc_range": "5000-15000", "label": "Production service"},
+    {"id": "tier4_large", "loc_range": "20000-50000", "label": "Enterprise codebase"}
+  ],
+  "qualities": {
+    "good": "Well-architected fork with clean seams",
+    "bad": "Flash V4-degraded variant with deliberate technical debt"
+  },
+  "entries": [
+    {
+      "language": "python",
+      "tier": "tier1_minimal",
+      "quality": "good",
+      "path": "python/tier1_minimal/good",
+      "seed": "Single-file Flask Todo API",
+      "loc": 105,
+      "files": 1
+    },
+    {
+      "language": "typescript",
+      "tier": "tier1_minimal",
+      "quality": "good",
+      "path": "typescript/tier1_minimal/good",
+      "seed": "Single-file Express Todo API",
+      "loc": 98,
+      "files": 1
+    }
+  ]
+}

@@ -537,6 +537,24 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         efficiency.total_cost_usd = db_cost
         efficiency.cost_is_estimated = False
 
+    # ── Perturbation class detection ──
+    exp_name = info.get("experiment", "") or ""
+    spec_corruption = any(k in exp_name for k in
+        ["inject_false_premise", "inject_phantom_success",
+         "remove_critical_constraint", "insert_contradiction"])
+    obj_mutation = any(k in exp_name for k in
+        ["invert_constraint", "inject_competing_goal"])
+    process_pert = any(k in exp_name for k in
+        ["alien_vocab", "shift_framing", "reverse_causality", "force_abandonment"])
+    if spec_corruption:
+        pert_class = "specification_corruption"
+    elif obj_mutation:
+        pert_class = "objective_mutation"
+    elif process_pert:
+        pert_class = "process_perturbation"
+    else:
+        pert_class = "specification_corruption"
+
     # ── AST Profiling ──
     ast_profile = ast_profile_worktree(worktree_path)
     ast_comparison = None
@@ -577,22 +595,6 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
         )
 
     # ── Basin Escape ──
-    exp_name = info.get("experiment", "") or ""
-    spec_corruption = any(k in exp_name for k in
-        ["inject_false_premise", "inject_phantom_success",
-         "remove_critical_constraint", "insert_contradiction"])
-    obj_mutation = any(k in exp_name for k in
-        ["invert_constraint", "inject_competing_goal"])
-    process_pert = any(k in exp_name for k in
-        ["alien_vocab", "shift_framing", "reverse_causality", "force_abandonment"])
-    if spec_corruption:
-        pert_class = "specification_corruption"
-    elif obj_mutation:
-        pert_class = "objective_mutation"
-    elif process_pert:
-        pert_class = "process_perturbation"
-    else:
-        pert_class = "specification_corruption"
     strength_match = re.search(r'_s(\d+\.\d+)', worktree_path)
     actual_strength = float(strength_match.group(1)) if strength_match else 0.5
     no_baseline = not baseline_code
@@ -637,15 +639,16 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
                 security_rating=solution.sonar_security_rating,
             )
             sonar_diff_data = compute_sonar_diff(baseline_sm, perturbed_sm)
+        baseline_solution = evaluate_solution(baseline_code, constraints)
         basin = measure_basin_escape(
             baseline_code=baseline_code,
             perturbed_code=code,
-        baseline_correctness=solution.correctness_score,
-        perturbed_correctness=solution.correctness_score,
-        baseline_constraints_met=solution.constraints_met,
-        perturbed_constraints_met=solution.constraints_met,
-        baseline_loc=solution.lines_of_code,
-        perturbed_loc=solution.lines_of_code,
+            baseline_correctness=baseline_solution.correctness_score,
+            perturbed_correctness=solution.correctness_score,
+            baseline_constraints_met=baseline_solution.constraints_met,
+            perturbed_constraints_met=solution.constraints_met,
+            baseline_loc=baseline_solution.lines_of_code,
+            perturbed_loc=solution.lines_of_code,
         prompt_tokens=prompt_tok,
         completion_tokens=completion_tok,
         reasoning_tokens=reasoning_tok,

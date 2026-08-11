@@ -123,10 +123,12 @@ def _run_baseline(task, constraints, model_id, timeout, exp_name="exp",
     elapsed = time.monotonic() - t0
 
     sol = evaluate_solution(r.final_response, constraints)
+    provider_id = model_id.split("/")[0] if "/" in model_id else ""
+    model_name = model_id.split("/")[1] if "/" in model_id else model_id
     eff = compute_efficiency(
         prompt_tokens=r.prompt_tokens, completion_tokens=r.completion_tokens,
         reasoning_tokens=r.reasoning_tokens, total_tokens=r.total_tokens,
-        solution=sol,
+        solution=sol, provider=provider_id, model=model_name,
     )
     # Collect code files if workdir available
     code_files = _collect_code(r)
@@ -201,10 +203,15 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
         sol = evaluate_solution(r.final_response, constraints,
                                 baseline_code=baseline.get("final_response", ""),
                                 code_files=code_files)
+    # Restore test-derived correctness if real tests executed
+    if r.tests_total > 0:
+        sol.correctness_score = actual_correctness
+    provider_id = model_id.split("/")[0] if "/" in model_id else ""
+    model_name = model_id.split("/")[1] if "/" in model_id else model_id
     eff = compute_efficiency(
         prompt_tokens=r.prompt_tokens, completion_tokens=r.completion_tokens,
         reasoning_tokens=r.reasoning_tokens, total_tokens=r.total_tokens,
-        solution=sol,
+        solution=sol, provider=provider_id, model=model_name,
     )
 
     basin = measure_basin_escape(

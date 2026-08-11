@@ -1,7 +1,7 @@
 # `src/instrument/` — Measurement Apparatus
 
 21 Python modules that form the core library. Measures search dynamics (not outputs): basin escape
-rates, recovery cost, attractor strength, strategy classification. Pip-installable as `reasoning-instrument`.
+rates, recovery cost, attractor strength, strategy classification. Pip-installable as `ai-finops-dynamics`.
 
 ## Architecture
 

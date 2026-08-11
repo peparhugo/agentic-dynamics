@@ -3,19 +3,28 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "reasoning-instrument"
+name = "ai-finops-dynamics"
 version = "0.5.0"
-description = "Agent economics measurement instrument — how does coding-agent cost and outcome change as specification quality degrades?"
+description = "AI FinOps Dynamics — does your AI assistant make your system better, or just bigger? Success isn't value."
 requires-python = ">=3.10"
 dependencies = [
     "pyyaml>=6.0",
-    "chromadb>=0.4.0",
-    "ollama>=0.3.0",
-    "neo4j>=5.20",
     "numpy>=1.22",
     "scikit-learn>=1.3",
     "pytest>=7.0",
+    "tree-sitter==0.21.3",
+    "tree-sitter-languages>=1.10",
 ]
+
+[project.optional-dependencies]
+all = [
+    "chromadb>=0.4.0",
+    "ollama>=0.3.0",
+    "neo4j>=5.20",
+]
+chromadb = ["chromadb>=0.4.0"]
+ollama = ["ollama>=0.3.0"]
+neo4j = ["neo4j>=5.20"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

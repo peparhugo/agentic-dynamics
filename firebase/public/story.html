@@ -120,7 +120,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>We observe an interesting pattern: some models produce fewer reasoning tokens while maintaining performance. Whether this is caused by GRPO training architecture, provider-side caching, or some combination is not yet determined.</p>
 
-<p>Later analysis revealed the deeper layer: both models generate <span class="tip" title="[M] Measured — avg output+reasoning tokens per session">~11,000 tokens per session</span>. Identical computational effort. Claude's tokens just cost 13.6&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$15.00 vs $1.10 per 1M output tokens</span>). And Claude writes 20.0K tokens to cache per session at <span class="tip" title="[X] External — provider list pricing">$3.75/Mtok</span> — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
+<p>Later analysis revealed the deeper layer: both models generate similar token volumes per session. However, equal generated token counts do not equate to identical computational effort — model architecture, activated parameters, hardware generation, inference infrastructure, and provider-side optimizations all differ materially. Claude's tokens cost 13.6&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$15.00 vs $1.10 per 1M output tokens</span>). And Claude writes 20.0K tokens to cache per session at <span class="tip" title="[X] External — provider list pricing">$3.75/Mtok</span> — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
 
 <div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
@@ -138,9 +138,9 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p><strong>Policy decisions.</strong> One-way doors vs two-way doors. Switching C&#8320; is reversible. Committing to an architecture that determines &beta; and v is not. The decision framework wasn't theoretical — it emerged from watching how costs compound when you get the architecture wrong.</p>
 
-<p><strong>Long-term planning.</strong> Codebase growth compounds quadratically through the N&sup2; term. The &beta;·v·N&sup2; term dominates long-run cost — model the curve before architectural commitments.</p>
+<p><strong>Long-term planning.</strong> Under linear context-growth assumptions, cumulative context cost contains an N&sup2; term (modeled extension, not independently tested). The &beta;·v·N&sup2; term dominates long-run cost — model the curve before architectural commitments.</p>
 
-<p><strong>Business outcomes.</strong> CostPerOutcome. Not cost per prompt. Not cost per session. Cost per accepted, verified, working outcome. The only metric that matters if you're accountable for results.</p>
+<p><strong>Business outcomes.</strong> CostPerOutcome. Not cost per prompt. Not cost per session. The durable value of an accepted outcome, divided by what it cost to produce and sustain it. The only metric that matters if you're accountable for results.</p>
 
 <p><strong>Energy economics.</strong> EPM(t). The Energy Price Multiplier. Local energy markets determine long-term compute prices. The 4Ms framework from Google Cloud formalizes this. The IEA projects 1.8&times; growth by 2050. Whatever model looks cheapest today gets more expensive every year — and the models with the highest Watt-per-useful-token ratio compound fastest.</p>
 
@@ -149,7 +149,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>This became a cumulative model for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
 </div>
 
-<p>What I didn't expect: When we first published this instrument, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't. It uses the SAME number of generated tokens as Claude. The difference is that each of Claude's tokens costs 13.6&times; more. And the cache write tax — 22,500 tokens written to cache at $3.75/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
+<p>What I didn't expect: When we first published this instrument, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't use fewer generated tokens than Claude in observed sessions. The difference is that each of Claude's tokens costs 13.6&times; more. And the cache write tax — 22,500 tokens written to cache at $3.75/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
 
 <h2>Why I was the person who could build this.</h2>
 
@@ -182,7 +182,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 "The instrument didn't come from theory. It came from watching $12.73 do more work than $700 ever did — and needing to understand why."
 </blockquote>
 
-<p>This project doesn't answer <strong>"what did we spend last month?"</strong> It answers <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> The N&sup2; tax is a snowball &mdash; every session grows the codebase, and every new line compounds the cost of the next one.</p>
+<p>This project doesn't answer <strong>"what did we spend last month?"</strong> It answers <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> Under modeled assumptions, the N&sup2; tax compounds — every session grows the codebase, and every new line compounds the cost of the next one.</p>
 
 <div style="text-align:center;margin:2rem 0">
 <a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">Explore AI FinOps Dynamics &rarr;</a>

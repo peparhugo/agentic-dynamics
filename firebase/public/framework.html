@@ -105,7 +105,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <section class="fsec" id="levers"><div class="inr wide">
 <div class="pulse">The Levers</div>
 <h2>What you control. What compounds.<br>What you must model.</h2>
-<p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment sessions. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
 
 <h3 style="color:var(--ac);margin:1.5rem 0 0.5rem;text-align:center">Augmented Workforce (Rules 1&ndash;5)</h3>
 <p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
@@ -124,7 +124,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="params">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div></div>
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 249 experiments. Drives the retry penalty R(r, E&#8340;).</div></div>
+<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 249 sessions. Drives the retry penalty R(r, E&#8340;).</div></div>
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div></div>
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div></div>
@@ -150,7 +150,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <section class="fsec" id="cost-model"><div class="inr wide">
 <div class="pulse">The Model</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
-<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment sessions. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
+<p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 
 <div style="max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.8rem">
 <div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--ac);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
@@ -306,7 +306,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <p class="lead">When a cheap model fails, you pay the retry penalty. Here's what that actually costs.</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:700px;margin:1rem auto;text-align:left">
 <div>
-<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 249 experiments</h4>
+<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 249 sessions</h4>
 <div class="tbl"><table><tbody>
 <tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">28.3&times; (price ratio)</td></tr>
 <tr><td>Escalation rate</td><td style="color:var(--am)">21.4%</td></tr>

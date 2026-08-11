@@ -21,16 +21,20 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install core dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pyyaml numpy
+          pip install pytest pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           pip install -e .
 
       - name: Run core tests (no external services)
         run: |
-          pytest tests/test_perturb.py tests/test_pricing.py tests/test_correctness_lineage.py -v
+          pytest tests/test_perturb.py tests/test_pricing.py tests/test_correctness_lineage.py tests/test_recovery.py tests/test_adapter.py tests/test_language.py tests/test_mutation.py -v
 
-      - name: Verify build_data integrity (dry run)
+      - name: Verify build_data imports cleanly (no DB required)
         run: |
-          python scripts/build_data.py --dry-run 2>&1 || true
+          python -c "import scripts.build_data; print('build_data imports OK')"
+
+      - name: Verify build_data integrity (dry run, DB-dependent)
+        run: |
+          python scripts/build_data.py --dry-run 2>&1 || echo "WARNING: build_data dry-run failed (expected without experiment DB)"

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Evidence — AI FinOps Dynamics</title>
-<meta name="description" content="Full evidence: 227 experiments, 249 sessions, 3 architectures, 8 variants. AST analysis, test pass rates, token economics, perturbation response, constraint detection.">
+<meta name="description" content="Full evidence: 227 experiment worktrees, 249 sessions, 8 model variants. Cost, correctness, value, perturbation response, AST analysis, provenance-tagged measurements.">
 <meta property="og:title" content="The Evidence — AI FinOps Dynamics">
 <meta property="og:description" content="Full evidence: 249 sessions, 8 model variants, provenance-tagged measurements">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/evidence.html">
@@ -93,13 +93,13 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </div>
 <section class="sec alt">
 <h2 id="grit-spectrum">The Grit Spectrum</h2>
-<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models, across three perturbation classes: specification corruption (4 operators that degrade information quality), objective mutation (2 operators that change the requested target), and process perturbation (4 operators that alter the search process). Grit is measured as the probability of verified success at a given perturbation strength.</p>
+<p class="lead"><strong style="color:var(--ac)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? We tested 10 perturbation operators across all models, across three perturbation classes: specification corruption (4 operators that degrade information quality), objective mutation (2 operators that change the requested target), and process perturbation (4 operators that alter the search process). Grit is measured as the probability of test-executed success at a given perturbation strength.</p>
 
 <div class="cards" style="margin-top:1.2rem">
 <div class="card"><div class="ctitle">Specification Corruption (4)</div><div class="cdesc">Degrade information quality while preserving intended ground truth. False premises, removed constraints, phantom successes, contradictory requirements. Simulate realistic incomplete requirements.</div></div>
 <div class="card"><div class="ctitle">Objective Mutation (2)</div><div class="cdesc">Change the requested target itself. Inverted constraints, competing goals. Tests whether the model notices the specification changed.</div></div>
 <div class="card"><div class="ctitle">Process Perturbation (4)</div><div class="cdesc">Alter the search process. Alien vocabulary, framing shifts, causality reversal, forced abandonment. Tests how the model navigates under unfamiliar constraints.</div></div>
-<div class="card"><div class="ctitle">Detector: Recovery Signals (7)</div><div class="cdesc">Markers, tool convergence, qualifier patterns, tech stack convergence, output length ratio, reasoning structure overlap. Classify every segment as EXPLORATION or RECOVERY.</div></div>
+<div class="card"><div class="ctitle">Detector: Recovery Signals (7)</div><div class="cdesc">Markers, tool convergence, qualifier patterns, tech stack convergence, output length ratio, reasoning structure overlap, trajectory distance. Classify every segment as EXPLORATION or RECOVERY.</div></div>
 <div class="card"><div class="ctitle">Detector: Strategy Archetypes (4)</div><div class="cdesc">CONSERVATIVE (low explore, high recover), EXPLORATORY (high escape, low recover), WASTEFUL (high explore, low quality), EFFICIENT (high explore, high quality, low cost).</div></div>
 </div>
 
@@ -265,7 +265,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="cards" style="margin-top:1rem">
 <div class="card"><div class="ctitle" style="color:var(--ac)">Test Pass Rate Caveat</div><div class="cdesc">Sampled pytest results are environment-sensitive. Approximately 31% of failures resolve with correct dependency installation. The raw pass rate counts everything; the "with correct env" column estimates real code quality. DeepSeek's 69% corrected rate is comparable to Claude and GPT-5.6.</div></div>
 <div class="card"><div class="ctitle" style="color:var(--am)">Energy Projection Caveat</div><div class="cdesc">The EPM uses a linear IEA-based projection. Real-world energy prices may diverge significantly. v0.5 will add sensitivity analysis with aggressive (2.5%/yr), baseline (1.6%/yr), and optimistic (0.8%/yr) scenarios.</div></div>
-<div class="card"><div class="ctitle">Reproduce This</div><div class="cdesc">The instrument is open source. 34 configs, 10 operators, 6 recovery signals. Clone the repo, install the instrument, run a config. <a href="https://github.com/peparhugo/ai-finops-framework" style="color:var(--ac)">View on GitHub.</a> <a href="methodology.html" style="color:var(--ac)">See the methodology.</a></div></div>
+<div class="card"><div class="ctitle">Reproduce This</div><div class="cdesc">The instrument is open source. 34 configs, 10 operators, 7 recovery signals. Clone the repo, install the instrument, run a config. <a href="https://github.com/peparhugo/ai-finops-framework" style="color:var(--ac)">View on GitHub.</a> <a href="methodology.html" style="color:var(--ac)">See the methodology.</a></div></div>
 </div>
 </section>
 
@@ -623,7 +623,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- ==================== STRATEGY DISTRIBUTION ==================== -->
 <section class="sec alt">
 <h2 id="strategy-distribution">Strategy Distribution</h2>
-<p class="lead">How models respond to perturbation: strategy archetypes classified by escape rate, recovery behavior, and output quality. <span style="color:var(--t3)">[C] Computed from 227 classified experiment sessions.</span></p>
+<p class="lead">How models respond to perturbation: strategy archetypes classified by escape rate, recovery behavior, and output quality. <span style="color:var(--t3)">[C] Computed from 227 classified experiment worktrees.</span></p>
 <div id="strategy-distribution"></div>
 <div class="insight"><strong>Key insight:</strong> Conservative dominates (62%), consistent with models defaulting to familiar patterns under perturbation. Only 3 sessions (1.3%) classified as wasteful — models rarely produce low-quality output with high exploration. The 24 "unknown" sessions lack sufficient signal for classification (typically narration failures or zero-code outputs). No sessions classified as EFFICIENT — the archetype requires both high exploration AND high quality at low cost, a rare combination.</div>
 </section>
@@ -665,7 +665,7 @@ All cost values measured directly from provider API responses via the openCode d
 
 <div class="card" style="padding:1rem">
 <div class="ctitle" style="font-size:0.78rem">Cross-Model Reasoning Distance</div>
-<div class="cdesc" style="font-size:0.72rem">Pairwise centroid distance across 8 models confirms <strong>architecture determines reasoning topology more than scale</strong>. GPT-5.6 and GPT-5.6-fast are closest of any pair (centroid distance 0.0062), followed by GPT-5-mini and GPT-5-nano (0.0092). Cross-family distances are 5&ndash;12x larger: Claude-to-any-GPT averages ~0.068. DeepSeek's centroid sits at intermediate distances to all other models — distinct from both families.</div>
+<div class="cdesc" style="font-size:0.72rem">Pairwise centroid distance across 8 models shows <strong>model family influences trajectory structure more than scale</strong>. GPT-5.6 and GPT-5.6-fast are closest of any pair (centroid distance 0.0062), followed by GPT-5-mini and GPT-5-nano (0.0092). Cross-family distances are 5&ndash;12x larger: Claude-to-any-GPT averages ~0.068. DeepSeek's centroid sits at intermediate distances to all other models — distinct from both families. These are observed behavioral patterns, not direct measurements of model internals.</div>
 </div>
 
 <div class="card" style="padding:1rem">

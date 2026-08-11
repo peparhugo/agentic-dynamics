@@ -1,6 +1,11 @@
 {
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "redirects": [
+      {"source": "/instrument.html", "destination": "/methodology.html", "type": 301},
+      {"source": "/applications.html", "destination": "/accelerator.html", "type": 301},
+      {"source": "/related-work.html", "destination": "/databricks.html", "type": 301}
+    ]
   }
 }

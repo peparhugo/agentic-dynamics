@@ -1,9 +1,12 @@
-"""Agent economics measurement instrument.
+"""Agent economics measurement instrument — AI FinOps Dynamics.
 
-Measures how coding-agent cost and verified outcome change as
-specification quality degrades. Uses controlled perturbation operators
-to turn specification quality into an experimental independent variable,
-then observes agent behavior, cost, and correctness under degraded input.
+Success isn't value. Measures how coding-agent cost, correctness,
+and outcome value change as specification quality degrades. Uses
+controlled perturbation to turn specification quality into an
+experimental independent variable, then observes agent behavior,
+cost, and correctness under degraded input.
+
+v0.6: Multi-language analysis via tree-sitter. Flash V4 mutation compiler.
 """
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
@@ -33,6 +36,25 @@ from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
 from .opencode import run_opencode_agentic, AgenticResult, normalize_opencode_event
 
+# v0.6: Multi-language analysis + mutation compiler
+from .language import (
+    LanguageProfile,
+    CodebaseAST,
+    detect_language,
+    parse_codebase,
+    get_parser,
+    collect_functions,
+    collect_imports,
+)
+from .mutation import (
+    MutationArtifact,
+    compile_mutation,
+    apply_mutation,
+    ALL_OPERATORS,
+    SPECIFICATION_OPERATORS,
+    CODEBASE_OPERATORS,
+)
+
 __all__ = [
     "build_operators", "perturb_prompt",
     "BasinMetrics", "measure_basin_escape",
@@ -49,4 +71,9 @@ __all__ = [
     "OllamaAnalyzer", "load_summary_data",
     "OpencodeAnalyzer", "REPORTS_DIR",
     "run_opencode_agentic", "AgenticResult", "normalize_opencode_event",
+    # v0.6
+    "LanguageProfile", "CodebaseAST", "detect_language", "parse_codebase",
+    "get_parser", "collect_functions", "collect_imports",
+    "MutationArtifact", "compile_mutation", "apply_mutation",
+    "ALL_OPERATORS", "SPECIFICATION_OPERATORS", "CODEBASE_OPERATORS",
 ]

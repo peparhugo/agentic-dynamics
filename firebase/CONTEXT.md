@@ -17,7 +17,7 @@ Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app). Fire
 | `framework.html` | Operational Framework | 10 principles, levers, interactive calculator, provider playbook |
 | `evidence.html` | The Evidence | Grit spectrum, cost ranking, AST analysis, perturbation response |
 | `story.html` | The Story | How a $20 API key became an experimental instrument |
-| `methodology.html` | The Instrument | Experiment design, 10 perturbation operators, 6 recovery signals |
+| `methodology.html` | The Instrument | Experiment design, 10 perturbation operators, 7 recovery signals |
 | `accelerator.html` | Applications | Operational hypotheses, maturity ladder, projections |
 | `databricks.html` | Related Work | Mapping every Databricks claim to calibrated measurements |
 | `glossary.html` | Glossary | Terminology reference |

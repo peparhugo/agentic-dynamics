@@ -4,7 +4,7 @@ Replaces text-similarity-based escape with output-based divergence:
 did the model build a structurally different solution from baseline?
 
 Grit operational definition:
-    Grit(s) = P(verified_success | perturbation_strength=s)
+    Grit(s) = P(test_executed_success | perturbation_strength=s)
     Grit retention: R(s) = G(s) / G(0)
     Grit AUC: area under outcome-retention curve
     Recovery premium: ΔC = C(successful_perturbed) / C(successful_baseline)

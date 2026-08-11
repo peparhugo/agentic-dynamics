@@ -72,10 +72,15 @@ def classify_trajectory_segments(
     Returns:
         List of SegmentClassification, one per step.
 
-    Recovery detection uses two signals:
+    Recovery detection uses multiple signals:
     1. Surface markers: rationalization phrases ("let me explain",
        "here's why", "to clarify", qualification language, etc.)
     2. Behavioral convergence: tool calls returning to baseline patterns
+    3. Qualification/hedging: language markers indicating uncertainty
+    4. Tech term convergence: matching technology vocabulary from baseline
+    5. Step length convergence: response length approaching baseline
+    6. Structural pattern convergence: same section headers/numbering
+    7. Trajectory distance: Jaccard distance of tool-call sets from baseline
     """
     markers = recovery_markers or _default_recovery_markers()
     baseline_tools_set = set(baseline.tool_call_sequence())
@@ -162,6 +167,19 @@ def classify_trajectory_segments(
                 ratio = overlap / max(len(baseline_patterns), 1)
                 if ratio >= 0.4:
                     signals.append((min(ratio, 0.7), f"pattern convergence: {overlap}/{len(baseline_patterns)} structures match"))
+
+        # Signal 7: reasoning trajectory distance
+        # Measures how far the perturbed trajectory has diverged from baseline
+        # by comparing tool-occurrence Jaccard distance within each window
+        baseline_tools = {s.tool_name for s in baseline.steps[:i+1] if s.tool_name}
+        perturbed_tools = {s.tool_name for s in perturbed.steps[:i+1] if s.tool_name}
+        union = baseline_tools | perturbed_tools
+        if union:
+            jaccard = len(baseline_tools & perturbed_tools) / len(union)
+            trajectory_distance = 1.0 - jaccard
+            if trajectory_distance > 0.3:
+                signals.append((min(trajectory_distance, 0.8),
+                                f"trajectory distance: {trajectory_distance:.2f}"))
 
         # Classify based on strongest signal
         if signals:

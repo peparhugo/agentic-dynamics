@@ -35,7 +35,8 @@ ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 # Actual DB costs were billed at these rates. Don't retroactively change.
 # For current pricing, see CURRENT_REFERENCE_PRICING below.
 #
-# Pricing snapshot: 2026-03 (experiment billing date)
+# Pricing snapshot: experiment billing dates (2026-Q2 through 2026-Q3 depending on model release).
+# Actual DB costs were billed at these rates. Don't retroactively change.
 PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
         "input": 0.27, "output": 1.10, "reasoning": 0.14,
@@ -54,10 +55,11 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
 # Current reference pricing (2026-08) — for comparison only. Experiment billing
 # uses PROVIDER_PRICING above. These are provider-disclosed rates and may not
 # reflect actual billed amounts (cache, batch discounts, tier pricing apply).
+# DeepSeek V4 Pro rates from https://api-docs.deepseek.com/quick_start/pricing
 CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
-        "input": 0.435, "output": 0.87, "reasoning": 0.435,
-        "cache_read": 0.14, "cache_write": 0.435,
+        "input": 0.435, "output": 0.87, "reasoning": 0.87,
+        "cache_read": 0.003625, "cache_write": 0.435,
     },
     "anthropic": {
         "input": 10.00, "output": 50.00, "reasoning": 50.00,

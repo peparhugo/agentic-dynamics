@@ -323,7 +323,7 @@ python scripts/generate_manifest.py
 ### 7.2 Update package identity
 **Audit §21 | File: `pyproject.toml:7-8`**
 
-- [x] name stays `reasoning-instrument` (breaking change risk)
+- [x] name changed to `ai-finops-dynamics` (aligned with project positioning)
 - [x] description updated per item 4.1 above
 
 ---

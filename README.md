@@ -1,7 +1,7 @@
 # AI FinOps Dynamics
 
 <p align="center">
-  <strong>An experimental instrument measuring the economics of agentic AI as specification quality degrades.</strong><br>
+  <strong>Success isn't value. An experimental instrument measuring what drives the cost and value of agentic AI outcomes.</strong><br>
   249 sessions, 10 perturbation operators, 8 model variants. $64.98 measured API spend.
 </p>
 
@@ -14,13 +14,14 @@
 
 ## What This Is
 
-A measurement instrument that deliberately degrades engineering specifications — missing constraints, false premises, contradictory requirements, alien vocabulary — then runs coding agents against them and measures:
+A measurement instrument that deliberately degrades engineering specifications — missing constraints, false premises, contradictory requirements, alien vocabulary — then runs coding agents against them and measures the full chain:
 
-- **Verified correctness** (agent-authored tests executed against generated artifacts)
+- **Decisions made** (observable execution trace: tool calls, file operations, reasoning)
+- **Correctness evidence** (agent-authored tests executed against generated artifacts)
 - **Task economics** (actual billed cost, token breakdown, cache behavior)
 - **Behavioral divergence** (structural escape from baseline solution patterns)
 
-Most coding-agent benchmarks ask: can the model solve a clean task? This instrument asks: **what happens when the specification itself degrades?**
+Most coding-agent benchmarks ask: can the model solve a clean task? This instrument asks: **does your AI assistant make your system better, or just bigger?**
 
 The approach: controlled perturbation as an experimental independent variable. Each of 10 operators applies a specific, repeatable degradation to the prompt before the coding agent sees it. The instrument captures the full execution trace, generated artifact, and cost telemetry.
 
@@ -32,10 +33,13 @@ The approach: controlled perturbation as an experimental independent variable. E
 Models produce similar generated token volumes yet bill at ratios driven by provider pricing architecture, not capability.
 
 **2. Agent reliability changes differently as specification quality degrades.**
-When specifications are corrupted, models exhibit materially different recovery behavior, output patterns, and cost trajectories. Grit (Ground-Truth Integrity) measures this: `G(s) = P(verified_success | perturbation_strength=s)`.
+When specifications are corrupted, models exhibit materially different recovery behavior, output patterns, and cost trajectories. Grit (Ground-Truth Integrity) measures this: `G(s) = P(test_executed_success | perturbation_strength=s)`.
 
 **3. Recovery itself has a cost signature.**
 When a model succeeds under perturbation, the overhead is measurable — both as extra tokens and as retry/narration cost. Recovery premium varies by provider family and perturbation class.
+
+**4. Success isn't value.**
+An agent can pass its own tests at low cost while making architectural decisions that increase future maintenance burden. The instrument captures correctness evidence; the FinOps question is whether each outcome increases or decreases the system's durable value.
 
 ---
 
@@ -46,10 +50,10 @@ Observed from the experiment corpus:
 | Metric | Description |
 |--------|-------------|
 | Cost-per-task variation | Token pricing, cache write policies, and provider economics stack into cost gaps |
-| Outcome retention under perturbation | Grit: `G(s) = P(verified_success \| perturbation_strength=s)` |
+| Outcome retention under perturbation | Grit: `G(s) = P(test_executed_success \| perturbation_strength=s)` |
 | Recovery overhead | Explanation Tax — tokens and cost burned returning to familiar patterns |
 
-Derived metrics: WOC ratio (first-pass success), cost per verified outcome.
+Derived metrics: WOC ratio (first-pass success), cost per test-executed outcome, AI Value Efficiency (durable outcome value / total cost).
 
 Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy price projection), batch/cascade/SLA — modeled, not independently tested.
 
@@ -86,7 +90,7 @@ Run `python scripts/inventory.py list` for a live breakdown.
 │   ├── efficiency.py         # Token / cost / energy efficiency
 │   ├── solution.py           # Solution quality evaluation
 │   ├── strategy.py           # Strategy archetype classification
-│   ├── recovery.py           # Recovery classification (6 signals)
+│   ├── recovery.py           # Recovery classification (7 signals)
 │   ├── recovery_cost.py      # Cost of recovering from perturbation
 │   ├── trajectory.py         # Reasoning trajectory capture
 │   ├── constraint_detection.py   # Dual-signal constraint verification
@@ -178,7 +182,7 @@ pip install -e .
 ### Run a Single Experiment
 
 ```bash
-python scripts/run.py --config experiments/configs/task_manager.yaml
+python scripts/run.py experiments/configs/task_manager.yaml
 ```
 
 ### Run Post-Hoc Analysis

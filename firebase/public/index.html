@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>AI FinOps Dynamics — Measuring what drives the cost of AI outcomes</title>
-<meta name="description" content="An open instrument measuring coding-agent economics as specification quality degrades. 249 sessions, 10 perturbation operators, 8 model variants.">
-<meta property="og:title" content="Coding-agent economics — what does a task cost when the spec is wrong?">
-<meta property="og:description" content="Coding-agent economics — what does a task cost when the spec is wrong?">
+<title>AI FinOps Dynamics — Does your AI assistant make your system better, or just bigger?</title>
+<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 249 sessions, 10 perturbation operators, 8 model variants.">
+<meta property="og:title" content="AI FinOps Dynamics — Success isn't value.">
+<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 249 sessions, 10 operators, 8 models.">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -60,9 +60,10 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
-    <h1>What does an AI coding task cost when the <strong style="color:var(--ac)">specification is wrong?</strong></h1>
-    <p class="lead">Cost per token doesn't answer that. This is an open instrument that deliberately degrades engineering specifications, runs coding agents against them, and measures what happens to verified outcomes and cost.</p>
-    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">How the Instrument Works</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="story.html" class="cta-btn ghost">Read the Story →</a></div>
+    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">AI FinOps Dynamics</div>
+    <h1>Does your AI coding assistant make your system <strong style="color:var(--ac)">better, or just bigger?</strong></h1>
+    <p class="lead">Success isn't value. An agent can pass every test, run cheaply, and still silently degrade the system it's supposed to improve. Nobody is measuring the difference — and you can't manage what you can't measure.</p>
+    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">See How We Measure It</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="story.html" class="cta-btn ghost">Read the Story →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
     <h3>Measured Corpus</h3>
@@ -73,11 +74,11 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   </aside>
 </div></section>
 
-<!-- Section 2: The missing variable -->
+<!-- Section 2: HOW -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">The missing variable</div>
-  <h2>Real specifications are not benchmarks.</h2>
-  <p class="lead">Requirements are incomplete. Constraints conflict. Context is stale. Previous steps are reported as successful when they aren't. Most coding-agent benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>what happens when the input itself degrades?</em></p>
+  <div class="section-kicker">How we measure it</div>
+  <h2>Controlled specification degradation — an experimental independent variable.</h2>
+  <p class="lead">Most benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>what happens when the input degrades?</em> We deliberately corrupt engineering specifications — false premises, removed constraints, contradictory requirements — then run coding agents against them and measure the full chain: decisions made, behavior that emerges, what it costs, whether it works, and what it's worth.</p>
   <div class="op-grid">
     <div class="op-card">
       <h4>Specification corruption</h4>
@@ -105,7 +106,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
       </ul>
     </div>
   </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">10 deterministic perturbation operators. Each controlled by a strength parameter (0.0–1.0). Not prompt engineering tricks — experimental interventions.</p>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">10 deterministic perturbation operators. Each controlled by a strength parameter (0.0–1.0). Not prompt engineering tricks — controlled experimental interventions. The instrument doesn't judge code quality. It measures how agent decisions, recovery behavior, and cost respond to degraded input — and what that means for the value of each outcome.</p>
 </div></section>
 
 <!-- Section 3: The instrument -->
@@ -119,7 +120,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
     <div class="pipe-step"><div class="ps-label">Trace capture</div>Reasoning, tool calls, token accounting</div>
     <div class="pipe-step"><div class="ps-label">Generated artifact</div>Code, tests, docs — frozen for evaluation</div>
     <div class="pipe-step"><div class="ps-label">Evaluator</div>Agent-authored tests executed; heuristic fallback tagged [H]</div>
-    <div class="pipe-step"><div class="ps-label">Cost + outcome</div>Measured $, verified correctness, divergence from baseline</div>
+    <div class="pipe-step"><div class="ps-label">Cost + outcome</div>Measured $, correctness evidence, divergence from baseline</div>
   </div>
   <div class="hero-actions"><a href="methodology.html" class="cta-btn">Full Instrument Spec →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Source Code →</a></div>
 </div></section>
@@ -150,21 +151,22 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 <section class="dossier-section"><div class="dossier-inner">
   <div class="section-kicker">The concept</div>
   <h2>Grit = Ground-Truth Integrity.</h2>
-  <p class="lead">Grit measures how well verified task success is preserved as specification quality degrades. Defined operationally:</p>
+  <p class="lead">Grit measures how well test-executed task success is preserved as specification quality degrades. Defined operationally:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Grit(s) = P(verified&nbsp;success | perturbation&nbsp;strength&nbsp;=s)<br>
+    Grit(s) = P(test-executed&nbsp;success | perturbation&nbsp;strength&nbsp;=s)<br>
     Retention: R(s) = Grit(s) / Grit(0)<br>
     Recovery&nbsp;premium: &Delta;C = C(successful&nbsp;perturbed) / C(successful&nbsp;baseline)
   </p>
-  <p>This is not "latent reasoning topology." It is an empirically measurable quantity: the probability of verified success under controlled degradation. Escape (structural divergence from baseline) is an explanatory behavioral measure — it may or may not correlate with robustness.</p>
+  <p>This is not "latent reasoning topology." It is an empirically measurable quantity: the probability of test-executed success under controlled degradation. Escape (structural divergence from baseline) is an explanatory behavioral measure — it may or may not correlate with robustness.</p>
+  <p>But passing tests at low cost isn't the same as delivering durable value. An agent can produce working code while making an architectural choice that silently compounds future cost — duplicate abstractions, wrong seams, drift from established conventions. The gap between correctness evidence and durable system value is the FinOps question this instrument exists to measure.</p>
   <div class="hero-actions"><a href="evidence.html#grit-spectrum" class="cta-btn">Explore the Grit Spectrum →</a></div>
 </div></section>
 
-<!-- Section 6: Why FinOps cares -->
+<!-- Section 6: What this means -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">Why this matters</div>
-  <h2>Task economics, not vendor preference.</h2>
-  <p class="lead">Once you can measure verified outcome &times; cost &times; specification quality, model routing can be based on task economics rather than vendor preference. This connects naturally to established FinOps <a href="https://www.finops.org/wg/finops-for-ai-tools-services-considerations/" style="color:var(--ac)">use-case economics</a> — total cost of achieving a specific business outcome per unit — without claiming to have invented that concept. The contribution is the <em>degraded specification</em> dimension.</p>
+  <div class="section-kicker">What this means</div>
+  <h2>If you can measure it, you can route on it.</h2>
+  <p class="lead">Once cost, correctness, and value are measured together, model routing stops being about vendor price sheets and starts being about earned outcomes. Route cheap models to cheap tasks. Route complex work where cheap failure is more expensive than expensive success. The contribution is the <em>degraded specification</em> dimension — nobody else is varying input quality as an experimental variable and measuring the economic consequences.</p>
   <div class="hero-actions"><a href="framework.html" class="cta-btn">Operational Framework →</a><a href="evidence.html" class="cta-btn ghost">Evidence →</a></div>
 </div></section>
 
