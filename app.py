@@ -50,7 +50,7 @@ def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
         conn.commit()
@@ -112,10 +112,7 @@ def list_tasks():
 
 @app.route("/tasks", methods=["POST"])
 def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
+    title = request.json['title']
     task = create_task(title)
     return jsonify(task), 201
 
