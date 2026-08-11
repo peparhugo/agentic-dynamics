@@ -1,5 +1,8 @@
-import pytest
 import os
+os.environ["RATELIMIT_STORAGE_URL"] = "memory://"
+os.environ["RATELIMIT_DEFAULT"] = "1000 per minute"
+
+import pytest
 import tempfile
 import app
 from unittest.mock import patch
@@ -169,22 +172,25 @@ class TestListTasks:
     def test_list_tasks_empty(self, client, auth_headers):
         resp = client.get("/tasks", headers=auth_headers)
         assert resp.status_code == 200
-        assert resp.get_json() == []
+        body = resp.get_json()
+        assert body["data"] == []
+        assert body["total"] == 0
+        assert body["next_cursor"] is None
 
     def test_list_tasks_returns_all(self, client, auth_headers):
         client.post("/tasks", json={"title": "Task 1"}, headers=auth_headers)
         client.post("/tasks", json={"title": "Task 2"}, headers=auth_headers)
         resp = client.get("/tasks", headers=auth_headers)
-        data = resp.get_json()
-        assert len(data) == 2
+        body = resp.get_json()
+        assert len(body["data"]) == 2
 
     def test_list_tasks_ordered_by_created_at_desc(self, client, auth_headers):
         client.post("/tasks", json={"title": "First"}, headers=auth_headers)
         client.post("/tasks", json={"title": "Second"}, headers=auth_headers)
         resp = client.get("/tasks", headers=auth_headers)
-        data = resp.get_json()
-        assert data[0]["title"] == "Second"
-        assert data[1]["title"] == "First"
+        body = resp.get_json()
+        assert body["data"][0]["title"] == "Second"
+        assert body["data"][1]["title"] == "First"
 
 
 class TestGetTask:
@@ -239,7 +245,7 @@ class TestUserIsolation:
     def test_user_cannot_see_other_users_tasks(self, client, auth_headers, other_auth_headers):
         client.post("/tasks", json={"title": "User 1 task"}, headers=auth_headers)
         resp = client.get("/tasks", headers=other_auth_headers)
-        assert resp.get_json() == []
+        assert resp.get_json()["data"] == []
 
     def test_user_cannot_get_other_users_task(self, client, auth_headers, other_auth_headers):
         resp = client.post("/tasks", json={"title": "User 1 task"}, headers=auth_headers)

@@ -4,3 +4,4 @@ pyjwt
 celery[redis]
 redis
 pytest
+flask-limiter[redis]

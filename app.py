@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import functools
 import jwt
 import sqlite3
@@ -15,6 +17,32 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 app.config["SECRET_KEY"] = SECRET_KEY
+
+RATELIMIT_STORAGE_URL = os.environ.get("RATELIMIT_STORAGE_URL", "redis://localhost:6379")
+RATELIMIT_DEFAULT = os.environ.get("RATELIMIT_DEFAULT", "100 per minute")
+
+
+def rate_limit_key():
+    if request.endpoint and request.endpoint.startswith("auth."):
+        return get_remote_address()
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            return str(payload["user_id"])
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=RATELIMIT_STORAGE_URL,
+    default_limits=[RATELIMIT_DEFAULT],
+    retry_after="http-date",
+)
 
 
 def get_db():
@@ -114,7 +142,28 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks(current_user_id: int):
-    return jsonify(task_repo.get_all(current_user_id))
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", 20, type=int)
+
+    if limit < 1:
+        limit = 20
+    if limit > 100:
+        limit = 100
+
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (ValueError, TypeError):
+            cursor = None
+
+    data, next_cursor = task_repo.get_all_paginated(current_user_id, cursor, limit)
+    total = task_repo.count_all(current_user_id)
+
+    return jsonify({
+        "data": data,
+        "next_cursor": next_cursor,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
