@@ -101,6 +101,43 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def find_all_paginated(self, owner_id, cursor=None, limit=20):
+        with self._get_db() as conn:
+            if cursor is not None:
+                cursor_row = conn.execute(
+                    "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
+                    (int(cursor), owner_id),
+                ).fetchone()
+                if cursor_row is None:
+                    return [], None, 0
+                cursor_created_at = cursor_row["created_at"]
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "AND (created_at < ? OR (created_at = ? AND id < ?)) "
+                    "ORDER BY created_at DESC, id DESC "
+                    "LIMIT ?",
+                    (owner_id, cursor_created_at, cursor_created_at, int(cursor), limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "ORDER BY created_at DESC, id DESC "
+                    "LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+
+            has_more = len(rows) > limit
+            items = [dict(r) for r in rows[:limit]]
+            next_cursor = str(items[-1]["id"]) if has_more and items else None
+
+            total_row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+            total = total_row["cnt"]
+
+            return items, next_cursor, total
+
     def find_by_id(self, id, **filters):
         owner_id = filters.get("owner_id")
         with self._get_db() as conn:

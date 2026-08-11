@@ -12,15 +12,41 @@ import os
 import jwt
 from werkzeug.security import check_password_hash
 from functools import wraps
+from flask_limiter import Limiter
 from celery_config import send_notification_email
 from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "dev-secret-key")
 app.config["JWT_EXPIRATION_HOURS"] = 24
+app.config["RATELIMIT_DEFAULT"] = os.environ.get("RATELIMIT_DEFAULT", "100 per minute")
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
 user_repo = UserRepository()
 task_repo = TaskRepository()
+
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(
+                token, app.config["JWT_SECRET_KEY"], algorithms=["HS256"]
+            )
+            return str(payload.get("user_id", ""))
+        except Exception:
+            pass
+    return request.remote_addr or "anonymous"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+)
 
 
 def get_db():
@@ -127,7 +153,16 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repo.find_all(owner_id=g.user_id))
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", type=int, default=20)
+    if limit < 1:
+        limit = 20
+    if limit > 100:
+        limit = 100
+    items, next_cursor, total = task_repo.find_all_paginated(
+        owner_id=g.user_id, cursor=cursor, limit=limit
+    )
+    return jsonify({"data": items, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
