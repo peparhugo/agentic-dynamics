@@ -9,6 +9,7 @@ import bcrypt
 from functools import wraps
 
 from celery_tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -21,6 +22,10 @@ def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+task_repo = TaskRepository(get_db)
+user_repo = UserRepository(get_db)
 
 
 def init_db():
@@ -103,105 +108,39 @@ def login_required(f):
     return decorated
 
 
-# ── User models ───────────────────────────────────────────────
+# ── Backward-compatible model wrappers ────────────────────────
 
 
 def create_user(username, password, email=None):
-    password_hash = bcrypt.hashpw(
-        password.encode("utf-8"), bcrypt.gensalt()
-    ).decode("utf-8")
-    with get_db() as conn:
-        try:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, email)"
-                " VALUES (?, ?, ?)",
-                (username, password_hash, email),
-            )
-            conn.commit()
-            return {"id": cursor.lastrowid, "username": username, "email": email}
-        except sqlite3.IntegrityError:
-            return None
+    return user_repo.create(username, password, email)
 
 
 def get_user_by_username(username):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        return dict(row) if row else None
+    return user_repo.find_by_username(username)
 
 
 def verify_password(user, password):
-    return bcrypt.checkpw(
-        password.encode("utf-8"), user["password_hash"].encode("utf-8")
-    )
-
-
-# ── Task models ───────────────────────────────────────────────
+    return user_repo.verify_password(user, password)
 
 
 def create_task(title, owner_id):
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id)"
-            " VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
+    return task_repo.create(title, owner_id)
 
 
 def get_tasks(owner_id):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    return task_repo.find_all(owner_id)
 
 
 def get_task(task_id, owner_id):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-        return dict(row) if row else None
+    return task_repo.find_by_id(task_id, owner_id)
 
 
 def fetch_task(task_id, owner_id):
-    return get_task(task_id, owner_id)
+    return task_repo.find_by_id(task_id, owner_id)
 
 
 def update_task(task_id, owner_id, title=None, status=None):
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            params.append(owner_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)}"
-                " WHERE id = ? AND owner_id = ?",
-                params,
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return task_repo.update(task_id, owner_id, title, status)
 
 
 # ── Auth routes ───────────────────────────────────────────────
@@ -214,7 +153,7 @@ def register():
     password = data.get("password", "").strip()
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password)
+    user = user_repo.create(username, password)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -227,8 +166,8 @@ def login():
     password = data.get("password", "").strip()
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = get_user_by_username(username)
-    if user is None or not verify_password(user, password):
+    user = user_repo.find_by_username(username)
+    if user is None or not user_repo.verify_password(user, password):
         return jsonify({"error": "invalid username or password"}), 401
     token = generate_token(user)
     return jsonify({"token": token})
@@ -241,7 +180,7 @@ def login():
 @login_required
 def list_tasks():
     user_id = request.current_user["user_id"]
-    return jsonify(get_tasks(user_id))
+    return jsonify(task_repo.find_all(user_id))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -252,7 +191,7 @@ def add_task():
     if not title:
         return jsonify({"error": "title is required"}), 400
     user_id = request.current_user["user_id"]
-    task = create_task(title, user_id)
+    task = task_repo.create(title, user_id)
     return jsonify(task), 201
 
 
@@ -260,7 +199,7 @@ def add_task():
 @login_required
 def show_task(task_id):
     user_id = request.current_user["user_id"]
-    task = get_task(task_id, user_id)
+    task = task_repo.find_by_id(task_id, user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -272,8 +211,8 @@ def edit_task(task_id):
     data = request.get_json(silent=True) or {}
     user_id = request.current_user["user_id"]
     new_status = data.get("status")
-    prev_task = get_task(task_id, user_id)
-    task = update_task(
+    prev_task = task_repo.find_by_id(task_id, user_id)
+    task = task_repo.update(
         task_id,
         user_id,
         title=data.get("title"),
