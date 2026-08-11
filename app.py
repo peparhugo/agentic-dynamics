@@ -6,6 +6,7 @@ import jwt
 import sqlite3
 import os
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
@@ -16,6 +17,10 @@ def get_db():
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+task_repo = TaskRepository(get_db)
+user_repo = UserRepository(get_db)
 
 
 def init_db():
@@ -75,22 +80,15 @@ def register():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
     email = data.get("email", "").strip() or f"{username}@example.com"
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing:
-            return jsonify({"error": "username already exists"}), 409
-        password_hash = generate_password_hash(password)
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        conn.commit()
-        return jsonify({
-            "id": cursor.lastrowid,
-            "username": username,
-        }), 201
+    existing = user_repo.find_by_username(username)
+    if existing:
+        return jsonify({"error": "username already exists"}), 409
+    password_hash = generate_password_hash(password)
+    user_id = user_repo.create(username, password_hash, email)
+    return jsonify({
+        "id": user_id,
+        "username": username,
+    }), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -100,21 +98,18 @@ def login():
     password = data.get("password", "")
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    with get_db() as conn:
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if user is None or not check_password_hash(user["password_hash"], password):
-            return jsonify({"error": "invalid username or password"}), 401
-        token = jwt.encode(
-            {
-                "user_id": user["id"],
-                "exp": datetime.utcnow() + timedelta(hours=24),
-            },
-            app.config["SECRET_KEY"],
-            algorithm="HS256",
-        )
-        return jsonify({"token": token})
+    user = user_repo.find_by_username_full(username)
+    if user is None or not check_password_hash(user["password_hash"], password):
+        return jsonify({"error": "invalid username or password"}), 401
+    token = jwt.encode(
+        {
+            "user_id": user["id"],
+            "exp": datetime.utcnow() + timedelta(hours=24),
+        },
+        app.config["SECRET_KEY"],
+        algorithm="HS256",
+    )
+    return jsonify({"token": token})
 
 
 @app.route("/tasks", methods=["POST"])
@@ -125,40 +120,27 @@ def create_task():
     if not title:
         return jsonify({"error": "title is required"}), 400
     now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, request.user_id),
-        )
-        conn.commit()
-        return jsonify({
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": request.user_id,
-        }), 201
+    task_id = task_repo.create(title, "pending", now, request.user_id)
+    return jsonify({
+        "id": task_id,
+        "title": title,
+        "status": "pending",
+        "created_at": now,
+        "owner_id": request.user_id,
+    }), 201
 
 
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (request.user_id,)
-        ).fetchall()
+    rows = task_repo.find_all_by_owner(request.user_id)
     return jsonify([dict(r) for r in rows])
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @token_required
 def get_task(task_id):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, request.user_id)
-        ).fetchone()
+    row = task_repo.find_by_id(task_id, request.user_id)
     if row is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(dict(row))
@@ -167,36 +149,23 @@ def get_task(task_id):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @token_required
 def update_task(task_id):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, request.user_id)
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
+    row = task_repo.find_by_id(task_id, request.user_id)
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
 
-        data = request.get_json(silent=True) or {}
-        title = data.get("title", row["title"]).strip() if data.get("title") is not None else row["title"]
-        status = data.get("status", row["status"])
-        old_status = row["status"]
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", row["title"]).strip() if data.get("title") is not None else row["title"]
+    status = data.get("status", row["status"])
+    old_status = row["status"]
 
-        conn.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
-            (title, status, task_id, request.user_id),
-        )
-        conn.commit()
+    task_repo.update(task_id, request.user_id, title, status)
 
-        if old_status != "completed" and status == "completed":
-            user = conn.execute(
-                "SELECT * FROM users WHERE id = ?", (request.user_id,)
-            ).fetchone()
-            user_email = user["email"] if user and user["email"] else f"user{request.user_id}@example.com"
-            send_notification_email.delay(user_email, title)
+    if old_status != "completed" and status == "completed":
+        user = user_repo.find_by_id(request.user_id)
+        user_email = user["email"] if user and user["email"] else f"user{request.user_id}@example.com"
+        send_notification_email.delay(user_email, title)
 
-        updated = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, request.user_id)
-        ).fetchone()
+    updated = task_repo.find_by_id(task_id, request.user_id)
     return jsonify(dict(updated))
 
 
