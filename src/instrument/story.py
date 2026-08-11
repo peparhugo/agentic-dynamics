@@ -15,6 +15,7 @@ import hashlib
 import json
 import shutil
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -200,6 +201,7 @@ class SessionResult:
     files_changed: int = 0
     exit_code: int = 0
     error: str = ""
+    continuation_used: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -214,6 +216,7 @@ class SessionResult:
             "files_changed": self.files_changed,
             "exit_code": self.exit_code,
             "error": self.error,
+            "continuation_used": self.continuation_used,
         }
         if self.agentic:
             d["agentic"] = {
@@ -508,50 +511,56 @@ def _run_session(
     continuation_tokens = 0
 
     # If timed out, automatically continue the session
-    if agentic.error and "timeout" in agentic.error.lower():
-        import json as _json
+    if agentic is not None and agentic.error and "timeout" in agentic.error.lower():
         jsonl_path = worktree / ".instrument" / "session.jsonl"
         session_id = ""
         if jsonl_path.exists():
             try:
                 with open(jsonl_path) as f:
-                    first = _json.loads(f.readline())
+                    first = json.loads(f.readline())
                     session_id = first.get("sessionID", "")
-            except Exception:
+            except (json.JSONDecodeError, OSError):
                 pass
 
         if session_id:
-            cont_result = subprocess.run(
-                [
-                    str(Path.home() / ".opencode/bin/opencode"), "run",
-                    "--session", session_id,
-                    "--fork",
-                    "--dir", str(worktree),
-                    "--model", model,
-                    "--auto",
-                    "Continue. Complete the task. Run tests and finish.",
-                ],
-                capture_output=True, text=True, timeout=timeout * 2,
-            )
-            continuation_used = True
-
-            # Estimate continuation cost from opencode DB
+            opencode_bin = Path.home() / ".opencode/bin/opencode"
             try:
+                cont_result = subprocess.run(
+                    [
+                        str(opencode_bin), "run",
+                        "--session", session_id,
+                        "--fork",
+                        "--dir", str(worktree),
+                        "--model", model,
+                        "--auto",
+                        "Continue. Complete the task. Run tests and finish.",
+                    ],
+                    capture_output=True, text=True, timeout=timeout * 2,
+                )
+            except subprocess.TimeoutExpired:
+                cont_result = None
+                print(
+                    f"[story] continuation failed: subprocess timed out "
+                    f"(session {session_id})",
+                    file=sys.stderr,
+                )
+
+            if cont_result is not None:
+                continuation_used = True
+
                 cont_cost = _estimate_session_cost(session_id)
                 continuation_cost += cont_cost
-            except Exception:
-                pass
 
-            # Parse continuation output for token counts
-            import re as _re
-            cont_tokens = _re.findall(r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout)
-            if cont_tokens:
-                continuation_tokens += sum(int(t) for t in cont_tokens)
+                import re as _re
+                cont_tokens = _re.findall(
+                    r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout
+                )
+                if cont_tokens:
+                    continuation_tokens += sum(int(t) for t in cont_tokens)
 
-            # If continuation succeeded, clear the error
-            if cont_result.returncode == 0:
-                agentic.error = ""
-                agentic.exit_code = 0
+                if cont_result.returncode == 0:
+                    agentic.error = ""
+                    agentic.exit_code = 0
 
     duration = time.monotonic() - t0
 
@@ -581,26 +590,32 @@ def _run_session(
         files_changed=files_changed,
         exit_code=agentic.exit_code if agentic else -1,
         error=agentic.error if agentic else "",
+        continuation_used=continuation_used,
     )
 
 
 def _estimate_session_cost(session_id: str) -> float:
     """Estimate the cost of a continuation session from opencode's database."""
     import sqlite3 as _sql
+
     db_path = Path.home() / ".local/share/opencode/opencode.db"
     if not db_path.exists():
         return 0.0
     try:
         conn = _sql.connect(str(db_path))
         rows = conn.execute(
-            "SELECT cost FROM session WHERE id LIKE ? ORDER BY updated_at DESC LIMIT 1",
-            (f"%{session_id}%",),
+            "SELECT cost FROM session WHERE id = ?", (session_id,),
         ).fetchall()
+        if not rows:
+            rows = conn.execute(
+                "SELECT cost FROM session WHERE id LIKE ? ORDER BY updated_at DESC LIMIT 1",
+                (f"%{session_id}%",),
+            ).fetchall()
         conn.close()
-        if rows and rows[0][0]:
+        if rows and rows[0][0] is not None:
             return float(rows[0][0])
     except Exception:
-        pass
+        conn.close()
     return 0.0
 
 
