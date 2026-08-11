@@ -15,6 +15,7 @@ class ClientRegistry:
     def __init__(self):
         self._lock = threading.Lock()
         self._clients: dict[str, ServerConnection] = {}
+        self._subscriptions: dict[str, set[str]] = {}
 
     def add(self, client_id: str, ws: ServerConnection) -> None:
         with self._lock:
@@ -23,6 +24,7 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            self._subscriptions.pop(client_id, None)
 
     def get(self, client_id: str) -> ServerConnection | None:
         with self._lock:
@@ -31,6 +33,32 @@ class ClientRegistry:
     def get_all(self) -> dict[str, ServerConnection]:
         with self._lock:
             return dict(self._clients)
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            if client_id not in self._clients:
+                return
+            self._subscriptions.setdefault(client_id, set()).add(channel)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subs = self._subscriptions.get(client_id)
+            if subs:
+                subs.discard(channel)
+                if not subs:
+                    self._subscriptions.pop(client_id, None)
+
+    def get_channels(self) -> dict[str, int]:
+        channels: dict[str, int] = {}
+        with self._lock:
+            for subs in self._subscriptions.values():
+                for ch in subs:
+                    channels[ch] = channels.get(ch, 0) + 1
+        return channels
+
+    def get_subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return [cid for cid, subs in self._subscriptions.items() if channel in subs]
 
     @property
     def count(self) -> int:
@@ -49,11 +77,18 @@ def _make_message(msg_type: str, payload: dict) -> str:
     })
 
 
-async def _broadcast(msg_type: str, payload: dict, exclude_id: str | None = None) -> None:
+async def _broadcast(msg_type: str, payload: dict, exclude_id: str | None = None, channel: str | None = None) -> None:
     msg = _make_message(msg_type, payload)
     clients = registry.get_all()
-    for cid, ws in clients.items():
+    if channel:
+        target_ids = registry.get_subscribers(channel)
+    else:
+        target_ids = list(clients.keys())
+    for cid in target_ids:
         if cid == exclude_id:
+            continue
+        ws = clients.get(cid)
+        if ws is None:
             continue
         try:
             await ws.send(msg)
@@ -81,7 +116,8 @@ async def handler(websocket: ServerConnection) -> None:
             payload = data.get("payload", {})
 
             if msg_type == "broadcast":
-                await _broadcast("broadcast", payload, exclude_id=client_id)
+                channel = data.get("channel")
+                await _broadcast("broadcast", payload, exclude_id=client_id, channel=channel)
 
             elif msg_type == "direct":
                 target_id = data.get("target")
@@ -92,6 +128,16 @@ async def handler(websocket: ServerConnection) -> None:
                             await target_ws.send(_make_message("direct", payload))
                         except ConnectionClosed:
                             registry.remove(target_id)
+
+            elif msg_type == "subscribe":
+                ch = data.get("channel")
+                if ch:
+                    registry.subscribe(client_id, ch)
+
+            elif msg_type == "unsubscribe":
+                ch = data.get("channel")
+                if ch:
+                    registry.unsubscribe(client_id, ch)
 
     finally:
         registry.remove(client_id)
@@ -105,11 +151,23 @@ async def health_handler(request: web.Request) -> web.Response:
     return web.json_response({"clients": registry.count})
 
 
+async def channels_handler(request: web.Request) -> web.Response:
+    return web.json_response({"channels": registry.get_channels()})
+
+
+async def channel_subscribers_handler(request: web.Request) -> web.Response:
+    name = request.match_info["name"]
+    subscribers = registry.get_subscribers(name)
+    return web.json_response({"channel": name, "subscribers": subscribers})
+
+
 async def main(host: str = "127.0.0.1", ws_port: int = 8765, http_port: int = 8080) -> None:
     ws_server = await serve(handler, host, ws_port)
 
     app = web.Application()
     app.router.add_get("/health", health_handler)
+    app.router.add_get("/channels", channels_handler)
+    app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host, http_port)
