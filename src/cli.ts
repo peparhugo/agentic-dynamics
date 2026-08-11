@@ -1,8 +1,35 @@
 #!/usr/bin/env node
 
-import { parseDirectory } from './parser';
-import { generateSite } from './generator';
-import { startServer } from './server';
+import path from 'path';
+import { SSGEngine } from './engine';
+import { MarkdownPlugin } from './plugins/markdown';
+import { TemplatePlugin } from './plugins/template';
+import { DevServerPlugin } from './plugins/devserver';
+import { Plugin } from './plugin';
+
+function getDefaultPlugins(): Plugin[] {
+  return [
+    new MarkdownPlugin(),
+    new TemplatePlugin(),
+    new DevServerPlugin(),
+  ];
+}
+
+function loadConfigPlugins(cwd: string): Plugin[] {
+  try {
+    const configPath = path.resolve(cwd, 'ssg.config.js');
+    const config = require(configPath);
+    if (config && Array.isArray(config.plugins)) {
+      return config.plugins;
+    }
+    if (config && config.default && Array.isArray(config.default.plugins)) {
+      return config.default.plugins;
+    }
+  } catch {
+    // config file not found or invalid, use defaults
+  }
+  return getDefaultPlugins();
+}
 
 function parseArgs(args: string[]): {
   content: string;
@@ -39,24 +66,44 @@ function parseArgs(args: string[]): {
 
 const command = process.argv[2];
 
-if (command === 'build') {
-  const { content, output, templates } = parseArgs(process.argv.slice(3));
+async function main(): Promise<void> {
+  if (command === 'build') {
+    const { content, output, templates } = parseArgs(process.argv.slice(3));
+    const plugins = loadConfigPlugins(process.cwd());
 
-  const pages = parseDirectory(content);
-  generateSite(pages, output, templates);
-  console.log(`Site generated in ${output} (${pages.length} pages)`);
-} else if (command === 'serve') {
-  const { content, output, templates, port } = parseArgs(process.argv.slice(3));
+    const engine = new SSGEngine({ content, output, templates, port: 3000 });
+    for (const plugin of plugins) {
+      engine.register(plugin);
+    }
 
-  const pages = parseDirectory(content);
-  generateSite(pages, output, templates);
-  console.log(`Site generated in ${output} (${pages.length} pages)`);
+    await engine.build();
+    console.log(`Site generated in ${output} (${engine.pages.length} pages)`);
+  } else if (command === 'serve') {
+    const { content, output, templates, port } = parseArgs(
+      process.argv.slice(3)
+    );
+    const plugins = loadConfigPlugins(process.cwd());
 
-  startServer({ port, content, output, templates });
-} else {
-  console.log(
-    'Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n' +
-    '       npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]'
-  );
-  process.exit(command ? 1 : 0);
+    const engine = new SSGEngine({ content, output, templates, port });
+    for (const plugin of plugins) {
+      engine.register(plugin);
+    }
+
+    const pages = engine.pages;
+    await engine.build();
+    console.log(`Site generated in ${output} (${pages.length} pages)`);
+
+    await engine.serve();
+  } else {
+    console.log(
+      'Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n' +
+        '       npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]'
+    );
+    process.exit(command ? 1 : 0);
+  }
 }
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

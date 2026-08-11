@@ -1,0 +1,1 @@
+{"version":3,"file":"template.js","sourceRoot":"","sources":["../../src/plugins/template.ts"],"names":[],"mappings":";;;AAAA,4CAA4C;AAG5C,MAAa,cAAc;IAA3B;QACE,SAAI,GAAG,UAAU,CAAC;IASpB,CAAC;IAPC,UAAU,CAAC,OAAsB;QAC/B,IAAA,wBAAY,EACV,OAAO,CAAC,KAAK,EACb,OAAO,CAAC,OAAO,CAAC,MAAM,EACtB,OAAO,CAAC,OAAO,CAAC,SAAS,CAC1B,CAAC;IACJ,CAAC;CACF;AAVD,wCAUC"}
