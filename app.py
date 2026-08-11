@@ -5,6 +5,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import sqlite3
 import os
+from tasks import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-change-me")
@@ -32,11 +33,16 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             )
         """)
         try:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         except sqlite3.OperationalError:
             pass
 
@@ -68,6 +74,7 @@ def register():
     password = data.get("password", "")
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
+    email = data.get("email", "").strip() or f"{username}@example.com"
     with get_db() as conn:
         existing = conn.execute(
             "SELECT id FROM users WHERE username = ?", (username,)
@@ -76,8 +83,8 @@ def register():
             return jsonify({"error": "username already exists"}), 409
         password_hash = generate_password_hash(password)
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
         return jsonify({
@@ -171,12 +178,20 @@ def update_task(task_id):
         data = request.get_json(silent=True) or {}
         title = data.get("title", row["title"]).strip() if data.get("title") is not None else row["title"]
         status = data.get("status", row["status"])
+        old_status = row["status"]
 
         conn.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
             (title, status, task_id, request.user_id),
         )
         conn.commit()
+
+        if old_status != "completed" and status == "completed":
+            user = conn.execute(
+                "SELECT * FROM users WHERE id = ?", (request.user_id,)
+            ).fetchone()
+            user_email = user["email"] if user and user["email"] else f"user{request.user_id}@example.com"
+            send_notification_email.delay(user_email, title)
 
         updated = conn.execute(
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",

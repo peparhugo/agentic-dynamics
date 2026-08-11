@@ -469,3 +469,111 @@ class TestUpdateTask:
             headers=h2,
         )
         assert resp.status_code == 404
+
+
+class TestNotificationTrigger:
+    def test_notification_sent_when_status_changes_to_completed(self, client, auth_headers, monkeypatch):
+        import tasks
+
+        calls = []
+        def fake_delay(email, title):
+            calls.append((email, title))
+
+        monkeypatch.setattr(tasks.send_notification_email, "delay", fake_delay)
+
+        created = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Finish report"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        task_id = created.get_json()["id"]
+
+        resp = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert len(calls) == 1
+        assert calls[0][0] == "testuser@example.com"
+        assert calls[0][1] == "Finish report"
+
+    def test_notification_not_sent_when_other_status(self, client, auth_headers, monkeypatch):
+        import tasks
+
+        calls = []
+        def fake_delay(email, title):
+            calls.append((email, title))
+
+        monkeypatch.setattr(tasks.send_notification_email, "delay", fake_delay)
+
+        created = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        task_id = created.get_json()["id"]
+
+        resp = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "in_progress"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert len(calls) == 0
+
+    def test_notification_not_sent_when_already_completed(self, client, auth_headers, monkeypatch):
+        import tasks
+
+        calls = []
+        def fake_delay(email, title):
+            calls.append((email, title))
+
+        monkeypatch.setattr(tasks.send_notification_email, "delay", fake_delay)
+
+        created = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        task_id = created.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        calls.clear()
+
+        resp = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 200
+        assert len(calls) == 0
+
+    def test_notification_not_sent_for_nonexistent_task(self, client, auth_headers, monkeypatch):
+        import tasks
+
+        calls = []
+        def fake_delay(email, title):
+            calls.append((email, title))
+
+        monkeypatch.setattr(tasks.send_notification_email, "delay", fake_delay)
+
+        resp = client.put(
+            "/tasks/9999",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        assert resp.status_code == 404
+        assert len(calls) == 0

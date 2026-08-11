@@ -4,6 +4,15 @@ import pytest
 from app import app, init_db
 
 
+@pytest.fixture(autouse=True)
+def _mock_notification_task():
+    import tasks
+    original_delay = tasks.send_notification_email.delay
+    tasks.send_notification_email.delay = lambda *a, **kw: None
+    yield
+    tasks.send_notification_email.delay = original_delay
+
+
 @pytest.fixture
 def client():
     app.config["TESTING"] = True
