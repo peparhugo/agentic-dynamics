@@ -34,12 +34,56 @@ class ClientRegistry:
         with self._lock:
             return list(self._clients.items())
 
+    def item_ids(self):
+        with self._lock:
+            return list(self._clients.keys())
+
     def clear(self):
         with self._lock:
             self._clients.clear()
 
 
+class ChannelManager:
+    def __init__(self):
+        self._channels = {}
+        self._lock = threading.Lock()
+
+    def subscribe(self, client_id, channel):
+        with self._lock:
+            if channel not in self._channels:
+                self._channels[channel] = set()
+            self._channels[channel].add(client_id)
+
+    def unsubscribe(self, client_id, channel):
+        with self._lock:
+            if channel in self._channels:
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    def unsubscribe_all(self, client_id):
+        with self._lock:
+            for channel in list(self._channels.keys()):
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    def get_subscribers(self, channel):
+        with self._lock:
+            subscribers = self._channels.get(channel, set())
+            return list(subscribers)
+
+    def list_channels(self):
+        with self._lock:
+            return {name: len(subscribers) for name, subscribers in self._channels.items()}
+
+    def clear(self):
+        with self._lock:
+            self._channels.clear()
+
+
 _registry = ClientRegistry()
+_channels = ChannelManager()
 _send_lock = threading.Lock()
 
 
@@ -74,14 +118,36 @@ def handle_client(conn):
             msg_type = data.get("type", "broadcast")
             payload = data.get("payload", {})
 
-            if msg_type == "broadcast":
+            if msg_type == "subscribe":
+                channel = payload.get("channel")
+                if channel:
+                    _channels.subscribe(client_id, channel)
+
+            elif msg_type == "unsubscribe":
+                channel = payload.get("channel")
+                if channel:
+                    _channels.unsubscribe(client_id, channel)
+
+            elif msg_type == "broadcast":
                 msg = make_message("broadcast", payload, from_id=client_id)
-                with _send_lock:
-                    for cid, cws in _registry.all_items():
-                        try:
-                            cws.send(msg)
-                        except Exception:
-                            _registry.remove(cid)
+                channel = data.get("channel")
+                if channel:
+                    subscriber_ids = _channels.get_subscribers(channel)
+                    with _send_lock:
+                        for cid in subscriber_ids:
+                            cws = _registry.get(cid)
+                            if cws:
+                                try:
+                                    cws.send(msg)
+                                except Exception:
+                                    _registry.remove(cid)
+                else:
+                    with _send_lock:
+                        for cid, cws in _registry.all_items():
+                            try:
+                                cws.send(msg)
+                            except Exception:
+                                _registry.remove(cid)
 
             elif msg_type == "direct":
                 target = payload.get("target")
@@ -98,6 +164,7 @@ def handle_client(conn):
     except Exception:
         pass
     finally:
+        _channels.unsubscribe_all(client_id)
         _registry.remove(client_id)
         disc_msg = make_message("system", {"client_id": client_id, "message": "Disconnected"})
         with _send_lock:
@@ -119,6 +186,16 @@ def handle_client(conn):
 
 async def health_handler(request):
     return web.json_response({"clients": _registry.count()})
+
+
+async def channels_handler(request):
+    return web.json_response(_channels.list_channels())
+
+
+async def channel_subscribers_handler(request):
+    channel_name = request.match_info["name"]
+    subscribers = _channels.get_subscribers(channel_name)
+    return web.json_response(subscribers)
 
 
 def run_ws_acceptor(host, port):
@@ -150,6 +227,8 @@ def start_server(host="0.0.0.0", ws_port=8765, http_port=8080):
     async def run_http():
         app = web.Application()
         app.router.add_get("/health", health_handler)
+        app.router.add_get("/channels", channels_handler)
+        app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, host, http_port)
