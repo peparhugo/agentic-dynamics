@@ -11,6 +11,8 @@ from websockets.exceptions import ConnectionClosed
 class ClientRegistry:
     def __init__(self):
         self._clients = {}
+        self._subscriptions = {}
+        self._client_channels = {}
         self._lock = threading.Lock()
 
     def add(self, client_id, websocket):
@@ -20,6 +22,13 @@ class ClientRegistry:
     def remove(self, client_id):
         with self._lock:
             self._clients.pop(client_id, None)
+            if client_id in self._client_channels:
+                for channel in list(self._client_channels[client_id]):
+                    if channel in self._subscriptions:
+                        self._subscriptions[channel].discard(client_id)
+                        if not self._subscriptions[channel]:
+                            del self._subscriptions[channel]
+                del self._client_channels[client_id]
 
     def count(self):
         with self._lock:
@@ -32,6 +41,48 @@ class ClientRegistry:
     def clear(self):
         with self._lock:
             self._clients.clear()
+            self._subscriptions.clear()
+            self._client_channels.clear()
+
+    def subscribe(self, client_id, channel):
+        with self._lock:
+            if channel not in self._subscriptions:
+                self._subscriptions[channel] = set()
+            self._subscriptions[channel].add(client_id)
+            if client_id not in self._client_channels:
+                self._client_channels[client_id] = set()
+            self._client_channels[client_id].add(channel)
+
+    def unsubscribe(self, client_id, channel):
+        with self._lock:
+            if channel in self._subscriptions:
+                self._subscriptions[channel].discard(client_id)
+                if not self._subscriptions[channel]:
+                    del self._subscriptions[channel]
+            if client_id in self._client_channels:
+                self._client_channels[client_id].discard(channel)
+                if not self._client_channels[client_id]:
+                    del self._client_channels[client_id]
+
+    def get_subscribers(self, channel):
+        with self._lock:
+            if channel in self._subscriptions:
+                return list(self._subscriptions[channel])
+            return []
+
+    def get_channels(self):
+        with self._lock:
+            return {name: len(subscribers) for name, subscribers in self._subscriptions.items()}
+
+    def get_subscriber_websockets(self, channel):
+        with self._lock:
+            if channel not in self._subscriptions:
+                return {}
+            result = {}
+            for cid in self._subscriptions[channel]:
+                if cid in self._clients:
+                    result[cid] = self._clients[cid]
+            return result
 
 
 class NotificationServer:
@@ -67,6 +118,9 @@ class NotificationServer:
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                         "sender": client_id,
                     }
+                    channel = data.get("channel")
+                    if channel:
+                        notification["channel"] = channel
                     await self._broadcast(notification)
                 elif msg_type == "direct":
                     target = data.get("target")
@@ -78,11 +132,23 @@ class NotificationServer:
                             "sender": client_id,
                         }
                         await self._send_direct(target, notification)
+                elif msg_type == "subscribe":
+                    channel = data.get("channel")
+                    if channel:
+                        self.registry.subscribe(client_id, channel)
+                elif msg_type == "unsubscribe":
+                    channel = data.get("channel")
+                    if channel:
+                        self.registry.unsubscribe(client_id, channel)
         finally:
             self.registry.remove(client_id)
 
     async def _broadcast(self, message):
-        clients = self.registry.get_all()
+        channel = message.get("channel")
+        if channel:
+            clients = self.registry.get_subscriber_websockets(channel)
+        else:
+            clients = self.registry.get_all()
         message_str = json.dumps(message)
         disconnected = []
         for cid, ws in clients.items():
@@ -106,6 +172,20 @@ class NotificationServer:
         if request.path == "/health":
             count = self.registry.count()
             response = connection.respond(200, json.dumps({"clients": count}))
+            response.headers["Content-Type"] = "application/json"
+            return response
+        if request.path == "/channels":
+            channels = self.registry.get_channels()
+            response = connection.respond(200, json.dumps({"channels": channels}))
+            response.headers["Content-Type"] = "application/json"
+            return response
+        if request.path.startswith("/channels/") and request.path.endswith("/subscribers"):
+            channel_name = request.path[len("/channels/"):-len("/subscribers")]
+            subscribers = self.registry.get_subscribers(channel_name)
+            response = connection.respond(200, json.dumps({
+                "channel": channel_name,
+                "subscribers": subscribers,
+            }))
             response.headers["Content-Type"] = "application/json"
             return response
         return None
