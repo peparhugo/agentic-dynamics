@@ -12,11 +12,9 @@ import os
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
-
-
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    database = os.environ.get("DATABASE", "todos.db")
+    conn = sqlite3.connect(database)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -50,10 +48,9 @@ def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
-        conn.commit()
         return {
             "id": cursor.lastrowid,
             "title": title,
@@ -99,7 +96,6 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
             conn.execute(
                 f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
             )
-            conn.commit()
     return get_task(task_id)
 
 
