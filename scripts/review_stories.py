@@ -67,9 +67,9 @@ def main():
             )
             commit_reviews.append(review.to_dict())
 
-        # Story review
-        print(f"    Reviewing full story...")
-        story_review = review_story(worktree, story.story_name)
+        # Story review with DeepSeek V4 Pro (better coherence analysis)
+        print(f"    Reviewing full story with DeepSeek V4 Pro...")
+        story_review = review_story(worktree, story.story_name, model="deepseek/deepseek-v4-pro")
 
         # Save
         out = {

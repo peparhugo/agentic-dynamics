@@ -299,6 +299,7 @@ class StoryResult:
             "language": self.language,
             "model": self.model,
             "mutation_id": self.mutation_id,
+            "perturbation_condition": self.perturbation_condition,
             "started_at": self.started_at,
             "completed_at": self.completed_at,
             "worktree": self.worktree,
@@ -309,6 +310,7 @@ class StoryResult:
                 "total_duration": self.total_duration,
                 "session_count": self.session_count,
                 "all_successful": self.all_successful,
+                "cascade_recovery": self.cascade_recovery,
             },
             "sessions": [s.to_dict() for s in self.sessions],
         }

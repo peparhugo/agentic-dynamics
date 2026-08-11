@@ -1,0 +1,16 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier1_minimal/good (good, tier1_minimal)
+Condition: early_degrade
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: early_degrade
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0016
+  Total tokens: 144,968
+  Duration: 1266.3s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_8a07787213e4.json

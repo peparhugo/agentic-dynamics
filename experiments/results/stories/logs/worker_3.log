@@ -1,3 +1,5 @@
 [17:21:36][worker] Started (pid=1046038)
 [17:21:36][worker] Redis connected
 [17:21:36][worker] [task_manager_api_tier1_minimal_bad_clean] Starting (1/30)
+[17:47:51][worker] [task_manager_api_tier1_minimal_bad_clean] FAILED ret=0 (1575s)
+[17:47:51][worker] [task_manager_api_tier2_small_good_early_degrade] Starting (2/30)

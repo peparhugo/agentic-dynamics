@@ -1,0 +1,148 @@
+{
+  "story_name": "task_manager_api",
+  "story_id": "8a07787213e4",
+  "codebase_path": "experiments/codebases/python/tier1_minimal/good",
+  "language": "python",
+  "model": "deepseek/deepseek-v4-pro",
+  "mutation_id": "mut_67426d069392f904",
+  "started_at": "2026-08-11T15:21:51.462353+00:00",
+  "completed_at": "2026-08-11T15:42:57.909409+00:00",
+  "worktree": "/tmp/story_8a07787213e4",
+  "error": "",
+  "summary": {
+    "total_cost": 0.0015675659999999998,
+    "total_tokens": 144968,
+    "total_duration": 1266.2978291469917,
+    "session_count": 5,
+    "all_successful": true
+  },
+  "sessions": [
+    {
+      "session_number": 1,
+      "task_type": "greenfield",
+      "prompt": "Create a Flask API for task management with the following requirements:\nIMPORTANT NOTE: Flask's jsonify automatically serializes datetime objects to ISO 8601 strings \u2014 no custom encoder is required.\nM",
+      "commit_hash": "666f663297a13ada2c5bec001d91c2ccd27e287e",
+      "commit_message": "[story] Session 1: greenfield",
+      "cost_usd": 0.000313519,
+      "total_tokens": 11424,
+      "duration_s": 51.768256716022734,
+      "files_changed": 4,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 12,
+        "tests_total": 12,
+        "tool_calls": 8,
+        "retries": 0,
+        "depth": 1,
+        "files_created": [
+          "test_app.py"
+        ],
+        "prompt_tokens": 203,
+        "completion_tokens": 213,
+        "reasoning_tokens": 0
+      }
+    },
+    {
+      "session_number": 2,
+      "task_type": "feature_addition",
+      "prompt": "Add JWT authentication to the existing task management API.\n\nNEW MODEL:\n- User: id (int, auto), username (str, unique), password_hash (str)\n\nNEW ENDPOINTS:\n- POST /auth/register \u2014 create user (JSON: {",
+      "commit_hash": "b02d09d4b35b1d4611270756607db3f68d6f0db5",
+      "commit_message": "[story] Session 2: feature_addition",
+      "cost_usd": 0.000192444,
+      "total_tokens": 31657,
+      "duration_s": 250.53484684901196,
+      "files_changed": 0,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 26,
+        "tests_total": 26,
+        "tool_calls": 14,
+        "retries": 2,
+        "depth": 3,
+        "files_created": [],
+        "prompt_tokens": 158,
+        "completion_tokens": 11,
+        "reasoning_tokens": 0
+      }
+    },
+    {
+      "session_number": 3,
+      "task_type": "integration",
+      "prompt": "Add an async email notification system to the task management API.\n\nREQUIREMENT:\nWhen a task's status changes to 'completed', send a notification email to the task owner asynchronously (do not block t",
+      "commit_hash": "9e57e8534bf1c7c83e9516216a0ef7c5f7536e13",
+      "commit_message": "[story] Session 3: integration",
+      "cost_usd": 0.000450399,
+      "total_tokens": 28169,
+      "duration_s": 189.1411024729896,
+      "files_changed": 3,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 29,
+        "tests_total": 29,
+        "tool_calls": 19,
+        "retries": 2,
+        "depth": 7,
+        "files_created": [
+          "celery_config.py",
+          "requirements.txt"
+        ],
+        "prompt_tokens": 237,
+        "completion_tokens": 275,
+        "reasoning_tokens": 9
+      }
+    },
+    {
+      "session_number": 4,
+      "task_type": "refactor",
+      "prompt": "Refactor the data access layer to use the Repository pattern.\n\nREQUIREMENT:\nExtract all database operations into repository classes. The API routes should NOT directly access SQLite.\n\nIMPLEMENTATION:\n",
+      "commit_hash": "13a97757fea052638583695cb0618577998dd28f",
+      "commit_message": "[story] Session 4: refactor",
+      "cost_usd": 0.000297685,
+      "total_tokens": 29724,
+      "duration_s": 248.81858018497587,
+      "files_changed": 2,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 29,
+        "tests_total": 29,
+        "tool_calls": 13,
+        "retries": 2,
+        "depth": 3,
+        "files_created": [
+          "repositories.py"
+        ],
+        "prompt_tokens": 129,
+        "completion_tokens": 145,
+        "reasoning_tokens": 10
+      }
+    },
+    {
+      "session_number": 5,
+      "task_type": "cross_cutting",
+      "prompt": "Add rate limiting and pagination to the task management API.\n\nRATE LIMITING:\n- Limit each authenticated user to 100 requests per minute\n- Use Flask-Limiter with Redis as the storage backend\n- Return 4",
+      "commit_hash": "9386a399c0ef9047ca033b3bc62941a517430a26",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "cost_usd": 0.000313519,
+      "total_tokens": 43994,
+      "duration_s": 526.0350429239916,
+      "files_changed": 0,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 38,
+        "tests_total": 38,
+        "tool_calls": 20,
+        "retries": 1,
+        "depth": 6,
+        "files_created": [],
+        "prompt_tokens": 335,
+        "completion_tokens": 11,
+        "reasoning_tokens": 0
+      }
+    }
+  ]
+}
