@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createServer = exports.serve = exports.TemplateEngine = exports.generateSite = exports.parseMarkdownFiles = void 0;
+exports.SSG = exports.createServer = exports.serve = exports.TemplateEngine = exports.generateSite = exports.parseMarkdownFiles = void 0;
 var parser_1 = require("./parser");
 Object.defineProperty(exports, "parseMarkdownFiles", { enumerable: true, get: function () { return parser_1.parseMarkdownFiles; } });
 var generator_1 = require("./generator");
@@ -10,4 +10,6 @@ Object.defineProperty(exports, "TemplateEngine", { enumerable: true, get: functi
 var server_1 = require("./server");
 Object.defineProperty(exports, "serve", { enumerable: true, get: function () { return server_1.serve; } });
 Object.defineProperty(exports, "createServer", { enumerable: true, get: function () { return server_1.createServer; } });
+var ssg_1 = require("./ssg");
+Object.defineProperty(exports, "SSG", { enumerable: true, get: function () { return ssg_1.SSG; } });
 //# sourceMappingURL=index.js.map

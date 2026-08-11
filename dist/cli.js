@@ -22,15 +22,38 @@ function parseArgs(args) {
             options.port = parseInt(args[i + 1], 10) || 3000;
             i++;
         }
+        else if (args[i] === '--config' && i + 1 < args.length) {
+            options.config = args[i + 1];
+            i++;
+        }
     }
     return options;
 }
+function loadCliConfig(options) {
+    if (!options.config)
+        return options;
+    try {
+        const configPath = require('path').resolve(options.config);
+        const mod = require(configPath);
+        const cfg = mod.default || mod;
+        return {
+            content: cfg.contentDir || options.content,
+            output: cfg.outputDir || options.output,
+            templates: cfg.templatesDir || options.templates,
+            port: cfg.port || options.port,
+        };
+    }
+    catch {
+        return options;
+    }
+}
 const args = process.argv.slice(2);
 if (args.length === 0 || (args[0] !== 'build' && args[0] !== 'serve')) {
-    console.error('Usage: ssg build|serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
+    console.error('Usage: ssg build|serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>] [--config <file>]');
     process.exit(1);
 }
-const options = parseArgs(args.slice(1));
+const cliOptions = parseArgs(args.slice(1));
+const options = loadCliConfig(cliOptions);
 if (args[0] === 'build') {
     const pages = (0, index_1.parseMarkdownFiles)(options.content);
     (0, index_1.generateSite)(pages, options.output, options.templates);
