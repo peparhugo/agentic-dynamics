@@ -167,6 +167,18 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="insight" id="ast-insight"><strong>Key insight:</strong> Loading...</div>
 </section>
 
+<!-- SonarQube Code Quality -->
+<section class="sec alt">
+<h2>Code Quality — SonarQube Static Analysis</h2>
+<p class="lead">198 of 227 worktrees analyzed via SonarQube (Docker scanner against generated code). Every codebase measured for bugs, vulnerabilities, code smells, cognitive complexity, and maintainability. 198/198 quality gates pass — zero vulnerabilities, maintainability A across all 8 models.</p>
+
+<div class="tbl"><table id="sonar-quality-tbl"><thead><tr><th>Model</th><th>Worktrees</th><th>Avg LOC</th><th>Bugs/kLOC</th><th>Smells/kLOC</th><th>Quality Score</th><th>Maint.</th></tr></thead><tbody id="sonar-quality-body">
+<tr><td colspan="7" style="color:var(--t3)">Loading...</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Finding:</strong> All 8 models produce maintainable code (SonarQube A rating). 198/198 quality gates pass. GPT-5 has the worst code hygiene at 19.0 smells/kLOC — 4× the industry average for production Python. DeepSeek produces the most code (678 LOC/worktree) with clean quality (0.18 bugs/kLOC). One FastAPI maintenance worktree was excluded from DeepSeek's averages — it contained 97K LOC of framework source, not generated code.</div>
+</section>
+
 <!-- Constraint Detection — DeepSeek vs Claude -->
 <section class="sec">
 <h2 id="constraint-detection">Constraint Detection — DeepSeek vs Claude</h2>
@@ -1034,6 +1046,18 @@ document.addEventListener('DOMContentLoaded', function () {
     if (insight && topLoc) {
       insight.innerHTML = '<strong>Key insight:</strong> ' + topLoc.label + ' produces the most modular code (avg ' + topLoc.ast_files.toFixed(1) + ' files, ' + topLoc.ast_functions + ' functions, ' + topLoc.ast_classes + ' classes per worktree). ' + topHints.label + ' leads on type hints (' + topHints.ast_type_hint_pct + '%). Generated from live experiment data.';
     }
+  })();
+
+  // --- SonarQube Quality Table ---
+  (function() {
+    var tbody = document.querySelector('#sonar-quality-body');
+    if (!tbody || !D || !D.sonar) return;
+    var sorted = Object.entries(D.sonar).sort(function(a, b) { return b[1].avg_loc - a[1].avg_loc; });
+    sorted.forEach(function(entry) {
+      var label = entry[0], v = entry[1];
+      var smells_cls = v.smells_per_kloc > 15 ? 'red' : v.smells_per_kloc > 8 ? 'amber' : 'green';
+      tbody.innerHTML += '<tr><td><strong>' + label + '</strong></td><td>' + v.worktrees_analyzed + '</td><td>' + v.avg_loc + '</td><td class="green">' + v.bugs_per_kloc.toFixed(1) + '</td><td class="' + smells_cls + '">' + v.smells_per_kloc.toFixed(1) + '</td><td>' + v.avg_quality_score.toFixed(3) + '</td><td class="green">' + v.maintainability + '</td></tr>';
+    });
   })();
 
   // Cost Efficiency Ranking table

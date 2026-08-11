@@ -81,6 +81,51 @@ def _load_grit_matrix():
         return []
 
 
+def _compute_sonar(entries):
+    """Per-model SonarQube quality aggregates, excluding known library-copy outliers."""
+    from collections import defaultdict
+    import math
+
+    SONAR_OUTLIERS = {"exp_batch_fastapi_maintenance_natural"}
+    models = defaultdict(lambda: {"bugs": [], "smells": [], "ncloc": [],
+                                   "scores": [], "ratings": [], "gates_ok": 0, "total": 0})
+
+    for e in entries:
+        if not e.get("sonar_analyzed"):
+            continue
+        if e.get("worktree_name", "") in SONAR_OUTLIERS:
+            continue
+        model = e.get("model", "unknown")
+        m = models[model]
+        m["bugs"].append(e.get("sonar_bugs", 0))
+        m["smells"].append(e.get("sonar_code_smells", 0))
+        m["ncloc"].append(e.get("sonar_ncloc", 0))
+        m["scores"].append(e.get("sonar_quality_score", 0))
+        m["ratings"].append(e.get("sonar_maintainability_rating", ""))
+        m["total"] += 1
+        if e.get("sonar_quality_gate", "").upper() == "OK":
+            m["gates_ok"] += 1
+
+    result = {}
+    for mid, v in sorted(models.items()):
+        if not v["ncloc"]:
+            continue
+        total_loc = sum(v["ncloc"])
+        label = mid.split("/")[-1]
+        result[label] = {
+            "avg_bugs": round(sum(v["bugs"]) / len(v["bugs"]), 1),
+            "avg_smells": round(sum(v["smells"]) / len(v["smells"]), 1),
+            "avg_loc": round(total_loc / len(v["ncloc"])),
+            "bugs_per_kloc": round(sum(v["bugs"]) / max(total_loc, 1) * 1000, 1),
+            "smells_per_kloc": round(sum(v["smells"]) / max(total_loc, 1) * 1000, 1),
+            "avg_quality_score": round(sum(v["scores"]) / len(v["scores"]), 3),
+            "maintainability": max(set(v["ratings"]), key=v["ratings"].count) if v["ratings"] else "?",
+            "gate_pass_rate": round(v["gates_ok"] / v["total"] * 100) if v["total"] > 0 else 0,
+            "worktrees_analyzed": v["total"],
+        }
+    return result
+
+
 def count_game_reports():
 
     if not REPORTS_DIR.exists():
@@ -533,6 +578,7 @@ def build():
         "energy_ranking": energy_ranking,
         "strategy_distribution": summary.get("strategy_distribution", {}),
         "grit_matrix": _load_grit_matrix(),
+        "sonar": _compute_sonar(entries),
         "design_parameters": {
             "beta": {"value": 0.001, "provenance": "design", "note": "Context inflation rate — calibrate to your codebase"},
             "woc_healthy": {"value": 0.85, "provenance": "design"},
