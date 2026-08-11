@@ -17,3 +17,10 @@ export interface BuildOptions {
   outputDir: string;
   templatesDir?: string;
 }
+
+export interface ServeOptions {
+  contentDir: string;
+  outputDir: string;
+  templatesDir?: string;
+  port: number;
+}

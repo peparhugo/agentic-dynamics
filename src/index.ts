@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 
 import { build } from './build';
-import { BuildOptions } from './types';
+import { serve } from './serve';
+import { BuildOptions, ServeOptions } from './types';
 
-function parseArgs(argv: string[]): BuildOptions {
+function parseBuildArgs(argv: string[]): BuildOptions {
   const contentIdx = argv.indexOf('--content');
   const outputIdx = argv.indexOf('--output');
   const templatesIdx = argv.indexOf('--templates');
@@ -15,11 +16,23 @@ function parseArgs(argv: string[]): BuildOptions {
   };
 }
 
+function parseServeArgs(argv: string[]): ServeOptions {
+  const buildOptions = parseBuildArgs(argv);
+  const portIdx = argv.indexOf('--port');
+  const port = portIdx !== -1 ? parseInt(argv[portIdx + 1], 10) : 3000;
+  return {
+    contentDir: buildOptions.contentDir,
+    outputDir: buildOptions.outputDir,
+    templatesDir: buildOptions.templatesDir,
+    port: isNaN(port) ? 3000 : port,
+  };
+}
+
 const args = process.argv.slice(2);
 const command = args[0];
 
 if (command === 'build') {
-  const options = parseArgs(args);
+  const options = parseBuildArgs(args);
   try {
     build(options);
     console.log(`Site built successfully in ${options.outputDir}`);
@@ -27,7 +40,11 @@ if (command === 'build') {
     console.error('Error building site:', (err as Error).message);
     process.exit(1);
   }
+} else if (command === 'serve') {
+  const options = parseServeArgs(args);
+  serve(options);
 } else {
   console.log('Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  console.log('       npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
   process.exit(0);
 }
