@@ -1,12 +1,13 @@
 import os
 import sqlite3
-from datetime import datetime
 from functools import wraps
 
 import jwt
 from celery_config import celery_app, send_notification_email
 from flask import Flask, g, jsonify, request
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
+
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -61,36 +62,6 @@ def init_db():
     db.commit()
 
 
-def create_user(username: str, password: str, email: str | None = None) -> dict | None:
-    db = get_db()
-    password_hash = generate_password_hash(password)
-    try:
-        cursor = db.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        db.commit()
-        return {"id": cursor.lastrowid, "username": username, "email": email}
-    except sqlite3.IntegrityError:
-        return None
-
-
-def get_user_by_username(username: str) -> dict | None:
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM users WHERE username = ?", (username,)
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def get_user_email(user_id: int) -> str | None:
-    db = get_db()
-    row = db.execute(
-        "SELECT email FROM users WHERE id = ?", (user_id,)
-    ).fetchone()
-    return row["email"] if row else None
-
-
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -112,68 +83,6 @@ def login_required(f):
     return decorated
 
 
-def create_task(title: str, owner_id: int) -> dict:
-    now = datetime.utcnow().isoformat()
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-        (title, now, owner_id),
-    )
-    db.commit()
-    return {
-        "id": cursor.lastrowid,
-        "title": title,
-        "status": "pending",
-        "created_at": now,
-        "owner_id": owner_id,
-    }
-
-
-def get_tasks(owner_id: int):
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-        (owner_id,),
-    ).fetchall()
-    return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int) -> dict | None:
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-        (task_id, owner_id),
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def update_task(
-    task_id: int,
-    owner_id: int,
-    title: str | None = None,
-    status: str | None = None,
-) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    db = get_db()
-    updates = []
-    params = []
-    if title is not None:
-        updates.append("title = ?")
-        params.append(title)
-    if status is not None:
-        updates.append("status = ?")
-        params.append(status)
-    if updates:
-        params.append(task_id)
-        db.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-        )
-        db.commit()
-    return get_task(task_id, owner_id)
-
-
 @app.route("/auth/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
@@ -182,7 +91,9 @@ def register():
     email = data.get("email", "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password, email)
+    db = get_db()
+    user_repo = UserRepository(db)
+    user = user_repo.create(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user["id"], "username": user["username"]}), 201
@@ -195,7 +106,9 @@ def login():
     password = data.get("password", "").strip()
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = get_user_by_username(username)
+    db = get_db()
+    user_repo = UserRepository(db)
+    user = user_repo.get_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     token = jwt.encode({"user_id": user["id"]}, app.secret_key, algorithm="HS256")
@@ -205,7 +118,9 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    db = get_db()
+    task_repo = TaskRepository(db)
+    return jsonify(task_repo.list_by_owner(g.user_id))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -215,14 +130,18 @@ def add_task():
     title = data.get("title", "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title, g.user_id)
+    db = get_db()
+    task_repo = TaskRepository(db)
+    task = task_repo.create(title, g.user_id)
     return jsonify(task), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @login_required
 def show_task(task_id: int):
-    task = get_task(task_id, g.user_id)
+    db = get_db()
+    task_repo = TaskRepository(db)
+    task = task_repo.get_by_id(task_id, g.user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -232,7 +151,10 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
-    task = update_task(
+    db = get_db()
+    task_repo = TaskRepository(db)
+    user_repo = UserRepository(db)
+    task = task_repo.update(
         task_id,
         g.user_id,
         title=data.get("title"),
@@ -241,7 +163,7 @@ def edit_task(task_id: int):
     if task is None:
         return jsonify({"error": "task not found"}), 404
     if task.get("status") == "completed":
-        user_email = get_user_email(g.user_id) or "unknown@example.com"
+        user_email = user_repo.get_email(g.user_id) or "unknown@example.com"
         send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
