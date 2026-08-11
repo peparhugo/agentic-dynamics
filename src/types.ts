@@ -12,3 +12,9 @@ export interface Page {
   content: string;
   html: string;
 }
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  totalPages: number;
+}
