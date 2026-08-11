@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
+    "handlebars": "^4.7.9",
     "marked": "^15.0.4"
   },
   "devDependencies": {

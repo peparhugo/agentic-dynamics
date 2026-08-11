@@ -1,0 +1,6 @@
+<h1>All Pages</h1>
+<ul>
+{{#each pages}}
+  <li><a href="{{slug}}.html">{{title}}</a>{{#if date}} <span class="date">{{date}}</span>{{/if}}</li>
+{{/each}}
+</ul>

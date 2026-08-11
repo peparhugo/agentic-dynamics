@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
-import { Page, BuildOptions } from './types';
+import Handlebars from 'handlebars';
+import { Page, BuildOptions, Frontmatter } from './types';
 
 function readPages(contentDir: string): Page[] {
   const absDir = path.resolve(contentDir);
@@ -41,12 +42,23 @@ function readPages(contentDir: string): Page[] {
       tags = rawData.tags.map((t) => String(t));
     }
 
+    const frontmatter: Frontmatter = {
+      title: rawData.title,
+      date,
+      tags,
+    };
+
+    if (rawData.template && typeof rawData.template === 'string') {
+      frontmatter.template = rawData.template;
+    }
+    if (rawData.layout === false || rawData.layout === '') {
+      frontmatter.layout = '';
+    } else if (rawData.layout && typeof rawData.layout === 'string') {
+      frontmatter.layout = rawData.layout;
+    }
+
     pages.push({
-      frontmatter: {
-        title: rawData.title,
-        date,
-        tags,
-      },
+      frontmatter,
       content: parsed.content,
       slug,
     });
@@ -64,74 +76,187 @@ function readPages(contentDir: string): Page[] {
   return pages;
 }
 
-function renderPageTemplate(page: Page): string {
-  const htmlContent = marked.parse(page.content, { async: false }) as string;
-  const dateStr = page.frontmatter.date
-    ? `<p class="date">${page.frontmatter.date}</p>`
-    : '';
-  const tagsStr =
-    page.frontmatter.tags && page.frontmatter.tags.length > 0
-      ? `<p class="tags">Tags: ${page.frontmatter.tags.join(', ')}</p>`
-      : '';
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${page.frontmatter.title}</title>
-</head>
-<body>
-  <nav><a href="index.html">Home</a></nav>
-  <article>
-    <h1>${page.frontmatter.title}</h1>
-    ${dateStr}
-    ${tagsStr}
-    <div>${htmlContent}</div>
-  </article>
-</body>
-</html>`;
+function loadPartial(partialsDir: string, name: string): void {
+  const filePath = path.join(partialsDir, `${name}.hbs`);
+  if (fs.existsSync(filePath)) {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    Handlebars.registerPartial(name, content);
+  }
 }
 
-function renderIndexTemplate(pages: Page[]): string {
-  const listItems = pages
-    .map((page) => {
-      const dateStr = page.frontmatter.date
-        ? `<span class="date">${page.frontmatter.date}</span>`
-        : '';
-      return `    <li><a href="${page.slug}.html">${page.frontmatter.title}</a> ${dateStr}</li>`;
-    })
-    .join('\n');
+function loadPartialDir(partialsDir: string): void {
+  if (!fs.existsSync(partialsDir)) return;
+  const entries = fs.readdirSync(partialsDir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.hbs')) continue;
+    const name = path.basename(entry.name, '.hbs');
+    const content = fs.readFileSync(path.join(partialsDir, entry.name), 'utf-8');
+    Handlebars.registerPartial(name, content);
+  }
+}
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Site</title>
-</head>
-<body>
-  <h1>All Pages</h1>
-  <ul>
-${listItems}
-  </ul>
-</body>
-</html>`;
+function compileFile(filePath: string): Handlebars.TemplateDelegate {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`Template not found: ${filePath}`);
+  }
+  const content = fs.readFileSync(filePath, 'utf-8');
+  return Handlebars.compile(content);
+}
+
+interface TemplateEnv {
+  compiledTemplates: Record<string, Handlebars.TemplateDelegate>;
+  compiledLayouts: Record<string, Handlebars.TemplateDelegate>;
+}
+
+function createTemplateEnv(templatesDir: string): TemplateEnv {
+  Handlebars.registerPartial('nav', '');
+
+  const partialsDir = path.join(templatesDir, 'partials');
+  loadPartialDir(partialsDir);
+
+  const layoutsDir = path.join(templatesDir, 'layouts');
+  const compiledTemplates: Record<string, Handlebars.TemplateDelegate> = {};
+  const compiledLayouts: Record<string, Handlebars.TemplateDelegate> = {};
+
+  if (fs.existsSync(templatesDir)) {
+    const entries = fs.readdirSync(templatesDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.hbs')) continue;
+      const name = path.basename(entry.name, '.hbs');
+      const content = fs.readFileSync(path.join(templatesDir, entry.name), 'utf-8');
+      compiledTemplates[name] = Handlebars.compile(content);
+    }
+  }
+
+  if (fs.existsSync(layoutsDir)) {
+    const entries = fs.readdirSync(layoutsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.hbs')) continue;
+      const name = path.basename(entry.name, '.hbs');
+      const content = fs.readFileSync(path.join(layoutsDir, entry.name), 'utf-8');
+      compiledLayouts[name] = Handlebars.compile(content);
+    }
+  }
+
+  return { compiledTemplates, compiledLayouts };
+}
+
+function resolveTemplate(
+  templateName: string | undefined,
+  compiledTemplates: Record<string, Handlebars.TemplateDelegate>,
+  defaultName: string,
+): Handlebars.TemplateDelegate {
+  const name = templateName || defaultName;
+  const tmpl = compiledTemplates[name];
+  if (!tmpl) {
+    throw new Error(`Template not found: ${name}`);
+  }
+  return tmpl;
+}
+
+function resolveLayout(
+  layoutName: string | undefined,
+  compiledLayouts: Record<string, Handlebars.TemplateDelegate>,
+  defaultName: string,
+): Handlebars.TemplateDelegate | null {
+  if (layoutName === '') return null;
+  const name = layoutName || defaultName;
+  if (!compiledLayouts[name]) {
+    if (layoutName) {
+      throw new Error(`Layout not found: ${layoutName}`);
+    }
+    return null;
+  }
+  return compiledLayouts[name];
+}
+
+function renderPage(
+  page: Page,
+  env: TemplateEnv,
+): string {
+  const htmlContent = marked.parse(page.content, { async: false }) as string;
+
+  const templateName = page.frontmatter.template || 'page';
+  const layoutName = page.frontmatter.layout || 'default';
+
+  const template = resolveTemplate(page.frontmatter.template, env.compiledTemplates, 'page');
+  const layout = resolveLayout(page.frontmatter.layout, env.compiledLayouts, 'default');
+
+  const tagsList = page.frontmatter.tags && page.frontmatter.tags.length > 0
+    ? page.frontmatter.tags.join(', ')
+    : '';
+
+  const context = {
+    title: page.frontmatter.title,
+    date: page.frontmatter.date || null,
+    tags: page.frontmatter.tags || [],
+    tagsList,
+    content: htmlContent,
+    slug: page.slug,
+  };
+
+  const renderedContent = template(context);
+
+  if (!layout) {
+    return renderedContent;
+  }
+
+  return layout({
+    title: page.frontmatter.title,
+    body: renderedContent,
+  });
+}
+
+function renderIndex(
+  pages: Page[],
+  env: TemplateEnv,
+): string {
+  const template = resolveTemplate(undefined, env.compiledTemplates, 'index');
+  const layout = resolveLayout(undefined, env.compiledLayouts, 'default');
+
+  const pagesData = pages.map((page) => ({
+    title: page.frontmatter.title,
+    slug: page.slug,
+    date: page.frontmatter.date || null,
+  }));
+
+  const context = {
+    title: 'My Site',
+    pages: pagesData,
+  };
+
+  const renderedContent = template(context);
+
+  if (!layout) {
+    return renderedContent;
+  }
+
+  return layout({
+    title: 'My Site',
+    body: renderedContent,
+  });
 }
 
 export function build(options: BuildOptions): void {
   const { contentDir, outputDir } = options;
+  const templatesDir = path.resolve(options.templatesDir || './templates');
+
+  if (!fs.existsSync(templatesDir)) {
+    throw new Error(`Templates directory not found: ${templatesDir}`);
+  }
+
   const pages = readPages(contentDir);
+  const env = createTemplateEnv(templatesDir);
 
   const absOutputDir = path.resolve(outputDir);
   fs.mkdirSync(absOutputDir, { recursive: true });
 
   for (const page of pages) {
-    const html = renderPageTemplate(page);
+    const html = renderPage(page, env);
     const outPath = path.join(absOutputDir, `${page.slug}.html`);
     fs.writeFileSync(outPath, html, 'utf-8');
   }
 
-  const indexHtml = renderIndexTemplate(pages);
+  const indexHtml = renderIndex(pages, env);
   fs.writeFileSync(path.join(absOutputDir, 'index.html'), indexHtml, 'utf-8');
 }
