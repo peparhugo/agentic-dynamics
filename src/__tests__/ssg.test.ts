@@ -1,7 +1,9 @@
 import path from "path";
 import { promises as fs } from "fs";
 import os from "os";
+import http from "http";
 import { build } from "../index";
+import { startDevServer, injectLiveReloadScript } from "../dev-server";
 
 let testDir: string;
 
@@ -501,5 +503,390 @@ title: Basic
     );
     expect(html).toContain("Basic");
     expect(html).toContain("<h1>Basic Page</h1>");
+  });
+});
+
+describe("dev server", () => {
+  let servers: Array<{
+    close: () => Promise<void>;
+  }> = [];
+
+  afterEach(async () => {
+    for (const s of servers) {
+      await s.close();
+    }
+    servers = [];
+  });
+
+  function httpGet(url: string): Promise<{ body: string; status: number; headers: http.IncomingHttpHeaders }> {
+    return new Promise((resolve, reject) => {
+      http.get(url, (res) => {
+        let body = "";
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+        res.on("end", () => {
+          resolve({ body, status: res.statusCode || 0, headers: res.headers });
+        });
+      }).on("error", reject);
+    });
+  }
+
+  function getPort(): number {
+    return 4000 + Math.floor(Math.random() * 1000);
+  }
+
+  test("injectLiveReloadScript injects script before closing body tag", () => {
+    const html =
+      "<html><head></head><body><p>Hello</p></body></html>";
+    const result = injectLiveReloadScript(html, 3000);
+
+    expect(result).toContain("ws://localhost:3000/__livereload");
+    expect(result).toContain("WebSocket");
+    expect(result).toContain("window.location.reload");
+    expect(result).toContain("<p>Hello</p>");
+
+    const bodyCloseIdx = result.lastIndexOf("</body>");
+    const scriptIdx = result.indexOf("WebSocket");
+    expect(scriptIdx).toBeLessThan(bodyCloseIdx);
+  });
+
+  test("dev server serves HTML pages with live reload script", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "test.md"),
+      `---
+title: Dev Test
+---
+
+# Dev Header
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${port}/test.html`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toContain("<title>Dev Test</title>");
+    expect(body).toContain("<h1>Dev Header</h1>");
+    expect(body).toContain("ws://localhost:" + port + "/__livereload");
+    expect(body).toContain("window.location.reload");
+  });
+
+  test("dev server serves index.html at root path with live reload script", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "home.md"),
+      `---
+title: Home Page
+---
+
+# Welcome
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${port}/`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toContain("Home Page");
+    expect(body).toContain("window.location.reload");
+  });
+
+  test("dev server returns 404 for missing files", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "only.md"),
+      `---
+title: Only
+---
+
+# Only page
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${port}/nonexistent.html`
+    );
+
+    expect(status).toBe(404);
+    expect(body).toBe("Not Found");
+  });
+
+  test("dev server does not inject script into non-HTML files", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "page.md"),
+      `---
+title: Page
+---
+
+# Page
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    await fs.writeFile(
+      path.join(outputDir, "style.css"),
+      "body { color: red; }",
+      "utf-8"
+    );
+
+    const { body, status, headers } = await httpGet(
+      `http://localhost:${port}/style.css`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toBe("body { color: red; }");
+    expect(body).not.toContain("WebSocket");
+    expect(headers["content-type"]).toContain("text/css");
+  });
+
+  test("dev server serves pages from subdirectories", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    const subDir = path.join(contentDir, "blog");
+    await fs.mkdir(subDir, { recursive: true });
+    await fs.writeFile(
+      path.join(subDir, "post.md"),
+      `---
+title: Blog Post
+---
+
+# A Blog Post
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${port}/blog/post.html`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toContain("<title>Blog Post</title>");
+    expect(body).toContain("<h1>A Blog Post</h1>");
+    expect(body).toContain("window.location.reload");
+  });
+
+  test("dev server rebuilds on content file change", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "dynamic.md"),
+      `---
+title: Original
+---
+
+# Original Content
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    let { body } = await httpGet(
+      `http://localhost:${port}/dynamic.html`
+    );
+    expect(body).toContain("<title>Original</title>");
+    expect(body).toContain("<h1>Original Content</h1>");
+
+    await fs.writeFile(
+      path.join(contentDir, "dynamic.md"),
+      `---
+title: Updated
+---
+
+# Updated Content
+`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const { body: body2 } = await httpGet(
+      `http://localhost:${port}/dynamic.html`
+    );
+    expect(body2).toContain("<title>Updated</title>");
+    expect(body2).toContain("<h1>Updated Content</h1>");
+  });
+
+  test("dev server rebuilds on template file change", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+    const templatesDir = path.join(testDir, "templates");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.mkdir(templatesDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(templatesDir, "default.hbs"),
+      `<html><body>TEMPLATE_V1: {{{content}}}</body></html>`
+    );
+    await fs.writeFile(
+      path.join(contentDir, "tmpl.md"),
+      `---
+title: Template Test
+---
+
+# Content
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      templatesDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    let { body } = await httpGet(
+      `http://localhost:${port}/tmpl.html`
+    );
+    expect(body).toContain("TEMPLATE_V1");
+
+    await fs.writeFile(
+      path.join(templatesDir, "default.hbs"),
+      `<html><body>TEMPLATE_V2: {{{content}}}</body></html>`
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const { body: body2 } = await httpGet(
+      `http://localhost:${port}/tmpl.html`
+    );
+    expect(body2).toContain("TEMPLATE_V2");
+  });
+
+  test("dev server uses custom port option", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "porttest.md"),
+      `---
+title: Port Test
+---
+
+# Port
+`
+    );
+
+    const customPort = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port: customPort,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${customPort}/porttest.html`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toContain("Port Test");
+    expect(body).toContain("ws://localhost:" + customPort + "/__livereload");
+  });
+
+  test("dev server injects live reload script into index.html", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, "idx.md"),
+      `---
+title: Indexed
+---
+
+# Indexed
+`
+    );
+
+    const port = getPort();
+    const dev = await startDevServer({
+      contentDir,
+      outputDir,
+      port,
+    });
+
+    servers.push(dev);
+
+    const { body, status } = await httpGet(
+      `http://localhost:${port}/index.html`
+    );
+
+    expect(status).toBe(200);
+    expect(body).toContain("window.location.reload");
   });
 });
