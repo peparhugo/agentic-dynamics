@@ -19,10 +19,16 @@ const ssg_1 = require("./ssg");
     type: 'string',
     default: './dist',
     describe: 'Output directory for generated HTML',
+})
+    .option('templates', {
+    type: 'string',
+    default: './templates',
+    describe: 'Template directory',
 }), (argv) => {
     (0, ssg_1.build)({
         contentDir: argv.content,
         outputDir: argv.output,
+        templateDir: argv.templates,
     });
 })
     .demandCommand(1, 'Please specify a command: build')

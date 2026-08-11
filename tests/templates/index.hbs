@@ -1,0 +1,10 @@
+{{> header}}
+<main>
+  <h1>Pages</h1>
+  <ul>
+    {{#each pages}}
+    <li><a href="{{slug}}.html">{{title}}</a>{{#if dateFormatted}} — {{dateFormatted}}{{/if}}{{#if tagsStr}} [{{tagsStr}}]{{/if}}</li>
+    {{/each}}
+  </ul>
+</main>
+{{> footer}}

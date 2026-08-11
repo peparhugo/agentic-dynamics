@@ -2,6 +2,8 @@ export interface Frontmatter {
   title: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface Page {
@@ -13,4 +15,20 @@ export interface Page {
 export interface SSGOptions {
   contentDir: string;
   outputDir: string;
+  templateDir?: string;
+}
+
+export interface PageTemplateData {
+  title: string;
+  date?: string;
+  dateFormatted?: string;
+  tags?: string[];
+  tagsStr?: string;
+  content: string;
+  slug: string;
+}
+
+export interface IndexTemplateData {
+  title: string;
+  pages: PageTemplateData[];
 }

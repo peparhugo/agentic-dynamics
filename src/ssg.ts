@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
-import { Page, SSGOptions } from './types';
+import { Page, SSGOptions, PageTemplateData } from './types';
+import { TemplateEngine } from './template-engine';
 
 function slugify(filename: string): string {
   const name = path.basename(filename, path.extname(filename));
@@ -28,78 +29,35 @@ function parsePage(filePath: string): Page {
       title: data.title || slug,
       date: data.date,
       tags: data.tags,
+      template: data.template,
+      layout: data.layout,
     },
     html,
     slug,
   };
 }
 
-function buildPageHTML(page: Page): string {
+function toTemplateData(page: Page): PageTemplateData {
   const { title, date, tags } = page.frontmatter;
-  const tagsHtml = tags && tags.length > 0
-    ? `<div class="tags">Tags: ${tags.join(', ')}</div>`
-    : '';
-  const dateHtml = date
-    ? `<div class="date">${new Date(date).toLocaleDateString()}</div>`
-    : '';
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-</head>
-<body>
-  <main>
-    <article>
-      <h1>${title}</h1>
-      ${dateHtml}
-      ${tagsHtml}
-      ${page.html}
-    </article>
-  </main>
-  <footer>
-    <a href="index.html">Back to index</a>
-  </footer>
-</body>
-</html>`;
-}
-
-function buildIndexHTML(pages: Page[]): string {
-  const listItems = pages
-    .map(page => {
-      const { title, date, tags } = page.frontmatter;
-      const dateStr = date ? ` — ${new Date(date).toLocaleDateString()}` : '';
-      const tagsStr = tags && tags.length > 0 ? ` [${tags.join(', ')}]` : '';
-      return `<li><a href="${page.slug}.html">${title}</a>${dateStr}${tagsStr}</li>`;
-    })
-    .join('\n      ');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Static Site</title>
-</head>
-<body>
-  <main>
-    <h1>Pages</h1>
-    <ul>
-      ${listItems}
-    </ul>
-  </main>
-</body>
-</html>`;
+  return {
+    title,
+    date,
+    dateFormatted: date ? new Date(date).toLocaleDateString('en-US') : undefined,
+    tags,
+    tagsStr: tags && tags.length > 0 ? tags.join(', ') : undefined,
+    content: page.html,
+    slug: page.slug,
+  };
 }
 
 export function build(options: SSGOptions): void {
-  const { contentDir, outputDir } = options;
+  const { contentDir, outputDir, templateDir } = options;
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
+
+  const engine = new TemplateEngine(templateDir);
 
   const files = readMarkdownFiles(contentDir);
   const pages: Page[] = [];
@@ -108,11 +66,16 @@ export function build(options: SSGOptions): void {
     const page = parsePage(file);
     pages.push(page);
 
-    const pageHTML = buildPageHTML(page);
+    const data = toTemplateData(page);
+    const pageHTML = engine.renderPage(data, page.frontmatter.template, page.frontmatter.layout);
     const outPath = path.join(outputDir, `${page.slug}.html`);
     fs.writeFileSync(outPath, pageHTML, 'utf-8');
   }
 
-  const indexHTML = buildIndexHTML(pages);
+  const indexData = {
+    title: 'My Static Site',
+    pages: pages.map(toTemplateData),
+  };
+  const indexHTML = engine.renderIndex(indexData);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHTML, 'utf-8');
 }

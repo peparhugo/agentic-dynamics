@@ -1,0 +1,10 @@
+{{> header}}
+<main>
+  <article>
+    <h1>{{title}}</h1>
+    {{#if dateFormatted}}<div class="date">{{dateFormatted}}</div>{{/if}}
+    {{#if tagsStr}}<div class="tags">Tags: {{tagsStr}}</div>{{/if}}
+    {{{content}}}
+  </article>
+</main>
+{{> footer}}

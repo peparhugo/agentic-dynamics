@@ -20,11 +20,17 @@ yargs(hideBin(process.argv))
           type: 'string',
           default: './dist',
           describe: 'Output directory for generated HTML',
+        })
+        .option('templates', {
+          type: 'string',
+          default: './templates',
+          describe: 'Template directory',
         }),
     (argv) => {
       build({
         contentDir: argv.content as string,
         outputDir: argv.output as string,
+        templateDir: argv.templates as string,
       });
     }
   )
