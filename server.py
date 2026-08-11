@@ -3,12 +3,52 @@ import json
 import os
 import sqlite3
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from http import HTTPStatus
 
 import websockets
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
+
+
+# ── Transport Error ──────────────────────────────────────────────
+
+
+class TransportError(Exception):
+    pass
+
+
+class ConnectionClosedError(TransportError):
+    pass
+
+
+# ── Base Transport ───────────────────────────────────────────────
+
+
+class BaseTransport(ABC):
+    @abstractmethod
+    async def on_connect(self, client):
+        """Called when a new client connects."""
+
+    @abstractmethod
+    async def on_disconnect(self, client):
+        """Called when a client disconnects."""
+
+    @abstractmethod
+    async def send_message(self, client, message_str):
+        """Send a message to a specific client."""
+
+    @abstractmethod
+    async def broadcast(self, clients, message_str, exclude=None):
+        """Send a message to all clients in the list."""
+
+    @abstractmethod
+    async def serve(self, handler, host, port, http_handler=None):
+        """Start the transport and process connections."""
+
+
+# ── Client Registry ──────────────────────────────────────────────
 
 
 class ClientRegistry:
@@ -80,6 +120,9 @@ class ClientRegistry:
 registry = ClientRegistry()
 
 
+# ── Message Helper ───────────────────────────────────────────────
+
+
 def message(type_, payload):
     return json.dumps({
         "type": type_,
@@ -88,35 +131,16 @@ def message(type_, payload):
     })
 
 
-async def broadcast(message_str, exclude=None):
-    clients = await registry.get_all()
-    for ws, _ in clients:
-        if ws is exclude:
-            continue
-        try:
-            await ws.send(message_str)
-        except ConnectionClosed:
-            await registry.unsubscribe_all(ws)
-            await registry.unregister(ws)
+# ── Config ───────────────────────────────────────────────────────
 
-
-async def broadcast_to_channel(message_str, channel):
-    subs = await registry.get_channel_websockets(channel)
-    for ws in subs:
-        try:
-            await ws.send(message_str)
-        except ConnectionClosed:
-            await registry.unsubscribe_all(ws)
-            await registry.unregister(ws)
-
-
-# ── Config ──────────────────────────────────────────────────────
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 SERVER_ID = str(uuid.uuid4())
 
-# ── SQLite Persistence ──────────────────────────────────────────
+
+# ── SQLite Persistence ───────────────────────────────────────────
+
 
 def _get_db():
     conn = sqlite3.connect(DATABASE_URL)
@@ -159,7 +183,7 @@ def _get_messages(limit=50, offset=0):
         return [dict(r) for r in rows]
 
 
-# ── Redis ───────────────────────────────────────────────────────
+# ── Redis ────────────────────────────────────────────────────────
 
 _redis_pool = None
 
@@ -246,7 +270,81 @@ async def _redis_subscriber():
             pass
 
 
-# ── Handler ─────────────────────────────────────────────────────
+# ── WebSocket Transport ──────────────────────────────────────────
+
+
+class WebSocketTransport(BaseTransport):
+    def __init__(self):
+        self._server = None
+
+    async def on_connect(self, client):
+        pass
+
+    async def on_disconnect(self, client):
+        pass
+
+    async def send_message(self, client, message_str):
+        await client.send(message_str)
+
+    async def broadcast(self, clients, message_str, exclude=None):
+        for client in clients:
+            if client is exclude:
+                continue
+            try:
+                await client.send(message_str)
+            except ConnectionClosed:
+                await registry.unsubscribe_all(client)
+                await registry.unregister(client)
+
+    async def serve(self, handler, host, port, http_handler=None):
+        async def _ws_handler(websocket):
+            await self.on_connect(websocket)
+            try:
+                await handler(websocket)
+            finally:
+                await self.on_disconnect(websocket)
+
+        async with serve(
+            _ws_handler,
+            host,
+            port,
+            process_request=http_handler,
+        ) as server:
+            self._server = server
+            await server.serve_forever()
+
+
+# ── Transport Factory ────────────────────────────────────────────
+
+
+def get_transport():
+    transport_type = os.environ.get("TRANSPORT", "websocket").lower()
+    if transport_type == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"Unknown transport type: {transport_type}")
+
+
+# ── Transport Module-Level Reference ─────────────────────────────
+
+transport = None
+
+
+# ── Broadcasting ─────────────────────────────────────────────────
+
+
+async def broadcast(message_str, exclude=None):
+    clients = await registry.get_all()
+    ws_list = [ws for ws, _ in clients]
+    await transport.broadcast(ws_list, message_str, exclude=exclude)
+
+
+async def broadcast_to_channel(message_str, channel):
+    subs = await registry.get_channel_websockets(channel)
+    await transport.broadcast(subs, message_str)
+
+
+# ── Handler ──────────────────────────────────────────────────────
+
 
 async def handler(websocket):
     client_id = await registry.register(websocket)
@@ -256,7 +354,7 @@ async def handler(websocket):
         "client_id": client_id,
         "message": "connected",
     })
-    await websocket.send(welcome)
+    await transport.send_message(websocket, welcome)
 
     _persist_message("system", {"client_id": client_id, "message": "connected"})
 
@@ -313,7 +411,8 @@ async def handler(websocket):
         await broadcast(leave_msg)
 
 
-# ── HTTP ────────────────────────────────────────────────────────
+# ── HTTP ─────────────────────────────────────────────────────────
+
 
 def _parse_query_string(path):
     limit = 50
@@ -370,21 +469,18 @@ async def process_request(connection, request):
     return None
 
 
-# ── Main ────────────────────────────────────────────────────────
+# ── Main ─────────────────────────────────────────────────────────
+
 
 async def main(host="localhost", port=8765):
+    global transport
     _init_db()
+    transport = get_transport()
     subscriber_task = None
     if REDIS_URL:
         subscriber_task = asyncio.ensure_future(_redis_subscriber())
     try:
-        async with serve(
-            handler,
-            host,
-            port,
-            process_request=process_request,
-        ) as server:
-            await server.serve_forever()
+        await transport.serve(handler, host, port, http_handler=process_request)
     finally:
         if subscriber_task:
             subscriber_task.cancel()
