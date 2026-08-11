@@ -4,8 +4,9 @@ import os
 import sqlite3
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from http import HTTPStatus
+from urllib.parse import unquote
 
 import websockets
 from websockets.asyncio.server import serve
@@ -137,6 +138,43 @@ def message(type_, payload):
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 SERVER_ID = str(uuid.uuid4())
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+
+
+# ── Rate Limiting ────────────────────────────────────────────────
+
+_rate_limit_cache = {}
+_rate_limit_lock = asyncio.Lock()
+
+
+async def _check_rate_limit(client_id):
+    window = 60
+    r = await _get_redis()
+    if r is not None:
+        try:
+            key = f"ratelimit:{client_id}"
+            pipe = r.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, window)
+            current = (await pipe.execute())[0]
+            if current > RATE_LIMIT:
+                return False
+            return True
+        except Exception:
+            pass
+
+    now = datetime.now(timezone.utc).timestamp()
+    async with _rate_limit_lock:
+        if client_id not in _rate_limit_cache:
+            _rate_limit_cache[client_id] = []
+        timestamps = _rate_limit_cache[client_id]
+        timestamps = [t for t in timestamps if now - t < window]
+        _rate_limit_cache[client_id] = timestamps
+        if len(timestamps) >= RATE_LIMIT:
+            return False
+        timestamps.append(now)
+        return True
 
 
 # ── SQLite Persistence ───────────────────────────────────────────
@@ -181,6 +219,45 @@ def _get_messages(limit=50, offset=0):
             (limit, offset),
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def _get_history(channel=None, since=None, limit=50):
+    with _get_db() as conn:
+        query = "SELECT * FROM messages WHERE 1=1"
+        params = []
+
+        if channel is not None:
+            query += " AND channel = ?"
+            params.append(channel)
+
+        if since is not None:
+            query += " AND timestamp > ?"
+            params.append(since)
+
+        query += " ORDER BY timestamp ASC LIMIT ?"
+        params.append(limit + 1)
+
+        rows = conn.execute(query, params).fetchall()
+        messages = [dict(r) for r in rows]
+        has_more = len(messages) > limit
+        if has_more:
+            messages = messages[:limit]
+        return messages, has_more
+
+
+async def _cleanup_expired_messages():
+    while True:
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=MESSAGE_TTL_DAYS)).isoformat()
+            with _get_db() as conn:
+                conn.execute(
+                    "DELETE FROM messages WHERE timestamp < ?",
+                    (cutoff,),
+                )
+                conn.commit()
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
 
 
 # ── Redis ────────────────────────────────────────────────────────
@@ -368,6 +445,10 @@ async def handler(websocket):
 
     try:
         async for raw in websocket:
+            if not await _check_rate_limit(client_id):
+                error_msg = message("error", {"message": "Rate limit exceeded. Please wait before sending more messages."})
+                await transport.send_message(websocket, error_msg)
+                continue
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
@@ -451,6 +532,38 @@ async def process_request(connection, request):
         response.headers["Content-Type"] = "application/json"
         return response
 
+    if request.path.startswith("/history"):
+        channel = None
+        since = None
+        limit = 50
+
+        if "?" in request.path:
+            qs = request.path.split("?", 1)[1]
+            for pair in qs.split("&"):
+                if "=" in pair:
+                    key, val = pair.split("=", 1)
+                    if key == "channel":
+                        channel = unquote(val)
+                    elif key == "since":
+                        since = unquote(val)
+                    elif key == "limit":
+                        try:
+                            limit = int(val)
+                        except ValueError:
+                            pass
+
+        if not channel:
+            body = json.dumps({"error": "channel parameter required"})
+            response = connection.respond(HTTPStatus.BAD_REQUEST, body)
+            response.headers["Content-Type"] = "application/json"
+            return response
+
+        messages, has_more = _get_history(channel=channel, since=since, limit=limit)
+        body = json.dumps({"messages": messages, "has_more": has_more})
+        response = connection.respond(HTTPStatus.OK, body)
+        response.headers["Content-Type"] = "application/json"
+        return response
+
     if request.path == "/channels":
         channels = await registry.get_channels()
         body = json.dumps(channels)
@@ -477,11 +590,17 @@ async def main(host="localhost", port=8765):
     _init_db()
     transport = get_transport()
     subscriber_task = None
+    cleanup_task = asyncio.ensure_future(_cleanup_expired_messages())
     if REDIS_URL:
         subscriber_task = asyncio.ensure_future(_redis_subscriber())
     try:
         await transport.serve(handler, host, port, http_handler=process_request)
     finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
         if subscriber_task:
             subscriber_task.cancel()
             try:

@@ -25,8 +25,10 @@ def _reset_registry():
 @pytest.fixture(autouse=True)
 def clean_registry():
     _reset_registry()
+    server._rate_limit_cache.clear()
     yield
     _reset_registry()
+    server._rate_limit_cache.clear()
 
 
 @pytest.fixture
@@ -905,3 +907,407 @@ async def test_redis_subscriber_receives_from_other_instance(server_args, redis_
         await _stop_server(task)
         server._redis_pool = old_pool
         server.SERVER_ID = old_server_id
+
+
+# ── New Tests: Rate Limiting ──────────────────────────────────────
+
+
+@pytest.fixture
+def rate_limit_env():
+    old_rate_limit = os.environ.get("RATE_LIMIT")
+    os.environ["RATE_LIMIT"] = "3"
+    server.RATE_LIMIT = 3
+    yield
+    if old_rate_limit is not None:
+        os.environ["RATE_LIMIT"] = old_rate_limit
+        server.RATE_LIMIT = int(old_rate_limit)
+    else:
+        os.environ.pop("RATE_LIMIT", None)
+        server.RATE_LIMIT = 100
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_blocks_excess_messages(server_args, rate_limit_env):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"index": i},
+                }))
+                raw = await asyncio.wait_for(ws.recv(), timeout=5)
+                msg = json.loads(raw)
+                assert msg["type"] == "broadcast"
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"index": 999},
+            }))
+            raw = await asyncio.wait_for(ws.recv(), timeout=5)
+            msg = json.loads(raw)
+            assert msg["type"] == "error"
+            assert "Rate limit exceeded" in msg["payload"]["message"]
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_configurable_via_env(server_args, rate_limit_env):
+    assert server.RATE_LIMIT == 3
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"index": i},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"index": 999},
+            }))
+            raw = await asyncio.wait_for(ws.recv(), timeout=5)
+            msg = json.loads(raw)
+            assert msg["type"] == "error"
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_sends_error_no_drop(server_args, rate_limit_env):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"index": i},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"index": 999},
+            }))
+            raw = await asyncio.wait_for(ws.recv(), timeout=5)
+            msg = json.loads(raw)
+            assert msg["type"] == "error"
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"index": 1000},
+            }))
+            raw = await asyncio.wait_for(ws.recv(), timeout=5)
+            msg2 = json.loads(raw)
+            assert msg2["type"] == "error"
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            await asyncio.sleep(0.05)
+            channels = await server.registry.get_channels()
+            assert channels == {}
+    finally:
+        await _stop_server(task)
+
+
+# ── New Tests: History Endpoint ───────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_history_returns_channel_messages(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            await ws.send(json.dumps({
+                "type": "chat",
+                "channel": "testchan",
+                "payload": {"text": "msg1"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=testchan HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        assert "200" in response
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        assert "messages" in data
+        assert "has_more" in data
+        assert isinstance(data["messages"], list)
+        assert len(data["messages"]) > 0
+        msgs = data["messages"]
+        assert any(m["type"] == "chat" and json.loads(m["payload"]) == {"text": "msg1"} for m in msgs)
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_messages_in_chronological_order(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "chat",
+                    "channel": "testchan",
+                    "payload": {"index": i},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=testchan HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        chat_msgs = [m for m in data["messages"] if m["type"] == "chat"]
+        timestamps = [m["timestamp"] for m in chat_msgs]
+        assert len(timestamps) == 3
+        assert timestamps == sorted(timestamps)
+        indices = [json.loads(m["payload"])["index"] for m in chat_msgs]
+        assert indices == [0, 1, 2]
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_since_filter(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    import datetime as dt
+    before = dt.datetime.now(dt.timezone.utc).isoformat()
+
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            for i in range(3):
+                await ws.send(json.dumps({
+                    "type": "chat",
+                    "channel": "testchan",
+                    "payload": {"index": i},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=testchan&since={before} HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        chat_msgs = [m for m in data["messages"] if m["type"] == "chat"]
+        assert len(chat_msgs) == 3
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_limit_and_has_more(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            for i in range(5):
+                await ws.send(json.dumps({
+                    "type": "chat",
+                    "channel": "testchan",
+                    "payload": {"index": i},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=testchan&limit=2 HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        chat_msgs = [m for m in data["messages"] if m["type"] == "chat"]
+        assert len(chat_msgs) == 2
+        assert data["has_more"] is True
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_has_more_false_when_all_returned(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "testchan",
+            }))
+            await ws.send(json.dumps({
+                "type": "chat",
+                "channel": "testchan",
+                "payload": {"text": "test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=testchan&limit=50 HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        assert data["has_more"] is False
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_requires_channel_parameter(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        assert "400" in response
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        assert "error" in data
+    finally:
+        await _stop_server(task)
+
+
+@pytest.mark.asyncio
+async def test_history_filters_by_channel_only(server_args, db_tmpfile):
+    host, port = server_args["host"], server_args["port"]
+    task = await _run_server(host, port)
+    try:
+        url = f"ws://{host}:{port}"
+        async with websockets.connect(url) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "chanA",
+            }))
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "channel": "chanB",
+            }))
+            await ws.send(json.dumps({
+                "type": "chat",
+                "channel": "chanA",
+                "payload": {"channel": "A"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "chat",
+                "channel": "chanB",
+                "payload": {"channel": "B"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.2)
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=chanA HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        chat_msgs = [m for m in data["messages"] if m["type"] == "chat"]
+        assert len(chat_msgs) == 1
+        assert json.loads(chat_msgs[0]["payload"]) == {"channel": "A"}
+
+        reader, writer = await asyncio.open_connection(host, port)
+        request = f"GET /history?channel=chanB HTTP/1.1\r\nHost: {host}:{port}\r\nConnection: close\r\n\r\n"
+        writer.write(request.encode())
+        await writer.drain()
+        response = (await reader.read()).decode()
+        writer.close()
+        await writer.wait_closed()
+
+        body = response.split("\r\n\r\n", 1)[1]
+        data = json.loads(body)
+        chat_msgs = [m for m in data["messages"] if m["type"] == "chat"]
+        assert len(chat_msgs) == 1
+        assert json.loads(chat_msgs[0]["payload"]) == {"channel": "B"}
+    finally:
+        await _stop_server(task)
