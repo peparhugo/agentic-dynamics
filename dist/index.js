@@ -19,6 +19,14 @@ function parseBuildArgs(args) {
             options.templates = args[i + 1];
             i += 2;
         }
+        else if (args[i] === '--incremental') {
+            options.incremental = true;
+            i += 1;
+        }
+        else if (args[i] === '--clean') {
+            options.clean = true;
+            i += 1;
+        }
         else {
             i += 1;
         }
@@ -53,13 +61,16 @@ function parseServeArgs(args) {
 }
 const command = process.argv[2];
 if (!command || (command !== 'build' && command !== 'serve')) {
-    console.error('Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+    console.error('Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]');
     console.error('       npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
     process.exit(1);
 }
 if (command === 'build') {
     const options = parseBuildArgs(process.argv);
-    const count = (0, generator_1.generateSite)(options.content, options.output, options.templates);
+    const count = (0, generator_1.generateSite)(options.content, options.output, options.templates, {
+        incremental: options.incremental,
+        clean: options.clean,
+    });
     process.exit(count > 0 ? 0 : 1);
 }
 else {
