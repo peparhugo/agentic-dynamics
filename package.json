@@ -1,0 +1,33 @@
+{
+  "name": "ssg",
+  "version": "1.0.0",
+  "description": "Static site generator CLI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ssg": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@types/jest": "~29.5.0",
+    "@types/node": "^26.2.0",
+    "commander": "^15.0.0",
+    "gray-matter": "^4.0.3",
+    "jest": "~29.7.0",
+    "markdown-it": "^15.0.0",
+    "ts-jest": "~29.2.0",
+    "typescript": "~5.6.0"
+  },
+  "devDependencies": {
+    "@swc/core": "^1.15.47",
+    "@swc/jest": "^0.2.39",
+    "@types/js-yaml": "^4.0.9"
+  }
+}
