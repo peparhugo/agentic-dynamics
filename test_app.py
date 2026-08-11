@@ -406,3 +406,88 @@ class TestUserIsolation:
         )
         assert resp.status_code == 404
         assert resp.get_json()["error"] == "task not found"
+
+
+class TestNotificationOnComplete:
+    def test_triggers_notification_when_status_changes_to_completed(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "Notify Me"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+
+        mock_delay.assert_called_once_with("testuser@example.com", "Notify Me")
+
+    def test_does_not_trigger_when_status_does_not_change_to_completed(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "Task"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"status": "in_progress"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_delay.assert_not_called()
+
+    def test_does_not_trigger_when_only_title_updated(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "Original"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"title": "Updated Title"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_delay.assert_not_called()
+
+    def test_does_not_trigger_when_already_completed_and_recompleted(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "Already Done"}, headers=headers)
+        client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_delay.assert_not_called()
+
+    def test_triggers_notification_uses_new_title_when_both_updated(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "Original"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"title": "New Title", "status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+
+        mock_delay.assert_called_once_with("testuser@example.com", "New Title")
+
+    def test_triggers_notification_when_completing_from_in_progress(self, client, mocker):
+        token = _register_and_get_token(client)
+        headers = _auth_headers(token)
+        client.post("/tasks", json={"title": "In Progress"}, headers=headers)
+        client.put("/tasks/1", json={"status": "in_progress"}, headers=headers)
+
+        mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+        resp = client.put(
+            "/tasks/1", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+
+        mock_delay.assert_called_once_with("testuser@example.com", "In Progress")

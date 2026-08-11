@@ -5,6 +5,7 @@ import os
 import jwt
 import bcrypt
 from functools import wraps
+from celery_config import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -205,6 +206,9 @@ def update_task(task_id):
         if row is None:
             return jsonify({"error": "task not found"}), 404
 
+        old_status = row["status"]
+        old_title = row["title"]
+
         updates = []
         params = []
 
@@ -230,6 +234,15 @@ def update_task(task_id):
             "SELECT id, title, status, created_at FROM tasks WHERE id = ?",
             (task_id,),
         ).fetchone()
+
+        if status is not None and status == "completed" and old_status != "completed":
+            user = conn.execute(
+                "SELECT username FROM users WHERE id = ?", (g.user_id,)
+            ).fetchone()
+            if user:
+                user_email = f"{user['username']}@example.com"
+                task_title_for_email = title if title is not None else old_title
+                send_notification_email.delay(user_email, task_title_for_email)
 
     return jsonify(dict(row))
 
