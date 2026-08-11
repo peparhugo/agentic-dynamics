@@ -2,6 +2,7 @@ import pytest
 import os
 import tempfile
 import app
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -34,6 +35,27 @@ def other_auth_headers(client):
 @pytest.fixture
 def sample_task(client, auth_headers):
     resp = client.post("/tasks", json={"title": "Test task"}, headers=auth_headers)
+    return resp.get_json()
+
+
+@pytest.fixture
+def email_user_headers(client):
+    client.post(
+        "/auth/register",
+        json={"username": "emailuser", "password": "testpass", "email": "user@example.com"},
+    )
+    resp = client.post(
+        "/auth/login", json={"username": "emailuser", "password": "testpass"}
+    )
+    token = resp.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def email_user_task(client, email_user_headers):
+    resp = client.post(
+        "/tasks", json={"title": "Important task"}, headers=email_user_headers
+    )
     return resp.get_json()
 
 
@@ -230,3 +252,64 @@ class TestUserIsolation:
         task_id = resp.get_json()["id"]
         resp = client.put(f"/tasks/{task_id}", json={"title": "Hacked"}, headers=other_auth_headers)
         assert resp.status_code == 404
+
+
+class TestNotification:
+    def test_notification_sent_on_completion(self, client, email_user_headers, email_user_task):
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{email_user_task['id']}",
+                json={"status": "completed"},
+                headers=email_user_headers,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_called_once_with("user@example.com", "Important task")
+
+    def test_notification_not_sent_without_email(self, client, auth_headers, sample_task):
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{sample_task['id']}",
+                json={"status": "completed"},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_notification_not_sent_on_title_update(self, client, email_user_headers, email_user_task):
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{email_user_task['id']}",
+                json={"title": "Updated title"},
+                headers=email_user_headers,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_notification_not_sent_on_nonexistent_task(self, client, email_user_headers):
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                "/tasks/9999",
+                json={"status": "completed"},
+                headers=email_user_headers,
+            )
+            assert resp.status_code == 404
+            mock_delay.assert_not_called()
+
+    def test_notification_not_sent_when_already_completed(self, client, email_user_headers):
+        resp = client.post(
+            "/tasks", json={"title": "Already done"}, headers=email_user_headers
+        )
+        task = resp.get_json()
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=email_user_headers,
+        )
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                f"/tasks/{task['id']}",
+                json={"status": "completed"},
+                headers=email_user_headers,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()

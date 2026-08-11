@@ -13,6 +13,8 @@ import jwt
 import sqlite3
 import os
 
+from celery_config import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -32,7 +34,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -43,6 +46,10 @@ def init_db():
             "  created_at TEXT NOT NULL"
             ")"
         )
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        except sqlite3.OperationalError:
+            pass
         try:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
         except sqlite3.OperationalError:
@@ -73,18 +80,26 @@ def token_required(f):
 
 # ── User models ─────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     password_hash = generate_password_hash(password)
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             return {"id": cursor.lastrowid, "username": username}
         except sqlite3.IntegrityError:
             return None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def get_user_by_username(username: str) -> dict | None:
@@ -176,9 +191,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -230,14 +246,22 @@ def show_task(current_user_id: int, task_id: int):
 @token_required
 def edit_task(current_user_id: int, task_id: int):
     data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+    old_task = get_task(task_id, current_user_id)
+    if old_task is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         current_user_id,
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if new_status == "completed" and old_task["status"] != "completed":
+        user = get_user_by_id(current_user_id)
+        if user and user.get("email"):
+            send_notification_email.delay(user["email"], task["title"])
     return jsonify(task)
 
 
