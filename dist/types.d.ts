@@ -2,6 +2,8 @@ export interface PageFrontmatter {
     title: string;
     date: string;
     tags: string[];
+    template?: string;
+    layout?: string;
 }
 export interface PageData {
     slug: string;

@@ -20,6 +20,8 @@ export function parseFiles({ contentDir }: ParseOptions): ParseResult {
       title: String(data.title || file.replace(/\.md$/, '')),
       date: formatDate(data.date),
       tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+      template: data.template ? String(data.template) : undefined,
+      layout: data.layout ? String(data.layout) : undefined,
     };
 
     const html = marked.parse(content.trim()) as string;

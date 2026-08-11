@@ -1,0 +1,16 @@
+  <header>
+    <h1>Blog</h1>
+  </header>
+  <main>
+    {{#if pages}}
+      {{#each pages}}
+    <article>
+      <h2><a href="{{slug}}.html">{{title}}</a></h2>
+      {{#if date}}<time>{{date}}</time>{{/if}}
+      {{#if tags}}<p>Tags: {{tags}}</p>{{/if}}
+    </article>
+      {{/each}}
+    {{else}}
+    <p>No posts yet.</p>
+    {{/if}}
+  </main>

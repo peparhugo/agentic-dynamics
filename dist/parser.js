@@ -21,6 +21,8 @@ function parseFiles({ contentDir }) {
             title: String(data.title || file.replace(/\.md$/, '')),
             date: formatDate(data.date),
             tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+            template: data.template ? String(data.template) : undefined,
+            layout: data.layout ? String(data.layout) : undefined,
         };
         const html = marked_1.marked.parse(content.trim());
         const slug = file.replace(/\.md$/, '');
