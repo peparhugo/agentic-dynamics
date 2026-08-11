@@ -1,0 +1,25 @@
+{
+  "name": "ssg",
+  "version": "1.0.0",
+  "description": "Static site generator CLI",
+  "main": "dist/index.js",
+  "bin": {
+    "ssg": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "marked": "^4.3.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/marked": "^4.3.0",
+    "@types/node": "^20.11.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  }
+}
