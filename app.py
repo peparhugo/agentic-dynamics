@@ -15,6 +15,7 @@ import os
 import secrets
 import jwt as pyjwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery_tasks import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -303,7 +304,10 @@ def update_task(user: dict, task_id: int):
         row = conn.execute(
             "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
-    return jsonify(dict(row))
+        task_data = dict(row)
+    if status is not None and status == "completed":
+        send_notification_email.delay(user["username"], task_data["title"])
+    return jsonify(task_data)
 
 
 # ── Admin Blueprint ─────────────────────────────────────────────
