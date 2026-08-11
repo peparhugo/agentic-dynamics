@@ -19,6 +19,8 @@ export function parseFile(filePath: string): Page {
     title: data.title || 'Untitled',
     date: dateStr,
     tags: Array.isArray(data.tags) ? data.tags : [],
+    template: typeof data.template === 'string' ? data.template : undefined,
+    layout: typeof data.layout === 'string' ? data.layout : undefined,
   };
 
   const html = marked.parse(content) as string;

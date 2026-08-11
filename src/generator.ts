@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import Handlebars from 'handlebars';
 import { Page } from './types';
 
 function htmlEncode(str: string): string {
@@ -79,14 +80,122 @@ function renderIndexHtml(pages: Page[]): string {
   return wrapPage('Index', body);
 }
 
-export function generateSite(pages: Page[], outputDir: string): void {
+interface TemplateEngine {
+  renderPage(page: Page): string;
+  renderIndex(pages: Page[]): string;
+}
+
+function registerPartials(partialsDir: string): void {
+  if (!fs.existsSync(partialsDir)) return;
+  const files = fs.readdirSync(partialsDir).filter((f) => f.endsWith('.hbs'));
+  for (const file of files) {
+    const name = path.basename(file, '.hbs');
+    const content = fs.readFileSync(path.join(partialsDir, file), 'utf-8');
+    Handlebars.registerPartial(name, content);
+  }
+}
+
+function loadTemplates(templateDir: string): TemplateEngine | null {
+  if (!fs.existsSync(templateDir)) return null;
+
+  const partialsDir = path.join(templateDir, 'partials');
+  registerPartials(partialsDir);
+
+  const layoutsDir = path.join(templateDir, 'layouts');
+  const layouts = new Map<string, Handlebars.TemplateDelegate>();
+  if (fs.existsSync(layoutsDir)) {
+    const files = fs.readdirSync(layoutsDir).filter((f) => f.endsWith('.hbs'));
+    for (const file of files) {
+      const name = path.basename(file, '.hbs');
+      const content = fs.readFileSync(path.join(layoutsDir, file), 'utf-8');
+      layouts.set(name, Handlebars.compile(content));
+    }
+  }
+
+  const pageTemplates = new Map<string, Handlebars.TemplateDelegate>();
+  const files = fs.readdirSync(templateDir).filter((f) => f.endsWith('.hbs'));
+  for (const file of files) {
+    const name = path.basename(file, '.hbs');
+    const content = fs.readFileSync(path.join(templateDir, file), 'utf-8');
+    pageTemplates.set(name, Handlebars.compile(content));
+  }
+
+  return {
+    renderPage(page: Page): string {
+      const templateName = page.frontmatter.template || 'page';
+      const template =
+        pageTemplates.get(templateName) || pageTemplates.get('page');
+      if (!template) {
+        throw new Error(`Page template "${templateName}" not found`);
+      }
+
+      const layoutName = page.frontmatter.layout || 'default';
+      const layout =
+        layouts.get(layoutName) || layouts.get('default');
+
+      const body = template({
+        title: page.frontmatter.title,
+        date: page.frontmatter.date,
+        tags: page.frontmatter.tags || [],
+        content: page.html,
+        slug: page.slug,
+      });
+
+      if (layout) {
+        return layout({
+          title: page.frontmatter.title,
+          body,
+        });
+      }
+
+      return body;
+    },
+
+    renderIndex(pages: Page[]): string {
+      const hasIndex = pageTemplates.has('index');
+      if (!hasIndex) {
+        return renderIndexHtml(pages);
+      }
+
+      const template = pageTemplates.get('index')!;
+      const layout = layouts.get('default');
+
+      const body = template({
+        pages: pages.map((p) => ({
+          title: p.frontmatter.title,
+          date: p.frontmatter.date,
+          tags: p.frontmatter.tags || [],
+          slug: p.slug,
+        })),
+      });
+
+      if (layout) {
+        return layout({ title: 'Index', body });
+      }
+
+      return body;
+    },
+  };
+}
+
+export function generateSite(
+  pages: Page[],
+  outputDir: string,
+  templateDir?: string
+): void {
+  const engine = templateDir ? loadTemplates(templateDir) : null;
+
   fs.mkdirSync(outputDir, { recursive: true });
 
   for (const page of pages) {
-    const html = renderPageHtml(page);
-    fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), html, 'utf-8');
+    const html = engine ? engine.renderPage(page) : renderPageHtml(page);
+    fs.writeFileSync(
+      path.join(outputDir, `${page.slug}.html`),
+      html,
+      'utf-8'
+    );
   }
 
-  const indexHtml = renderIndexHtml(pages);
+  const indexHtml = engine ? engine.renderIndex(pages) : renderIndexHtml(pages);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf-8');
 }

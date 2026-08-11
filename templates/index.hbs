@@ -1,0 +1,8 @@
+<h1>All Posts</h1>
+<ul>
+  {{#each pages}}
+  <li>
+    <a href="{{slug}}.html">{{title}}</a>{{#if date}} <time>{{date}}</time>{{/if}}{{#if tags}} <span class="tags">{{#each tags}}<span class="tag">{{this}}</span> {{/each}}</span>{{/if}}
+  </li>
+  {{/each}}
+</ul>

@@ -6,6 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.generateSite = generateSite;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
+const handlebars_1 = __importDefault(require("handlebars"));
 function htmlEncode(str) {
     return str
         .replace(/&/g, '&amp;')
@@ -73,13 +74,92 @@ function renderIndexHtml(pages) {
   </ul>`;
     return wrapPage('Index', body);
 }
-function generateSite(pages, outputDir) {
+function registerPartials(partialsDir) {
+    if (!fs_1.default.existsSync(partialsDir))
+        return;
+    const files = fs_1.default.readdirSync(partialsDir).filter((f) => f.endsWith('.hbs'));
+    for (const file of files) {
+        const name = path_1.default.basename(file, '.hbs');
+        const content = fs_1.default.readFileSync(path_1.default.join(partialsDir, file), 'utf-8');
+        handlebars_1.default.registerPartial(name, content);
+    }
+}
+function loadTemplates(templateDir) {
+    if (!fs_1.default.existsSync(templateDir))
+        return null;
+    const partialsDir = path_1.default.join(templateDir, 'partials');
+    registerPartials(partialsDir);
+    const layoutsDir = path_1.default.join(templateDir, 'layouts');
+    const layouts = new Map();
+    if (fs_1.default.existsSync(layoutsDir)) {
+        const files = fs_1.default.readdirSync(layoutsDir).filter((f) => f.endsWith('.hbs'));
+        for (const file of files) {
+            const name = path_1.default.basename(file, '.hbs');
+            const content = fs_1.default.readFileSync(path_1.default.join(layoutsDir, file), 'utf-8');
+            layouts.set(name, handlebars_1.default.compile(content));
+        }
+    }
+    const pageTemplates = new Map();
+    const files = fs_1.default.readdirSync(templateDir).filter((f) => f.endsWith('.hbs'));
+    for (const file of files) {
+        const name = path_1.default.basename(file, '.hbs');
+        const content = fs_1.default.readFileSync(path_1.default.join(templateDir, file), 'utf-8');
+        pageTemplates.set(name, handlebars_1.default.compile(content));
+    }
+    return {
+        renderPage(page) {
+            const templateName = page.frontmatter.template || 'page';
+            const template = pageTemplates.get(templateName) || pageTemplates.get('page');
+            if (!template) {
+                throw new Error(`Page template "${templateName}" not found`);
+            }
+            const layoutName = page.frontmatter.layout || 'default';
+            const layout = layouts.get(layoutName) || layouts.get('default');
+            const body = template({
+                title: page.frontmatter.title,
+                date: page.frontmatter.date,
+                tags: page.frontmatter.tags || [],
+                content: page.html,
+                slug: page.slug,
+            });
+            if (layout) {
+                return layout({
+                    title: page.frontmatter.title,
+                    body,
+                });
+            }
+            return body;
+        },
+        renderIndex(pages) {
+            const hasIndex = pageTemplates.has('index');
+            if (!hasIndex) {
+                return renderIndexHtml(pages);
+            }
+            const template = pageTemplates.get('index');
+            const layout = layouts.get('default');
+            const body = template({
+                pages: pages.map((p) => ({
+                    title: p.frontmatter.title,
+                    date: p.frontmatter.date,
+                    tags: p.frontmatter.tags || [],
+                    slug: p.slug,
+                })),
+            });
+            if (layout) {
+                return layout({ title: 'Index', body });
+            }
+            return body;
+        },
+    };
+}
+function generateSite(pages, outputDir, templateDir) {
+    const engine = templateDir ? loadTemplates(templateDir) : null;
     fs_1.default.mkdirSync(outputDir, { recursive: true });
     for (const page of pages) {
-        const html = renderPageHtml(page);
+        const html = engine ? engine.renderPage(page) : renderPageHtml(page);
         fs_1.default.writeFileSync(path_1.default.join(outputDir, `${page.slug}.html`), html, 'utf-8');
     }
-    const indexHtml = renderIndexHtml(pages);
+    const indexHtml = engine ? engine.renderIndex(pages) : renderIndexHtml(pages);
     fs_1.default.writeFileSync(path_1.default.join(outputDir, 'index.html'), indexHtml, 'utf-8');
 }
 //# sourceMappingURL=generator.js.map

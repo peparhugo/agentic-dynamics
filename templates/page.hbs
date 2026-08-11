@@ -1,0 +1,14 @@
+<article>
+  <h1>{{title}}</h1>
+  {{#if date}}
+  <div class="meta"><time>{{date}}</time></div>
+  {{/if}}
+  {{#if tags}}
+  <div class="tags">
+    {{#each tags}}
+    <span class="tag">{{this}}</span>
+    {{/each}}
+  </div>
+  {{/if}}
+  {{{content}}}
+</article>
