@@ -10,6 +10,8 @@ import sqlite3
 import jwt
 import os
 
+from celery_tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -28,7 +30,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -52,9 +55,13 @@ def migrate():
                 "CREATE TABLE IF NOT EXISTS users ("
                 "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
                 "  username TEXT NOT NULL UNIQUE,"
-                "  password_hash TEXT NOT NULL"
+                "  password_hash TEXT NOT NULL,"
+                "  email TEXT"
                 ")"
             )
+        user_cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 # ── Auth decorator ─────────────────────────────────────────────
@@ -77,13 +84,13 @@ def login_required(f):
 
 # ── Auth helpers ────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     with get_db() as conn:
         try:
             password_hash = generate_password_hash(password)
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             return {"id": cursor.lastrowid, "username": username}
@@ -95,6 +102,14 @@ def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
         return dict(row) if row else None
 
@@ -175,11 +190,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() or None
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
 
@@ -235,14 +251,24 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+    old_task = get_task(task_id, g.user_id)
+
     task = update_task(
         task_id,
         g.user_id,
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+
+    if new_status == "completed" and old_task and old_task.get("status") != "completed":
+        user = get_user_by_id(g.user_id)
+        if user:
+            email = user.get("email") or f"{user['username']}@example.com"
+            send_notification_email.delay(email, task["title"])
+
     return jsonify(task)
 
 

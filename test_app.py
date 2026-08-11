@@ -1,5 +1,6 @@
 import pytest
 import os
+from unittest.mock import patch
 from app import app, init_db, migrate, DATABASE
 
 
@@ -281,3 +282,67 @@ class TestUpdateTask:
         assert resp.status_code == 404
         data = resp.get_json()
         assert data["error"] == "task not found"
+
+
+# ── Notification Trigger Tests ──────────────────────────────────
+
+class TestNotificationTrigger:
+    def test_sends_notification_when_status_changes_to_completed(self, client):
+        headers = auth_headers(client)
+        create_resp = client.post("/tasks", json={"title": "Async Task"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+            assert resp.status_code == 200
+            mock_delay.assert_called_once()
+
+    def test_no_notification_when_only_title_changes(self, client):
+        headers = auth_headers(client)
+        create_resp = client.post("/tasks", json={"title": "Stay Pending"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(f"/tasks/{task_id}", json={"title": "New Title"}, headers=headers)
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_no_notification_when_status_not_completed(self, client):
+        headers = auth_headers(client)
+        create_resp = client.post("/tasks", json={"title": "In Progress"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "in_progress"}, headers=headers)
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_no_notification_for_nonexistent_task(self, client):
+        headers = auth_headers(client)
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put("/tasks/9999", json={"status": "completed"}, headers=headers)
+            assert resp.status_code == 404
+            mock_delay.assert_not_called()
+
+    def test_no_notification_when_already_completed(self, client):
+        headers = auth_headers(client)
+        create_resp = client.post("/tasks", json={"title": "Already Done"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_sends_notification_when_both_title_and_status_completed(self, client):
+        headers = auth_headers(client)
+        create_resp = client.post("/tasks", json={"title": "Both"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(f"/tasks/{task_id}", json={"title": "Both Done", "status": "completed"}, headers=headers)
+            assert resp.status_code == 200
+            mock_delay.assert_called_once()
