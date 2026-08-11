@@ -37,6 +37,7 @@ ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 #
 # Pricing snapshot: experiment billing dates (2026-Q2 through 2026-Q3 depending on model release).
 # Actual DB costs were billed at these rates. Don't retroactively change.
+# These rates reflect what was actually charged during the v0.5 experiment corpus.
 PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
         "input": 0.27, "output": 1.10, "reasoning": 0.14,
@@ -50,12 +51,22 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
         "input": 1.25, "output": 10.00, "reasoning": 10.00,
         "cache_read": 0.625, "cache_write": 2.50,
     },
+    # v0.9 models — added Aug 2026
+    "anthropic-sonnet5": {
+        "input": 2.00, "output": 10.00, "reasoning": 10.00,
+        "cache_read": 0.20, "cache_write": 2.50,
+        "note": "Claude Sonnet 5 intro pricing through Aug 31, 2026. Sep 1: $3/$15.",
+    },
+    "openai-luna": {
+        "input": 0.20, "output": 1.20, "reasoning": 1.20,
+        "cache_read": 0.02, "cache_write": 0.25,
+    },
 }
 
-# Current reference pricing (2026-08) — for comparison only. Experiment billing
+# Current reference pricing (2026-08-11) — for comparison only. Experiment billing
 # uses PROVIDER_PRICING above. These are provider-disclosed rates and may not
 # reflect actual billed amounts (cache, batch discounts, tier pricing apply).
-# DeepSeek V4 Pro rates from https://api-docs.deepseek.com/quick_start/pricing
+# Sources: api-docs.deepseek.com, docs.anthropic.com, platform.openai.com
 CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
         "input": 0.435, "output": 0.87, "reasoning": 0.87,
@@ -69,17 +80,33 @@ CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
         "input": 5.00, "output": 30.00, "reasoning": 30.00,
         "cache_read": 2.50, "cache_write": 10.00,
     },
+    # v0.9 reference pricing
+    "anthropic-sonnet5": {
+        "input": 2.00, "output": 10.00, "reasoning": 10.00,
+        "cache_read": 0.20, "cache_write": 2.50,
+        "note_snapshot": "2026-08-11. Intro $2/$10 through Aug 31. Sep 1: $3/$15.",
+    },
+    "openai-luna": {
+        "input": 0.20, "output": 1.20, "reasoning": 1.20,
+        "cache_read": 0.02, "cache_write": 0.25,
+        "note_snapshot": "2026-08-11. GPT-5.6 Luna standard pricing.",
+    },
 }
 
 def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     """Get approximate pricing for a provider/model.
     
     Returns per-million-token rates. Falls back to generic provider rates
-    if model-specific pricing is unavailable.
+    if model-specific pricing is unavailable. Returns historical billing
+    rates for pre-v0.9 models, current rates for v0.9+ models.
     """
     combined = f"{provider_id} {model_id}".lower()
     if "deepseek" in combined:
         return PROVIDER_PRICING["deepseek"]
+    if "sonnet" in combined:
+        return PROVIDER_PRICING["anthropic-sonnet5"]
+    if "luna" in combined:
+        return PROVIDER_PRICING["openai-luna"]
     if any(k in combined for k in ("anthropic", "claude")):
         return PROVIDER_PRICING["anthropic"]
     if any(k in combined for k in ("openai", "gpt")):

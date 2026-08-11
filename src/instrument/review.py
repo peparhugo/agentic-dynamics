@@ -158,7 +158,7 @@ def review_commit(
     *,
     story_name: str = "",
     session_number: int = 0,
-    model: str = "openai/gpt-5.6",
+    model: str = "deepseek/deepseek-v4-flash",
     timeout: int = 300,
 ) -> CommitReview:
     """Review a single commit using an LLM agent.
@@ -209,7 +209,7 @@ def review_story(
     worktree: Path,
     story_name: str,
     *,
-    model: str = "anthropic/claude-fable-5",
+    model: str = "deepseek/deepseek-v4-flash",
     timeout: int = 300,
 ) -> StoryReview:
     """Review a complete multi-session story.

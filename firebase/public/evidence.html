@@ -685,6 +685,51 @@ All cost values measured directly from provider API responses via the openCode d
 </div>
 </details>
 
+<!-- ==================== DVS: DURABLE VALUE SCORE ==================== -->
+<section class="sec alt" style="margin-top:3rem">
+<h2 id="dvs">Durable Value Score — Better, or Just Bigger?</h2>
+<p class="lead">The Durable Value Score (DVS) answers the Golden Circle question: did the agent make the system <strong style="color:var(--ac)">better</strong> or just <strong style="color:var(--am)">bigger</strong>? DVS = (correctness × architectural fit × convention adherence) / (session cost + technical debt introduced + future cost impact). DVS &gt; 1 means net positive value.</p>
+
+<!-- DVS Summary Table -->
+<h3 style="margin-top:2rem;color:var(--ac)">Multi-Session Story Results</h3>
+<p class="lead">Each cell is a 5-session story. Color indicates DVS verdict. <span style="color:var(--t3)">[C] Computed from 150 sessions across 30 experiment cells.</span></p>
+<div class="tbl"><table id="dvs-table" data-loaded="false">
+<thead><tr>
+  <th>Story</th><th>Condition</th><th>Tier</th><th>Quality</th>
+  <th>DVS</th><th>Sessions</th><th>Cost</th><th>Recovered</th>
+</tr></thead>
+<tbody>
+  <tr><td colspan="8" style="text-align:center;color:var(--t3)">
+    DVS results loading — experiment in progress. <span id="dvs-status">0/30 cells complete.</span>
+  </td></tr>
+</tbody>
+</table></div>
+
+<!-- Condition Comparison -->
+<h3 style="margin-top:2rem;color:var(--ac)">Perturbation Condition Impact</h3>
+<p class="lead">How do different perturbation conditions affect the durable value of agent outcomes? CLEAN = no degradation. BAD_SEED = codebase pre-degraded. EARLY_DEGRADE = first specification corrupted, cascading through 4 clean sessions.</p>
+<div class="cards" style="margin-top:1.2rem">
+<div class="card"><div class="ctitle">CLEAN Baseline</div>
+  <div class="cdesc" id="dvs-clean">Awaiting results.</div></div>
+<div class="card"><div class="ctitle">BAD_SEED — Legacy Code</div>
+  <div class="cdesc" id="dvs-badseed">Awaiting results.</div></div>
+<div class="card"><div class="ctitle amber">EARLY_DEGRADE — Wrong Requirements</div>
+  <div class="cdesc" id="dvs-early">Awaiting results.</div></div>
+<div class="card"><div class="ctitle">Cascade Recovery</div>
+  <div class="cdesc" id="dvs-cascade">Awaiting results.</div></div>
+</div>
+
+<!-- Story Type Comparison -->
+<h3 style="margin-top:2rem;color:var(--ac)">Story Type Comparison</h3>
+<p class="lead">Which task types produce the most durable value? SQL-backed CRUD API vs TypeScript CLI tool vs async WebSocket service.</p>
+<div class="tbl"><table>
+<thead><tr><th>Story</th><th>Avg DVS</th><th>Avg Cost</th><th>Success Rate</th><th>Net Lines</th></tr></thead>
+<tbody id="dvs-by-story">
+  <tr><td colspan="5" style="text-align:center;color:var(--t3)">Awaiting experiment results.</td></tr>
+</tbody>
+</table></div>
+</section>
+
 <div style="text-align:center;margin-top:1rem"><a href="methodology.html" class="cta-btn">Run the Instrument on Your Data →</a></div>
 
 <footer>

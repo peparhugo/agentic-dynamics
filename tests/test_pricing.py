@@ -37,8 +37,19 @@ def test_get_pricing_raises_on_unknown():
 
 
 def test_get_pricing_anthropic_via_claude():
-    pricing = get_pricing("", "claude-sonnet")
+    pricing = get_pricing("anthropic", "claude-fable-5")
     assert pricing["output"] == 15.00
+
+
+def test_get_pricing_sonnet5():
+    pricing = get_pricing("anthropic", "claude-sonnet-5")
+    assert pricing["output"] == 10.00
+
+
+def test_get_pricing_luna():
+    pricing = get_pricing("openai", "gpt-5.6-luna")
+    assert pricing["output"] == 1.20
+    assert pricing["input"] == 0.20
 
 
 def test_get_pricing_openai_via_gpt():
