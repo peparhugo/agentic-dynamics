@@ -7,7 +7,7 @@ import {
   LIVE_RELOAD_SCRIPT,
 } from '../src/server';
 
-const tmpDir = path.join(__dirname, '..', '.test-tmp');
+const tmpDir = path.join(__dirname, '..', '.test-tmp-server');
 
 beforeEach(() => {
   if (fs.existsSync(tmpDir)) {
