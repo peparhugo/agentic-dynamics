@@ -36,7 +36,7 @@ from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
 from .opencode import run_opencode_agentic, AgenticResult, normalize_opencode_event
 
-# v0.6: Multi-language analysis + mutation compiler
+# v0.6: Multi-language analysis + mutation compiler + story orchestrator
 from .language import (
     LanguageProfile,
     CodebaseAST,
@@ -53,6 +53,16 @@ from .mutation import (
     ALL_OPERATORS,
     SPECIFICATION_OPERATORS,
     CODEBASE_OPERATORS,
+)
+from .story import (
+    StoryConfig,
+    StoryResult,
+    SessionSpec,
+    SessionResult,
+    run_story,
+    save_story_result,
+    load_story_result,
+    BUILTIN_STORIES,
 )
 
 __all__ = [
@@ -76,4 +86,6 @@ __all__ = [
     "get_parser", "collect_functions", "collect_imports",
     "MutationArtifact", "compile_mutation", "apply_mutation",
     "ALL_OPERATORS", "SPECIFICATION_OPERATORS", "CODEBASE_OPERATORS",
+    "StoryConfig", "StoryResult", "SessionSpec", "SessionResult",
+    "run_story", "save_story_result", "load_story_result", "BUILTIN_STORIES",
 ]

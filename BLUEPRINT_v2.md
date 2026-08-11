@@ -2,6 +2,20 @@
 
 **Status:** v0.5 deployed. v0.6 active. Target: v1.0 full balanced experiment.
 
+### v0.6 Progress
+
+- [x] Round 1: Audit bugs (P0) — 5 fixes
+- [x] Round 2: Site consistency + release hygiene (P1) — 12 fixes
+- [x] Round 3: Golden Circle + value reframing — homepage, README, metadata
+- [x] `mutation.py` — Flash V4 compiler, 20 operators, pinned artifacts, 16 tests
+- [x] `language.py` — tree-sitter multi-language, Python+TS+Go+Rust, 12 tests
+- [x] Codebase catalog seeds — Python (Flask Todo) + TypeScript (Express Todo)
+- [x] `story.py` — multi-session orchestrator, 2 built-in stories, git-integrated, 20 tests
+- [x] `scripts/run_story.py` — CLI runner for story experiments
+- [x] CI updated to 8 test modules, 76 tests
+- [ ] Per-commit analysis: AST diff, SonarQube delta, convention adherence ← **NEXT**
+- [ ] Commit reviewer agent (GPT-5.6)
+
 ---
 
 ## Part 1: Current State (v0.5)
