@@ -1,5 +1,5 @@
 import * as http from 'http';
-export declare function injectReloadScript(html: string): string;
+export { injectReloadScript } from '../plugins/dev-server-plugin';
 export interface ServeOptions {
     content?: string;
     output?: string;
