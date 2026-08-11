@@ -12,6 +12,7 @@ import sqlite3
 import os
 import bcrypt
 import jwt
+from tasks import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -45,15 +46,18 @@ def init_db():
         columns = [col[1] for col in conn.execute("PRAGMA table_info(tasks)").fetchall()]
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        user_columns = [col[1] for col in conn.execute("PRAGMA table_info(users)").fetchall()]
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 # ── Models ────────────────────────────────────────────────────
 
-def create_user(username: str, password_hash: str) -> int:
+def create_user(username: str, password_hash: str, email: str | None = None) -> int:
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
         return cursor.lastrowid
@@ -62,6 +66,12 @@ def create_user(username: str, password_hash: str) -> int:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -176,10 +186,11 @@ def register():
     if get_user_by_username(username):
         return jsonify({"error": "username already exists"}), 409
 
+    email = data.get("email", f"{username}@example.com")
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
-    user_id = create_user(username, password_hash)
+    user_id = create_user(username, password_hash, email)
 
-    return jsonify({"id": user_id, "username": username}), 201
+    return jsonify({"id": user_id, "username": username, "email": email}), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -239,6 +250,12 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+
+    if data.get("status") == "completed":
+        user = get_user_by_id(g.current_user_id)
+        if user and user.get("email"):
+            send_notification_email.delay(user["email"], task["title"])
+
     return jsonify(task)
 
 

@@ -1,9 +1,12 @@
 import os
 import tempfile
+from unittest import mock
+
 import pytest
 
 db_file = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
 os.environ["DATABASE"] = db_file.name
+os.environ["CELERY_ALWAYS_EAGER"] = "true"
 
 import app
 
@@ -258,3 +261,52 @@ def test_multiple_tasks_increment_ids(client):
     assert r1.get_json()["id"] == 1
     assert r2.get_json()["id"] == 2
     assert r3.get_json()["id"] == 3
+
+
+# ── Notification Tests ─────────────────────────────────────────
+
+def test_notification_triggered_on_completed(client):
+    headers = _register_and_login(client, "notifyuser", "pass")
+    client.post("/tasks", json={"title": "Send email"}, headers=headers)
+    with mock.patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+        assert resp.status_code == 200
+        mock_delay.assert_called_once_with("notifyuser@example.com", "Send email")
+
+
+def test_notification_not_triggered_on_other_status(client):
+    headers = _register_and_login(client, "notifyuser2", "pass")
+    client.post("/tasks", json={"title": "In progress task"}, headers=headers)
+    with mock.patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put("/tasks/1", json={"status": "in_progress"}, headers=headers)
+        assert resp.status_code == 200
+        mock_delay.assert_not_called()
+
+
+def test_notification_not_triggered_on_title_only(client):
+    headers = _register_and_login(client, "notifyuser3", "pass")
+    client.post("/tasks", json={"title": "Old title"}, headers=headers)
+    with mock.patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put("/tasks/1", json={"title": "New title"}, headers=headers)
+        assert resp.status_code == 200
+        mock_delay.assert_not_called()
+
+
+def test_notification_not_triggered_task_not_found(client):
+    headers = _register_and_login(client, "notifyuser4", "pass")
+    with mock.patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put("/tasks/999", json={"status": "completed"}, headers=headers)
+        assert resp.status_code == 404
+        mock_delay.assert_not_called()
+
+
+def test_notification_with_custom_email(client):
+    headers = _register_and_login(client, "custemail", "pass")
+    client.post("/auth/register", json={"username": "custemail2", "password": "pass", "email": "custom@test.com"})
+    login_resp = client.post("/auth/login", json={"username": "custemail2", "password": "pass"})
+    headers2 = {"Authorization": f"Bearer {login_resp.get_json()['token']}"}
+    client.post("/tasks", json={"title": "Custom email task"}, headers=headers2)
+    with mock.patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers2)
+        assert resp.status_code == 200
+        mock_delay.assert_called_once_with("custom@test.com", "Custom email task")
