@@ -11,9 +11,12 @@
     "test": "jest"
   },
   "dependencies": {
+    "@types/ws": "^8.18.1",
+    "chokidar": "^3.6.0",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.9",
-    "marked": "^4.3.0"
+    "marked": "^4.3.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/handlebars": "^4.1.0",
