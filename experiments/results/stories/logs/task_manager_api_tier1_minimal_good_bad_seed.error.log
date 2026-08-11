@@ -1,0 +1,17 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier1_minimal/good (good, tier1_minimal)
+Condition: bad_seed
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: bad_seed
+  Sessions: 5  |  All successful: False
+  Total cost: $0.0029
+  Total tokens: 193,894
+  Duration: 1702.5s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_117533fe8f2f.json
+  ERROR: Session 5 failed: Timeout after 900s

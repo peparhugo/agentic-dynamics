@@ -74,7 +74,7 @@ def main():
         help="Perturbation condition",
     )
     parser.add_argument(
-        "--timeout", type=int, default=900, help="Per-session timeout in seconds"
+        "--timeout", type=int, default=1200, help="Per-session timeout in seconds"
     )
     parser.add_argument(
         "--worktree-root", default="/tmp", help="Parent directory for worktrees"

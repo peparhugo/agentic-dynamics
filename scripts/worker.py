@@ -22,7 +22,7 @@ QUEUE_KEY = "story_jobs"
 STATUS_KEY = "story_status"
 WORKER_PREFIX = "worker"
 
-TIMEOUT_PER_CELL = 7200
+TIMEOUT_PER_CELL = 9000
 BLOCK_TIMEOUT = 10
 IDLE_POLLS_BEFORE_EXIT = 12  # 12 × 10s = 2 minutes idle → exit
 

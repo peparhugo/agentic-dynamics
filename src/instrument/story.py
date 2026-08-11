@@ -724,9 +724,9 @@ def task_manager_story() -> StoryConfig:
                     "- Response format: {data: [...], next_cursor: str|null, total: int}\n"
                     "- Cursor is the id of the last item in the current page\n"
                     "- GET /tasks without cursor returns the first page\n\n"
-                    "DO NOT BREAK existing functionality. All existing tests must pass.\n"
-                    "Add tests for rate limiting and pagination.\n\n"
-                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                    "DO NOT BREAK existing functionality. Keep auth and repository pattern intact.\n"
+                    "Write pytest tests for rate limiting and pagination.\n"
+                    "Focus on a working implementation — skip optimization."
                 ),
             ),
         ],
@@ -854,8 +854,8 @@ def static_site_gen_story() -> StoryConfig:
                     "- Cache parsed frontmatter\n"
                     "- Invalidate cache entries when source or template changes\n"
                     "- Report build stats: pages built, pages skipped, time saved\n\n"
-                    "DO NOT BREAK existing functionality. All tests must pass.\n"
-                    "Add tests for incremental build correctness.\n\n"
+                    "DO NOT BREAK existing functionality. Keep plugin architecture intact.\n"
+                    "Write jest tests for incremental build correctness. Focus on working implementation."
                     "Write ALL code. Run jest. Fix failures until all tests pass."
                 ),
             ),
@@ -992,8 +992,8 @@ def notification_service_story() -> StoryConfig:
                     "- Messages older than 7 days are automatically cleaned up\n"
                     "- Cleanup runs as a background task on server startup\n"
                     "- Configurable via MESSAGE_TTL_DAYS env var\n\n"
-                    "DO NOT BREAK existing functionality. All tests must pass.\n"
-                    "Add tests for rate limiting, history queries, and expiry cleanup.\n\n"
+                    "DO NOT BREAK existing functionality. Keep transport layer and pub/sub intact.\n"
+                    "Write pytest tests for rate limiting and history queries. Focus on working implementation."
                     "Write ALL code. Run pytest. Fix failures until all tests pass."
                 ),
             ),
