@@ -15,9 +15,10 @@ program
   .description('Build the static site')
   .option('--content <dir>', 'Content directory', './content')
   .option('--output <dir>', 'Output directory', './dist')
+  .option('--templates <dir>', 'Templates directory', './templates')
   .action((options) => {
     try {
-      buildSite(options.content, options.output);
+      buildSite(options.content, options.output, options.templates);
       console.log(`Site built successfully in ${options.output}`);
     } catch (err) {
       console.error('Error:', (err as Error).message);
