@@ -1,0 +1,16 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier2_small/good (good, tier2_small)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: clean
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0022
+  Total tokens: 188,082
+  Duration: 1569.2s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f9e607e131ce.json

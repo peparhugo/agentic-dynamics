@@ -1,0 +1,1114 @@
+{
+  "generated_at": "2026-08-11T21:44:29.181205",
+  "total_cells": 26,
+  "skipped": 0,
+  "failed": 0,
+  "by_condition": {
+    "bad_seed": {
+      "count": 1,
+      "avg_dvs": 35.8289,
+      "avg_cost": 0.003027,
+      "success_rate": 1.0
+    },
+    "clean": {
+      "count": 17,
+      "avg_dvs": 15.138,
+      "avg_cost": 0.003173,
+      "success_rate": 0.88
+    },
+    "early_degrade": {
+      "count": 8,
+      "avg_dvs": 25.1311,
+      "avg_cost": 0.002731,
+      "success_rate": 1.0
+    }
+  },
+  "by_story": {
+    "notification_service": {
+      "count": 5,
+      "avg_dvs": 29.5047,
+      "avg_cost": 0.005258,
+      "success_rate": 1.0
+    },
+    "static_site_gen": {
+      "count": 10,
+      "avg_dvs": 5.2789,
+      "avg_cost": 0.002714,
+      "success_rate": 1.0
+    },
+    "task_manager_api": {
+      "count": 11,
+      "avg_dvs": 26.7191,
+      "avg_cost": 0.002308,
+      "success_rate": 0.82
+    }
+  },
+  "cells": [
+    {
+      "story": "notification_service",
+      "story_id": "1e002365da34",
+      "condition": "bad_seed",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.003027,
+      "total_tokens": 267507,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.8333,
+        "session_cost": 0.003,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0086,
+        "score": 35.8289,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.833,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.166667,
+        "avg_degree": 0.33,
+        "max_in_degree": 1,
+        "max_in_degree_module": "server.py",
+        "max_out_degree": 1,
+        "max_out_degree_module": "test_server.py",
+        "connected_components": 2,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "notification_service",
+      "story_id": "1ac39990faac",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002635,
+      "total_tokens": 226881,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.6667,
+        "session_cost": 0.0026,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0097,
+        "score": 27.1287,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.667,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.333333,
+        "avg_degree": 0.67,
+        "max_in_degree": 2,
+        "max_in_degree_module": "server.py",
+        "max_out_degree": 2,
+        "max_out_degree_module": "test_server.py",
+        "connected_components": 2,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "notification_service",
+      "story_id": "e4702df34e1e",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 3,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.015721,
+      "total_tokens": 117038,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.8,
+        "session_cost": 0.0157,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0397,
+        "score": 0.0722,
+        "verdict": "net_negative",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.8,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.2,
+        "avg_degree": 0.8,
+        "max_in_degree": 2,
+        "max_in_degree_module": "store.py",
+        "max_out_degree": 2,
+        "max_out_degree_module": "server.py",
+        "connected_components": 1,
+        "largest_component_size": 5
+      }
+    },
+    {
+      "story": "notification_service",
+      "story_id": "3461c71fba8e",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002481,
+      "total_tokens": 231984,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.875,
+        "session_cost": 0.0025,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0103,
+        "score": 34.323,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.875,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.083333,
+        "avg_degree": 0.25,
+        "max_in_degree": 1,
+        "max_in_degree_module": "server.py",
+        "max_out_degree": 1,
+        "max_out_degree_module": "test_server.py",
+        "connected_components": 3,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "notification_service",
+      "story_id": "b3fbf0d3eca6",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002425,
+      "total_tokens": 193739,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.75,
+        "session_cost": 0.0024,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.005,
+        "score": 50.1706,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.75,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.5,
+        "avg_degree": 0.5,
+        "max_in_degree": 1,
+        "max_in_degree_module": "app.py",
+        "max_out_degree": 1,
+        "max_out_degree_module": "test_app.py",
+        "connected_components": 1,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "3b55ef98f7c9",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 3,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.001054,
+      "total_tokens": 125839,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1573,
+        "session_cost": 0.0011,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0036,
+        "score": 0.1704,
+        "verdict": "net_negative",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 4,
+      "net_lines": 0,
+      "avg_convention": 0.157,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 13,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "ffcde83c22ae",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 3,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.001754,
+      "total_tokens": 133635,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1592,
+        "session_cost": 0.0018,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.005,
+        "score": 0.1177,
+        "verdict": "net_negative",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 3,
+      "net_lines": 0,
+      "avg_convention": 0.159,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 6,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "1b6f0b4967f2",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002651,
+      "total_tokens": 210592,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1547,
+        "session_cost": 0.0027,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0091,
+        "score": 6.5554,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.155,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 15,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "3befdab6020a",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002627,
+      "total_tokens": 204380,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1553,
+        "session_cost": 0.0026,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0078,
+        "score": 7.4673,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.155,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 21,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "a7a0b9259a17",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.003774,
+      "total_tokens": 278081,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1568,
+        "session_cost": 0.0038,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0087,
+        "score": 6.288,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.157,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 16,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "ecb7095c6c25",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002823,
+      "total_tokens": 228299,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1582,
+        "session_cost": 0.0028,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0093,
+        "score": 6.5495,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.158,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 16,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "04d63a677687",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.003644,
+      "total_tokens": 255439,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1539,
+        "session_cost": 0.0036,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0115,
+        "score": 5.0862,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.154,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 17,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "4c1f8dd819b2",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002591,
+      "total_tokens": 216649,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1576,
+        "session_cost": 0.0026,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0078,
+        "score": 7.6182,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.158,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.003268,
+        "avg_degree": 0.06,
+        "max_in_degree": 1,
+        "max_in_degree_module": "__mocks__/chokidar.ts",
+        "max_out_degree": 1,
+        "max_out_degree_module": "plugins/dev-server-plugin.ts",
+        "connected_components": 17,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "8def7a9e572f",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002994,
+      "total_tokens": 271200,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1581,
+        "session_cost": 0.003,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0089,
+        "score": 6.6389,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.158,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 13,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "static_site_gen",
+      "story_id": "b3cab912ad30",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.003227,
+      "total_tokens": 229318,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.1365,
+        "session_cost": 0.0032,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0076,
+        "score": 6.2978,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.137,
+      "graph": {
+        "modularity": 0.0,
+        "graph_density": 0.0,
+        "avg_degree": 0.0,
+        "max_in_degree": 0,
+        "max_in_degree_module": "",
+        "max_out_degree": 0,
+        "max_out_degree_module": "",
+        "connected_components": 13,
+        "largest_component_size": 1
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "117533fe8f2f",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.002943,
+      "total_tokens": 193894,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.625,
+        "session_cost": 0.0029,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0116,
+        "score": 0.2143,
+        "verdict": "net_negative",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.625,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.416667,
+        "avg_degree": 1.25,
+        "max_in_degree": 3,
+        "max_in_degree_module": "repositories.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 1,
+        "largest_component_size": 4
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "f9b81f42ece3",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002271,
+      "total_tokens": 177779,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.625,
+        "session_cost": 0.0023,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0049,
+        "score": 43.6955,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.625,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.416667,
+        "avg_degree": 1.25,
+        "max_in_degree": 3,
+        "max_in_degree_module": "repositories.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 1,
+        "largest_component_size": 4
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "159eeb8c388a",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.002643,
+      "total_tokens": 145030,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.5,
+        "session_cost": 0.0026,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0104,
+        "score": 0.191,
+        "verdict": "net_negative",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 6,
+      "net_lines": 0,
+      "avg_convention": 0.5,
+      "graph": {
+        "modularity": 0.2857,
+        "graph_density": 0.166667,
+        "avg_degree": 1.0,
+        "max_in_degree": 4,
+        "max_in_degree_module": "repositories/task_repository.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 3,
+        "largest_component_size": 5
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "1bf430da0328",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 3,
+      "all_successful": true,
+      "cascade_recovery": null,
+      "total_cost": 0.000596,
+      "total_tokens": 47507,
+      "dvs": {
+        "correctness": 0.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.75,
+        "session_cost": 0.0006,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0002,
+        "score": 4.8116,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 2,
+      "net_lines": 0,
+      "avg_convention": 0.75,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 1.0,
+        "avg_degree": 1.0,
+        "max_in_degree": 2,
+        "max_in_degree_module": "app.py",
+        "max_out_degree": 2,
+        "max_out_degree_module": "test_app.py",
+        "connected_components": 1,
+        "largest_component_size": 2
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "f1e988572174",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": false,
+      "cascade_recovery": false,
+      "total_cost": 0.001815,
+      "total_tokens": 179479,
+      "dvs": {
+        "correctness": 0.9957,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.5,
+        "session_cost": 0.0018,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0047,
+        "score": 38.3109,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.5,
+      "graph": {
+        "modularity": 0.6154,
+        "graph_density": 0.309524,
+        "avg_degree": 1.86,
+        "max_in_degree": 5,
+        "max_in_degree_module": "repositories/task_repository.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 1,
+        "largest_component_size": 7
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "f9e607e131ce",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.00217,
+      "total_tokens": 188082,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.5,
+        "session_cost": 0.0022,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0048,
+        "score": 35.7611,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.5,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.533333,
+        "avg_degree": 2.67,
+        "max_in_degree": 6,
+        "max_in_degree_module": "tasks.py",
+        "max_out_degree": 7,
+        "max_out_degree_module": "test_app.py",
+        "connected_components": 1,
+        "largest_component_size": 6
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "3d414997ad3f",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002285,
+      "total_tokens": 189937,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.4,
+        "session_cost": 0.0023,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0026,
+        "score": 41.1268,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.4,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.4,
+        "avg_degree": 1.6,
+        "max_in_degree": 4,
+        "max_in_degree_module": "repositories.py",
+        "max_out_degree": 3,
+        "max_out_degree_module": "test_tasks.py",
+        "connected_components": 1,
+        "largest_component_size": 5
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "5449b76fe3f4",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": false,
+      "cascade_recovery": false,
+      "total_cost": 0.004674,
+      "total_tokens": 214562,
+      "dvs": {
+        "correctness": 0.955,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.3333,
+        "session_cost": 0.0047,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0119,
+        "score": 9.5892,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.333,
+      "graph": {
+        "modularity": 0.75,
+        "graph_density": 0.266667,
+        "avg_degree": 1.33,
+        "max_in_degree": 4,
+        "max_in_degree_module": "repository.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 2,
+        "largest_component_size": 5
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "6b11ccba8497",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002228,
+      "total_tokens": 190182,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.625,
+        "session_cost": 0.0022,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0062,
+        "score": 36.8937,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.625,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.75,
+        "avg_degree": 2.25,
+        "max_in_degree": 4,
+        "max_in_degree_module": "repositories.py",
+        "max_out_degree": 5,
+        "max_out_degree_module": "app.py",
+        "connected_components": 1,
+        "largest_component_size": 4
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "879a2d635e81",
+      "condition": "early_degrade",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.002199,
+      "total_tokens": 208626,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.5,
+        "session_cost": 0.0022,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0028,
+        "score": 49.787,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.5,
+      "graph": {
+        "modularity": 0.75,
+        "graph_density": 0.190476,
+        "avg_degree": 1.14,
+        "max_in_degree": 4,
+        "max_in_degree_module": "app.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 3,
+        "largest_component_size": 5
+      }
+    },
+    {
+      "story": "task_manager_api",
+      "story_id": "8a07787213e4",
+      "condition": "clean",
+      "model": "deepseek/deepseek-v4-pro",
+      "sessions": 5,
+      "all_successful": true,
+      "cascade_recovery": false,
+      "total_cost": 0.001568,
+      "total_tokens": 144968,
+      "dvs": {
+        "correctness": 1.0,
+        "architectural_fit": 0.5,
+        "convention_adherence": 0.5,
+        "session_cost": 0.0016,
+        "technical_debt_introduced": 0.0,
+        "future_cost_impact": 0.0059,
+        "score": 33.5288,
+        "verdict": "net_positive",
+        "provenance": {
+          "has_independent_tests": false,
+          "has_review": false,
+          "has_sonar": false,
+          "has_entropy": true
+        }
+      },
+      "commits": 5,
+      "net_lines": 0,
+      "avg_convention": 0.5,
+      "graph": {
+        "modularity": 1.0,
+        "graph_density": 0.583333,
+        "avg_degree": 1.75,
+        "max_in_degree": 3,
+        "max_in_degree_module": "repositories.py",
+        "max_out_degree": 4,
+        "max_out_degree_module": "app.py",
+        "connected_components": 1,
+        "largest_component_size": 4
+      }
+    }
+  ]
+}

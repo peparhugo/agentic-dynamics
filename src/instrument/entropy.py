@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST
-from .language import collect_functions
+from .language import collect_functions, _should_skip
 
 
 # ── Data Structures ────────────────────────────────────────────
@@ -101,6 +101,8 @@ def compute_entropy(
     # ── Dimension 1: Function length distribution ──
     func_lengths: list[int] = []
     for file_path in codebase_path.rglob("*"):
+        if _should_skip(file_path):
+            continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
                 source = file_path.read_bytes()
@@ -121,6 +123,8 @@ def compute_entropy(
     # ── Dimension 2: Module size distribution ──
     file_sizes: list[int] = []
     for file_path in codebase_path.rglob("*"):
+        if _should_skip(file_path):
+            continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
                 lines = len(file_path.read_bytes().split(b"\n"))
@@ -135,6 +139,8 @@ def compute_entropy(
     import_counts: list[int] = []
     file_imports: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
+        if _should_skip(file_path):
+            continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
                 source = file_path.read_bytes()
@@ -157,6 +163,8 @@ def compute_entropy(
     # ── Dimension 4: Naming convention consistency ──
     naming_counts: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
+        if _should_skip(file_path):
+            continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
                 source = file_path.read_bytes()
@@ -178,6 +186,8 @@ def compute_entropy(
     # ── Dimension 5: File-to-responsibility mapping ──
     file_classes: dict[str, int] = {}
     for file_path in codebase_path.rglob("*"):
+        if _should_skip(file_path):
+            continue
         if file_path.suffix in profile.extensions and file_path.is_file():
             try:
                 source = file_path.read_bytes()

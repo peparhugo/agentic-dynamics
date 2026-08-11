@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST
+from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST, _should_skip
 
 
 # ── Data Structures ────────────────────────────────────────────
@@ -107,7 +107,7 @@ def build_graph(
     # First pass: build module metadata
     file_modules: dict[str, ModuleNode] = {}
     for file_path in codebase_path.rglob("*"):
-        if file_path.is_dir() or file_path.suffix not in extensions:
+        if file_path.is_dir() or file_path.suffix not in extensions or _should_skip(file_path):
             continue
         try:
             source = file_path.read_bytes()

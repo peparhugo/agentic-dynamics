@@ -96,6 +96,15 @@ _PROFILES: dict[str, LanguageProfile] = {
 }
 
 
+# Directories to skip when walking codebases
+_SKIP_DIRS = {"__pycache__", "node_modules", ".git", "dist", "build", "venv", ".venv", ".pytest_cache"}
+
+
+def _should_skip(path: Path) -> bool:
+    """Check if a path should be skipped during codebase analysis."""
+    return any(skip in path.parts for skip in _SKIP_DIRS)
+
+
 def detect_language(path: Path) -> LanguageProfile | None:
     """Detect the dominant programming language in a directory.
 
@@ -206,7 +215,11 @@ def parse_codebase(path: Path, profile: LanguageProfile | None = None) -> Codeba
     import_types = profile.import_node_types
 
     for file_path in path.rglob("*"):
-        if file_path.is_dir() or file_path.suffix not in extensions:
+        if file_path.is_dir():
+            continue
+        if _should_skip(file_path):
+            continue
+        if file_path.suffix not in extensions:
             continue
         try:
             source = file_path.read_bytes()

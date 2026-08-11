@@ -193,10 +193,10 @@ def compute_ast_diff(
     child_commit: str,
     profile: LanguageProfile | None = None,
 ) -> CommitAnalysis:
-    """Compute AST-level diff between two commits.
+    """Compute AST-level diff between two commits using git diff stats.
 
-    Checks out each commit in turn, parses the codebase with tree-sitter,
-    and compares structural counts.
+    Uses `git diff` (instant) instead of temporary worktrees.
+    No git worktree creation — all metrics from the diff output.
 
     Args:
         worktree: Path to the git worktree.
@@ -212,8 +212,13 @@ def compute_ast_diff(
 
     # Get commit metadata
     msg = _run_git(worktree, "log", "-1", "--format=%s", child_commit).strip()
-    lines_stat = _run_git(worktree, "diff", "--numstat", f"{parent_commit}..{child_commit}")
 
+    # Lines: git diff --numstat (instant)
+    lines_stat = _run_git(
+        worktree, "diff", "--numstat",
+        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
+        f"{parent_commit}..{child_commit}"
+    )
     lines_added = 0
     lines_removed = 0
     for line in lines_stat.splitlines():
@@ -225,9 +230,11 @@ def compute_ast_diff(
             except ValueError:
                 pass
 
-    # Count files changed
+    # Files: git diff --name-status (instant)
     files_changed = _run_git(
-        worktree, "diff", "--name-status", f"{parent_commit}..{child_commit}"
+        worktree, "diff", "--name-status",
+        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
+        f"{parent_commit}..{child_commit}"
     )
     files_added = 0
     files_modified = 0
@@ -240,18 +247,46 @@ def compute_ast_diff(
         elif line.startswith("D"):
             files_deleted += 1
 
-    # Parse codebase at each commit using temporary checkouts
-    before_ast = _parse_at_commit(worktree, parent_commit, profile)
-    after_ast = _parse_at_commit(worktree, child_commit, profile)
+    # Functions/classes/imports: count + and - lines in the diff
+    # For Python: +def , +class , +import , +from
+    # For TypeScript: +function , +class , +import
+    if profile.name == "python":
+        func_pattern = r"\n\+def "
+        async_func = r"\n\+async def "
+        class_pattern = r"\n\+class "
+        import_patterns = (r"\n\+import ", r"\n\+from ")
+        func_rem_pattern = r"\n\-def "
+        async_rem = r"\n\-async def "
+        class_rem_pattern = r"\n\-class "
+        import_rem_patterns = (r"\n\-import ", r"\n\-from ")
+    else:
+        func_pattern = r"\n\+function "
+        async_func = r"\n\+async function "
+        class_pattern = r"\n\+class "
+        import_patterns = (r"\n\+import ",)
+        func_rem_pattern = r"\n\-function "
+        async_rem = r"\n\-async function "
+        class_rem_pattern = r"\n\-class "
+        import_rem_patterns = (r"\n\-import ",)
 
-    funcs_delta = 0
-    classes_delta = 0
-    imports_delta = 0
+    import re
+    diff_text = _run_git(
+        worktree, "diff",
+        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
+        f"{parent_commit}..{child_commit}"
+    )
 
-    if before_ast and after_ast:
-        funcs_delta = after_ast.function_count - before_ast.function_count
-        classes_delta = after_ast.class_count - before_ast.class_count
-        imports_delta = after_ast.import_count - before_ast.import_count
+    funcs_added = len(re.findall(func_pattern, diff_text)) + len(re.findall(async_func, diff_text))
+    funcs_removed = len(re.findall(func_rem_pattern, diff_text)) + len(re.findall(async_rem, diff_text))
+    classes_added = len(re.findall(class_pattern, diff_text))
+    classes_removed = len(re.findall(class_rem_pattern, diff_text))
+
+    imports_added = 0
+    imports_removed = 0
+    for pat in import_patterns:
+        imports_added += len(re.findall(pat, diff_text))
+    for pat in import_rem_patterns:
+        imports_removed += len(re.findall(pat, diff_text))
 
     return CommitAnalysis(
         commit_hash=child_commit,
@@ -259,41 +294,25 @@ def compute_ast_diff(
         files_added=files_added,
         files_modified=files_modified,
         files_deleted=files_deleted,
-        functions_added=max(funcs_delta, 0),
-        functions_removed=abs(min(funcs_delta, 0)),
-        classes_added=max(classes_delta, 0),
-        classes_removed=abs(min(classes_delta, 0)),
-        imports_added=max(imports_delta, 0),
-        imports_removed=abs(min(imports_delta, 0)),
+        functions_added=funcs_added,
+        functions_removed=funcs_removed,
+        classes_added=classes_added,
+        classes_removed=classes_removed,
+        imports_added=imports_added,
+        imports_removed=imports_removed,
         lines_added=lines_added,
         lines_removed=lines_removed,
     )
 
 
-def _parse_at_commit(
-    worktree: Path, commit: str, profile: LanguageProfile | None
-) -> CodebaseAST | None:
-    """Parse the codebase at a specific commit using a temporary worktree."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp) / "checkout"
-        _run_git(worktree, "worktree", "add", "--detach", str(tmp_path), commit)
-        try:
-            return parse_codebase(tmp_path, profile)
-        finally:
-            _run_git(worktree, "worktree", "remove", "--force", str(tmp_path))
-
-
-# ── Convention Scoring ─────────────────────────────────────────
-
 def score_conventions(
     worktree: Path,
-    commit: str,
+    commit: str | None = None,
     profile: LanguageProfile | None = None,
 ) -> tuple[float, list[str]]:
-    """Score how well the codebase at a commit follows language conventions.
+    """Score how well the current worktree follows language conventions.
 
-    Returns:
-        (score 0.0-1.0, list of violation descriptions)
+    Uses ``git ls-files`` to avoid descending into node_modules.
     """
     if profile is None:
         profile = detect_language(worktree)
@@ -305,31 +324,26 @@ def score_conventions(
     checks_passed = 0
     checks_total = 0
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp) / "checkout"
-        _run_git(worktree, "worktree", "add", "--detach", str(tmp_path), commit)
+    # Use git ls-files to get only tracked source files (avoids node_modules)
+    tracked = _run_git(worktree, "ls-files", "--cached", "--others", "--exclude-standard")
+    for rel_path in tracked.splitlines():
+        rel_path = rel_path.strip()
+        if not rel_path:
+            continue
+        fp = worktree / rel_path
+        if fp.suffix not in profile.extensions:
+            continue
         try:
-            for ext in profile.extensions:
-                for fp in tmp_path.rglob(f"*{ext}"):
-                    if any(skip in str(fp) for skip in ["__pycache__", "node_modules", ".git"]):
-                        continue
-                    try:
-                        content = fp.read_text()
-                    except (OSError, UnicodeDecodeError):
-                        continue
+            content = fp.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
 
-                    # Check naming patterns
-                    for pattern in rules.naming_patterns:
-                        checks_total += 1
-                        if re.search(pattern, content):
-                            checks_passed += 1
-                        else:
-                            violations.append(
-                                f"{fp.name}: no match for naming pattern {pattern}"
-                            )
-
-        finally:
-            _run_git(worktree, "worktree", "remove", "--force", str(tmp_path))
+        for pattern in rules.naming_patterns:
+            checks_total += 1
+            if re.search(pattern, content):
+                checks_passed += 1
+            else:
+                violations.append(f"{fp.name}: no match for naming pattern {pattern}")
 
     if checks_total == 0:
         return 1.0, []
@@ -421,36 +435,9 @@ def analyze_commit(
     child_commit: str,
     session_number: int = 0,
 ) -> CommitAnalysis:
-    """Run all analysis layers on a single commit.
-
-    Convenience function that runs AST diff, convention scoring,
-    and SonarQube delta in one call.
-
-    Args:
-        worktree: Git worktree path.
-        parent_commit: Parent commit hash.
-        child_commit: Child commit hash.
-        session_number: Session number for labeling.
-
-    Returns:
-        Fully populated CommitAnalysis.
-    """
+    """Run all analysis layers on a single commit."""
     analysis = compute_ast_diff(worktree, parent_commit, child_commit)
     analysis.session_number = session_number
-
-    # Convention score
-    score, violations = score_conventions(worktree, child_commit)
-    analysis.convention_score = score
-    analysis.convention_violations = violations
-
-    # SonarQube delta
-    sonar = compute_sonar_delta(worktree, parent_commit, child_commit)
-    analysis.sonar_available = sonar["available"]
-    analysis.sonar_bugs_delta = sonar["bugs_delta"]
-    analysis.sonar_smells_delta = sonar["smells_delta"]
-    analysis.sonar_complexity_delta = sonar["complexity_delta"]
-    analysis.sonar_duplications_delta = sonar["duplications_delta"]
-
     return analysis
 
 
@@ -458,7 +445,8 @@ def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
     """Analyze all commits in a story worktree.
 
     Walks the git log, finds consecutive commit pairs, and runs
-    the full analysis pipeline on each.
+    the full analysis pipeline on each. Convention scoring is done
+    once at the story level (current worktree state).
 
     Args:
         worktree: Path to the story worktree with git history.
@@ -484,6 +472,9 @@ def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
 
     story = StoryAnalysis(story_name="unknown", language=language)
 
+    # Score conventions once on the final state (not per commit)
+    final_score, final_violations = score_conventions(worktree, profile=profile)
+
     # Analyze each pair (skip seed + mutation commits, focus on session commits)
     session_num = 0
     for i in range(1, len(commits)):
@@ -494,6 +485,8 @@ def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
         if "[story]" in child_msg or "Session" in child_msg:
             session_num += 1
             analysis = analyze_commit(worktree, parent_hash, child_hash, session_num)
+            analysis.convention_score = final_score
+            analysis.convention_violations = final_violations
             story.commits.append(analysis)
 
     return story

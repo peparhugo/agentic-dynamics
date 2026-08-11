@@ -1,0 +1,62 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "ffcde83c22ae",
+  "codebase_path": "experiments/codebases/typescript/tier2_small/good",
+  "language": "typescript",
+  "model": "deepseek/deepseek-v4-pro",
+  "mutation_id": "",
+  "perturbation_condition": "",
+  "started_at": "2026-08-11T16:34:39.203607+00:00",
+  "completed_at": "2026-08-11T16:57:49.846416+00:00",
+  "worktree": "/tmp/story_ffcde83c22ae",
+  "error": "Session 3 failed: Timeout after 900s",
+  "summary": {
+    "total_cost": 0.00175421,
+    "total_tokens": 133635,
+    "total_duration": 1388.1572949719848,
+    "session_count": 3,
+    "all_successful": true,
+    "cascade_recovery": null
+  },
+  "sessions": [
+    {
+      "session_number": 1,
+      "task_type": "greenfield",
+      "prompt": "Build a static site generator CLI in TypeScript.\n\nCORE FEATURES:\n- Read Markdown files from a content directory (default: ./content)\n- Parse Markdown to HTML with frontmatter support (title, date, tag",
+      "commit_hash": "d5cbd19f19496d2dae403fb1d79cabb9825414c4",
+      "commit_message": "[story] Session 1: greenfield",
+      "cost_usd": 0.000313954,
+      "total_tokens": 17180,
+      "duration_s": 140.87453458399978,
+      "files_changed": 5340,
+      "exit_code": 0,
+      "error": ""
+    },
+    {
+      "session_number": 2,
+      "task_type": "feature_addition",
+      "prompt": "Add template engine and layout support to the static site generator.\n\nTEMPLATES:\n- Support Handlebars (.hbs) or EJS templates\n- Each page can specify a template in its frontmatter\n- Default template i",
+      "commit_hash": "154d15dab9f841be392c1c8c369231e1c06c7acc",
+      "commit_message": "[story] Session 2: feature_addition",
+      "cost_usd": 0.000833141,
+      "total_tokens": 37937,
+      "duration_s": 346.58522440999513,
+      "files_changed": 13,
+      "exit_code": 0,
+      "error": ""
+    },
+    {
+      "session_number": 3,
+      "task_type": "integration",
+      "prompt": "Add a live-reload development server to the SSG.\n\nDEV SERVER:\n- npx ssg serve \u2014 start dev server on localhost:3000\n- Watch content/ and templates/ directories for changes\n- Rebuild on file change\n- In",
+      "commit_hash": "41bc952d9997d45d8af46af115d1e947cc8964e0",
+      "commit_message": "[story] Session 3: integration",
+      "cost_usd": 0.000607115,
+      "total_tokens": 78518,
+      "duration_s": 900.6975359779899,
+      "files_changed": 68,
+      "exit_code": 0,
+      "error": ""
+    }
+  ]
+}

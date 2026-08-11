@@ -1,0 +1,16 @@
+
+Story: static_site_gen (5 sessions, typescript)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/typescript/tier2_small/bad (bad, tier2_small)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: static_site_gen
+  Condition: clean
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0028
+  Total tokens: 228,299
+  Duration: 1948.5s
+  Cascade recovery: no
+  Results: experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_ecb7095c6c25.json

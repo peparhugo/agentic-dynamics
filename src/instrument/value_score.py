@@ -38,7 +38,7 @@ from .review import CommitReview
 DEBT_COST_PER_BUG = 0.50         # $ per bug introduced
 DEBT_COST_PER_SMELL = 0.10       # $ per code smell introduced
 DEBT_COST_PER_COMPLEXITY = 0.05  # $ per complexity point added
-ENTROPY_COST_PER_001 = 0.25      # $ per 0.01 composite entropy increase
+ENTROPY_MULTIPLIER = 10.0         # entropy delta × avg_session_cost × multiplier = future cost
 
 
 @dataclass
@@ -125,9 +125,9 @@ def compute_dvs(
         dvs.technical_debt_introduced = _sonar_delta_to_cost(commit_analysis)
         dvs.has_sonar = True
 
-    # Future cost impact from entropy delta
+    # Future cost impact from entropy delta — scaled to session cost
     if entropy_delta_value > 0:
-        dvs.future_cost_impact = entropy_delta_value * ENTROPY_COST_PER_001 * 100
+        dvs.future_cost_impact = entropy_delta_value * max(session_cost, 0.0001) * ENTROPY_MULTIPLIER
         dvs.has_entropy = True
 
     # Compute score
@@ -160,7 +160,7 @@ def compute_story_dvs(
     convention_values: list[float],
     *,
     total_sonar_cost: float = 0.0,
-    total_entropy_cost: float = 0.0,
+    entropy_delta: float = 0.0,
 ) -> DurableValueScore:
     """Compute DVS for an entire multi-session story.
 
@@ -180,7 +180,7 @@ def compute_story_dvs(
         architectural_fit=avg_arch_fit,
         convention_adherence=avg_convention,
         session_cost=total_cost,
-        entropy_delta_value=total_entropy_cost / (ENTROPY_COST_PER_001 * 100) if ENTROPY_COST_PER_001 > 0 else 0,
+        entropy_delta_value=entropy_delta,
     )
 
 

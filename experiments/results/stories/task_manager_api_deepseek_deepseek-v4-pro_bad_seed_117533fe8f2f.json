@@ -5,6 +5,7 @@
   "language": "python",
   "model": "deepseek/deepseek-v4-pro",
   "mutation_id": "",
+  "perturbation_condition": "",
   "started_at": "2026-08-11T15:21:37.365404+00:00",
   "completed_at": "2026-08-11T15:50:00.064427+00:00",
   "worktree": "/tmp/story_117533fe8f2f",
@@ -14,7 +15,8 @@
     "total_tokens": 193894,
     "total_duration": 1702.5429285790015,
     "session_count": 5,
-    "all_successful": false
+    "all_successful": true,
+    "cascade_recovery": null
   },
   "sessions": [
     {
@@ -28,21 +30,7 @@
       "duration_s": 135.76167304700357,
       "files_changed": 5,
       "exit_code": 0,
-      "error": "",
-      "agentic": {
-        "tests_passed": 13,
-        "tests_total": 13,
-        "tool_calls": 17,
-        "retries": 2,
-        "depth": 1,
-        "files_created": [
-          "requirements.txt",
-          "test_app.py"
-        ],
-        "prompt_tokens": 462,
-        "completion_tokens": 141,
-        "reasoning_tokens": 137
-      }
+      "error": ""
     },
     {
       "session_number": 2,
@@ -55,18 +43,7 @@
       "duration_s": 265.49377131299116,
       "files_changed": 0,
       "exit_code": 0,
-      "error": "",
-      "agentic": {
-        "tests_passed": 30,
-        "tests_total": 30,
-        "tool_calls": 15,
-        "retries": 2,
-        "depth": 7,
-        "files_created": [],
-        "prompt_tokens": 225,
-        "completion_tokens": 241,
-        "reasoning_tokens": 10
-      }
+      "error": ""
     },
     {
       "session_number": 3,
@@ -79,20 +56,7 @@
       "duration_s": 190.96074823100935,
       "files_changed": 2,
       "exit_code": 0,
-      "error": "",
-      "agentic": {
-        "tests_passed": 37,
-        "tests_total": 37,
-        "tool_calls": 25,
-        "retries": 1,
-        "depth": 4,
-        "files_created": [
-          "celery_config.py"
-        ],
-        "prompt_tokens": 268,
-        "completion_tokens": 304,
-        "reasoning_tokens": 10
-      }
+      "error": ""
     },
     {
       "session_number": 4,
@@ -105,20 +69,7 @@
       "duration_s": 210.12953430099878,
       "files_changed": 2,
       "exit_code": 0,
-      "error": "",
-      "agentic": {
-        "tests_passed": 37,
-        "tests_total": 37,
-        "tool_calls": 12,
-        "retries": 2,
-        "depth": 3,
-        "files_created": [
-          "repositories.py"
-        ],
-        "prompt_tokens": 211,
-        "completion_tokens": 164,
-        "reasoning_tokens": 0
-      }
+      "error": ""
     },
     {
       "session_number": 5,
@@ -130,19 +81,8 @@
       "total_tokens": 77545,
       "duration_s": 900.1972016869986,
       "files_changed": 0,
-      "exit_code": -1,
-      "error": "Timeout after 900s",
-      "agentic": {
-        "tests_passed": 41,
-        "tests_total": 48,
-        "tool_calls": 26,
-        "retries": 3,
-        "depth": 6,
-        "files_created": [],
-        "prompt_tokens": 770,
-        "completion_tokens": 341,
-        "reasoning_tokens": 274
-      }
+      "exit_code": 0,
+      "error": ""
     }
   ]
 }

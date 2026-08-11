@@ -1,0 +1,16 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier2_small/good (good, tier2_small)
+Condition: bad_seed
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: bad_seed
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0023
+  Total tokens: 177,779
+  Duration: 1364.7s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_f9b81f42ece3.json

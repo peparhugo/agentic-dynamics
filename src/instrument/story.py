@@ -576,12 +576,22 @@ def load_story_result(path: Path) -> StoryResult:
         language=d.get("language", ""),
         model=d.get("model", ""),
         mutation_id=d.get("mutation_id", ""),
+        perturbation_condition=d.get("perturbation_condition", ""),
         started_at=d.get("started_at", ""),
         completed_at=d.get("completed_at", ""),
         worktree=d.get("worktree", ""),
         error=d.get("error", ""),
     )
     for s in d.get("sessions", []):
+        # Rebuild AgenticResult from JSON if present
+        agentic = None
+        if "agentic" in s and s["agentic"]:
+            from .opencode import AgenticResult
+            a = s["agentic"]
+            agentic = AgenticResult(
+                tests_passed=a.get("tests_passed", 0),
+                tests_total=a.get("tests_total", 0),
+            )
         result.sessions.append(SessionResult(
             session_number=s["session_number"],
             task_type=s.get("task_type", ""),
@@ -594,6 +604,7 @@ def load_story_result(path: Path) -> StoryResult:
             files_changed=s.get("files_changed", 0),
             exit_code=s.get("exit_code", 0),
             error=s.get("error", ""),
+            agentic=agentic,
         ))
     return result
 

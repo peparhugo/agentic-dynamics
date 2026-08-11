@@ -1,0 +1,16 @@
+
+Story: static_site_gen (5 sessions, typescript)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/typescript/tier2_small/good (good, tier2_small)
+Condition: early_degrade
+============================================================
+
+============================================================
+Story complete: static_site_gen
+  Condition: early_degrade
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0026
+  Total tokens: 216,649
+  Duration: 1744.5s
+  Cascade recovery: no
+  Results: experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_early_degrade_4c1f8dd819b2.json

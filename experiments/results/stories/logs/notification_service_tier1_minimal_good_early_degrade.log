@@ -1,0 +1,16 @@
+
+Story: notification_service (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier1_minimal/good (good, tier1_minimal)
+Condition: early_degrade
+============================================================
+
+============================================================
+Story complete: notification_service
+  Condition: early_degrade
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0025
+  Total tokens: 231,984
+  Duration: 2009.5s
+  Cascade recovery: no
+  Results: experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_3461c71fba8e.json

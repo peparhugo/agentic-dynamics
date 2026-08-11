@@ -1,0 +1,148 @@
+{
+  "story_name": "notification_service",
+  "story_id": "3461c71fba8e",
+  "codebase_path": "experiments/codebases/python/tier1_minimal/good",
+  "language": "python",
+  "model": "deepseek/deepseek-v4-pro",
+  "mutation_id": "mut_f21eec4e6efcca87",
+  "perturbation_condition": "early_degrade",
+  "started_at": "2026-08-11T17:11:45.650557+00:00",
+  "completed_at": "2026-08-11T17:45:15.306481+00:00",
+  "worktree": "/tmp/story_3461c71fba8e",
+  "error": "",
+  "summary": {
+    "total_cost": 0.002481008,
+    "total_tokens": 231984,
+    "total_duration": 2009.4895278479962,
+    "session_count": 5,
+    "all_successful": true,
+    "cascade_recovery": false
+  },
+  "sessions": [
+    {
+      "session_number": 1,
+      "task_type": "greenfield",
+      "prompt": "MUTATED SPECIFICATION:\nBuild a WebSocket-based notification server in Python.\nCORE FEATURES:\n- Accept WebSocket connections from clients\n- Assign each client a unique ID on connect\n- Broadcast a messa",
+      "commit_hash": "0aa80aa4db546016d6df03e3c7ac0b2a1b4a663a",
+      "commit_message": "[story] Session 1: greenfield",
+      "cost_usd": 0.000574461,
+      "total_tokens": 49861,
+      "duration_s": 536.6402946970193,
+      "files_changed": 5,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 13,
+        "tests_total": 13,
+        "tool_calls": 30,
+        "retries": 1,
+        "depth": 3,
+        "files_created": [
+          "server.py",
+          "test_server.py"
+        ],
+        "prompt_tokens": 507,
+        "completion_tokens": 11,
+        "reasoning_tokens": 191
+      }
+    },
+    {
+      "session_number": 2,
+      "task_type": "feature_addition",
+      "prompt": "Add channel-based subscriptions to the notification server.\n\nCHANNELS:\n- Clients subscribe to named channels (e.g. 'alerts', 'system', 'chat')\n- Messages are delivered ONLY to clients subscribed to th",
+      "commit_hash": "f86c38ba015039990a6675ae352535dab82d62e9",
+      "commit_message": "[story] Session 2: feature_addition",
+      "cost_usd": 0.00049648,
+      "total_tokens": 28125,
+      "duration_s": 198.359970444988,
+      "files_changed": 0,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 25,
+        "tests_total": 25,
+        "tool_calls": 19,
+        "retries": 2,
+        "depth": 3,
+        "files_created": [],
+        "prompt_tokens": 298,
+        "completion_tokens": 307,
+        "reasoning_tokens": 0
+      }
+    },
+    {
+      "session_number": 3,
+      "task_type": "integration",
+      "prompt": "Integrate Redis pub/sub as the message backbone.\n\nREDIS INTEGRATION:\n- Use Redis pub/sub channels for message distribution\n- Server publishes to Redis channel; workers subscribe and deliver\n- Multiple",
+      "commit_hash": "5e44fa69ff6d8bd485976bf6b5ea52cfc055667f",
+      "commit_message": "[story] Session 3: integration",
+      "cost_usd": 0.000529018,
+      "total_tokens": 50652,
+      "duration_s": 505.5917734710092,
+      "files_changed": 2,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 39,
+        "tests_total": 39,
+        "tool_calls": 20,
+        "retries": 2,
+        "depth": 2,
+        "files_created": [
+          "test_redis_integration.py"
+        ],
+        "prompt_tokens": 154,
+        "completion_tokens": 307,
+        "reasoning_tokens": 15
+      }
+    },
+    {
+      "session_number": 4,
+      "task_type": "refactor",
+      "prompt": "Refactor the notification server to use a pluggable transport layer.\n\nREQUIREMENT:\nExtract the WebSocket transport behind a Transport interface so\ndifferent transport mechanisms (SSE, polling, raw TCP",
+      "commit_hash": "e1afc9a7df626d8945cc532513639d45252a8860",
+      "commit_message": "[story] Session 4: refactor",
+      "cost_usd": 0.000268627,
+      "total_tokens": 53013,
+      "duration_s": 468.0321790489834,
+      "files_changed": 0,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 39,
+        "tests_total": 39,
+        "tool_calls": 14,
+        "retries": 2,
+        "depth": 3,
+        "files_created": [],
+        "prompt_tokens": 121,
+        "completion_tokens": 12,
+        "reasoning_tokens": 16
+      }
+    },
+    {
+      "session_number": 5,
+      "task_type": "cross_cutting",
+      "prompt": "Add rate limiting and persistent message history.\n\nRATE LIMITING:\n- Limit each client to 100 messages per minute\n- Limits enforced per-client-ID using Redis counters\n- Return error message on rate lim",
+      "commit_hash": "d7d3278011a5b466bb71fecdbb8905b16b7d8b03",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "cost_usd": 0.000612422,
+      "total_tokens": 50333,
+      "duration_s": 300.86531018599635,
+      "files_changed": 0,
+      "exit_code": 0,
+      "error": "",
+      "agentic": {
+        "tests_passed": 49,
+        "tests_total": 49,
+        "tool_calls": 27,
+        "retries": 3,
+        "depth": 3,
+        "files_created": [],
+        "prompt_tokens": 344,
+        "completion_tokens": 315,
+        "reasoning_tokens": 10
+      }
+    }
+  ]
+}

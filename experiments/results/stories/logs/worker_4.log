@@ -1,3 +1,116 @@
 [17:21:36][worker] Started (pid=1046039)
 [17:21:36][worker] Redis connected
 [17:21:36][worker] [task_manager_api_tier1_minimal_bad_early_degrade] Starting (1/30)
+[17:53:15][worker] [task_manager_api_tier1_minimal_bad_early_degrade] FAILED ret=0 (1899s)
+[17:53:15][worker] [task_manager_api_tier2_small_bad_early_degrade] Starting (2/30)
+[18:12:46][worker] [task_manager_api_tier2_small_bad_early_degrade] OK (1171s)
+[18:12:46][worker] [static_site_gen_tier1_minimal_bad_clean] Starting (3/30)
+[18:42:06][worker] [static_site_gen_tier1_minimal_bad_clean] OK (1760s)
+[18:42:06][worker] [static_site_gen_tier2_small_good_early_degrade] Starting (4/30)
+[19:11:31][worker] [static_site_gen_tier2_small_good_early_degrade] OK (1765s)
+[19:11:31][worker] [notification_service_tier1_minimal_good_early_degrade] Starting (5/30)
+[19:45:15][worker] [notification_service_tier1_minimal_good_early_degrade] OK (2024s)
+[19:46:14][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:47:23][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:48:33][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:49:41][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:50:49][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:51:58][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:53:08][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:54:16][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:55:25][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:56:33][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:57:42][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:58:51][worker] Redis error: Timeout reading from socket, retrying in 10s
+[19:59:59][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:01:08][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:02:17][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:03:27][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:04:36][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:05:45][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:06:55][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:08:04][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:09:13][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:10:21][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:11:30][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:12:39][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:13:47][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:14:55][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:16:03][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:17:13][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:18:23][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:19:32][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:20:42][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:21:51][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:23:00][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:24:10][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:25:19][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:26:27][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:27:36][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:28:44][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:29:53][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:31:03][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:32:12][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:33:21][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:34:30][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:35:38][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:36:47][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:37:56][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:39:05][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:40:15][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:41:23][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:42:33][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:43:42][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:44:51][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:45:59][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:47:07][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:48:16][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:49:24][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:50:34][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:51:42][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:52:51][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:54:00][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:55:09][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:56:18][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:57:25][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:58:34][worker] Redis error: Timeout reading from socket, retrying in 10s
+[20:59:43][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:00:52][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:02:01][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:03:09][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:04:18][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:05:27][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:06:38][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:07:47][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:08:56][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:10:04][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:11:14][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:12:23][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:13:31][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:14:40][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:15:49][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:16:59][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:18:08][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:19:17][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:20:27][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:21:36][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:22:45][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:23:54][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:25:02][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:26:11][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:27:21][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:28:30][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:29:39][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:30:48][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:31:58][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:33:07][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:34:16][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:35:25][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:36:34][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:37:43][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:38:52][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:40:01][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:41:10][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:42:19][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:43:28][worker] Redis error: Timeout reading from socket, retrying in 10s
+[21:44:37][worker] Redis error: Timeout reading from socket, retrying in 10s

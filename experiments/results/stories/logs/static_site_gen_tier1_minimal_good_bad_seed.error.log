@@ -1,0 +1,17 @@
+
+Story: static_site_gen (5 sessions, typescript)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/typescript/tier1_minimal/good (good, tier1_minimal)
+Condition: bad_seed
+============================================================
+
+============================================================
+Story complete: static_site_gen
+  Condition: bad_seed
+  Sessions: 3  |  All successful: False
+  Total cost: $0.0011
+  Total tokens: 125,839
+  Duration: 1465.3s
+  Cascade recovery: no
+  Results: experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_3b55ef98f7c9.json
+  ERROR: Session 3 failed: Timeout after 900s

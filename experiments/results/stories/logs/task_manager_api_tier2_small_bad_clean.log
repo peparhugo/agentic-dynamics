@@ -1,0 +1,17 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier2_small/bad (bad, tier2_small)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: clean
+  Sessions: 3  |  All successful: False
+  Total cost: $0.0006
+  Total tokens: 47,507
+  Duration: 1260.1s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_1bf430da0328.json
+  ERROR: Session 3 failed: Timeout after 900s
