@@ -325,3 +325,71 @@ def test_update_task_model():
     finally:
         os.close(db_fd)
         os.unlink(db_path)
+
+
+# ── Notification tests ───────────────────────────────────────────
+
+
+def test_notification_sent_when_status_changes_to_completed(client, mocker):
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    headers = auth_header(client, "notifyuser", "pass")
+    client.post("/tasks", json={"title": "Notify me"}, headers=headers)
+
+    resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+    assert resp.status_code == 200
+
+    mock_delay.assert_called_once_with(
+        "notifyuser@example.com", "Notify me"
+    )
+
+
+def test_notification_not_sent_when_status_is_other(client, mocker):
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    headers = auth_header(client, "user1", "pass")
+    client.post("/tasks", json={"title": "Task"}, headers=headers)
+
+    resp = client.put("/tasks/1", json={"status": "in-progress"}, headers=headers)
+    assert resp.status_code == 200
+
+    mock_delay.assert_not_called()
+
+
+def test_notification_not_sent_when_already_completed(client, mocker):
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    headers = auth_header(client, "user2", "pass")
+    client.post("/tasks", json={"title": "Already done"}, headers=headers)
+    client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+
+    mock_delay.reset_mock()
+
+    resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+    assert resp.status_code == 200
+
+    mock_delay.assert_not_called()
+
+
+def test_notification_not_sent_when_updating_title_only(client, mocker):
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    headers = auth_header(client, "user3", "pass")
+    client.post("/tasks", json={"title": "Title only"}, headers=headers)
+
+    resp = client.put("/tasks/1", json={"title": "New title"}, headers=headers)
+    assert resp.status_code == 200
+
+    mock_delay.assert_not_called()
+
+
+def test_notification_not_sent_when_no_status_change(client, mocker):
+    mock_delay = mocker.patch.object(app_module.send_notification_email, "delay")
+
+    headers = auth_header(client, "user4", "pass")
+    client.post("/tasks", json={"title": "No change"}, headers=headers)
+
+    resp = client.put("/tasks/1", json={}, headers=headers)
+    assert resp.status_code == 200
+
+    mock_delay.assert_not_called()

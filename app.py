@@ -13,6 +13,7 @@ import re
 import jwt
 import bcrypt
 from functools import wraps
+from celery_config import send_notification_email
 
 app = Flask(__name__)
 
@@ -129,6 +130,12 @@ def authenticate_user(username: str, password: str) -> dict | None:
     if not verify_password(password, user["password_hash"]):
         return None
     return user
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        return dict(row) if row else None
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -283,6 +290,9 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    previous = get_task(task_id, owner_id=request.current_user_id)
+    if previous is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         owner_id=request.current_user_id,
@@ -291,6 +301,14 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    status = data.get("status")
+    if status is not None and status == "completed" and previous.get("status") != "completed":
+        user = get_user_by_id(request.current_user_id)
+        user_email = f"{user['username']}@example.com" if user else "unknown@example.com"
+        try:
+            send_notification_email.delay(user_email, task["title"])
+        except Exception:
+            pass
     return jsonify(task)
 
 
