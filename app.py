@@ -1,9 +1,12 @@
 import functools
+import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import send_notification_email
@@ -11,6 +14,10 @@ from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev-secret-key-change-in-production"
+app.config.setdefault(
+    "RATELIMIT_STORAGE_URI",
+    os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"),
+)
 DATABASE = "tasks.db"
 
 
@@ -63,6 +70,30 @@ def migrate_db():
     conn.close()
 
 
+def limiter_key():
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        try:
+            data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{data['user_id']}"
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(key_func=limiter_key, app=app)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    response = jsonify({"error": "Rate limit exceeded. Try again later."})
+    response.status_code = 429
+    retry_after = e.retry_after if hasattr(e, "retry_after") else 60
+    response.headers["Retry-After"] = str(retry_after)
+    return response
+
+
 def token_required(f):
     @functools.wraps(f)
     def decorated(*args, **kwargs):
@@ -88,6 +119,7 @@ def token_required(f):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 def register():
     data = request.get_json(silent=True)
     if not data:
@@ -110,6 +142,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 def login():
     data = request.get_json(silent=True)
     if not data:
@@ -139,6 +172,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 @token_required
 def create_task():
     data = request.get_json(silent=True)
@@ -154,13 +188,29 @@ def create_task():
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 @token_required
 def list_tasks():
-    tasks = task_repo.find_all_by_owner(g.current_user_id)
-    return jsonify(tasks)
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = min(max(1, limit), 100)
+
+    tasks = task_repo.find_all_by_owner_paginated(
+        g.current_user_id, cursor=cursor, limit=limit
+    )
+    total = task_repo.count_all_by_owner(g.current_user_id)
+
+    next_cursor = str(tasks[-1]["id"]) if len(tasks) == limit else None
+
+    return jsonify({
+        "data": tasks,
+        "next_cursor": next_cursor,
+        "total": total,
+    })
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 @token_required
 def get_task(task_id):
     task = task_repo.find_by_id_and_owner(task_id, g.current_user_id)
@@ -172,6 +222,7 @@ def get_task(task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit(lambda: app.config.get("RATELIMIT_GLOBAL", "100 per minute"))
 @token_required
 def update_task(task_id):
     data = request.get_json(silent=True)
