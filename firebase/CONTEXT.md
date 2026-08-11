@@ -13,17 +13,17 @@ Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app). Fire
 
 | File | Page | Content |
 |------|------|---------|
-| `index.html` | Home | Diagnosis + Databricks validation |
-| `framework.html` | The Framework | 10 rules, levers, interactive calculator, provider playbook |
+| `index.html` | Home | AI FinOps Dynamics hero + key findings |
+| `framework.html` | Operational Framework | 10 principles, levers, interactive calculator, provider playbook |
 | `evidence.html` | The Evidence | Grit spectrum, cost ranking, AST analysis, perturbation response |
-| `story.html` | The Story | How a $20 API key became this framework |
-| `methodology.html` | Methodology | Experiment design, 10 perturbation operators, 6 recovery signals |
-| `accelerator.html` | Accelerator | Enterprise bridge, maturity ladder, projections |
-| `databricks.html` | Databricks | Mapping every Databricks claim to calibrated measurements |
+| `story.html` | The Story | How a $20 API key became an experimental instrument |
+| `methodology.html` | The Instrument | Experiment design, 10 perturbation operators, 6 recovery signals |
+| `accelerator.html` | Applications | Operational hypotheses, maturity ladder, projections |
+| `databricks.html` | Related Work | Mapping every Databricks claim to calibrated measurements |
 | `glossary.html` | Glossary | Terminology reference |
 | `app.js` | — | Interactive UI, levers, calculator, charts |
 | `base.css` | — | Base stylesheet |
-| `data.js` | — | **Generated.** `window.FRAMEWORK_DATA` with all measurements, provenance-tagged |
+| `data.js` | — | **Generated.** `window.DYNAMICS_DATA` with all measurements, provenance-tagged |
 
 ## Data Pipeline
 

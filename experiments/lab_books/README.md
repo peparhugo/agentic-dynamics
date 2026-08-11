@@ -1,6 +1,6 @@
 # Lab Books
 
-Structured experiment plans for analyzing the AI FinOps Framework dataset. Each lab book follows the same format as `src/instrument/lab_book.py`: hypothesis → methodology → data sources → analysis steps → expected output → interpretation guide → results (initially empty).
+Structured experiment plans for analyzing the AI FinOps Dynamics dataset. Each lab book follows the same format as `src/instrument/lab_book.py`: hypothesis → methodology → data sources → analysis steps → expected output → interpretation guide → results (initially empty).
 
 ## Status
 

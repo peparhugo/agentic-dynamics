@@ -1,8 +1,8 @@
-/* Generated 2026-08-11 02:39:13 UTC by build_data.py */
+/* Generated 2026-08-11 03:22:27 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
-window.FRAMEWORK_DATA = {
+window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-11T02:39:13.888871+00:00",
+    "generated_at": "2026-08-11T03:22:27.423287+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {

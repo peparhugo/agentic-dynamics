@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build data.js for the AI FinOps Framework website.
+"""Build data.js for the AI FinOps Dynamics website.
 
 Reads inventory.json, _results_summary.json, and opencode.db,
-produces a single data.js with window.FRAMEWORK_DATA containing
+produces a single data.js with window.DYNAMICS_DATA containing
 all measured/computed/derived values with provenance tags.
 
 Usage:
@@ -620,14 +620,14 @@ def build():
 
     js = f"/* Generated {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')} by build_data.py */\n"
     js += "/* DO NOT EDIT — regenerate with: python scripts/build_data.py */\n"
-    js += "window.FRAMEWORK_DATA = " + json.dumps(clean_data, indent=2, default=str) + ";\n"
+    js += "window.DYNAMICS_DATA = " + json.dumps(clean_data, indent=2, default=str) + ";\n"
 
     return js, data
 
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Build data.js for the AI FinOps Framework website")
+    parser = argparse.ArgumentParser(description="Build data.js for the AI FinOps Dynamics website")
     parser.add_argument("--dry-run", action="store_true", help="Print instead of writing")
     args = parser.parse_args()
 

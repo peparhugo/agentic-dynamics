@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>AI FinOps Framework — Your AI bill is a black box. This framework opens it.</title>
-<meta name="description" content="The comprehensive AI FinOps Framework: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 249 experiment sessions.">
-<meta property="og:title" content="The AI FinOps Framework — 10 Rules, Interactive Calculator">
+<title>Operational Framework — AI FinOps Dynamics</title>
+<meta name="description" content="Operational principles derived from AI FinOps Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 249 experiment sessions.">
+<meta property="og:title" content="Operational Framework — AI FinOps Dynamics">
 <meta property="og:description" content="Operational framework: observed patterns, derived metrics, modeled extensions">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/framework.html">
 <meta property="og:type" content="website">
@@ -330,7 +330,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <div style="text-align:center;margin-top:1rem"><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div>
 
 <footer>
-<strong>The AI FinOps Framework · v0.4 · August 2026</strong><br>
+<strong>AI FinOps Dynamics · v0.5 · August 2026</strong><br>
 <span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
 </footer>
@@ -338,7 +338,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <script>
 let calcMode='augmented';
 const epmScenarios=[1.00,1.25,1.50],epmLabels=['Baseline (1.00&times;)','High (1.25&times;)','Extreme (1.50&times;)'];
-var models=(window.FRAMEWORK_DATA&&window.FRAMEWORK_DATA.calculator&&window.FRAMEWORK_DATA.calculator.model_costs)||[{n:'DeepSeek v4 Pro',c:0.0158,p:0.84},{n:'GPT-5-nano',c:0.0057,p:0.89},{n:'GPT-5-mini',c:0.0258,p:0.94},{n:'GPT-5',c:0.159,p:0.7},{n:'GPT-5.5',c:0.282,p:1.0},{n:'GPT-5.6',c:0.4474,p:1.0},{n:'GPT-5.6-fast',c:0.6625,p:1.0},{n:'Claude Fable 5',c:1.0847,p:0.99}];
+var models=(window.DYNAMICS_DATA&&window.DYNAMICS_DATA.calculator&&window.DYNAMICS_DATA.calculator.model_costs)||[{n:'DeepSeek v4 Pro',c:0.0158,p:0.84},{n:'GPT-5-nano',c:0.0057,p:0.89},{n:'GPT-5-mini',c:0.0258,p:0.94},{n:'GPT-5',c:0.159,p:0.7},{n:'GPT-5.5',c:0.282,p:1.0},{n:'GPT-5.6',c:0.4474,p:1.0},{n:'GPT-5.6-fast',c:0.6625,p:1.0},{n:'Claude Fable 5',c:1.0847,p:0.99}];
 
 function setCalcMode(m){
   calcMode=m;
@@ -360,7 +360,7 @@ function updateROI(){
     document.getElementById('howComputed').textContent='Augmented Workforce\nPer-session: c(t) = C\u2080 \u00d7 EPM(t) \u00d7 (1 + \u03b2\u00b7v\u00b7t)\nCumulative: C(N,v) = C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nMonthly: C_mo = E \u00d7 C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nWhere: E='+E+' eng, N='+N+' sess/mo, \u03b2='+B+', v='+V+', EPM='+EPM.toFixed(2);
   } else {
     var W=+r_workload.value,b=+r_batch.value/100,rr=+r_retry.value/100,ac0=+r_ac0.value/1000,er=+r_arate.value/1000;
-    var escTiers=(window.FRAMEWORK_DATA&&window.FRAMEWORK_DATA.calculator&&window.FRAMEWORK_DATA.calculator.escalation_tiers)||[{m:'DS\u2192GPT-5-nano',e:0.4},{m:'DS\u2192GPT-5-mini',e:1.6},{m:'DS\u2192GPT-5',e:10.1},{m:'DS\u2192GPT-5.5',e:17.8},{m:'DS\u2192GPT-5.6',e:28.3},{m:'DS\u2192GPT-5.6-fast',e:41.9},{m:'DS\u2192Claude',e:68.7},{m:'\u2192Human ($5/job)',e:316.5}],escLabels=['DS\u2192GPT-5-nano (0.4\u00d7)','DS\u2192GPT-5-mini (1.6\u00d7)','DS\u2192GPT-5 (10.1\u00d7)','DS\u2192GPT-5.5 (17.8\u00d7)','DS\u2192GPT-5.6 (28.3\u00d7)','DS\u2192GPT-5.6-fast (41.9\u00d7)','DS\u2192Claude (68.7\u00d7)','\u2192Human ($5)'];
+    var escTiers=(window.DYNAMICS_DATA&&window.DYNAMICS_DATA.calculator&&window.DYNAMICS_DATA.calculator.escalation_tiers)||[{m:'DS\u2192GPT-5-nano',e:0.4},{m:'DS\u2192GPT-5-mini',e:1.6},{m:'DS\u2192GPT-5',e:10.1},{m:'DS\u2192GPT-5.5',e:17.8},{m:'DS\u2192GPT-5.6',e:28.3},{m:'DS\u2192GPT-5.6-fast',e:41.9},{m:'DS\u2192Claude',e:68.7},{m:'\u2192Human ($5/job)',e:316.5}],escLabels=['DS\u2192GPT-5-nano (0.4\u00d7)','DS\u2192GPT-5-mini (1.6\u00d7)','DS\u2192GPT-5 (10.1\u00d7)','DS\u2192GPT-5.5 (17.8\u00d7)','DS\u2192GPT-5.6 (28.3\u00d7)','DS\u2192GPT-5.6-fast (41.9\u00d7)','DS\u2192Claude (68.7\u00d7)','\u2192Human ($5)'];
     var Em=escTiers[+r_escalation.value-1].e;
     v_workload.textContent=W.toLocaleString();v_batch.textContent=Math.round(b*100);v_retry.textContent=(rr*100).toFixed(1);v_escalation.textContent=escLabels[+r_escalation.value-1];v_ac0.textContent='$'+ac0.toFixed(3);v_arate.textContent=(er*100).toFixed(1)+'%';
     roi_context.textContent='Auto: '+W.toLocaleString()+' jobs/day \u00b7 '+(b*100).toFixed(0)+'% batch \u00b7 r='+(rr*100).toFixed(1)+'% \u00b7 E\u2098='+Em.toFixed(1)+'\u00d7';

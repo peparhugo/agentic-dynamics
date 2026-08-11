@@ -304,7 +304,7 @@ python scripts/generate_manifest.py
 - [x] Add `og:url` to every page
 - [x] Replace inline `data:image/svg+xml` OG images with hosted 1200×627 PNG
 - [x] Update `og:description` to match new positioning
-- [x] Make `og:title` page-specific (not all "AI FinOps Framework")
+- [x] Make `og:title` page-specific (e.g., "AI FinOps Dynamics — Page Name")
 
 ---
 

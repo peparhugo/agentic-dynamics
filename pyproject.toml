@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "reasoning-instrument"
-version = "0.4.0"
+version = "0.5.0"
 description = "Agent economics measurement instrument — how does coding-agent cost and outcome change as specification quality degrades?"
 requires-python = ">=3.10"
 dependencies = [

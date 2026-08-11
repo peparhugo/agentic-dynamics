@@ -1,5 +1,5 @@
-/* === AI FinOps Framework — Shared JavaScript === */
-/* v0.4 */
+/* === AI FinOps Dynamics — Shared JavaScript === */
+/* v0.5 */
 
 /* --- Theme Toggle --- */
 (function() {
@@ -19,10 +19,10 @@
   document.body.appendChild(toggle);
 })();
 
-/* --- Data-driven injection (reads window.FRAMEWORK_DATA from data.js) --- */
+/* --- Data-driven injection (reads window.DYNAMICS_DATA from data.js) --- */
 (function() {
   document.addEventListener('DOMContentLoaded', function() {
-    var D = window.FRAMEWORK_DATA;
+    var D = window.DYNAMICS_DATA;
     if (!D) return;
 
     function fmtUSD(v) { return (typeof v === 'number' ? v.toFixed(2) : v); }

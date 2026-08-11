@@ -38,7 +38,7 @@
 |--------|-------|---------|
 | `inventory.py` | 402 | Reads opencode.db, worktrees, results JSONs, config YAMLs. Commands: `refresh`, `list`, `stats`, `worktrees`, `report`. |
 | `_constants.py` | 30 | Shared constants (DB path, result dirs, model configs). Imported by inventory, analyze, and lab scripts. |
-| `build_data.py` | 562 | Produces `window.FRAMEWORK_DATA` with provenance-tagged [M]/[C]/[H]/[X] measurements for the website. |
+| `build_data.py` | 562 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[X] measurements for the website. |
 | `backfill_artifacts.py` | 263 | Copies generated code from `/tmp/exp_*` to `experiments/results/reports/`. Extracts session transcripts from SQLite. |
 | `regen_typescript_ssg.py` | 172 | Reconstructs TypeScript SSG worktrees from opencode DB part records. |
 | `batch_analyze_ts_ssg.py` | 159 | Runs `analyze_worktrees` on just the typescript_ssg worktrees. |

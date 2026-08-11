@@ -1,7 +1,7 @@
-# Coding-Agent Economics Instrument
+# AI FinOps Dynamics
 
 <p align="center">
-  <strong>An open instrument measuring how coding-agent cost and verified outcome change as specification quality degrades.</strong><br>
+  <strong>An experimental instrument measuring the economics of agentic AI as specification quality degrades.</strong><br>
   249 sessions, 10 perturbation operators, 8 model variants. $64.98 measured API spend.
 </p>
 
@@ -39,7 +39,7 @@ When a model succeeds under perturbation, the overhead is measurable — both as
 
 ---
 
-## Operational Framework
+## Observed Dynamics
 
 Observed from the experiment corpus:
 
@@ -150,13 +150,12 @@ All numbers on the website are live-generated. Every measurement is provenance-t
 
 | Page | What |
 |------|------|
-| [Home](https://ai-finops-rulebook.web.app) | The diagnosis + Databricks validation |
-| [The Framework](https://ai-finops-rulebook.web.app/framework.html) | 10 rules, levers, interactive calculator, provider playbook |
+| [Home](https://ai-finops-rulebook.web.app) | The instrument + key findings |
+| [The Instrument](https://ai-finops-rulebook.web.app/methodology.html) | Experiment design, perturbation operators, recovery signals |
 | [The Evidence](https://ai-finops-rulebook.web.app/evidence.html) | Grit spectrum, cost ranking, AST analysis, perturbation response |
+| [Operational Framework](https://ai-finops-rulebook.web.app/framework.html) | 10 principles, levers, interactive calculator, provider playbook |
 | [The Story](https://ai-finops-rulebook.web.app/story.html) | How a $20 API key became this |
-| [The Methodology](https://ai-finops-rulebook.web.app/methodology.html) | Experiment design, perturbation operators, recovery signals |
-| [The Accelerator](https://ai-finops-rulebook.web.app/accelerator.html) | Enterprise bridge, maturity ladder, projections, autonomous workloads |
-| [Databricks Comparison](https://ai-finops-rulebook.web.app/databricks.html) | Mapping every Databricks claim to calibrated measurements |
+| [Related Work](https://ai-finops-rulebook.web.app/databricks.html) | Databricks benchmark, FinOps Foundation |
 
 ---
 
@@ -258,12 +257,12 @@ python scripts/lab_survival_horizon.py # Sessions-to-bankruptcy
 ## Citation
 
 ```bibtex
-@misc{ai-finops-framework-2026,
-  title  = {The AI FinOps Framework: A Predictive Model for AI Inference Costs},
+@misc{ai-finops-dynamics-2026,
+  title  = {AI FinOps Dynamics: An experimental instrument for the economics of agentic AI},
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},
-  note   = {v0.4. 249 experiment sessions, 8 models, 10 perturbation operators.}
+  note   = {v0.5. 249 experiment sessions, 8 models, 10 perturbation operators.}
 }
 ```
 

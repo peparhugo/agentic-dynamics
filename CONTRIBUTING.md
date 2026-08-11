@@ -1,13 +1,13 @@
-# Contributing to the AI FinOps Framework
+# Contributing to AI FinOps Dynamics
 
-Thanks for your interest in contributing. This is a research instrument — every contribution adds data points that make the cost model more robust and the framework more universal.
+Thanks for your interest in contributing. This is a research instrument — every contribution adds data points that make the cost model more robust and the instrument more universal.
 
 ---
 
 ## Ways to Contribute
 
 ### I Have API Credits
-The highest-impact contribution: **run experiments on models or languages we haven't tested yet.** Check the [roadmap](https://ai-finops-rulebook.web.app/roadmap.html) for items marked **🟣 Help Wanted**.
+The highest-impact contribution: **run experiments on models or languages we haven't tested yet.** Check the experiment configs in `experiments/configs/` for available task types.
 
 ### I Know a Stack We Haven't Tested
 Add a new experiment config in `experiments/configs/`. TypeScript/Node.js, Go, Rust, and Java/Spring are all priorities.
@@ -187,4 +187,4 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 
 ## Questions?
 
-Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/ai-finops-framework/discussions). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.
+Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/ai-finops-framework/issues). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.
