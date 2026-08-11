@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import { build } from './build';
+import { serve } from './serve';
 
 const program = new Command();
 
@@ -23,6 +24,22 @@ program
       console.error(`Error: ${message}`);
       process.exit(1);
     }
+  });
+
+program
+  .command('serve')
+  .description('Start a development server with live reload')
+  .option('--content <dir>', 'Content directory containing Markdown files', './content')
+  .option('--output <dir>', 'Output directory for generated HTML files', './dist')
+  .option('--templates <dir>', 'Templates directory for Handlebars layouts, templates, and partials', './templates')
+  .option('--port <port>', 'Port to listen on', '3000')
+  .action((options) => {
+    serve({
+      content: options.content,
+      output: options.output,
+      templates: options.templates,
+      port: parseInt(options.port, 10),
+    });
   });
 
 program.parse(process.argv);
