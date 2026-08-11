@@ -4,6 +4,8 @@ from functools import wraps
 
 import jwt
 from flask import Flask, current_app, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import send_notification_email
@@ -12,6 +14,27 @@ from repositories.task_repository import TaskRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev-secret-key"
+
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        try:
+            payload = jwt.decode(
+                token, current_app.config["SECRET_KEY"], algorithms=["HS256"]
+            )
+            return f"user:{payload['user_id']}"
+        except Exception:
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    storage_uri=app.config.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379"),
+    default_limits=["100 per minute"],
+)
 
 
 def get_db():
@@ -106,6 +129,9 @@ def require_auth(f):
     return decorated
 
 
+limiter.init_app(app)
+
+
 @app.route("/auth/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True)
@@ -179,8 +205,18 @@ def create_task():
 @require_auth
 def list_tasks():
     task_repo = get_task_repo()
-    tasks = task_repo.find_all_by_owner(g.current_user_id)
-    return jsonify([task_to_dict(t) for t in tasks]), 200
+    cursor_param = request.args.get("cursor")
+    cursor = int(cursor_param) if cursor_param else None
+    try:
+        limit = int(request.args.get("limit", 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 100))
+    data, next_cursor = task_repo.find_all_by_owner_paginated(
+        g.current_user_id, cursor, limit
+    )
+    total = task_repo.count_by_owner(g.current_user_id)
+    return jsonify({"data": [task_to_dict(t) for t in data], "next_cursor": next_cursor, "total": total}), 200
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
