@@ -26,12 +26,24 @@ yargs(hideBin(process.argv))
           type: 'string',
           default: './templates',
           describe: 'Template directory',
+        })
+        .option('incremental', {
+          type: 'boolean',
+          default: false,
+          describe: 'Only rebuild changed pages',
+        })
+        .option('clean', {
+          type: 'boolean',
+          default: false,
+          describe: 'Force a clean build, ignoring cache',
         }),
     (argv) => {
       build({
         contentDir: argv.content as string,
         outputDir: argv.output as string,
         templateDir: argv.templates as string,
+        incremental: argv.incremental as boolean,
+        clean: argv.clean as boolean,
       });
     }
   )

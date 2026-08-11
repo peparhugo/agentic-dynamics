@@ -3,6 +3,7 @@ import path from 'path';
 import { Plugin, BuildContext } from '../plugin';
 import { Page, PageTemplateData } from '../types';
 import { TemplateEngine } from '../template-engine';
+import { CacheManager } from '../cache';
 
 function toTemplateData(page: Page): PageTemplateData {
   const { title, date, tags } = page.frontmatter;
@@ -29,10 +30,27 @@ export class TemplatePlugin implements Plugin {
   onFile(page: Page, context: BuildContext): void {
     if (!this.engine) return;
 
+    const cache: CacheManager | undefined = context.cache;
+    const isFromCache = !!(page as any)._fromCache;
+    const incremental = !!context.incremental;
+
+    if (isFromCache && incremental && cache) {
+      const cachedHTML = cache.getCachedHTML(page.slug);
+      if (cachedHTML) {
+        const outPath = path.join(context.outputDir, `${page.slug}.html`);
+        fs.writeFileSync(outPath, cachedHTML, 'utf-8');
+        return;
+      }
+    }
+
     const data = toTemplateData(page);
     const pageHTML = this.engine.renderPage(data, page.frontmatter.template, page.frontmatter.layout);
     const outPath = path.join(context.outputDir, `${page.slug}.html`);
     fs.writeFileSync(outPath, pageHTML, 'utf-8');
+
+    if (incremental && cache && !isFromCache) {
+      cache.setCachedHTML(page.slug, pageHTML);
+    }
   }
 
   afterBuild(context: BuildContext): void {

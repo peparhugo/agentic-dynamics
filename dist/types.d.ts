@@ -14,6 +14,12 @@ export interface SSGOptions {
     contentDir: string;
     outputDir: string;
     templateDir?: string;
+    incremental?: boolean;
+    clean?: boolean;
+}
+export interface BuildStats {
+    pagesBuilt: number;
+    pagesSkipped: number;
 }
 export interface PageTemplateData {
     title: string;

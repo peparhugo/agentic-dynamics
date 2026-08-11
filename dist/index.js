@@ -25,11 +25,23 @@ const serve_1 = require("./serve");
     type: 'string',
     default: './templates',
     describe: 'Template directory',
+})
+    .option('incremental', {
+    type: 'boolean',
+    default: false,
+    describe: 'Only rebuild changed pages',
+})
+    .option('clean', {
+    type: 'boolean',
+    default: false,
+    describe: 'Force a clean build, ignoring cache',
 }), (argv) => {
     (0, ssg_1.build)({
         contentDir: argv.content,
         outputDir: argv.output,
         templateDir: argv.templates,
+        incremental: argv.incremental,
+        clean: argv.clean,
     });
 })
     .command('serve', 'Start dev server with live reload', (yargs) => yargs

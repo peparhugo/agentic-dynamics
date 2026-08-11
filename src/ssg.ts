@@ -1,9 +1,14 @@
 import fs from 'fs';
 import path from 'path';
 import { Plugin, BuildContext, SSGConfig } from './plugin';
-import { SSGOptions } from './types';
+import { SSGOptions, BuildStats } from './types';
 import { MarkdownPlugin } from './plugins/markdown-plugin';
 import { TemplatePlugin } from './plugins/template-plugin';
+import { CacheManager, BuildStats as CacheStats } from './cache';
+
+export interface BuildResult {
+  stats: BuildStats;
+}
 
 export class SSGEngine {
   private plugins: Plugin[] = [];
@@ -86,8 +91,8 @@ export class SSGEngine {
     );
   }
 
-  build(): void {
-    const { outputDir } = this.options;
+  build(): BuildResult {
+    const { outputDir, incremental, clean } = this.options;
 
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
@@ -98,6 +103,22 @@ export class SSGEngine {
       pages: [],
       outputDir,
     };
+
+    let cache: CacheManager | null = null;
+
+    if (incremental) {
+      cache = new CacheManager(path.join(outputDir, '.ssg-cache.json'));
+      if (clean) {
+        cache.delete();
+      }
+      cache.load();
+      const templatesHash = cache.computeTemplatesHash(this.options.templateDir || '');
+      const manifest = cache.getManifest();
+      const templatesChanged = !manifest || manifest.templatesHash !== templatesHash;
+      context.cache = cache;
+      context.templatesChanged = templatesChanged;
+      context.incremental = true;
+    }
 
     for (const plugin of this.plugins) {
       if (plugin.onStart) {
@@ -112,6 +133,13 @@ export class SSGEngine {
     }
 
     for (const page of context.pages) {
+      const isCached = incremental && !!(page as any)._fromCache;
+      if (isCached) {
+        if (cache) {
+          cache.incrementSkipped();
+        }
+      }
+
       for (const plugin of this.plugins) {
         if (plugin.onFile) {
           plugin.onFile(page, context);
@@ -125,15 +153,33 @@ export class SSGEngine {
       }
     }
 
+    if (incremental && cache) {
+      const templatesHash = cache.currentTemplatesHash;
+      const newManifest = cache.buildManifest(templatesHash);
+      if (Object.keys(newManifest.pages).length > 0) {
+        cache.save(newManifest);
+      }
+    }
+
     for (const plugin of this.plugins) {
       if (plugin.onEnd) {
         plugin.onEnd(context);
       }
     }
+
+    const stats: BuildStats = cache
+      ? cache.getStats()
+      : { pagesBuilt: context.pages.length, pagesSkipped: 0 };
+
+    if (incremental) {
+      console.log(`Build complete: ${stats.pagesBuilt} page(s) built, ${stats.pagesSkipped} page(s) skipped`);
+    }
+
+    return { stats };
   }
 }
 
-export function build(options: SSGOptions): void {
+export function build(options: SSGOptions): BuildResult {
   const engine = new SSGEngine(options);
-  engine.build();
+  return engine.build();
 }
