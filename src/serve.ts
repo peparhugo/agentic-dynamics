@@ -146,11 +146,13 @@ export function serve(options: ServeOptions): ServerInstance {
 
   const watcher = chokidar.watch(watchDirs, {
     ignoreInitial: true,
-    usePolling: true,
-    interval: 200,
+    awaitWriteFinish: {
+      stabilityThreshold: 100,
+      pollInterval: 50,
+    },
   });
 
-  watcher.on('all', () => {
+  watcher.on('all', (event, filePath) => {
     triggerRebuild();
   });
 
@@ -176,13 +178,13 @@ export function serve(options: ServeOptions): ServerInstance {
     server,
     ready,
     close(): Promise<void> {
-      return new Promise((resolve) => {
-        watcher.close();
+      watcher.close();
+      for (const client of clients) {
+        client.terminate();
+      }
+      clients.clear();
+      return new Promise<void>((resolve) => {
         wss.close(() => {
-          for (const client of clients) {
-            client.terminate();
-          }
-          clients.clear();
           server.close(() => resolve());
         });
       });

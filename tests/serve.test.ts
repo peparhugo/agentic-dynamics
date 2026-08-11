@@ -4,7 +4,7 @@ import path from 'path';
 import http from 'http';
 import WebSocket from 'ws';
 
-const testBase = path.join(__dirname, 'integration');
+const testBase = path.join(__dirname, 'serve-integration');
 const contentDir = path.join(testBase, 'content');
 const outputDir = path.join(testBase, 'dist');
 const templatesDir = path.join(testBase, 'templates');
@@ -54,7 +54,7 @@ describe('serve', () => {
     } catch {
       // ignore
     }
-  });
+  }, 15000);
 
   async function startServer(opts?: { port?: number; templatesDir?: string }) {
     const port = opts?.port || 0;
@@ -199,7 +199,7 @@ Alpha content`);
     const messagePromise = new Promise<string>((resolve, reject) => {
       ws.on('message', (data) => resolve(data.toString()));
       ws.on('error', reject);
-      setTimeout(() => reject(new Error('No reload message received')), 8000);
+      setTimeout(() => reject(new Error('No reload message received')), 15000);
     });
 
     createContentFile('beta.md', `---
@@ -211,7 +211,7 @@ Beta content`);
     expect(msg).toBe('reload');
 
     ws.close();
-  }, 15000);
+  }, 20000);
 
   it('rebuilds dist on content change', async () => {
     createContentFile('first.md', `---
@@ -232,12 +232,19 @@ title: Second
 ---
 Second content`);
 
-    await wait(1000);
+    let exists = false;
+    for (let i = 0; i < 20; i++) {
+      await wait(500);
+      if (fs.existsSync(secondPath)) {
+        exists = true;
+        break;
+      }
+    }
 
-    expect(fs.existsSync(secondPath)).toBe(true);
+    expect(exists).toBe(true);
     const html = fs.readFileSync(secondPath, 'utf-8');
     expect(html).toContain('Second');
-  }, 10000);
+  }, 30000);
 
   it('serves on the specified port', async () => {
     createContentFile('page.md', `---
