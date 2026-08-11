@@ -43,7 +43,7 @@ limiter = Limiter(
     app=app,
     key_func=_get_rate_limit_key,
     storage_uri=os.environ.get("RATELIMIT_STORAGE_URL", "redis://localhost:6379"),
-    default_limits=[os.environ.get("RATE_LIMIT", "100 per minute")],
+    application_limits=[os.environ.get("RATE_LIMIT", "100 per minute")],
 )
 
 
