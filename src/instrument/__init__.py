@@ -77,6 +77,29 @@ from .review import (
     StoryReview,
     review_commit,
     review_story,
+    generate_tests,
+    compare_implementations,
+)
+from .entropy import (
+    EntropyProfile,
+    compute_entropy,
+    entropy_delta,
+    entropy_delta_detailed,
+)
+from .codebase_graph import (
+    CodebaseGraph,
+    ModuleNode,
+    GraphMetrics,
+    GraphDelta,
+    build_graph,
+    compute_metrics,
+    compute_graph_delta,
+)
+from .value_score import (
+    DurableValueScore,
+    compute_dvs,
+    compute_story_dvs,
+    dvs_verdict_to_emoji,
 )
 
 __all__ = [
@@ -105,4 +128,10 @@ __all__ = [
     "CommitAnalysis", "StoryAnalysis", "analyze_commit",
     "analyze_story_worktree", "compute_ast_diff", "score_conventions",
     "CommitReview", "StoryReview", "review_commit", "review_story",
+    "generate_tests", "compare_implementations",
+    "EntropyProfile", "compute_entropy", "entropy_delta", "entropy_delta_detailed",
+    "CodebaseGraph", "ModuleNode", "GraphMetrics", "GraphDelta",
+    "build_graph", "compute_metrics", "compute_graph_delta",
+    "DurableValueScore", "compute_dvs", "compute_story_dvs",
+    "dvs_verdict_to_emoji",
 ]

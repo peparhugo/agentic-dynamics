@@ -29,7 +29,7 @@ jobs:
 
       - name: Run core tests (no external services)
         run: |
-          pytest tests/test_perturb.py tests/test_pricing.py tests/test_correctness_lineage.py tests/test_recovery.py tests/test_adapter.py tests/test_language.py tests/test_mutation.py tests/test_story.py tests/test_commit_analysis.py tests/test_review_agent.py -v
+          pytest tests/test_perturb.py tests/test_pricing.py tests/test_correctness_lineage.py tests/test_recovery.py tests/test_adapter.py tests/test_language.py tests/test_mutation.py tests/test_story.py tests/test_commit_analysis.py tests/test_review_agent.py tests/test_entropy.py tests/test_codebase_graph.py tests/test_value_score.py -v
 
       - name: Verify build_data imports cleanly (no DB required)
         run: |

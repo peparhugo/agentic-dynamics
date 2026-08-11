@@ -16,10 +16,16 @@
 - [x] `review.py` — agent-based commit reviewer (GPT-5.6) + story reviewer (Claude)
 - [x] `scripts/analyze_stories.py` — post-hoc analysis of story worktrees
 - [x] CI updated to 10 test modules, 97 tests
-- [ ] **v0.6 COMPLETE** ← all modules built, all 97 tests pass
+- [x] **v0.6 COMPLETE** ← all modules built
 
 ### v0.7 — Neo4j + Entropy + Review Agents
 **Sessions:** 0 (re-analysis)  |  **Cost:** ~$5
+
+- [x] `entropy.py` — 5-dimension architectural entropy
+- [x] `codebase_graph.py` — In-memory import graph metrics
+- [x] `value_score.py` — Durable Value Score calculation
+- [x] `review.py` extended — test generator + cross-model comparator
+- [x] CI updated to 13 test modules, 138 tests
 
 ---
 
@@ -240,20 +246,20 @@ MODIFIED:
 ### v0.6 — Story Format + Enhanced Perturbations + Python/TS
 **Sessions:** ~120  |  **Cost:** ~$5.50
 
-- mutation.py: Flash V4 compiler for 20 operators
-- story.py: Multi-session orchestrator
-- language.py: LanguageProfile + tree-sitter for Python + TypeScript
-- Story catalog: 2 stories × 2 languages
-- Per-commit analysis: AST diff, Sonar, conventions
-- Commit reviewer agent
+- [x] mutation.py: Flash V4 compiler for 20 operators
+- [x] story.py: Multi-session orchestrator
+- [x] language.py: LanguageProfile + tree-sitter for Python + TypeScript
+- [x] Story catalog: 2 stories × 2 languages
+- [x] Per-commit analysis: AST diff, Sonar, conventions
+- [x] Commit reviewer agent
 
 ### v0.7 — Neo4j + Entropy + Review Agents
 **Sessions:** 0 (re-analysis)  |  **Cost:** ~$5
 
-- codebase_graph.py: Neo4j graph metrics
-- entropy.py: 5-dimension architectural entropy
-- review.py: Full agent pool (test gen, story review, cross-model comparison)
-- value_score.py: DVS calculation
+- [x] codebase_graph.py: In-memory import graph metrics (modularity, centrality, density)
+- [x] entropy.py: 5-dimension architectural entropy
+- [x] review.py: Full agent pool (test gen, story review, cross-model comparison)
+- [x] value_score.py: DVS calculation
 
 ### v0.8 — LSP + Independent Tests
 **Sessions:** +120  |  **Cost:** ~$8

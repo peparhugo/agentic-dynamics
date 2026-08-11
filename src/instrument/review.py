@@ -6,7 +6,8 @@ They produce durable JSON output committed as experimental evidence.
 Pool:
   - Commit Reviewer (GPT-5.6): Reviews individual commits
   - Story Reviewer (Claude): Reviews full story coherence
-  - Cross-Model Comparator (Claude): Compares solutions across models
+  - Cross-Model Comparator (Claude): Compares architectural choices across models
+  - Test Generator (Flash V4): Creates held-out tests before experiment runs
 """
 
 from __future__ import annotations
@@ -347,3 +348,147 @@ def _run_git(worktree: Path, *args: str) -> str:
         return proc.stdout
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return ""
+
+
+# ── Test Generator ─────────────────────────────────────────────
+
+_TEST_GEN_PROMPT = """You are a test generator for an experimental measurement instrument.
+Write a comprehensive test suite for the following specification.
+
+SPECIFICATION:
+{specification}
+
+REQUIREMENTS:
+1. Write tests that verify correct behavior, NOT that the code compiles.
+2. Test edge cases: empty inputs, boundary values, error conditions.
+3. Test integration: multiple endpoints/features working together.
+4. Write {test_count} tests minimum.
+5. Use the {test_framework} test framework for {language}.
+
+Output ONLY valid {language} code for the test file. No explanations."""
+
+
+def generate_tests(
+    specification: str,
+    language: str = "python",
+    test_framework: str = "pytest",
+    test_count: int = 20,
+    *,
+    model: str = "deepseek/deepseek-v4-flash",
+    timeout: int = 300,
+) -> str | None:
+    """Generate held-out tests from a specification BEFORE the experiment runs.
+
+    These tests are created without the agent ever seeing them. They serve
+    as an independent correctness evaluator (evaluator_independent=True).
+
+    Args:
+        specification: The clean task specification to test.
+        language: Target language (python, typescript).
+        test_framework: Test framework to use (pytest, jest).
+        test_count: Minimum number of tests to generate.
+        model: Model for test generation (cheap model since tests are reviewed).
+        timeout: Timeout in seconds.
+
+    Returns:
+        Test file content as string, or None if generation failed.
+    """
+    prompt = _TEST_GEN_PROMPT.format(
+        specification=specification,
+        test_count=test_count,
+        test_framework=test_framework,
+        language=language,
+    )
+
+    response = _call_agent(prompt, model=model, timeout=timeout)
+    return response
+
+
+# ── Cross-Model Comparator ─────────────────────────────────────
+
+_COMPARISON_PROMPT = """You are comparing implementations of the same task produced by different AI coding agents.
+Each implementation was built by an agent completing the same {session_count}-session story.
+
+TASK: {task_description}
+
+IMPLEMENTATIONS:
+{implementations}
+
+Compare the architectural decisions made by each model. For each key decision area
+(authentication approach, data access pattern, error handling, testing strategy, etc.),
+describe which model made the most durable choice and why.
+
+Output ONLY valid JSON, no other text:
+{{
+  "decision_areas": [
+    {{
+      "area": "<decision area name>",
+      "models": {{
+        "<model_name>": "<what this model did>",
+        ...
+      }},
+      "best_choice": "<model_name that made the most durable choice>",
+      "rationale": "<why this choice is more maintainable, scalable, or less likely to create future cost>"
+    }},
+    ...
+  ],
+  "overall_assessment": {{
+    "most_maintainable": "<model_name>",
+    "most_innovative": "<model_name>",
+    "most_cost_effective": "<model_name>",
+    "most_architecturally_sound": "<model_name>",
+    "summary": "<one paragraph comparing the models>"
+  }}
+}}"""
+
+
+def compare_implementations(
+    specifications: dict[str, str],  # model_name -> task spec
+    code_bases: dict[str, str],      # model_name -> codebase path or summary
+    task_description: str = "",
+    session_count: int = 5,
+    *,
+    model: str = "anthropic/claude-fable-5",
+    timeout: int = 600,
+) -> dict[str, Any] | None:
+    """Compare implementations of the same task across multiple models.
+
+    Args:
+        specifications: Map of model_name -> original task specification.
+        code_bases: Map of model_name -> codebase summary or path.
+        task_description: Human-readable task description.
+        session_count: Number of sessions in the story.
+        model: Model used for comparison (should be high-quality).
+        timeout: Timeout in seconds.
+
+    Returns:
+        Parsed comparison JSON dict, or None if generation failed.
+    """
+    # Build implementation descriptions for the prompt
+    impl_parts: list[str] = []
+    for model_name, spec in specifications.items():
+        code_summary = code_bases.get(model_name, "No code available")
+        # Truncate code summaries
+        if len(code_summary) > 2000:
+            code_summary = code_summary[:2000] + "\n... (truncated)"
+        impl_parts.append(f"--- MODEL: {model_name} ---\nTASK: {spec}\nCODE SUMMARY:\n{code_summary}\n")
+
+    prompt = _COMPARISON_PROMPT.format(
+        task_description=task_description or "Multi-session coding task",
+        session_count=session_count,
+        implementations="\n\n".join(impl_parts),
+    )
+
+    response = _call_agent(prompt, model=model, timeout=timeout)
+    if not response:
+        return None
+
+    try:
+        start = response.find("{")
+        end = response.rfind("}") + 1
+        if start >= 0 and end > start:
+            return json.loads(response[start:end])
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass
+
+    return None
