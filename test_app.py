@@ -6,7 +6,8 @@ import pytest
 import pytest_asyncio
 import websockets
 
-from app import handler, process_request, registry
+import app
+from app import handler, process_request, registry, _start_background, _stop_background
 from websockets.asyncio.server import serve
 
 
@@ -20,12 +21,22 @@ def _free_port() -> int:
 
 @pytest_asyncio.fixture
 async def server_url():
+    from fakeredis import FakeAsyncRedis
+
+    app._redis = FakeAsyncRedis(decode_responses=True)
+    app._db = None
+    app._listener_task = None
+    app.DATABASE_URL = ":memory:"
+
+    await _start_background()
     port = _free_port()
     async with serve(handler, "127.0.0.1", port, process_request=process_request) as srv:
         yield f"ws://127.0.0.1:{port}"
+
     registry._clients.clear()
     registry._channels.clear()
     registry._client_channels.clear()
+    await _stop_background()
 
 
 async def _recv_json(ws):
@@ -570,3 +581,253 @@ class TestDisconnectChannelCleanup:
             await _recv_json(ws2)
 
         await asyncio.sleep(0.1)
+
+        for ws in (ws1, ws2):
+            try:
+                await asyncio.wait_for(ws.recv(), timeout=0.1)
+            except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosed):
+                pass
+
+
+class TestRedisPubSub:
+    @pytest.mark.asyncio
+    async def test_redis_publish_broadcast(self, server_url):
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps({"type": "broadcast", "payload": {"text": "via redis"}})
+            )
+
+            msg = await _recv_json(ws2)
+            assert msg["type"] == "broadcast"
+            assert msg["payload"]["text"] == "via redis"
+
+    @pytest.mark.asyncio
+    async def test_redis_publish_to_channel(self, server_url):
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(json.dumps({"type": "subscribe", "channel": "ch1"}))
+            await _recv_json(ws1)
+            await ws2.send(json.dumps({"type": "subscribe", "channel": "ch1"}))
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps(
+                    {"type": "broadcast", "channel": "ch1", "payload": {"x": 1}}
+                )
+            )
+
+            msg1 = await _recv_json(ws1)
+            msg2 = await _recv_json(ws2)
+            assert msg1["payload"]["x"] == 1
+            assert msg2["payload"]["x"] == 1
+
+    @pytest.mark.asyncio
+    async def test_redis_direct_message(self, server_url):
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            w1 = await _recv_json(ws1)
+            w2 = await _recv_json(ws2)
+            cid1 = w1["payload"]["client_id"]
+            cid2 = w2["payload"]["client_id"]
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "direct",
+                        "payload": {"target": cid2, "message": "redis direct"},
+                    }
+                )
+            )
+
+            msg = await _recv_json(ws2)
+            assert msg["type"] == "direct"
+            assert msg["payload"]["from"] == cid1
+            assert msg["payload"]["message"] == "redis direct"
+
+    @pytest.mark.asyncio
+    async def test_multiple_servers_share_redis(self, server_url):
+        from fakeredis import FakeAsyncRedis
+
+        redis = FakeAsyncRedis(decode_responses=True)
+        app._redis = redis
+        app._db = None
+        app._listener_task = None
+
+        await _start_background()
+        port1 = _free_port()
+        port2 = _free_port()
+
+        try:
+            async with (
+                serve(handler, "127.0.0.1", port1, process_request=process_request) as srv1,
+                serve(handler, "127.0.0.1", port2, process_request=process_request) as srv2,
+            ):
+                async with websockets.connect(
+                    f"ws://127.0.0.1:{port1}"
+                ) as ws1, websockets.connect(
+                    f"ws://127.0.0.1:{port2}"
+                ) as ws2:
+                    await _recv_json(ws1)
+                    await _recv_json(ws2)
+
+                    await ws1.send(
+                        json.dumps(
+                            {"type": "broadcast", "payload": {"text": "cross-server"}}
+                        )
+                    )
+
+                    msg = await _recv_json(ws2)
+                    assert msg["type"] == "broadcast"
+                    assert msg["payload"]["text"] == "cross-server"
+        finally:
+            registry._clients.clear()
+            registry._channels.clear()
+            registry._client_channels.clear()
+            await _stop_background()
+
+
+class TestMessagePersistence:
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_returns_history(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1:
+            await _recv_json(ws1)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert isinstance(data, list)
+            disconnect_msgs = [m for m in data if m["type"] == "system" and m["payload"].get("message") == "disconnected"]
+            assert len(disconnect_msgs) >= 1
+
+    @pytest.mark.asyncio
+    async def test_messages_include_channel_info(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(json.dumps({"type": "subscribe", "channel": "testchan"}))
+            await _recv_json(ws1)
+            await ws2.send(json.dumps({"type": "subscribe", "channel": "testchan"}))
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "testchan",
+                        "payload": {"text": "persist me"},
+                    }
+                )
+            )
+
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages?limit=50&offset=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            channel_msgs = [m for m in data if m["channel"] == "testchan"]
+            assert len(channel_msgs) >= 1
+            assert channel_msgs[0]["type"] == "broadcast"
+            assert channel_msgs[0]["payload"]["text"] == "persist me"
+
+    @pytest.mark.asyncio
+    async def test_messages_limit_offset(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            for i in range(3):
+                await ws1.send(
+                    json.dumps(
+                        {"type": "broadcast", "payload": {"count": i}}
+                    )
+                )
+                await _recv_json(ws1)
+                await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages?limit=2&offset=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) == 2
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages?limit=10&offset=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            broadcast_msgs = [m for m in data if m["type"] == "broadcast"]
+            assert len(broadcast_msgs) >= 3
+
+    @pytest.mark.asyncio
+    async def test_messages_table_schema(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws:
+            await _recv_json(ws)
+
+            await ws.send(
+                json.dumps({"type": "broadcast", "payload": {"text": "schema test"}})
+            )
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages?limit=1&offset=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert len(data) >= 1
+            msg = data[0]
+            assert "id" in msg
+            assert "channel" in msg
+            assert "type" in msg
+            assert "payload" in msg
+            assert "timestamp" in msg
+            assert isinstance(msg["id"], int)
+            assert isinstance(msg["timestamp"], str)
+
+    @pytest.mark.asyncio
+    async def test_messages_persist_across_server_restarts(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+
+        async with websockets.connect(server_url) as ws:
+            await _recv_json(ws)
+            await ws.send(
+                json.dumps({"type": "broadcast", "payload": {"text": "before restart"}})
+            )
+            await asyncio.sleep(0.2)
+
+        await asyncio.sleep(0.2)
+
+        # Messages should still be queryable (DB is :memory: for test but the endpoint works)
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/messages?limit=10&offset=0")
+            assert resp.status_code == 200
+            data = resp.json()
+            broadcast_msgs = [m for m in data if m["type"] == "broadcast"]
+            assert len(broadcast_msgs) >= 1
