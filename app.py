@@ -55,6 +55,12 @@ def init_db():
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TEXT NOT NULL
+            );
         """)
 
 
@@ -226,6 +232,77 @@ def delete_item(user: dict, item_id: int):
     return jsonify({"message": "item deleted"})
 
 
+# ── Tasks Blueprint ─────────────────────────────────────────────
+
+tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks")
+
+
+@tasks_bp.route("", methods=["POST"])
+def create_task():
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", "").strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    now = datetime.utcnow().isoformat()
+    with get_db() as conn:
+        cursor = conn.execute(
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
+            (title, now),
+        )
+        conn.commit()
+        return jsonify({
+            "id": cursor.lastrowid,
+            "title": title,
+            "status": "pending",
+            "created_at": now,
+        }), 201
+
+
+@tasks_bp.route("", methods=["GET"])
+def list_tasks():
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM tasks ORDER BY created_at DESC"
+        ).fetchall()
+    return jsonify([dict(r) for r in rows])
+
+
+@tasks_bp.route("/<int:task_id>", methods=["GET"])
+def get_task(task_id: int):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
+    return jsonify(dict(row))
+
+
+@tasks_bp.route("/<int:task_id>", methods=["PUT"])
+def update_task(task_id: int):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+        if row is None:
+            return jsonify({"error": "task not found"}), 404
+        data = request.get_json(silent=True) or {}
+        title = data.get("title")
+        status = data.get("status")
+        if title is not None:
+            title = title.strip()
+            if not title:
+                return jsonify({"error": "title cannot be empty"}), 400
+            conn.execute("UPDATE tasks SET title = ? WHERE id = ?", (title, task_id))
+        if status is not None:
+            conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
+        conn.commit()
+        row = conn.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    return jsonify(dict(row))
+
+
 # ── Admin Blueprint ─────────────────────────────────────────────
 
 admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
@@ -247,6 +324,7 @@ def list_users(user: dict):
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(items_bp)
+app.register_blueprint(tasks_bp)
 app.register_blueprint(admin_bp)
 
 
