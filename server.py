@@ -1,3 +1,4 @@
+import abc
 import asyncio
 import json
 import os
@@ -153,8 +154,97 @@ class ClientRegistry:
             return []
 
 
+class BaseTransport(abc.ABC):
+    @abc.abstractmethod
+    def on_connect(self, handler):
+        """Register an async handler called with (connection) for each new client."""
+
+    @abc.abstractmethod
+    def on_disconnect(self, handler):
+        """Register an async handler called with (connection) on client disconnect."""
+
+    @abc.abstractmethod
+    async def send_message(self, connection, message):
+        """Send a text message to a connection."""
+
+    @abc.abstractmethod
+    async def broadcast(self, connections, message):
+        """Send a text message to a collection of connections."""
+
+    @property
+    @abc.abstractmethod
+    def port(self):
+        """The port the transport is listening on."""
+
+    @abc.abstractmethod
+    async def start(self):
+        """Start the transport server."""
+
+    @abc.abstractmethod
+    async def stop(self):
+        """Stop the transport server."""
+
+
+class WebSocketTransport(BaseTransport):
+    def __init__(self, host="localhost", port=8765, process_request=None):
+        self._host = host
+        self._port = port
+        self._process_request = process_request
+        self._server = None
+        self._on_connect_cb = None
+        self._on_disconnect_cb = None
+
+    def on_connect(self, handler):
+        self._on_connect_cb = handler
+
+    def on_disconnect(self, handler):
+        self._on_disconnect_cb = handler
+
+    async def send_message(self, connection, message):
+        await connection.send(message)
+
+    async def broadcast(self, connections, message):
+        conns = connections.values() if isinstance(connections, dict) else connections
+        for conn in conns:
+            try:
+                await conn.send(message)
+            except ConnectionClosed:
+                pass
+
+    @property
+    def port(self):
+        if self._server is not None and self._server.sockets:
+            return self._server.sockets[0].getsockname()[1]
+        return self._port
+
+    async def start(self):
+        on_connect_cb = self._on_connect_cb
+        on_disconnect_cb = self._on_disconnect_cb
+
+        async def connection_handler(connection):
+            try:
+                await on_connect_cb(connection)
+            finally:
+                if on_disconnect_cb is not None:
+                    await on_disconnect_cb(connection)
+
+        self._server_ctx = serve_ws(
+            connection_handler,
+            self._host,
+            self._port,
+            process_request=self._process_request,
+        )
+        self._server = await self._server_ctx.__aenter__()
+
+    async def stop(self):
+        if self._server_ctx is not None:
+            await self._server_ctx.__aexit__(None, None, None)
+            self._server_ctx = None
+            self._server = None
+
+
 class NotificationServer:
-    def __init__(self, host="localhost", port=8765, redis_url=None, database_url=None):
+    def __init__(self, host="localhost", port=8765, redis_url=None, database_url=None, transport=None):
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
@@ -164,6 +254,15 @@ class NotificationServer:
         self._redis = None
         self._redis_available = False
         self._redis_sub_task = None
+
+        if transport is not None:
+            self._transport = transport
+        else:
+            transport_type = os.environ.get("TRANSPORT", "websocket")
+            if transport_type == "websocket":
+                self._transport = WebSocketTransport(host, port, process_request=self._process_request)
+            else:
+                raise ValueError(f"Unknown transport type: {transport_type}")
 
     async def _connect_redis(self):
         if not self._redis_url or not HAS_REDIS:
@@ -209,24 +308,24 @@ class NotificationServer:
         disconnected = []
         for cid, ws in clients.items():
             try:
-                await ws.send(message_str)
+                await self._transport.send_message(ws, message_str)
             except ConnectionClosed:
                 disconnected.append(cid)
         for cid in disconnected:
             self.registry.remove(cid)
 
-    async def _handler(self, websocket):
+    async def _handler(self, connection):
         client_id = str(uuid.uuid4())
-        self.registry.add(client_id, websocket)
+        self.registry.add(client_id, connection)
         try:
             welcome = {
                 "type": "system",
                 "payload": {"client_id": client_id, "message": "Connected"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
-            await websocket.send(json.dumps(welcome))
+            await self._transport.send_message(connection, json.dumps(welcome))
 
-            async for message in websocket:
+            async for message in connection:
                 try:
                     data = json.loads(message)
                 except json.JSONDecodeError:
@@ -299,7 +398,7 @@ class NotificationServer:
         ws = clients.get(target_id)
         if ws is not None:
             try:
-                await ws.send(json.dumps(message))
+                await self._transport.send_message(ws, json.dumps(message))
             except ConnectionClosed:
                 self.registry.remove(target_id)
 
@@ -344,13 +443,9 @@ class NotificationServer:
         if self._redis_available:
             self._redis_sub_task = asyncio.create_task(self._redis_subscriber())
         try:
-            async with serve_ws(
-                self._handler,
-                self.host,
-                self.port,
-                process_request=self._process_request,
-            ) as ws_server:
-                yield ws_server
+            self._transport.on_connect(self._handler)
+            await self._transport.start()
+            yield self._transport._server
         finally:
             if self._redis_sub_task:
                 self._redis_sub_task.cancel()
@@ -362,6 +457,7 @@ class NotificationServer:
             if self._redis:
                 await self._redis.close()
                 self._redis = None
+            await self._transport.stop()
 
 
 async def main():
