@@ -1,6 +1,7 @@
 import pytest
 import os
 import tempfile
+from unittest.mock import patch
 from app import app, init_db, get_db
 
 
@@ -29,6 +30,23 @@ def auth_headers(client):
     )
     resp = client.post(
         "/auth/login", json={"username": "testuser", "password": "testpass"}
+    )
+    token = resp.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def auth_headers_with_email(client):
+    client.post(
+        "/auth/register",
+        json={
+            "username": "emailuser",
+            "password": "testpass",
+            "email": "user@example.com",
+        },
+    )
+    resp = client.post(
+        "/auth/login", json={"username": "emailuser", "password": "testpass"}
     )
     token = resp.get_json()["token"]
     return {"Authorization": f"Bearer {token}"}
@@ -451,3 +469,107 @@ class TestUserIsolation:
             headers={"Authorization": f"Bearer {alice_token}"},
         ).get_json()
         assert task["title"] == "Alice Task"
+
+
+class TestNotification:
+
+    def test_email_sent_when_status_changes_to_completed(
+        self, client, auth_headers_with_email
+    ):
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Notify Task"},
+            headers=auth_headers_with_email,
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.notify_task_completion") as mock_notify:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers_with_email,
+            )
+            assert resp.status_code == 200
+            mock_notify.assert_called_once_with("user@example.com", "Notify Task")
+
+    def test_no_email_when_status_not_completed(
+        self, client, auth_headers_with_email
+    ):
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers=auth_headers_with_email,
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.notify_task_completion") as mock_notify:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "in_progress"},
+                headers=auth_headers_with_email,
+            )
+            assert resp.status_code == 200
+            mock_notify.assert_not_called()
+
+    def test_no_email_when_only_title_updated(
+        self, client, auth_headers_with_email
+    ):
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Old Title"},
+            headers=auth_headers_with_email,
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.notify_task_completion") as mock_notify:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"title": "New Title"},
+                headers=auth_headers_with_email,
+            )
+            assert resp.status_code == 200
+            mock_notify.assert_not_called()
+
+    def test_no_email_when_already_completed(
+        self, client, auth_headers_with_email
+    ):
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Already Done"},
+            headers=auth_headers_with_email,
+        )
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers=auth_headers_with_email,
+        )
+
+        with patch("app.notify_task_completion") as mock_notify:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers_with_email,
+            )
+            assert resp.status_code == 200
+            mock_notify.assert_not_called()
+
+    def test_no_email_when_user_has_no_email(
+        self, client, auth_headers
+    ):
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "No Email Task"},
+            headers=auth_headers,
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch("app.notify_task_completion") as mock_notify:
+            resp = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+            )
+            assert resp.status_code == 200
+            mock_notify.assert_not_called()

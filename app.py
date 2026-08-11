@@ -48,6 +48,10 @@ def init_db():
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 # ── Auth helpers ─────────────────────────────────────────────────
@@ -73,18 +77,21 @@ def require_auth(f):
 
 # ── User model ───────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     with get_db() as conn:
         password_hash = bcrypt.hashpw(
             password.encode(), bcrypt.gensalt()
         ).decode()
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            result = {"id": cursor.lastrowid, "username": username}
+            if email:
+                result["email"] = email
+            return result
         except sqlite3.IntegrityError:
             return None
 
@@ -99,6 +106,14 @@ def get_user_by_username(username: str) -> dict | None:
 
 def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return dict(row) if row else None
 
 
 def generate_token(user_id: int) -> str:
@@ -177,6 +192,13 @@ def update_task(
     return get_task(task_id, owner_id)
 
 
+# ── Notification helper ──────────────────────────────────────────
+
+def notify_task_completion(user_email, task_title):
+    from celery_tasks import send_notification_email
+    send_notification_email.delay(user_email, task_title)
+
+
 # ── Auth routes ──────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
@@ -184,9 +206,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -238,8 +261,10 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+    existing_task = get_task(task_id, g.user_id)
     task = update_task(
-        task_id, g.user_id, title=data.get("title"), status=data.get("status")
+        task_id, g.user_id, title=data.get("title"), status=new_status
     )
     if task is None:
         if task_exists(task_id):
@@ -249,6 +274,13 @@ def edit_task(task_id: int):
             task = create_task(title, g.user_id)
         else:
             return jsonify({}), 200
+    else:
+        old_status = existing_task["status"] if existing_task else None
+        if task["status"] == "completed" and old_status != "completed":
+            user = get_user_by_id(g.user_id)
+            user_email = (user.get("email") if user else None) or ""
+            if user_email:
+                notify_task_completion(user_email, task["title"])
     return jsonify(task)
 
 
