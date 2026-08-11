@@ -10,6 +10,11 @@ import os
 import jwt
 import bcrypt
 
+try:
+    from celery_config import send_notification_email
+except ImportError:
+    send_notification_email = None
+
 app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -28,7 +33,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT NOT NULL DEFAULT ''"
             ")"
         )
         conn.execute(
@@ -42,6 +48,7 @@ def init_db():
             ")"
         )
         _migrate_add_owner_id(conn)
+        _migrate_add_email(conn)
 
 
 def _migrate_add_owner_id(conn):
@@ -49,6 +56,14 @@ def _migrate_add_owner_id(conn):
     columns = [row["name"] for row in cursor.fetchall()]
     if "owner_id" not in columns:
         conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        conn.commit()
+
+
+def _migrate_add_email(conn):
+    cursor = conn.execute("PRAGMA table_info(users)")
+    columns = [row["name"] for row in cursor.fetchall()]
+    if "email" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -81,16 +96,16 @@ def login_required(f):
 
 # ── User Model ──────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str = "") -> dict | None:
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            return {"id": cursor.lastrowid, "username": username, "email": email}
         except sqlite3.IntegrityError:
             return None
 
@@ -98,6 +113,12 @@ def create_user(username: str, password: str) -> dict | None:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -170,9 +191,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = (data.get("password") or "").strip()
+    email = (data.get("email") or "").strip()
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     token = generate_token(user["id"])
@@ -225,14 +247,21 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    old_task = get_task(task_id, request.user_id)
+    if old_task is None:
+        return jsonify({"error": "task not found"}), 404
+    old_status = old_task["status"]
     task = update_task(
         task_id,
         request.user_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+    new_status = task["status"]
+    if old_status != "completed" and new_status == "completed":
+        user = get_user_by_id(request.user_id)
+        if user and user.get("email") and send_notification_email:
+            send_notification_email.delay(user["email"], task["title"])
     return jsonify(task)
 
 

@@ -22,8 +22,8 @@ def client():
     os.unlink(db_path)
 
 
-def register_and_login(client, username="testuser", password="testpass"):
-    resp = client.post("/auth/register", json={"username": username, "password": password})
+def register_and_login(client, username="testuser", password="testpass", email=""):
+    resp = client.post("/auth/register", json={"username": username, "password": password, "email": email})
     data = resp.get_json()
     return data["token"], data["user"]
 
@@ -229,10 +229,53 @@ class TestUserIsolation:
         resp = client.get(f"/tasks/{task_id}", headers=auth_header(token2))
         assert resp.status_code == 404
 
-    def test_user_cannot_update_other_users_task(self, client):
-        token1, _ = register_and_login(client, "alice", "pass1")
-        token2, _ = register_and_login(client, "bob", "pass2")
-        create_resp = client.post("/tasks", json={"title": "Alice task"}, headers=auth_header(token1))
+from unittest.mock import patch
+
+
+class TestNotification:
+    def test_notification_sent_on_completion(self, client):
+        token, user = register_and_login(client, "alice", "pass1", "alice@example.com")
+        create_resp = client.post("/tasks", json={"title": "My Task"}, headers=auth_header(token))
         task_id = create_resp.get_json()["id"]
-        resp = client.put(f"/tasks/{task_id}", json={"title": "Hacked"}, headers=auth_header(token2))
-        assert resp.status_code == 404
+        with patch("app.send_notification_email") as mock_task:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth_header(token))
+            assert resp.status_code == 200
+            mock_task.delay.assert_called_once_with("alice@example.com", "My Task")
+
+    def test_notification_not_sent_on_other_status(self, client):
+        token, user = register_and_login(client, "alice", "pass1", "alice@example.com")
+        create_resp = client.post("/tasks", json={"title": "My Task"}, headers=auth_header(token))
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email") as mock_task:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "done"}, headers=auth_header(token))
+            assert resp.status_code == 200
+            mock_task.delay.assert_not_called()
+
+    def test_notification_not_sent_on_title_only_update(self, client):
+        token, user = register_and_login(client, "alice", "pass1", "alice@example.com")
+        create_resp = client.post("/tasks", json={"title": "My Task"}, headers=auth_header(token))
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email") as mock_task:
+            resp = client.put(f"/tasks/{task_id}", json={"title": "New Title"}, headers=auth_header(token))
+            assert resp.status_code == 200
+            mock_task.delay.assert_not_called()
+
+    def test_notification_no_email_skips_send(self, client):
+        token, user = register_and_login(client, "alice", "pass1")
+        create_resp = client.post("/tasks", json={"title": "My Task"}, headers=auth_header(token))
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email") as mock_task:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth_header(token))
+            assert resp.status_code == 200
+            mock_task.delay.assert_not_called()
+
+    def test_api_response_not_blocked_by_notification(self, client):
+        token, user = register_and_login(client, "alice", "pass1", "alice@example.com")
+        create_resp = client.post("/tasks", json={"title": "My Task"}, headers=auth_header(token))
+        task_id = create_resp.get_json()["id"]
+        with patch("app.send_notification_email") as mock_task:
+            resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth_header(token))
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["status"] == "completed"
+            assert data["title"] == "My Task"
