@@ -58,6 +58,30 @@ class TaskRepository(BaseRepository):
             "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
         )
 
+    def find_all_by_owner_paginated(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> tuple[list[dict], int, str | None]:
+        total_row = self._fetchone(
+            "SELECT COUNT(*) as cnt FROM tasks WHERE owner_id = ?", (owner_id,)
+        )
+        total = total_row["cnt"] if total_row else 0
+
+        if cursor is not None:
+            rows = self._fetchall(
+                "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (owner_id, cursor, limit + 1),
+            )
+        else:
+            rows = self._fetchall(
+                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+                (owner_id, limit + 1),
+            )
+
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        next_cursor = str(rows[-1]["id"]) if has_more else None
+        return rows, total, next_cursor
+
     def find_by_id_and_owner(self, task_id: int, owner_id: int) -> dict | None:
         return self._fetchone(
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)

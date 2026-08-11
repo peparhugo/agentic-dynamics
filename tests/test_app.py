@@ -7,6 +7,7 @@ import pytest
 db_file = tempfile.NamedTemporaryFile(delete=False, suffix=".db")
 os.environ["DATABASE"] = db_file.name
 os.environ["CELERY_ALWAYS_EAGER"] = "true"
+os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
 
 import app
 
@@ -19,6 +20,7 @@ def _register_and_login(client, username="testuser", password="testpass"):
 
 @pytest.fixture
 def client():
+    app.limiter.reset()
     app.init_db()
     with app.app.test_client() as client:
         yield client
@@ -122,13 +124,13 @@ def test_user_isolation(client):
 
     resp = client.get("/tasks", headers=headers1)
     data = resp.get_json()
-    assert len(data) == 1
-    assert data[0]["title"] == "Task of user1"
+    assert len(data["data"]) == 1
+    assert data["data"][0]["title"] == "Task of user1"
 
     resp = client.get("/tasks", headers=headers2)
     data = resp.get_json()
-    assert len(data) == 1
-    assert data[0]["title"] == "Task of user2"
+    assert len(data["data"]) == 1
+    assert data["data"][0]["title"] == "Task of user2"
 
 
 def test_cannot_access_other_users_task(client):
@@ -159,7 +161,9 @@ def test_list_tasks_empty(client):
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
-    assert data == []
+    assert data["data"] == []
+    assert data["next_cursor"] is None
+    assert data["total"] == 0
 
 
 def test_list_tasks_ordered(client):
@@ -170,10 +174,12 @@ def test_list_tasks_ordered(client):
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
-    assert len(data) == 3
-    assert data[0]["title"] == "Task 3"
-    assert data[1]["title"] == "Task 2"
-    assert data[2]["title"] == "Task 1"
+    assert len(data["data"]) == 3
+    assert data["data"][0]["title"] == "Task 3"
+    assert data["data"][1]["title"] == "Task 2"
+    assert data["data"][2]["title"] == "Task 1"
+    assert data["total"] == 3
+    assert data["next_cursor"] is None
 
 
 def test_get_single_task(client):
@@ -310,3 +316,143 @@ def test_notification_with_custom_email(client):
         resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers2)
         assert resp.status_code == 200
         mock_delay.assert_called_once_with("custom@test.com", "Custom email task")
+
+
+# ── Pagination Tests ─────────────────────────────────────────────
+
+def test_pagination_default_limit(client):
+    headers = _register_and_login(client, "paginateuser", "pass")
+    for i in range(25):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["data"]) == 20
+    assert data["total"] == 25
+    assert data["next_cursor"] is not None
+
+
+def test_pagination_custom_limit(client):
+    headers = _register_and_login(client, "paginateuser2", "pass")
+    for i in range(10):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+    resp = client.get("/tasks?limit=5", headers=headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["data"]) == 5
+    assert data["total"] == 10
+    assert data["next_cursor"] is not None
+
+
+def test_pagination_max_limit(client):
+    headers = _register_and_login(client, "paginateuser3", "pass")
+    for i in range(150):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+    resp = client.get("/tasks?limit=200", headers=headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data["data"]) == 100
+    assert data["total"] == 150
+
+
+def test_pagination_cursor(client):
+    headers = _register_and_login(client, "paginateuser4", "pass")
+    for i in range(25):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+
+    page1 = client.get("/tasks?limit=10", headers=headers).get_json()
+    assert len(page1["data"]) == 10
+    assert page1["next_cursor"] is not None
+
+    page2 = client.get(f"/tasks?limit=10&cursor={page1['next_cursor']}", headers=headers).get_json()
+    assert len(page2["data"]) == 10
+    assert page2["next_cursor"] is not None
+
+    page3 = client.get(f"/tasks?limit=10&cursor={page2['next_cursor']}", headers=headers).get_json()
+    assert len(page3["data"]) == 5
+    assert page3["next_cursor"] is None
+
+    all_tasks = page1["data"] + page2["data"] + page3["data"]
+    titles = [t["title"] for t in all_tasks]
+    assert titles == [f"Task {i}" for i in range(24, -1, -1)]
+
+
+def test_pagination_no_duplicates(client):
+    headers = _register_and_login(client, "paginateuser5", "pass")
+    for i in range(30):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+
+    seen_ids = set()
+    cursor = None
+    while True:
+        url = "/tasks?limit=7"
+        if cursor:
+            url += f"&cursor={cursor}"
+        page = client.get(url, headers=headers).get_json()
+        for task in page["data"]:
+            assert task["id"] not in seen_ids
+            seen_ids.add(task["id"])
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+
+    assert len(seen_ids) == 30
+
+
+def test_pagination_total_remains_constant(client):
+    headers = _register_and_login(client, "paginateuser6", "pass")
+    for i in range(15):
+        client.post("/tasks", json={"title": f"Task {i}"}, headers=headers)
+
+    page1 = client.get("/tasks?limit=5", headers=headers).get_json()
+    assert page1["total"] == 15
+
+    page2 = client.get(f"/tasks?limit=5&cursor={page1['next_cursor']}", headers=headers).get_json()
+    assert page2["total"] == 15
+
+    page3 = client.get(f"/tasks?limit=5&cursor={page2['next_cursor']}", headers=headers).get_json()
+    assert page3["total"] == 15
+
+
+# ── Rate Limiting Tests ───────────────────────────────────────────
+
+def test_rate_limit_on_register(client):
+    for i in range(101):
+        resp = client.post("/auth/register", json={"username": f"rluser{i}", "password": "pass"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_on_login(client):
+    client.post("/auth/register", json={"username": "rllogin", "password": "pass"})
+    for i in range(100):
+        resp = client.post("/auth/login", json={"username": "rllogin", "password": "pass"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_on_authenticated_endpoint(client):
+    headers = _register_and_login(client, "rlauth", "pass")
+    for i in range(100):
+        resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_returns_retry_after_header(client):
+    for i in range(101):
+        resp = client.post("/auth/register", json={"username": f"rlheader{i}", "password": "pass"})
+    assert resp.status_code == 429
+    retry_after = resp.headers.get("Retry-After")
+    assert retry_after is not None
+    assert int(retry_after) >= 1
+
+
+def test_rate_limit_per_user_isolation(client):
+    for i in range(101):
+        resp = client.post("/auth/register", json={"username": f"rlu{i}", "password": "pass"})
+    assert resp.status_code == 429
+
+    headers = _register_and_login(client, "rlisolated", "pass")
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 200

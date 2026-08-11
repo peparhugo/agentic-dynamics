@@ -5,13 +5,15 @@ A single-file Flask app with clean structure: models, routes, error handling.
 Designed as a baseline for multi-session stories.
 """
 
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, current_app
 from datetime import datetime, timedelta
 from functools import wraps
 import sqlite3
 import os
 import bcrypt
 import jwt
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from tasks import send_notification_email
 from repository import TaskRepository, UserRepository
 
@@ -19,6 +21,27 @@ app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{payload['user_id']}"
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    headers_enabled=True,
+)
+limiter.init_app(app)
 
 
 def get_db():
@@ -129,7 +152,13 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repo.find_all_by_owner(g.current_user_id))
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", 20, type=int)
+    limit = min(max(limit, 1), 100)
+    rows, total, next_cursor = task_repo.find_all_by_owner_paginated(
+        g.current_user_id, cursor=cursor, limit=limit
+    )
+    return jsonify({"data": rows, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
