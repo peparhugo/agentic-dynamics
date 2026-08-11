@@ -186,3 +186,175 @@ async def test_system_message_on_disconnect():
             assert sys_msg["type"] == "system"
             assert "disconnected" in sys_msg["payload"]["message"]
             assert sys_msg["payload"]["client_id"] == client1_id
+
+
+@pytest.mark.asyncio
+async def test_subscribe_to_channel():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            assert resp["type"] == "system"
+            assert "Subscribed to alerts" in resp["payload"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_from_channel():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "unsubscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            resp = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            assert resp["type"] == "system"
+            assert "Unsubscribed from alerts" in resp["payload"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_only_to_subscribers():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws1:
+            await asyncio.wait_for(ws1.recv(), timeout=5)
+            async with connect(f"ws://localhost:{PORT}") as ws2:
+                await asyncio.wait_for(ws2.recv(), timeout=5)
+
+                await ws1.send(json.dumps({
+                    "type": "subscribe",
+                    "payload": {"channel": "alerts"},
+                }))
+                await asyncio.wait_for(ws1.recv(), timeout=5)
+
+                await ws1.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"channel": "alerts", "message": "channel msg"},
+                }))
+
+                msg1 = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                assert msg1["payload"]["message"] == "channel msg"
+
+                await ws1.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "global msg"},
+                }))
+
+                msg2 = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+                assert msg2["payload"]["message"] == "global msg"
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_empty():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        resp = await http_get("localhost", PORT, "/channels")
+        assert resp == {}
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_with_subscribers():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            resp = await http_get("localhost", PORT, "/channels")
+            assert "alerts" in resp
+            assert resp["alerts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            raw = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            client_id = raw["payload"]["client_id"]
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            resp = await http_get("localhost", PORT, "/channels/alerts/subscribers")
+            assert client_id in resp
+
+
+@pytest.mark.asyncio
+async def test_multiple_channel_subscriptions():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "system"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            resp = await http_get("localhost", PORT, "/channels")
+            assert resp.get("alerts") == 1
+            assert resp.get("system") == 1
+
+
+@pytest.mark.asyncio
+async def test_channel_cleanup_on_disconnect():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            resp = await http_get("localhost", PORT, "/channels")
+            assert resp.get("alerts") == 1
+
+        await asyncio.sleep(0.2)
+
+        resp = await http_get("localhost", PORT, "/channels")
+        assert resp.get("alerts", 0) == 0
+
+
+@pytest.mark.asyncio
+async def test_dynamic_subscribe_unsubscribe():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            resp = await http_get("localhost", PORT, "/channels")
+            assert resp == {}
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "chat"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            resp = await http_get("localhost", PORT, "/channels")
+            assert resp.get("chat") == 1
+
+            await ws.send(json.dumps({
+                "type": "unsubscribe",
+                "payload": {"channel": "chat"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            resp = await http_get("localhost", PORT, "/channels")
+            assert resp == {}
