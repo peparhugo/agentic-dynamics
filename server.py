@@ -4,9 +4,10 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs
 
 from websockets.asyncio.server import serve as serve_ws
@@ -21,6 +22,8 @@ except ImportError:
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 
 class MessageStore:
@@ -69,6 +72,52 @@ class MessageStore:
                 }
                 for r in rows
             ]
+
+    def get_history(self, channel=None, since=None, limit=50):
+        with self._get_conn() as conn:
+            conditions = []
+            params = []
+
+            if channel:
+                conditions.append("channel = ?")
+                params.append(channel)
+
+            if since:
+                conditions.append("timestamp >= ?")
+                params.append(since)
+
+            where = ""
+            if conditions:
+                where = " WHERE " + " AND ".join(conditions)
+
+            params.append(limit + 1)
+            rows = conn.execute(
+                f"SELECT * FROM messages{where} ORDER BY timestamp ASC, id ASC LIMIT ?",
+                params,
+            ).fetchall()
+
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+
+            messages = [
+                {
+                    "id": r["id"],
+                    "channel": r["channel"],
+                    "type": r["type"],
+                    "payload": json.loads(r["payload"]),
+                    "timestamp": r["timestamp"],
+                }
+                for r in rows
+            ]
+
+            return {"messages": messages, "has_more": has_more}
+
+    def cleanup_old(self, ttl_days):
+        with self._get_conn() as conn:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+            conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            conn.commit()
 
 
 class ClientRegistry:
@@ -152,6 +201,35 @@ class ClientRegistry:
             if client_id in self._client_channels:
                 return list(self._client_channels[client_id])
             return []
+
+
+class RateLimiter:
+    def __init__(self, limit=None):
+        self._limit = limit if limit is not None else RATE_LIMIT
+        self._redis = None
+        self._local = {}
+        self._lock = threading.Lock()
+
+    def set_redis(self, redis_client):
+        self._redis = redis_client
+
+    async def check_and_increment(self, client_id):
+        minute = int(time.time() / 60)
+        key = f"rate:{client_id}:{minute}"
+
+        if self._redis:
+            try:
+                count = await self._redis.incr(key)
+                if count == 1:
+                    await self._redis.expire(key, 120)
+                return count <= self._limit, count
+            except Exception:
+                pass
+
+        with self._lock:
+            self._local[key] = self._local.get(key, 0) + 1
+            count = self._local[key]
+            return count <= self._limit, count
 
 
 class BaseTransport(abc.ABC):
@@ -244,7 +322,7 @@ class WebSocketTransport(BaseTransport):
 
 
 class NotificationServer:
-    def __init__(self, host="localhost", port=8765, redis_url=None, database_url=None, transport=None):
+    def __init__(self, host="localhost", port=8765, redis_url=None, database_url=None, transport=None, rate_limit=None):
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
@@ -254,6 +332,8 @@ class NotificationServer:
         self._redis = None
         self._redis_available = False
         self._redis_sub_task = None
+        self._cleanup_task = None
+        self.rate_limiter = RateLimiter(limit=rate_limit)
 
         if transport is not None:
             self._transport = transport
@@ -329,6 +409,18 @@ class NotificationServer:
                 try:
                     data = json.loads(message)
                 except json.JSONDecodeError:
+                    continue
+
+                allowed, _ = await self.rate_limiter.check_and_increment(client_id)
+                if not allowed:
+                    error_msg = json.dumps({
+                        "type": "error",
+                        "payload": {"message": f"Rate limit exceeded: max {RATE_LIMIT} messages per minute"},
+                    })
+                    try:
+                        await self._transport.send_message(connection, error_msg)
+                    except ConnectionClosed:
+                        break
                     continue
 
                 msg_type = data.get("type", "broadcast")
@@ -435,11 +527,30 @@ class NotificationServer:
             response = connection.respond(200, json.dumps({"messages": messages}))
             response.headers["Content-Type"] = "application/json"
             return response
+        if path == "/history":
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            limit = int(query.get("limit", ["50"])[0])
+            result = self.message_store.get_history(channel=channel, since=since, limit=limit)
+            response = connection.respond(200, json.dumps(result))
+            response.headers["Content-Type"] = "application/json"
+            return response
         return None
+
+    async def _cleanup_loop(self):
+        ttl_days = MESSAGE_TTL_DAYS
+        while True:
+            try:
+                self.message_store.cleanup_old(ttl_days)
+            except Exception:
+                pass
+            await asyncio.sleep(3600)
 
     @asynccontextmanager
     async def run(self):
         await self._connect_redis()
+        self.rate_limiter.set_redis(self._redis)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         if self._redis_available:
             self._redis_sub_task = asyncio.create_task(self._redis_subscriber())
         try:
@@ -447,6 +558,13 @@ class NotificationServer:
             await self._transport.start()
             yield self._transport._server
         finally:
+            if self._cleanup_task:
+                self._cleanup_task.cancel()
+                try:
+                    await self._cleanup_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                self._cleanup_task = None
             if self._redis_sub_task:
                 self._redis_sub_task.cancel()
                 try:

@@ -3,11 +3,12 @@ import json
 import os
 import tempfile
 import threading
+import time
 
 import pytest
 from websockets.asyncio.client import connect
 
-from server import NotificationServer, ClientRegistry, MessageStore
+from server import NotificationServer, ClientRegistry, MessageStore, RateLimiter
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 
@@ -54,6 +55,22 @@ async def notification_server():
         db_path = f.name
     try:
         server = NotificationServer(host="localhost", port=0, database_url=db_path, redis_url="")
+        async with server.run() as ws_server:
+            server.port = ws_server.sockets[0].getsockname()[1]
+            yield server
+    finally:
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
+
+
+@pytest.fixture
+async def rate_limited_server():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = f.name
+    try:
+        server = NotificationServer(host="localhost", port=0, database_url=db_path, redis_url="", rate_limit=5)
         async with server.run() as ws_server:
             server.port = ws_server.sockets[0].getsockname()[1]
             yield server
@@ -1041,3 +1058,371 @@ class TestRedisPubSub:
         data = await async_http_get("localhost", redis_server.port, "/messages")
         assert len(data["messages"]) == 1
         assert data["messages"][0]["payload"]["message"] == "persisted"
+
+
+class TestRateLimiter:
+    @pytest.mark.asyncio
+    async def test_allows_within_limit(self):
+        limiter = RateLimiter(limit=3)
+        for _ in range(3):
+            allowed, _ = await limiter.check_and_increment("client1")
+            assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_exceeded(self):
+        limiter = RateLimiter(limit=3)
+        for _ in range(3):
+            await limiter.check_and_increment("client1")
+        allowed, count = await limiter.check_and_increment("client1")
+        assert allowed is False
+        assert count == 4
+
+    @pytest.mark.asyncio
+    async def test_different_clients_separate_counters(self):
+        limiter = RateLimiter(limit=2)
+        for _ in range(3):
+            await limiter.check_and_increment("client1")
+        allowed, _ = await limiter.check_and_increment("client2")
+        assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_increment_returns_count(self):
+        limiter = RateLimiter(limit=100)
+        _, count1 = await limiter.check_and_increment("c1")
+        _, count2 = await limiter.check_and_increment("c1")
+        assert count1 == 1
+        assert count2 == 2
+
+    def test_thread_safety_local_mode(self):
+        limiter = RateLimiter(limit=10000)
+        errors = []
+
+        async def burst(client_id, count):
+            try:
+                for _ in range(count):
+                    await limiter.check_and_increment(client_id)
+            except Exception as e:
+                errors.append(e)
+
+        async def run():
+            tasks = [
+                burst("a", 200),
+                burst("b", 200),
+                burst("c", 200),
+            ]
+            await asyncio.gather(*tasks)
+
+        asyncio.run(run())
+        assert len(errors) == 0
+
+
+class TestMessageStoreHistory:
+    def test_get_history_empty(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            result = store.get_history()
+            assert result["messages"] == []
+            assert result["has_more"] is False
+
+    def test_get_history_channel_filter(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            store.save("alerts", "broadcast", {"msg": "a"}, "2024-01-01T00:00:00+00:00")
+            store.save("system", "broadcast", {"msg": "b"}, "2024-01-01T00:00:01+00:00")
+            store.save("alerts", "broadcast", {"msg": "c"}, "2024-01-01T00:00:02+00:00")
+
+            result = store.get_history(channel="alerts")
+            assert len(result["messages"]) == 2
+            assert result["messages"][0]["payload"]["msg"] == "a"
+            assert result["messages"][1]["payload"]["msg"] == "c"
+            assert result["has_more"] is False
+
+    def test_get_history_since_filter(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            store.save("test", "broadcast", {"msg": "old"}, "2024-01-01T00:00:00+00:00")
+            store.save("test", "broadcast", {"msg": "new"}, "2024-01-01T00:00:02+00:00")
+
+            result = store.get_history(since="2024-01-01T00:00:01+00:00")
+            assert len(result["messages"]) == 1
+            assert result["messages"][0]["payload"]["msg"] == "new"
+
+    def test_get_history_chronological_order(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            store.save("test", "broadcast", {"idx": 2}, "2024-01-01T00:00:02+00:00")
+            store.save("test", "broadcast", {"idx": 1}, "2024-01-01T00:00:01+00:00")
+            store.save("test", "broadcast", {"idx": 3}, "2024-01-01T00:00:03+00:00")
+
+            result = store.get_history()
+            assert [m["payload"]["idx"] for m in result["messages"]] == [1, 2, 3]
+
+    def test_get_history_limit(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            for i in range(10):
+                store.save("test", "broadcast", {"idx": i}, f"2024-01-01T00:00:{i:02d}+00:00")
+
+            result = store.get_history(limit=3)
+            assert len(result["messages"]) == 3
+            assert [m["payload"]["idx"] for m in result["messages"]] == [0, 1, 2]
+
+    def test_get_history_has_more(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            for i in range(5):
+                store.save("test", "broadcast", {"idx": i}, f"2024-01-01T00:00:{i:02d}+00:00")
+
+            result = store.get_history(limit=3)
+            assert result["has_more"] is True
+            assert len(result["messages"]) == 3
+
+            result = store.get_history(limit=10)
+            assert result["has_more"] is False
+            assert len(result["messages"]) == 5
+
+    def test_get_history_channel_and_since(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            store.save("a", "broadcast", {"msg": "1"}, "2024-01-01T00:00:00+00:00")
+            store.save("b", "broadcast", {"msg": "2"}, "2024-01-01T00:00:01+00:00")
+            store.save("a", "broadcast", {"msg": "3"}, "2024-01-01T00:00:02+00:00")
+            store.save("a", "broadcast", {"msg": "4"}, "2024-01-01T00:00:03+00:00")
+
+            result = store.get_history(channel="a", since="2024-01-01T00:00:01+00:00")
+            assert len(result["messages"]) == 2
+            assert [m["payload"]["msg"] for m in result["messages"]] == ["3", "4"]
+
+    def test_cleanup_old(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            from datetime import datetime, timedelta, timezone
+
+            recent = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+            old = (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()
+
+            store.save("test", "broadcast", {"msg": "old"}, old)
+            store.save("test", "broadcast", {"msg": "recent"}, recent)
+
+            store.cleanup_old(ttl_days=7)
+
+            messages = store.get_messages()
+            assert len(messages) == 1
+            assert messages[0]["payload"]["msg"] == "recent"
+
+    def test_cleanup_old_default(self):
+        with tempfile.NamedTemporaryFile(suffix=".db") as f:
+            store = MessageStore(f.name)
+            from datetime import datetime, timedelta, timezone
+
+            recent = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+            very_old = "2020-01-01T00:00:00+00:00"
+
+            store.save("test", "broadcast", {"msg": "ancient"}, very_old)
+            store.save("test", "broadcast", {"msg": "recent"}, recent)
+
+            store.cleanup_old(ttl_days=7)
+
+            messages = store.get_messages()
+            assert len(messages) == 1
+            assert messages[0]["payload"]["msg"] == "recent"
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded_sends_error(rate_limited_server):
+    uri = f"ws://localhost:{rate_limited_server.port}"
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+        for _ in range(6):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"msg": "test"}
+            }))
+
+        messages = []
+        for _ in range(10):
+            try:
+                msg = await asyncio.wait_for(ws.recv(), timeout=2)
+                messages.append(json.loads(msg))
+            except asyncio.TimeoutError:
+                break
+
+        error_messages = [m for m in messages if m["type"] == "error"]
+        assert len(error_messages) >= 1
+        assert "Rate limit exceeded" in error_messages[0]["payload"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_stops_processing(rate_limited_server):
+    uri = f"ws://localhost:{rate_limited_server.port}"
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+        for i in range(10):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"idx": i}
+            }))
+
+        received = []
+        for _ in range(10):
+            try:
+                msg = await asyncio.wait_for(ws.recv(), timeout=2)
+                received.append(json.loads(msg))
+            except asyncio.TimeoutError:
+                break
+
+        errors = [m for m in received if m["type"] == "error"]
+        broadcasts = [m for m in received if m["type"] == "broadcast"]
+        assert len(errors) >= 1
+        assert len(broadcasts) <= 5
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_empty(notification_server):
+    port = notification_server.port
+    data = await async_http_get("localhost", port, "/history")
+    assert data["messages"] == []
+    assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_with_data(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+        for i in range(3):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"idx": i}
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+    await asyncio.sleep(0.1)
+    data = await async_http_get("localhost", notification_server.port, "/history")
+    assert len(data["messages"]) == 3
+    assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_channel_filter(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"msg": "alert1"}
+        }))
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await ws.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"msg": "sys1"}
+        }))
+        await asyncio.wait_for(ws.recv(), timeout=5)
+
+    await asyncio.sleep(0.1)
+    data = await async_http_get("localhost", notification_server.port,
+                                "/history?channel=alerts")
+    assert len(data["messages"]) == 1
+    assert data["messages"][0]["channel"] == "alerts"
+    assert data["messages"][0]["payload"]["msg"] == "alert1"
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_has_more(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+        for i in range(5):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"idx": i}
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+    await asyncio.sleep(0.1)
+    data = await async_http_get("localhost", notification_server.port, "/history?limit=2")
+    assert len(data["messages"]) == 2
+    assert data["has_more"] is True
+
+    data = await async_http_get("localhost", notification_server.port, "/history?limit=10")
+    assert len(data["messages"]) == 5
+    assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_respects_limit(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+        for i in range(10):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"idx": i}
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+    await asyncio.sleep(0.1)
+    data = await async_http_get("localhost", notification_server.port, "/history?limit=3")
+    assert len(data["messages"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_chronological_order(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+        for i in range(3):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"idx": i}
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await asyncio.sleep(0.02)
+
+    await asyncio.sleep(0.1)
+    data = await async_http_get("localhost", notification_server.port, "/history")
+    idxs = [m["payload"]["idx"] for m in data["messages"]]
+    assert idxs == sorted(idxs)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_with_channel_and_since(notification_server):
+    uri = f"ws://localhost:{notification_server.port}"
+
+    t_before = None
+    async with connect(uri) as ws:
+        await asyncio.wait_for(ws.recv(), timeout=5)
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+
+        for i in range(3):
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"idx": i}
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await asyncio.sleep(0.02)
+
+        t_before = "2024-01-01T00:00:00+00:00"
+
+    await asyncio.sleep(0.1)
+
+    data = await async_http_get("localhost", notification_server.port,
+                                f"/history?channel=alerts&since={t_before}")
+    assert len(data["messages"]) == 3
+    for m in data["messages"]:
+        assert m["channel"] == "alerts"
