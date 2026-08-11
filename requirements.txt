@@ -1,3 +1,5 @@
 flask
 PyJWT
 pytest
+celery
+redis

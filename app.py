@@ -4,6 +4,7 @@ from datetime import datetime
 from functools import wraps
 
 import jwt
+from celery_config import celery_app, send_notification_email
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -33,7 +34,8 @@ def init_db():
         "CREATE TABLE IF NOT EXISTS users ("
         "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
         "  username TEXT NOT NULL UNIQUE,"
-        "  password_hash TEXT NOT NULL"
+        "  password_hash TEXT NOT NULL,"
+        "  email TEXT"
         ")"
     )
     db.execute(
@@ -52,19 +54,23 @@ def init_db():
         )
     except sqlite3.OperationalError:
         pass
+    try:
+        db.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    except sqlite3.OperationalError:
+        pass
     db.commit()
 
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     db = get_db()
     password_hash = generate_password_hash(password)
     try:
         cursor = db.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         db.commit()
-        return {"id": cursor.lastrowid, "username": username}
+        return {"id": cursor.lastrowid, "username": username, "email": email}
     except sqlite3.IntegrityError:
         return None
 
@@ -75,6 +81,14 @@ def get_user_by_username(username: str) -> dict | None:
         "SELECT * FROM users WHERE username = ?", (username,)
     ).fetchone()
     return dict(row) if row else None
+
+
+def get_user_email(user_id: int) -> str | None:
+    db = get_db()
+    row = db.execute(
+        "SELECT email FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    return row["email"] if row else None
 
 
 def login_required(f):
@@ -165,9 +179,10 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user["id"], "username": user["username"]}), 201
@@ -225,6 +240,9 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task.get("status") == "completed":
+        user_email = get_user_email(g.user_id) or "unknown@example.com"
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
