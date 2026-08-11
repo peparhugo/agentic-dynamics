@@ -30,7 +30,6 @@
 |--------|-------|---------|-------|
 | `entropy.py` | 353 | 5-dimension architectural entropy | 14 |
 | `codebase_graph.py` | 356 | In-memory import graph metrics (no Neo4j required) | 11 |
-| `value_score.py` | 208 | DVS formula (built but superseded — see deviations) | 11 |
 
 ### v0.8 — LSP + Conventions
 
@@ -49,7 +48,6 @@
 - 4 seed codebases (Python + TS × tier1 + tier2)
 - Redis queue infrastructure (docker-compose + enqueue + worker + monitor)
 - `--session --fork` auto-recovery in story.py _run_session()
-- `dvs_fast.py` — sequential DVS computation (30s for 26 cells)
 - `recover_stories.py` — post-hoc session continuation
 
 **Experiment executed:**
@@ -75,23 +73,10 @@
 |-------------------|--------|-----|
 | 30 cells, 150 sessions | 26 cells, 122 sessions | 4 notification_service tier2 cells not enqueued |
 | ~$3 cost | $0.19 | DeepSeek cheaper than estimated; fork costs included |
-| DVS as north star metric | DVS dropped | Unsolvable weighting problem — see below |
 | Post-hoc timeout recovery script | Auto-recovery in `_run_session()` | `opencode run --session --fork` built in |
 | 3 models by v1.0 | DeepSeek-only | User strategy: prove pipeline on cheapest model first |
 | Flash V4 codebase mutators at runtime | Deterministic pre-generated bad variants | Flash V4 too slow for runtime codebase mutations |
-| Evidence page with DVS charts | Lab Book 14 — raw dimensions + reviewer quotes | Present evidence, not a formula |
 | Docker Compose worker pool for production | Sequential + host-level Redis (batch_stories.py fallback) | Redis workers crashed from bash timeouts |
-
-### Why DVS Was Dropped
-
-DVS = (correctness × arch_fit × convention) / (cost + debt + entropy)
-
-Three fatal problems:
-1. **Cost domination** — tiny session costs ($0.0006-0.016) made DVS ≈ 1/cost. Every cell looked the same.
-2. **Weighting impossible** — no objective way to weight correctness (binary) vs arch_fit (reviewer) vs convention (broken for TS) vs entropy (penalized expected growth).
-3. **Meaningless threshold** — DVS > 1 was supposed to mean "net positive." In practice, every cell with passing tests was > 1 (cost was so low) and every timed-out cell was < 0.1. The threshold was a binary correctness gate, not a value measure.
-
-**Replacement:** Present raw dimensions in Lab Book 14. Correctness (pass/fail), arch_fit (reviewer score), convention (pattern match), cost (billed), and — most importantly — the reviewer's actual words as qualitative code quality evidence.
 
 ---
 
@@ -191,7 +176,6 @@ src/instrument/commit_analysis.py   515L   Per-commit AST diff, convention scori
 src/instrument/review.py            554L   Agent review pool (5 agents)
 src/instrument/entropy.py           353L   5-dimension architectural entropy
 src/instrument/codebase_graph.py    356L   In-memory import graph metrics
-src/instrument/value_score.py       208L   DVS formula (built, superseded)
 src/instrument/lsp_diagnostics.py   400L   Multi-tool LSP diagnostics
 ```
 
@@ -203,14 +187,10 @@ scripts/analyze_stories.py   Post-hoc per-commit analysis
 scripts/recover_stories.py   Session timeout recovery
 scripts/review_stories.py    Batch review agent runner
 scripts/batch_stories.py     Sequential matrix runner (fallback)
-scripts/dvs_fast.py          Fast DVS computation (30s for 26 cells)
 scripts/lab_story_review.py  Lab Book 14 analysis
 scripts/enqueue.py           Redis job queue filler
 scripts/worker.py            Redis experiment worker
 scripts/monitor.py           Redis experiment monitor
-scripts/enqueue_dvs.py       Redis DVS job queue
-scripts/worker_dvs.py        Redis DVS worker (review-augmented)
-scripts/collect_dvs.py       Redis DVS result collector
 ```
 
 ### Assets
@@ -219,7 +199,6 @@ scripts/collect_dvs.py       Redis DVS result collector
 experiments/codebases/               4 seed codebases + 4 bad variants
 experiments/lab_books/lab_story_review.md   Lab Book 14
 experiments/results/stories/         26 story result JSONs
-experiments/results/stories/dvs_summary.json  Aggregate metrics
 experiments/results/lab_story_review.json     Analysis output
 conventions/python.yaml              Python convention rules
 conventions/typescript.yaml          TypeScript convention rules (not yet integrated)

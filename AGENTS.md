@@ -1,80 +1,35 @@
-# AI FinOps Framework — Routing Guide
+# Rules for this project
 
-Calibrated measurement instrument for AI inference costs. 227 stress tests across 8 models.
-Measures **Grit** (Ground-Truth Integrity): correctness under degraded/contradictory input.
+**BEHAVIOR:** Do not analyze, summarize, discuss, or evaluate the project's subject matter (FinOps, AI costs, Grit, perturbation theory, experiments). This is a codebase with Python files. You edit them. You run tests. That's it. Stay quiet about what the project means. If the user asks about FinOps specifically, answer directly and briefly.
 
-## Decision Tree
+**NAVIGATION:** Use mental-model.md for file paths and function signatures. Never read more than 3 source files without checking the module map first. Always offload research to explore subagents.
 
-```
-What are you doing?
-├─ Modifying measurement logic (perturb.py, basin.py, etc.)
-│  └─ Read: src/instrument/CONTEXT.md
-├─ Running experiments against a model
-│  └─ Load skill: instrument
-├─ Analyzing experiment results / generating game reports
-│  └─ Load skill: analyze
-├─ Running a lab book analysis (Grit Matrix, Claude audit, etc.)
-│  └─ Load skill: lab-books
-├─ Working on the public website
-│  └─ Read: firebase/CONTEXT.md
-├─ Understanding experiment configs, results, or review docs
-│  └─ Read: experiments/CONTEXT.md
-├─ Debugging a script (which does what)
-│  └─ Read: scripts/CONTEXT.md
-├─ Running the full data pipeline (inventory → analyze → build)
-│  └─ Read: scripts/CONTEXT.md (inventory.py, analyze_worktrees.py, build_data.py)
-└─ General overview or first visit
-   └─ Read: README.md (the full document)
-```
-
-## Key Glossary
-
-| Term | Meaning |
-|------|---------|
-| **Grit** | Ground-Truth Integrity — correctness maintained under degraded input |
-| **Perturbation** | Deliberate prompt degradation to stress-test model reasoning |
-| **Manifold operators** | Push model off linguistic surface (vocab swap, framing shift, etc.) |
-| **Semantic operators** | Probe reasoning coherence (false premises, contradictions, etc.) |
-| **Basin** | Attractor basin — the solution space a model defaults to. Escape = divergence from baseline. |
-| **Recovery** | Tokens burned returning to familiar patterns after perturbation |
-| **Strategy archetype** | CONSERVATIVE / EXPLORATORY / EFFICIENT / WASTEFUL (from basin + cost + correctness) |
-| **Explanation Tax** | Overhead cost of narrated reasoning (Claude 11% flail + 8% penalty; DeepSeek 8% flail + 0.0% penalty) |
-| **Game Report** | Markdown artifact summarizing a single experiment run's dynamics + cost + quality |
-
-## Data Pipeline
-
-```
-opencode.db ──→ inventory.py refresh          ──→ inventory.json
-       │
-       ├──→ analyze_worktrees.py ──→ _results_summary.json ──┐
-       │         │                                             │
-/tmp/exp_* ──┘   ├──→ reports/*.md (game reports)            │
-                 └──→ reports/*/session.jsonl                 │
-                                       │                      │
-                                       ↓                      ↓
-                          analyze_trajectories.py      build_data.py
-                                       │                      │
-                                       ↓                      ↓
-                          _trajectory_aggregate.json   firebase/public/data.js
-```
-
-## Project Map
-
-| Directory | Contains | CONTEXT |
-|-----------|----------|---------|
-| `src/instrument/` | 21 Python modules — measurement apparatus | `src/instrument/CONTEXT.md` |
-| `scripts/` | 35 Python scripts + 1 `.sh` — runners, analyzers, pipeline, 14 lab books | `scripts/CONTEXT.md` |
-| `experiments/` | 34 YAML configs, results, 13 lab books, 6 reviews | `experiments/CONTEXT.md` |
-| `firebase/` | Public website (8 HTML pages + data.js) | `firebase/CONTEXT.md` |
-| `tests/` | pytest suite for adapter, perturb, pricing, recovery | — |
-| `infrastructure/` | Test suite (4 modules), Docker Compose (Neo4j + ChromaDB) | — |
-| `.opencode/skills/` | 3 opencode skills for common workflows | — |
-
-## Quick Commands
+## Commands
 
 ```bash
-python scripts/run.py --config experiments/configs/<name>.yaml    # Run experiment
-python scripts/analyze_worktrees.py                               # Post-hoc analysis
-python scripts/inventory.py list                                  # List experiments
-python scripts/build_data.py                                      # Build website data.js
+python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek
+python scripts/analyze_worktrees.py
+python scripts/inventory.py refresh
+python scripts/build_data.py
+pytest tests/
+pytest tests/test_<module>.py -v
+firebase deploy --only hosting
 ```
+
+## Key files (read on demand, not preemptively)
+
+- `.opencode/instructions/mental-model.md` — architecture, signatures, module map, dependencies
+- `src/instrument/CONTEXT.md` — instrument module reference
+- `scripts/CONTEXT.md` — script reference
+- `experiments/CONTEXT.md` — experiment ecosystem
+- `firebase/CONTEXT.md` — website documentation
+
+## Skills (load when entering a domain)
+
+- `instrument` — running experiments + measurement pipeline knowledge
+- `analyze` — post-hoc analysis pipeline
+- `lab-books` — lab book analyses
+
+## Conventions
+
+Snake_case functions, PascalCase classes, type hints on public signatures. Deprecated: experiment.py, adapter.py, lab_book.py. Use opencode.py. Update `__init__.py` for new exports. Dataclasses over dicts.

@@ -31,7 +31,7 @@ def find_timed_out_cells() -> list[dict[str, Any]]:
     """Find all timed-out experiment cells."""
     cells = []
     for f in sorted(RESULTS_DIR.glob("*.json")):
-        if "log" in str(f) or "dvs" in str(f):
+        if "log" in str(f):
             continue
         try:
             d = json.loads(f.read_text())

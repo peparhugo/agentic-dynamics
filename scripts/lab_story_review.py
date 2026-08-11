@@ -19,7 +19,7 @@ from instrument.story import load_story_result
 def main():
     results_dir = Path("experiments/results/stories")
     result_files = sorted(results_dir.glob("*.json"))
-    result_files = [f for f in result_files if "log" not in f.name and "dvs" not in f.name]
+    result_files = [f for f in result_files if "log" not in f.name]
 
     cells = []
 

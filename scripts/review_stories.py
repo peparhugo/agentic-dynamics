@@ -21,7 +21,7 @@ def main():
 
     results_dir = Path("experiments/results/stories")
     result_files = sorted(results_dir.glob("*.json"))
-    result_files = [f for f in result_files if "dvs_summary" not in f.name and "log" not in f.parent.name]
+    result_files = [f for f in result_files if "log" not in f.parent.name]
 
     if not result_files:
         print("No story results found.")

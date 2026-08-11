@@ -8,7 +8,6 @@ created: 2026-08-11
 data_sources:
   - experiments/results/stories/*.json
   - experiments/codebases/
-  - experiments/results/stories/dvs_summary.json
 analysis_script: scripts/lab_story_review.py
 reviewer_model: deepseek/deepseek-v4-flash
 model_tested: deepseek/deepseek-v4-pro

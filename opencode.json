@@ -1,0 +1,21 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "deepseek/deepseek-v4-pro",
+  "instructions": [
+    "AGENTS.md"
+  ],
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 15000
+  },
+  "subagent_depth": 2,
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "task": "allow",
+    "external_directory": "allow",
+    "webfetch": "allow",
+    "skill": "allow"
+  }
+}

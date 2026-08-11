@@ -97,12 +97,6 @@ from .codebase_graph import (
     compute_metrics,
     compute_graph_delta,
 )
-from .value_score import (
-    DurableValueScore,
-    compute_dvs,
-    compute_story_dvs,
-    dvs_verdict_to_emoji,
-)
 from .lsp_diagnostics import (
     LSPDiagnostic,
     LSPReport,
@@ -142,8 +136,6 @@ __all__ = [
     "EntropyProfile", "compute_entropy", "entropy_delta", "entropy_delta_detailed",
     "CodebaseGraph", "ModuleNode", "GraphMetrics", "GraphDelta",
     "build_graph", "compute_metrics", "compute_graph_delta",
-    "DurableValueScore", "compute_dvs", "compute_story_dvs",
-    "dvs_verdict_to_emoji",
     "LSPDiagnostic", "LSPReport", "run_diagnostics",
     "diagnostics_delta", "available_tools",
 ]
