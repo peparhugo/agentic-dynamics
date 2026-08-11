@@ -27,6 +27,38 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def find_all_by_owner_paginated(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> dict:
+        limit = max(1, min(limit, 100))
+        with self._get_db() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()[0]
+
+            if cursor is not None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+
+            data = [dict(r) for r in rows]
+            next_cursor = str(data[-1]["id"]) if data and has_more else None
+
+            return {
+                "data": data,
+                "next_cursor": next_cursor,
+                "total": total,
+            }
+
     def find_by_id_and_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._get_db() as conn:
             row = conn.execute(

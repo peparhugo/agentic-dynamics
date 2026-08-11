@@ -14,6 +14,10 @@ try:
 except ImportError:
     send_notification_email = None
 
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
+
 from repositories.task_repository import TaskRepository
 from repositories.user_repository import UserRepository
 
@@ -21,6 +25,35 @@ app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+
+def _get_rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        try:
+            payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return str(payload["user_id"])
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    app=app,
+    key_func=_get_rate_limit_key,
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URL", "redis://localhost:6379"),
+    default_limits=[os.environ.get("RATE_LIMIT", "100 per minute")],
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def _ratelimit_handler(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    if hasattr(e, 'retry_after'):
+        response.headers["Retry-After"] = str(e.retry_after)
+    return response
 
 
 def get_db():
@@ -136,7 +169,11 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repo.find_all_by_owner(request.user_id))
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = max(1, min(limit, 100))
+    result = task_repo.find_all_by_owner_paginated(request.user_id, cursor, limit)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])
