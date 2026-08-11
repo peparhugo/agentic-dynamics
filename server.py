@@ -4,9 +4,10 @@ import os
 import socket
 import sqlite3
 import threading
+import time
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 from websockets.sync.server import ServerConnection, ServerProtocol
@@ -20,6 +21,8 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "chat.db")
 TRANSPORT_TYPE = os.environ.get("TRANSPORT", "websocket")
 BROADCAST_CHANNEL = "chat:message"
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 _server_id = str(uuid.uuid4())
 
@@ -219,6 +222,8 @@ _redis_failed = False
 _redis_init_lock = threading.Lock()
 _redis_ready = threading.Event()
 _db_lock = threading.Lock()
+_rate_limit_store = {}
+_rate_limit_lock = threading.Lock()
 
 _transport = None
 
@@ -250,6 +255,31 @@ def _save_message(channel, msg_type, payload, timestamp):
         conn.close()
 
 
+def _check_rate_limit(client_id):
+    r = _get_redis()
+    minute_key = int(datetime.now(timezone.utc).timestamp() // 60)
+
+    if r is not None:
+        redis_key = f"ratelimit:{client_id}:{minute_key}"
+        try:
+            current = r.incr(redis_key)
+            if current == 1:
+                r.expire(redis_key, 120)
+            return current > RATE_LIMIT
+        except Exception:
+            pass
+
+    mem_key = f"{client_id}:{minute_key}"
+    with _rate_limit_lock:
+        current = _rate_limit_store.get(mem_key, 0) + 1
+        _rate_limit_store[mem_key] = current
+        if len(_rate_limit_store) > 10000:
+            stale = [k for k in _rate_limit_store if not k.endswith(f":{minute_key}")]
+            for k in stale:
+                del _rate_limit_store[k]
+        return current > RATE_LIMIT
+
+
 def get_messages(limit=50, offset=0):
     with _db_lock:
         conn = sqlite3.connect(DATABASE_URL)
@@ -268,6 +298,43 @@ def get_messages(limit=50, offset=0):
             pass
         result.append(d)
     return result
+
+
+def get_history(channel=None, since=None, limit=50):
+    with _db_lock:
+        conn = sqlite3.connect(DATABASE_URL)
+        conn.row_factory = sqlite3.Row
+
+        query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE 1=1"
+        params = []
+
+        if channel:
+            query += " AND channel = ?"
+            params.append(channel)
+
+        if since:
+            query += " AND timestamp >= ?"
+            params.append(since)
+
+        query += " ORDER BY timestamp ASC LIMIT ?"
+        params.append(limit + 1)
+
+        rows = conn.execute(query, params).fetchall()
+        conn.close()
+
+    has_more = len(rows) > limit
+    result_rows = rows[:limit]
+
+    messages = []
+    for row in result_rows:
+        d = dict(row)
+        try:
+            d["payload"] = json.loads(d["payload"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+        messages.append(d)
+
+    return {"messages": messages, "has_more": has_more}
 
 
 def _get_redis():
@@ -394,6 +461,26 @@ def _start_redis_subscriber():
     return t
 
 
+def _cleanup_expired_messages():
+    while True:
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=MESSAGE_TTL_DAYS)).isoformat()
+            with _db_lock:
+                conn = sqlite3.connect(DATABASE_URL)
+                conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+                conn.commit()
+                conn.close()
+        except Exception:
+            pass
+        time.sleep(3600)
+
+
+def _start_cleanup():
+    t = threading.Thread(target=_cleanup_expired_messages, name="msg-cleanup", daemon=True)
+    t.start()
+    return t
+
+
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
@@ -426,6 +513,13 @@ def _on_client_connect(client_id, ws):
 
         msg_type = data.get("type", "broadcast")
         payload = data.get("payload", {})
+
+        if _check_rate_limit(client_id):
+            _transport.send_message(client_id, json.dumps({
+                "type": "error",
+                "payload": {"message": f"Rate limit exceeded. Max {RATE_LIMIT} messages per minute."}
+            }))
+            continue
 
         if msg_type == "subscribe":
             channel = payload.get("channel")
@@ -527,10 +621,19 @@ async def messages_handler(request):
     return web.json_response(messages)
 
 
+async def history_handler(request):
+    channel = request.query.get("channel")
+    since = request.query.get("since")
+    limit = int(request.query.get("limit", "50"))
+    data = get_history(channel=channel, since=since, limit=limit)
+    return web.json_response(data)
+
+
 def start_server(host="0.0.0.0", ws_port=8765, http_port=8080):
     _init_transport()
     _init_db()
     _start_redis_subscriber()
+    _start_cleanup()
 
     ws_thread = _transport.start(host, ws_port)
 
@@ -540,6 +643,7 @@ def start_server(host="0.0.0.0", ws_port=8765, http_port=8080):
         app_.router.add_get("/channels", channels_handler)
         app_.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
         app_.router.add_get("/messages", messages_handler)
+        app_.router.add_get("/history", history_handler)
         runner = web.AppRunner(app_)
         await runner.setup()
         site = web.TCPSite(runner, host, http_port)

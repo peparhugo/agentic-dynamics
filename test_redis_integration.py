@@ -61,6 +61,8 @@ def redis_server():
 def reset_state():
     server_module._registry.clear()
     server_module._channels.clear()
+    with server_module._rate_limit_lock:
+        server_module._rate_limit_store.clear()
     with server_module._db_lock:
         import sqlite3
         conn = sqlite3.connect(server_module.DATABASE_URL)
