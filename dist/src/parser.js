@@ -17,6 +17,8 @@ function parseMarkdownFile(filePath) {
         title: data.title,
         date: data.date instanceof Date ? data.date.toISOString().slice(0, 10) : data.date != null ? String(data.date) : undefined,
         tags: data.tags,
+        template: data.template,
+        layout: data.layout,
     };
     if (!frontmatter.title) {
         throw new Error(`Missing required frontmatter field "title" in ${filePath}`);

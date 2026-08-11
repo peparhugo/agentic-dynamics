@@ -10,7 +10,10 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
 }
-function generatePageHtml(page) {
+function generatePageHtml(page, engine) {
+    if (engine) {
+        return engine.renderPage(page);
+    }
     const { title, date, tags } = page.frontmatter;
     const dateStr = date || '';
     const tagsStr = tags ? tags.map((t) => escapeHtml(t)).join(', ') : '';
@@ -36,7 +39,10 @@ function generatePageHtml(page) {
 </body>
 </html>`;
 }
-function generateIndexHtml(pages) {
+function generateIndexHtml(pages, engine) {
+    if (engine) {
+        return engine.renderIndex(pages);
+    }
     const items = pages
         .map((page) => {
         const { title, date, tags } = page.frontmatter;
