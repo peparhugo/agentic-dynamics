@@ -1,5 +1,5 @@
 {
-  "version": "0.6.0",
+  "version": "0.9.0",
   "description": "Pre-seeded codebases for multi-session experiment stories.",
   "languages": ["python", "typescript", "go", "rust"],
   "tiers": [
@@ -10,7 +10,7 @@
   ],
   "qualities": {
     "good": "Well-architected fork with clean seams",
-    "bad": "Flash V4-degraded variant with deliberate technical debt"
+    "bad": "Flash V4-degraded variant with deliberate technical debt (generated via generators/build.py)"
   },
   "entries": [
     {
@@ -19,7 +19,16 @@
       "quality": "good",
       "path": "python/tier1_minimal/good",
       "seed": "Single-file Flask Todo API",
-      "loc": 105,
+      "loc": 129,
+      "files": 1
+    },
+    {
+      "language": "python",
+      "tier": "tier2_small",
+      "quality": "good",
+      "path": "python/tier2_small/good",
+      "seed": "Multi-file Flask Auth API with Blueprints and JWT",
+      "loc": 210,
       "files": 1
     },
     {
@@ -28,8 +37,57 @@
       "quality": "good",
       "path": "typescript/tier1_minimal/good",
       "seed": "Single-file Express Todo API",
-      "loc": 98,
+      "loc": 94,
       "files": 1
+    },
+    {
+      "language": "typescript",
+      "tier": "tier2_small",
+      "quality": "good",
+      "path": "typescript/tier2_small/good",
+      "seed": "NestJS-style Express Auth API with JWT",
+      "loc": 210,
+      "files": 1
+    },
+    {
+      "language": "python",
+      "tier": "tier1_minimal",
+      "quality": "bad",
+      "path": "python/tier1_minimal/bad",
+      "seed": "Flash V4 degraded variant of tier1_minimal/good",
+      "loc": 0,
+      "files": 0,
+      "note": "Generate with: python experiments/codebases/generators/build.py python --tier tier1_minimal --apply"
+    },
+    {
+      "language": "python",
+      "tier": "tier2_small",
+      "quality": "bad",
+      "path": "python/tier2_small/bad",
+      "seed": "Flash V4 degraded variant of tier2_small/good",
+      "loc": 0,
+      "files": 0,
+      "note": "Generate with: python experiments/codebases/generators/build.py python --tier tier2_small --apply"
+    },
+    {
+      "language": "typescript",
+      "tier": "tier1_minimal",
+      "quality": "bad",
+      "path": "typescript/tier1_minimal/bad",
+      "seed": "Flash V4 degraded variant of tier1_minimal/good",
+      "loc": 0,
+      "files": 0,
+      "note": "Generate with: python experiments/codebases/generators/build.py typescript --tier tier1_minimal --apply"
+    },
+    {
+      "language": "typescript",
+      "tier": "tier2_small",
+      "quality": "bad",
+      "path": "typescript/tier2_small/bad",
+      "seed": "Flash V4 degraded variant of tier2_small/good",
+      "loc": 0,
+      "files": 0,
+      "note": "Generate with: python experiments/codebases/generators/build.py typescript --tier tier2_small --apply"
     }
   ]
 }

@@ -34,6 +34,24 @@
 - [x] Convention rule files — `conventions/python.yaml`, `conventions/typescript.yaml`
 - [x] CI updated to 14 test modules, 156 tests
 
+**v0.6 + v0.7 + v0.8 COMPLETE — all libraries built.**
+
+### v0.9 — DeepSeek-Only Pipeline Validation ← ACTIVE
+**Sessions:** 30 cells × 5 = 150  |  **Cost:** ~$3
+
+**Strategy:** Prove full pipeline on DeepSeek first before spending on Luna (~$1.50) or Claude (~$99).
+
+- [ ] PerturbationCondition enum + condition_to_mutations() in story.py
+- [ ] run_story.py CLI: --condition, --codebase-quality flags
+- [ ] notification_service story (3rd built-in)
+- [ ] Bad codebase variants (Flash V4 → review → commit)
+- [ ] tier2_small seed codebases (Python + TypeScript)
+
+### v1.0 — Full Multi-Model Experiment (After Pipeline Validated)
+**Models:** DeepSeek V4 Pro, GPT-5.6 Luna, Claude Sonnet 5
+**Sessions:** 90 cells × 5 = 450  |  **Cost:** ~$104
+**Note:** Other models added incrementally after DeepSeek pipeline proven.
+
 ---
 
 ## Part 1: Current State (v0.5)

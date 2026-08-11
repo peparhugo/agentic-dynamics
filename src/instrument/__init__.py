@@ -63,6 +63,8 @@ from .story import (
     save_story_result,
     load_story_result,
     BUILTIN_STORIES,
+    PerturbationCondition,
+    condition_to_mutations,
 )
 from .commit_analysis import (
     CommitAnalysis,
@@ -132,6 +134,7 @@ __all__ = [
     "ALL_OPERATORS", "SPECIFICATION_OPERATORS", "CODEBASE_OPERATORS",
     "StoryConfig", "StoryResult", "SessionSpec", "SessionResult",
     "run_story", "save_story_result", "load_story_result", "BUILTIN_STORIES",
+    "PerturbationCondition", "condition_to_mutations",
     "CommitAnalysis", "StoryAnalysis", "analyze_commit",
     "analyze_story_worktree", "compute_ast_diff", "score_conventions",
     "CommitReview", "StoryReview", "review_commit", "review_story",

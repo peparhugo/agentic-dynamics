@@ -16,6 +16,9 @@ from instrument.story import (
     BUILTIN_STORIES,
     task_manager_story,
     static_site_gen_story,
+    notification_service_story,
+    PerturbationCondition,
+    condition_to_mutations,
     _prepare_worktree,
     _git,
     _detect_or_use,
@@ -239,3 +242,89 @@ def test_run_story_validates_sessions():
     config = StoryConfig(name="empty", sessions=[])
     with pytest.raises(ValueError, match="no sessions"):
         run_story(config, codebase_path="/tmp")
+
+
+class TestPerturbationCondition:
+    def test_clean_returns_no_mutations(self):
+        cm, sm = condition_to_mutations(
+            PerturbationCondition.CLEAN,
+            Path("."),
+            ["spec1", "spec2"],
+        )
+        assert cm is None
+        assert sm == {}
+
+    def test_early_degrade_returns_session1_mutation(self):
+        cm, sm = condition_to_mutations(
+            PerturbationCondition.EARLY_DEGRADE,
+            Path("."),
+            ["build api", "add auth"],
+        )
+        assert cm is None
+        assert 1 in sm
+
+    def test_early_degrade_empty_specs(self):
+        cm, sm = condition_to_mutations(
+            PerturbationCondition.EARLY_DEGRADE,
+            Path("."),
+            [],
+        )
+        assert cm is None
+        assert sm == {}
+
+    def test_bad_seed_nonexistent_path(self):
+        cm, sm = condition_to_mutations(
+            PerturbationCondition.BAD_SEED,
+            Path("/nonexistent/path/xyz"),
+            [],
+        )
+        assert cm is None
+
+    def test_all_conditions_are_strings(self):
+        for cond in PerturbationCondition:
+            assert isinstance(cond.value, str)
+
+    def test_story_result_tracks_condition(self):
+        result = StoryResult(
+            story_name="test",
+            perturbation_condition="bad_seed",
+        )
+        assert result.perturbation_condition == "bad_seed"
+
+    def test_cascade_recovery_none_with_few_sessions(self):
+        result = StoryResult(
+            story_name="test",
+            sessions=[SessionResult(1, "greenfield", "A")],
+        )
+        assert result.cascade_recovery is None
+
+    def test_cascade_recovery_with_improvement(self):
+        from instrument.opencode import AgenticResult
+        s1 = SessionResult(1, "greenfield", "A")
+        s1.agentic = AgenticResult(tests_passed=2, tests_total=10)  # 0.2
+        s2 = SessionResult(2, "refactor", "B")
+        s2.agentic = AgenticResult(tests_passed=8, tests_total=10)  # 0.8
+        result = StoryResult(
+            story_name="test",
+            sessions=[s1, s2],
+        )
+        assert result.cascade_recovery is True
+
+
+class TestNotificationStory:
+    def test_exists_in_builtins(self):
+        assert "notification_service" in BUILTIN_STORIES
+
+    def test_has_five_sessions(self):
+        story = notification_service_story()
+        assert len(story.sessions) == 5
+
+    def test_session_types(self):
+        story = notification_service_story()
+        types = [s.task_type for s in story.sessions]
+        assert types == ["greenfield", "feature_addition", "integration", "refactor", "cross_cutting"]
+
+    def test_all_prompts_are_substantial(self):
+        story = notification_service_story()
+        for s in story.sessions:
+            assert len(s.prompt) > 100, f"Session {s.session_number} prompt too short"

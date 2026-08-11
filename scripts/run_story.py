@@ -1,9 +1,11 @@
 """Story runner CLI — run multi-session experiment stories.
 
 Usage:
-    python scripts/run_story.py task_manager_api --model deepseek/deepseek-v4-pro
-    python scripts/run_story.py static_site_gen --model anthropic/claude-fable-5 --mutation inject_bug --strength 0.5
-    python scripts/run_story.py --list  # List available stories
+    python scripts/run_story.py task_manager_api
+    python scripts/run_story.py task_manager_api --condition bad_seed
+    python scripts/run_story.py static_site_gen --codebase-quality bad
+    python scripts/run_story.py notification_service --tier tier2_small
+    python scripts/run_story.py --list
 """
 
 import argparse
@@ -17,8 +19,21 @@ from instrument.story import (
     StoryConfig,
     run_story,
     save_story_result,
+    PerturbationCondition,
 )
 from instrument.mutation import compile_mutation
+
+# Default codebase mappings for --codebase-quality shortcut
+_CODEBASE_MAP = {
+    ("python", "tier1_minimal", "good"): "experiments/codebases/python/tier1_minimal/good",
+    ("python", "tier1_minimal", "bad"): "experiments/codebases/python/tier1_minimal/bad",
+    ("python", "tier2_small", "good"): "experiments/codebases/python/tier2_small/good",
+    ("python", "tier2_small", "bad"): "experiments/codebases/python/tier2_small/bad",
+    ("typescript", "tier1_minimal", "good"): "experiments/codebases/typescript/tier1_minimal/good",
+    ("typescript", "tier1_minimal", "bad"): "experiments/codebases/typescript/tier1_minimal/bad",
+    ("typescript", "tier2_small", "good"): "experiments/codebases/typescript/tier2_small/good",
+    ("typescript", "tier2_small", "bad"): "experiments/codebases/typescript/tier2_small/bad",
+}
 
 
 def main():
@@ -28,7 +43,7 @@ def main():
     parser.add_argument(
         "story",
         nargs="?",
-        help="Story name (task_manager_api, static_site_gen) or path to YAML",
+        help="Story name (task_manager_api, static_site_gen, notification_service) or path to YAML",
     )
     parser.add_argument(
         "--list", action="store_true", help="List available built-in stories"
@@ -38,16 +53,25 @@ def main():
     )
     parser.add_argument(
         "--codebase",
-        default="experiments/codebases/python/tier1_minimal/good",
-        help="Path to seed codebase",
-    )
-    parser.add_argument(
-        "--mutation",
         default=None,
-        help="Perturbation operator to apply (e.g. inject_bug, remove_constraint)",
+        help="Path to seed codebase (overrides --codebase-quality and --tier)",
     )
     parser.add_argument(
-        "--strength", type=float, default=0.5, help="Mutation strength (0.0-1.0)"
+        "--codebase-quality",
+        choices=["good", "bad"],
+        default="good",
+        help="Codebase quality: good (clean) or bad (Flash V4 degraded)",
+    )
+    parser.add_argument(
+        "--tier",
+        default="tier1_minimal",
+        help="Codebase tier: tier1_minimal or tier2_small",
+    )
+    parser.add_argument(
+        "--condition",
+        choices=["clean", "bad_seed", "early_degrade"],
+        default="clean",
+        help="Perturbation condition",
     )
     parser.add_argument(
         "--timeout", type=int, default=600, help="Per-session timeout in seconds"
@@ -95,29 +119,34 @@ def main():
         print(f"Available: {list(BUILTIN_STORIES)}")
         sys.exit(1)
 
-    # Compile mutation if requested
-    mutation = None
-    if args.mutation:
-        print(f"Compiling mutation: {args.mutation} (strength={args.strength})...")
-        mutation = compile_mutation(
-            specification=story.sessions[0].prompt if story.sessions else "",
-            operator=args.mutation,
-            strength=args.strength,
-            codebase_path=Path(args.codebase) if Path(args.codebase).exists() else None,
-        )
-        print(f"  Mutation ID: {mutation.mutation_id}")
+    # Resolve codebase path
+    if args.codebase:
+        codebase_path = args.codebase
+    else:
+        key = (story.language, args.tier, args.codebase_quality)
+        codebase_path = _CODEBASE_MAP.get(key)
+        if codebase_path is None:
+            print(f"No codebase mapping for {key}")
+            print(f"Use --codebase to specify path manually")
+            sys.exit(1)
+        if not Path(codebase_path).exists():
+            print(f"Codebase not found: {codebase_path}")
+            print(f"Use --codebase to specify path or generate the missing codebase")
+            sys.exit(1)
 
-    print(f"\nStory: {story.name} ({len(story.sessions)} sessions)")
+    condition = PerturbationCondition(args.condition)
+
+    print(f"\nStory: {story.name} ({len(story.sessions)} sessions, {story.language})")
     print(f"Model: {args.model}")
-    print(f"Codebase: {args.codebase}")
-    print(f"Mutation: {args.mutation or 'none'}")
+    print(f"Codebase: {codebase_path} ({args.codebase_quality}, {args.tier})")
+    print(f"Condition: {condition.value}")
     print(f"{'='*60}")
 
     result = run_story(
         story,
-        codebase_path=args.codebase,
+        codebase_path=codebase_path,
         model=args.model,
-        mutation=mutation,
+        condition=condition,
         worktree_root=args.worktree_root,
         timeout=args.timeout,
         thinking_budget_tokens=args.thinking_budget,
@@ -129,16 +158,18 @@ def main():
     results_dir = Path(args.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
     model_slug = args.model.replace("/", "_").replace(" ", "_")
-    out_path = results_dir / f"{story.name}_{model_slug}_{result.story_id}.json"
+    out_path = results_dir / f"{story.name}_{model_slug}_{condition.value}_{result.story_id}.json"
     save_story_result(result, out_path)
 
     print(f"\n{'='*60}")
     print(f"Story complete: {story.name}")
-    print(f"  Sessions: {result.session_count}")
+    print(f"  Condition: {condition.value}")
+    print(f"  Sessions: {result.session_count}  |  All successful: {result.all_successful}")
     print(f"  Total cost: ${result.total_cost:.4f}")
     print(f"  Total tokens: {result.total_tokens:,}")
     print(f"  Duration: {result.total_duration:.1f}s")
-    print(f"  All successful: {result.all_successful}")
+    if result.cascade_recovery is not None:
+        print(f"  Cascade recovery: {'yes' if result.cascade_recovery else 'no'}")
     print(f"  Results: {out_path}")
     if result.error:
         print(f"  ERROR: {result.error}")

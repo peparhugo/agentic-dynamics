@@ -18,6 +18,7 @@ import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,99 @@ import yaml
 
 from .opencode import run_opencode_agentic, AgenticResult
 from .language import detect_language, parse_codebase, LanguageProfile
-from .mutation import MutationArtifact, apply_mutation
+from .mutation import MutationArtifact, apply_mutation, compile_mutation, CODEBASE_OPERATORS, SPECIFICATION_OPERATORS
+
+
+# ── Perturbation Condition ─────────────────────────────────────
+
+class PerturbationCondition(str, Enum):
+    """Experimental conditions for perturbing multi-session stories."""
+    CLEAN = "clean"                  # No mutation, no codebase degradation
+    BAD_SEED = "bad_seed"            # Codebase degraded before session 1
+    EARLY_DEGRADE = "early_degrade"  # Session 1 spec corrupted only
+    LATE_DEGRADE = "late_degrade"    # Session 4 spec corrupted only (v1.5)
+
+
+def condition_to_mutations(
+    condition: PerturbationCondition,
+    codebase_path: Path,
+    story_specs: list[str],
+    *,
+    compiler_model: str = "deepseek/deepseek-v4-flash",
+    cache_dir: Path | None = None,
+) -> tuple[MutationArtifact | None, dict[int, MutationArtifact]]:
+    """Map a perturbation condition to specific mutations.
+
+    Args:
+        condition: Experimental condition.
+        codebase_path: Path to seed codebase (for BAD_SEED).
+        story_specs: Session prompts in order (for EARLY/LATE degrades).
+        compiler_model: Model for mutation compilation.
+        cache_dir: Optional cache directory for compiled artifacts.
+
+    Returns:
+        (codebase_mutation, {session_number: spec_mutation})
+        - codebase_mutation: applied once before session 1
+        - spec_mutations: applied to specific sessions
+
+    Examples:
+        >>> condition_to_mutations(CLEAN, Path("."), [])
+        (None, {})
+        >>> cm, sm = condition_to_mutations(EARLY_DEGRADE, Path("."), ["build api", "add auth"])
+        >>> cm is None, 1 in sm
+        (True, True)
+    """
+    cache = cache_dir or Path("experiments/codebases/.mutation_cache")
+    cache.mkdir(parents=True, exist_ok=True)
+
+    if condition == PerturbationCondition.CLEAN:
+        return None, {}
+
+    if condition == PerturbationCondition.BAD_SEED:
+        if not codebase_path.exists():
+            return None, {}
+        ops = ["introduce_coupling", "scatter_logic", "break_convention"]
+        artifacts: list[MutationArtifact] = []
+        for op in ops:
+            artifact = compile_mutation(
+                specification=f"Degrade the codebase architecture.",
+                operator=op,
+                strength=0.5,
+                codebase_path=codebase_path,
+                model=compiler_model,
+                cache_dir=cache,
+            )
+            if artifact.would_produce_changes():
+                artifacts.append(artifact)
+        # Combine multiple codebase mutations for application
+        # Return the first one that actually compiles; apply sequentially
+        return (artifacts[0] if artifacts else None), {}
+
+    if condition == PerturbationCondition.EARLY_DEGRADE:
+        if not story_specs:
+            return None, {}
+        artifact = compile_mutation(
+            specification=story_specs[0],
+            operator="inject_false_premise",
+            strength=0.5,
+            model=compiler_model,
+            cache_dir=cache,
+        )
+        return None, {1: artifact}
+
+    if condition == PerturbationCondition.LATE_DEGRADE:
+        if len(story_specs) < 4:
+            return None, {}
+        artifact = compile_mutation(
+            specification=story_specs[3],  # Session 4 (0-indexed)
+            operator="remove_constraint",
+            strength=0.5,
+            model=compiler_model,
+            cache_dir=cache,
+        )
+        return None, {4: artifact}
+
+    return None, {}
 
 
 # ── Data Structures ────────────────────────────────────────────
@@ -154,6 +247,7 @@ class StoryResult:
     language: str = ""
     model: str = ""
     mutation_id: str = ""
+    perturbation_condition: str = ""
     started_at: str = ""
     completed_at: str = ""
     worktree: str = ""
@@ -179,6 +273,30 @@ class StoryResult:
     @property
     def all_successful(self) -> bool:
         return all(s.exit_code == 0 for s in self.sessions)
+
+    @property
+    def cascade_recovery(self) -> bool | None:
+        """If session 1 had low correctness, did later sessions recover?
+
+        Returns True if correctness improved from session 1 to last session.
+        Returns False if it degraded or stayed the same.
+        Returns None if no cascade data available.
+        """
+        if len(self.sessions) < 2:
+            return None
+        first = self.sessions[0]
+        last = self.sessions[-1]
+        if first.agentic is None or last.agentic is None:
+            return None
+        first_correctness = first.agentic.correctness
+        last_correctness = last.agentic.correctness
+        if first_correctness >= last_correctness:
+            return False
+        # Find the session where correctness stabilized
+        for i, s in enumerate(self.sessions):
+            if s.agentic and s.agentic.correctness > first_correctness:
+                return True
+        return None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -210,6 +328,7 @@ def run_story(
     *,
     codebase_path: str,
     model: str = "deepseek/deepseek-v4-pro",
+    condition: PerturbationCondition = PerturbationCondition.CLEAN,
     mutation: MutationArtifact | None = None,
     worktree_root: str = "/tmp",
     timeout: int = 600,
@@ -221,14 +340,15 @@ def run_story(
 ) -> StoryResult:
     """Run a complete multi-session story.
 
-    Creates an isolated worktree, clones the codebase, applies mutation,
+    Creates an isolated worktree, clones the codebase, applies condition,
     then runs each session sequentially with git commits between sessions.
 
     Args:
         story: StoryConfig defining session sequence and prompts.
         codebase_path: Path to the seed codebase to clone.
         model: Model ID for all sessions.
-        mutation: Optional MutationArtifact to apply before session 1.
+        condition: PerturbationCondition to apply.
+        mutation: Optional explicit MutationArtifact (overrides condition).
         worktree_root: Parent directory for isolated worktrees.
         timeout: Per-session timeout in seconds.
         thinking_budget_tokens: Token budget for reasoning.
@@ -244,12 +364,25 @@ def run_story(
         raise ValueError(f"Story '{story.name}' has no sessions defined")
 
     story_id = hashlib.sha256(
-        f"{story.name}|{model}|{codebase_path}|{time.monotonic()}".encode()
+        f"{story.name}|{model}|{codebase_path}|{condition.value}|{time.monotonic()}".encode()
     ).hexdigest()[:12]
 
     worktree = Path(worktree_root) / f"story_{story_id}"
     if worktree.exists():
         shutil.rmtree(worktree)
+
+    # Resolve condition to mutations
+    codebase_path_obj = Path(codebase_path)
+    story_specs = [s.prompt for s in story.sessions]
+    if mutation is None and condition != PerturbationCondition.CLEAN:
+        codebase_mutation, spec_mutations = condition_to_mutations(
+            condition,
+            codebase_path_obj,
+            story_specs,
+        )
+    else:
+        codebase_mutation = None
+        spec_mutations = {}
 
     result = StoryResult(
         story_name=story.name,
@@ -257,18 +390,31 @@ def run_story(
         codebase_path=codebase_path,
         language=story.language,
         model=model,
-        mutation_id=mutation.mutation_id if mutation else "",
+        mutation_id="",
+        perturbation_condition=condition.value,
         started_at=datetime.now(timezone.utc).isoformat(),
         worktree=str(worktree),
     )
 
     try:
-        _prepare_worktree(codebase_path, worktree, mutation)
+        _prepare_worktree(codebase_path, worktree, codebase_mutation)
         result.language = _detect_or_use(worktree, story.language)
 
         for spec in story.sessions:
+            # Check if this session has a spec-level mutation
+            session_mutation = spec_mutations.get(spec.session_number)
+            session_prompt = spec.prompt
+            if session_mutation and session_mutation.mutated_spec:
+                session_prompt = session_mutation.mutated_spec
+                result.mutation_id = session_mutation.mutation_id
+
             session_result = _run_session(
-                spec=spec,
+                spec=SessionSpec(
+                    session_number=spec.session_number,
+                    task_type=spec.task_type,
+                    prompt=session_prompt,
+                    description=spec.description,
+                ),
                 worktree=worktree,
                 model=model,
                 session_name=f"[{story.name}] Session {spec.session_number}: {spec.task_type}",
@@ -715,7 +861,146 @@ def static_site_gen_story() -> StoryConfig:
     )
 
 
+def notification_service_story() -> StoryConfig:
+    """A 5-session story building a real-time notification delivery service.
+
+    Session 1: Core WebSocket server + client (greenfield)
+    Session 2: Channel subscriptions + message routing (feature addition)
+    Session 3: Redis pub/sub integration (integration)
+    Session 4: Extract protocol layer (refactor)
+    Session 5: Rate limiting + message persistence (cross-cutting)
+    """
+    return StoryConfig(
+        name="notification_service",
+        description="Build a real-time notification delivery service across 5 sessions",
+        language="python",
+        constraints=[
+            "All communication via WebSocket",
+            "Use Redis for pub/sub and rate limiting",
+            "SQLite for message persistence",
+        ],
+        sessions=[
+            SessionSpec(
+                session_number=1,
+                task_type="greenfield",
+                description="Core WebSocket server with broadcast",
+                prompt=(
+                    "Build a WebSocket-based notification server in Python.\n\n"
+                    "CORE FEATURES:\n"
+                    "- Accept WebSocket connections from clients\n"
+                    "- Assign each client a unique ID on connect\n"
+                    "- Broadcast a message to ALL connected clients\n"
+                    "- Handle client disconnect (clean removal)\n"
+                    "- REST endpoint: GET /health — returns connected client count\n\n"
+                    "MESSAGE FORMAT:\n"
+                    "- All messages are JSON: {type: str, payload: dict, timestamp: str}\n"
+                    "- Supported types: 'broadcast', 'direct', 'system'\n\n"
+                    "TECH:\n"
+                    "- Use websockets library (not Flask-SocketIO)\n"
+                    "- Async with asyncio\n"
+                    "- Thread-safe client registry\n"
+                    "- Tests with pytest + pytest-asyncio\n\n"
+                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                ),
+            ),
+            SessionSpec(
+                session_number=2,
+                task_type="feature_addition",
+                description="Channel subscriptions and targeted routing",
+                prompt=(
+                    "Add channel-based subscriptions to the notification server.\n\n"
+                    "CHANNELS:\n"
+                    "- Clients subscribe to named channels (e.g. 'alerts', 'system', 'chat')\n"
+                    "- Messages are delivered ONLY to clients subscribed to that channel\n"
+                    "- Clients can subscribe/unsubscribe dynamically\n"
+                    "- A client can be subscribed to multiple channels\n\n"
+                    "MESSAGE TYPES:\n"
+                    "- Add 'subscribe' and 'unsubscribe' message types\n"
+                    "- Messages with a 'channel' field route only to that channel's subscribers\n"
+                    "- Messages without a channel still broadcast to all\n\n"
+                    "REST ENDPOINTS:\n"
+                    "- GET /channels — list active channels and subscriber counts\n"
+                    "- GET /channels/{name}/subscribers — list subscriber IDs\n\n"
+                    "DO NOT BREAK existing functionality. All tests must pass.\n\n"
+                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                ),
+            ),
+            SessionSpec(
+                session_number=3,
+                task_type="integration",
+                description="Redis pub/sub message backbone",
+                prompt=(
+                    "Integrate Redis pub/sub as the message backbone.\n\n"
+                    "REDIS INTEGRATION:\n"
+                    "- Use Redis pub/sub channels for message distribution\n"
+                    "- Server publishes to Redis channel; workers subscribe and deliver\n"
+                    "- Multiple server instances can share the same Redis backbone\n"
+                    "- Client connection state stored in Redis (survives server restart)\n\n"
+                    "PERSISTENCE:\n"
+                    "- Store all messages in SQLite for history\n"
+                    "- REST endpoint: GET /messages?limit=50&offset=0\n"
+                    "- Messages table: id, channel, type, payload, timestamp\n\n"
+                    "CONFIG:\n"
+                    "- REDIS_URL env var for broker connection\n"
+                    "- DATABASE_URL env var for SQLite path\n\n"
+                    "DO NOT BREAK existing behavior. All tests must pass.\n"
+                    "Add integration tests for Redis pub/sub and message persistence.\n\n"
+                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                ),
+            ),
+            SessionSpec(
+                session_number=4,
+                task_type="refactor",
+                description="Extract protocol layer into pluggable transports",
+                prompt=(
+                    "Refactor the notification server to use a pluggable transport layer.\n\n"
+                    "REQUIREMENT:\n"
+                    "Extract the WebSocket transport behind a Transport interface so\n"
+                    "different transport mechanisms (SSE, polling, raw TCP) can be added\n"
+                    "without modifying the core notification logic.\n\n"
+                    "IMPLEMENTATION:\n"
+                    "- Create BaseTransport abstract class:\n"
+                    "  - on_connect(), on_disconnect(), send_message(), broadcast()\n"
+                    "- Move WebSocket logic into WebSocketTransport\n"
+                    "- The core NotificationServer should work with any Transport\n"
+                    "- Transport is selected by config (TRANSPORT env var)\n"
+                    "- WebSocketTransport is the default\n\n"
+                    "API MUST remain identical. All existing tests must pass without\n"
+                    "modification. Client behavior must not change.\n\n"
+                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                ),
+            ),
+            SessionSpec(
+                session_number=5,
+                task_type="cross_cutting",
+                description="Rate limiting + persistent message history",
+                prompt=(
+                    "Add rate limiting and persistent message history.\n\n"
+                    "RATE LIMITING:\n"
+                    "- Limit each client to 100 messages per minute\n"
+                    "- Limits enforced per-client-ID using Redis counters\n"
+                    "- Return error message on rate limit exceeded (no drop)\n"
+                    "- Configurable via RATE_LIMIT env var\n\n"
+                    "MESSAGE HISTORY:\n"
+                    "- REST endpoint: GET /history?channel=X&since=ISO_TIMESTAMP&limit=50\n"
+                    "- Returns messages for a specific channel/time range\n"
+                    "- Paginated with has_more boolean\n"
+                    "- Messages returned in chronological order\n\n"
+                    "SYSTEM MESSAGE EXPIRY:\n"
+                    "- Messages older than 7 days are automatically cleaned up\n"
+                    "- Cleanup runs as a background task on server startup\n"
+                    "- Configurable via MESSAGE_TTL_DAYS env var\n\n"
+                    "DO NOT BREAK existing functionality. All tests must pass.\n"
+                    "Add tests for rate limiting, history queries, and expiry cleanup.\n\n"
+                    "Write ALL code. Run pytest. Fix failures until all tests pass."
+                ),
+            ),
+        ],
+    )
+
+
 BUILTIN_STORIES: dict[str, StoryConfig] = {
     "task_manager_api": task_manager_story(),
     "static_site_gen": static_site_gen_story(),
+    "notification_service": notification_service_story(),
 }
