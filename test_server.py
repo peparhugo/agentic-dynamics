@@ -1,25 +1,51 @@
+import os
+import tempfile
+
+_temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False, prefix="test_chat_")
+_temp_db_path = _temp_db.name
+_temp_db.close()
+os.environ["DATABASE_URL"] = _temp_db_path
+
 import asyncio
 import json
+import sqlite3
 import time
 
 import pytest
 import websockets
 from aiohttp import ClientSession
 
-from server import start_server, _registry, _channels
+from server import (
+    DATABASE_URL,
+    _channels,
+    _db_lock,
+    _registry,
+    get_messages,
+    start_server,
+)
 
 HOST = "127.0.0.1"
 WS_PORT = 18765
 HTTP_PORT = 18080
 
 
+def _clear_messages_table():
+    with _db_lock:
+        conn = sqlite3.connect(DATABASE_URL)
+        conn.execute("DELETE FROM messages")
+        conn.commit()
+        conn.close()
+
+
 @pytest.fixture(autouse=True)
 def reset_registry():
     _registry.clear()
     _channels.clear()
+    _clear_messages_table()
     yield
     _registry.clear()
     _channels.clear()
+    _clear_messages_table()
 
 
 @pytest.fixture(scope="module")
@@ -469,3 +495,150 @@ class TestChannelBroadcast:
 
             with pytest.raises(asyncio.TimeoutError):
                 await asyncio.wait_for(ws2.recv(), timeout=0.5)
+
+
+class TestMessagePersistence:
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_returns_empty_when_no_messages(self, server):
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=0"
+            ) as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data == []
+
+    @pytest.mark.asyncio
+    async def test_broadcast_message_is_persisted(self, server):
+        async with websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws1, \
+                   websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws2:
+            await ws1.recv()
+            await ws2.recv()
+
+            await ws1.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"text": "persist me"}
+            }))
+            await asyncio.wait_for(ws2.recv(), timeout=2)
+            await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=0"
+            ) as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert len(data) >= 1
+                msg = data[0]
+                assert msg["type"] == "broadcast"
+                assert msg["payload"] == {"text": "persist me"}
+                assert "id" in msg
+                assert "timestamp" in msg
+
+    @pytest.mark.asyncio
+    async def test_channel_message_is_persisted_with_channel(self, server):
+        async with websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws1, \
+                   websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws2:
+            await ws1.recv()
+            await ws2.recv()
+
+            await ws2.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"}
+            }))
+            await asyncio.sleep(0.1)
+
+            await ws1.send(json.dumps({
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"text": "channel msg"}
+            }))
+            await asyncio.wait_for(ws2.recv(), timeout=2)
+            await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=0"
+            ) as resp:
+                data = await resp.json()
+                assert len(data) >= 1
+                channel_msgs = [m for m in data if m["payload"].get("text") == "channel msg"]
+                assert len(channel_msgs) >= 1
+                assert channel_msgs[0]["channel"] == "alerts"
+                assert channel_msgs[0]["type"] == "broadcast"
+
+    @pytest.mark.asyncio
+    async def test_direct_message_is_persisted(self, server):
+        async with websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws1, \
+                   websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws2:
+            d1 = json.loads(await ws1.recv())
+            d2 = json.loads(await ws2.recv())
+            target_id = d2["payload"]["client_id"]
+
+            await ws1.send(json.dumps({
+                "type": "direct",
+                "payload": {"target": target_id, "text": "direct persist"}
+            }))
+            await asyncio.wait_for(ws2.recv(), timeout=2)
+            await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=0"
+            ) as resp:
+                data = await resp.json()
+                direct_msgs = [m for m in data if m["payload"].get("text") == "direct persist"]
+                assert len(direct_msgs) >= 1
+                assert direct_msgs[0]["type"] == "direct"
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_respects_limit(self, server):
+        async def send_and_consume(text):
+            async with websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws_send, \
+                       websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws_recv:
+                await ws_send.recv()
+                await ws_recv.recv()
+                await ws_send.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"text": text}
+                }))
+                await asyncio.wait_for(ws_recv.recv(), timeout=2)
+                await asyncio.sleep(0.1)
+
+        for i in range(5):
+            await send_and_consume(f"msg-{i}")
+
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=3&offset=0"
+            ) as resp:
+                data = await resp.json()
+                assert len(data) == 3
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_respects_offset(self, server):
+        async def send_and_consume(text):
+            async with websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws_send, \
+                       websockets.connect(f"ws://{HOST}:{WS_PORT}") as ws_recv:
+                await ws_send.recv()
+                await ws_recv.recv()
+                await ws_send.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"text": text}
+                }))
+                await asyncio.wait_for(ws_recv.recv(), timeout=2)
+                await asyncio.sleep(0.1)
+
+        for i in range(5):
+            await send_and_consume(f"offset-{i}")
+
+        async with ClientSession() as session:
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=0"
+            ) as resp:
+                all_data = await resp.json()
+            async with session.get(
+                f"http://{HOST}:{HTTP_PORT}/messages?limit=50&offset=2"
+            ) as resp:
+                offset_data = await resp.json()
+            assert len(offset_data) == len(all_data) - 2
