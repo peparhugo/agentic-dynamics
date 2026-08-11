@@ -8,6 +8,8 @@ import jwt
 import bcrypt
 from functools import wraps
 
+from celery_tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -47,6 +49,10 @@ def migrate_db():
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
         except sqlite3.OperationalError:
             pass
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 # ── Legacy helpers ────────────────────────────────────────────
@@ -68,6 +74,7 @@ def generate_token(user):
     payload = {
         "user_id": user["id"],
         "username": user["username"],
+        "email": user.get("email") or f"{user['username']}@example.com",
         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
@@ -99,18 +106,19 @@ def login_required(f):
 # ── User models ───────────────────────────────────────────────
 
 
-def create_user(username, password):
+def create_user(username, password, email=None):
     password_hash = bcrypt.hashpw(
         password.encode("utf-8"), bcrypt.gensalt()
     ).decode("utf-8")
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email)"
+                " VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return {"id": cursor.lastrowid, "username": username}
+            return {"id": cursor.lastrowid, "username": username, "email": email}
         except sqlite3.IntegrityError:
             return None
 
@@ -263,14 +271,21 @@ def show_task(task_id):
 def edit_task(task_id):
     data = request.get_json(silent=True) or {}
     user_id = request.current_user["user_id"]
+    new_status = data.get("status")
+    prev_task = get_task(task_id, user_id)
     task = update_task(
         task_id,
         user_id,
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if new_status == "completed" and (
+        prev_task is None or prev_task.get("status") != "completed"
+    ):
+        user_email = request.current_user.get("email")
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
