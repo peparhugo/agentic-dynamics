@@ -1,0 +1,349 @@
+"""Agent review system — use LLMs to evaluate AI-generated commits.
+
+Review agents run post-hoc and are deterministic for a given artifact.
+They produce durable JSON output committed as experimental evidence.
+
+Pool:
+  - Commit Reviewer (GPT-5.6): Reviews individual commits
+  - Story Reviewer (Claude): Reviews full story coherence
+  - Cross-Model Comparator (Claude): Compares solutions across models
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import tempfile
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+# ── Data Structures ────────────────────────────────────────────
+
+@dataclass
+class CommitReview:
+    """Structured review of a single commit."""
+
+    commit_hash: str
+    reviewer_model: str
+    architectural_fit: float  # 0.0-1.0
+    convention_adherence: float  # 0.0-1.0
+    introduces_technical_debt: bool
+    respects_existing_patterns: bool
+    better_or_worse: str  # "better", "worse", "neutral", "unclear"
+    problems: list[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    summary: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "commit_hash": self.commit_hash,
+            "reviewer_model": self.reviewer_model,
+            "architectural_fit": self.architectural_fit,
+            "convention_adherence": self.convention_adherence,
+            "introduces_technical_debt": self.introduces_technical_debt,
+            "respects_existing_patterns": self.respects_existing_patterns,
+            "better_or_worse": self.better_or_worse,
+            "problems": self.problems,
+            "strengths": self.strengths,
+            "summary": self.summary,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "CommitReview":
+        return cls(
+            commit_hash=d.get("commit_hash", ""),
+            reviewer_model=d.get("reviewer_model", ""),
+            architectural_fit=d.get("architectural_fit", 0.0),
+            convention_adherence=d.get("convention_adherence", 0.0),
+            introduces_technical_debt=d.get("introduces_technical_debt", False),
+            respects_existing_patterns=d.get("respects_existing_patterns", True),
+            better_or_worse=d.get("better_or_worse", "unclear"),
+            problems=d.get("problems", []),
+            strengths=d.get("strengths", []),
+            summary=d.get("summary", ""),
+        )
+
+
+@dataclass
+class StoryReview:
+    """Structured review of an entire multi-session story."""
+
+    story_name: str
+    reviewer_model: str
+    overall_coherence: float  # 0.0-1.0
+    compounding_issues: list[str] = field(default_factory=list)
+    key_decisions: list[str] = field(default_factory=list)
+    trajectory_description: str = ""
+    summary: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "story_name": self.story_name,
+            "reviewer_model": self.reviewer_model,
+            "overall_coherence": self.overall_coherence,
+            "compounding_issues": self.compounding_issues,
+            "key_decisions": self.key_decisions,
+            "trajectory_description": self.trajectory_description,
+            "summary": self.summary,
+        }
+
+
+# ── Review Prompts ─────────────────────────────────────────────
+
+_COMMIT_REVIEW_PROMPT = """You are reviewing a git commit made by an AI coding agent.
+Your job is to assess whether this commit makes the codebase better or worse.
+
+CONTEXT:
+This is session {session_number} of a multi-session story: {story_name}
+The commit message is: {commit_message}
+
+DIFF:
+{diff}
+
+Evaluate on these criteria:
+1. ARCHITECTURAL FIT (0.0-1.0): Does this change respect existing module boundaries?
+   Does it use existing abstractions or create unnecessary new ones?
+2. CONVENTION ADHERENCE (0.0-1.0): Does the new code follow the same naming,
+   formatting, and structural conventions as the existing codebase?
+3. TECHNICAL DEBT: Does this change introduce coupling, duplication, dead code,
+   or other patterns that will increase future maintenance burden?
+4. PATTERN RESPECT: Does this change follow existing architectural patterns?
+
+Output ONLY valid JSON, no other text:
+{{
+  "architectural_fit": <0.0-1.0>,
+  "convention_adherence": <0.0-1.0>,
+  "introduces_technical_debt": <true/false>,
+  "respects_existing_patterns": <true/false>,
+  "better_or_worse": "<better|worse|neutral|unclear>",
+  "problems": ["<specific problem>", ...],
+  "strengths": ["<specific strength>", ...],
+  "summary": "<one-sentence evaluation>"
+}}"""
+
+_STORY_REVIEW_PROMPT = """You are reviewing a complete multi-session AI coding story.
+Across {session_count} sessions, an AI agent built a software project incrementally.
+Each session produced one git commit building on the prior commit.
+
+REVIEW THE FOLLOWING COMMIT SEQUENCE FOR THE STORY: {story_name}
+
+COMMIT LOG:
+{commit_log}
+
+Evaluate:
+1. COHERENCE (0.0-1.0): Do the 5 sessions form a logical progression?
+   Does session 5 build naturally on sessions 1-4?
+2. COMPOUNDING ISSUES: Did any early decisions constrain or harm later sessions?
+3. KEY DECISIONS: What were the most consequential architectural choices?
+4. TRAJECTORY: Did the quality improve, degrade, or stay flat across sessions?
+
+Output ONLY valid JSON, no other text:
+{{
+  "overall_coherence": <0.0-1.0>,
+  "compounding_issues": ["<issue>", ...],
+  "key_decisions": ["<decision>", ...],
+  "trajectory_description": "<one paragraph describing the quality arc>",
+  "summary": "<one-sentence overall evaluation>"
+}}"""
+
+
+# ── Review Functions ───────────────────────────────────────────
+
+def review_commit(
+    worktree: Path,
+    commit_hash: str,
+    *,
+    story_name: str = "",
+    session_number: int = 0,
+    model: str = "openai/gpt-5.6",
+    timeout: int = 300,
+) -> CommitReview:
+    """Review a single commit using an LLM agent.
+
+    Args:
+        worktree: Path to the git worktree.
+        commit_hash: Commit to review.
+        story_name: Name of the story for context.
+        session_number: Session number for context.
+        model: Model to use for review.
+        timeout: Timeout in seconds.
+
+    Returns:
+        CommitReview with scores and findings.
+    """
+    # Get commit metadata and diff
+    commit_msg = _run_git(worktree, "log", "-1", "--format=%s", commit_hash).strip()
+    diff = _run_git(worktree, "diff", f"{commit_hash}~1..{commit_hash}")
+
+    if not diff.strip():
+        return CommitReview(
+            commit_hash=commit_hash,
+            reviewer_model=model,
+            architectural_fit=1.0,
+            convention_adherence=1.0,
+            introduces_technical_debt=False,
+            respects_existing_patterns=True,
+            better_or_worse="neutral",
+            summary="No changes in this commit.",
+        )
+
+    # Truncate diff if too large
+    if len(diff) > 8000:
+        diff = diff[:8000] + "\n... (diff truncated)"
+
+    prompt = _COMMIT_REVIEW_PROMPT.format(
+        session_number=session_number,
+        story_name=story_name,
+        commit_message=commit_msg,
+        diff=diff,
+    )
+
+    response = _call_agent(prompt, model=model, timeout=timeout)
+    return _parse_commit_review(response, commit_hash, model)
+
+
+def review_story(
+    worktree: Path,
+    story_name: str,
+    *,
+    model: str = "anthropic/claude-fable-5",
+    timeout: int = 300,
+) -> StoryReview:
+    """Review a complete multi-session story.
+
+    Args:
+        worktree: Path to the git worktree with full history.
+        story_name: Name of the story.
+        model: Model to use for review.
+        timeout: Timeout in seconds.
+
+    Returns:
+        StoryReview with coherence and trajectory analysis.
+    """
+    log = _run_git(worktree, "log", "--reverse", "--format=%h %s")
+    session_count = log.count("[story]") if "[story]" in log else len(log.splitlines())
+
+    prompt = _STORY_REVIEW_PROMPT.format(
+        story_name=story_name,
+        session_count=session_count,
+        commit_log=log,
+    )
+
+    response = _call_agent(prompt, model=model, timeout=timeout)
+    return _parse_story_review(response, story_name, model)
+
+
+def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
+    """Call an LLM agent via opencode CLI."""
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".txt", delete=False, prefix="review_"
+    ) as f:
+        f.write(prompt)
+        prompt_file = f.name
+
+    try:
+        result = subprocess.run(
+            ["open", "code", "--model", model, "--prompt-file", prompt_file,
+             "--timeout", str(timeout), "--silent"],
+            capture_output=True,
+            text=True,
+            timeout=timeout + 30,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return None
+    finally:
+        try:
+            Path(prompt_file).unlink()
+        except OSError:
+            pass
+
+
+def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> CommitReview:
+    """Parse LLM response into CommitReview. Falls back to defaults on parse failure."""
+    defaults = CommitReview(
+        commit_hash=commit_hash,
+        reviewer_model=model,
+        architectural_fit=0.5,
+        convention_adherence=0.5,
+        introduces_technical_debt=False,
+        respects_existing_patterns=True,
+        better_or_worse="unclear",
+        summary="Review unavailable.",
+    )
+
+    if not response:
+        return defaults
+
+    try:
+        # Extract JSON from response (may have surrounding text)
+        start = response.find("{")
+        end = response.rfind("}") + 1
+        if start >= 0 and end > start:
+            data = json.loads(response[start:end])
+            return CommitReview(
+                commit_hash=commit_hash,
+                reviewer_model=model,
+                architectural_fit=float(data.get("architectural_fit", 0.5)),
+                convention_adherence=float(data.get("convention_adherence", 0.5)),
+                introduces_technical_debt=bool(data.get("introduces_technical_debt", False)),
+                respects_existing_patterns=bool(data.get("respects_existing_patterns", True)),
+                better_or_worse=str(data.get("better_or_worse", "unclear")),
+                problems=list(data.get("problems", [])),
+                strengths=list(data.get("strengths", [])),
+                summary=str(data.get("summary", "")),
+            )
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass
+
+    return defaults
+
+
+def _parse_story_review(response: str | None, story_name: str, model: str) -> StoryReview:
+    """Parse LLM response into StoryReview."""
+    defaults = StoryReview(
+        story_name=story_name,
+        reviewer_model=model,
+        overall_coherence=0.5,
+        summary="Review unavailable.",
+    )
+
+    if not response:
+        return defaults
+
+    try:
+        start = response.find("{")
+        end = response.rfind("}") + 1
+        if start >= 0 and end > start:
+            data = json.loads(response[start:end])
+            return StoryReview(
+                story_name=story_name,
+                reviewer_model=model,
+                overall_coherence=float(data.get("overall_coherence", 0.5)),
+                compounding_issues=list(data.get("compounding_issues", [])),
+                key_decisions=list(data.get("key_decisions", [])),
+                trajectory_description=str(data.get("trajectory_description", "")),
+                summary=str(data.get("summary", "")),
+            )
+    except (json.JSONDecodeError, KeyError, ValueError):
+        pass
+
+    return defaults
+
+
+def _run_git(worktree: Path, *args: str) -> str:
+    try:
+        proc = subprocess.run(
+            ["git"] + list(args),
+            capture_output=True,
+            text=True,
+            cwd=str(worktree),
+            timeout=30,
+        )
+        return proc.stdout
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return ""

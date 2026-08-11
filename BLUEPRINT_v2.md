@@ -12,9 +12,14 @@
 - [x] Codebase catalog seeds — Python (Flask Todo) + TypeScript (Express Todo)
 - [x] `story.py` — multi-session orchestrator, 2 built-in stories, git-integrated, 20 tests
 - [x] `scripts/run_story.py` — CLI runner for story experiments
-- [x] CI updated to 8 test modules, 76 tests
-- [ ] Per-commit analysis: AST diff, SonarQube delta, convention adherence ← **NEXT**
-- [ ] Commit reviewer agent (GPT-5.6)
+- [x] `commit_analysis.py` — per-commit AST diff, SonarQube delta, convention scoring
+- [x] `review.py` — agent-based commit reviewer (GPT-5.6) + story reviewer (Claude)
+- [x] `scripts/analyze_stories.py` — post-hoc analysis of story worktrees
+- [x] CI updated to 10 test modules, 97 tests
+- [ ] **v0.6 COMPLETE** ← all modules built, all 97 tests pass
+
+### v0.7 — Neo4j + Entropy + Review Agents
+**Sessions:** 0 (re-analysis)  |  **Cost:** ~$5
 
 ---
 
