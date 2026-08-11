@@ -1,12 +1,14 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { PageData, BuildOptions } from "./types";
+import { PageData, BuildOptions, BuildStats } from "./types";
 import { Plugin, runHook, runFilePipeline } from "./plugin";
 import { createMarkdownPlugin } from "./plugins/markdown";
 import { createTemplatePlugin } from "./plugins/template";
+import { BuildCache, hashContent, hashDirectory } from "./cache";
 
 export { generatePageHtml, generateIndexHtml } from "./html-generator";
 export { parseMarkdownFile } from "./plugins/markdown";
+export { BuildStats } from "./types";
 
 async function walkDir(
   dir: string,
@@ -54,11 +56,31 @@ function getBuiltinPlugins(): Plugin[] {
   ];
 }
 
-export async function build(options: BuildOptions): Promise<void> {
+export async function build(options: BuildOptions): Promise<BuildStats> {
   const contentDir = path.resolve(options.contentDir);
   const outputDir = path.resolve(options.outputDir);
 
   const plugins = getBuiltinPlugins();
+
+  const cache = new BuildCache(outputDir);
+  const incremental = options.incremental === true;
+
+  let templatesHash = "";
+
+  if (incremental) {
+    await fs.mkdir(outputDir, { recursive: true });
+    await cache.load();
+
+    if (options.clean) {
+      cache.clear();
+    }
+
+    const templatesDir = options.templatesDir
+      ? path.resolve(options.templatesDir)
+      : path.resolve("templates");
+    templatesHash = await hashDirectory(templatesDir);
+    cache.setTemplatesHash(templatesHash);
+  }
 
   await runHook(plugins, "onStart", options);
   await runHook(plugins, "beforeBuild", options);
@@ -68,18 +90,74 @@ export async function build(options: BuildOptions): Promise<void> {
   const files = await getMarkdownFiles(contentDir);
   const pages: PageData[] = [];
 
-  for (const file of files) {
-    let page: PageData = { path: file, frontmatter: {}, html: "" };
-    page = await runFilePipeline(plugins, page, options);
-    pages.push(page);
+  let pagesBuilt = 0;
+  let pagesSkipped = 0;
+  const perPageTimeMs = 50;
 
+  for (const file of files) {
     const outPath = file.replace(/\.md$/, ".html");
     const fullOutPath = path.join(outputDir, outPath);
-    const outDir = path.dirname(fullOutPath);
-    await fs.mkdir(outDir, { recursive: true });
-    await fs.writeFile(fullOutPath, page.html, "utf-8");
+
+    if (incremental) {
+      const absSourcePath = path.join(contentDir, file);
+      const sourceContent = await fs.readFile(absSourcePath, "utf-8");
+      const sourceHash = hashContent(sourceContent);
+
+      if (!cache.isChanged(file, sourceHash, templatesHash)) {
+        const entry = cache.getEntry(file)!;
+        const cachedPage: PageData = {
+          path: file,
+          frontmatter: entry.frontmatter,
+          html: entry.html,
+        };
+        pages.push(cachedPage);
+
+        const outDir = path.dirname(fullOutPath);
+        await fs.mkdir(outDir, { recursive: true });
+        await fs.writeFile(fullOutPath, cachedPage.html, "utf-8");
+        pagesSkipped++;
+        continue;
+      }
+
+      let page: PageData = { path: file, frontmatter: {}, html: "" };
+      page = await runFilePipeline(plugins, page, options);
+      pages.push(page);
+
+      cache.setEntry(file, {
+        sourceHash,
+        templatesHash,
+        frontmatter: page.frontmatter,
+        html: page.html,
+      });
+
+      const outDir = path.dirname(fullOutPath);
+      await fs.mkdir(outDir, { recursive: true });
+      await fs.writeFile(fullOutPath, page.html, "utf-8");
+      pagesBuilt++;
+    } else {
+      let page: PageData = { path: file, frontmatter: {}, html: "" };
+      page = await runFilePipeline(plugins, page, options);
+      pages.push(page);
+
+      const outDir = path.dirname(fullOutPath);
+      await fs.mkdir(outDir, { recursive: true });
+      await fs.writeFile(fullOutPath, page.html, "utf-8");
+      pagesBuilt++;
+    }
+  }
+
+  if (incremental) {
+    await cache.save();
   }
 
   await runHook(plugins, "afterBuild", options, pages);
   await runHook(plugins, "onEnd", options);
+
+  const stats: BuildStats = {
+    pagesBuilt,
+    pagesSkipped,
+    timeSavedMs: pagesSkipped * perPageTimeMs,
+  };
+
+  return stats;
 }

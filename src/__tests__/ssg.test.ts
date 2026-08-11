@@ -890,3 +890,462 @@ title: Indexed
     expect(body).toContain("window.location.reload");
   });
 });
+
+describe("incremental builds", () => {
+  async function createContent(
+    contentDir: string,
+    files: Record<string, string>
+  ) {
+    for (const [relPath, content] of Object.entries(files)) {
+      const fullPath = path.join(contentDir, relPath);
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
+      await fs.writeFile(fullPath, content, "utf-8");
+    }
+  }
+
+  test("incremental build creates cache file", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "page.md": `---
+title: Cached Page
+---
+
+# Hello
+`,
+    });
+
+    const stats = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    const cachePath = path.join(outputDir, ".ssg-cache.json");
+    const cacheExists = await fs
+      .access(cachePath)
+      .then(() => true)
+      .catch(() => false);
+    expect(cacheExists).toBe(true);
+
+    const cacheRaw = await fs.readFile(cachePath, "utf-8");
+    const cache = JSON.parse(cacheRaw);
+    expect(cache.version).toBe(1);
+    expect(cache.entries["page.md"]).toBeDefined();
+    expect(cache.entries["page.md"].frontmatter.title).toBe("Cached Page");
+    expect(cache.entries["page.md"].html).toContain("Hello");
+
+    expect(stats.pagesBuilt).toBe(1);
+    expect(stats.pagesSkipped).toBe(0);
+  });
+
+  test("second incremental build skips unchanged pages", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "a.md": `---
+title: Alpha
+---
+
+# Alpha Page
+`,
+      "b.md": `---
+title: Beta
+---
+
+# Beta Page
+`,
+    });
+
+    const stats1 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats1.pagesBuilt).toBe(2);
+    expect(stats1.pagesSkipped).toBe(0);
+
+    const stats2 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats2.pagesBuilt).toBe(0);
+    expect(stats2.pagesSkipped).toBe(2);
+    expect(stats2.timeSavedMs).toBe(100);
+
+    const aHtml = await fs.readFile(
+      path.join(outputDir, "a.html"),
+      "utf-8"
+    );
+    expect(aHtml).toContain("Alpha");
+
+    const bHtml = await fs.readFile(
+      path.join(outputDir, "b.html"),
+      "utf-8"
+    );
+    expect(bHtml).toContain("Beta");
+  });
+
+  test("changing a source file rebuilds only that page", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "first.md": `---
+title: First
+---
+
+# First Page
+`,
+      "second.md": `---
+title: Second
+---
+
+# Second Page
+`,
+    });
+
+    const stats1 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats1.pagesBuilt).toBe(2);
+
+    await fs.writeFile(
+      path.join(contentDir, "first.md"),
+      `---
+title: First Modified
+---
+
+# First Page Changed
+`
+    );
+
+    const stats2 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats2.pagesBuilt).toBe(1);
+    expect(stats2.pagesSkipped).toBe(1);
+
+    const firstHtml = await fs.readFile(
+      path.join(outputDir, "first.html"),
+      "utf-8"
+    );
+    expect(firstHtml).toContain("First Modified");
+    expect(firstHtml).toContain("First Page Changed");
+
+    const secondHtml = await fs.readFile(
+      path.join(outputDir, "second.html"),
+      "utf-8"
+    );
+    expect(secondHtml).toContain("Second");
+  });
+
+  test("changing a template invalidates all page caches", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+    const templatesDir = path.join(testDir, "templates");
+
+    await createContent(contentDir, {
+      "x.md": `---
+title: X
+---
+
+# X Content
+`,
+      "y.md": `---
+title: Y
+---
+
+# Y Content
+`,
+    });
+
+    await createContent(templatesDir, {
+      "default.hbs": `<html><body>T1: {{{content}}}</body></html>`,
+    });
+
+    const stats1 = await build({
+      contentDir,
+      outputDir,
+      templatesDir,
+      incremental: true,
+    });
+    expect(stats1.pagesBuilt).toBe(2);
+
+    await fs.writeFile(
+      path.join(templatesDir, "default.hbs"),
+      `<html><body>T2: {{{content}}}</body></html>`
+    );
+
+    const stats2 = await build({
+      contentDir,
+      outputDir,
+      templatesDir,
+      incremental: true,
+    });
+    expect(stats2.pagesBuilt).toBe(2);
+    expect(stats2.pagesSkipped).toBe(0);
+
+    const xHtml = await fs.readFile(
+      path.join(outputDir, "x.html"),
+      "utf-8"
+    );
+    expect(xHtml).toContain("T2:");
+    expect(xHtml).toContain("X Content");
+  });
+
+  test("clean flag forces full rebuild regardless of cache", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "page.md": `---
+title: Page
+---
+
+# Page
+`,
+    });
+
+    const stats1 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats1.pagesBuilt).toBe(1);
+
+    const stats2 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+      clean: true,
+    });
+    expect(stats2.pagesBuilt).toBe(1);
+    expect(stats2.pagesSkipped).toBe(0);
+  });
+
+  test("non-incremental build still works and produces correct output", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "p.md": `---
+title: Normal
+---
+
+# Normal Build
+`,
+    });
+
+    const stats = await build({
+      contentDir,
+      outputDir,
+    });
+    expect(stats.pagesBuilt).toBe(1);
+    expect(stats.pagesSkipped).toBe(0);
+
+    const html = await fs.readFile(
+      path.join(outputDir, "p.html"),
+      "utf-8"
+    );
+    expect(html).toContain("Normal Build");
+  });
+
+  test("incremental build reports accurate stats", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "one.md": `---
+title: One
+---
+
+# One
+`,
+      "two.md": `---
+title: Two
+---
+
+# Two
+`,
+      "three.md": `---
+title: Three
+---
+
+# Three
+`,
+    });
+
+    const stats1 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats1.pagesBuilt).toBe(3);
+    expect(stats1.pagesSkipped).toBe(0);
+    expect(stats1.timeSavedMs).toBe(0);
+
+    const stats2 = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats2.pagesBuilt).toBe(0);
+    expect(stats2.pagesSkipped).toBe(3);
+    expect(stats2.timeSavedMs).toBe(150);
+  });
+
+  test("incremental build skips page but still writes its HTML to output", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "keep.md": `---
+title: Keep
+---
+
+# Keep Content
+`,
+    });
+
+    await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    const html1 = await fs.readFile(
+      path.join(outputDir, "keep.html"),
+      "utf-8"
+    );
+
+    await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    const html2 = await fs.readFile(
+      path.join(outputDir, "keep.html"),
+      "utf-8"
+    );
+    expect(html2).toBe(html1);
+    expect(html2).toContain("Keep Content");
+  });
+
+  test("index.html is regenerated even with skipped pages", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "z.md": `---
+title: Z Page
+---
+
+# Z
+`,
+    });
+
+    await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    const index1 = await fs.readFile(
+      path.join(outputDir, "index.html"),
+      "utf-8"
+    );
+
+    await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    const index2 = await fs.readFile(
+      path.join(outputDir, "index.html"),
+      "utf-8"
+    );
+    expect(index2).toContain("Z Page");
+    expect(index2).toBe(index1);
+  });
+
+  test("missing cache is treated like clean build", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "fresh.md": `---
+title: Fresh
+---
+
+# Fresh Start
+`,
+    });
+
+    const stats = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats.pagesBuilt).toBe(1);
+    expect(stats.pagesSkipped).toBe(0);
+
+    const html = await fs.readFile(
+      path.join(outputDir, "fresh.html"),
+      "utf-8"
+    );
+    expect(html).toContain("Fresh Start");
+  });
+
+  test("adding a new page builds only that page on incremental", async () => {
+    const contentDir = path.join(testDir, "content");
+    const outputDir = path.join(testDir, "output");
+
+    await createContent(contentDir, {
+      "existing.md": `---
+title: Existing
+---
+
+# Existing Page
+`,
+    });
+
+    await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+
+    await createContent(contentDir, {
+      "new.md": `---
+title: New
+---
+
+# New Page
+`,
+    });
+
+    const stats = await build({
+      contentDir,
+      outputDir,
+      incremental: true,
+    });
+    expect(stats.pagesBuilt).toBe(1);
+    expect(stats.pagesSkipped).toBe(1);
+
+    const newHtml = await fs.readFile(
+      path.join(outputDir, "new.html"),
+      "utf-8"
+    );
+    expect(newHtml).toContain("New Page");
+  });
+});

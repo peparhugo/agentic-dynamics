@@ -16,13 +16,20 @@ program
   .option("--output <dir>", "Output directory", "./dist")
   .option("--templates <dir>", "Templates directory", "./templates")
   .option("--config <file>", "Config file", "ssg.config.ts")
-  .action(async (options: { content: string; output: string; templates: string; config: string }) => {
+  .option("--incremental", "Only rebuild changed pages", false)
+  .option("--clean", "Force a clean build", false)
+  .action(async (options: { content: string; output: string; templates: string; config: string; incremental: boolean; clean: boolean }) => {
     try {
-      await build({
+      const stats = await build({
         contentDir: options.content,
         outputDir: options.output,
         templatesDir: options.templates,
+        incremental: options.incremental,
+        clean: options.clean,
       });
+      if (options.incremental) {
+        console.log(`Pages built: ${stats.pagesBuilt}, skipped: ${stats.pagesSkipped}, time saved: ~${stats.timeSavedMs}ms`);
+      }
       console.log("Build complete");
     } catch (err) {
       console.error("Error:", (err as Error).message);
