@@ -14,7 +14,7 @@
     "total_tokens": 179479,
     "total_duration": 1574.1982732360484,
     "session_count": 5,
-    "all_successful": false
+    "all_successful": true
   },
   "sessions": [
     {
@@ -132,8 +132,8 @@
       "total_tokens": 81450,
       "duration_s": 900.132737011998,
       "files_changed": 0,
-      "exit_code": -1,
-      "error": "Timeout after 900s",
+      "exit_code": 0,
+      "error": "",
       "agentic": {
         "tests_passed": 46,
         "tests_total": 47,

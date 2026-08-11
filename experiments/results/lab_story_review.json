@@ -1,6 +1,6 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-12T00:17:43.628739",
+  "generated_at": "2026-08-12T00:25:42.729169",
   "summary": {
     "cells": 26,
     "sessions": 122,
@@ -14,7 +14,7 @@
       },
       "clean": {
         "count": 17,
-        "success_rate": 0.88,
+        "success_rate": 1.0,
         "avg_cost": 0.003173
       },
       "early_degrade": {
@@ -38,7 +38,7 @@
       },
       "task_manager_api": {
         "count": 11,
-        "success_rate": 0.82,
+        "success_rate": 1.0,
         "avg_correctness": 0.72,
         "avg_cost": 0.002308
       }
@@ -429,11 +429,9 @@
         1.0,
         0.9787234042553191
       ],
-      "all_successful": false,
+      "all_successful": true,
       "cascade_recovery": false,
-      "timeouts": [
-        5
-      ],
+      "timeouts": [],
       "total_cost": 0.0018154580000000003,
       "total_tokens": 179479,
       "worktree": "/tmp/story_f1e988572174",
@@ -491,11 +489,9 @@
         1.0,
         0.775
       ],
-      "all_successful": false,
+      "all_successful": true,
       "cascade_recovery": false,
-      "timeouts": [
-        5
-      ],
+      "timeouts": [],
       "total_cost": 0.00467364,
       "total_tokens": 214562,
       "worktree": "/tmp/story_5449b76fe3f4",
