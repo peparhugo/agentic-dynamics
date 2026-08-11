@@ -1,0 +1,1 @@
+{"version":3,"file":"markdown.js","sourceRoot":"","sources":["../../src/plugins/markdown.ts"],"names":[],"mappings":";;;AAAA,mCAAgC;AAGnB,QAAA,cAAc,GAAW;IACpC,IAAI,EAAE,UAAU;IAChB,MAAM,CAAC,IAAI;QACT,IAAI,CAAC,OAAO,GAAG,eAAM,CAAC,KAAK,CAAC,IAAI,CAAC,OAAO,EAAE,EAAE,KAAK,EAAE,KAAK,EAAE,CAAW,CAAC;IACxE,CAAC;CACF,CAAC"}

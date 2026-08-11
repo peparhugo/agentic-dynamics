@@ -9,6 +9,7 @@ export interface Page {
     frontmatter: Frontmatter;
     content: string;
     slug: string;
+    html?: string;
 }
 export interface BuildOptions {
     contentDir: string;
@@ -20,5 +21,17 @@ export interface ServeOptions {
     outputDir: string;
     templatesDir?: string;
     port: number;
+}
+export interface Plugin {
+    name: string;
+    onStart?(ctx: PluginContext): void;
+    beforeBuild?(ctx: PluginContext): void;
+    onFile?(page: Page, ctx: PluginContext): void;
+    afterBuild?(ctx: PluginContext): void;
+    onEnd?(ctx: PluginContext): void;
+}
+export interface PluginContext extends Record<string, any> {
+    options: BuildOptions;
+    pages: Page[];
 }
 //# sourceMappingURL=types.d.ts.map
