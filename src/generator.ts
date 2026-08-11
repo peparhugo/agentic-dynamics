@@ -1,4 +1,5 @@
 import { Page } from './types';
+import { TemplateEngine } from './templates';
 
 function escapeHtml(text: string): string {
   return text
@@ -9,7 +10,11 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export function generatePageHtml(page: Page): string {
+export function generatePageHtml(page: Page, engine?: TemplateEngine): string {
+  if (engine) {
+    return engine.renderPage(page);
+  }
+
   const { title, date, tags } = page.frontmatter;
   const dateStr = date || '';
   const tagsStr = tags ? tags.map((t) => escapeHtml(t)).join(', ') : '';
@@ -37,7 +42,11 @@ export function generatePageHtml(page: Page): string {
 </html>`;
 }
 
-export function generateIndexHtml(pages: Page[]): string {
+export function generateIndexHtml(pages: Page[], engine?: TemplateEngine): string {
+  if (engine) {
+    return engine.renderIndex(pages);
+  }
+
   const items = pages
     .map((page) => {
       const { title, date, tags } = page.frontmatter;

@@ -15,10 +15,12 @@ program
   .description('Build the static site')
   .option('--content <dir>', 'Content directory', './content')
   .option('--output <dir>', 'Output directory', './dist')
+  .option('--templates <dir>', 'Templates directory')
   .action((options) => {
     const contentDir = path.resolve(options.content);
     const outputDir = path.resolve(options.output);
-    build({ contentDir, outputDir });
+    const templatesDir = options.templates ? path.resolve(options.templates) : undefined;
+    build({ contentDir, outputDir, templatesDir });
   });
 
 program.parse(process.argv);

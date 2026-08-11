@@ -12,6 +12,8 @@ export function parseMarkdownFile(filePath: string): Page {
     title: data.title as string,
     date: data.date instanceof Date ? (data.date as Date).toISOString().slice(0, 10) : data.date != null ? String(data.date) : undefined,
     tags: data.tags as string[] | undefined,
+    template: data.template as string | undefined,
+    layout: data.layout as string | undefined,
   };
 
   if (!frontmatter.title) {
