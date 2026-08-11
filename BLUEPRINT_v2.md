@@ -1,359 +1,245 @@
-# Blueprint v2 — AI FinOps Dynamics: From Instrument to Discipline
+# Blueprint v3 — AI FinOps Dynamics: Actual State & Next Steps
 
-**Status:** v0.5 deployed. v0.6 active. Target: v1.0 full balanced experiment.
+**Status:** v0.9 complete. 26 cells, 122 sessions, 100% success, $0.19 DeepSeek spend. Lab Book 14 published.
 
-### v0.6 Progress
+---
+
+## Part 1: Completed (v0.5 → v0.9)
+
+### v0.5 — Instrument Core + Site Fixes
 
 - [x] Round 1: Audit bugs (P0) — 5 fixes
 - [x] Round 2: Site consistency + release hygiene (P1) — 12 fixes
 - [x] Round 3: Golden Circle + value reframing — homepage, README, metadata
-- [x] `mutation.py` — Flash V4 compiler, 20 operators, pinned artifacts, 16 tests
-- [x] `language.py` — tree-sitter multi-language, Python+TS+Go+Rust, 12 tests
-- [x] Codebase catalog seeds — Python (Flask Todo) + TypeScript (Express Todo)
-- [x] `story.py` — multi-session orchestrator, 2 built-in stories, git-integrated, 20 tests
-- [x] `scripts/run_story.py` — CLI runner for story experiments
-- [x] `commit_analysis.py` — per-commit AST diff, SonarQube delta, convention scoring
-- [x] `review.py` — agent-based commit reviewer (GPT-5.6) + story reviewer (Claude)
-- [x] `scripts/analyze_stories.py` — post-hoc analysis of story worktrees
-- [x] CI updated to 10 test modules, 97 tests
-- [x] **v0.6 COMPLETE** ← all modules built
+- [x] Package: reasoning-instrument → ai-finops-dynamics, heavy deps → optional
+- [x] Deployed at ai-finops-rulebook.web.app
 
-### v0.7 — Neo4j + Entropy + Review Agents
-**Sessions:** 0 (re-analysis)  |  **Cost:** ~$5
+### v0.6 — Story Format + Analysis
 
-- [x] `entropy.py` — 5-dimension architectural entropy
-- [x] `codebase_graph.py` — In-memory import graph metrics
-- [x] `value_score.py` — Durable Value Score calculation
-- [x] `review.py` extended — test generator + cross-model comparator
-- [x] CI updated to 13 test modules, 138 tests
+| Module | Lines | Purpose | Tests |
+|--------|-------|---------|-------|
+| `mutation.py` | 313 | Flash V4 mutation compiler, 20 operators | 16 |
+| `language.py` | 259 | tree-sitter multi-language (Python, TS, Go, Rust) | 12 |
+| `story.py` | 1019 | Multi-session orchestrator, 3 built-in stories, auto-recovery | 20 |
+| `commit_analysis.py` | 515 | Per-commit AST diff (git-based, fast), convention scoring | 11 |
+| `review.py` | 554 | Agent review pool (commit, story, test gen, cross-model) | 12 |
 
-### v0.8 — LSP + Independent Tests + Convention Rules
-**Sessions:** +120  |  **Cost:** ~$8
+### v0.7 — Architecture Analysis
 
-- [x] `lsp_diagnostics.py` — Multi-tool LSP diagnostics (pyright, mypy, tsc, go-vet, cargo-check)
-- [x] Convention rule files — `conventions/python.yaml`, `conventions/typescript.yaml`
-- [x] CI updated to 14 test modules, 156 tests
+| Module | Lines | Purpose | Tests |
+|--------|-------|---------|-------|
+| `entropy.py` | 353 | 5-dimension architectural entropy | 14 |
+| `codebase_graph.py` | 356 | In-memory import graph metrics (no Neo4j required) | 11 |
+| `value_score.py` | 208 | DVS formula (built but superseded — see deviations) | 11 |
 
-**v0.6 + v0.7 + v0.8 COMPLETE — all libraries built.**
+### v0.8 — LSP + Conventions
 
-### v0.9 — DeepSeek-Only Pipeline Validation ← ACTIVE
-**Sessions:** 30 cells × 5 = 150  |  **Cost:** ~$3
+| Module | Lines | Purpose | Tests |
+|--------|-------|---------|-------|
+| `lsp_diagnostics.py` | 400 | Multi-tool LSP (pyright, mypy, tsc, go-vet, cargo-check) | 18 |
 
-- [x] PerturbationCondition enum + condition_to_mutations() in story.py
-- [x] run_story.py CLI: --condition, --codebase-quality flags
-- [x] notification_service story (3rd built-in)
-- [x] Bad codebase variants (4 deterministic variants: Python+TS × tier1+tier2)
-- [x] tier2_small seed codebases (Python + TypeScript)
-- [x] opencode CLI fix (opencode run, not open code)
-- [x] Pipeline validated (pilot: 4/5 sessions, $0.0026)
-- [ ] Run DeepSeek matrix: 30 cells × 5 sessions = 150 sessions
-- [ ] Post-hoc analysis: analyze_stories.py + review agents + DVS
+### v0.9 — Experiment Pipeline & Execution
 
-### v1.0 — Full Multi-Model Experiment (After Pipeline Validated)
-**Models:** DeepSeek V4 Pro, GPT-5.6 Luna, Claude Sonnet 5
-**Sessions:** 90 cells × 5 = 450  |  **Cost:** ~$104
-**Note:** Other models added incrementally after DeepSeek pipeline proven.
+**Built:**
+- PerturbationCondition enum (CLEAN, BAD_SEED, EARLY_DEGRADE, LATE_DEGRADE)
+- condition_to_mutations() — maps conditions to mutation artifacts
+- run_story.py CLI: --condition, --codebase-quality, --tier flags
+- notification_service story (3rd built-in)
+- 4 deterministic bad codebase variants (Python + TS × tier1 + tier2)
+- 4 seed codebases (Python + TS × tier1 + tier2)
+- Redis queue infrastructure (docker-compose + enqueue + worker + monitor)
+- `--session --fork` auto-recovery in story.py _run_session()
+- `dvs_fast.py` — sequential DVS computation (30s for 26 cells)
+- `recover_stories.py` — post-hoc session continuation
 
----
+**Experiment executed:**
+- 26 cells (4 missing: notification_service × tier2 — workers exited early)
+- 122 sessions across 3 stories, 2 tiers, 2 qualities, 3 conditions
+- 100% success after timeout recovery (8/8 original timeouts recovered)
+- $0.1854 total DeepSeek spend (includes fork continuation costs)
+- Flash V4 review agent ran on all 26 final session commits
 
-## Part 1: Current State (v0.5)
+**Lab experiment documented:**
+- Lab Book 14: Multi-Session Story Review
+- `experiments/lab_books/lab_story_review.md` — full methodology + results
+- `scripts/lab_story_review.py` — analysis script
+- `experiments/results/lab_story_review.json` — machine-readable output
 
-### What we fixed across 3 rounds
-
-**Round 1 — Audit Bugs (P0)**
-- `compute_efficiency()` crash: now passes provider/model from model_id
-- `pert_class` NameError in analyze_worktrees.py: assignment moved before first use
-- Baseline correctness contamination: baseline_solution computed from actual baseline code
-- Correctness pipeline: actual_correctness restored after heuristic re-eval
-- README: --config → positional
-
-**Round 2 — Site Consistency + Release Hygiene (P1)**
-- og:url mismatches fixed (3 pages) + Firebase 301 redirects
-- Recovery signals 6→7 (implemented trajectory distance signal)
-- "verified" → "test-executed" across 12 locations
-- Corpus vocabulary: sessions/worktrees/reports now consistent
-- Pricing: snapshot label fixed, cache_read $0.14→$0.003625
-- Package: reasoning-instrument → ai-finops-dynamics, heavy deps → optional
-- CI: 5 test modules (was 3), build_data import check added
-- GitHub: description, homepage, 9 topics
-- New files: og-image.png, robots.txt, sitemap.xml, CITATION.cff
-- Deployed at ai-finops-rulebook.web.app
-
-**Round 3 — Golden Circle + Value Reframing**
-- WHY: "Does your AI coding assistant make your system better, or just bigger?"
-- HOW: "Controlled specification degradation — an experimental independent variable"
-- WHAT: Pipeline, findings, Grit with value paragraph
-- WHAT NEXT: "If you can measure it, you can route on it"
-- New finding #4: "Success isn't value"
-- New derived metric: AI Value Efficiency
-
-### Current instrument architecture (21 modules)
-
-```
-Core:    perturb.py (regex operators) → opencode.py (session runner)
-Measure: trajectory.py, solution.py, basin.py, efficiency.py,
-         recovery.py (7 signals), recovery_cost.py, strategy.py
-Valid:   constraint_detection.py, semantic_validation.py (AST/escape/markers)
-Output:  game_report.py, lab_book.py
-Service: sonar.py, graph.py (Neo4j), embeddings.py (ChromaDB)
-```
-
-### Current limitations
-
-- Single-session experiments — cannot measure compounding decisions
-- Python-only AST — no cross-language analysis
-- Regex-based perturbations — shallow text manipulation
-- Agent-authored tests only — evaluator_independent=False for all sessions
-- No context complexity as independent variable
-- No durable value measurement — captures cost + correctness, not value
+**CI:** 14 test modules, 168 tests passing.
 
 ---
 
-## Part 2: The v1.0 Vision
+## Part 2: Deviations from Blueprint v2
 
-### The Golden Circle
+| Blueprint v2 Said | Actual | Why |
+|-------------------|--------|-----|
+| 30 cells, 150 sessions | 26 cells, 122 sessions | 4 notification_service tier2 cells not enqueued |
+| ~$3 cost | $0.19 | DeepSeek cheaper than estimated; fork costs included |
+| DVS as north star metric | DVS dropped | Unsolvable weighting problem — see below |
+| Post-hoc timeout recovery script | Auto-recovery in `_run_session()` | `opencode run --session --fork` built in |
+| 3 models by v1.0 | DeepSeek-only | User strategy: prove pipeline on cheapest model first |
+| Flash V4 codebase mutators at runtime | Deterministic pre-generated bad variants | Flash V4 too slow for runtime codebase mutations |
+| Evidence page with DVS charts | Lab Book 14 — raw dimensions + reviewer quotes | Present evidence, not a formula |
+| Docker Compose worker pool for production | Sequential + host-level Redis (batch_stories.py fallback) | Redis workers crashed from bash timeouts |
 
-```
-WHY:  Success isn't value — and nobody is measuring the difference.
-HOW:  Treat specification quality as an experimental variable.
-      Measure the full chain: decisions → behavior → cost → correctness → value.
-WHAT: AI FinOps Dynamics — an open instrument.
-```
+### Why DVS Was Dropped
 
-### The Missing Measurement Chain
+DVS = (correctness × arch_fit × convention) / (cost + debt + entropy)
 
-```
-Current (v0.5):
-  spec degradation → agent behavior → cost + correctness
+Three fatal problems:
+1. **Cost domination** — tiny session costs ($0.0006-0.016) made DVS ≈ 1/cost. Every cell looked the same.
+2. **Weighting impossible** — no objective way to weight correctness (binary) vs arch_fit (reviewer) vs convention (broken for TS) vs entropy (penalized expected growth).
+3. **Meaningless threshold** — DVS > 1 was supposed to mean "net positive." In practice, every cell with passing tests was > 1 (cost was so low) and every timed-out cell was < 0.1. The threshold was a binary correctness gate, not a value measure.
 
-Target (v1.0):
-  spec × context × history → multi-session decisions
-    → per-commit analysis (AST diff, Sonar, LSP, conventions, entropy)
-    → aggregate analysis (Neo4j graph, review agents, cross-model comparison)
-    → Durable Value Score
-    → "better, or just bigger?"
-```
-
-### Durable Value Score (North Star Metric)
-
-```
-DVS = (correctness × architectural_fit × convention_adherence)
-      ──────────────────────────────────────────────────────
-      (session_cost + technical_debt_introduced + future_cost_impact)
-
-DVS > 1 → net positive outcome
-DVS < 1 → net negative outcome
-```
+**Replacement:** Present raw dimensions in Lab Book 14. Correctness (pass/fail), arch_fit (reviewer score), convention (pattern match), cost (billed), and — most importantly — the reviewer's actual words as qualitative code quality evidence.
 
 ---
 
-## Part 3: v1.0 Experiment Architecture
+## Part 3: Current v0.9 Results
 
-### 3.1 Enhanced Perturbations: Flash V4 Mutation Compiler
+### By Condition
 
-**Module:** `src/instrument/mutation.py`
+| Condition | Cells | Success | Avg Arch Fit | Avg Cost |
+|-----------|-------|---------|-------------|----------|
+| CLEAN | 17 | 100% | 0.75 | $0.009 |
+| EARLY_DEGRADE | 8 | 100% | 0.69 | $0.003 |
+| BAD_SEED | 1 | 100% | 0.88 | $0.003 |
 
-Use DeepSeek Flash V4 as a mutation compiler. One compilation per experiment config cell, producing a pinned, hashable `mutation.jsonl` artifact. All sessions in that cell consume the same mutation.
+### By Story
 
-**Mutation types:**
-- Specification mutators (10, prompt-level): inject_false_premise, remove_constraint, insert_contradiction, invert_constraint, inject_phantom_success, inject_competing_goal, inject_alien_vocab, shift_framing, reverse_causality, force_abandonment
-- Codebase mutators (10, source-level): inject_bug, add_dead_code, introduce_coupling, duplicate_abstraction, break_convention, corrupt_docstring, remove_error_handling, weaken_type_hints, scatter_logic, circular_dependency
+| Story | Cells | Success | Avg Correctness | Avg Cost |
+|-------|-------|---------|-----------------|----------|
+| task_manager_api | 11 | 100% | 0.72 | $0.012 |
+| notification_service | 5 | 100% | 0.80 | $0.005 |
+| static_site_gen | 10 | 100% | 0.80 | $0.003 |
 
-### 3.2 Multi-Session Story Format
+**Note on static_site_gen convention:** Scores of 0.14-0.16 are a measurement artifact — the convention checker uses Python patterns on TypeScript files. Fix pending.
 
-**Module:** `src/instrument/story.py`
+### Key Findings from Lab Book 14
 
-Each experiment cell is a *story* of N sequential sessions, each producing one git commit, each building on the prior session's HEAD.
-
-```
-STORY: "Build a task management API"
-  Session 1 → Commit A: Core models + CRUD (greenfield)
-  Session 2 → Commit B: Auth middleware (feature addition)
-  Session 3 → Commit C: Async notification worker (integration)
-  Session 4 → Commit D: Refactor to repository pattern (refactor)
-  Session 5 → Commit E: Rate limiting + pagination (cross-cutting)
-```
-
-### 3.3 Multi-Language Design
-
-**Module:** `src/instrument/language.py`
-
-Abstract language-specific analysis behind `LanguageProfile` interface, backed by tree-sitter (AST) and LSP servers (diagnostics).
-
-Supported: Python, TypeScript, Go, Rust
-Adding a language: grammar file + LanguageProfile + convention YAML
-
-### 3.4 Per-Commit Analysis
-
-| Layer | Tool | Metrics |
-|-------|------|---------|
-| AST Diff | tree-sitter | File/function/class delta, import graph, coupling |
-| SonarQube Delta | SonarQube | Bugs, smells, complexity, duplications, ratings |
-| LSP Diagnostics | pyright/ts-server/gopls/rust-analyzer | Type errors, dead code, interface violations |
-| Convention Adherence | Per-language YAML rules | Naming, patterns, error handling, docstrings |
-
-### 3.5 Aggregate Analysis
-
-| Layer | Tool | Metrics |
-|-------|------|---------|
-| Neo4j Graph | Neo4j + APOC + GDS | Modularity, centrality, coupling, dependency direction |
-| Architectural Entropy | entropy.py | Function length, module size, import graph, naming, file responsibility entropy |
-| Review Agents | Claude/GPT-5.6 | Commit review, story review, cross-model comparison |
-
-### 3.6 Review Agent Pool
-
-| Agent | Runs When | Output | Cost |
-|-------|-----------|--------|------|
-| Test Generator (Flash V4) | Pre-experiment | held_out_tests/ | ~$0.05 |
-| Commit Reviewer (GPT-5.6) | Per commit | commit_review_{id}.json | ~$0.02 |
-| Story Reviewer (Claude) | Per story | story_review_{id}.json | ~$0.10 |
-| Cross-Model Comparator (Claude) | Per task type | comparison_{story}.md | ~$0.20 |
-| Bug Validator (Flash V4) | Per seed | bug_validity.json | ~$0.01 |
-
-### 3.7 Codebase Catalog
-
-**Location:** `experiments/codebases/`
-
-| Tier | LOC | Example |
-|------|-----|---------|
-| 1: Minimal | 100-500 | flask-todo, express-todo, gin-todo, actix-todo |
-| 2: Small | 500-2000 | fastapi-auth-api, nest-auth, echo-auth, axum-auth |
-| 3: Medium | 5000-15000 | fastapi-realworld, nest-realworld, gin-realworld |
-| 4: Large | 20000-50000 | sentry-sdk (fork), typeorm (fork), gitea-lite (fork) |
-
-Each tier × language × 2 qualities (good seams / bad seams).
-Bad seams generated by Flash V4 degradation of good fork.
-
-### 3.8 Scale Infrastructure
-
-Docker Compose worker pool with Redis queue.
-opencode manages API keys internally — workers only need opencode installed and the API config already present.
-
-```
-infrastructure/
-├── docker-compose.experiment.yml
-├── Dockerfile.worker
-└── scripts/
-    ├── enqueue.py
-    ├── worker.py
-    └── monitor.py
-```
-
-At 8 replicas × ~3 min/session: ~150 sessions/hour.
-Full 540-session experiment: ~3.6 hours.
+1. **Condition does not degrade code quality.** Review scores comparable (0.69-0.75) across conditions.
+2. **No cascade effects.** EARLY_DEGRADE cells maintained 100% test pass rates from session 1 to 5.
+3. **Session 5 requires more time.** Cross-cutting tasks timed out at 1200s before auto-recovery was added. Now recovered automatically.
+4. **Most common reviewer problems:** Infrastructure coupling (69%), missing type hints (57%), bare except blocks (46%).
+5. **Review agent works at scale.** Flash V4 produces specific, quotable code reviews. 26 cells reviewed.
 
 ---
 
-## Part 4: New Instrument Modules (v0.6 → v1.0)
+## Part 4: Current Limitations
+
+| Limitation | Status |
+|-----------|--------|
+| Single model (DeepSeek V4 Pro) | No cross-model comparison |
+| Single reviewer (Flash V4) | No inter-reviewer reliability |
+| Convention scoring broken for TypeScript | Rules exist, not integrated |
+| Binary correctness metric | Tests pass or don't — no gradation |
+| 4 missing notification_service cells | Workers exited early |
+| Agent-authored tests only | evaluator_independent=False |
+| Codebase tiers 1-2 only (no medium/large) | Deferred |
+| Go + Rust support (grammars exist, no stories) | Deferred |
+
+---
+
+## Part 5: Next Steps
+
+### P0 — Fix Measurement Issues (Before Sharing)
+
+| # | Task | Effort | Priority |
+|---|------|--------|----------|
+| 1 | Fix convention scoring for TypeScript — integrate `conventions/typescript.yaml` | 30 min | Blocking — current numbers are misleading |
+| 2 | Complete 4 missing notification_service cells (tier2 variants) | 30 min + ~$0.01 | Completes the matrix |
+
+### P1 — Cross-Model Comparison
+
+| # | Task | Effort | Cost |
+|---|------|--------|------|
+| 3 | Run GPT-5.6 Luna (26 cells, same matrix) | 2-3 hours | ~$0.20 |
+| 4 | Run Claude Sonnet 5 (26 cells, same matrix) | 3-4 hours | ~$10 |
+| 5 | Cross-model review comparison lab book | 1 hour | $0 |
+| 6 | Reviewer calibration (run same diff through 3 reviewers) | 30 min | ~$0.01 |
+
+### P2 — Deeper Analysis
+
+| # | Task | Effort |
+|---|------|--------|
+| 7 | Gradated correctness (parse session.jsonl for per-test results) | 1 hour |
+| 8 | Add tier3_medium codebases (5000+ LOC forks) | 2 hours |
+| 9 | Go + Rust story definitions | 2 hours |
+| 10 | Evidence page from lab book data | 2 hours |
+| 11 | Docker Compose worker pool debugging | 1 hour |
+| 12 | v1.0 formal release + DOI | 1 hour |
+
+### P3 — Scientific Rigor
+
+| # | Task | Effort |
+|---|------|--------|
+| 13 | Held-out test generation (Flash V4 pre-experiment) | 1 hour |
+| 14 | Inter-reviewer reliability (3 reviewers on same 10 cells) | 30 min + ~$0.05 |
+| 15 | Statistical treatment (confidence intervals, effect sizes) | 2 hours |
+
+---
+
+## Part 6: Module Inventory
+
+### New Modules (All Built)
 
 ```
-NEW:
-  mutation.py         # Flash V4 mutation compiler
-  language.py          # Multi-language profile + tree-sitter wrapper
-  story.py             # Multi-session orchestrator
-  lsp_diagnostics.py   # LSP analysis per language
-  entropy.py           # Architectural entropy
-  codebase_graph.py    # Neo4j import + graph metrics
-  review.py            # Agent review system
-  value_score.py       # Durable Value Score
+src/instrument/mutation.py         313L   Flash V4 mutation compiler, 20 operators
+src/instrument/language.py          259L   tree-sitter multi-language, 4 langs
+src/instrument/story.py            1019L   Multi-session orchestrator, 3 stories, auto-recovery
+src/instrument/commit_analysis.py   515L   Per-commit AST diff, convention scoring
+src/instrument/review.py            554L   Agent review pool (5 agents)
+src/instrument/entropy.py           353L   5-dimension architectural entropy
+src/instrument/codebase_graph.py    356L   In-memory import graph metrics
+src/instrument/value_score.py       208L   DVS formula (built, superseded)
+src/instrument/lsp_diagnostics.py   400L   Multi-tool LSP diagnostics
+```
 
-MODIFIED:
-  perturb.py           # Add codebase mutators + Flash V4 path
-  basin.py             # Python ast → tree-sitter
-  semantic_validation.py  # Python ast → tree-sitter
-  solution.py          # Add architectural_fit field
-  strategy.py          # Add value-based archetype dimension
-  game_report.py       # Add DVS, commit review, story coherence sections
+### New Scripts
+
+```
+scripts/run_story.py         Story experiment CLI
+scripts/analyze_stories.py   Post-hoc per-commit analysis
+scripts/recover_stories.py   Session timeout recovery
+scripts/review_stories.py    Batch review agent runner
+scripts/batch_stories.py     Sequential matrix runner (fallback)
+scripts/dvs_fast.py          Fast DVS computation (30s for 26 cells)
+scripts/lab_story_review.py  Lab Book 14 analysis
+scripts/enqueue.py           Redis job queue filler
+scripts/worker.py            Redis experiment worker
+scripts/monitor.py           Redis experiment monitor
+scripts/enqueue_dvs.py       Redis DVS job queue
+scripts/worker_dvs.py        Redis DVS worker (review-augmented)
+scripts/collect_dvs.py       Redis DVS result collector
+```
+
+### Assets
+
+```
+experiments/codebases/               4 seed codebases + 4 bad variants
+experiments/lab_books/lab_story_review.md   Lab Book 14
+experiments/results/stories/         26 story result JSONs
+experiments/results/stories/dvs_summary.json  Aggregate metrics
+experiments/results/lab_story_review.json     Analysis output
+conventions/python.yaml              Python convention rules
+conventions/typescript.yaml          TypeScript convention rules (not yet integrated)
+infrastructure/docker-compose.experiment.yml  Redis queue
 ```
 
 ---
 
-## Part 5: Phased Roadmap
+## Part 7: Recommended Immediate Actions
 
-### v0.6 — Story Format + Enhanced Perturbations + Python/TS
-**Sessions:** ~120  |  **Cost:** ~$5.50
+Next session priorities, in order:
 
-- [x] mutation.py: Flash V4 compiler for 20 operators
-- [x] story.py: Multi-session orchestrator
-- [x] language.py: LanguageProfile + tree-sitter for Python + TypeScript
-- [x] Story catalog: 2 stories × 2 languages
-- [x] Per-commit analysis: AST diff, Sonar, conventions
-- [x] Commit reviewer agent
+1. **Fix TypeScript convention scoring** — integrate `conventions/typescript.yaml` into `score_conventions()`. 30 minutes. Unblocks valid story-type comparisons.
 
-### v0.7 — Neo4j + Entropy + Review Agents
-**Sessions:** 0 (re-analysis)  |  **Cost:** ~$5
+2. **Complete missing 4 cells** — enqueue and run notification_service × tier2 variants. 30 minutes + ~$0.01. Completes the 30-cell matrix.
 
-- [x] codebase_graph.py: In-memory import graph metrics (modularity, centrality, density)
-- [x] entropy.py: 5-dimension architectural entropy
-- [x] review.py: Full agent pool (test gen, story review, cross-model comparison)
-- [x] value_score.py: DVS calculation
+3. **Regenerate lab book** with fixed conventions and complete matrix. 5 minutes.
 
-### v0.8 — LSP + Independent Tests
-**Sessions:** +120  |  **Cost:** ~$8
-
-- [x] lsp_diagnostics.py: Per-language LSP analysis (pyright, mypy, tsc, go-vet, cargo-check)
-- [x] Convention rule files: Python + TypeScript YAML convention rule sets
-- [x] Independent test generation (Flash V4, pre-experiment) — in review.py
-
-### v0.9 — Scale Infrastructure + Full Matrix
-**Sessions:** +300  |  **Cost:** ~$30
-
-- Docker Compose worker pool
-- Bad seams codebase variants
-- Full experiment matrix
-
-### v1.0 — DVS + Formal Release
-**Sessions:** 540 total  |  **Cost:** ~$48.50 total
-
-- DVS per model per story per codebase tier
-- Decision Horizon measurement
-- v1.0.0 git tag + Zenodo DOI
+4. **Decide on Luna** — the first cross-model comparison is $0.20. Worth doing before Claude ($10) to validate that the pipeline works with a second model.
 
 ---
 
-## Part 6: v1.0 Experiment Matrix
-
-```
-Independent Variables:
-  Story type (5)           — task_manager, static_site, notification, auth_gw, pipeline
-  Codebase tier (3)        — minimal, small, medium
-  Codebase quality (2)     — good seams, bad seams
-  Model (4)                — DeepSeek V4 Pro, Claude Fable 5, GPT-5.6, GPT-5-mini
-  Mutation (3)             — clean, inject_bug_s0.7, false_premise_s0.7
-  Repetitions (2)
-
-Total cells: ~540  |  Data points: ~16,200  |  Total cost: ~$48.50
-```
-
----
-
-## Part 7: Risks and Mitigations
-
-| Risk | Mitigation |
-|------|-----------|
-| Flash V4 mutations are low-quality | Human review gate. Fall back to regex on failure. |
-| Multi-session stories diverge | Bounded, specific task per session. No open-ended sessions. |
-| tree-sitter grammars are buggy | Python/TS grammars are mature. Go/Rust deferred. |
-| Review agents hallucinate scores | Structured JSON with explicit criteria. 10% human sampled. |
-| Docker scaling ceiling | Start with 4 replicas. Scale incrementally. |
-| Independent test generation too hard | Flash V4 writes tests from spec. Human reviews sample. |
-| DVS is too reductive | DVS is ONE metric. Full layers always available. |
-
----
-
-## Part 8: Infrastructure Note
-
-opencode manages API keys internally through its own configuration.
-Docker workers do NOT need API keys in environment variables — they only need
-opencode CLI installed and the user's opencode config mounted read-only.
-
-```yaml
-# Worker volumes — no API keys required
-volumes:
-  - ~/.config/opencode:/home/worker/.config/opencode:ro
-  - ~/.local/share/opencode:/home/worker/.local/share/opencode:ro
-```
-
----
-
-*Generated from two full audits, three rounds of fixes, Golden Circle reframing, and full v1.0 architecture design. August 2026.*
+*Updated August 2026. Reflects actual built state, executed experiment, and documented deviations from Blueprint v2.*
