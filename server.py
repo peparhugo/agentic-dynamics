@@ -5,6 +5,7 @@ import socket
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -17,6 +18,7 @@ except ImportError:
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "chat.db")
+TRANSPORT_TYPE = os.environ.get("TRANSPORT", "websocket")
 BROADCAST_CHANNEL = "chat:message"
 
 _server_id = str(uuid.uuid4())
@@ -95,6 +97,119 @@ class ChannelManager:
             self._channels.clear()
 
 
+class BaseTransport(ABC):
+    @abstractmethod
+    def on_connect(self, callback):
+        """Register a callback for when a client connects: callback(client_id, connection)"""
+
+    @abstractmethod
+    def on_disconnect(self, callback):
+        """Register a callback for when a client disconnects: callback(client_id)"""
+
+    @abstractmethod
+    def send_message(self, client_id, message):
+        """Send a message to a specific client."""
+
+    @abstractmethod
+    def broadcast(self, message, exclude_id=None):
+        """Broadcast a message to all connected clients, optionally excluding one."""
+
+    @abstractmethod
+    def start(self, host, port):
+        """Start the transport server, begin accepting connections."""
+
+
+class WebSocketTransport(BaseTransport):
+    def __init__(self, registry, send_lock):
+        self.registry = registry
+        self._send_lock = send_lock
+        self._on_connect_cb = None
+        self._on_disconnect_cb = None
+
+    def on_connect(self, callback):
+        self._on_connect_cb = callback
+
+    def on_disconnect(self, callback):
+        self._on_disconnect_cb = callback
+
+    def send_message(self, client_id, message):
+        with self._send_lock:
+            ws = self.registry.get(client_id)
+            if ws:
+                try:
+                    ws.send(message)
+                except Exception:
+                    self.registry.remove(client_id)
+
+    def broadcast(self, message, exclude_id=None):
+        with self._send_lock:
+            for cid, ws in self.registry.all_items():
+                if cid == exclude_id:
+                    continue
+                try:
+                    ws.send(message)
+                except Exception:
+                    self.registry.remove(cid)
+
+    def start(self, host, port):
+        sock = socket.create_server((host, port), reuse_port=True)
+        sock.listen()
+
+        def accept_loop():
+            try:
+                while True:
+                    conn, addr = sock.accept()
+                    client_id = str(uuid.uuid4())
+                    protocol = ServerProtocol()
+                    ws = ServerConnection(conn, protocol)
+                    try:
+                        ws.handshake()
+                    except Exception:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                        continue
+                    self.registry.add(client_id, ws)
+                    thread = threading.Thread(
+                        target=self._client_thread, args=(client_id, ws, conn), daemon=True
+                    )
+                    thread.start()
+            except Exception:
+                pass
+            finally:
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+
+        accept_thread = threading.Thread(target=accept_loop, name="ws-acceptor", daemon=True)
+        accept_thread.start()
+        return accept_thread
+
+    def _client_thread(self, client_id, ws, conn):
+        try:
+            if self._on_connect_cb:
+                self._on_connect_cb(client_id, ws)
+        except Exception:
+            pass
+        finally:
+            self.registry.remove(client_id)
+            if self._on_disconnect_cb:
+                try:
+                    self._on_disconnect_cb(client_id)
+                except Exception:
+                    pass
+            try:
+                ws.close()
+            except Exception:
+                pass
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 _registry = ClientRegistry()
 _channels = ChannelManager()
 _send_lock = threading.Lock()
@@ -104,6 +219,8 @@ _redis_failed = False
 _redis_init_lock = threading.Lock()
 _redis_ready = threading.Event()
 _db_lock = threading.Lock()
+
+_transport = None
 
 
 def _init_db():
@@ -288,10 +405,7 @@ def make_message(msg_type, payload, from_id=None):
     return json.dumps(msg)
 
 
-def handle_client(conn):
-    client_id = str(uuid.uuid4())
-    protocol = ServerProtocol()
-    ws = None
+def _on_client_connect(client_id, ws):
     r = _get_redis()
     use_redis = r is not None and _redis_ready.is_set()
 
@@ -302,95 +416,94 @@ def handle_client(conn):
         except Exception:
             use_redis = False
 
-    try:
-        ws = ServerConnection(conn, protocol)
-        ws.handshake()
-        _registry.add(client_id, ws)
+    _transport.send_message(client_id, make_message("system", {"client_id": client_id, "message": "Connected"}))
 
-        ws.send(make_message("system", {"client_id": client_id, "message": "Connected"}))
-
-        for raw_message in ws:
-            try:
-                data = json.loads(raw_message)
-            except json.JSONDecodeError:
-                continue
-
-            msg_type = data.get("type", "broadcast")
-            payload = data.get("payload", {})
-
-            if msg_type == "subscribe":
-                channel = payload.get("channel")
-                if channel:
-                    _channels.subscribe(client_id, channel)
-                    if use_redis:
-                        try:
-                            r.sadd(f"chat:channel:{_server_id}:{channel}", client_id)
-                        except Exception:
-                            pass
-
-            elif msg_type == "unsubscribe":
-                channel = payload.get("channel")
-                if channel:
-                    _channels.unsubscribe(client_id, channel)
-                    if use_redis:
-                        try:
-                            r.srem(f"chat:channel:{_server_id}:{channel}", client_id)
-                        except Exception:
-                            pass
-
-            elif msg_type in ("broadcast", "direct"):
-                channel = data.get("channel")
-                timestamp = now_iso()
-
-                _save_message(channel, msg_type, payload, timestamp)
-
-                if use_redis:
-                    redis_msg = {
-                        "type": msg_type,
-                        "payload": payload,
-                        "from": client_id,
-                        "channel": channel,
-                        "timestamp": timestamp,
-                        "_sender_id": client_id,
-                    }
-                    try:
-                        r.publish(BROADCAST_CHANNEL, json.dumps(redis_msg))
-                    except Exception:
-                        _local_deliver(msg_type, payload, client_id, channel)
-                else:
-                    _local_deliver(msg_type, payload, client_id, channel)
-
-    except Exception:
-        pass
-    finally:
-        _channels.unsubscribe_all(client_id)
-        _registry.remove(client_id)
-
-        if use_redis:
-            try:
-                r.hdel("chat:clients", client_id)
-                r.srem(f"chat:server:{_server_id}:clients", client_id)
-                for ch_name in _channels.list_channels():
-                    r.srem(f"chat:channel:{_server_id}:{ch_name}", client_id)
-            except Exception:
-                pass
-
-        disc_msg = make_message("system", {"client_id": client_id, "message": "Disconnected"})
-        with _send_lock:
-            for cid, cws in _registry.all_items():
-                try:
-                    cws.send(disc_msg)
-                except Exception:
-                    _registry.remove(cid)
-        if ws is not None:
-            try:
-                ws.close()
-            except Exception:
-                pass
+    for raw_message in ws:
         try:
-            conn.close()
+            data = json.loads(raw_message)
+        except json.JSONDecodeError:
+            continue
+
+        msg_type = data.get("type", "broadcast")
+        payload = data.get("payload", {})
+
+        if msg_type == "subscribe":
+            channel = payload.get("channel")
+            if channel:
+                _channels.subscribe(client_id, channel)
+                if use_redis:
+                    try:
+                        r.sadd(f"chat:channel:{_server_id}:{channel}", client_id)
+                    except Exception:
+                        pass
+
+        elif msg_type == "unsubscribe":
+            channel = payload.get("channel")
+            if channel:
+                _channels.unsubscribe(client_id, channel)
+                if use_redis:
+                    try:
+                        r.srem(f"chat:channel:{_server_id}:{channel}", client_id)
+                    except Exception:
+                        pass
+
+        elif msg_type in ("broadcast", "direct"):
+            channel = data.get("channel")
+            timestamp = now_iso()
+
+            _save_message(channel, msg_type, payload, timestamp)
+
+            if use_redis:
+                redis_msg = {
+                    "type": msg_type,
+                    "payload": payload,
+                    "from": client_id,
+                    "channel": channel,
+                    "timestamp": timestamp,
+                    "_sender_id": client_id,
+                }
+                try:
+                    r.publish(BROADCAST_CHANNEL, json.dumps(redis_msg))
+                except Exception:
+                    _local_deliver(msg_type, payload, client_id, channel)
+            else:
+                _local_deliver(msg_type, payload, client_id, channel)
+
+
+def _on_client_disconnect(client_id):
+    r = _get_redis()
+    use_redis = r is not None and _redis_ready.is_set()
+
+    _channels.unsubscribe_all(client_id)
+
+    if use_redis:
+        try:
+            r.hdel("chat:clients", client_id)
+            r.srem(f"chat:server:{_server_id}:clients", client_id)
+            for ch_name in _channels.list_channels():
+                r.srem(f"chat:channel:{_server_id}:{ch_name}", client_id)
         except Exception:
             pass
+
+    disc_msg = make_message("system", {"client_id": client_id, "message": "Disconnected"})
+    with _send_lock:
+        for cid, cws in _registry.all_items():
+            try:
+                cws.send(disc_msg)
+            except Exception:
+                _registry.remove(cid)
+
+
+def _init_transport():
+    global _transport
+    transport_type = TRANSPORT_TYPE.lower()
+    if transport_type == "websocket":
+        _transport = WebSocketTransport(registry=_registry, send_lock=_send_lock)
+    else:
+        raise ValueError(f"Unknown transport type: {transport_type}")
+    _transport.on_connect(_on_client_connect)
+    _transport.on_disconnect(_on_client_disconnect)
+    return _transport
 
 
 async def health_handler(request):
@@ -414,42 +527,20 @@ async def messages_handler(request):
     return web.json_response(messages)
 
 
-def run_ws_acceptor(host, port):
-    sock = socket.create_server((host, port), reuse_port=True)
-    sock.listen()
-
-    def accept_loop():
-        try:
-            while True:
-                conn, addr = sock.accept()
-                thread = threading.Thread(target=handle_client, args=(conn,), daemon=True)
-                thread.start()
-        except Exception:
-            pass
-        finally:
-            try:
-                sock.close()
-            except Exception:
-                pass
-
-    accept_thread = threading.Thread(target=accept_loop, name="ws-acceptor", daemon=True)
-    accept_thread.start()
-    return accept_thread
-
-
 def start_server(host="0.0.0.0", ws_port=8765, http_port=8080):
+    _init_transport()
     _init_db()
     _start_redis_subscriber()
 
-    ws_thread = run_ws_acceptor(host, ws_port)
+    ws_thread = _transport.start(host, ws_port)
 
     async def run_http():
-        app = web.Application()
-        app.router.add_get("/health", health_handler)
-        app.router.add_get("/channels", channels_handler)
-        app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
-        app.router.add_get("/messages", messages_handler)
-        runner = web.AppRunner(app)
+        app_ = web.Application()
+        app_.router.add_get("/health", health_handler)
+        app_.router.add_get("/channels", channels_handler)
+        app_.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
+        app_.router.add_get("/messages", messages_handler)
+        runner = web.AppRunner(app_)
         await runner.setup()
         site = web.TCPSite(runner, host, http_port)
         await site.start()
