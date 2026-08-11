@@ -1,10 +1,10 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-12T00:25:42.729169",
+  "generated_at": "2026-08-12T00:49:07.072575",
   "summary": {
     "cells": 26,
     "sessions": 122,
-    "total_cost": 0.07882,
+    "total_cost": 0.185399,
     "total_tokens": 5070627,
     "by_condition": {
       "bad_seed": {
@@ -15,7 +15,7 @@
       "clean": {
         "count": 17,
         "success_rate": 1.0,
-        "avg_cost": 0.003173
+        "avg_cost": 0.009443
       },
       "early_degrade": {
         "count": 8,
@@ -40,7 +40,7 @@
         "count": 11,
         "success_rate": 1.0,
         "avg_correctness": 0.72,
-        "avg_cost": 0.002308
+        "avg_cost": 0.011997
       }
     }
   },
@@ -354,7 +354,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.0029432679999999998,
+      "total_cost": 0.032117618,
       "total_tokens": 193894,
       "worktree": "/tmp/story_117533fe8f2f",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_117533fe8f2f.json"
@@ -394,7 +394,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.0026425090000000004,
+      "total_cost": 0.029679001,
       "total_tokens": 145030,
       "worktree": "/tmp/story_159eeb8c388a",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_159eeb8c388a.json"
@@ -432,7 +432,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0018154580000000003,
+      "total_cost": 0.0277175,
       "total_tokens": 179479,
       "worktree": "/tmp/story_f1e988572174",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f1e988572174.json"
@@ -492,7 +492,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.00467364,
+      "total_cost": 0.029139923,
       "total_tokens": 214562,
       "worktree": "/tmp/story_5449b76fe3f4",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_5449b76fe3f4.json"

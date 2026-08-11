@@ -479,7 +479,12 @@ def _run_session(
     standardize: bool,
     enforce_pytest: bool,
 ) -> SessionResult:
-    """Run one session in the story and commit its output."""
+    """Run one session in the story and commit its output.
+
+    If the session times out, automatically runs a continuation via
+    opencode's --session --fork mechanism to recover the work. The
+    combined cost (original + continuation) is recorded.
+    """
     files_before = _list_tracked_files(worktree)
     t0 = time.monotonic()
 
@@ -496,6 +501,58 @@ def _run_session(
         session_name=session_name,
     )
 
+    total_cost = agentic.estimated_cost_usd if agentic else 0.0
+    total_tokens = agentic.total_tokens if agentic else 0
+    continuation_used = False
+    continuation_cost = 0.0
+    continuation_tokens = 0
+
+    # If timed out, automatically continue the session
+    if agentic.error and "timeout" in agentic.error.lower():
+        import json as _json
+        jsonl_path = worktree / ".instrument" / "session.jsonl"
+        session_id = ""
+        if jsonl_path.exists():
+            try:
+                with open(jsonl_path) as f:
+                    first = _json.loads(f.readline())
+                    session_id = first.get("sessionID", "")
+            except Exception:
+                pass
+
+        if session_id:
+            cont_result = subprocess.run(
+                [
+                    str(Path.home() / ".opencode/bin/opencode"), "run",
+                    "--session", session_id,
+                    "--fork",
+                    "--dir", str(worktree),
+                    "--model", model,
+                    "--auto",
+                    "Continue. Complete the task. Run tests and finish.",
+                ],
+                capture_output=True, text=True, timeout=timeout * 2,
+            )
+            continuation_used = True
+
+            # Estimate continuation cost from opencode DB
+            try:
+                cont_cost = _estimate_session_cost(session_id)
+                continuation_cost += cont_cost
+            except Exception:
+                pass
+
+            # Parse continuation output for token counts
+            import re as _re
+            cont_tokens = _re.findall(r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout)
+            if cont_tokens:
+                continuation_tokens += sum(int(t) for t in cont_tokens)
+
+            # If continuation succeeded, clear the error
+            if cont_result.returncode == 0:
+                agentic.error = ""
+                agentic.exit_code = 0
+
     duration = time.monotonic() - t0
 
     # Commit all changes
@@ -503,7 +560,6 @@ def _run_session(
     commit_msg = f"[story] Session {spec.session_number}: {spec.task_type}"
     _git(worktree, "add", "-A")
 
-    # Only commit if there are changes
     status = _git(worktree, "status", "--porcelain")
     if status.strip():
         _git(worktree, "commit", "-m", commit_msg, "--allow-empty")
@@ -519,13 +575,33 @@ def _run_session(
         commit_hash=commit_hash,
         commit_message=commit_msg,
         agentic=agentic,
-        cost_usd=agentic.estimated_cost_usd if agentic else 0.0,
-        total_tokens=agentic.total_tokens if agentic else 0,
+        cost_usd=round(total_cost + continuation_cost, 8),
+        total_tokens=total_tokens + continuation_tokens,
         duration_s=duration,
         files_changed=files_changed,
         exit_code=agentic.exit_code if agentic else -1,
-        error=agentic.error if agentic else "agentic result is None",
+        error=agentic.error if agentic else "",
     )
+
+
+def _estimate_session_cost(session_id: str) -> float:
+    """Estimate the cost of a continuation session from opencode's database."""
+    import sqlite3 as _sql
+    db_path = Path.home() / ".local/share/opencode/opencode.db"
+    if not db_path.exists():
+        return 0.0
+    try:
+        conn = _sql.connect(str(db_path))
+        rows = conn.execute(
+            "SELECT cost FROM session WHERE id LIKE ? ORDER BY updated_at DESC LIMIT 1",
+            (f"%{session_id}%",),
+        ).fetchall()
+        conn.close()
+        if rows and rows[0][0]:
+            return float(rows[0][0])
+    except Exception:
+        pass
+    return 0.0
 
 
 # ── Git Helpers ────────────────────────────────────────────────

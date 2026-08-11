@@ -11,7 +11,7 @@
   "worktree": "/tmp/story_117533fe8f2f",
   "error": "Session 5 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.0029432679999999998,
+    "total_cost": 0.03211762,
     "total_tokens": 193894,
     "total_duration": 1702.5429285790015,
     "session_count": 5,
@@ -77,7 +77,7 @@
       "prompt": "Add rate limiting and pagination to the task management API.\n\nRATE LIMITING:\n- Limit each authenticated user to 100 requests per minute\n- Use Flask-Limiter with Redis as the storage backend\n- Return 4",
       "commit_hash": "29a460f01528692cb6f65d1b128fb273114cb750",
       "commit_message": "[story] Session 5: cross_cutting",
-      "cost_usd": 0.00114608,
+      "cost_usd": 0.03032043,
       "total_tokens": 77545,
       "duration_s": 900.1972016869986,
       "files_changed": 0,

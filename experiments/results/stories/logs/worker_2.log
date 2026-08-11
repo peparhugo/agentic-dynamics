@@ -274,3 +274,5 @@
 [00:43:51][worker] Redis error: Timeout reading from socket, retrying in 10s
 [00:44:59][worker] Redis error: Timeout reading from socket, retrying in 10s
 [00:46:08][worker] Redis error: Timeout reading from socket, retrying in 10s
+[00:47:17][worker] Redis error: Timeout reading from socket, retrying in 10s
+[00:48:26][worker] Redis error: Timeout reading from socket, retrying in 10s
