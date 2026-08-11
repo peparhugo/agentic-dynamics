@@ -1,6 +1,7 @@
 import json
 import os
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -370,3 +371,63 @@ def test_cannot_update_other_user_task(client, auth, auth_two):
         headers=auth,
     )
     assert resp.status_code == 404
+
+
+def test_update_task_to_completed_triggers_notification(client, auth):
+    client.post(
+        "/tasks",
+        json={"title": "Complete me"},
+        headers=auth,
+    )
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put(
+            "/tasks/1",
+            json={"status": "completed"},
+            headers=auth,
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["status"] == "completed"
+    mock_delay.assert_called_once_with("testuser@example.com", "Complete me")
+
+
+def test_update_task_to_done_no_notification(client, auth):
+    client.post(
+        "/tasks",
+        json={"title": "Just done"},
+        headers=auth,
+    )
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put(
+            "/tasks/1",
+            json={"status": "done"},
+            headers=auth,
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["status"] == "done"
+    mock_delay.assert_not_called()
+
+
+def test_update_task_title_no_notification(client, auth):
+    client.post(
+        "/tasks",
+        json={"title": "Old title"},
+        headers=auth,
+    )
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        resp = client.put(
+            "/tasks/1",
+            json={"title": "New title"},
+            headers=auth,
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["title"] == "New title"
+    mock_delay.assert_not_called()

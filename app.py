@@ -7,6 +7,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import send_notification_email
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev-secret-key-change-in-production"
 DATABASE = "tasks.db"
@@ -236,6 +238,14 @@ def update_task(task_id):
         (new_title, new_status, task_id, g.current_user_id),
     )
     conn.commit()
+
+    if new_status == "completed":
+        user_row = conn.execute(
+            "SELECT username FROM users WHERE id = ?", (g.current_user_id,)
+        ).fetchone()
+        if user_row:
+            user_email = f"{user_row['username']}@example.com"
+            send_notification_email.delay(user_email, new_title)
 
     updated = conn.execute(
         "SELECT * FROM tasks WHERE id = ?", (task_id,)
