@@ -238,30 +238,28 @@ def review_story(
 
 def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
     """Call an LLM agent via opencode CLI."""
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False, prefix="review_"
-    ) as f:
-        f.write(prompt)
-        prompt_file = f.name
+    import os
+    import re
+
+    opencode_bin = os.environ.get(
+        "OPENCODE_BIN",
+        str(Path.home() / ".opencode/bin/opencode"),
+    )
 
     try:
         result = subprocess.run(
-            ["open", "code", "--model", model, "--prompt-file", prompt_file,
-             "--timeout", str(timeout), "--silent"],
+            [opencode_bin, "run", prompt, "--model", model, "--auto"],
             capture_output=True,
             text=True,
             timeout=timeout + 30,
         )
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-        return None
+        output = result.stdout or ""
+        output = re.sub(r'\x1b\[[0-9;]*m', '', output)
+        lines = [l for l in output.splitlines()
+                 if l.strip() and not l.strip().startswith(">")]
+        return "\n".join(lines).strip() or None
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
-    finally:
-        try:
-            Path(prompt_file).unlink()
-        except OSError:
-            pass
 
 
 def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> CommitReview:

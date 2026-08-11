@@ -49,24 +49,22 @@ def condition_to_mutations(
 ) -> tuple[MutationArtifact | None, dict[int, MutationArtifact]]:
     """Map a perturbation condition to specific mutations.
 
+    For BAD_SEED: looks for a pre-generated 'bad/' variant at the same
+    directory level. If found, returns a no-op artifact (the codebase
+    is pre-degraded on disk). If not found, returns None (skip BAD_SEED).
+
+    For EARLY_DEGRADE / LATE_DEGRADE: compiles spec mutations via Flash V4
+    at runtime (these are cheap, single-prompt calls).
+
     Args:
         condition: Experimental condition.
-        codebase_path: Path to seed codebase (for BAD_SEED).
-        story_specs: Session prompts in order (for EARLY/LATE degrades).
+        codebase_path: Path to seed codebase.
+        story_specs: Session prompts in order.
         compiler_model: Model for mutation compilation.
-        cache_dir: Optional cache directory for compiled artifacts.
+        cache_dir: Optional cache directory.
 
     Returns:
         (codebase_mutation, {session_number: spec_mutation})
-        - codebase_mutation: applied once before session 1
-        - spec_mutations: applied to specific sessions
-
-    Examples:
-        >>> condition_to_mutations(CLEAN, Path("."), [])
-        (None, {})
-        >>> cm, sm = condition_to_mutations(EARLY_DEGRADE, Path("."), ["build api", "add auth"])
-        >>> cm is None, 1 in sm
-        (True, True)
     """
     cache = cache_dir or Path("experiments/codebases/.mutation_cache")
     cache.mkdir(parents=True, exist_ok=True)
@@ -75,24 +73,19 @@ def condition_to_mutations(
         return None, {}
 
     if condition == PerturbationCondition.BAD_SEED:
-        if not codebase_path.exists():
-            return None, {}
-        ops = ["introduce_coupling", "scatter_logic", "break_convention"]
-        artifacts: list[MutationArtifact] = []
-        for op in ops:
-            artifact = compile_mutation(
-                specification=f"Degrade the codebase architecture.",
-                operator=op,
+        # Look for pre-generated bad variant on disk
+        # e.g. ".../tier1_minimal/good" -> ".../tier1_minimal/bad"
+        bad_path = codebase_path.parent / "bad"
+        if bad_path.exists() and any(bad_path.iterdir()):
+            return MutationArtifact(
+                mutation_id="bad_seed_pregen",
+                operator="bad_seed",
+                operator_class="codebase",
                 strength=0.5,
-                codebase_path=codebase_path,
-                model=compiler_model,
-                cache_dir=cache,
-            )
-            if artifact.would_produce_changes():
-                artifacts.append(artifact)
-        # Combine multiple codebase mutations for application
-        # Return the first one that actually compiles; apply sequentially
-        return (artifacts[0] if artifacts else None), {}
+                original_spec="Pre-generated bad variant",
+                codebase_patch=f"Using pre-generated variant at {bad_path}",
+            ), {}
+        return None, {}
 
     if condition == PerturbationCondition.EARLY_DEGRADE:
         if not story_specs:
@@ -110,7 +103,7 @@ def condition_to_mutations(
         if len(story_specs) < 4:
             return None, {}
         artifact = compile_mutation(
-            specification=story_specs[3],  # Session 4 (0-indexed)
+            specification=story_specs[3],
             operator="remove_constraint",
             strength=0.5,
             model=compiler_model,
@@ -373,16 +366,23 @@ def run_story(
 
     # Resolve condition to mutations
     codebase_path_obj = Path(codebase_path)
+
+    # BAD_SEED condition: use the pre-generated bad variant on disk
+    actual_codebase_path = codebase_path
+    if condition == PerturbationCondition.BAD_SEED:
+        bad_path = codebase_path_obj.parent / "bad"
+        if bad_path.exists() and any(bad_path.iterdir()):
+            actual_codebase_path = str(bad_path)
+
     story_specs = [s.prompt for s in story.sessions]
+    codebase_mutation = None
+    spec_mutations = {}
     if mutation is None and condition != PerturbationCondition.CLEAN:
         codebase_mutation, spec_mutations = condition_to_mutations(
             condition,
             codebase_path_obj,
             story_specs,
         )
-    else:
-        codebase_mutation = None
-        spec_mutations = {}
 
     result = StoryResult(
         story_name=story.name,
@@ -397,7 +397,7 @@ def run_story(
     )
 
     try:
-        _prepare_worktree(codebase_path, worktree, codebase_mutation)
+        _prepare_worktree(actual_codebase_path, worktree, codebase_mutation if codebase_mutation and codebase_mutation.would_produce_changes() else None)
         result.language = _detect_or_use(worktree, story.language)
 
         for spec in story.sessions:

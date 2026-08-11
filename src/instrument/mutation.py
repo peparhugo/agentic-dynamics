@@ -321,28 +321,27 @@ def _call_opencode(
     *,
     model: str = "deepseek/deepseek-v4-flash",
     timeout: int = 300,
-    silent: bool = True,
 ) -> str | None:
     """Run a single-turn prompt through opencode CLI.
 
     Returns the model's text response, or None on failure.
     """
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".txt", delete=False, prefix="mut_"
-    ) as f:
-        f.write(prompt)
-        prompt_file = f.name
+    import os
+    import re
+
+    opencode_bin = os.environ.get(
+        "OPENCODE_BIN",
+        str(Path.home() / ".opencode/bin/opencode"),
+    )
+
+    args = [
+        opencode_bin, "run",
+        prompt,
+        "--model", model,
+        "--auto",
+    ]
 
     try:
-        args = [
-            "open", "code",
-            "--model", model,
-            "--prompt-file", prompt_file,
-            "--timeout", str(timeout),
-        ]
-        if silent:
-            args.append("--silent")
-
         result = subprocess.run(
             args,
             capture_output=True,
@@ -350,17 +349,18 @@ def _call_opencode(
             timeout=timeout + 30,
         )
 
-        if result.returncode == 0 and result.stdout.strip():
-            return result.stdout.strip()
-        return None
+        output = result.stdout or ""
+        # Strip ANSI escape codes
+        output = re.sub(r'\x1b\[[0-9;]*m', '', output)
+        # Strip opencode header lines ("> build · model" etc)
+        lines = [l for l in output.splitlines()
+                 if l.strip() and not l.strip().startswith(">")]
+        return "\n".join(lines).strip() or None
 
-    except (subprocess.TimeoutExpired, FileNotFoundError):
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        import sys
+        print(f"WARNING: opencode call failed: {e}", file=sys.stderr)
         return None
-    finally:
-        try:
-            Path(prompt_file).unlink()
-        except OSError:
-            pass
 
 
 # ── Artifact Application ───────────────────────────────────────
