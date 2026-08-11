@@ -1,5 +1,6 @@
 import jwt
 import pytest
+from unittest.mock import patch
 
 from app import app, init_db, get_db
 
@@ -256,3 +257,48 @@ class TestTaskIsolation:
         client.post("/tasks", json={"title": "User1 task"}, headers=headers)
         resp = client.put("/tasks/1", json={"title": "Hijacked"}, headers=other_headers)
         assert resp.status_code == 404
+
+
+class TestNotification:
+    def test_completed_status_triggers_notification(self, client, headers):
+        client.post("/tasks", json={"title": "Notify me"}, headers=headers)
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                "/tasks/1", json={"status": "completed"}, headers=headers
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_called_once_with(
+                "testuser@example.com", "Notify me"
+            )
+
+    def test_non_completed_status_does_not_trigger(self, client, headers):
+        client.post("/tasks", json={"title": "No notify"}, headers=headers)
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                "/tasks/1", json={"status": "in_progress"}, headers=headers
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_already_completed_does_not_trigger_again(self, client, headers):
+        client.post("/tasks", json={"title": "Done task"}, headers=headers)
+        client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                "/tasks/1", json={"status": "completed"}, headers=headers
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_not_called()
+
+    def test_completed_with_title_update_triggers_notification(self, client, headers):
+        client.post("/tasks", json={"title": "Old"}, headers=headers)
+        with patch("app.send_notification_email.delay") as mock_delay:
+            resp = client.put(
+                "/tasks/1",
+                json={"title": "New", "status": "completed"},
+                headers=headers,
+            )
+            assert resp.status_code == 200
+            mock_delay.assert_called_once_with(
+                "testuser@example.com", "Old"
+            )

@@ -6,6 +6,8 @@ import jwt
 from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import send_notification_email
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev-secret-key"
 
@@ -45,6 +47,10 @@ def init_db():
         db.execute(
             "ALTER TABLE task ADD COLUMN owner_id INTEGER REFERENCES user(id)"
         )
+    except sqlite3.OperationalError:
+        pass
+    try:
+        db.execute("ALTER TABLE user ADD COLUMN email TEXT")
     except sqlite3.OperationalError:
         pass
     db.commit()
@@ -114,9 +120,10 @@ def register():
         return jsonify({"error": "Username already exists"}), 409
 
     password_hash = generate_password_hash(password)
+    email = data.get("email", f"{username.strip()}@example.com")
     cursor = db.execute(
-        "INSERT INTO user (username, password_hash) VALUES (?, ?)",
-        (username.strip(), password_hash),
+        "INSERT INTO user (username, password_hash, email) VALUES (?, ?, ?)",
+        (username.strip(), password_hash, email),
     )
     db.commit()
     return jsonify({"id": cursor.lastrowid, "username": username.strip()}), 201
@@ -230,6 +237,12 @@ def update_task(task_id):
         ),
     )
     db.commit()
+
+    if row["status"] != "completed" and status == "completed":
+        user = db.execute(
+            "SELECT email FROM user WHERE id = ?", (g.current_user_id,)
+        ).fetchone()
+        send_notification_email.delay(user["email"], row["title"])
 
     row = db.execute(
         "SELECT * FROM task WHERE id = ? AND owner_id = ?",
