@@ -1,9 +1,5 @@
 ---
-title: My Post
-date: 2024-03-10
-tags:
-  - blog
+title: Post
+date: 2024-01-01
 ---
-# My Post
-
-Content here.
+# Post

@@ -8,6 +8,11 @@ import { TemplateEngine } from './templates';
 import { PageData } from './types';
 import { startDevServer } from './server';
 import { parseArgs } from './index';
+import { SsgEngine } from './ssg-engine';
+import { Plugin, BuildContext } from './plugin';
+import { MarkdownPlugin } from './plugins/markdown';
+import { TemplatePlugin } from './plugins/template';
+import { DevServerPlugin } from './plugins/dev-server';
 
 const tmpDir = path.join(__dirname, '..', '.test-tmp');
 
@@ -632,5 +637,705 @@ date: 2024-08-01
   it('parseArgs uses default port 3000', () => {
     const result = parseArgs(['serve']);
     expect(result.port).toBe(3000);
+  });
+});
+
+describe('Plugin interface', () => {
+  it('implements all lifecycle hooks on a custom plugin', () => {
+    const hooks: string[] = [];
+
+    const plugin: Plugin = {
+      name: 'test-plugin',
+      onStart(_ctx: BuildContext) {
+        hooks.push('onStart');
+      },
+      beforeBuild(_ctx: BuildContext) {
+        hooks.push('beforeBuild');
+      },
+      afterBuild(_ctx: BuildContext) {
+        hooks.push('afterBuild');
+      },
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        hooks.push('onFile');
+        return page;
+      },
+      onEnd(_ctx: BuildContext) {
+        hooks.push('onEnd');
+      },
+    };
+
+    expect(plugin.name).toBe('test-plugin');
+    expect(typeof plugin.onStart).toBe('function');
+    expect(typeof plugin.beforeBuild).toBe('function');
+    expect(typeof plugin.afterBuild).toBe('function');
+    expect(typeof plugin.onFile).toBe('function');
+    expect(typeof plugin.onEnd).toBe('function');
+  });
+
+  it('allows plugins with only a subset of hooks', () => {
+    const plugin: Plugin = {
+      name: 'minimal',
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        return page;
+      },
+    };
+
+    expect(plugin.name).toBe('minimal');
+    expect(plugin.onStart).toBeUndefined();
+    expect(plugin.beforeBuild).toBeUndefined();
+    expect(plugin.afterBuild).toBeUndefined();
+    expect(typeof plugin.onFile).toBe('function');
+    expect(plugin.onEnd).toBeUndefined();
+  });
+});
+
+describe('SsgEngine', () => {
+  it('builds a site using the plugin pipeline', async () => {
+    const contentDir = setupContentDir({
+      'post.md': `---
+title: Pipeline Post
+date: 2024-06-15
+tags:
+  - blog
+---
+# Pipeline Post
+
+Content from plugin pipeline.`,
+    });
+
+    const dist = outputDir();
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf-8');
+    expect(indexHtml).toContain('<!DOCTYPE html>');
+    expect(indexHtml).toContain('Pipeline Post');
+    expect(indexHtml).toContain('post.html');
+    expect(indexHtml).toContain('2024-06-15');
+    expect(indexHtml).toContain('blog');
+
+    const postHtml = fs.readFileSync(path.join(dist, 'post.html'), 'utf-8');
+    expect(postHtml).toContain('<!DOCTYPE html>');
+    expect(postHtml).toContain('<h1>Pipeline Post</h1>');
+    expect(postHtml).toContain('Pipeline Post');
+  });
+
+  it('runs lifecycle hooks in the correct order', async () => {
+    const contentDir = setupContentDir({
+      'a.md': `---
+title: A
+date: 2024-01-01
+---
+# A`,
+    });
+
+    const dist = outputDir();
+    const order: string[] = [];
+
+    const tracePlugin: Plugin = {
+      name: 'trace',
+      onStart(_ctx: BuildContext) {
+        order.push('onStart');
+      },
+      beforeBuild(_ctx: BuildContext) {
+        order.push('beforeBuild');
+      },
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        order.push('onFile');
+        return page;
+      },
+      afterBuild(_ctx: BuildContext) {
+        order.push('afterBuild');
+      },
+      onEnd(_ctx: BuildContext) {
+        order.push('onEnd');
+      },
+    };
+
+    const engine = new SsgEngine([
+      tracePlugin,
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    expect(order).toEqual([
+      'onStart',
+      'beforeBuild',
+      'onFile',
+      'afterBuild',
+      'onEnd',
+    ]);
+  });
+
+  it('runs multiple plugins in registered order', async () => {
+    const contentDir = setupContentDir({
+      'a.md': `---
+title: A
+date: 2024-01-01
+---
+# A`,
+    });
+
+    const dist = outputDir();
+    const callOrder: string[] = [];
+
+    const pluginA: Plugin = {
+      name: 'plugin-a',
+      onStart(_ctx: BuildContext) {
+        callOrder.push('a:onStart');
+      },
+      beforeBuild(_ctx: BuildContext) {
+        callOrder.push('a:beforeBuild');
+      },
+      afterBuild(_ctx: BuildContext) {
+        callOrder.push('a:afterBuild');
+      },
+      onEnd(_ctx: BuildContext) {
+        callOrder.push('a:onEnd');
+      },
+    };
+
+    const pluginB: Plugin = {
+      name: 'plugin-b',
+      onStart(_ctx: BuildContext) {
+        callOrder.push('b:onStart');
+      },
+      beforeBuild(_ctx: BuildContext) {
+        callOrder.push('b:beforeBuild');
+      },
+      afterBuild(_ctx: BuildContext) {
+        callOrder.push('b:afterBuild');
+      },
+      onEnd(_ctx: BuildContext) {
+        callOrder.push('b:onEnd');
+      },
+    };
+
+    const engine = new SsgEngine([
+      pluginA,
+      new MarkdownPlugin(),
+      pluginB,
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    const aStart = callOrder.indexOf('a:onStart');
+    const bStart = callOrder.indexOf('b:onStart');
+    expect(aStart).toBeLessThan(bStart);
+
+    const aBefore = callOrder.indexOf('a:beforeBuild');
+    const bBefore = callOrder.indexOf('b:beforeBuild');
+    expect(aBefore).toBeLessThan(bBefore);
+
+    const aAfter = callOrder.indexOf('a:afterBuild');
+    const bAfter = callOrder.indexOf('b:afterBuild');
+    expect(aAfter).toBeLessThan(bAfter);
+
+    const aEnd = callOrder.indexOf('a:onEnd');
+    const bEnd = callOrder.indexOf('b:onEnd');
+    expect(aEnd).toBeLessThan(bEnd);
+  });
+
+  it('throws when content directory does not exist', async () => {
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+
+    await expect(
+      engine.build({
+        contentDir: '/nonexistent/dir',
+        outputDir: outputDir(),
+        templatesDir: outputDir(),
+      })
+    ).rejects.toThrow('Content directory not found');
+  });
+
+  it('ignores non-markdown files', async () => {
+    const contentDir = setupContentDir({
+      'post.md': `---
+title: Post
+date: 2024-01-01
+---
+# Post`,
+      'readme.txt': 'not markdown',
+    });
+
+    const dist = outputDir();
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    expect(fs.existsSync(path.join(dist, 'post.html'))).toBe(true);
+    expect(fs.existsSync(path.join(dist, 'readme.html'))).toBe(false);
+  });
+
+  it('handles multiple pages and creates index sorted by date', async () => {
+    const contentDir = setupContentDir({
+      'old.md': `---
+title: Old Post
+date: 2024-01-01
+---
+# Old`,
+      'new.md': `---
+title: New Post
+date: 2024-06-01
+---
+# New`,
+    });
+
+    const dist = outputDir();
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf-8');
+    const newIdx = indexHtml.indexOf('New Post');
+    const oldIdx = indexHtml.indexOf('Old Post');
+    expect(newIdx).toBeLessThan(oldIdx);
+  });
+});
+
+describe('MarkdownPlugin', () => {
+  it('parses a raw page and returns PageData with HTML', () => {
+    const plugin = new MarkdownPlugin();
+
+    const rawPage: PageData = {
+      slug: 'hello',
+      frontmatter: { title: 'hello', date: '', tags: [] },
+      content: `---
+title: Hello World
+date: 2024-01-15
+tags:
+  - typescript
+  - cli
+---
+# Hello
+
+This is a test post.`,
+      html: '',
+    };
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: '',
+      templatesDir: '',
+      pages: [],
+    };
+
+    const result = plugin.onFile(rawPage, ctx);
+    expect(result.slug).toBe('hello');
+    expect(result.frontmatter.title).toBe('Hello World');
+    expect(result.frontmatter.date).toBe('2024-01-15');
+    expect(result.frontmatter.tags).toEqual(['typescript', 'cli']);
+    expect(result.html).toContain('<h1>Hello</h1>');
+    expect(result.html).toContain('<p>This is a test post.</p>');
+    expect(result.content).not.toContain('---');
+  });
+
+  it('uses filename as title when no title in frontmatter', () => {
+    const plugin = new MarkdownPlugin();
+
+    const rawPage: PageData = {
+      slug: 'no-title',
+      frontmatter: { title: 'no-title', date: '', tags: [] },
+      content: `---
+date: 2024-02-01
+---
+# Content`,
+      html: '',
+    };
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: '',
+      templatesDir: '',
+      pages: [],
+    };
+
+    const result = plugin.onFile(rawPage, ctx);
+    expect(result.frontmatter.title).toBe('no-title');
+  });
+
+  it('handles missing date and tags gracefully', () => {
+    const plugin = new MarkdownPlugin();
+
+    const rawPage: PageData = {
+      slug: 'minimal',
+      frontmatter: { title: 'minimal', date: '', tags: [] },
+      content: `---
+title: Minimal
+---
+Just content.`,
+      html: '',
+    };
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: '',
+      templatesDir: '',
+      pages: [],
+    };
+
+    const result = plugin.onFile(rawPage, ctx);
+    expect(result.frontmatter.date).toBe('');
+    expect(result.frontmatter.tags).toEqual([]);
+  });
+
+  it('parses template and layout from frontmatter', () => {
+    const plugin = new MarkdownPlugin();
+
+    const rawPage: PageData = {
+      slug: 'custom',
+      frontmatter: { title: 'custom', date: '', tags: [] },
+      content: `---
+title: Custom Page
+date: 2024-01-01
+template: fancy
+layout: wide
+---
+# Custom`,
+      html: '',
+    };
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: '',
+      templatesDir: '',
+      pages: [],
+    };
+
+    const result = plugin.onFile(rawPage, ctx);
+    expect(result.frontmatter.template).toBe('fancy');
+    expect(result.frontmatter.layout).toBe('wide');
+  });
+});
+
+describe('TemplatePlugin', () => {
+  it('renders and writes HTML files', async () => {
+    const dist = outputDir();
+    const pages: PageData[] = [
+      {
+        slug: 'test-post',
+        frontmatter: {
+          title: 'Test Post',
+          date: '2024-03-10',
+          tags: ['blog'],
+        },
+        content: '# Test',
+        html: '<h1>Test</h1>',
+      },
+    ];
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: dist,
+      templatesDir: dist,
+      pages,
+    };
+
+    const plugin = new TemplatePlugin();
+    await plugin.afterBuild(ctx);
+
+    expect(fs.existsSync(path.join(dist, 'test-post.html'))).toBe(true);
+    expect(fs.existsSync(path.join(dist, 'index.html'))).toBe(true);
+
+    const postHtml = fs.readFileSync(path.join(dist, 'test-post.html'), 'utf-8');
+    expect(postHtml).toContain('<!DOCTYPE html>');
+    expect(postHtml).toContain('Test Post');
+    expect(postHtml).toContain('<h1>Test</h1>');
+  });
+
+  it('creates the output directory if it does not exist', async () => {
+    const dist = outputDir();
+    const pages: PageData[] = [
+      {
+        slug: 'p',
+        frontmatter: { title: 'P', date: '2024-01-01', tags: [] },
+        content: '# P',
+        html: '<h1>P</h1>',
+      },
+    ];
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: dist,
+      templatesDir: dist,
+      pages,
+    };
+
+    const plugin = new TemplatePlugin();
+    await plugin.afterBuild(ctx);
+
+    expect(fs.existsSync(dist)).toBe(true);
+    expect(fs.existsSync(path.join(dist, 'index.html'))).toBe(true);
+    expect(fs.existsSync(path.join(dist, 'p.html'))).toBe(true);
+  });
+
+  it('uses custom templates from a directory', async () => {
+    const templatesDir = setupTemplatesDir({
+      'layouts/fancy-layout.hbs': `<!DOCTYPE html><html><head><title>{{title}}</title></head><body><section>{{{body}}}</section></body></html>`,
+      'fancy.hbs': `<div class="fancy-post"><h2>{{title}}</h2><time>{{date}}</time><div class="content">{{{content}}}</div></div>`,
+      'index.hbs': `<ul>{{#each pages}}<li><a href="{{slug}}.html">{{title}}</a></li>{{/each}}</ul>`,
+    });
+
+    const dist = outputDir();
+    const pages: PageData[] = [
+      {
+        slug: 'post',
+        frontmatter: {
+          title: 'Custom Template Post',
+          date: '2024-05-01',
+          tags: [],
+          template: 'fancy',
+          layout: 'fancy-layout',
+        },
+        content: '# Fancy',
+        html: '<h1>Fancy</h1>',
+      },
+    ];
+
+    const ctx: BuildContext = {
+      contentDir: '',
+      outputDir: dist,
+      templatesDir,
+      pages,
+    };
+
+    const plugin = new TemplatePlugin();
+    await plugin.afterBuild(ctx);
+
+    const postHtml = fs.readFileSync(path.join(dist, 'post.html'), 'utf-8');
+    expect(postHtml).toContain('<div class="fancy-post">');
+    expect(postHtml).toContain('<h2>Custom Template Post</h2>');
+    expect(postHtml).toContain('<section>');
+
+    const indexHtml = fs.readFileSync(path.join(dist, 'index.html'), 'utf-8');
+    expect(indexHtml).toContain('<a href="post.html">Custom Template Post</a>');
+  });
+});
+
+describe('DevServerPlugin with engine', () => {
+  let port: number;
+  let contentDir: string;
+  let dist: string;
+
+  beforeEach(async () => {
+    contentDir = setupContentDir({
+      'post.md': `---
+title: Plugin Post
+date: 2024-03-10
+tags:
+  - blog
+---
+# Plugin Post
+
+Content served via plugin.`,
+    });
+    dist = outputDir();
+    port = await getFreePort();
+  });
+
+  it('serves HTML files from the output directory', async () => {
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+    const devServer = new DevServerPlugin(engine);
+    const server = await devServer.serve({
+      contentDir,
+      outputDir: dist,
+      templatesDir: dist,
+      port,
+    });
+
+    await new Promise((r) => server.on('listening', r));
+
+    const { status, body } = await httpGet(`http://localhost:${port}/post.html`);
+    expect(status).toBe(200);
+    expect(body).toContain('<!DOCTYPE html>');
+    expect(body).toContain('Plugin Post');
+
+    server.close();
+  });
+
+  it('injects live-reload WebSocket script into HTML', async () => {
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+    const devServer = new DevServerPlugin(engine);
+    const server = await devServer.serve({
+      contentDir,
+      outputDir: dist,
+      templatesDir: dist,
+      port,
+    });
+
+    await new Promise((r) => server.on('listening', r));
+
+    const { body } = await httpGet(`http://localhost:${port}/post.html`);
+    expect(body).toContain("WebSocket('ws://' + location.host)");
+    expect(body).toContain("msg.data === 'reload'");
+    expect(body).toContain('location.reload()');
+
+    server.close();
+  });
+
+  it('serves index.html for the root path', async () => {
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      new TemplatePlugin(),
+    ]);
+    const devServer = new DevServerPlugin(engine);
+    const server = await devServer.serve({
+      contentDir,
+      outputDir: dist,
+      templatesDir: dist,
+      port,
+    });
+
+    await new Promise((r) => server.on('listening', r));
+
+    const { status, body } = await httpGet(`http://localhost:${port}/`);
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Blog</h1>');
+
+    server.close();
+  });
+});
+
+describe('Plugin pipeline extensibility', () => {
+  it('custom plugin can transform pages in the pipeline', async () => {
+    const contentDir = setupContentDir({
+      'post.md': `---
+title: Original Title
+date: 2024-01-01
+---
+# Original Content`,
+    });
+
+    const dist = outputDir();
+
+    const uppercasePlugin: Plugin = {
+      name: 'uppercase',
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        return {
+          ...page,
+          frontmatter: {
+            ...page.frontmatter,
+            title: page.frontmatter.title.toUpperCase(),
+          },
+          html: page.html.toUpperCase(),
+        };
+      },
+    };
+
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      uppercasePlugin,
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    const postHtml = fs.readFileSync(path.join(dist, 'post.html'), 'utf-8');
+    expect(postHtml).toContain('ORIGINAL TITLE');
+  });
+
+  it('plugin pipeline order affects output', async () => {
+    const contentDir = setupContentDir({
+      'post.md': `---
+title: Hello
+date: 2024-01-01
+---
+# Hello`,
+    });
+
+    const dist = outputDir();
+
+    const prefixPlugin: Plugin = {
+      name: 'prefix',
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        return {
+          ...page,
+          frontmatter: {
+            ...page.frontmatter,
+            title: 'Prefix: ' + page.frontmatter.title,
+          },
+        };
+      },
+    };
+
+    const suffixPlugin: Plugin = {
+      name: 'suffix',
+      onFile(page: PageData, _ctx: BuildContext): PageData {
+        return {
+          ...page,
+          frontmatter: {
+            ...page.frontmatter,
+            title: page.frontmatter.title + ' :Suffix',
+          },
+        };
+      },
+    };
+
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      prefixPlugin,
+      suffixPlugin,
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    const postHtml = fs.readFileSync(path.join(dist, 'post.html'), 'utf-8');
+    expect(postHtml).toContain('Prefix: Hello :Suffix');
+  });
+
+  it('plugin can add metadata in beforeBuild and use it in afterBuild', async () => {
+    const contentDir = setupContentDir({
+      'post.md': `---
+title: Post
+date: 2024-01-01
+---
+# Post`,
+    });
+
+    const dist = outputDir();
+    let capturedPages: PageData[] = [];
+
+    const metaPlugin: Plugin = {
+      name: 'meta',
+      beforeBuild(_ctx: BuildContext) {},
+      afterBuild(ctx: BuildContext) {
+        capturedPages = ctx.pages;
+      },
+    };
+
+    const engine = new SsgEngine([
+      new MarkdownPlugin(),
+      metaPlugin,
+      new TemplatePlugin(),
+    ]);
+
+    await engine.build({ contentDir, outputDir: dist, templatesDir: dist });
+
+    expect(capturedPages).toHaveLength(1);
+    expect(capturedPages[0].slug).toBe('post');
+    expect(capturedPages[0].frontmatter.title).toBe('Post');
   });
 });

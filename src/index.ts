@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 
-import { parseFiles } from './parser';
-import { generateSite } from './generator';
-import { startDevServer } from './server';
+import { MarkdownPlugin } from './plugins/markdown';
+import { TemplatePlugin } from './plugins/template';
+import { DevServerPlugin } from './plugins/dev-server';
+import { SsgEngine } from './ssg-engine';
+
+export { SsgEngine } from './ssg-engine';
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/template';
+export { DevServerPlugin } from './plugins/dev-server';
 
 export function parseArgs(args: string[]): {
   contentDir: string;
@@ -40,12 +46,18 @@ export function parseArgs(args: string[]): {
   return { command, contentDir, outputDir, templatesDir, port };
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const { command, contentDir, outputDir, templatesDir, port } = parseArgs(args);
 
+  const engine = new SsgEngine([
+    new MarkdownPlugin(),
+    new TemplatePlugin(),
+  ]);
+
   if (command === 'serve') {
-    startDevServer({ contentDir, outputDir, templatesDir, port });
+    const devServer = new DevServerPlugin(engine);
+    devServer.serve({ contentDir, outputDir, templatesDir, port });
     return;
   }
 
@@ -57,8 +69,7 @@ function main() {
   }
 
   try {
-    const parseResult = parseFiles({ contentDir, outputDir });
-    generateSite(parseResult, outputDir, templatesDir);
+    await engine.build({ contentDir, outputDir, templatesDir });
     console.log(`Site generated in ${outputDir}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
