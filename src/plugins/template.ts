@@ -15,8 +15,13 @@ export class TemplatePlugin implements Plugin {
     engine.init();
 
     for (const page of ctx.pages) {
-      const html = engine.renderPage(page);
-      fs.writeFileSync(path.join(ctx.outputDir, `${page.slug}.html`), html);
+      if (ctx.cachedPages && ctx.cachedPages.has(page.slug)) {
+        const cachedHtml = ctx.cachedPages.get(page.slug)!;
+        fs.writeFileSync(path.join(ctx.outputDir, `${page.slug}.html`), cachedHtml);
+      } else {
+        const html = engine.renderPage(page);
+        fs.writeFileSync(path.join(ctx.outputDir, `${page.slug}.html`), html);
+      }
     }
 
     const indexHtml = engine.renderIndex(ctx.pages);

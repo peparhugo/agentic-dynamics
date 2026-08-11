@@ -5,6 +5,9 @@ export interface BuildContext {
   outputDir: string;
   templatesDir: string;
   pages: PageData[];
+  incremental?: boolean;
+  cachedPages?: Map<string, string>;
+  buildStats?: { pagesBuilt: number; pagesSkipped: number; timeSavedMs: number };
 }
 
 export interface Plugin {

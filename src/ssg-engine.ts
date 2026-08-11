@@ -2,6 +2,10 @@ import fs from 'fs';
 import path from 'path';
 import { Plugin, BuildContext } from './plugin';
 import { PageData } from './types';
+import { CacheManager, BuildStats, CacheEntry } from './cache';
+
+export { BuildStats } from './cache';
+export { CacheManager } from './cache';
 
 export class SsgEngine {
   plugins: Plugin[];
@@ -14,12 +18,32 @@ export class SsgEngine {
     contentDir: string;
     outputDir: string;
     templatesDir: string;
-  }): Promise<void> {
+    incremental?: boolean;
+    clean?: boolean;
+  }): Promise<BuildStats> {
+    const stats: BuildStats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
+
+    const cache = new CacheManager(options.outputDir);
+
+    if (options.clean) {
+      cache.delete();
+    }
+
+    const isIncremental = !!(options.incremental);
+    let templateHash = '';
+
+    if (isIncremental) {
+      cache.load();
+      templateHash = CacheManager.computeTemplateHash(options.templatesDir);
+    }
+
     const ctx: BuildContext = {
       contentDir: options.contentDir,
       outputDir: options.outputDir,
       templatesDir: options.templatesDir,
       pages: [],
+      incremental: isIncremental,
+      buildStats: stats,
     };
 
     await this.runHook('onStart', ctx);
@@ -30,10 +54,32 @@ export class SsgEngine {
     }
 
     const files = fs.readdirSync(ctx.contentDir).filter((f) => f.endsWith('.md'));
+    const cachedHtmlMap = new Map<string, string>();
+    const builtSlugs: string[] = [];
 
     for (const file of files) {
       const slug = file.replace(/\.md$/, '');
-      const rawContent = fs.readFileSync(path.join(ctx.contentDir, file), 'utf-8');
+      const filePath = path.join(ctx.contentDir, file);
+      const rawContent = fs.readFileSync(filePath, 'utf-8');
+      const contentHash = CacheManager.computeContentHash(filePath);
+
+      if (isIncremental && !cache.isStale(slug, contentHash, templateHash)) {
+        const cached = cache.getCachedPage(slug);
+        if (cached) {
+          const cachedPage: PageData = {
+            slug,
+            frontmatter: cached.frontmatter,
+            content: rawContent,
+            html: cached.html,
+          };
+          ctx.pages.push(cachedPage);
+          cachedHtmlMap.set(slug, cached.html);
+          stats.pagesSkipped++;
+          const perPageTimeMs = 10;
+          stats.timeSavedMs += perPageTimeMs;
+          continue;
+        }
+      }
 
       let page: PageData = {
         slug,
@@ -52,10 +98,51 @@ export class SsgEngine {
       }
 
       ctx.pages.push(page);
+      stats.pagesBuilt++;
+      builtSlugs.push(slug);
+
+      if (isIncremental) {
+        const entry: CacheEntry = {
+          slug,
+          contentHash,
+          templateHash,
+          html: page.html,
+          frontmatter: page.frontmatter,
+        };
+        cache.setEntry(entry);
+      }
+    }
+
+    if (cachedHtmlMap.size > 0) {
+      ctx.cachedPages = cachedHtmlMap;
     }
 
     await this.runHook('afterBuild', ctx);
+
+    if (isIncremental) {
+      for (const slug of builtSlugs) {
+        const htmlFile = path.join(options.outputDir, `${slug}.html`);
+        if (fs.existsSync(htmlFile)) {
+          const renderedHtml = fs.readFileSync(htmlFile, 'utf-8');
+          const entry = cache.getEntry(slug);
+          if (entry) {
+            entry.html = renderedHtml;
+            cache.setEntry(entry);
+          }
+        }
+      }
+      cache.save();
+    }
+
     await this.runHook('onEnd', ctx);
+
+    if (isIncremental && stats.pagesSkipped > 0) {
+      console.log(
+        `[ssg] Built ${stats.pagesBuilt} page(s), skipped ${stats.pagesSkipped} page(s) unchanged, saved ~${stats.timeSavedMs}ms`
+      );
+    }
+
+    return stats;
   }
 
   private async runHook(

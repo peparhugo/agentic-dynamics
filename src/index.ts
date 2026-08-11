@@ -16,12 +16,16 @@ export function parseArgs(args: string[]): {
   templatesDir: string;
   command: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 } {
   const command = args[0] || 'build';
   let contentDir = './content';
   let outputDir = './dist';
   let templatesDir = './templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--content' && i + 1 < args.length) {
@@ -40,15 +44,19 @@ export function parseArgs(args: string[]): {
         process.exit(1);
       }
       i++;
+    } else if (args[i] === '--incremental') {
+      incremental = true;
+    } else if (args[i] === '--clean') {
+      clean = true;
     }
   }
 
-  return { command, contentDir, outputDir, templatesDir, port };
+  return { command, contentDir, outputDir, templatesDir, port, incremental, clean };
 }
 
 async function main() {
   const args = process.argv.slice(2);
-  const { command, contentDir, outputDir, templatesDir, port } = parseArgs(args);
+  const { command, contentDir, outputDir, templatesDir, port, incremental, clean } = parseArgs(args);
 
   const engine = new SsgEngine([
     new MarkdownPlugin(),
@@ -56,20 +64,20 @@ async function main() {
   ]);
 
   if (command === 'serve') {
-    const devServer = new DevServerPlugin(engine);
+    const devServer = new DevServerPlugin(engine, incremental);
     devServer.serve({ contentDir, outputDir, templatesDir, port });
     return;
   }
 
   if (command !== 'build') {
     console.error(`Unknown command: ${command}`);
-    console.error('Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+    console.error('Usage: npx ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]');
     console.error('       npx ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
     process.exit(1);
   }
 
   try {
-    await engine.build({ contentDir, outputDir, templatesDir });
+    await engine.build({ contentDir, outputDir, templatesDir, incremental, clean });
     console.log(`Site generated in ${outputDir}`);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

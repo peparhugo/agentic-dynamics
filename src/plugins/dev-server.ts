@@ -85,9 +85,11 @@ export class DevServerPlugin implements Plugin {
   name = 'dev-server';
 
   private engine: SsgEngine;
+  private incremental: boolean;
 
-  constructor(engine: SsgEngine) {
+  constructor(engine: SsgEngine, incremental = false) {
     this.engine = engine;
+    this.incremental = incremental;
   }
 
   async serve(options: DevServerOptions): Promise<http.Server> {
@@ -146,6 +148,7 @@ export class DevServerPlugin implements Plugin {
             contentDir: options.contentDir,
             outputDir: options.outputDir,
             templatesDir: options.templatesDir,
+            incremental: this.incremental,
           });
           notifyClients();
         } catch (err: unknown) {
