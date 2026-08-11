@@ -5,13 +5,49 @@ import os
 import jwt
 import bcrypt
 from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from celery_config import send_notification_email
 from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
+app.config["RATELIMIT_LIMIT"] = os.environ.get("RATELIMIT_LIMIT", "100 per minute")
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
+
+
+def _get_rate_limit_key():
+    auth = request.headers.get("Authorization")
+    if auth and auth.startswith("Bearer "):
+        token = auth[7:]
+        try:
+            data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return str(data["user_id"])
+        except Exception:
+            pass
+    return get_remote_address()
+
+
+def _get_rate_limit_limit():
+    return app.config.get("RATELIMIT_LIMIT", "100 per minute")
+
+
+def _on_rate_limit_breach(request_limit):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    return response
+
+
+limiter = Limiter(
+    key_func=_get_rate_limit_key,
+    storage_uri=os.environ.get("LIMITER_STORAGE_URI", "redis://localhost:6379"),
+    default_limits=[_get_rate_limit_limit],
+    headers_enabled=True,
+    retry_after="delta-seconds",
+    on_breach=_on_rate_limit_breach,
+)
+limiter.init_app(app)
 
 
 def get_db():
@@ -152,8 +188,11 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
-    tasks = task_repo.find_by_owner(g.user_id)
-    return jsonify(tasks)
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", type=int, default=20)
+    limit = max(1, min(limit, 100))
+    result = task_repo.find_by_owner_paginated(g.user_id, cursor=cursor, limit=limit)
+    return jsonify(result)
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
