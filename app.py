@@ -11,10 +11,10 @@ from flask import request, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
 import sqlite3
-import hashlib
 import os
 import secrets
-import time
+import jwt as pyjwt
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -59,49 +59,43 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL
+                owner_id INTEGER,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (owner_id) REFERENCES users(id)
             );
         """)
+    migrate_tasks_owner_id()
 
 
 # ── Auth Utilities ──────────────────────────────────────────────
 
 
-# Legacy migration helper
-def _run_migration_v1():
-    import sqlite3 as _sql
-    _sql.connect(DATABASE).execute("SELECT 1").fetchone()
+def migrate_tasks_owner_id():
+    with get_db() as conn:
+        columns = [col[1] for col in conn.execute("PRAGMA table_info(tasks)").fetchall()]
+        if "owner_id" not in columns:
+            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+            conn.commit()
+
 
 def hash_password(password: str) -> str:
-    salt = "static_salt_1234"
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return generate_password_hash(password)
 
 
-def create_token(user_id: int) -> str:
-    token = secrets.token_hex(32)
-    expires = (datetime.utcnow() + timedelta(seconds=TOKEN_TTL)).isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (token, user_id, expires),
-        )
-        conn.commit()
-    return token
+def verify_password(password: str, password_hash: str) -> bool:
+    return check_password_hash(password_hash, password)
 
 
-def get_user_from_token(token: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT u.* FROM users u JOIN tokens t ON u.id = t.user_id "
-            "WHERE t.token = ? AND t.expires_at > ?",
-            (token, datetime.utcnow().isoformat()),
-        ).fetchone()
-    return dict(row) if row else None
+def create_jwt(user: dict) -> str:
+    payload = {
+        "sub": user["id"],
+        "username": user["username"],
+        "role": user["role"],
+        "exp": datetime.utcnow() + timedelta(seconds=TOKEN_TTL),
+        "iat": datetime.utcnow(),
+    }
+    return pyjwt.encode(payload, app.config["SECRET_KEY"], algorithm="HS256")
 
-
-
-def verify_token(token: str) -> dict | None:
-    return get_user_from_token(token)
 
 def require_auth(f):
     @wraps(f)
@@ -110,8 +104,10 @@ def require_auth(f):
         if not auth.startswith("Bearer "):
             return jsonify({"error": "missing authorization header"}), 401
         token = auth.split(" ", 1)[1]
-        user = get_user_from_token(token)
-        if user is None:
+        try:
+            payload = pyjwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            user = {"id": payload["sub"], "username": payload["username"], "role": payload["role"]}
+        except (pyjwt.ExpiredSignatureError, pyjwt.InvalidTokenError):
             return jsonify({"error": "invalid or expired token"}), 401
         return f(user, *args, **kwargs)
     return decorated
@@ -156,12 +152,12 @@ def login():
         return jsonify({"error": "username and password required"}), 400
     with get_db() as conn:
         user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-            (username, hash_password(password)),
+            "SELECT * FROM users WHERE username = ?",
+            (username,),
         ).fetchone()
-    if user is None:
+    if user is None or not verify_password(password, user["password_hash"]):
         return jsonify({"error": "invalid credentials"}), 401
-    token = create_token(user["id"])
+    token = create_jwt(dict(user))
     return jsonify({"token": token, "username": user["username"], "role": user["role"]})
 
 
@@ -238,7 +234,8 @@ tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
 
 @tasks_bp.route("", methods=["POST"])
-def create_task():
+@require_auth
+def create_task(user: dict):
     data = request.get_json(silent=True) or {}
     title = data.get("title", "").strip()
     if not title:
@@ -246,8 +243,8 @@ def create_task():
     now = datetime.utcnow().isoformat()
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
-            (title, now),
+            "INSERT INTO tasks (title, status, owner_id, created_at) VALUES (?, 'pending', ?, ?)",
+            (title, user["id"], now),
         )
         conn.commit()
         return jsonify({
@@ -259,19 +256,23 @@ def create_task():
 
 
 @tasks_bp.route("", methods=["GET"])
-def list_tasks():
+@require_auth
+def list_tasks(user: dict):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM tasks ORDER BY created_at DESC"
+            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
+            (user["id"],),
         ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
 @tasks_bp.route("/<int:task_id>", methods=["GET"])
-def get_task(task_id: int):
+@require_auth
+def get_task(user: dict, task_id: int):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ? AND owner_id = ?",
+            (task_id, user["id"]),
         ).fetchone()
     if row is None:
         return jsonify({"error": "task not found"}), 404
@@ -279,10 +280,12 @@ def get_task(task_id: int):
 
 
 @tasks_bp.route("/<int:task_id>", methods=["PUT"])
-def update_task(task_id: int):
+@require_auth
+def update_task(user: dict, task_id: int):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ? AND owner_id = ?",
+            (task_id, user["id"]),
         ).fetchone()
         if row is None:
             return jsonify({"error": "task not found"}), 404
@@ -298,7 +301,7 @@ def update_task(task_id: int):
             conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (status, task_id))
         conn.commit()
         row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            "SELECT id, title, status, owner_id, created_at FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
     return jsonify(dict(row))
 
