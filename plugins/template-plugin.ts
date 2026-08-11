@@ -17,7 +17,7 @@ export class TemplatePlugin implements Plugin {
     const ctx = this.context;
     if (!ctx) return;
 
-    const { outputDir, templatesDir } = ctx;
+    const { outputDir, templatesDir, skippedSlugs } = ctx;
 
     let engine: TemplateEngine | undefined;
     if (templatesDir && fs.existsSync(templatesDir)) {
@@ -30,6 +30,10 @@ export class TemplatePlugin implements Plugin {
     }
 
     for (const page of pages) {
+      if (skippedSlugs?.has(page.slug)) {
+        continue;
+      }
+
       let html: string;
       if (engine) {
         const tplName = page.template || (engine.hasTemplate('default') ? 'default' : undefined);
@@ -39,6 +43,7 @@ export class TemplatePlugin implements Plugin {
         html = pageTemplate(page);
       }
       fs.writeFileSync(path.join(absoluteOutput, `${page.slug}.html`), html);
+      page.html = html;
     }
 
     let indexHtml: string;

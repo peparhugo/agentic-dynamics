@@ -50,7 +50,7 @@ class TemplatePlugin {
         const ctx = this.context;
         if (!ctx)
             return;
-        const { outputDir, templatesDir } = ctx;
+        const { outputDir, templatesDir, skippedSlugs } = ctx;
         let engine;
         if (templatesDir && fs.existsSync(templatesDir)) {
             engine = new template_engine_1.TemplateEngine({ templatesDir: path.resolve(templatesDir) });
@@ -60,6 +60,9 @@ class TemplatePlugin {
             fs.mkdirSync(absoluteOutput, { recursive: true });
         }
         for (const page of pages) {
+            if (skippedSlugs?.has(page.slug)) {
+                continue;
+            }
             let html;
             if (engine) {
                 const tplName = page.template || (engine.hasTemplate('default') ? 'default' : undefined);
@@ -70,6 +73,7 @@ class TemplatePlugin {
                 html = (0, template_1.pageTemplate)(page);
             }
             fs.writeFileSync(path.join(absoluteOutput, `${page.slug}.html`), html);
+            page.html = html;
         }
         let indexHtml;
         if (engine && engine.hasIndex()) {

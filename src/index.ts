@@ -15,9 +15,14 @@ program
   .option('--content <dir>', 'Content directory containing Markdown files', './content')
   .option('--output <dir>', 'Output directory for generated HTML files', './dist')
   .option('--templates <dir>', 'Templates directory for Handlebars layouts, templates, and partials', './templates')
+  .option('--incremental', 'Only rebuild changed pages using cache', false)
+  .option('--clean', 'Force a clean build, ignoring any existing cache', false)
   .action((options) => {
     try {
-      build(options.content, options.output, options.templates);
+      build(options.content, options.output, options.templates, {
+        incremental: options.incremental,
+        clean: options.clean,
+      });
       console.log(`Site built successfully. Output: ${options.output}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

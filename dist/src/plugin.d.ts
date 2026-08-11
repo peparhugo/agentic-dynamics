@@ -1,8 +1,13 @@
 import { Page } from './types';
+import { SsgCacheManifest } from './cache';
 export interface BuildContext {
     contentDir: string;
     outputDir: string;
     templatesDir?: string;
+    cache?: SsgCacheManifest | null;
+    cachePath?: string;
+    skippedSlugs?: Set<string>;
+    templatesHash?: string;
 }
 export interface Plugin {
     name: string;
