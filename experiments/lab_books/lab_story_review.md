@@ -15,6 +15,11 @@ model_tested: deepseek/deepseek-v4-pro
 sessions: 130
 cells: 26
 total_cost_usd: 0.0788
+note_on_cost: >-
+  The $0.0788 total reflects original session costs only. The 8 timeout recoveries
+  via --session --fork each ran a continuation opencode session with separate billing
+  (~$0.001-0.003 each). Estimated total with continuations: ~$0.10. Continuation costs
+  are in opencode's DB but were not captured in the story result JSONs.
 ---
 
 # Lab Book 14: Multi-Session Story Review
