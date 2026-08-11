@@ -93,36 +93,21 @@ class StoryReview:
 
 # ── Review Prompts ─────────────────────────────────────────────
 
-_COMMIT_REVIEW_PROMPT = """You are reviewing a git commit made by an AI coding agent.
-Your job is to assess whether this commit makes the codebase better or worse.
+_COMMIT_REVIEW_PROMPT = """Rate this git commit made by an AI coding agent on architectural fit and convention adherence.
 
-CONTEXT:
-This is session {session_number} of a multi-session story: {story_name}
-The commit message is: {commit_message}
+COMMIT: {commit_message}
 
 DIFF:
 {diff}
 
-Evaluate on these criteria:
-1. ARCHITECTURAL FIT (0.0-1.0): Does this change respect existing module boundaries?
-   Does it use existing abstractions or create unnecessary new ones?
-2. CONVENTION ADHERENCE (0.0-1.0): Does the new code follow the same naming,
-   formatting, and structural conventions as the existing codebase?
-3. TECHNICAL DEBT: Does this change introduce coupling, duplication, dead code,
-   or other patterns that will increase future maintenance burden?
-4. PATTERN RESPECT: Does this change follow existing architectural patterns?
-
-Output ONLY valid JSON, no other text:
-{{
-  "architectural_fit": <0.0-1.0>,
-  "convention_adherence": <0.0-1.0>,
-  "introduces_technical_debt": <true/false>,
-  "respects_existing_patterns": <true/false>,
-  "better_or_worse": "<better|worse|neutral|unclear>",
-  "problems": ["<specific problem>", ...],
-  "strengths": ["<specific strength>", ...],
-  "summary": "<one-sentence evaluation>"
-}}"""
+Output EXACTLY this format with no other text:
+arch_fit: <0.0-1.0>
+convention: <0.0-1.0>
+debt: <true/false>
+respects_patterns: <true/false>
+better_or_worse: <better|worse|neutral>
+summary: <one sentence>
+problems: <comma-separated list or none>"""
 
 _STORY_REVIEW_PROMPT = """You are reviewing a complete multi-session AI coding story.
 Across {session_count} sessions, an AI agent built a software project incrementally.
@@ -174,9 +159,25 @@ def review_commit(
     Returns:
         CommitReview with scores and findings.
     """
-    # Get commit metadata and diff
+    # Get commit metadata and diff (source files only)
     commit_msg = _run_git(worktree, "log", "-1", "--format=%s", commit_hash).strip()
-    diff = _run_git(worktree, "diff", f"{commit_hash}~1..{commit_hash}")
+    raw_diff = _run_git(worktree, "diff", f"{commit_hash}~1..{commit_hash}")
+
+    # Filter diff to source files only (skip pycache, .instrument, node_modules)
+    lines = []
+    keep = False
+    for line in raw_diff.splitlines():
+        if line.startswith("diff --git"):
+            keep = (
+                any(ext in line for ext in (".py", ".ts", ".tsx", ".js", ".json", ".yaml", ".yml", ".go", ".rs"))
+                and "__pycache__" not in line
+                and ".instrument" not in line
+                and "node_modules" not in line
+                and "dist/" not in line
+            )
+        if keep:
+            lines.append(line)
+    diff = "\n".join(lines)
 
     if not diff.strip():
         return CommitReview(
@@ -263,7 +264,7 @@ def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
 
 
 def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> CommitReview:
-    """Parse LLM response into CommitReview. Falls back to defaults on parse failure."""
+    """Parse LLM response into CommitReview. Handles both JSON and key:value formats."""
     defaults = CommitReview(
         commit_hash=commit_hash,
         reviewer_model=model,
@@ -278,8 +279,8 @@ def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> 
     if not response:
         return defaults
 
+    # Try JSON first
     try:
-        # Extract JSON from response (may have surrounding text)
         start = response.find("{")
         end = response.rfind("}") + 1
         if start >= 0 and end > start:
@@ -299,7 +300,84 @@ def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> 
     except (json.JSONDecodeError, KeyError, ValueError):
         pass
 
+    # Try key:value format
+    try:
+        import re
+        arch_fit = _extract_float(response, r"arch_fit:\s*([\d.]+)")
+        convention = _extract_float(response, r"convention:\s*([\d.]+)")
+        debt = _extract_bool(response, r"debt:\s*(true|false)")
+        respects = _extract_bool(response, r"respects_patterns:\s*(true|false)")
+        bow = _extract_str(response, r"better_or_worse:\s*(\w+)")
+        summary = _extract_str(response, r"summary:\s*(.+?)(?:\n|$)")
+        problems = _extract_list(response, r"problems:\s*(.+)")
+
+        if arch_fit is not None:
+            return CommitReview(
+                commit_hash=commit_hash, reviewer_model=model,
+                architectural_fit=max(0.0, min(1.0, arch_fit)),
+                convention_adherence=max(0.0, min(1.0, convention or arch_fit or 0.5)),
+                introduces_technical_debt=debt or False,
+                respects_existing_patterns=respects or True,
+                better_or_worse=bow or "unclear",
+                problems=[p.strip() for p in (problems or "").split(",") if p.strip() and p.strip() != "none"],
+                strengths=[],
+                summary=summary or "Review parsed from text output.",
+            )
+    except Exception:
+        pass
+
+    # Try single-number response (model returned just a score)
+    try:
+        text = response.strip()
+        if text.replace(".", "").replace("-", "").isdigit():
+            score = float(text)
+            return CommitReview(
+                commit_hash=commit_hash, reviewer_model=model,
+                architectural_fit=max(0.0, min(1.0, score)),
+                convention_adherence=max(0.0, min(1.0, score)),
+                better_or_worse="better" if score >= 0.5 else "worse",
+                summary=f"Score: {score}",
+            )
+    except (ValueError, AttributeError):
+        pass
+
     return defaults
+
+
+def _extract_float(text: str, pattern: str) -> float | None:
+    import re
+    m = re.search(pattern, text)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def _extract_bool(text: str, pattern: str) -> bool | None:
+    import re
+    m = re.search(pattern, text)
+    if m:
+        return m.group(1).lower() == "true"
+    return None
+
+
+def _extract_str(text: str, pattern: str) -> str | None:
+    import re
+    m = re.search(pattern, text)
+    if m:
+        return m.group(1).strip()
+    return None
+
+
+def _extract_list(text: str, pattern: str) -> str | None:
+    import re
+    m = re.search(pattern, text)
+    if m:
+        val = m.group(1).strip()
+        return val if val != "none" else ""
+    return None
 
 
 def _parse_story_review(response: str | None, story_name: str, model: str) -> StoryReview:
