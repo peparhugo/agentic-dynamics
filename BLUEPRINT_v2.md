@@ -39,13 +39,15 @@
 ### v0.9 — DeepSeek-Only Pipeline Validation ← ACTIVE
 **Sessions:** 30 cells × 5 = 150  |  **Cost:** ~$3
 
-**Strategy:** Prove full pipeline on DeepSeek first before spending on Luna (~$1.50) or Claude (~$99).
-
-- [ ] PerturbationCondition enum + condition_to_mutations() in story.py
-- [ ] run_story.py CLI: --condition, --codebase-quality flags
-- [ ] notification_service story (3rd built-in)
-- [ ] Bad codebase variants (Flash V4 → review → commit)
-- [ ] tier2_small seed codebases (Python + TypeScript)
+- [x] PerturbationCondition enum + condition_to_mutations() in story.py
+- [x] run_story.py CLI: --condition, --codebase-quality flags
+- [x] notification_service story (3rd built-in)
+- [x] Bad codebase variants (4 deterministic variants: Python+TS × tier1+tier2)
+- [x] tier2_small seed codebases (Python + TypeScript)
+- [x] opencode CLI fix (opencode run, not open code)
+- [x] Pipeline validated (pilot: 4/5 sessions, $0.0026)
+- [ ] Run DeepSeek matrix: 30 cells × 5 sessions = 150 sessions
+- [ ] Post-hoc analysis: analyze_stories.py + review agents + DVS
 
 ### v1.0 — Full Multi-Model Experiment (After Pipeline Validated)
 **Models:** DeepSeek V4 Pro, GPT-5.6 Luna, Claude Sonnet 5
