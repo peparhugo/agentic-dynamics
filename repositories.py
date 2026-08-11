@@ -50,6 +50,31 @@ class TaskRepository(BaseRepository):
             (owner_id,),
         )
 
+    def find_tasks_by_owner_paginated(self, owner_id, cursor, limit):
+        if cursor is not None:
+            return self._fetchall(
+                "SELECT id, title, status, owner_id, created_at FROM tasks "
+                "WHERE owner_id = ? AND id < ? "
+                "ORDER BY created_at DESC, id DESC "
+                "LIMIT ?",
+                (owner_id, cursor, limit),
+            )
+        else:
+            return self._fetchall(
+                "SELECT id, title, status, owner_id, created_at FROM tasks "
+                "WHERE owner_id = ? "
+                "ORDER BY created_at DESC, id DESC "
+                "LIMIT ?",
+                (owner_id, limit),
+            )
+
+    def count_tasks_by_owner(self, owner_id):
+        result = self._fetchone(
+            "SELECT COUNT(*) FROM tasks WHERE owner_id = ?",
+            (owner_id,),
+        )
+        return result[0] if result else 0
+
     def find_task_by_id_and_owner(self, task_id, owner_id):
         return self._fetchone(
             "SELECT id, title, status, owner_id, created_at FROM tasks "

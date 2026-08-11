@@ -15,6 +15,8 @@ import os
 import secrets
 import jwt as pyjwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from celery_tasks import send_notification_email
 from repositories import UserRepository, TaskRepository, ItemsRepository
 
@@ -23,6 +25,34 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 DATABASE = os.environ.get("DATABASE", "auth_api.db")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+
+
+# ── Rate Limiting ───────────────────────────────────────────────
+
+def get_rate_limit_key():
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        try:
+            token = auth.split(" ", 1)[1]
+            payload = pyjwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{payload['sub']}"
+        except Exception:
+            pass
+    addr = get_remote_address()
+    return addr or "127.0.0.1"
+
+
+RATE_LIMIT_STORAGE = os.environ.get("RATE_LIMIT_STORAGE", "redis://localhost:6379/2")
+APP_RATE_LIMIT = os.environ.get("APP_RATE_LIMIT", "100 per minute")
+
+limiter = Limiter(
+    key_func=get_rate_limit_key,
+    default_limits=[APP_RATE_LIMIT],
+    storage_uri=RATE_LIMIT_STORAGE,
+    strategy="fixed-window",
+    headers_enabled=True,
+)
+limiter.init_app(app)
 
 
 # ── Database ────────────────────────────────────────────────────
@@ -244,10 +274,23 @@ def create_task(user: dict):
 @tasks_bp.route("", methods=["GET"])
 @require_auth
 def list_tasks(user: dict):
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", type=int, default=20)
+    if limit < 1:
+        limit = 20
+    limit = min(limit, 100)
     with get_db() as conn:
         task_repo = TaskRepository(conn)
-        rows = task_repo.find_tasks_by_owner(user["id"])
-    return jsonify([dict(r) for r in rows])
+        total = task_repo.count_tasks_by_owner(user["id"])
+        rows = task_repo.find_tasks_by_owner_paginated(user["id"], cursor, limit + 1)
+    tasks = [dict(r) for r in rows]
+    has_more = len(tasks) > limit
+    if has_more:
+        tasks = tasks[:limit]
+        next_cursor = str(tasks[-1]["id"]) if tasks else None
+    else:
+        next_cursor = None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @tasks_bp.route("/<int:task_id>", methods=["GET"])
