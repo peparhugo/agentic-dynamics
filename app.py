@@ -3,7 +3,7 @@ import json
 import os
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import aiosqlite
@@ -14,6 +14,8 @@ from websockets.exceptions import ConnectionClosed
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 TRANSPORT = os.environ.get("TRANSPORT", "websocket")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 
 class BaseTransport(ABC):
@@ -113,6 +115,25 @@ def _create_transport() -> BaseTransport:
     raise ValueError(f"Unknown transport type: {transport_type}")
 
 
+class RateLimiter:
+    def __init__(self, redis_client=None, max_messages: int = 100):
+        self._redis = redis_client
+        self._max = max_messages
+
+    async def check(self, client_id: str) -> tuple[bool, str | None]:
+        if self._redis is None:
+            return (True, None)
+        try:
+            key = f"ratelimit:{client_id}"
+            count = await self._redis.incr(key)
+            await self._redis.expire(key, 60)
+            if count > self._max:
+                return (False, f"Rate limit exceeded. Max {self._max} messages per minute.")
+            return (True, None)
+        except Exception:
+            return (True, None)
+
+
 class MessageStore:
     def __init__(self, db_path: str):
         self._db_path = db_path
@@ -163,6 +184,49 @@ class MessageStore:
             }
             for row in rows
         ]
+
+    async def get_history(self, channel: str = "", since: str = "", limit: int = 50) -> tuple[list[dict], bool]:
+        if self._db is None:
+            return ([], False)
+        where_clauses = []
+        params: list = []
+        if channel:
+            where_clauses.append("channel = ?")
+            params.append(channel)
+        if since:
+            where_clauses.append("timestamp >= ?")
+            params.append(since)
+        where_sql = " AND ".join(where_clauses) if where_clauses else "1=1"
+        sql = (
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            f"WHERE {where_sql} ORDER BY timestamp ASC LIMIT ?"
+        )
+        params.append(limit + 1)
+        cursor = await self._db.execute(sql, tuple(params))
+        rows = await cursor.fetchall()
+        has_more = len(rows) > limit
+        result_rows = rows[:limit]
+        messages = [
+            {
+                "id": row[0],
+                "channel": row[1],
+                "type": row[2],
+                "payload": json.loads(row[3]),
+                "timestamp": row[4],
+            }
+            for row in result_rows
+        ]
+        return (messages, has_more)
+
+    async def cleanup_old_messages(self, ttl_days: int) -> int:
+        if self._db is None:
+            return 0
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+        cursor = await self._db.execute(
+            "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+        )
+        await self._db.commit()
+        return cursor.rowcount
 
     async def close(self) -> None:
         if self._db:
@@ -305,12 +369,16 @@ class ClientRegistry:
         self._lock = asyncio.Lock()
         self._bus: RedisMessageBus | None = None
         self._store: MessageStore | None = None
+        self._rate_limiter = None
 
     def set_bus(self, bus: RedisMessageBus) -> None:
         self._bus = bus
 
     def set_store(self, store: MessageStore) -> None:
         self._store = store
+
+    def set_rate_limiter(self, rl) -> None:
+        self._rate_limiter = rl
 
     async def register(self, websocket) -> str:
         return await self._transport.register(websocket)
@@ -432,6 +500,17 @@ def make_ws_handler(reg: ClientRegistry):
                 except json.JSONDecodeError:
                     continue
 
+                if reg._rate_limiter:
+                    allowed, error_msg = await reg._rate_limiter.check(client_id)
+                    if not allowed:
+                        err = json.dumps({
+                            "type": "error",
+                            "payload": {"message": error_msg},
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        })
+                        await reg._transport.send_message(client_id, err)
+                        continue
+
                 msg_type = data.get("type", "broadcast")
                 payload = data.get("payload", {})
 
@@ -523,6 +602,24 @@ def make_http_handler(reg: ClientRegistry):
                     "\r\n"
                     f"{body}"
                 )
+            elif method == "GET" and path == "/history":
+                channel = query_params.get("channel", "")
+                since = query_params.get("since", "")
+                limit = int(query_params.get("limit", "50"))
+                messages, has_more = [], False
+                if reg._store:
+                    messages, has_more = await reg._store.get_history(
+                        channel=channel, since=since, limit=limit
+                    )
+                body = json.dumps({"messages": messages, "has_more": has_more})
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {len(body)}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    f"{body}"
+                )
             elif method == "GET" and path.startswith("/channels/") and path.endswith("/subscribers"):
                 prefix = "/channels/"
                 suffix = "/subscribers"
@@ -591,6 +688,15 @@ async def start_server(ws_host: str = "localhost", ws_port: int = 8765,
     return ws_server, http_server
 
 
+async def _cleanup_loop(store: MessageStore, ttl_days: int) -> None:
+    while True:
+        try:
+            await store.cleanup_old_messages(ttl_days)
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
 async def main() -> None:
     store = MessageStore(DATABASE_URL)
     await store.connect()
@@ -600,11 +706,21 @@ async def main() -> None:
     await bus.connect()
     registry.set_bus(bus)
 
+    rl = RateLimiter(bus._pub if bus.enabled else None, RATE_LIMIT)
+    registry.set_rate_limiter(rl)
+
+    cleanup_task = asyncio.create_task(_cleanup_loop(store, MESSAGE_TTL_DAYS))
+
     ws_server, http_server = await start_server()
     try:
         async with ws_server, http_server:
             await asyncio.Future()
     finally:
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except asyncio.CancelledError:
+            pass
         await bus.close()
         await store.close()
 

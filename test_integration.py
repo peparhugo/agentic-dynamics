@@ -9,7 +9,7 @@ import pytest_asyncio
 import redis.asyncio as redis
 from websockets.asyncio.client import connect as ws_connect
 
-from app import ClientRegistry, MessageStore, RedisMessageBus, start_server
+from app import ClientRegistry, MessageStore, RateLimiter, RedisMessageBus, start_server
 
 
 def _find_free_port() -> int:
@@ -105,6 +105,9 @@ async def server_with_redis(redis_clean, temp_db):
     await bus.connect()
     reg.set_bus(bus)
 
+    rl = RateLimiter(bus._pub if bus.enabled else None, 100)
+    reg.set_rate_limiter(rl)
+
     ws_server, http_server = await start_server(
         ws_host="127.0.0.1", ws_port=ws_port,
         http_host="127.0.0.1", http_port=http_port,
@@ -139,6 +142,9 @@ async def two_servers(redis_clean, temp_db):
     await bus1.connect()
     reg1.set_bus(bus1)
 
+    rl1 = RateLimiter(bus1._pub if bus1.enabled else None, 100)
+    reg1.set_rate_limiter(rl1)
+
     ws_port1 = _find_free_port()
     http_port1 = _find_free_port()
     ws1, http1 = await start_server(
@@ -155,6 +161,9 @@ async def two_servers(redis_clean, temp_db):
     bus2 = RedisMessageBus(REDIS_URL, reg2, store2)
     await bus2.connect()
     reg2.set_bus(bus2)
+
+    rl2 = RateLimiter(bus2._pub if bus2.enabled else None, 100)
+    reg2.set_rate_limiter(rl2)
 
     ws_port2 = _find_free_port()
     http_port2 = _find_free_port()
@@ -556,3 +565,233 @@ async def test_redis_pubsub_delivers_to_all_subscribers(server_with_redis):
 
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(ws1.recv(), timeout=0.5)
+
+
+# ── Rate limiting tests ──
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_allows_up_to_limit(server_with_redis):
+    reg = server_with_redis["registry"]
+    reg._rate_limiter._max = 5
+    async with ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws:
+        await _recv_json(ws)
+        for i in range(5):
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
+    reg._rate_limiter._max = 100
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded_returns_error(server_with_redis):
+    reg = server_with_redis["registry"]
+    reg._rate_limiter._max = 5
+    async with ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws:
+        await _recv_json(ws)
+        for i in range(5):
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await asyncio.sleep(0.01)
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 99}}))
+        msg = await _recv_json(ws)
+        assert msg["type"] == "error"
+        assert "Rate limit exceeded" in msg["payload"]["message"]
+        assert "5" in msg["payload"]["message"]
+    reg._rate_limiter._max = 100
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_does_not_drop_connection(server_with_redis):
+    reg = server_with_redis["registry"]
+    reg._rate_limiter._max = 3
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        for i in range(5):
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.1)
+        health = await _http_get(server_with_redis["http_port"], "/health")
+        assert health["connected_clients"] >= 1
+    reg._rate_limiter._max = 100
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_error_message_has_timestamp(server_with_redis):
+    reg = server_with_redis["registry"]
+    reg._rate_limiter._max = 1
+    async with ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws:
+        await _recv_json(ws)
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+        await asyncio.sleep(0.01)
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 2}}))
+        msg = await _recv_json(ws)
+        assert msg["type"] == "error"
+        assert "timestamp" in msg
+    reg._rate_limiter._max = 100
+
+
+# ── Message history tests ──
+
+
+@pytest.mark.asyncio
+async def test_history_returns_messages_for_channel(server_with_redis):
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "histchan"}))
+        await asyncio.sleep(0.05)
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "histchan",
+            "payload": {"msg": "first"},
+        }))
+        await _recv_json(ws1)
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "histchan",
+            "payload": {"msg": "second"},
+        }))
+        await _recv_json(ws1)
+
+    await asyncio.sleep(0.2)
+
+    result = await _http_get(server_with_redis["http_port"], "/history?channel=histchan&limit=50")
+    assert "messages" in result
+    assert "has_more" in result
+    assert result["has_more"] is False
+    messages = result["messages"]
+    assert len(messages) >= 2
+    assert messages[0]["payload"]["msg"] == "first"
+    assert messages[1]["payload"]["msg"] == "second"
+    assert messages[0]["timestamp"] <= messages[1]["timestamp"]
+
+
+@pytest.mark.asyncio
+async def test_history_returns_chronological_order(server_with_redis):
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "chrono"}))
+        await asyncio.sleep(0.05)
+        for i in range(5):
+            await ws2.send(json.dumps({
+                "type": "broadcast",
+                "channel": "chrono",
+                "payload": {"seq": i},
+            }))
+            await _recv_json(ws1)
+
+    await asyncio.sleep(0.2)
+
+    result = await _http_get(server_with_redis["http_port"], "/history?channel=chrono&limit=50")
+    messages = result["messages"]
+    seqs = [m["payload"]["seq"] for m in messages]
+    assert seqs == sorted(seqs)
+    assert seqs == [0, 1, 2, 3, 4]
+
+
+@pytest.mark.asyncio
+async def test_history_pagination_has_more(server_with_redis):
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "paginate"}))
+        await asyncio.sleep(0.05)
+        for i in range(10):
+            await ws2.send(json.dumps({
+                "type": "broadcast",
+                "channel": "paginate",
+                "payload": {"seq": i},
+            }))
+            await _recv_json(ws1)
+
+    await asyncio.sleep(0.2)
+
+    page1 = await _http_get(server_with_redis["http_port"], "/history?channel=paginate&limit=4")
+    assert page1["has_more"] is True
+    assert len(page1["messages"]) == 4
+
+    last_ts = page1["messages"][-1]["timestamp"]
+    page2 = await _http_get(server_with_redis["http_port"],
+                            f"/history?channel=paginate&since={last_ts}&limit=10")
+    assert page2["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_since_filter(server_with_redis):
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "sincechan"}))
+        await asyncio.sleep(0.05)
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "sincechan",
+            "payload": {"msg": "old"},
+        }))
+        msg_old = await _recv_json(ws1)
+        await asyncio.sleep(0.1)
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "sincechan",
+            "payload": {"msg": "new"},
+        }))
+        await _recv_json(ws1)
+
+    await asyncio.sleep(0.2)
+
+    result = await _http_get(server_with_redis["http_port"],
+                             f"/history?channel=sincechan&since={msg_old['timestamp']}&limit=50")
+    messages = result["messages"]
+    assert len(messages) >= 1
+    payloads = [m["payload"]["msg"] for m in messages]
+    assert "old" in payloads
+    assert "new" in payloads
+
+
+@pytest.mark.asyncio
+async def test_history_empty_for_unknown_channel(server_with_redis):
+    result = await _http_get(server_with_redis["http_port"], "/history?channel=nonexistent&limit=50")
+    assert result == {"messages": [], "has_more": False}
+
+
+@pytest.mark.asyncio
+async def test_history_message_structure(server_with_redis):
+    async with (
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws1,
+        ws_connect(await _ws_url(server_with_redis["ws_port"])) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "structure"}))
+        await asyncio.sleep(0.05)
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "structure",
+            "payload": {"key": "value"},
+        }))
+        await _recv_json(ws1)
+
+    await asyncio.sleep(0.2)
+
+    result = await _http_get(server_with_redis["http_port"], "/history?channel=structure&limit=50")
+    messages = result["messages"]
+    assert len(messages) >= 1
+    msg = messages[0]
+    assert "id" in msg
+    assert "channel" in msg
+    assert "type" in msg
+    assert "payload" in msg
+    assert "timestamp" in msg
+    assert msg["channel"] == "structure"
+    assert isinstance(msg["payload"], dict)
