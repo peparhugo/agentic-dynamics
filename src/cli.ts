@@ -2,14 +2,17 @@
 
 import * as path from 'path';
 import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR, DEFAULT_SITE_TITLE } from './build';
+import { startDevServer, DEFAULT_PORT } from './dev-server';
 
 export interface CliOptions {
+  command?: 'build' | 'serve';
   contentDir: string;
   outputDir: string;
   siteTitle: string;
   templatesDir: string;
   defaultTemplate?: string;
   defaultLayout?: string;
+  port?: number;
   help?: boolean;
 }
 
@@ -48,16 +51,33 @@ export function parseCliArgs(argv: string[]): CliOptions {
       options.siteTitle = args[++i] ?? DEFAULT_SITE_TITLE;
     } else if (arg.startsWith('--title=')) {
       options.siteTitle = arg.slice('--title='.length) || DEFAULT_SITE_TITLE;
+    } else if (arg === 'build') {
+      options.command = 'build';
+    } else if (arg === 'serve') {
+      options.command = 'serve';
+    } else if (arg === '--port') {
+      options.port = parsePort(args[++i]);
+    } else if (arg.startsWith('--port=')) {
+      options.port = parsePort(arg.slice('--port='.length));
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
-    } else if (arg === 'build') {
-      // command marker, no-op
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
 
   return options;
+}
+
+function parsePort(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    throw new Error('--port requires a value');
+  }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    throw new Error(`Invalid port: ${value}`);
+  }
+  return port;
 }
 
 function printUsage(): void {
@@ -73,6 +93,49 @@ function printUsage(): void {
   console.log('  --layout <name>     Default layout to use when none is set');
   console.log('  --title <text>      Site title used in the generated pages');
   console.log('  -h, --help          Show this help');
+  console.log('');
+  console.log('ssg serve [options]');
+  console.log('');
+  console.log('Start a live-reload dev server for the site.');
+  console.log('');
+  console.log('Options:');
+  console.log('  --port <number>     Port for the dev server (default: 3000)');
+  console.log('  --content <dir>     Markdown content directory (default: ./content)');
+  console.log('  --output <dir>      Output directory for generated HTML (default: ./dist)');
+  console.log('  --templates <dir>   Template directory (default: ./templates)');
+  console.log('  --template <name>   Default page template to use when none is set');
+  console.log('  --layout <name>     Default layout to use when none is set');
+  console.log('  --title <text>      Site title used in the generated pages');
+  console.log('  -h, --help          Show this help');
+}
+
+async function runServe(options: CliOptions): Promise<number> {
+  const instance = await startDevServer({
+    contentDir: options.contentDir,
+    outputDir: options.outputDir,
+    templatesDir: options.templatesDir,
+    siteTitle: options.siteTitle,
+    defaultTemplate: options.defaultTemplate,
+    defaultLayout: options.defaultLayout,
+    port: options.port ?? DEFAULT_PORT,
+  });
+  console.log(`Dev server running at http://localhost:${instance.port}`);
+  console.log(`Watching ${path.resolve(options.contentDir)} and ${path.resolve(options.templatesDir)}`);
+  console.log('Press Ctrl+C to stop.');
+
+  const shutdown = async (): Promise<void> => {
+    await instance.close();
+  };
+  process.once('SIGINT', () => {
+    shutdown().then(() => process.exit(0));
+  });
+  process.once('SIGTERM', () => {
+    shutdown().then(() => process.exit(0));
+  });
+
+  return await new Promise<number>((resolve) => {
+    instance.server.on('close', () => resolve(0));
+  });
 }
 
 export async function run(argv: string[]): Promise<number> {
@@ -91,13 +154,22 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   try {
+    if (options.command === 'serve') {
+      return await runServe(options);
+    }
+
     const pages = await buildSite(options);
     const content = path.resolve(options.contentDir);
     const output = path.resolve(options.outputDir);
     console.log(`Generated ${pages.length} page(s) from ${content} into ${output}`);
     return 0;
   } catch (error) {
-    console.error(`Build failed: ${(error as Error).message}`);
+    const message = (error as Error).message;
+    if (options.command === 'serve') {
+      console.error(`Dev server failed: ${message}`);
+    } else {
+      console.error(`Build failed: ${message}`);
+    }
     return 1;
   }
 }

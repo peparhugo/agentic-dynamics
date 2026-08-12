@@ -35,6 +35,28 @@ describe('parseCliArgs', () => {
     expect(options.help).toBe(true);
   });
 
+  it('parses the serve command', () => {
+    const options = parseCliArgs(['node', 'ssg', 'serve']);
+    expect(options.command).toBe('serve');
+    expect(options.port).toBeUndefined();
+  });
+
+  it('parses --port for the serve command', () => {
+    const options = parseCliArgs(['node', 'ssg', 'serve', '--port', '8080']);
+    expect(options.command).toBe('serve');
+    expect(options.port).toBe(8080);
+  });
+
+  it('parses --port= syntax', () => {
+    const options = parseCliArgs(['node', 'ssg', 'serve', '--port=4000']);
+    expect(options.port).toBe(4000);
+  });
+
+  it('throws on an invalid port', () => {
+    expect(() => parseCliArgs(['node', 'ssg', 'serve', '--port', 'abc'])).toThrow(/Invalid port/);
+    expect(() => parseCliArgs(['node', 'ssg', 'serve', '--port=99999'])).toThrow(/Invalid port/);
+  });
+
   it('throws on unknown arguments', () => {
     expect(() => parseCliArgs(['node', 'ssg', 'build', '--bogus'])).toThrow(/Unknown argument/);
   });
