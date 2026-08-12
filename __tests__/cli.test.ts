@@ -16,6 +16,11 @@ describe('parseArgs', () => {
     expect(options.outputDir).toBe('public');
   });
 
+  it('parses the --templates flag', () => {
+    const { options } = parseArgs(['build', '--templates', 'themes']);
+    expect(options.templateDir).toBe('themes');
+  });
+
   it('defaults the command to build when omitted', () => {
     const { command } = parseArgs(['--content', 'pages']);
     expect(command).toBe('build');

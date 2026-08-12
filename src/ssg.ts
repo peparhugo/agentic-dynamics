@@ -1,15 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import { parseMarkdownFile } from './parser';
-import { renderIndex, renderPage } from './template';
+import { TemplateEngine, renderIndex } from './template';
 import { Page } from './types';
 
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
+const DEFAULT_TEMPLATE_DIR = 'templates';
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templateDir?: string;
+  defaultTemplate?: string;
+  defaultLayout?: string;
 }
 
 function collectMarkdownFiles(dir: string): string[] {
@@ -38,9 +42,16 @@ function ensureCleanDir(dir: string): void {
 export function build(options: BuildOptions = {}): Page[] {
   const contentDir = path.resolve(options.contentDir ?? DEFAULT_CONTENT_DIR);
   const outputDir = path.resolve(options.outputDir ?? DEFAULT_OUTPUT_DIR);
+  const templateDir = path.resolve(options.templateDir ?? DEFAULT_TEMPLATE_DIR);
 
   const files = collectMarkdownFiles(contentDir);
   const pages = files.map((file) => parseMarkdownFile(file, contentDir));
+
+  const engine = new TemplateEngine({
+    templateDir,
+    defaultTemplate: options.defaultTemplate,
+    defaultLayout: options.defaultLayout,
+  });
 
   ensureCleanDir(outputDir);
 
@@ -48,7 +59,7 @@ export function build(options: BuildOptions = {}): Page[] {
     const fileName = `${page.slug}.html`;
     const filePath = path.join(outputDir, fileName);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, renderPage(page), 'utf8');
+    fs.writeFileSync(filePath, engine.renderPage(page), 'utf8');
   }
 
   fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');

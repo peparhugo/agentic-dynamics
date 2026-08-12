@@ -56,4 +56,25 @@ Body.`
     const page = parseMarkdownFile(file);
     expect(page.slug).toBe('about');
   });
+
+  it('extracts template and layout from frontmatter', () => {
+    const file = makeTempFile(
+      `---
+title: T
+template: post
+layout: wide
+---
+Body.`
+    );
+    const page = parseMarkdownFile(file);
+    expect(page.template).toBe('post');
+    expect(page.layout).toBe('wide');
+  });
+
+  it('omits template and layout when not provided', () => {
+    const file = makeTempFile('Body.');
+    const page = parseMarkdownFile(file);
+    expect(page.template).toBeUndefined();
+    expect(page.layout).toBeUndefined();
+  });
 });

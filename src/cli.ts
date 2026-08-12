@@ -8,9 +8,10 @@ function printUsage(): void {
   ssg build [options]
 
 Options:
-  --content <dir>   Source directory for Markdown files (default: ./content)
-  --output <dir>    Output directory for generated HTML (default: ./dist)
-  --help            Show this help`);
+  --content <dir>     Source directory for Markdown files (default: ./content)
+  --output <dir>      Output directory for generated HTML (default: ./dist)
+  --templates <dir>   Directory for Handlebars templates (default: ./templates)
+  --help              Show this help`);
 }
 
 function parseArgs(argv: string[]): { command: string; options: BuildOptions; help: boolean } {
@@ -33,6 +34,10 @@ function parseArgs(argv: string[]): { command: string; options: BuildOptions; he
         break;
       case '--output':
         options.outputDir = argv[idx + 1];
+        idx += 2;
+        break;
+      case '--templates':
+        options.templateDir = argv[idx + 1];
         idx += 2;
         break;
       default:

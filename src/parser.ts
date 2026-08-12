@@ -24,6 +24,13 @@ function normalizeTitle(fm: Frontmatter, filePath: string): string {
   return path.basename(filePath, path.extname(filePath));
 }
 
+function normalizeString(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+  return undefined;
+}
+
 function normalizeDate(fm: Frontmatter): string {
   const value = fm.date;
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -57,6 +64,8 @@ export function parseMarkdownFile(filePath: string, baseDir?: string): Page {
     title: normalizeTitle(fm, filePath),
     date: normalizeDate(fm),
     tags: normalizeTag(fm.tags),
+    template: normalizeString(fm.template),
+    layout: normalizeString(fm.layout),
     content,
     html,
   };
