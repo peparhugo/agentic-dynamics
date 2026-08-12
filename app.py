@@ -31,14 +31,52 @@ from functools import wraps
 from datetime import datetime, timedelta, timezone
 
 import jwt
+from celery import Celery
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
+
+import celery_config
 
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 app.config.setdefault("SECRET_KEY", os.environ.get("SECRET_KEY", "dev-secret-key"))
 app.config.setdefault("JWT_EXPIRATION_HOURS", 24)
+
+
+def create_celery():
+    celery_app = Celery(
+        __name__,
+        broker=celery_config.broker_url,
+        backend=celery_config.result_backend,
+        include=["app"],
+    )
+    celery_app.conf.update(
+        task_routes=celery_config.task_routes,
+        task_serializer=celery_config.task_serializer,
+        result_serializer=celery_config.result_serializer,
+        accept_content=celery_config.accept_content,
+        timezone=celery_config.timezone,
+        enable_utc=celery_config.enable_utc,
+    )
+    return celery_app
+
+
+celery = create_celery()
+
+
+@celery.task(name="app.send_notification_email")
+def send_notification_email(user_email, task_title):
+    message = f"Mock email sent to {user_email}: your task '{task_title}' is completed."
+    print(message)
+    app.logger.info(message)
+    return message
+
+
+def user_email_from_row(user):
+    if "email" in user.keys() and user["email"]:
+        return user["email"]
+    return user["username"]
 
 
 def get_db():
@@ -240,6 +278,7 @@ def update_task(task_id):
         ).fetchone()
         if row is None:
             return jsonify({"error": "task not found"}), 404
+        previous_status = row["status"]
         title = data.get("title", row["title"])
         status = data.get("status", row["status"])
         if title is None or not str(title).strip():
@@ -252,6 +291,17 @@ def update_task(task_id):
         row = conn.execute(
             "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+    if status == "completed" and previous_status != "completed":
+        try:
+            send_notification_email.delay(
+                user_email_from_row(user), row["title"]
+            )
+        except Exception as exc:
+            app.logger.error(
+                "Failed to enqueue completion notification for task %s: %s",
+                task_id,
+                exc,
+            )
     return jsonify(task_from_row(row))
 
 

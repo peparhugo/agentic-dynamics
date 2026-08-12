@@ -233,3 +233,120 @@ def test_cannot_access_others_task(client, alice, bob):
 
     after = client.get(f"/tasks/{task_id}", headers=auth_headers(alice))
     assert after.get_json()["title"] == "alice task"
+
+
+class FakeCeleryTask:
+    def __init__(self):
+        self.calls = []
+
+    def delay(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
+
+def test_celery_config_present():
+    import celery_config
+
+    assert celery_config.broker_url
+    assert celery_config.result_backend
+    assert isinstance(celery_config.task_routes, dict)
+
+
+def test_send_notification_email_task_registered():
+    assert app_module.send_notification_email.name == "app.send_notification_email"
+    assert app_module.send_notification_email.__name__ == "send_notification_email"
+
+
+def test_send_notification_email_task_body(capsys):
+    app_module.send_notification_email("alice@example.com", "Write docs")
+    captured = capsys.readouterr()
+    assert "alice@example.com" in captured.out
+    assert "Write docs" in captured.out
+
+
+def test_completing_task_triggers_notification(monkeypatch, client, alice):
+    created = client.post(
+        "/tasks", json={"title": "ship it"}, headers=auth_headers(alice)
+    )
+    task_id = created.get_json()["id"]
+
+    fake = FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    resp = client.put(
+        f"/tasks/{task_id}",
+        json={"status": "completed"},
+        headers=auth_headers(alice),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    assert fake.calls == [(("alice", "ship it"), {})]
+
+
+def test_no_notification_unless_completed(monkeypatch, client, alice):
+    created = client.post(
+        "/tasks", json={"title": "docs"}, headers=auth_headers(alice)
+    )
+    task_id = created.get_json()["id"]
+
+    fake = FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    resp = client.put(
+        f"/tasks/{task_id}", json={"title": "renamed"}, headers=auth_headers(alice)
+    )
+    assert resp.status_code == 200
+    assert fake.calls == []
+
+    client.put(
+        f"/tasks/{task_id}", json={"status": "in_progress"}, headers=auth_headers(alice)
+    )
+    assert fake.calls == []
+
+    client.put(
+        f"/tasks/{task_id}", json={"status": "done"}, headers=auth_headers(alice)
+    )
+    assert fake.calls == []
+
+
+def test_completion_transition_triggers_once(monkeypatch, client, alice):
+    created = client.post(
+        "/tasks", json={"title": "release"}, headers=auth_headers(alice)
+    )
+    task_id = created.get_json()["id"]
+
+    fake = FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    client.put(
+        f"/tasks/{task_id}",
+        json={"title": "release v2", "status": "completed"},
+        headers=auth_headers(alice),
+    )
+    assert fake.calls == [(("alice", "release v2"), {})]
+
+    client.put(
+        f"/tasks/{task_id}",
+        json={"status": "completed"},
+        headers=auth_headers(alice),
+    )
+    assert len(fake.calls) == 1
+
+
+def test_completed_task_returns_quickly_without_broker(client, alice, monkeypatch):
+    created = client.post(
+        "/tasks", json={"title": "offline"}, headers=auth_headers(alice)
+    )
+    task_id = created.get_json()["id"]
+
+    def broken_delay(*args, **kwargs):
+        raise RuntimeError("broker unreachable")
+
+    monkeypatch.setattr(app_module.send_notification_email, "delay", broken_delay)
+
+    resp = client.put(
+        f"/tasks/{task_id}",
+        json={"status": "completed"},
+        headers=auth_headers(alice),
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
