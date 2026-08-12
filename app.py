@@ -3,13 +3,18 @@
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 import os
-import sqlite3
 
 import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import (
+    BaseRepository,
+    DuplicateUsernameError,
+    TaskRepository,
+    UserRepository,
+)
 
 
 app = Flask(__name__)
@@ -18,46 +23,16 @@ app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "development-sec
 app.config["JWT_EXPIRATION_HOURS"] = 24
 
 
-def get_db():
-    """Open a database connection configured for the current application."""
-    connection = sqlite3.connect(app.config["DATABASE"])
-    connection.row_factory = sqlite3.Row
-    return connection
-
-
 def init_db():
-    """Create or migrate the schema without discarding existing task rows."""
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                email TEXT,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
-        user_columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(users)")
-        }
-        if "email" not in user_columns:
-            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    BaseRepository.initialize_database(app.config["DATABASE"])
+
+
+def user_repository():
+    return UserRepository(app.config["DATABASE"])
+
+
+def task_repository():
+    return TaskRepository(app.config["DATABASE"])
 
 
 def task_json(row):
@@ -98,10 +73,7 @@ def authenticated(view):
         except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
             return error("invalid or expired token", 401)
 
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT id, username, email FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+        user = user_repository().find_by_id(user_id)
         if user is None:
             return error("invalid or expired token", 401)
         g.user = user
@@ -125,13 +97,10 @@ def register():
 
     username = username.strip()
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-                (username, email.strip() if email else None, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user_id = user_repository().create_user(
+            username, email.strip() if email else None, generate_password_hash(password)
+        )
+    except DuplicateUsernameError:
         return error("username already exists", 409)
     return jsonify({"id": user_id, "username": username}), 201
 
@@ -144,11 +113,7 @@ def login():
     if not isinstance(username, str) or not isinstance(password, str):
         return error("username and password are required", 400)
 
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, username, password_hash FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
+    user = user_repository().find_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return error("invalid username or password", 401)
     return jsonify({"token": issue_token(user["id"]), "username": user["username"]})
@@ -164,37 +129,19 @@ def create_task():
 
     title = title.strip()
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-            (title, created_at, g.user["id"]),
-        )
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ?",
-            (cursor.lastrowid,),
-        ).fetchone()
+    row = task_repository().create_task(title, created_at, g.user["id"])
     return jsonify(task_json(row)), 201
 
 
 @app.route("/tasks", methods=["GET"])
 @authenticated
 def list_tasks():
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (g.user["id"],),
-        ).fetchall()
+    rows = task_repository().list_for_owner(g.user["id"])
     return jsonify([task_json(row) for row in rows])
 
 
 def find_task(task_id):
-    with get_db() as connection:
-        return connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE id = ? AND owner_id = ?",
-            (task_id, g.user["id"]),
-        ).fetchone()
+    return task_repository().find_for_owner(task_id, g.user["id"])
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
@@ -235,18 +182,13 @@ def update_task(task_id):
         data.get("status") == "completed" and previous_row["status"] != "completed"
     )
 
-    values.append(task_id)
-    with get_db() as connection:
-        cursor = connection.execute(
-            f"UPDATE tasks SET {', '.join(fields)} WHERE id = ? AND owner_id = ?",
-            values + [g.user["id"]],
-        )
-        if cursor.rowcount == 0:
-            return error("task not found", 404)
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ?",
-            (task_id,),
-        ).fetchone()
+    row = task_repository().update_for_owner(
+        task_id,
+        g.user["id"],
+        {field.split(" = ")[0]: value for field, value in zip(fields, values)},
+    )
+    if row is None:
+        return error("task not found", 404)
     if status_changed_to_completed:
         send_notification_email.delay(
             g.user["email"] or g.user["username"], row["title"]
