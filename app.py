@@ -9,12 +9,13 @@ from functools import wraps
 
 import jwt
 from flask import Flask, request, jsonify, g
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone, datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 
 from notifications import send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 
@@ -66,94 +67,18 @@ def init_db():
         conn.commit()
 
 
-# ── User model ────────────────────────────────────────────────
+# ── Repositories ──────────────────────────────────────────────
+# `get_db` is passed by reference (not called here) so each repository
+# always opens connections against the current DATABASE, even if it is
+# reassigned later (e.g. by tests).
 
-def create_user(username: str, password: str, email: str | None = None) -> dict:
-    email = email or f"{username}@example.com"
-    with get_db() as conn:
-        password_hash = generate_password_hash(password)
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username, "email": email}
+user_repository = UserRepository(get_db)
+task_repository = TaskRepository(get_db)
 
 
 def get_user_by_username(username: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def get_user_by_id(user_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(row) if row else None
-
-
-# ── Task model ────────────────────────────────────────────────
-
-def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
-
-
-def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def update_task(
-    task_id: int, owner_id: int, title: str | None = None, status: str | None = None
-) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            params.append(owner_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-                params,
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    """Kept as a module-level function for backwards compatibility."""
+    return user_repository.find_by_username(username)
 
 
 # ── Auth helpers ──────────────────────────────────────────────
@@ -177,7 +102,7 @@ def login_required(view):
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         except jwt.PyJWTError:
             return jsonify({"error": "missing or invalid token"}), 401
-        user = get_user_by_id(payload["sub"])
+        user = user_repository.find_by_id(payload["sub"])
         if user is None:
             return jsonify({"error": "missing or invalid token"}), 401
         g.user = user
@@ -198,7 +123,12 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already exists"}), 409
-    user = create_user(username, password, email)
+    email = email or f"{username}@example.com"
+    user = user_repository.create(
+        username=username,
+        password_hash=generate_password_hash(password),
+        email=email,
+    )
     return jsonify(user), 201
 
 
@@ -221,7 +151,7 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(get_tasks(g.user["id"]))
+    return jsonify(task_repository.list_for_owner(g.user["id"]))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -231,14 +161,14 @@ def add_task():
     title = data.get("title", "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title, g.user["id"])
+    task = task_repository.create(title=title, owner_id=g.user["id"])
     return jsonify(task), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @login_required
 def show_task(task_id: int):
-    task = get_task(task_id, g.user["id"])
+    task = task_repository.find_by_id_for_owner(task_id, g.user["id"])
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -249,8 +179,8 @@ def show_task(task_id: int):
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")
-    previous_task = get_task(task_id, g.user["id"])
-    task = update_task(
+    previous_task = task_repository.find_by_id_for_owner(task_id, g.user["id"])
+    task = task_repository.update(
         task_id,
         g.user["id"],
         title=data.get("title"),
