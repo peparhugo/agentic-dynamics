@@ -2,13 +2,13 @@
 
 from functools import wraps
 from flask import Flask, g, jsonify, request
-from datetime import datetime
 import sqlite3
 import os
 import time
 from werkzeug.security import check_password_hash, generate_password_hash
 import jwt
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository, initialize_database
 
 app = Flask(__name__)
 
@@ -25,27 +25,7 @@ def get_db():
 
 
 def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER REFERENCES users(id)"
-            ")"
-        )
-        # Keep databases created by the previous schema usable without losing rows.
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+    initialize_database(get_db)
 
 
 # Initialize the schema when the application module is loaded by a WSGI server.
@@ -53,45 +33,15 @@ init_db()
 
 
 def create_task(title: str, owner_id: int | None = None) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) "
-            "VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    return TaskRepository(get_db).create_task(title, owner_id)
 
 
 def get_tasks(owner_id: int | None = None):
-    with get_db() as conn:
-        if owner_id is None:
-            rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-        return [dict(r) for r in rows]
+    return TaskRepository(get_db).list_tasks(owner_id)
 
 
 def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
-    with get_db() as conn:
-        if owner_id is None:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        else:
-            row = conn.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, owner_id),
-            ).fetchone()
-        return dict(row) if row else None
+    return TaskRepository(get_db).get_task(task_id, owner_id)
 
 
 
@@ -103,28 +53,7 @@ def fetch_task(task_id: int) -> dict | None:
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None,
                 owner_id: int | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            where = "id = ?" if owner_id is None else "id = ? AND owner_id = ?"
-            if owner_id is not None:
-                params.append(owner_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE {where}", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return TaskRepository(get_db).update_task(task_id, title, status, owner_id)
 
 
 def create_token(user_id: int) -> str:
@@ -147,8 +76,7 @@ def require_auth(view):
             user_id = int(payload["sub"])
         except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
             return jsonify({"error": "invalid or expired token"}), 401
-        with get_db() as conn:
-            user = conn.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+        user = UserRepository(get_db).get_auth_user(user_id)
         if user is None:
             return jsonify({"error": "invalid or expired token"}), 401
         g.user = dict(user)
@@ -167,13 +95,8 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
     try:
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            conn.commit()
-            user_id = cursor.lastrowid
+        user = UserRepository(get_db).create_user(username, generate_password_hash(password))
+        user_id = user["id"]
     except sqlite3.IntegrityError:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user_id, "username": username}), 201
@@ -184,8 +107,7 @@ def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
-    with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    user = UserRepository(get_db).get_by_username(username)
     if user is None or not isinstance(password, str) or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
@@ -238,10 +160,7 @@ def edit_task(task_id: int):
     if task is None:
         return jsonify({"error": "task not found"}), 404
     if current_task["status"] != "completed" and task["status"] == "completed":
-        with get_db() as conn:
-            owner = conn.execute(
-                "SELECT username FROM users WHERE id = ?", (task["owner_id"],)
-            ).fetchone()
+        owner = UserRepository(get_db).get_auth_user(task["owner_id"])
         if owner is not None:
             send_notification_email.delay(owner["username"], task["title"])
     return jsonify(task)
