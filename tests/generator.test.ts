@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src/generator';
+import { buildSite, getLastBuildStats } from '../src/generator';
 import { parseArgs } from '../src/cli';
 
 describe('static site generator', () => {
@@ -57,5 +57,36 @@ describe('static site generator', () => {
     buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
     expect(fs.readFileSync(path.join(output, 'old.html'), 'utf8')).toContain('<h1>Old</h1><p>Old text.</p>');
     expect(fs.readFileSync(path.join(output, 'index.html'), 'utf8')).toContain('<!doctype html>');
+  });
+
+  test('skips unchanged pages during an incremental build', () => {
+    const output = path.join(root, 'site');
+    const content = path.join(root, 'content');
+    buildSite({ contentDir: content, outputDir: output, incremental: true });
+    buildSite({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(getLastBuildStats()).toEqual(expect.objectContaining({ pagesBuilt: 0, pagesSkipped: 2 }));
+    expect(fs.existsSync(path.join(output, '.ssg-cache.json'))).toBe(true);
+
+    fs.writeFileSync(path.join(content, 'old.md'), '---\ntitle: Changed\n---\nUpdated text.');
+    const pages = buildSite({ contentDir: content, outputDir: output, incremental: true });
+    expect(pages.find((page) => page.slug === 'old')?.title).toBe('Changed');
+    expect(getLastBuildStats()).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 1 }));
+    expect(fs.readFileSync(path.join(output, 'old.html'), 'utf8')).toContain('Updated text.');
+    expect(fs.readFileSync(path.join(output, 'notes', 'new.html'), 'utf8')).toContain('New text');
+  });
+
+  test('rebuilds all pages when a template changes and supports clean builds', () => {
+    const templates = path.join(root, 'templates');
+    fs.mkdirSync(templates, { recursive: true });
+    fs.writeFileSync(path.join(templates, 'page.hbs'), '<h1>{{title}}</h1>{{{content}}}');
+    const output = path.join(root, 'site');
+    buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates, incremental: true });
+    fs.writeFileSync(path.join(templates, 'page.hbs'), '<h2>{{title}}</h2>{{{content}}}');
+    buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates, incremental: true });
+    expect(getLastBuildStats()).toEqual(expect.objectContaining({ pagesBuilt: 2, pagesSkipped: 0 }));
+    expect(fs.readFileSync(path.join(output, 'old.html'), 'utf8')).toContain('<h2>Old</h2>');
+    buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates, incremental: true, clean: true });
+    expect(getLastBuildStats().pagesSkipped).toBe(0);
   });
 });

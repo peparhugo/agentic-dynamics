@@ -4,6 +4,27 @@ export interface BuildContext {
   options: Required<Pick<BuildOptions, 'contentDir' | 'outputDir' | 'templatesDir'>>;
   pages: Page[];
   files: string[];
+  cache: BuildCache;
+}
+
+export interface CachePage {
+  sourceHash: string;
+  templateHash: string;
+  output: string;
+  frontmatter?: { data: Record<string, unknown>; content: string };
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSaved: number;
+}
+
+export interface BuildCache {
+  incremental: boolean;
+  templateHash: string;
+  pages: Record<string, CachePage>;
+  stats: BuildStats;
 }
 
 export interface Plugin {

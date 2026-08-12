@@ -1,5 +1,5 @@
-export { buildSite } from './src/generator';
-export type { BuildOptions, Page } from './src/generator';
+export { buildSite, getLastBuildStats } from './src/generator';
+export type { BuildOptions, BuildStats, Page } from './src/generator';
 export { startDevServer } from './src/server';
 export type { DevServer, ServeOptions } from './src/server';
 export type { Plugin, BuildContext, SSGConfig } from './src/plugin';

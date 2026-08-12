@@ -40,6 +40,14 @@ export class TemplatePlugin implements Plugin {
 
   onFile(page: Page, context: BuildContext): Page {
     const directory = context.options.templatesDir;
+    const relative = String(page._sourceRelative ?? `${page.slug}.md`);
+    const cached = context.cache.pages[relative];
+    const target = path.join(context.options.outputDir, `${page.slug}.html`);
+    if (context.cache.incremental && cached?.sourceHash === page._sourceHash && cached.templateHash === context.cache.templateHash && cached.output && fs.existsSync(target)) {
+      context.cache.stats.pagesSkipped += 1;
+      context.cache.stats.timeSaved += 1;
+      return page;
+    }
     const renderer = this.renderer(directory);
     const templateName = page.template ?? (templateFile(directory, 'page') ? 'page' : 'default');
     const templateContext = { ...page, content: page.html, page } as Record<string, unknown>;
@@ -47,9 +55,10 @@ export class TemplatePlugin implements Plugin {
     const body = `<article>\n<h1>${page.title}</h1>\n${tags}${page.html}\n</article>`;
     const rendered = renderer.render(templateName, templateContext) ?? document(page.title, body);
     const output = this.withLayout(templateContext, directory, rendered, renderer);
-    const target = path.join(context.options.outputDir, `${page.slug}.html`);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, output);
+    context.cache.stats.pagesBuilt += 1;
+    context.cache.pages[relative] = { sourceHash: String(page._sourceHash ?? ''), templateHash: context.cache.templateHash, output, frontmatter: cached?.frontmatter };
     return page;
   }
 

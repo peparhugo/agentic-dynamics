@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite, BuildOptions } from './generator';
+import { buildSite, BuildOptions, getLastBuildStats } from './generator';
 import { startDevServer } from './server';
 
 export function parseArgs(args: string[]): BuildOptions & { port?: number } {
@@ -17,6 +17,8 @@ export function parseArgs(args: string[]): BuildOptions & { port?: number } {
       if (argument === '--content') options.contentDir = value;
       else if (argument === '--output') options.outputDir = value;
       else options.templatesDir = value;
+    } else if (argument === '--incremental') options.incremental = true;
+    else if (argument === '--clean') options.clean = true;
     }
   }
   return options;
@@ -25,7 +27,7 @@ export function parseArgs(args: string[]): BuildOptions & { port?: number } {
 if (require.main === module) {
   const [command, ...args] = process.argv.slice(2);
   if (command !== 'build' && command !== 'serve') {
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] | ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
+    console.error('Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>] | ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
     process.exitCode = 1;
   } else {
     try {
@@ -37,7 +39,8 @@ if (require.main === module) {
         });
       } else {
         const pages = buildSite(parseArgs(args));
-        console.log(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} .`);
+        const stats = getLastBuildStats();
+        console.log(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} (${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSaved}ms saved).`);
       }
     } catch (error) {
       console.error(error instanceof Error ? error.message : error);
