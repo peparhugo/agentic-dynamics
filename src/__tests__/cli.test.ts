@@ -43,6 +43,30 @@ describe('parseArgs', () => {
     expect(result.options.templateDir).toBe('./theme');
   });
 
+  it('parses the serve command', () => {
+    const result = parseArgs(['node', 'ssg', 'serve']);
+    expect(result.command).toBe('serve');
+  });
+
+  it('reads --port option', () => {
+    const result = parseArgs(['node', 'ssg', 'serve', '--port', '8080']);
+    expect(result.options.port).toBe(8080);
+  });
+
+  it('supports the short --port flag', () => {
+    const result = parseArgs(['node', 'ssg', 'serve', '-p', '4000']);
+    expect(result.options.port).toBe(4000);
+  });
+
+  it('throws on an invalid port', () => {
+    expect(() => parseArgs(['node', 'ssg', 'serve', '--port', 'notaport'])).toThrow(
+      'Invalid port'
+    );
+    expect(() => parseArgs(['node', 'ssg', 'serve', '--port', '99999'])).toThrow(
+      'Invalid port'
+    );
+  });
+
   it('throws on an unknown option', () => {
     expect(() => parseArgs(['node', 'ssg', 'build', '--bogus'])).toThrow(
       'Unknown option or command'
