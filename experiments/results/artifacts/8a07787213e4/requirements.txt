@@ -1,0 +1,7 @@
+flask
+werkzeug
+pyjwt
+celery[redis]
+redis
+pytest
+flask-limiter

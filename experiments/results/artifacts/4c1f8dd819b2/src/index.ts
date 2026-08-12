@@ -1,0 +1,28 @@
+#!/usr/bin/env node
+import { Command } from 'commander';
+import { build } from './build';
+
+const program = new Command();
+
+program
+  .name('ssg')
+  .description('Static site generator — converts Markdown files to HTML');
+
+program
+  .command('build')
+  .description('Generate the site from Markdown files')
+  .option('--content <dir>', 'Content directory containing Markdown files', './content')
+  .option('--output <dir>', 'Output directory for generated HTML files', './dist')
+  .option('--templates <dir>', 'Templates directory for Handlebars layouts, templates, and partials', './templates')
+  .action((options) => {
+    try {
+      build(options.content, options.output, options.templates);
+      console.log(`Site built successfully. Output: ${options.output}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error: ${message}`);
+      process.exit(1);
+    }
+  });
+
+program.parse(process.argv);

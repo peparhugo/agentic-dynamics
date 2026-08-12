@@ -1,0 +1,7 @@
+Flask
+Flask-Limiter
+PyJWT
+Werkzeug
+pytest
+celery
+redis

@@ -1,0 +1,6 @@
+flask>=2.0
+flask-limiter>=3.0
+pytest>=7.0
+PyJWT>=2.0
+celery[redis]>=5.3
+redis>=4.5

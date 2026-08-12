@@ -1,0 +1,6 @@
+websockets>=13.0
+pytest>=8.0
+pytest-asyncio>=0.24
+aiohttp>=3.9
+redis>=5.0
+fakeredis>=2.0
