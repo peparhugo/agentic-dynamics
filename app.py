@@ -24,6 +24,8 @@ import jwt
 from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_SECONDS = 3600
@@ -56,7 +58,8 @@ def init_db(database_path: str) -> None:
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -74,6 +77,11 @@ def init_db(database_path: str) -> None:
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
 
+        # ── Migration: add email to users tables created before notifications ──
+        user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+
         conn.commit()
     finally:
         conn.close()
@@ -81,14 +89,14 @@ def init_db(database_path: str) -> None:
 
 # ── User models ──────────────────────────────────────────────
 
-def create_user(username: str, password_hash: str) -> dict:
+def create_user(username: str, password_hash: str, email: str) -> dict:
     db = get_db()
     cursor = db.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        (username, password_hash),
+        "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+        (username, password_hash, email),
     )
     db.commit()
-    return {"id": cursor.lastrowid, "username": username}
+    return {"id": cursor.lastrowid, "username": username, "email": email}
 
 
 def get_user_by_username(username: str):
@@ -242,19 +250,27 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
 
         username = data.get("username")
         password = data.get("password")
+        email = data.get("email")
 
         if not isinstance(username, str) or not username.strip():
             return jsonify({"error": "username is required"}), 400
         if not isinstance(password, str) or not password:
             return jsonify({"error": "password is required"}), 400
+        if email is not None and (not isinstance(email, str) or not email.strip()):
+            return jsonify({"error": "email must be a non-empty string"}), 400
 
         username = username.strip()
         if get_user_by_username(username) is not None:
             return jsonify({"error": "username already exists"}), 409
 
+        # Notifications need *some* address to send to; default to a
+        # deterministic placeholder derived from the username when the
+        # caller doesn't supply a real one.
+        email = email.strip() if isinstance(email, str) else f"{username}@example.com"
+
         password_hash = generate_password_hash(password)
         try:
-            user = create_user(username, password_hash)
+            user = create_user(username, password_hash, email)
         except sqlite3.IntegrityError:
             return jsonify({"error": "username already exists"}), 409
 
@@ -334,12 +350,20 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
         if title is None and status is None:
             return jsonify({"error": "title and/or status is required"}), 400
 
+        new_status = status.strip() if status is not None else None
         task = update_task(
             task_id,
             g.current_user["id"],
             title=title.strip() if title is not None else None,
-            status=status.strip() if status is not None else None,
+            status=new_status,
         )
+
+        # Fire-and-forget async notification: only when the status is
+        # *changing into* 'completed' (not on every no-op re-save of an
+        # already-completed task), and never blocking the response.
+        if new_status == "completed" and existing["status"] != "completed":
+            send_notification_email.delay(g.current_user["email"], task["title"])
+
         return jsonify(task)
 
     @app.errorhandler(404)
