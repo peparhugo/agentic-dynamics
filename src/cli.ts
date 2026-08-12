@@ -2,18 +2,21 @@
 
 import path from 'node:path';
 import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from './generator';
+import { serve, DEFAULT_PORT, type ServeOptions } from './serve';
 import { DEFAULT_TEMPLATE_DIR } from './templates';
 
 export interface CliOptions {
   contentDir: string;
   outputDir: string;
   templatesDir: string;
+  port?: number;
 }
 
 export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | { ok: false; error: string } {
   let contentDir = DEFAULT_CONTENT_DIR;
   let outputDir = DEFAULT_OUTPUT_DIR;
   let templatesDir = DEFAULT_TEMPLATE_DIR;
+  let port: number | undefined = undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -63,6 +66,30 @@ export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | {
       continue;
     }
 
+    if (arg === '--port') {
+      const value = argv[i + 1];
+      if (!value || value.startsWith('--')) {
+        return { ok: false, error: 'Missing value for --port' };
+      }
+      const parsedPort = Number(value);
+      if (!Number.isInteger(parsedPort) || parsedPort < 0 || parsedPort > 65535) {
+        return { ok: false, error: `Invalid port: ${value}` };
+      }
+      port = parsedPort;
+      i += 1;
+      continue;
+    }
+
+    if (arg.startsWith('--port=')) {
+      const value = arg.slice('--port='.length);
+      const parsedPort = Number(value);
+      if (!Number.isInteger(parsedPort) || parsedPort < 0 || parsedPort > 65535) {
+        return { ok: false, error: `Invalid port: ${value}` };
+      }
+      port = parsedPort;
+      continue;
+    }
+
     if (arg === '-h' || arg === '--help') {
       return {
         ok: false,
@@ -83,32 +110,57 @@ export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | {
       contentDir: path.resolve(contentDir),
       outputDir: path.resolve(outputDir),
       templatesDir: path.resolve(templatesDir),
+      port,
     },
   };
 }
 
+export function usage(): string {
+  return 'Usage: ssg <command> [options]\n\nCommands:\n  build  Build the site\n  serve  Start a development server with live reload\n\nOptions:\n  --content <dir>     Content directory (default: content)\n  --output <dir>      Output directory (default: dist)\n  --templates <dir>   Templates directory (default: templates)\n  --port <number>     Port for the dev server (default: 3000)\n  -h, --help          Show this help';
+}
+
 export async function main(argv: string[]): Promise<void> {
   const command = argv[0];
-  if (command !== 'build') {
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
-    process.exitCode = 1;
+
+  if (command === 'build') {
+    const parsed = parseArgs(argv.slice(1));
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      process.exitCode = 1;
+      return;
+    }
+
+    const { contentDir, outputDir, templatesDir } = parsed.options;
+    const result = await buildSite(contentDir, outputDir, { templatesDir });
+
+    console.log(`Generated ${result.pages.length} page(s) into ${outputDir}`);
+    for (const file of result.files) {
+      console.log(`  ${file}`);
+    }
     return;
   }
 
-  const parsed = parseArgs(argv.slice(1));
-  if (!parsed.ok) {
-    console.error(parsed.error);
-    process.exitCode = 1;
+  if (command === 'serve') {
+    const parsed = parseArgs(argv.slice(1));
+    if (!parsed.ok) {
+      console.error(parsed.error);
+      process.exitCode = 1;
+      return;
+    }
+
+    const serveOptions: ServeOptions = {
+      contentDir: parsed.options.contentDir,
+      outputDir: parsed.options.outputDir,
+      templatesDir: parsed.options.templatesDir,
+      port: parsed.options.port ?? DEFAULT_PORT,
+    };
+
+    await serve(serveOptions);
     return;
   }
 
-  const { contentDir, outputDir, templatesDir } = parsed.options;
-  const result = await buildSite(contentDir, outputDir, { templatesDir });
-
-  console.log(`Generated ${result.pages.length} page(s) into ${outputDir}`);
-  for (const file of result.files) {
-    console.log(`  ${file}`);
-  }
+  console.error(usage());
+  process.exitCode = 1;
 }
 
 if (require.main === module) {

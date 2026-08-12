@@ -98,7 +98,7 @@ describe('ssg build (end to end)', () => {
 
   it('fails with a non-zero exit code for an unknown command', async () => {
     const dir = makeTempDir();
-    const { code, stderr } = await runCli(dir, ['serve']);
+    const { code, stderr } = await runCli(dir, ['frobnicate']);
     expect(code).toBe(1);
     expect(stderr).toContain('Usage');
   });

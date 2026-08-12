@@ -16,13 +16,16 @@
     "test": "jest"
   },
   "dependencies": {
+    "chokidar": "^3.6.0",
     "gray-matter": "^4.0.3",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.1.0",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.12",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^20.14.0",
+    "@types/ws": "^8.18.1",
     "ts-jest": "^29.1.5",
     "typescript": "^5.5.4"
   }
