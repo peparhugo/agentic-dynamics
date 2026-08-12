@@ -35,4 +35,43 @@ describe('buildSite', () => {
 
     await expect(readFile(path.join(output, 'old.html'))).rejects.toMatchObject({ code: 'ENOENT' });
   });
+
+  test('renders a Handlebars template, layout, and partials from frontmatter', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await mkdir(content, { recursive: true });
+    await mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await mkdir(path.join(templates, 'partials'), { recursive: true });
+    await writeFile(path.join(templates, 'article.hbs'), '<h1>{{title}}</h1>{{{content}}}{{> footer}}');
+    await writeFile(path.join(templates, 'layouts', 'site.hbs'), '<!doctype html><body>{{> header}}{{{body}}}</body>');
+    await writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>Header</header>');
+    await writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+    await writeFile(path.join(content, 'page.md'), '---\ntitle: Templated\ntemplate: article\nlayout: site\n---\nHello **world**');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    const html = await readFile(path.join(output, 'page.html'), 'utf8');
+    expect(html).toContain('<header>Header</header>');
+    expect(html).toContain('<h1>Templated</h1>');
+    expect(html).toContain('<strong>world</strong>');
+    expect(html).toContain('<footer>Footer</footer>');
+  });
+
+  test('uses the default EJS template when no template is in frontmatter', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await mkdir(content, { recursive: true });
+    await mkdir(path.join(templates, 'partials'), { recursive: true });
+    await writeFile(path.join(templates, 'default.ejs'), '<main><h1><%= title %></h1><%- content %><%- include("partials/footer") %></main>');
+    await writeFile(path.join(templates, 'partials', 'footer.ejs'), '<footer>Included</footer>');
+    await writeFile(path.join(content, 'page.md'), '---\ntitle: Default\n---\nText');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    expect(await readFile(path.join(output, 'page.html'), 'utf8')).toBe('<main><h1>Default</h1><p>Text</p>\n<footer>Included</footer></main>');
+  });
 });
