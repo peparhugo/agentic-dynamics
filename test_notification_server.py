@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 
 import pytest
 import pytest_asyncio
@@ -153,3 +154,48 @@ async def test_subscriptions_are_dynamic_and_exposed_over_http(server):
         assert listing == {"channels": []}
     finally:
         await client.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    instance = NotificationServer(websocket_port=0, http_port=0,
+                                  database_url=str(tmp_path / "messages.sqlite"),
+                                  redis_url="redis://127.0.0.1:6399/0")
+    await instance.start()
+    try:
+        await instance.broadcast({"text": "one"}, channel="alerts")
+        await instance.broadcast({"text": "two"})
+        status, response = await http_json(instance, "/messages?limit=1&offset=1")
+        assert status == "HTTP/1.1 200 OK"
+        assert len(response["messages"]) == 1
+        assert response["messages"][0]["payload"] == {"text": "two"}
+        assert response["messages"][0]["channel"] is None
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_servers_share_redis_pubsub(tmp_path):
+    redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+    first = NotificationServer(websocket_port=0, http_port=0,
+                               redis_url=redis_url,
+                               database_url=str(tmp_path / "first.sqlite"))
+    second = NotificationServer(websocket_port=0, http_port=0,
+                                redis_url=redis_url,
+                                database_url=str(tmp_path / "second.sqlite"))
+    await first.start()
+    await second.start()
+    if first._redis is None or second._redis is None:
+        await first.stop()
+        await second.stop()
+        pytest.skip("Redis is not available")
+    client = await websockets.connect(f"ws://127.0.0.1:{second.websocket_port}")
+    try:
+        await client.recv()
+        await first.broadcast({"text": "from another server"})
+        received = json.loads(await asyncio.wait_for(client.recv(), timeout=1))
+        assert received["payload"] == {"text": "from another server"}
+    finally:
+        await client.close()
+        await first.stop()
+        await second.stop()
