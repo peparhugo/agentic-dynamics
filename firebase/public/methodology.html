@@ -70,14 +70,27 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <!-- Pipeline -->
 <section class="sec alt wide">
 <h2>The Experiment Pipeline</h2>
-<p class="lead">Every experiment follows the same calibrated path. A YAML configuration defines the task, the model, the perturbation operators, and the analysis modules. The instrument spawns an isolated opencode session, applies perturbations, captures the observable execution trace, and runs multi-dimensional analysis.</p>
+<p class="lead">Every experiment follows the same calibrated path. A YAML configuration defines the task, the model, the perturbation operators, and the analysis modules. The instrument dispatches through a <strong style="color:var(--ac)">provider-agnostic backend</strong> — the opencode binary or the Claude CLI, whichever serves the model — applies perturbations, streams the observable execution trace live, and runs multi-dimensional analysis.</p>
 <div class="pipeline">
 <div class="pipe-step"><div class="ps-num">1</div><div class="ps-title">Config</div><div class="ps-desc">YAML defines task domain, model, perturbation operators, strengths, and RNG seed for reproducibility.</div></div>
-<div class="pipe-step"><div class="ps-num">2</div><div class="ps-title">Session</div><div class="ps-desc">Isolated opencode worktree. Model receives the (perturbed) prompt and produces code + reasoning.</div></div>
-<div class="pipe-step"><div class="ps-num">3</div><div class="ps-title">Trajectory</div><div class="ps-desc">Full reasoning trace captured — tool calls, outputs, token counts, timing. Individual reasoning steps extracted and embedded via bge-m3 (1024-dim) into ChromaDB for step-level comparison across sessions.</div></div>
+<div class="pipe-step"><div class="ps-num">2</div><div class="ps-title">Dispatch</div><div class="ps-desc">Backend-agnostic run: <code style="color:var(--ac)">anthropic/*</code> routes to the Claude CLI (subscription-safe), everything else to opencode. An isolated worktree receives the (perturbed) prompt and produces code + reasoning.</div></div>
+<div class="pipe-step"><div class="ps-num">3</div><div class="ps-title">Trajectory</div><div class="ps-desc">Full reasoning trace captured and streamed live (Redis pub/sub with per-cell replay). Tool calls, outputs, token counts, timing. Reasoning steps embedded via bge-m3 (1024-dim) into ChromaDB for step-level comparison across sessions.</div></div>
 <div class="pipe-step"><div class="ps-num">4</div><div class="ps-title">Analysis</div><div class="ps-desc">Solution quality, basin escape, recovery classification, strategy taxonomy, efficiency metrics. All scored.</div></div>
 <div class="pipe-step"><div class="ps-num">5</div><div class="ps-desc">Measured session costs and test results feed the cost equation. Provenance-tagged metrics power the 10 decision rules.</div></div>
 </div>
+</section>
+
+<!-- The Harness -->
+<section class="sec wide">
+<h2>The Harness</h2>
+<p class="lead">The instrument runs in two regimes over the same backend, orchestrated by a YAML pipeline and observed through a live control plane.</p>
+<div class="cards">
+<div class="card"><div class="ctag">Single-session</div><div class="ctitle">Perturbation experiments</div><div class="cdesc"><code style="color:var(--ac)">scripts/run.py --config &lt;task&gt;.yaml</code>. One task, one (perturbed) prompt, one isolated worktree. Produces a Game Report and feeds <code>_results_summary.json</code> — the original 227-worktree corpus.</div></div>
+<div class="card"><div class="ctag amber">Multi-session</div><div class="ctitle">Story pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/enqueue.py</code> fills a Redis queue (story &times; tier &times; quality &times; condition); <code style="color:var(--ac)">scripts/worker.py</code> drains it, running each cell as a five-session story with git commits between sessions &mdash; greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting.</div></div>
+<div class="card"><div class="ctag">Orchestration</div><div class="ctitle">YAML pipeline</div><div class="cdesc"><code style="color:var(--ac)">scripts/pipeline.py --plan &lt;ci|deploy|full_matrix|feature|ship_features&gt;</code>. Phase DAGs (lint &rarr; test &rarr; build; matrix &rarr; analyze &rarr; review &rarr; deploy) with Redis state and parallel workers.</div></div>
+<div class="card"><div class="ctag">Control plane</div><div class="ctitle">Live telemetry</div><div class="cdesc"><code style="color:var(--ac)">admin/server.py</code> serves a dashboard: a live experiment matrix, per-cell event streams (SSE), and a routing board &mdash; reading the same Redis state the workers write.</div></div>
+</div>
+<div class="wtm"><strong>Provider-agnostic by design:</strong> every regime goes through the same backend seam (<code style="color:var(--ac)">backends.py</code>). <code style="color:var(--ac)">anthropic/*</code> models run through the Claude CLI &mdash; subscription-safe, no per-token API spend &mdash; while other providers run through opencode. Both emit the same event schema, so downstream analysis is identical regardless of provider.</div>
 </section>
 
 <!-- Measurement Provenance -->
@@ -189,9 +202,10 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 
 <div class="cards">
 <div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/ai-finops-framework<br>cd ai-finops-framework<br>pip install -e .</code></div></div>
-<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
-<div class="card"><div class="ctitle">3. Read the Results</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Compare correctness, cost, escape scores, recovery ratios, and strategy classifications across runs.</div></div>
-<div class="card"><div class="ctitle">4. Extend It</div><div class="cdesc">Add new perturbation operators in <code>src/instrument/perturb.py</code>. Add new task configs in <code>experiments/configs/</code>. The instrument is modular by design &ndash; new operators, models, and domains plug in without modifying the core runner.</div></div>
+<div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
+<div class="card"><div class="ctitle">3. Run a Story</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run_story.py task_manager_api --model anthropic/claude-sonnet-5 --backend claude_cli</code><br><br>Five-session stories with git commits between sessions. <code>--backend claude_cli</code> runs Claude on your subscription; <code>--model anthropic/*</code> auto-routes the same way. Scale with <code>scripts/enqueue.py</code> + <code>scripts/worker.py</code>.</div></div>
+<div class="card"><div class="ctitle">4. Watch It Live</div><div class="cdesc"><code style="color:var(--ac)">python admin/server.py</code><br><br>Live control plane: experiment matrix, per-cell event streams, routing board. Or <code>scripts/monitor.py</code> for a terminal dashboard.</div></div>
+<div class="card"><div class="ctitle">5. Read &amp; Extend</div><div class="cdesc">Results output to <code>experiments/results/</code> as JSON and Markdown. Add perturbation operators in <code>src/instrument/perturb.py</code>, configs in <code>experiments/configs/</code>. The instrument is modular &ndash; new operators, models, and providers plug in without modifying the core runner.</div></div>
 </div>
 </section>
 <section class="sec wide">
