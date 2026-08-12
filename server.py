@@ -10,6 +10,9 @@ from urllib.parse import parse_qs, urlparse
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
 
+from transport import BaseTransport, WebSocketTransport
+
+TRANSPORT = os.environ.get("TRANSPORT", "websocket")
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 REDIS_CHANNEL = "chat:messages"
@@ -80,6 +83,11 @@ class ClientRegistry:
 
 registry = ClientRegistry()
 
+if TRANSPORT == "websocket":
+    _transport = WebSocketTransport(registry)
+else:
+    _transport = WebSocketTransport(registry)
+
 
 def _init_message_db():
     global _message_db_initialized
@@ -133,42 +141,19 @@ def make_message(msg_type, payload):
 
 
 async def broadcast(message):
-    tasks = []
-    for cid, ws in registry.get_all():
-        tasks.append(_safe_send(cid, ws, message))
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+    await _transport.broadcast(message)
 
 
 async def broadcast_to_clients(client_ids, message):
     tasks = []
     for cid in client_ids:
-        ws = registry.get(cid)
-        if ws is not None:
-            tasks.append(_safe_send(cid, ws, message))
+        tasks.append(_transport.send_message(cid, message))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def _safe_send(client_id, websocket, message):
-    try:
-        await websocket.send(message)
-    except (ConnectionClosedOK, ConnectionClosedError):
-        registry.remove(client_id)
-    except Exception:
-        registry.remove(client_id)
-
-
 async def send_direct(recipient_id, message):
-    ws = registry.get(recipient_id)
-    if ws is None:
-        return
-    try:
-        await ws.send(message)
-    except (ConnectionClosedOK, ConnectionClosedError):
-        registry.remove(recipient_id)
-    except Exception:
-        registry.remove(recipient_id)
+    await _transport.send_message(recipient_id, message)
 
 
 async def init_redis():
@@ -206,12 +191,7 @@ async def _redis_subscriber_task():
                                 await send_direct(recipient, raw)
                             sender_id = payload.get("from")
                             if sender_id:
-                                sender_ws = registry.get(sender_id)
-                                if sender_ws:
-                                    try:
-                                        await sender_ws.send(raw)
-                                    except Exception:
-                                        registry.remove(sender_id)
+                                await _transport.send_message(sender_id, raw)
                         elif msg_type == "system":
                             await broadcast(raw)
         except Exception:
@@ -225,16 +205,16 @@ async def publish_to_redis(message_str):
 
 async def handler(websocket):
     client_id = str(uuid.uuid4())
-    registry.add(client_id, websocket)
+    await _transport.on_connect(client_id, websocket)
 
     try:
         welcome = make_message("system", {
             "message": f"Connected as {client_id}",
             "client_id": client_id
         })
-        await websocket.send(welcome)
+        await _transport.send_message(client_id, welcome)
     except Exception:
-        registry.remove(client_id)
+        await _transport.on_disconnect(client_id)
         return
 
     try:
@@ -256,7 +236,7 @@ async def handler(websocket):
                         "channel": channel,
                         "client_id": client_id
                     })
-                    await websocket.send(confirm)
+                    await _transport.send_message(client_id, confirm)
             elif msg_type == "unsubscribe":
                 channel = payload.get("channel", "")
                 if channel:
@@ -266,7 +246,7 @@ async def handler(websocket):
                         "channel": channel,
                         "client_id": client_id
                     })
-                    await websocket.send(confirm)
+                    await _transport.send_message(client_id, confirm)
             elif msg_type == "broadcast":
                 payload_for_storage = dict(payload)
                 ts = datetime.now(timezone.utc).isoformat()
@@ -296,13 +276,13 @@ async def handler(websocket):
                         await publish_to_redis(direct_msg)
                     else:
                         await send_direct(recipient, direct_msg)
-                        await websocket.send(direct_msg)
+                        await _transport.send_message(client_id, direct_msg)
     except (ConnectionClosedOK, ConnectionClosedError):
         pass
     except Exception:
         pass
     finally:
-        registry.remove(client_id)
+        await _transport.on_disconnect(client_id)
         leave_msg = make_message("system", {
             "message": f"Client {client_id} disconnected",
             "client_id": client_id
