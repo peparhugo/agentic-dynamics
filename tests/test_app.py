@@ -1,10 +1,20 @@
 import app as task_app
 
 
-def test_task_lifecycle(tmp_path, monkeypatch):
+def authenticated_client(tmp_path, monkeypatch, username="alice"):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
     client = task_app.app.test_client()
+    client.post("/auth/register", json={"username": username, "password": "secret"})
+    token = client.post(
+        "/auth/login", json={"username": username, "password": "secret"}
+    ).get_json()["token"]
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    return client
+
+
+def test_task_lifecycle(tmp_path, monkeypatch):
+    client = authenticated_client(tmp_path, monkeypatch)
 
     created = client.post("/tasks", json={"title": "Write tests"})
     assert created.status_code == 201
@@ -26,9 +36,7 @@ def test_task_lifecycle(tmp_path, monkeypatch):
 
 
 def test_list_is_newest_first(tmp_path, monkeypatch):
-    monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
-    task_app.init_db()
-    client = task_app.app.test_client()
+    client = authenticated_client(tmp_path, monkeypatch)
     client.post("/tasks", json={"title": "First"})
     client.post("/tasks", json={"title": "Second"})
 
@@ -38,9 +46,7 @@ def test_list_is_newest_first(tmp_path, monkeypatch):
 
 
 def test_validation_and_not_found_errors(tmp_path, monkeypatch):
-    monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
-    task_app.init_db()
-    client = task_app.app.test_client()
+    client = authenticated_client(tmp_path, monkeypatch)
 
     missing_title = client.post("/tasks", json={})
     assert missing_title.status_code == 400
@@ -53,3 +59,22 @@ def test_validation_and_not_found_errors(tmp_path, monkeypatch):
     no_update = client.put("/tasks/999", json={})
     assert no_update.status_code == 404
     assert no_update.get_json() == {"error": "task not found"}
+
+
+def test_authentication_and_task_isolation(tmp_path, monkeypatch):
+    monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
+    task_app.init_db()
+    client = task_app.app.test_client()
+    assert client.get("/tasks").status_code == 401
+    assert client.post("/auth/register", json={"username": "one", "password": "pw"}).status_code == 201
+    assert client.post("/auth/register", json={"username": "one", "password": "pw"}).status_code == 409
+    one = client.post("/auth/login", json={"username": "one", "password": "pw"}).get_json()["token"]
+    assert client.post("/auth/login", json={"username": "one", "password": "bad"}).status_code == 401
+    assert client.post("/auth/register", json={"username": "two", "password": "pw"}).status_code == 201
+    two = client.post("/auth/login", json={"username": "two", "password": "pw"}).get_json()["token"]
+
+    first = client.post("/tasks", headers={"Authorization": f"Bearer {one}"}, json={"title": "private"})
+    task_id = first.get_json()["id"]
+    assert client.get("/tasks", headers={"Authorization": f"Bearer {two}"}).get_json() == []
+    assert client.get(f"/tasks/{task_id}", headers={"Authorization": f"Bearer {two}"}).status_code == 404
+    assert client.get("/tasks", headers={"Authorization": "Bearer invalid"}).status_code == 401
