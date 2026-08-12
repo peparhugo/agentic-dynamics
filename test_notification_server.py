@@ -1,10 +1,12 @@
 import asyncio
 import json
 import os
+from datetime import datetime, timezone
 
 import pytest
 import pytest_asyncio
 import websockets
+from urllib.parse import quote
 
 from notification_server import NotificationServer
 
@@ -199,3 +201,42 @@ async def test_servers_share_redis_pubsub(tmp_path):
         await client.close()
         await first.stop()
         await second.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_instead_of_dropping_message(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "1")
+    instance = NotificationServer(websocket_port=0, http_port=0,
+                                  redis_url="redis://127.0.0.1:6399/0")
+    await instance.start()
+    client = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+    try:
+        await client.recv()
+        await client.send(json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+        await client.send(json.dumps({"type": "broadcast", "payload": {"n": 2}}))
+        responses = [json.loads(await client.recv()), json.loads(await client.recv())]
+        response = next(item for item in responses if "error" in item["payload"])
+        assert response["payload"]["error"] == "rate limit exceeded"
+    finally:
+        await client.close()
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_since_and_reports_more(tmp_path):
+    instance = NotificationServer(websocket_port=0, http_port=0,
+                                  database_url=str(tmp_path / "history.sqlite"),
+                                  redis_url="redis://127.0.0.1:6399/0")
+    await instance.start()
+    try:
+        await instance.broadcast({"n": 1}, channel="alerts")
+        since = datetime.now(timezone.utc).isoformat()
+        await instance.broadcast({"n": 2}, channel="alerts")
+        await instance.broadcast({"n": 3}, channel="alerts")
+        status, response = await http_json(
+            instance, f"/history?channel=alerts&since={quote(since)}&limit=1")
+        assert status == "HTTP/1.1 200 OK"
+        assert [item["payload"]["n"] for item in response["messages"]] == [2]
+        assert response["has_more"] is True
+    finally:
+        await instance.stop()
