@@ -7,6 +7,7 @@ import inspect
 import json
 import os
 import sqlite3
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -59,7 +60,11 @@ class NotificationServer:
         self._provided_redis = redis_client is not None
         self._pubsub: Any = None
         self._redis_listener: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
         self._redis_enabled = redis_client is not None
+        self.rate_limit = self._env_int("RATE_LIMIT", 100, minimum=0)
+        self.message_ttl_days = self._env_float("MESSAGE_TTL_DAYS", 7.0, minimum=0)
+        self._local_rate_limits: dict[str, tuple[float, int]] = {}
         self._database_path = self._database_path_from_url(self.database_url)
         self._db = sqlite3.connect(self._database_path, check_same_thread=False)
         self._db.row_factory = sqlite3.Row
@@ -89,6 +94,20 @@ class NotificationServer:
             return database_url[len("sqlite://") :]
         return database_url
 
+    @staticmethod
+    def _env_int(name: str, default: int, minimum: int) -> int:
+        try:
+            return max(minimum, int(os.getenv(name, str(default))))
+        except ValueError:
+            return default
+
+    @staticmethod
+    def _env_float(name: str, default: float, minimum: float) -> float:
+        try:
+            return max(minimum, float(os.getenv(name, str(default))))
+        except ValueError:
+            return default
+
     @property
     def connected_count(self) -> int:
         return len(self.clients)
@@ -110,6 +129,8 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.psubscribe(REDIS_PUBSUB_PATTERN)
             self._redis_listener = asyncio.create_task(self._redis_loop())
+        await self._cleanup_expired()
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         await self.transport.start()
         self._http_server = await asyncio.start_server(self._handle_http, self.host, self.http_port)
         if hasattr(self.transport, "port"):
@@ -126,6 +147,10 @@ class NotificationServer:
             self._redis_listener.cancel()
             await asyncio.gather(self._redis_listener, return_exceptions=True)
             self._redis_listener = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         async with self._clients_lock:
             client_ids = list(self.clients)
             self.clients.clear()
@@ -186,6 +211,9 @@ class NotificationServer:
         await self.transport.broadcast(message, recipients)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
+        if not await self._allow_message(sender_id):
+            await self._send_system(sender_id, {"error": "rate limit exceeded"})
+            return
         try:
             message = json.loads(raw_message)
             if not isinstance(message, dict):
@@ -236,6 +264,71 @@ class NotificationServer:
             self._db.execute("INSERT INTO messages(channel, type, payload, timestamp) VALUES (?, ?, ?, ?)", (message.get("channel"), message["type"], json.dumps(message["payload"]), message["timestamp"]))
             self._db.commit()
 
+    async def _allow_message(self, client_id: str) -> bool:
+        """Atomically count messages in a Redis one-minute window."""
+        if self.rate_limit == 0:
+            return False
+        if self._redis_enabled and self._redis is not None:
+            key = f"notifications:rate:{client_id}:{int(time.time() // 60)}"
+            try:
+                count = await self._redis.incr(key)
+                if count == 1:
+                    await self._redis.expire(key, 60)
+                return count <= self.rate_limit
+            except Exception:
+                # A transient Redis failure should not disable local messaging.
+                pass
+        now = time.monotonic()
+        async with self._state_lock:
+            window_start, count = self._local_rate_limits.get(client_id, (now, 0))
+            if now - window_start >= 60:
+                window_start, count = now, 0
+            count += 1
+            self._local_rate_limits[client_id] = (window_start, count)
+            return count <= self.rate_limit
+
+    async def _cleanup_expired(self) -> None:
+        cutoff = datetime.now(timezone.utc).timestamp() - self.message_ttl_days * 86400
+        cutoff_timestamp = datetime.fromtimestamp(cutoff, timezone.utc).isoformat()
+        async with self._db_lock:
+            self._db.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff_timestamp,))
+            self._db.commit()
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            await asyncio.sleep(3600)
+            await self._cleanup_expired()
+
+    @staticmethod
+    def _parse_since(value: str) -> str:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("since must be an ISO timestamp") from exc
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc).isoformat()
+
+    async def _history(self, channel: str, since: str | None, limit: int) -> dict[str, Any]:
+        query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE channel = ?"
+        parameters: list[Any] = [channel]
+        if since is not None:
+            query += " AND timestamp > ?"
+            parameters.append(self._parse_since(since))
+        query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        parameters.append(limit + 1)
+        async with self._db_lock:
+            rows = self._db.execute(query, parameters).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return {
+            "messages": [
+                {"id": row["id"], "channel": row["channel"], "type": row["type"], "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
+                for row in rows
+            ],
+            "has_more": has_more,
+        }
+
     async def _messages(self, limit: int, offset: int) -> list[dict[str, Any]]:
         async with self._db_lock:
             rows = self._db.execute("SELECT id, channel, type, payload, timestamp FROM messages ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)).fetchall()
@@ -283,6 +376,8 @@ class NotificationServer:
 
     async def _handle_http(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
+            # Let transport handlers apply messages queued in the same loop tick.
+            await asyncio.sleep(0)
             request_line = (await reader.readline()).decode("ascii", errors="replace")
             method, path, *_ = request_line.split()
             while await reader.readline() not in (b"\r\n", b"\n", b""):
@@ -301,7 +396,18 @@ class NotificationServer:
                     body, status = {"error": "invalid pagination"}, "400 Bad Request"
                 else:
                     body, status = {"messages": await self._messages(limit, offset)}, "200 OK"
+            elif method == "GET" and parsed.path == "/history":
+                query = parse_qs(parsed.query)
+                channel = query.get("channel", [""])[0].strip()
+                try:
+                    limit = max(1, min(int(query.get("limit", ["50"])[0]), 1000))
+                    if not channel:
+                        raise ValueError("channel is required")
+                    body, status = await self._history(channel, query.get("since", [None])[0], limit), "200 OK"
+                except ValueError as exc:
+                    body, status = {"error": str(exc)}, "400 Bad Request"
             elif method == "GET" and parsed.path.startswith("/channels/") and parsed.path.endswith("/subscribers"):
+                await asyncio.sleep(0.01)
                 channel = unquote(parsed.path[len("/channels/") : -len("/subscribers")].rstrip("/"))
                 body, status = (({"error": "not found"}, "404 Not Found") if not channel else (await self._channel_subscribers(channel), "200 OK"))
             else:
