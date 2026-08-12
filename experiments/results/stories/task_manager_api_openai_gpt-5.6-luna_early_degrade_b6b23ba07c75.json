@@ -20,7 +20,11 @@
     "total_duration": 388.4287857449672,
     "session_count": 5,
     "all_successful": true,
-    "cascade_recovery": false
+    "cascade_recovery": false,
+    "test_count": 15,
+    "test_lines": 197,
+    "code_lines": 441,
+    "test_code_ratio": 0.447
   },
   "sessions": [
     {
@@ -184,7 +188,10 @@
         "cache_write_tokens": 33825,
         "context_tokens": 553928,
         "cache_hit_rate": 0.989
-      }
+      },
+      "test_count": 15,
+      "test_lines": 197,
+      "code_lines": 441
     }
   ]
 }

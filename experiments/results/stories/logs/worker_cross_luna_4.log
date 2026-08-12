@@ -1,0 +1,5 @@
+[16:05:09][worker] Started (pid=1853578)
+[16:05:09][worker] Redis connected
+[16:07:10][worker] Queue empty after 12 polls. Exit[16:09:13][worker] [not_ti_go_ear] OK (549s)
+[16:11:13][worker] Queue empty after 12 polls. Exiting.
+[16:11:13][worker] Done: 1 ok, 0 failed, 1 total

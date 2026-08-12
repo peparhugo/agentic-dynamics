@@ -1,0 +1,199 @@
+{
+  "story_name": "notification_service",
+  "story_id": "117ae6080d3b",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 0,
+    "total_lines_removed": 0,
+    "net_lines": 0,
+    "average_convention_score": 0.879
+  },
+  "commits": [
+    {
+      "commit_hash": "0477e095d941d0c850308fccde1ee07493d93ef8",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "eb22532e005c3e51f056b414a1c3bafa9e4d6af3",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "fb36324657e84020cc632a201b8b0b430bd58546",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "44133fb461e09432ff199918b56cf905e276293e",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "f3bd03e703a3db9fb74e79d553ceb1399e6c30ed",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ]
+}

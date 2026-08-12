@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 05:05:13 UTC by build_data.py */
+/* Generated 2026-08-12 13:20:46 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T05:05:13.150925+00:00",
+    "generated_at": "2026-08-12T13:20:46.837248+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -3102,21 +3102,12 @@ window.DYNAMICS_DATA = {
     "models": [
       {
         "model": "openai/gpt-5.6-luna",
-        "cells": 2,
-        "total_cost": 0.154516,
-        "avg_cost": 0.077258,
-        "total_tokens": 54213,
-        "avg_cache_hit": 0.976,
-        "avg_duration_s": 361.0
-      },
-      {
-        "model": "deepseek/deepseek-v4-pro",
-        "cells": 35,
-        "total_cost": 0.258291,
-        "avg_cost": 0.00738,
-        "total_tokens": 6953909,
-        "avg_cache_hit": 0.0,
-        "avg_duration_s": 1675.0
+        "cells": 27,
+        "total_cost": 2.423908,
+        "avg_cost": 0.089774,
+        "total_tokens": 856219,
+        "avg_cache_hit": 0.974,
+        "avg_duration_s": 472.0
       },
       {
         "model": "anthropic/claude-sonnet-5",
@@ -3126,110 +3117,119 @@ window.DYNAMICS_DATA = {
         "total_tokens": 172925,
         "avg_cache_hit": 0.982,
         "avg_duration_s": 1103.0
+      },
+      {
+        "model": "deepseek/deepseek-v4-pro",
+        "cells": 35,
+        "total_cost": 4.822804,
+        "avg_cost": 0.137794,
+        "total_tokens": 6088089,
+        "avg_cache_hit": 0.778,
+        "avg_duration_s": 1675.0
       }
     ],
     "conditions": [
       {
         "condition": "bad_seed",
-        "cells": 7,
+        "cells": 12,
         "variants": 6,
-        "total_cost": 0.044559,
-        "avg_cost": 0.006366,
-        "success": 7,
+        "total_cost": 1.363081,
+        "avg_cost": 0.11359,
+        "success": 12,
         "fail": 0
       },
       {
         "condition": "clean",
-        "cells": 18,
+        "cells": 28,
         "variants": 12,
-        "total_cost": 4.919855,
-        "avg_cost": 0.273325,
-        "success": 18,
+        "total_cost": 7.497239,
+        "avg_cost": 0.267759,
+        "success": 28,
         "fail": 0
       },
       {
         "condition": "early_degrade",
-        "cells": 14,
+        "cells": 24,
         "variants": 12,
-        "total_cost": 0.085148,
-        "avg_cost": 0.006082,
-        "success": 14,
+        "total_cost": 3.023146,
+        "avg_cost": 0.125964,
+        "success": 24,
         "fail": 0
       }
     ],
     "stories": [
       {
-        "story": "static_site_gen",
-        "cells": 10,
-        "total_cost": 0.02714,
-        "avg_cost": 0.002714,
-        "sessions": 46,
-        "avg_duration_s": 1904.0,
-        "avg_tokens_per_session": 46528.0
+        "story": "notification_service",
+        "cells": 16,
+        "total_cost": 2.099285,
+        "avg_cost": 0.131205,
+        "sessions": 78,
+        "avg_duration_s": 1376.0,
+        "avg_tokens_per_session": 28877.0
       },
       {
-        "story": "notification_service",
-        "cells": 10,
-        "total_cost": 0.065177,
-        "avg_cost": 0.006518,
-        "sessions": 48,
-        "avg_duration_s": 1792.0,
-        "avg_tokens_per_session": 45656.0
+        "story": "static_site_gen",
+        "cells": 20,
+        "total_cost": 2.508622,
+        "avg_cost": 0.125431,
+        "sessions": 96,
+        "avg_duration_s": 1164.0,
+        "avg_tokens_per_session": 23164.0
       },
       {
         "story": "task_manager_api",
-        "cells": 19,
-        "total_cost": 4.957245,
-        "avg_cost": 0.260908,
-        "sessions": 93,
-        "avg_duration_s": 1294.0,
-        "avg_tokens_per_session": 30047.0
+        "cells": 28,
+        "total_cost": 7.275559,
+        "avg_cost": 0.259841,
+        "sessions": 138,
+        "avg_duration_s": 1010.0,
+        "avg_tokens_per_session": 17791.0
       }
     ],
     "tiers": [
       {
         "tier": "tier1_minimal",
         "quality": "bad",
-        "cells": 8,
-        "avg_cost": 0.010824,
-        "avg_tokens_per_session": 39688.0,
-        "avg_session_duration_s": 344.0
+        "cells": 14,
+        "avg_cost": 0.11281,
+        "avg_tokens_per_session": 20481.0,
+        "avg_session_duration_s": 242.0
       },
       {
         "tier": "tier1_minimal",
         "quality": "good",
-        "cells": 16,
-        "avg_cost": 0.306274,
-        "avg_tokens_per_session": 33624.0,
-        "avg_session_duration_s": 297.0
+        "cells": 24,
+        "avg_cost": 0.298265,
+        "avg_tokens_per_session": 19880.0,
+        "avg_session_duration_s": 229.0
       },
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 6,
-        "avg_cost": 0.006862,
-        "avg_tokens_per_session": 39868.0,
-        "avg_session_duration_s": 389.0
+        "cells": 10,
+        "avg_cost": 0.11586,
+        "avg_tokens_per_session": 25157.0,
+        "avg_session_duration_s": 267.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 9,
-        "avg_cost": 0.002378,
-        "avg_tokens_per_session": 44228.0,
-        "avg_session_duration_s": 354.0
+        "cells": 16,
+        "avg_cost": 0.124198,
+        "avg_tokens_per_session": 25501.0,
+        "avg_session_duration_s": 242.0
       }
     ],
     "sessions": {
-      "total": 187,
-      "total_cost": 5.049561294999996,
-      "total_tokens": 227138,
-      "total_cache_reads": 12082902,
-      "cache_hit_rate": 0.996,
-      "duration_s": 61553.181478765066,
-      "successful": 187,
+      "total": 312,
+      "total_cost": 11.883465889999998,
+      "total_tokens": 7117233,
+      "total_cache_reads": 148819281,
+      "cache_hit_rate": 0.977,
+      "duration_s": 73584.40570902891,
+      "successful": 312,
       "failed": 0
     },
-    "generated_at": "2026-08-12T05:05:13.264064+00:00"
+    "generated_at": "2026-08-12T13:20:46.947264+00:00"
   }
 };

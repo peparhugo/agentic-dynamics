@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_4c1f8dd819b2",
   "error": "",
   "summary": {
-    "total_cost": 0.002591005,
-    "total_tokens": 216649,
+    "total_cost": 0.15349617,
+    "total_tokens": 226684,
     "total_duration": 1744.5042092759686,
     "session_count": 5,
     "all_successful": true,
-    "cascade_recovery": false
+    "cascade_recovery": false,
+    "total_cache_reads": 3985408,
+    "total_cache_writes": 0,
+    "total_context_tokens": 4212092,
+    "cache_hit_rate": 0.946,
+    "test_count": 0,
+    "test_lines": 0,
+    "code_lines": 0,
+    "test_code_ratio": 0.0
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Build a static site generator CLI in TypeScript.\nCORE FEATURES:\n- Read Markdown files from a content directory (default: ./content)\n- Parse Markdown to HTML with frontmatter support (title, date, tags",
       "commit_hash": "074a77dd675d9670acfd71e8998b66080d59b00a",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000232232,
+      "cost_usd": 0.01469169,
       "total_tokens": 21056,
       "duration_s": 171.7005140639958,
       "files_changed": 5160,
@@ -48,9 +56,12 @@
           "src/types.ts",
           "tsconfig.json"
         ],
-        "prompt_tokens": 24,
-        "completion_tokens": 158,
-        "reasoning_tokens": 10
+        "prompt_tokens": 12922,
+        "completion_tokens": 7200,
+        "reasoning_tokens": 1570,
+        "total_tokens": 21692,
+        "cache_read_tokens": 397440,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -59,7 +70,7 @@
       "prompt": "Add template engine and layout support to the static site generator.\n\nTEMPLATES:\n- Support Handlebars (.hbs) or EJS templates\n- Each page can specify a template in its frontmatter\n- Default template i",
       "commit_hash": "ddbac1450eb36bb66c073011694496fe0bce2f55",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000319667,
+      "cost_usd": 0.0326966,
       "total_tokens": 42358,
       "duration_s": 375.0320435689937,
       "files_changed": 11,
@@ -80,9 +91,12 @@
           "templates/partials/header.hbs",
           "templates/partials/nav.hbs"
         ],
-        "prompt_tokens": 363,
-        "completion_tokens": 11,
-        "reasoning_tokens": 0
+        "prompt_tokens": 26653,
+        "completion_tokens": 13242,
+        "reasoning_tokens": 6737,
+        "total_tokens": 46632,
+        "cache_read_tokens": 1026432,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -91,7 +105,7 @@
       "prompt": "Add a live-reload development server to the SSG.\n\nDEV SERVER:\n- npx ssg serve \u2014 start dev server on localhost:3000\n- Watch content/ and templates/ directories for changes\n- Rebuild on file change\n- In",
       "commit_hash": "321016a68c706694d2cda6bb2370950afc78b724",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.000572634,
+      "cost_usd": 0.03000439,
       "total_tokens": 45546,
       "duration_s": 369.35770082098315,
       "files_changed": 72,
@@ -141,9 +155,12 @@
           "dist/src/types.js.map",
           "src/serve.ts"
         ],
-        "prompt_tokens": 294,
-        "completion_tokens": 324,
-        "reasoning_tokens": 0
+        "prompt_tokens": 25390,
+        "completion_tokens": 9658,
+        "reasoning_tokens": 8130,
+        "total_tokens": 43178,
+        "cache_read_tokens": 961152,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -152,7 +169,7 @@
       "prompt": "Refactor the SSG to use a plugin system for extensibility.\n\nPLUGIN SYSTEM:\n- Define a Plugin interface with lifecycle hooks:\n  - onStart(), beforeBuild(), afterBuild(), onFile(page), onEnd()\n- Plugins",
       "commit_hash": "c16caa950c8ce068c3681f57023788373f76b477",
       "commit_message": "[story] Session 4: refactor",
-      "cost_usd": 0.000743067,
+      "cost_usd": 0.03592648,
       "total_tokens": 51213,
       "duration_s": 426.477230088989,
       "files_changed": 35,
@@ -201,9 +218,12 @@
           "src/plugin.ts",
           "ssg.config.ts"
         ],
-        "prompt_tokens": 529,
-        "completion_tokens": 370,
-        "reasoning_tokens": 10
+        "prompt_tokens": 30218,
+        "completion_tokens": 8307,
+        "reasoning_tokens": 14802,
+        "total_tokens": 53327,
+        "cache_read_tokens": 738432,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -212,7 +232,7 @@
       "prompt": "Add incremental builds and caching to the SSG.\n\nINCREMENTAL BUILDS:\n- npx ssg build --incremental \u2014 only rebuild changed pages\n- Track file hashes in a .ssg-cache.json manifest\n- Skip rebuild of pages",
       "commit_hash": "b1daa4483c0633a7db1879054bc7458e9436c692",
       "commit_message": "[story] Session 5: cross_cutting",
-      "cost_usd": 0.000723405,
+      "cost_usd": 0.04017701,
       "total_tokens": 56476,
       "duration_s": 401.93672073300695,
       "files_changed": 10,
@@ -236,10 +256,19 @@
           "dist/src/cache.js.map",
           "src/cache.ts"
         ],
-        "prompt_tokens": 393,
-        "completion_tokens": 392,
-        "reasoning_tokens": 11
-      }
+        "prompt_tokens": 38532,
+        "completion_tokens": 12171,
+        "reasoning_tokens": 11152,
+        "total_tokens": 61855,
+        "cache_read_tokens": 861952,
+        "cache_write_tokens": 0,
+        "context_tokens": 923807,
+        "cache_hit_rate": 0.933,
+        "estimated_cost_usd": 0.040177006
+      },
+      "test_count": 0,
+      "test_lines": 0,
+      "code_lines": 0
     }
   ]
 }

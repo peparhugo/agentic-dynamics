@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_117533fe8f2f",
   "error": "Session 5 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.03211762,
-    "total_tokens": 193894,
+    "total_cost": 0.13245109,
+    "total_tokens": 0,
     "total_duration": 1702.5429285790015,
     "session_count": 5,
     "all_successful": true,
-    "cascade_recovery": null
+    "cascade_recovery": null,
+    "total_cache_reads": 0,
+    "total_cache_writes": 0,
+    "total_context_tokens": 0,
+    "cache_hit_rate": 0.0,
+    "test_count": 49,
+    "test_lines": 780,
+    "code_lines": 369,
+    "test_code_ratio": 2.114
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Create a Flask API for task management with the following requirements:\n\nMODELS:\n- Task: id (int, auto), title (str), status (str, default 'pending'), created_at (datetime)\n\nENDPOINTS:\n- POST /tasks \u2014",
       "commit_hash": "5641adbef5590752cd77ad65d95cfbcdd81a0af4",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000536094,
+      "cost_usd": 0.01588173,
       "total_tokens": 26468,
       "duration_s": 135.76167304700357,
       "files_changed": 5,
@@ -38,7 +46,7 @@
       "prompt": "Add JWT authentication to the existing task management API.\n\nNEW MODEL:\n- User: id (int, auto), username (str, unique), password_hash (str)\n\nNEW ENDPOINTS:\n- POST /auth/register \u2014 create user (JSON: {",
       "commit_hash": "00ff341df2c03fe40d743a5a8985609212d2bf12",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000428997,
+      "cost_usd": 0.02486802,
       "total_tokens": 31580,
       "duration_s": 265.49377131299116,
       "files_changed": 0,
@@ -51,7 +59,7 @@
       "prompt": "Add an async email notification system to the task management API.\n\nREQUIREMENT:\nWhen a task's status changes to 'completed', send a notification email to the task owner asynchronously (do not block t",
       "commit_hash": "398304faf69f681c640e46821050203ff97e3d07",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.00049184,
+      "cost_usd": 0.01558588,
       "total_tokens": 28742,
       "duration_s": 190.96074823100935,
       "files_changed": 2,
@@ -64,7 +72,7 @@
       "prompt": "Refactor the data access layer to use the Repository pattern.\n\nREQUIREMENT:\nExtract all database operations into repository classes. The API routes should NOT directly access SQLite.\n\nIMPLEMENTATION:\n",
       "commit_hash": "6f9e1ed09eb282cd66b4c020360f5982d317bb49",
       "commit_message": "[story] Session 4: refactor",
-      "cost_usd": 0.000340257,
+      "cost_usd": 0.0168508,
       "total_tokens": 29559,
       "duration_s": 210.12953430099878,
       "files_changed": 2,
@@ -77,12 +85,15 @@
       "prompt": "Add rate limiting and pagination to the task management API.\n\nRATE LIMITING:\n- Limit each authenticated user to 100 requests per minute\n- Use Flask-Limiter with Redis as the storage backend\n- Return 4",
       "commit_hash": "29a460f01528692cb6f65d1b128fb273114cb750",
       "commit_message": "[story] Session 5: cross_cutting",
-      "cost_usd": 0.03032043,
+      "cost_usd": 0.05926466,
       "total_tokens": 77545,
       "duration_s": 900.1972016869986,
       "files_changed": 0,
       "exit_code": 0,
-      "error": ""
+      "error": "",
+      "test_count": 49,
+      "test_lines": 780,
+      "code_lines": 369
     }
   ]
 }

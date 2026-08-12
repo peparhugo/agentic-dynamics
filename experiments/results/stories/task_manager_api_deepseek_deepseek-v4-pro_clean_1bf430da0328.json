@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_1bf430da0328",
   "error": "Session 3 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.0005956889999999999,
-    "total_tokens": 47507,
+    "total_cost": 0.02954007,
+    "total_tokens": 0,
     "total_duration": 1260.112961987994,
     "session_count": 3,
     "all_successful": true,
-    "cascade_recovery": null
+    "cascade_recovery": null,
+    "total_cache_reads": 0,
+    "total_cache_writes": 0,
+    "total_context_tokens": 0,
+    "cache_hit_rate": 0.0,
+    "test_count": 39,
+    "test_lines": 393,
+    "code_lines": 235,
+    "test_code_ratio": 1.672
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Create a Flask API for task management with the following requirements:\n\nMODELS:\n- Task: id (int, auto), title (str), status (str, default 'pending'), created_at (datetime)\n\nENDPOINTS:\n- POST /tasks \u2014",
       "commit_hash": "22e92f69c9be03fad1fa6048ce5f1d64c7174143",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000152801,
+      "cost_usd": 0.01496696,
       "total_tokens": 23696,
       "duration_s": 150.88888747399324,
       "files_changed": 5,
@@ -38,7 +46,7 @@
       "prompt": "Add JWT authentication to the existing task management API.\n\nNEW MODEL:\n- User: id (int, auto), username (str, unique), password_hash (str)\n\nNEW ENDPOINTS:\n- POST /auth/register \u2014 create user (JSON: {",
       "commit_hash": "76a90e21d4ad990688f9de9b23b499db587a30f9",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000442888,
+      "cost_usd": 0.01457311,
       "total_tokens": 23811,
       "duration_s": 209.014872603002,
       "files_changed": 0,
@@ -56,7 +64,10 @@
       "duration_s": 900.2092019109987,
       "files_changed": 0,
       "exit_code": 0,
-      "error": ""
+      "error": "",
+      "test_count": 39,
+      "test_lines": 393,
+      "code_lines": 235
     }
   ]
 }

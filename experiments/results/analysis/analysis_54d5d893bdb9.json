@@ -1,0 +1,229 @@
+{
+  "story_name": "task_manager_api",
+  "story_id": "54d5d893bdb9",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 0,
+    "total_lines_removed": 0,
+    "net_lines": 0,
+    "average_convention_score": 0.709
+  },
+  "commits": [
+    {
+      "commit_hash": "c14d94819533c5fa74b4cce24ecf854b3f873cca",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.709,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "notifications.py: Classes should use PascalCase",
+          "notifications.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "6eba383248f02f6072c608f65de262e9697d9d92",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.709,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "notifications.py: Classes should use PascalCase",
+          "notifications.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "c5168ec112c8a2e43ba677822a40a085916d66de",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.709,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "notifications.py: Classes should use PascalCase",
+          "notifications.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "74ac8b2835d2003b5d85aecd5ea693b8344c2ba8",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.709,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "notifications.py: Classes should use PascalCase",
+          "notifications.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "df11570fdd032d09ab371746d9f4a0d2f5f85c66",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.709,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "notifications.py: Classes should use PascalCase",
+          "notifications.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ]
+}

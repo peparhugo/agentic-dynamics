@@ -1,0 +1,119 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "21c3ce6002e183c7f2c459e8f41cddf7041b21e1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "threading.Lock used inside asyncio event loop (unnecessary",
+        "can block)",
+        "missing type hints on public signatures",
+        "message payloads are plain dicts instead of dataclasses",
+        "duplicated timestamp construction",
+        "no validation of direct-message targets"
+      ],
+      "strengths": [],
+      "summary": "Clean greenfield websocket notification server with sensible separation of registry and server logic, but mixes a threading.Lock into an asyncio context and skips type hints and dataclass usage called for by project conventions.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "57593cf70c33bc248fc63a51c02d3c673ef89368",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "missing type hints on public signatures",
+        "`_transport._server` private attribute leak defeats abstraction",
+        "`_server_ctx` uninitialized in __init__ (AttributeError if stop() before start())",
+        "ConnectionClosed needs explicit import",
+        "no typing/Protocol for handler callbacks"
+      ],
+      "strengths": [],
+      "summary": "Decouples NotificationServer from websockets via a BaseTransport abstraction, improving testability, but leaks internals through `_transport._server`.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "aec9627186de62cd289ed2bae6ae4b875a1b8357",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "missing type hints on new public signatures (get_history/cleanup_old/check_and_increment)",
+        "bare except Exception: pass in 3 spots",
+        "rate-limit error message uses global RATE_LIMIT instead of instance self._limit (wrong when rate_limit override set)",
+        "unbounded _local dict growth in fallback limiter"
+      ],
+      "strengths": [],
+      "summary": "Adds coherent cross-cutting features (Redis-backed rate limiting with local fallback, message history endpoint, TTL cleanup) that slot into the existing MessageStore/background-task architecture.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "acc02485a17915278bc6d4da62b03b2916cd6deb",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "channel field leaks into subscriber message payload",
+        "get_subscribers returns list while get_subscriber_websockets returns dict",
+        "no channel name validation (slashes break /channels/{name}/subscribers routing)"
+      ],
+      "strengths": [],
+      "summary": "The commit cleanly extends the existing thread-safe ClientRegistry pattern to add pub/sub channels with proper cleanup on remove/clear, wired through the broadcast handler and HTTP layer with comprehensive tests.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "126d33792731bb0483e7acb2337b712d4621f74a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.68,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "sync sqlite writes block the event loop inside async handlers",
+        "direct messages are persisted but never published to Redis so they stay local-only in distributed mode",
+        "bare except clauses swallow errors in _redis_subscriber",
+        "no type hints on new public signatures",
+        "committed __pycache__/.pyc files and messages.db binary to git"
+      ],
+      "strengths": [],
+      "summary": "The Session 3 \"integration\" commit cleanly adds SQLite persistence (MessageStore), optional Redis pub/sub with graceful fallback, and a `/messages` history endpoint, refactoring `run()` into an async context manager that manages Redis lifecycle.",
+      "session_number": 3
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "1e002365da34",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Single-file architecture never decomposed: server.py grew from 129 to 588 lines across 5 sessions, with MessageStore, ClientRegistry, RateLimiter, and transports all living in one module even after the session-4 refactor that was nominally about structure",
+      "Seed app.py (Flask todo API) was entirely discarded in session 1 \u2014 the greenfield rewrite shared no code, types, or conventions with the seed, so there was no true baseline inheritance",
+      "Redis pub/sub support added in session 5 duplicated delivery paths (_deliver_locally vs publish) and only kept local/registry state partially in sync with Redis sub sets, leaving cross-process subscription state to drift",
+      "RateLimiter local fallback dict grows unbounded per client_id-per-minute key with no eviction when Redis is unavailable"
+    ],
+    "key_decisions": [
+      "Session 1 chose a raw asyncio websockets server instead of the Flask stack from the seed \u2014 set the entire architectural trajectory toward an async WebSocket transport",
+      "Session 3 introduced a sqlite MessageStore (MessageStore class) as the persistence layer, enabling history/retention features in later sessions",
+      "Session 4 introduced a BaseTransport ABC + WebSocketTransport abstraction with constructor injection into NotificationServer \u2014 the single most consequential decision, decoupling transport concerns from core logic and enabling the cross-cutting HTTP endpoints (_process_request) and testability",
+      "Session 5 added a RateLimiter abstraction with Redis backing plus TTL cleanup loop, making Redis an optional enhancement with graceful degradation rather than a hard dependency"
+    ],
+    "trajectory_description": "Quality improved monotonically and sharply across the arc. The codebase grew from a 129-line, 16-test greenfield core in session 1 to a 588-line, 82-test system by session 5, with every session adding a coherent layer: core messaging and client registry, then subscriptions and direct messaging, then durable message history via sqlite, then a transport abstraction and refactor, then cross-cutting rate limiting, Redis pub/sub, health/channel/subscriber HTTP endpoints, and TTL-based cleanup. Tests stayed green throughout (16\u219239\u219259\u219259\u219282), the session-4 refactor preserved behavior while improving architecture, and the final suite passes 82/82 \u2014 the only real blemish being that the 'refactor' session did not break up the steadily bloatng single server.py file.",
+    "summary": "A coherent, high-quality five-session arc that compounded features onto a sound async architecture and improved steadily, marred only by persistent single-file bloat and partially-duplicated Redis delivery paths."
+  }
+}

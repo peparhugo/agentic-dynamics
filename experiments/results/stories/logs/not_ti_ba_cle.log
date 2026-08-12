@@ -1,0 +1,16 @@
+
+Story: notification_service (5 sessions, python)
+Model: openai/gpt-5.6-luna
+Codebase: experiments/codebases/python/tier2_small/bad (bad, tier2_small)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: notification_service
+  Condition: clean
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0754
+  Total tokens: 26,970
+  Duration: 394.0s
+  Cascade recovery: no
+  Results: experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4182ba649c21.json

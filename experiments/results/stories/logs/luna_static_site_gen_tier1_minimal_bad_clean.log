@@ -1,0 +1,16 @@
+
+Story: static_site_gen (5 sessions, typescript)
+Model: openai/gpt-5.6-luna
+Codebase: experiments/codebases/typescript/tier1_minimal/bad (bad, tier1_minimal)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: static_site_gen
+  Condition: clean
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0972
+  Total tokens: 38,917
+  Duration: 436.5s
+  Cascade recovery: no
+  Results: experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fe842562ab05.json

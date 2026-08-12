@@ -11,7 +11,7 @@
   "worktree": "/tmp/story_c9e06c7b6b5c",
   "error": "",
   "summary": {
-    "total_cost": 0.07544756999999999,
+    "total_cost": 0.07544757,
     "total_tokens": 26500,
     "total_cache_reads": 1029491,
     "total_cache_writes": 93191,
@@ -20,7 +20,11 @@
     "total_duration": 352.1162984370021,
     "session_count": 5,
     "all_successful": true,
-    "cascade_recovery": false
+    "cascade_recovery": false,
+    "test_count": 16,
+    "test_lines": 200,
+    "code_lines": 435,
+    "test_code_ratio": 0.46
   },
   "sessions": [
     {
@@ -186,7 +190,10 @@
         "cache_write_tokens": 26369,
         "context_tokens": 330296,
         "cache_hit_rate": 0.98
-      }
+      },
+      "test_count": 16,
+      "test_lines": 200,
+      "code_lines": 435
     }
   ]
 }

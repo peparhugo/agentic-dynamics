@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_1e002365da34",
   "error": "",
   "summary": {
-    "total_cost": 0.003027368,
-    "total_tokens": 267507,
+    "total_cost": 0.18429738,
+    "total_tokens": 281215,
     "total_duration": 1868.913190789026,
     "session_count": 5,
     "all_successful": true,
-    "cascade_recovery": false
+    "cascade_recovery": false,
+    "total_cache_reads": 4433536,
+    "total_cache_writes": 0,
+    "total_context_tokens": 4714751,
+    "cache_hit_rate": 0.94,
+    "test_count": 82,
+    "test_lines": 1428,
+    "code_lines": 734,
+    "test_code_ratio": 1.946
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Build a WebSocket-based notification server in Python.\n\nCORE FEATURES:\n- Accept WebSocket connections from clients\n- Assign each client a unique ID on connect\n- Broadcast a message to ALL connected cl",
       "commit_hash": "21c3ce6002e183c7f2c459e8f41cddf7041b21e1",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000281039,
+      "cost_usd": 0.04238669,
       "total_tokens": 52158,
       "duration_s": 357.2512356850202,
       "files_changed": 7,
@@ -43,9 +51,12 @@
           "server.py",
           "test_server.py"
         ],
-        "prompt_tokens": 167,
-        "completion_tokens": 11,
-        "reasoning_tokens": 12
+        "prompt_tokens": 33284,
+        "completion_tokens": 11057,
+        "reasoning_tokens": 15976,
+        "total_tokens": 60317,
+        "cache_read_tokens": 1210880,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -54,7 +65,7 @@
       "prompt": "Add channel-based subscriptions to the notification server.\n\nCHANNELS:\n- Clients subscribe to named channels (e.g. 'alerts', 'system', 'chat')\n- Messages are delivered ONLY to clients subscribed to th",
       "commit_hash": "acc02485a17915278bc6d4da62b03b2916cd6deb",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000523856,
+      "cost_usd": 0.02076345,
       "total_tokens": 33755,
       "duration_s": 208.90889028998208,
       "files_changed": 0,
@@ -67,9 +78,12 @@
         "retries": 1,
         "depth": 2,
         "files_created": [],
-        "prompt_tokens": 278,
-        "completion_tokens": 315,
-        "reasoning_tokens": 10
+        "prompt_tokens": 23411,
+        "completion_tokens": 7150,
+        "reasoning_tokens": 3562,
+        "total_tokens": 34123,
+        "cache_read_tokens": 347648,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -78,7 +92,7 @@
       "prompt": "Integrate Redis pub/sub as the message backbone.\n\nREDIS INTEGRATION:\n- Use Redis pub/sub channels for message distribution\n- Server publishes to Redis channel; workers subscribe and deliver\n- Multiple",
       "commit_hash": "126d33792731bb0483e7acb2337b712d4621f74a",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.001337596,
+      "cost_usd": 0.04255854,
       "total_tokens": 61426,
       "duration_s": 472.7262246909959,
       "files_changed": 0,
@@ -91,9 +105,12 @@
         "retries": 2,
         "depth": 10,
         "files_created": [],
-        "prompt_tokens": 1488,
-        "completion_tokens": 268,
-        "reasoning_tokens": 278
+        "prompt_tokens": 38226,
+        "completion_tokens": 11004,
+        "reasoning_tokens": 14763,
+        "total_tokens": 63993,
+        "cache_read_tokens": 969088,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -102,7 +119,7 @@
       "prompt": "Refactor the notification server to use a pluggable transport layer.\n\nREQUIREMENT:\nExtract the WebSocket transport behind a Transport interface so\ndifferent transport mechanisms (SSE, polling, raw TCP",
       "commit_hash": "57593cf70c33bc248fc63a51c02d3c673ef89368",
       "commit_message": "[story] Session 4: refactor",
-      "cost_usd": 0.000551493,
+      "cost_usd": 0.04304615,
       "total_tokens": 65339,
       "duration_s": 482.6987174570095,
       "files_changed": 0,
@@ -115,9 +132,12 @@
         "retries": 4,
         "depth": 4,
         "files_created": [],
-        "prompt_tokens": 159,
-        "completion_tokens": 275,
-        "reasoning_tokens": 9
+        "prompt_tokens": 43792,
+        "completion_tokens": 6155,
+        "reasoning_tokens": 17886,
+        "total_tokens": 67833,
+        "cache_read_tokens": 849920,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -126,7 +146,7 @@
       "prompt": "Add rate limiting and persistent message history.\n\nRATE LIMITING:\n- Limit each client to 100 messages per minute\n- Limits enforced per-client-ID using Redis counters\n- Return error message on rate lim",
       "commit_hash": "aec9627186de62cd289ed2bae6ae4b875a1b8357",
       "commit_message": "[story] Session 5: cross_cutting",
-      "cost_usd": 0.000333384,
+      "cost_usd": 0.03554255,
       "total_tokens": 54829,
       "duration_s": 347.3281226660183,
       "files_changed": 0,
@@ -139,10 +159,19 @@
         "retries": 1,
         "depth": 2,
         "files_created": [],
-        "prompt_tokens": 290,
-        "completion_tokens": 11,
-        "reasoning_tokens": 0
-      }
+        "prompt_tokens": 36991,
+        "completion_tokens": 10773,
+        "reasoning_tokens": 7185,
+        "total_tokens": 54949,
+        "cache_read_tokens": 1056000,
+        "cache_write_tokens": 0,
+        "context_tokens": 1110949,
+        "cache_hit_rate": 0.951,
+        "estimated_cost_usd": 0.035542545
+      },
+      "test_count": 82,
+      "test_lines": 1428,
+      "code_lines": 734
     }
   ]
 }

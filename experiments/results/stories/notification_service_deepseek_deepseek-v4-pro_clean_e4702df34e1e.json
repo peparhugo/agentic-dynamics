@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_e4702df34e1e",
   "error": "Session 3 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.015721016,
-    "total_tokens": 117038,
+    "total_cost": 0.08552881,
+    "total_tokens": 0,
     "total_duration": 1210.9310503330198,
     "session_count": 3,
     "all_successful": true,
-    "cascade_recovery": null
+    "cascade_recovery": null,
+    "total_cache_reads": 0,
+    "total_cache_writes": 0,
+    "total_context_tokens": 0,
+    "cache_hit_rate": 0.0,
+    "test_count": 17,
+    "test_lines": 370,
+    "code_lines": 590,
+    "test_code_ratio": 0.627
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Build a WebSocket-based notification server in Python.\n\nCORE FEATURES:\n- Accept WebSocket connections from clients\n- Assign each client a unique ID on connect\n- Broadcast a message to ALL connected cl",
       "commit_hash": "6e181cef7d89f2d5485f0cf4c07cb1be06a36eb5",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000432245,
+      "cost_usd": 0.01884771,
       "total_tokens": 28660,
       "duration_s": 145.9213217680226,
       "files_changed": 6,
@@ -38,7 +46,7 @@
       "prompt": "Add channel-based subscriptions to the notification server.\n\nCHANNELS:\n- Clients subscribe to named channels (e.g. 'alerts', 'system', 'chat')\n- Messages are delivered ONLY to clients subscribed to th",
       "commit_hash": "34bb9bcb51d6a7dbaaefc9bacdcf39ecd229f31f",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000402114,
+      "cost_usd": 0.01557431,
       "total_tokens": 24338,
       "duration_s": 164.89548838400515,
       "files_changed": 0,
@@ -51,12 +59,15 @@
       "prompt": "Integrate Redis pub/sub as the message backbone.\n\nREDIS INTEGRATION:\n- Use Redis pub/sub channels for message distribution\n- Server publishes to Redis channel; workers subscribe and deliver\n- Multiple",
       "commit_hash": "1e3b6fcb8a882c7265b673f68a69acfcf18ab4b5",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.014886657,
+      "cost_usd": 0.05110679,
       "total_tokens": 64040,
       "duration_s": 900.114240180992,
       "files_changed": 5,
       "exit_code": 0,
-      "error": ""
+      "error": "",
+      "test_count": 17,
+      "test_lines": 370,
+      "code_lines": 590
     }
   ]
 }

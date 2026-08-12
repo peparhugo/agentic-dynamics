@@ -55,6 +55,9 @@ SESSION_SCHEMA = pa.schema([
     pa.field("continuation_used", pa.bool_()),
     pa.field("worktree", pa.string()),
     pa.field("started_at", pa.string()),
+    pa.field("test_count", pa.int32()),
+    pa.field("test_lines", pa.int32()),
+    pa.field("code_lines", pa.int32()),
 ])
 
 STORY_SCHEMA = pa.schema([
@@ -74,6 +77,10 @@ STORY_SCHEMA = pa.schema([
     pa.field("all_successful", pa.bool_()),
     pa.field("cascade_recovery", pa.bool_()),
     pa.field("worktree", pa.string()),
+    pa.field("test_count", pa.int32()),
+    pa.field("test_lines", pa.int32()),
+    pa.field("code_lines", pa.int32()),
+    pa.field("test_code_ratio", pa.float64()),
 ])
 
 
@@ -134,6 +141,10 @@ def sync() -> dict[str, int]:
             "all_successful": summary.get("all_successful", False),
             "cascade_recovery": summary.get("cascade_recovery", False),
             "worktree": worktree,
+            "test_count": summary.get("test_count", 0) or 0,
+            "test_lines": summary.get("test_lines", 0) or 0,
+            "code_lines": summary.get("code_lines", 0) or 0,
+            "test_code_ratio": summary.get("test_code_ratio", 0.0) or 0.0,
         })
 
         for s in d.get("sessions", []):
@@ -168,6 +179,9 @@ def sync() -> dict[str, int]:
                 "continuation_used": s.get("continuation_used", False),
                 "worktree": worktree,
                 "started_at": d.get("started_at", ""),
+                "test_count": s.get("test_count", 0) or 0,
+                "test_lines": s.get("test_lines", 0) or 0,
+                "code_lines": s.get("code_lines", 0) or 0,
             })
 
     if session_rows:

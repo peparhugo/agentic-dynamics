@@ -10,11 +10,19 @@
   "worktree": "/tmp/story_f1e988572174",
   "error": "Session 5 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.0277175,
-    "total_tokens": 179479,
+    "total_cost": 0.11774659,
+    "total_tokens": 98362,
     "total_duration": 1574.1982732360484,
     "session_count": 5,
-    "all_successful": true
+    "all_successful": true,
+    "total_cache_reads": 1337984,
+    "total_cache_writes": 0,
+    "total_context_tokens": 1436346,
+    "cache_hit_rate": 0.932,
+    "test_count": 47,
+    "test_lines": 458,
+    "code_lines": 385,
+    "test_code_ratio": 1.19
   },
   "sessions": [
     {
@@ -23,7 +31,7 @@
       "prompt": "Create a Flask API for task management with the following requirements:\n\nMODELS:\n- Task: id (int, auto), title (str), status (str, default 'pending'), created_at (datetime)\n\nENDPOINTS:\n- POST /tasks \u2014",
       "commit_hash": "c7d4b10e287f4857e8c69c35eb53f8e8d009439b",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000232319,
+      "cost_usd": 0.00613689,
       "total_tokens": 12054,
       "duration_s": 45.20469903101912,
       "files_changed": 4,
@@ -38,9 +46,12 @@
         "files_created": [
           "test_app.py"
         ],
-        "prompt_tokens": 375,
-        "completion_tokens": 17,
-        "reasoning_tokens": 14
+        "prompt_tokens": 8605,
+        "completion_tokens": 1948,
+        "reasoning_tokens": 429,
+        "total_tokens": 10982,
+        "cache_read_tokens": 89856,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -49,7 +60,7 @@
       "prompt": "Add JWT authentication to the existing task management API.\n\nNEW MODEL:\n- User: id (int, auto), username (str, unique), password_hash (str)\n\nNEW ENDPOINTS:\n- POST /auth/register \u2014 create user (JSON: {",
       "commit_hash": "69fc574d38a0504bf03ece8df939f2fcb7d3b05d",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000439292,
+      "cost_usd": 0.01411268,
       "total_tokens": 23265,
       "duration_s": 185.78251628001453,
       "files_changed": 0,
@@ -62,9 +73,12 @@
         "retries": 2,
         "depth": 2,
         "files_created": [],
-        "prompt_tokens": 142,
-        "completion_tokens": 339,
-        "reasoning_tokens": 0
+        "prompt_tokens": 14540,
+        "completion_tokens": 6990,
+        "reasoning_tokens": 1050,
+        "total_tokens": 22580,
+        "cache_read_tokens": 218752,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -73,7 +87,7 @@
       "prompt": "Add an async email notification system to the task management API.\n\nREQUIREMENT:\nWhen a task's status changes to 'completed', send a notification email to the task owner asynchronously (do not block t",
       "commit_hash": "b5fdc37efac811318d8fc79642b2261d02287ac5",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.000243107,
+      "cost_usd": 0.02022718,
       "total_tokens": 38365,
       "duration_s": 228.6455431340146,
       "files_changed": 2,
@@ -88,9 +102,12 @@
         "files_created": [
           "celery_config.py"
         ],
-        "prompt_tokens": 201,
-        "completion_tokens": 11,
-        "reasoning_tokens": 9
+        "prompt_tokens": 24057,
+        "completion_tokens": 5184,
+        "reasoning_tokens": 3763,
+        "total_tokens": 33004,
+        "cache_read_tokens": 545792,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -99,7 +116,7 @@
       "prompt": "Refactor the data access layer to use the Repository pattern.\n\nREQUIREMENT:\nExtract all database operations into repository classes. The API routes should NOT directly access SQLite.\n\nIMPLEMENTATION:\n",
       "commit_hash": "b01d12934fc902bc6ef3cac7b0f4507ec56815c2",
       "commit_message": "[story] Session 4: refactor",
-      "cost_usd": 0.000217732,
+      "cost_usd": 0.01146092,
       "total_tokens": 24345,
       "duration_s": 214.4327777790022,
       "files_changed": 8,
@@ -117,9 +134,12 @@
           "repositories/task_repository.py",
           "repositories/user_repository.py"
         ],
-        "prompt_tokens": 262,
-        "completion_tokens": 11,
-        "reasoning_tokens": 8
+        "prompt_tokens": 7464,
+        "completion_tokens": 3804,
+        "reasoning_tokens": 4630,
+        "total_tokens": 15898,
+        "cache_read_tokens": 241792,
+        "cache_write_tokens": 0
       }
     },
     {
@@ -128,7 +148,7 @@
       "prompt": "Add rate limiting and pagination to the task management API.\n\nRATE LIMITING:\n- Limit each authenticated user to 100 requests per minute\n- Use Flask-Limiter with Redis as the storage backend\n- Return 4",
       "commit_hash": "cebe804e4cb85be95ee4797de97b670580889f9f",
       "commit_message": "[story] Session 5: cross_cutting",
-      "cost_usd": 0.02658505,
+      "cost_usd": 0.06580892,
       "total_tokens": 81450,
       "duration_s": 900.132737011998,
       "files_changed": 0,
@@ -141,10 +161,19 @@
         "retries": 10,
         "depth": 6,
         "files_created": [],
-        "prompt_tokens": 212,
-        "completion_tokens": 169,
-        "reasoning_tokens": 173
-      }
+        "prompt_tokens": 7464,
+        "completion_tokens": 3804,
+        "reasoning_tokens": 4630,
+        "total_tokens": 15898,
+        "cache_read_tokens": 241792,
+        "cache_write_tokens": 0,
+        "context_tokens": 257690,
+        "cache_hit_rate": 0.938,
+        "estimated_cost_usd": 0.011460916000000002
+      },
+      "test_count": 47,
+      "test_lines": 458,
+      "code_lines": 385
     }
   ]
 }

@@ -11,12 +11,20 @@
   "worktree": "/tmp/story_3b55ef98f7c9",
   "error": "Session 3 failed: Timeout after 900s",
   "summary": {
-    "total_cost": 0.00105444,
-    "total_tokens": 125839,
+    "total_cost": 0.09544271,
+    "total_tokens": 0,
     "total_duration": 1465.2856028960086,
     "session_count": 3,
     "all_successful": true,
-    "cascade_recovery": null
+    "cascade_recovery": null,
+    "total_cache_reads": 0,
+    "total_cache_writes": 0,
+    "total_context_tokens": 0,
+    "cache_hit_rate": 0.0,
+    "test_count": 0,
+    "test_lines": 0,
+    "code_lines": 0,
+    "test_code_ratio": 0.0
   },
   "sessions": [
     {
@@ -25,7 +33,7 @@
       "prompt": "Build a static site generator CLI in TypeScript.\n\nCORE FEATURES:\n- Read Markdown files from a content directory (default: ./content)\n- Parse Markdown to HTML with frontmatter support (title, date, tag",
       "commit_hash": "0bab9b3fa3ae2dd5c4e59e15a12ea03182d12d06",
       "commit_message": "[story] Session 1: greenfield",
-      "cost_usd": 0.000339851,
+      "cost_usd": 0.01715828,
       "total_tokens": 23927,
       "duration_s": 234.83229383500293,
       "files_changed": 5172,
@@ -38,7 +46,7 @@
       "prompt": "Add template engine and layout support to the static site generator.\n\nTEMPLATES:\n- Support Handlebars (.hbs) or EJS templates\n- Each page can specify a template in its frontmatter\n- Default template i",
       "commit_hash": "45ee869ea287cc016f58a97e47a15e85ca00d534",
       "commit_message": "[story] Session 2: feature_addition",
-      "cost_usd": 0.000341069,
+      "cost_usd": 0.0285864,
       "total_tokens": 38980,
       "duration_s": 329.76605398900574,
       "files_changed": 7,
@@ -51,12 +59,15 @@
       "prompt": "Add a live-reload development server to the SSG.\n\nDEV SERVER:\n- npx ssg serve \u2014 start dev server on localhost:3000\n- Watch content/ and templates/ directories for changes\n- Rebuild on file change\n- In",
       "commit_hash": "ab83cda493a898dfc5037d87818e8f0cdc7c89b2",
       "commit_message": "[story] Session 3: integration",
-      "cost_usd": 0.00037352,
+      "cost_usd": 0.04969803,
       "total_tokens": 62932,
       "duration_s": 900.687255072,
       "files_changed": 68,
       "exit_code": 0,
-      "error": ""
+      "error": "",
+      "test_count": 0,
+      "test_lines": 0,
+      "code_lines": 0
     }
   ]
 }

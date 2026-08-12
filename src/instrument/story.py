@@ -211,6 +211,9 @@ class SessionResult:
     exit_code: int = 0
     error: str = ""
     continuation_used: bool = False
+    test_count: int = 0
+    test_lines: int = 0
+    code_lines: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         d: dict[str, Any] = {
@@ -226,6 +229,9 @@ class SessionResult:
             "exit_code": self.exit_code,
             "error": self.error,
             "continuation_used": self.continuation_used,
+            "test_count": self.test_count,
+            "test_lines": self.test_lines,
+            "code_lines": self.code_lines,
         }
         if self.agentic:
             d["agentic"] = {
@@ -328,6 +334,24 @@ class StoryResult:
                 return True
         return None
 
+    @property
+    def total_test_count(self) -> int:
+        return sum(s.test_count for s in self.sessions)
+
+    @property
+    def total_test_lines(self) -> int:
+        return sum(s.test_lines for s in self.sessions)
+
+    @property
+    def total_code_lines(self) -> int:
+        return sum(s.code_lines for s in self.sessions)
+
+    @property
+    def test_code_ratio(self) -> float:
+        if self.total_code_lines == 0:
+            return 0.0
+        return self.total_test_lines / self.total_code_lines
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "story_name": self.story_name,
@@ -348,6 +372,10 @@ class StoryResult:
                 "total_cache_writes": self.total_cache_writes,
                 "total_context_tokens": self.total_context_tokens,
                 "cache_hit_rate": round(self.cache_hit_rate, 3),
+                "test_count": self.total_test_count,
+                "test_lines": self.total_test_lines,
+                "code_lines": self.total_code_lines,
+                "test_code_ratio": round(self.test_code_ratio, 3),
                 "total_duration": self.total_duration,
                 "session_count": self.session_count,
                 "all_successful": self.all_successful,
@@ -515,6 +543,28 @@ def _prepare_worktree(
         _git(worktree, "commit", "-m", f"[mutation] {mutation.operator} s={mutation.strength}")
 
 
+def _count_tests(worktree: Path) -> tuple[int, int, int]:
+    """Count test functions, test lines, and non-test code lines in worktree."""
+    import re as _re
+    test_count = 0
+    test_lines = 0
+    code_lines = 0
+    for f in worktree.rglob("*.py"):
+        if "__pycache__" in str(f) or ".pytest_cache" in str(f):
+            continue
+        try:
+            content = f.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        n = len(content.splitlines())
+        if "test" in f.name.lower() or f.parent.name == "tests":
+            test_lines += n
+            test_count += len(_re.findall(r"def test_\w+", content))
+        else:
+            code_lines += n
+    return test_count, test_lines, code_lines
+
+
 def _run_session(
     spec: SessionSpec,
     worktree: Path,
@@ -626,6 +676,8 @@ def _run_session(
     files_after = _list_tracked_files(worktree)
     files_changed = len(files_after.symmetric_difference(files_before))
 
+    test_count, test_lines, code_lines = _count_tests(worktree)
+
     return SessionResult(
         session_number=spec.session_number,
         task_type=spec.task_type,
@@ -640,6 +692,9 @@ def _run_session(
         exit_code=agentic.exit_code if agentic else -1,
         error=agentic.error if agentic else "",
         continuation_used=continuation_used,
+        test_count=test_count,
+        test_lines=test_lines,
+        code_lines=code_lines,
     )
 
 

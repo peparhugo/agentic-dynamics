@@ -3,3 +3,14 @@
 [06:58:24][worker] [luna_task_manager_api_tier1_minimal_good_early_degrade] Starting (1/30)
 [07:04:46][worker] [luna_task_manager_api_tier1_minimal_good_early_degrade] OK (382s)
 [07:04:46][worker] [luna_task_manager_api_tier2_small_good_bad_seed] Starting (2/30)
+[07:11:23][worker] [luna_task_manager_api_tier2_small_good_bad_seed] OK (397s)
+[07:11:23][worker] [luna_task_manager_api_tier2_small_bad_early_degrade] Starting (3/30)
+[07:18:48][worker] [luna_task_manager_api_tier2_small_bad_early_degrade] OK (445s)
+[07:18:48][worker] [luna_static_site_gen_tier1_minimal_bad_early_degrade] Starting (4/30)
+[07:25:50][worker] [luna_static_site_gen_tier1_minimal_bad_early_degrade] OK (422s)
+[07:25:50][worker] [luna_static_site_gen_tier2_small_bad_early_degrade] Starting (5/30)
+[07:32:47][worker] [luna_static_site_gen_tier2_small_bad_early_degrade] OK (418s)
+[07:32:47][worker] [luna_notification_service_tier1_minimal_good_bad_seed] Starting (6/30)
+[07:39:26][worker] [luna_notification_service_tier1_minimal_good_bad_seed] OK (399s)
+[07:41:27][worker] Queue empty after 12 polls. Exiting.
+[07:41:27][worker] Done: 6 ok, 0 failed, 6 total
