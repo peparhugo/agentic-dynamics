@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src/generator';
+import { buildSite, getLastBuildStats } from '../src/generator';
 import type { Plugin } from '../src/generator';
 
 describe('buildSite', () => {
@@ -95,5 +95,44 @@ describe('buildSite', () => {
 
     expect(events).toEqual(['start', 'before', 'file', 'after', 'end']);
     expect(await readFile(path.join(output, 'page.html'), 'utf8')).toContain('Changed');
+  });
+
+  test('skips unchanged pages and rebuilds only changed pages', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    await mkdir(content, { recursive: true });
+    await writeFile(path.join(content, 'one.md'), '---\ntitle: One\n---\nOne');
+    await writeFile(path.join(content, 'two.md'), '---\ntitle: Two\n---\nTwo');
+
+    await buildSite({ contentDir: content, outputDir: output });
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    expect(getLastBuildStats()).toMatchObject({ built: 0, skipped: 2 });
+
+    await writeFile(path.join(content, 'two.md'), '---\ntitle: Two\n---\nChanged');
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    expect(getLastBuildStats()).toMatchObject({ built: 1, skipped: 1 });
+    expect(await readFile(path.join(output, 'two.html'), 'utf8')).toContain('Changed');
+  });
+
+  test('invalidates every page when the template changes and cleans deleted pages', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await mkdir(content, { recursive: true });
+    await mkdir(templates, { recursive: true });
+    await writeFile(path.join(templates, 'default.hbs'), '<main>{{title}} {{{content}}}</main>');
+    await writeFile(path.join(content, 'page.md'), '---\ntitle: Page\n---\nContent');
+    await writeFile(path.join(content, 'deleted.md'), 'Deleted');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+    await rm(path.join(content, 'deleted.md'));
+    await writeFile(path.join(templates, 'default.hbs'), '<article>{{title}} {{{content}}}</article>');
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+
+    expect(getLastBuildStats()).toMatchObject({ built: 1, skipped: 0 });
+    await expect(readFile(path.join(output, 'deleted.html'))).rejects.toMatchObject({ code: 'ENOENT' });
+    expect(await readFile(path.join(output, 'page.html'), 'utf8')).toContain('<article>');
   });
 });

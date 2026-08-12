@@ -8,6 +8,9 @@ export interface PluginContext {
   pages: Page[];
   files: Map<string, string | Buffer>;
   emitFile: (filePath: string, contents: string | Buffer) => void;
+  cache?: {
+    parsed: Map<string, { sourceHash: string; metadata: Page['metadata']; content: string }>;
+  };
 }
 
 export interface Plugin {
