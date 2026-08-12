@@ -33,6 +33,9 @@ def init_db():
         )
 
 
+init_db()
+
+
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str) -> dict:
@@ -95,7 +98,12 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    title = data.get("title", "")
+    if not isinstance(title, str):
+        return jsonify({"error": "title must be a string"}), 400
+    title = title.strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -112,17 +120,24 @@ def show_task(task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
+    if get_task(task_id) is None:
+        return jsonify({"error": "task not found"}), 404
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    if not data or not ("title" in data or "status" in data):
+        return jsonify({"error": "title or status is required"}), 400
+    if "title" in data and (not isinstance(data["title"], str) or not data["title"].strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+    if "status" in data and (not isinstance(data["status"], str) or not data["status"].strip()):
+        return jsonify({"error": "status must be a non-empty string"}), 400
     task = update_task(
         task_id,
-        title=data.get("title"),
+        title=data.get("title", None).strip() if "title" in data else None,
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
     return jsonify(task)
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
