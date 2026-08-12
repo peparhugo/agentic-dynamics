@@ -13,6 +13,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 from websockets.asyncio.server import Server, ServerConnection, Request, serve
 from websockets.datastructures import Headers
@@ -21,7 +22,7 @@ from websockets.exceptions import ConnectionClosed
 
 
 LOGGER = logging.getLogger(__name__)
-MESSAGE_TYPES = {"broadcast", "direct", "system"}
+MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def timestamp() -> str:
@@ -36,6 +37,7 @@ class NotificationServer:
         self.host = host
         self.port = port
         self.clients: dict[str, ServerConnection] = {}
+        self.channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
         self._server: Server | None = None
 
@@ -64,13 +66,45 @@ class NotificationServer:
             body,
         )
 
+    def _json_response(self, body_value: Any, status: int = 200, reason: str = "OK") -> Response:
+        body = json.dumps(body_value).encode()
+        return Response(
+            status,
+            reason,
+            Headers({"Content-Type": "application/json", "Content-Length": str(len(body))}),
+            body,
+        )
+
+    async def _channels_response(self) -> Response:
+        with self._lock:
+            channels = {
+                name: len(subscribers)
+                for name, subscribers in self.channels.items()
+                if subscribers
+            }
+        return self._json_response({"channels": channels})
+
+    async def _subscribers_response(self, name: str) -> Response:
+        with self._lock:
+            subscribers = sorted(self.channels.get(name, set()))
+        return self._json_response({"channel": name, "subscribers": subscribers})
+
     async def _process_request(
         self, _connection: ServerConnection, request: Request
     ) -> Response | None:
-        if request.path.split("?", 1)[0] == "/health":
-            if request.headers.get("Connection", "").lower() == "upgrade":
-                return None
+        path = request.path.split("?", 1)[0]
+        if request.headers.get("Connection", "").lower() == "upgrade":
+            return None
+        if path == "/health":
             return await self._health_response()
+        if path == "/channels":
+            return await self._channels_response()
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")]).strip("/")
+            if name:
+                return await self._subscribers_response(name)
+        if path.startswith("/channels/"):
+            return self._json_response({"error": "not found"}, 404, "Not Found")
         return None
 
     async def _register(self, connection: ServerConnection) -> str:
@@ -82,6 +116,10 @@ class NotificationServer:
     async def _remove(self, client_id: str) -> None:
         with self._lock:
             self.clients.pop(client_id, None)
+            for name in list(self.channels):
+                self.channels[name].discard(client_id)
+                if not self.channels[name]:
+                    del self.channels[name]
 
     async def _send_to(self, connection: ServerConnection, message: str) -> bool:
         try:
@@ -90,11 +128,20 @@ class NotificationServer:
         except ConnectionClosed:
             return False
 
-    async def broadcast(self, message_type: str, payload: dict[str, Any]) -> None:
-        """Send a valid message to every currently registered client."""
+    async def broadcast(
+        self, message_type: str, payload: dict[str, Any], channel: str | None = None
+    ) -> None:
+        """Send a valid message to all clients or subscribers of a channel."""
         message = self._make_message(message_type, payload)
         with self._lock:
-            recipients = list(self.clients.items())
+            if channel is None:
+                recipients = list(self.clients.items())
+            else:
+                recipients = [
+                    (client_id, self.clients[client_id])
+                    for client_id in self.channels.get(channel, set())
+                    if client_id in self.clients
+                ]
         results = await asyncio.gather(
             *(self._send_to(connection, message) for _, connection in recipients),
             return_exceptions=False,
@@ -120,7 +167,17 @@ class NotificationServer:
                 )
             return
 
-        if message_type == "direct":
+        channel = payload.get("channel", message.get("channel"))
+        if channel is not None and not isinstance(channel, str):
+            await self._send_error(client_id, "channel must be a string")
+            return
+        if channel is not None:
+            channel = channel.strip()
+            if not channel:
+                await self._send_error(client_id, "channel must be a non-empty string")
+                return
+
+        if message_type == "direct" and channel is None:
             target_id = payload.get("client_id")
             with self._lock:
                 target = self.clients.get(target_id)
@@ -128,7 +185,30 @@ class NotificationServer:
                 await self._send_to(target, self._make_message("direct", payload))
             return
 
-        await self.broadcast(message_type, payload)
+        if message_type in {"subscribe", "unsubscribe"}:
+            channel = payload.get("channel", message.get("channel"))
+            if not isinstance(channel, str) or not channel.strip():
+                await self._send_error(client_id, "channel must be a non-empty string")
+                return
+            channel = channel.strip()
+            with self._lock:
+                if message_type == "subscribe":
+                    self.channels.setdefault(channel, set()).add(client_id)
+                else:
+                    subscribers = self.channels.get(channel)
+                    if subscribers is not None:
+                        subscribers.discard(client_id)
+                        if not subscribers:
+                            del self.channels[channel]
+            return
+
+        await self.broadcast(message_type, payload, channel)
+
+    async def _send_error(self, client_id: str, error: str) -> None:
+        with self._lock:
+            connection = self.clients.get(client_id)
+        if connection is not None:
+            await self._send_to(connection, self._make_message("system", {"error": error}))
 
     async def _handler(self, connection: ServerConnection) -> None:
         client_id = await self._register(connection)
@@ -161,6 +241,7 @@ class NotificationServer:
             self._server = None
         with self._lock:
             self.clients.clear()
+            self.channels.clear()
 
 
 async def main() -> None:

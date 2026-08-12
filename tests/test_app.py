@@ -92,3 +92,42 @@ async def test_invalid_message_returns_system_error(server):
         message = await receive_json(connection)
         assert message["type"] == "system"
         assert "error" in message["payload"]
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_only_reach_subscribers_and_can_unsubscribe(server):
+    uri = f"ws://127.0.0.1:{server.bound_port}"
+    async with connect(uri) as alerts, connect(uri) as other:
+        await alerts.recv()
+        await other.recv()
+        await alerts.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await alerts.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "one"}})
+        )
+        message = await receive_json(alerts)
+        assert message["payload"]["text"] == "one"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other.recv(), timeout=0.05)
+
+        await alerts.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+        await alerts.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "two"}})
+        )
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(alerts.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_channel_endpoints_list_subscribers(server):
+    uri = f"ws://127.0.0.1:{server.bound_port}"
+    async with connect(uri) as connection:
+        client_id = (await receive_json(connection))["payload"]["client_id"]
+        await connection.send(json.dumps({"type": "subscribe", "payload": {"channel": "system"}}))
+        response = await asyncio.to_thread(
+            urlopen, f"http://127.0.0.1:{server.bound_port}/channels"
+        )
+        assert json.loads(response.read()) == {"channels": {"system": 1}}
+        response = await asyncio.to_thread(
+            urlopen, f"http://127.0.0.1:{server.bound_port}/channels/system/subscribers"
+        )
+        assert json.loads(response.read()) == {"channel": "system", "subscribers": [client_id]}
