@@ -1,5 +1,6 @@
 import asyncio
 import json
+from urllib.parse import quote
 
 import pytest
 import pytest_asyncio
@@ -153,3 +154,36 @@ async def test_redis_backbone_delivers_between_server_instances(unused_tcp_port_
     finally:
         await first.stop()
         await second.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error(monkeypatch, unused_tcp_port_factory):
+    monkeypatch.setenv("RATE_LIMIT", "1")
+    instance = NotificationServer(
+        websocket_port=unused_tcp_port_factory(), health_port=unused_tcp_port_factory()
+    )
+    await instance.start()
+    try:
+        client = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+        await client.recv()
+        await client.send(json.dumps({"type": "subscribe", "channel": "one", "payload": {}}))
+        await client.send(json.dumps({"type": "subscribe", "channel": "two", "payload": {}}))
+        response = json.loads(await client.recv())
+        assert response["payload"]["error"] == "rate limit exceeded"
+        await client.close()
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_paginates(server):
+    await server.broadcast({"text": "first"}, "events")
+    first_timestamp = server._message_history(1, 0)[0]["timestamp"]
+    await server.broadcast({"text": "second"}, "events")
+    await server.broadcast({"text": "other"}, "other")
+
+    result = await get_json(
+        server.health_port, f"/history?channel=events&since={quote(first_timestamp)}&limit=1"
+    )
+    assert [message["payload"]["text"] for message in result["messages"]] == ["second"]
+    assert result["has_more"] is False

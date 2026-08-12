@@ -14,7 +14,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -61,6 +61,8 @@ class NotificationServer:
         self.database_url = database_url if database_url is not None else os.getenv(
             "DATABASE_URL", ":memory:"
         )
+        self.rate_limit = self._env_int("RATE_LIMIT", 100)
+        self.message_ttl_days = self._env_int("MESSAGE_TTL_DAYS", 7)
         self._instance_id = str(uuid.uuid4())
         selected_transport = os.getenv("TRANSPORT", "websocket").lower()
         if transport is not None:
@@ -75,6 +77,8 @@ class NotificationServer:
         self._redis: redis.Redis | None = None
         self._pubsub: redis.client.PubSub | None = None
         self._redis_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._local_rate_counters: dict[tuple[str, int], int] = {}
         self._database = sqlite3.connect(self._sqlite_path(), check_same_thread=False)
         self._database.row_factory = sqlite3.Row
         self._database_lock = threading.RLock()
@@ -88,6 +92,13 @@ class NotificationServer:
             )"""
         )
         self._database.commit()
+
+    @staticmethod
+    def _env_int(name: str, default: int) -> int:
+        try:
+            return max(0, int(os.getenv(name, str(default))))
+        except (TypeError, ValueError):
+            return default
 
     def _sqlite_path(self) -> str:
         if self.database_url.startswith("sqlite:///"):
@@ -115,6 +126,8 @@ class NotificationServer:
 
     async def start(self) -> None:
         """Start both listeners."""
+        self._cleanup_expired_messages()
+        self._cleanup_task = asyncio.create_task(self._message_cleanup_loop())
         if self.redis_url:
             self._redis = redis.from_url(self.redis_url, decode_responses=True)
             await self._redis.ping()
@@ -140,6 +153,10 @@ class NotificationServer:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
             self._redis_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         if self._pubsub is not None:
             await self._pubsub.close()
             self._pubsub = None
@@ -228,6 +245,37 @@ class NotificationServer:
             )
             self._database.commit()
 
+    def _cleanup_expired_messages(self) -> None:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        with self._database_lock:
+            self._database.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            self._database.commit()
+
+    async def _message_cleanup_loop(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(3600)
+                self._cleanup_expired_messages()
+        except asyncio.CancelledError:
+            raise
+
+    async def _allow_message(self, client_id: str) -> bool:
+        """Count messages in a shared Redis minute bucket."""
+        bucket = int(datetime.now(timezone.utc).timestamp()) // 60
+        if self._redis is not None:
+            key = f"notification:rate:{client_id}:{bucket}"
+            count = await self._redis.incr(key)
+            if count == 1:
+                await self._redis.expire(key, 60)
+            return count <= self.rate_limit
+        counter_key = (client_id, bucket)
+        count = self._local_rate_counters.get(counter_key, 0) + 1
+        self._local_rate_counters[counter_key] = count
+        self._local_rate_counters = {
+            key: value for key, value in self._local_rate_counters.items() if key[1] >= bucket
+        }
+        return count <= self.rate_limit
+
     def _message_history(self, limit: int, offset: int) -> list[dict[str, Any]]:
         with self._database_lock:
             rows = self._database.execute(
@@ -239,6 +287,29 @@ class NotificationServer:
              "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
             for row in rows
         ]
+
+    def _channel_history(
+        self, channel: str, since: str | None, limit: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        params: list[Any] = [channel]
+        where = "channel = ?"
+        if since is not None:
+            where += " AND timestamp > ?"
+            params.append(since)
+        params.append(limit + 1)
+        with self._database_lock:
+            rows = self._database.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                f"WHERE {where} ORDER BY timestamp ASC, id ASC LIMIT ?",
+                params,
+            ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return [
+            {"id": row["id"], "channel": row["channel"], "type": row["type"],
+             "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
+            for row in rows
+        ], has_more
 
     async def _client_connected(self, client_id: str) -> None:
         if self._redis is not None:
@@ -260,6 +331,11 @@ class NotificationServer:
             await self._redis.delete(f"notification:client:{client_id}")
 
     async def _handle_client_message(self, client_id: str, raw_message: str) -> None:
+        if not await self._allow_message(client_id):
+            await self.transport.send_message(
+                client_id, make_message("system", {"error": "rate limit exceeded"})
+            )
+            return
         try:
             message = json.loads(raw_message)
             message_type = message["type"]
@@ -324,17 +400,47 @@ class NotificationServer:
                 subscribers = sorted(self.channels.get(name, set()))
                 body = json.dumps({"channel": name, "subscribers": subscribers}).encode()
                 status = "200 OK"
-            elif path == "/messages":
+            elif path in {"/messages", "/history"}:
                 query = parse_qs(urlsplit(request_line.decode("ascii", errors="ignore").split(" ")[1]).query)
                 try:
                     limit = max(0, min(1000, int(query.get("limit", ["50"])[0])))
-                    offset = max(0, int(query.get("offset", ["0"])[0]))
                 except (TypeError, ValueError):
                     body = json.dumps({"error": "invalid pagination"}).encode()
                     status = "400 Bad Request"
                 else:
-                    body = json.dumps(self._message_history(limit, offset)).encode()
-                    status = "200 OK"
+                    if path == "/messages":
+                        try:
+                            offset = max(0, int(query.get("offset", ["0"])[0]))
+                        except (TypeError, ValueError):
+                            body = json.dumps({"error": "invalid pagination"}).encode()
+                            status = "400 Bad Request"
+                        else:
+                            body = json.dumps(self._message_history(limit, offset)).encode()
+                            status = "200 OK"
+                    else:
+                        channel = query.get("channel", [None])[0]
+                        since = query.get("since", [None])[0]
+                        if not isinstance(channel, str) or not channel:
+                            body = json.dumps({"error": "channel is required"}).encode()
+                            status = "400 Bad Request"
+                        else:
+                            if since is not None:
+                                try:
+                                    parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                                    if parsed_since.tzinfo is None:
+                                        raise ValueError
+                                    since = parsed_since.astimezone(timezone.utc).isoformat()
+                                except ValueError:
+                                    body = json.dumps({"error": "invalid since timestamp"}).encode()
+                                    status = "400 Bad Request"
+                                else:
+                                    messages, has_more = self._channel_history(channel, since, limit)
+                                    body = json.dumps({"messages": messages, "has_more": has_more}).encode()
+                                    status = "200 OK"
+                            else:
+                                messages, has_more = self._channel_history(channel, None, limit)
+                                body = json.dumps({"messages": messages, "has_more": has_more}).encode()
+                                status = "200 OK"
             else:
                 body = json.dumps({"error": "not found"}).encode()
                 status = "404 Not Found"
