@@ -180,7 +180,7 @@ describe('parseArgs', () => {
 
   it('returns invalid for unknown subcommands or missing option values', () => {
     expect(parseArgs([])).toBe('invalid');
-    expect(parseArgs(['serve'])).toBe('invalid');
+    expect(parseArgs(['frobnicate'])).toBe('invalid');
     expect(parseArgs(['build', '--content'])).toBe('invalid');
     expect(parseArgs(['build', '--templates'])).toBe('invalid');
     expect(parseArgs(['build', '--output', '--content', 'x'])).toBe('invalid');

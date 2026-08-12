@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import * as path from 'path';
 import { build } from './ssg';
+import { startDevServer, type ServeOptions } from './serve';
 
 export interface CliOptions {
   contentDir: string;
@@ -8,19 +9,32 @@ export interface CliOptions {
   templateDir: string;
 }
 
-export type ParseResult = CliOptions | 'help' | 'invalid';
+export type ParseResult = CliOptions | ServeOptions | 'help' | 'invalid';
 
 export function printHelp(): void {
-  console.log(`Usage: ssg build [options]
+  console.log(`Usage: ssg build [options] | ssg serve [options]
 
 Generate a static site from Markdown files.
+
+Commands:
+  build             Build the site once into the output directory
+  serve             Build and serve the site with live reload
 
 Options:
   --content <dir>   Directory containing Markdown content (default: ./content)
   --output <dir>    Directory to write the generated HTML (default: ./dist)
   --templates <dir> Directory containing Handlebars templates (default: ./templates)
+  --port <number>   Port for the dev server (default: 3000)
   --help, -h        Show this help message
 `);
+}
+
+function isValidPort(value: string): boolean {
+  if (!/^\d+$/.test(value)) {
+    return false;
+  }
+  const port = Number(value);
+  return Number.isInteger(port) && port >= 1 && port <= 65535;
 }
 
 export function parseArgs(args: string[]): ParseResult {
@@ -31,14 +45,50 @@ export function parseArgs(args: string[]): ParseResult {
   if (subcommand === '--help' || subcommand === '-h') {
     return 'help';
   }
-  if (subcommand !== 'build') {
-    return 'invalid';
-  }
   const options: CliOptions = {
     contentDir: 'content',
     outputDir: 'dist',
     templateDir: 'templates',
   };
+  if (subcommand === 'serve') {
+    const serveOptions: ServeOptions = { command: 'serve', ...options, port: 3000 };
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '--help' || arg === '-h') {
+        return 'help';
+      }
+      if (
+        arg === '--content' ||
+        arg === '--output' ||
+        arg === '--templates' ||
+        arg === '--port'
+      ) {
+        const value = args[i + 1];
+        if (!value || value.startsWith('--')) {
+          return 'invalid';
+        }
+        if (arg === '--content') {
+          serveOptions.contentDir = value;
+        } else if (arg === '--output') {
+          serveOptions.outputDir = value;
+        } else if (arg === '--templates') {
+          serveOptions.templateDir = value;
+        } else {
+          if (!isValidPort(value)) {
+            return 'invalid';
+          }
+          serveOptions.port = Number(value);
+        }
+        i += 1;
+      } else {
+        return 'invalid';
+      }
+    }
+    return serveOptions;
+  }
+  if (subcommand !== 'build') {
+    return 'invalid';
+  }
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--help' || arg === '-h') {
@@ -74,6 +124,23 @@ async function main(): Promise<void> {
     console.error('Invalid arguments. Run `ssg --help` for usage.');
     process.exitCode = 1;
     return;
+  }
+  if ('command' in parsed && parsed.command === 'serve') {
+    try {
+      const server = await startDevServer(parsed);
+      console.log(`Serving ${path.resolve(parsed.outputDir)} at http://localhost:${server.port}`);
+      console.log('Watching for changes...');
+      const shutdown = (): void => {
+        void server.close().then(() => process.exit(0));
+      };
+      process.on('SIGINT', shutdown);
+      process.on('SIGTERM', shutdown);
+      return;
+    } catch (err) {
+      console.error(`Dev server failed to start: ${(err as Error).message}`);
+      process.exitCode = 1;
+      return;
+    }
   }
   try {
     const pages = await build(parsed);
