@@ -10,6 +10,8 @@ export interface Page {
   contentHtml: string;
   template?: string;
   layout?: string;
+  filePath?: string;
+  html?: string;
 }
 
 export function pageFromFile(filePath: string): Page {
@@ -24,5 +26,6 @@ export function pageFromFile(filePath: string): Page {
     contentHtml: parsed.contentHtml,
     template: parsed.frontmatter.template,
     layout: parsed.frontmatter.layout,
+    filePath,
   };
 }

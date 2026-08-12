@@ -1,9 +1,10 @@
 import { createServer, IncomingMessage, Server, ServerResponse } from 'http';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { extname, join, resolve, sep } from 'path';
-import chokidar, { FSWatcher } from 'chokidar';
-import { WebSocket, WebSocketServer } from 'ws';
-import { buildSite } from './build';
+import { FSWatcher } from 'chokidar';
+import { WebSocketServer } from 'ws';
+import { SsgEngine, createEngine } from './ssg';
+import { DevServerPlugin } from './plugins/dev-server';
 
 export interface ServeOptions {
   content: string;
@@ -117,51 +118,22 @@ export function startDevServer(options: ServeOptions): DevServer {
   const templatesDir = resolve(options.templates);
   const outputDir = resolve(options.output);
 
-  buildSite(contentDir, outputDir, templatesDir);
-
-  const wss = new WebSocketServer({ noServer: true });
-
-  function notifyClients(): void {
-    for (const client of wss.clients) {
-      if (client.readyState === WebSocket.OPEN) {
-        try {
-          client.send('reload');
-        } catch {
-          // client may have closed between the readyState check and send
-        }
-      }
-    }
-  }
-
-  function rebuild(): void {
-    try {
-      buildSite(contentDir, outputDir, templatesDir);
-      notifyClients();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      process.stderr.write(`Rebuild error: ${message}\n`);
-    }
-  }
-
-  const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
-  watcher.on('change', rebuild);
-  watcher.on('add', rebuild);
-  watcher.on('unlink', rebuild);
-  watcher.on('addDir', rebuild);
-  watcher.on('unlinkDir', rebuild);
-
-  let readyResolve: () => void;
-  let readyReject: (err: Error) => void;
-  const readyPromise = new Promise<void>((resolve, reject) => {
-    readyResolve = resolve;
-    readyReject = reject;
+  const devServerPlugin = new DevServerPlugin();
+  const engine: SsgEngine = createEngine({
+    contentDir,
+    outputDir,
+    templatesDir,
+    plugins: [devServerPlugin],
   });
-  watcher.on('ready', () => {
-    readyResolve();
+  devServerPlugin.setRebuild(() => {
+    engine.build();
   });
-  watcher.on('error', (err: Error) => {
-    readyReject(err);
-  });
+
+  engine.start();
+  engine.build();
+
+  const wss = devServerPlugin.wss;
+  const watcher = devServerPlugin.watcher as FSWatcher;
 
   const server = createServer((req, res) => {
     handleRequest(req, res, outputDir);
@@ -186,7 +158,7 @@ export function startDevServer(options: ServeOptions): DevServer {
       return `http://localhost:${addr.port}`;
     },
     ready(): Promise<void> {
-      return readyPromise;
+      return devServerPlugin.ready();
     },
     close(): Promise<void> {
       return new Promise((resolveClose, rejectClose) => {
