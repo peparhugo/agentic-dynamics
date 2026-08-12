@@ -9,6 +9,7 @@ describe('parseArgs', () => {
     expect(result.command).toBe('build');
     expect(result.options.contentDir).toBe('./content');
     expect(result.options.outputDir).toBe('./dist');
+    expect(result.options.templateDir).toBe('./templates');
   });
 
   it('reads --content and --output options', () => {
@@ -29,6 +30,17 @@ describe('parseArgs', () => {
     const result = parseArgs(['node', 'ssg', 'build', '-c', './pages', '-o', './site']);
     expect(result.options.contentDir).toBe('./pages');
     expect(result.options.outputDir).toBe('./site');
+  });
+
+  it('reads --templates option', () => {
+    const result = parseArgs([
+      'node',
+      'ssg',
+      'build',
+      '--templates',
+      './theme',
+    ]);
+    expect(result.options.templateDir).toBe('./theme');
   });
 
   it('throws on an unknown option', () => {
@@ -57,5 +69,49 @@ describe('run', () => {
 
     const about = await fs.readFile(path.join(outputDir, 'about.html'), 'utf-8');
     expect(about).toContain('We make static sites.');
+  });
+
+  it('builds with a custom templates directory via the CLI', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-tpl-'));
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'out');
+    const templateDir = path.join(root, 'templates');
+
+    await fs.mkdir(contentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(contentDir, 'home.md'),
+      '---\ntitle: Home\n---\n# Home\nWelcome home.'
+    );
+    await fs.mkdir(path.join(templateDir, 'partials'), { recursive: true });
+    await fs.mkdir(path.join(templateDir, 'layouts'), { recursive: true });
+    await fs.writeFile(
+      path.join(templateDir, 'default.hbs'),
+      '<article>{{{body}}}</article>'
+    );
+    await fs.writeFile(
+      path.join(templateDir, 'layouts', 'default.hbs'),
+      '<html><body>{{> banner}}{{{body}}}</body></html>'
+    );
+    await fs.writeFile(
+      path.join(templateDir, 'partials', 'banner.hbs'),
+      '<p class="banner">Banner</p>'
+    );
+
+    await run([
+      'node',
+      'ssg',
+      'build',
+      '--content',
+      contentDir,
+      '--output',
+      outputDir,
+      '--templates',
+      templateDir,
+    ]);
+
+    const home = await fs.readFile(path.join(outputDir, 'home.html'), 'utf-8');
+    expect(home).toContain('<p class="banner">Banner</p>');
+    expect(home).toContain('<article>');
+    expect(home).toContain('Welcome home.');
   });
 });

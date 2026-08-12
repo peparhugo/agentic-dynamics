@@ -1,6 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parseFrontmatter, renderMarkdown } from './markdown';
+import {
+  DEFAULT_TEMPLATE_DIR,
+  registerPartials,
+  renderPageWithTemplates,
+  templateDirExists,
+} from './template';
 import { BuildOptions, Page } from './types';
 
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown']);
@@ -54,7 +60,7 @@ export async function collectMarkdownFiles(contentDir: string): Promise<string[]
 export async function buildPage(contentDir: string, source: string): Promise<Page> {
   const absPath = path.join(contentDir, source);
   const raw = await fs.readFile(absPath, 'utf-8');
-  const { title, date, tags, body } = parseFrontmatter(raw);
+  const { title, date, tags, template, layout, body } = parseFrontmatter(raw);
   const html = await renderMarkdown(body);
 
   return {
@@ -63,6 +69,8 @@ export async function buildPage(contentDir: string, source: string): Promise<Pag
     title: title ?? titleFromSource(source),
     date,
     tags,
+    template,
+    layout,
     body,
     html,
   };
@@ -157,6 +165,11 @@ export function renderIndexHtml(pages: Page[]): string {
 
 export async function buildSite(options: BuildOptions): Promise<Page[]> {
   const { contentDir, outputDir } = options;
+  const templateDir = path.resolve(options.templateDir ?? DEFAULT_TEMPLATE_DIR);
+  const useTemplates = await templateDirExists(templateDir);
+  if (useTemplates) {
+    await registerPartials(templateDir);
+  }
 
   const sources = await collectMarkdownFiles(contentDir);
   const pages: Page[] = [];
@@ -171,7 +184,10 @@ export async function buildSite(options: BuildOptions): Promise<Page[]> {
     const relHtml = `${page.slug}.html`;
     const dest = path.join(outputDir, relHtml);
     await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.writeFile(dest, renderPageHtml(page), 'utf-8');
+    const html = useTemplates
+      ? await renderPageWithTemplates(page, templateDir)
+      : renderPageHtml(page);
+    await fs.writeFile(dest, html, 'utf-8');
   }
 
   await fs.writeFile(

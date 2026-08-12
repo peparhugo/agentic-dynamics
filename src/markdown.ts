@@ -25,7 +25,16 @@ export function parseFrontmatter(source: string): Frontmatter & { body: string }
       .filter((t) => t.length > 0);
   }
 
-  return { title, date, tags, body: parsed.content };
+  const template =
+    typeof data.template === 'string' && data.template.trim()
+      ? data.template.trim()
+      : undefined;
+  const layout =
+    typeof data.layout === 'string' && data.layout.trim()
+      ? data.layout.trim()
+      : undefined;
+
+  return { title, date, tags, template, layout, body: parsed.content };
 }
 
 export async function renderMarkdown(markdown: string): Promise<string> {

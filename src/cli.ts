@@ -1,5 +1,6 @@
 import path from 'path';
 import { buildSite } from './build';
+import { DEFAULT_TEMPLATE_DIR } from './template';
 import { BuildOptions } from './types';
 
 const DEFAULT_CONTENT_DIR = './content';
@@ -8,6 +9,7 @@ const DEFAULT_OUTPUT_DIR = './dist';
 export interface CliOptions {
   contentDir: string;
   outputDir: string;
+  templateDir: string;
 }
 
 export function printHelp(): void {
@@ -19,9 +21,10 @@ Commands:
   build    Generate the site from the content directory
 
 Options:
-  -c, --content <dir>   Content directory containing Markdown files (default: ${DEFAULT_CONTENT_DIR})
-  -o, --output <dir>    Output directory for generated HTML (default: ${DEFAULT_OUTPUT_DIR})
-  -h, --help            Show this help message
+  -c, --content <dir>     Content directory containing Markdown files (default: ${DEFAULT_CONTENT_DIR})
+  -o, --output <dir>      Output directory for generated HTML (default: ${DEFAULT_OUTPUT_DIR})
+  -t, --templates <dir>   Template directory with .hbs templates (default: ${DEFAULT_TEMPLATE_DIR})
+  -h, --help              Show this help message
 `);
 }
 
@@ -35,6 +38,7 @@ export function parseArgs(argv: string[]): {
   const options: CliOptions = {
     contentDir: DEFAULT_CONTENT_DIR,
     outputDir: DEFAULT_OUTPUT_DIR,
+    templateDir: DEFAULT_TEMPLATE_DIR,
   };
   let help = false;
 
@@ -66,6 +70,15 @@ export function parseArgs(argv: string[]): {
         options.outputDir = value;
         break;
       }
+      case '-t':
+      case '--templates': {
+        const value = args[++i];
+        if (!value || value.startsWith('-')) {
+          throw new Error(`Missing value for option ${arg}`);
+        }
+        options.templateDir = value;
+        break;
+      }
       default:
         throw new Error(`Unknown option or command: ${arg}`);
     }
@@ -85,6 +98,7 @@ export async function run(argv: string[]): Promise<void> {
   const options: BuildOptions = {
     contentDir: path.resolve(parsed.options.contentDir),
     outputDir: path.resolve(parsed.options.outputDir),
+    templateDir: path.resolve(parsed.options.templateDir),
   };
 
   const pages = await buildSite(options);
