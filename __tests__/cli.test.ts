@@ -30,4 +30,14 @@ describe('parseArgs', () => {
     const { help } = parseArgs(['build', '--help']);
     expect(help).toBe(true);
   });
+
+  it('parses the serve command', () => {
+    const { command } = parseArgs(['serve']);
+    expect(command).toBe('serve');
+  });
+
+  it('parses the --port flag', () => {
+    const { options } = parseArgs(['serve', '--port', '4000']);
+    expect(options.port).toBe(4000);
+  });
 });
