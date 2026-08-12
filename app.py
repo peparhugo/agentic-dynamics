@@ -2,7 +2,9 @@ import asyncio
 import json
 import os
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from typing import Any
 
 import aiosqlite
 import redis.asyncio as redis
@@ -11,6 +13,104 @@ from websockets.exceptions import ConnectionClosed
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+TRANSPORT = os.environ.get("TRANSPORT", "websocket")
+
+
+class BaseTransport(ABC):
+    @abstractmethod
+    async def register(self, connection: Any) -> str:
+        ...
+
+    @abstractmethod
+    async def unregister(self, client_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def on_connect(self, client_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> bool:
+        ...
+
+    @abstractmethod
+    async def broadcast(self, message: str, *, exclude: str | None = None) -> None:
+        ...
+
+    @abstractmethod
+    async def count(self) -> int:
+        ...
+
+    @abstractmethod
+    async def has_client(self, client_id: str) -> bool:
+        ...
+
+
+class WebSocketTransport(BaseTransport):
+    def __init__(self) -> None:
+        self._connections: dict[str, Any] = {}
+        self._lock = asyncio.Lock()
+
+    async def register(self, connection: Any) -> str:
+        client_id = str(uuid.uuid4())
+        async with self._lock:
+            self._connections[client_id] = connection
+        return client_id
+
+    async def unregister(self, client_id: str) -> None:
+        async with self._lock:
+            self._connections.pop(client_id, None)
+
+    async def on_connect(self, client_id: str) -> None:
+        pass
+
+    async def on_disconnect(self, client_id: str) -> None:
+        pass
+
+    async def send_message(self, client_id: str, message: str) -> bool:
+        async with self._lock:
+            ws = self._connections.get(client_id)
+        if ws is None:
+            return False
+        try:
+            await ws.send(message)
+            return True
+        except (ConnectionClosed, OSError):
+            await self.unregister(client_id)
+            return False
+
+    async def broadcast(self, message: str, *, exclude: str | None = None) -> None:
+        disconnected: list[str] = []
+        async with self._lock:
+            clients = list(self._connections.items())
+        for cid, ws in clients:
+            if cid == exclude:
+                continue
+            try:
+                await ws.send(message)
+            except (ConnectionClosed, OSError):
+                disconnected.append(cid)
+        for cid in disconnected:
+            await self.unregister(cid)
+
+    async def count(self) -> int:
+        async with self._lock:
+            return len(self._connections)
+
+    async def has_client(self, client_id: str) -> bool:
+        async with self._lock:
+            return client_id in self._connections
+
+
+def _create_transport() -> BaseTransport:
+    transport_type = TRANSPORT
+    if transport_type == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"Unknown transport type: {transport_type}")
 
 
 class MessageStore:
@@ -199,8 +299,8 @@ class RedisMessageBus:
 
 
 class ClientRegistry:
-    def __init__(self):
-        self._clients: dict[str, object] = {}
+    def __init__(self, transport: BaseTransport | None = None):
+        self._transport = transport if transport is not None else _create_transport()
         self._channels: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
         self._bus: RedisMessageBus | None = None
@@ -213,48 +313,22 @@ class ClientRegistry:
         self._store = store
 
     async def register(self, websocket) -> str:
-        client_id = str(uuid.uuid4())
-        async with self._lock:
-            self._clients[client_id] = websocket
-        return client_id
+        return await self._transport.register(websocket)
 
     async def unregister(self, client_id: str) -> None:
-        async with self._lock:
-            self._clients.pop(client_id, None)
+        await self._transport.unregister(client_id)
 
     async def broadcast(self, message: str, *, exclude: str | None = None) -> None:
-        disconnected: list[str] = []
-        async with self._lock:
-            clients = list(self._clients.items())
-        for cid, ws in clients:
-            if cid == exclude:
-                continue
-            try:
-                await ws.send(message)
-            except (ConnectionClosed, OSError):
-                disconnected.append(cid)
-        for cid in disconnected:
-            await self.unregister(cid)
+        await self._transport.broadcast(message, exclude=exclude)
 
     async def send_to(self, target_id: str, message: str) -> bool:
-        async with self._lock:
-            ws = self._clients.get(target_id)
-        if ws is None:
-            return False
-        try:
-            await ws.send(message)
-            return True
-        except (ConnectionClosed, OSError):
-            await self.unregister(target_id)
-            return False
+        return await self._transport.send_message(target_id, message)
 
     async def count(self) -> int:
-        async with self._lock:
-            return len(self._clients)
+        return await self._transport.count()
 
     async def has_client(self, client_id: str) -> bool:
-        async with self._lock:
-            return client_id in self._clients
+        return await self._transport.has_client(client_id)
 
     async def subscribe(self, client_id: str, channel: str) -> None:
         async with self._lock:
@@ -283,19 +357,12 @@ class ClientRegistry:
             await self._bus.update_client_state(client_id, "unsubscribe_all")
 
     async def broadcast_channel(self, message: str, channel: str, *, exclude: str | None = None) -> None:
-        disconnected: list[str] = []
         async with self._lock:
             subscriber_ids = list(self._channels.get(channel, set()))
-            clients = {cid: self._clients.get(cid) for cid in subscriber_ids if cid in self._clients}
-        for cid, ws in clients.items():
+        for cid in subscriber_ids:
             if cid == exclude:
                 continue
-            try:
-                await ws.send(message)
-            except (ConnectionClosed, OSError):
-                disconnected.append(cid)
-        for cid in disconnected:
-            await self.unregister(cid)
+            await self._transport.send_message(cid, message)
 
     async def get_channels(self) -> dict[str, int]:
         async with self._lock:
@@ -304,7 +371,11 @@ class ClientRegistry:
     async def get_subscribers(self, channel: str) -> list[str]:
         async with self._lock:
             subs = self._channels.get(channel, set())
-            return [cid for cid in subs if cid in self._clients]
+        result: list[str] = []
+        for cid in subs:
+            if await self._transport.has_client(cid):
+                result.append(cid)
+        return result
 
     async def persist_and_publish(self, routing: str, message: str,
                                   channel: str = "", exclude: str | None = None,
@@ -340,16 +411,13 @@ def _make_message(msg_type: str, payload: dict, **extra) -> str:
     return json.dumps(msg)
 
 
-def _send_ws(ws, message: str):
-    return ws.send(message)
-
-
 def make_ws_handler(reg: ClientRegistry):
     async def handler(websocket) -> None:
         client_id = await reg.register(websocket)
+        await reg._transport.on_connect(client_id)
 
         welcome = _make_message("system", {"client_id": client_id, "connected": True, "message": "Welcome"})
-        await _send_ws(websocket, welcome)
+        await reg._transport.send_message(client_id, welcome)
 
         join_notice = _make_message("system", {"client_id": client_id, "event": "connected"})
         await reg.broadcast(join_notice, exclude=client_id)
@@ -398,6 +466,8 @@ def make_ws_handler(reg: ClientRegistry):
             await reg.unregister(client_id)
             leave_notice = _make_message("system", {"client_id": client_id, "event": "disconnected"})
             await reg.broadcast(leave_notice, exclude=None)
+
+            await reg._transport.on_disconnect(client_id)
 
             if reg._bus:
                 await reg._bus.update_client_state(client_id, "unregister")
