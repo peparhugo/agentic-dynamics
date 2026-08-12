@@ -2,6 +2,7 @@
 
 from functools import wraps
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
 import sqlite3
 import os
 import time
@@ -16,6 +17,28 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_SECONDS = 3600
+
+
+def rate_limit_key() -> str:
+    """Use the authenticated subject when available, otherwise the client IP."""
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        try:
+            payload = jwt.decode(header[7:].strip(), JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            return f"user:{payload['sub']}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"),
+    headers_enabled=True,
+    in_memory_fallback_enabled=True,
+)
 
 
 def get_db():
@@ -38,6 +61,10 @@ def create_task(title: str, owner_id: int | None = None) -> dict:
 
 def get_tasks(owner_id: int | None = None):
     return TaskRepository(get_db).list_tasks(owner_id)
+
+
+def paginate_tasks(owner_id: int, cursor: int | None, limit: int):
+    return TaskRepository(get_db).paginate_tasks(owner_id, cursor, limit)
 
 
 def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
@@ -115,7 +142,22 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user["id"]))
+    try:
+        limit = int(request.args.get("limit", 20))
+        cursor_value = request.args.get("cursor")
+        cursor = int(cursor_value) if cursor_value is not None else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+    if cursor is not None and cursor < 1:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+
+    tasks, total = paginate_tasks(g.user["id"], cursor, limit)
+    has_next_page = len(tasks) > limit
+    tasks = tasks[:limit]
+    next_cursor = tasks[-1]["id"] if has_next_page else None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])

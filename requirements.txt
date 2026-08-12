@@ -1,0 +1,5 @@
+Flask
+Flask-Limiter
+PyJWT
+celery
+redis

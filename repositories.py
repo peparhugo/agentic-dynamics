@@ -95,6 +95,31 @@ class TaskRepository(BaseRepository):
         with closing(self.connection_factory()) as conn:
             return [self._row_to_dict(row) for row in conn.execute(query, params).fetchall()]
 
+    def paginate_tasks(self, owner_id: int | None, cursor: int | None,
+                       limit: int) -> tuple[list[dict[str, Any]], int]:
+        filters = []
+        params: list[Any] = []
+        if owner_id is not None:
+            filters.append("owner_id = ?")
+            params.append(owner_id)
+        if cursor is not None:
+            filters.append("id < ?")
+            params.append(cursor)
+        where = f" WHERE {' AND '.join(filters)}" if filters else ""
+        with closing(self.connection_factory()) as conn:
+            total_filters = []
+            total_params: list[Any] = []
+            if owner_id is not None:
+                total_filters.append("owner_id = ?")
+                total_params.append(owner_id)
+            total_where = f" WHERE {' AND '.join(total_filters)}" if total_filters else ""
+            total = conn.execute(f"SELECT COUNT(*) FROM tasks{total_where}", total_params).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM tasks{where} ORDER BY id DESC LIMIT ?",
+                (*params, limit + 1),
+            ).fetchall()
+            return [self._row_to_dict(row) for row in rows[:limit + 1]], total
+
     def get_task(self, task_id: int, owner_id: int | None = None) -> dict[str, Any] | None:
         query = "SELECT * FROM tasks WHERE id = ?"
         params: tuple[Any, ...] = (task_id,)

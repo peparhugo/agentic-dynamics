@@ -10,6 +10,7 @@ def client(tmp_path, monkeypatch):
     import app
 
     app.init_db()
+    app.limiter.reset()
     return app.app.test_client()
 
 
@@ -61,10 +62,10 @@ def test_users_only_see_and_modify_their_own_tasks(client):
     assert created.status_code == 201
     task_id = created.get_json()["id"]
     assert created.get_json()["owner_id"] == 1
-    assert client.get("/tasks", headers=auth(bob)).get_json() == []
+    assert client.get("/tasks", headers=auth(bob)).get_json()["data"] == []
     assert client.get(f"/tasks/{task_id}", headers=auth(bob)).status_code == 404
     assert client.put(f"/tasks/{task_id}", headers=auth(bob), json={"status": "done"}).status_code == 404
-    assert client.get("/tasks", headers=auth(alice)).get_json()[0]["title"] == "Alice task"
+    assert client.get("/tasks", headers=auth(alice)).get_json()["data"][0]["title"] == "Alice task"
 
 
 def test_old_tasks_schema_is_migrated_without_data_loss(tmp_path, monkeypatch):
@@ -122,3 +123,52 @@ def test_notification_only_sends_on_transition_to_completed(client, monkeypatch)
     client.put(task_url, headers=auth(user_token), json={"title": "Shipped feature"})
 
     assert calls == [("alice@example.com", "Ship feature")]
+
+
+def test_tasks_are_cursor_paginated(client):
+    register(client, "pager")
+    user_token = token(client, "pager")
+    for title in ("one", "two", "three", "four", "five"):
+        assert client.post("/tasks", headers=auth(user_token), json={"title": title}).status_code == 201
+
+    first = client.get("/tasks?limit=2", headers=auth(user_token))
+    first_body = first.get_json()
+    assert first.status_code == 200
+    assert [task["title"] for task in first_body["data"]] == ["five", "four"]
+    assert first_body["total"] == 5
+    assert first_body["next_cursor"] == first_body["data"][-1]["id"]
+
+    second = client.get(
+        f"/tasks?cursor={first_body['next_cursor']}&limit=2",
+        headers=auth(user_token),
+    )
+    second_body = second.get_json()
+    assert [task["title"] for task in second_body["data"]] == ["three", "two"]
+    assert second_body["total"] == 5
+
+    final = client.get(
+        f"/tasks?cursor={second_body['next_cursor']}&limit=2",
+        headers=auth(user_token),
+    ).get_json()
+    assert [task["title"] for task in final["data"]] == ["one"]
+    assert final["next_cursor"] is None
+
+
+def test_task_pagination_validates_limit(client):
+    register(client, "limits")
+    user_token = token(client, "limits")
+    assert client.get("/tasks?limit=0", headers=auth(user_token)).status_code == 400
+    assert client.get("/tasks?limit=101", headers=auth(user_token)).status_code == 400
+    assert client.get("/tasks?cursor=not-an-id", headers=auth(user_token)).status_code == 400
+
+
+def test_authenticated_user_rate_limit_returns_retry_after(client):
+    register(client, "rate-limited")
+    user_token = token(client, "rate-limited")
+    headers = auth(user_token)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(100)]
+    assert all(response.status_code == 200 for response in responses)
+    limited = client.get("/tasks", headers=headers)
+    assert limited.status_code == 429
+    assert limited.headers.get("Retry-After")
