@@ -27,17 +27,25 @@ import yaml
 
 from .opencode import run_opencode_agentic, AgenticResult
 from .language import detect_language, parse_codebase, LanguageProfile
-from .mutation import MutationArtifact, apply_mutation, compile_mutation, CODEBASE_OPERATORS, SPECIFICATION_OPERATORS
+from .mutation import (
+    MutationArtifact,
+    apply_mutation,
+    compile_mutation,
+    CODEBASE_OPERATORS,
+    SPECIFICATION_OPERATORS,
+)
 
 
 # ── Perturbation Condition ─────────────────────────────────────
 
+
 class PerturbationCondition(str, Enum):
     """Experimental conditions for perturbing multi-session stories."""
-    CLEAN = "clean"                  # No mutation, no codebase degradation
-    BAD_SEED = "bad_seed"            # Codebase degraded before session 1
+
+    CLEAN = "clean"  # No mutation, no codebase degradation
+    BAD_SEED = "bad_seed"  # Codebase degraded before session 1
     EARLY_DEGRADE = "early_degrade"  # Session 1 spec corrupted only
-    LATE_DEGRADE = "late_degrade"    # Session 4 spec corrupted only (v1.5)
+    LATE_DEGRADE = "late_degrade"  # Session 4 spec corrupted only (v1.5)
 
 
 def condition_to_mutations(
@@ -117,13 +125,14 @@ def condition_to_mutations(
 
 # ── Data Structures ────────────────────────────────────────────
 
+
 @dataclass
 class SessionSpec:
     """Definition of one session in a story."""
 
     session_number: int
     task_type: str  # greenfield, feature_addition, integration, refactor, cross_cutting
-    prompt: str     # the actual task prompt for this session
+    prompt: str  # the actual task prompt for this session
     description: str = ""  # human-readable description
 
     def to_dict(self) -> dict[str, Any]:
@@ -229,6 +238,12 @@ class SessionResult:
                 "prompt_tokens": self.agentic.prompt_tokens,
                 "completion_tokens": self.agentic.completion_tokens,
                 "reasoning_tokens": self.agentic.reasoning_tokens,
+                "total_tokens": self.agentic.total_tokens,
+                "estimated_cost_usd": self.agentic.estimated_cost_usd,
+                "cache_read_tokens": self.agentic.cache_read_tokens,
+                "cache_write_tokens": self.agentic.cache_write_tokens,
+                "context_tokens": self.agentic.context_tokens,
+                "cache_hit_rate": round(self.agentic.cache_hit_rate, 3),
             }
         return d
 
@@ -257,6 +272,25 @@ class StoryResult:
     @property
     def total_tokens(self) -> int:
         return sum(s.total_tokens for s in self.sessions)
+
+    @property
+    def total_cache_reads(self) -> int:
+        return sum(s.agentic.cache_read_tokens for s in self.sessions if s.agentic)
+
+    @property
+    def total_cache_writes(self) -> int:
+        return sum(s.agentic.cache_write_tokens for s in self.sessions if s.agentic)
+
+    @property
+    def total_context_tokens(self) -> int:
+        return self.total_tokens + self.total_cache_reads
+
+    @property
+    def cache_hit_rate(self) -> float:
+        total_context = self.total_context_tokens
+        if total_context == 0:
+            return 0.0
+        return self.total_cache_reads / total_context
 
     @property
     def total_duration(self) -> float:
@@ -310,6 +344,10 @@ class StoryResult:
             "summary": {
                 "total_cost": self.total_cost,
                 "total_tokens": self.total_tokens,
+                "total_cache_reads": self.total_cache_reads,
+                "total_cache_writes": self.total_cache_writes,
+                "total_context_tokens": self.total_context_tokens,
+                "cache_hit_rate": round(self.cache_hit_rate, 3),
                 "total_duration": self.total_duration,
                 "session_count": self.session_count,
                 "all_successful": self.all_successful,
@@ -320,6 +358,7 @@ class StoryResult:
 
 
 # ── Story Runner ───────────────────────────────────────────────
+
 
 def run_story(
     story: StoryConfig,
@@ -402,7 +441,13 @@ def run_story(
     )
 
     try:
-        _prepare_worktree(actual_codebase_path, worktree, codebase_mutation if codebase_mutation and codebase_mutation.would_produce_changes() else None)
+        _prepare_worktree(
+            actual_codebase_path,
+            worktree,
+            codebase_mutation
+            if codebase_mutation and codebase_mutation.would_produce_changes()
+            else None,
+        )
         result.language = _detect_or_use(worktree, story.language)
 
         for spec in story.sessions:
@@ -527,21 +572,26 @@ def _run_session(
             try:
                 cont_result = subprocess.run(
                     [
-                        str(opencode_bin), "run",
-                        "--session", session_id,
+                        str(opencode_bin),
+                        "run",
+                        "--session",
+                        session_id,
                         "--fork",
-                        "--dir", str(worktree),
-                        "--model", model,
+                        "--dir",
+                        str(worktree),
+                        "--model",
+                        model,
                         "--auto",
                         "Continue. Complete the task. Run tests and finish.",
                     ],
-                    capture_output=True, text=True, timeout=timeout * 2,
+                    capture_output=True,
+                    text=True,
+                    timeout=timeout * 2,
                 )
             except subprocess.TimeoutExpired:
                 cont_result = None
                 print(
-                    f"[story] continuation failed: subprocess timed out "
-                    f"(session {session_id})",
+                    f"[story] continuation failed: subprocess timed out (session {session_id})",
                     file=sys.stderr,
                 )
 
@@ -552,9 +602,8 @@ def _run_session(
                 continuation_cost += cont_cost
 
                 import re as _re
-                cont_tokens = _re.findall(
-                    r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout
-                )
+
+                cont_tokens = _re.findall(r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout)
                 if cont_tokens:
                     continuation_tokens += sum(int(t) for t in cont_tokens)
 
@@ -604,7 +653,8 @@ def _estimate_session_cost(session_id: str) -> float:
     try:
         conn = _sql.connect(str(db_path))
         rows = conn.execute(
-            "SELECT cost FROM session WHERE id = ?", (session_id,),
+            "SELECT cost FROM session WHERE id = ?",
+            (session_id,),
         ).fetchall()
         if not rows:
             rows = conn.execute(
@@ -620,6 +670,7 @@ def _estimate_session_cost(session_id: str) -> float:
 
 
 # ── Git Helpers ────────────────────────────────────────────────
+
 
 def _git(worktree: Path, *args: str) -> str:
     """Run a git command in the worktree. Returns stdout."""
@@ -650,6 +701,7 @@ def _list_tracked_files(worktree: Path) -> set[str]:
 
 # ── Story Persistence ─────────────────────────────────────────
 
+
 def save_story_result(result: StoryResult, path: Path) -> None:
     """Save a StoryResult as JSON."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -678,29 +730,33 @@ def load_story_result(path: Path) -> StoryResult:
         agentic = None
         if "agentic" in s and s["agentic"]:
             from .opencode import AgenticResult
+
             a = s["agentic"]
             agentic = AgenticResult(
                 tests_passed=a.get("tests_passed", 0),
                 tests_total=a.get("tests_total", 0),
             )
-        result.sessions.append(SessionResult(
-            session_number=s["session_number"],
-            task_type=s.get("task_type", ""),
-            prompt=s.get("prompt", ""),
-            commit_hash=s.get("commit_hash", ""),
-            commit_message=s.get("commit_message", ""),
-            cost_usd=s.get("cost_usd", 0.0),
-            total_tokens=s.get("total_tokens", 0),
-            duration_s=s.get("duration_s", 0.0),
-            files_changed=s.get("files_changed", 0),
-            exit_code=s.get("exit_code", 0),
-            error=s.get("error", ""),
-            agentic=agentic,
-        ))
+        result.sessions.append(
+            SessionResult(
+                session_number=s["session_number"],
+                task_type=s.get("task_type", ""),
+                prompt=s.get("prompt", ""),
+                commit_hash=s.get("commit_hash", ""),
+                commit_message=s.get("commit_message", ""),
+                cost_usd=s.get("cost_usd", 0.0),
+                total_tokens=s.get("total_tokens", 0),
+                duration_s=s.get("duration_s", 0.0),
+                files_changed=s.get("files_changed", 0),
+                exit_code=s.get("exit_code", 0),
+                error=s.get("error", ""),
+                agentic=agentic,
+            )
+        )
     return result
 
 
 # ── Built-in Story Catalog ─────────────────────────────────────
+
 
 def task_manager_story() -> StoryConfig:
     """A 5-session story building a task management API.

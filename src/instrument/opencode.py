@@ -28,7 +28,6 @@ else:
     OPENCODE_BIN = "opencode"  # fall back to $PATH
 
 
-
 @dataclass
 class AgenticResult:
     """Complete result of an agentic opencode session."""
@@ -53,9 +52,9 @@ class AgenticResult:
     thinking_steps: int = 0
 
     # Compounding effects
-    retry_loops: int = 0           # how many times did it retry?
-    iteration_depth: int = 0       # max depth of tool call chains
-    error_count: int = 0           # tool call errors encountered
+    retry_loops: int = 0  # how many times did it retry?
+    iteration_depth: int = 0  # max depth of tool call chains
+    error_count: int = 0  # tool call errors encountered
 
     # Test results
     tests_passed: int = 0
@@ -67,6 +66,21 @@ class AgenticResult:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
+
+    # Cache (context tokens not re-sent to provider — "free" reads)
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+
+    # Effective context throughput (billable + cached = total context footprint)
+    context_tokens: int = 0
+
+    @property
+    def cache_hit_rate(self) -> float:
+        """Fraction of context served from cache (0.0–1.0)."""
+        total_context = self.total_tokens + self.cache_read_tokens
+        if total_context == 0:
+            return 0.0
+        return self.cache_read_tokens / total_context
 
     # Cost
     estimated_cost_usd: float = 0.0
@@ -117,7 +131,9 @@ def _build_standardized_prompt(
     """
     header = "[STANDARDIZED CONSTRAINTS — APPLY TO ALL MODELS]\n"
     if thinking_budget_tokens > 0:
-        header += f"- Reasoning budget: {thinking_budget_tokens} tokens maximum for thinking/planning\n"
+        header += (
+            f"- Reasoning budget: {thinking_budget_tokens} tokens maximum for thinking/planning\n"
+        )
     if output_token_limit > 0:
         header += f"- Output limit: {output_token_limit} tokens maximum total output\n"
     if silent_mode is not None:
@@ -194,8 +210,9 @@ def run_opencode_agentic(
     import tempfile
 
     t0 = time.monotonic()
-    result = AgenticResult(run_id=session_name or f"opencode_{int(t0)}",
-                            task=prompt, model=model, workdir=workdir)
+    result = AgenticResult(
+        run_id=session_name or f"opencode_{int(t0)}", task=prompt, model=model, workdir=workdir
+    )
     result.thinking_effort = thinking_effort or "default"
     result.thinking_budget_tokens = thinking_budget_tokens
 
@@ -217,8 +234,14 @@ def run_opencode_agentic(
     # Initialize git for version control tracking
     if init_git:
         subprocess.run(["git", "init"], cwd=workdir, capture_output=True)
-        subprocess.run(["git", "config", "user.email", "experiment@instrument.local"], cwd=workdir, capture_output=True)
-        subprocess.run(["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True)
+        subprocess.run(
+            ["git", "config", "user.email", "experiment@instrument.local"],
+            cwd=workdir,
+            capture_output=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True
+        )
         subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True)
         subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
 
@@ -226,11 +249,15 @@ def run_opencode_agentic(
     files_before = _list_files(workdir)
 
     cmd = [
-        OPENCODE_BIN, "run",
-        "--model", model,
-        "--format", "json",
+        OPENCODE_BIN,
+        "run",
+        "--model",
+        model,
+        "--format",
+        "json",
         "--auto",
-        "--dir", workdir,
+        "--dir",
+        workdir,
     ]
     if thinking_effort and thinking_effort in THINKING_VARIANTS:
         cmd.extend(["--variant", THINKING_VARIANTS[thinking_effort]])
@@ -263,7 +290,9 @@ def run_opencode_agentic(
         result.exit_code = -1
         # Try to parse any partial output
         if e.stdout:
-            _parse_session_output(e.stdout.decode() if isinstance(e.stdout, bytes) else str(e.stdout), result)
+            _parse_session_output(
+                e.stdout.decode() if isinstance(e.stdout, bytes) else str(e.stdout), result
+            )
     except Exception as e:
         result.error = str(e)
         result.exit_code = -2
@@ -272,11 +301,14 @@ def run_opencode_agentic(
 
     # Detect file changes (filter out venv, pip, pytest cache)
     files_after = _list_files(workdir)
+
     def _is_artifact(p):
-        parts = p.split('/')
-        for skip in ['.venv', 'venv', '__pycache__', '.pytest_cache', 'node_modules', '.git']:
-            if skip in parts: return True
+        parts = p.split("/")
+        for skip in [".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git"]:
+            if skip in parts:
+                return True
         return False
+
     result.files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
     result.files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
 
@@ -345,16 +377,20 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
             status = state.get("status", "?")
             tool_input = state.get("input", "")
             tool_output = state.get("output", "")
-            is_error = status not in ("completed", "success") or ("error" in str(tool_output).lower() if tool_output else False)
+            is_error = status not in ("completed", "success") or (
+                "error" in str(tool_output).lower() if tool_output else False
+            )
 
-            tool_calls.append({
-                "type": "tool_use",
-                "tool": tool_name,
-                "input": str(tool_input)[:300],
-                "output": str(tool_output)[:300],
-                "status": status,
-                "is_error": is_error,
-            })
+            tool_calls.append(
+                {
+                    "type": "tool_use",
+                    "tool": tool_name,
+                    "input": str(tool_input)[:300],
+                    "output": str(tool_output)[:300],
+                    "status": status,
+                    "is_error": is_error,
+                }
+            )
             current_depth += 1
             iteration_depth = max(iteration_depth, current_depth)
             result.total_tool_calls += 1
@@ -377,33 +413,46 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
             if text_content:
                 final_texts.append(str(text_content))
 
-        # Step finish — extract cumulative token usage and cost
+        # Step finish — accumulate token usage and cost
         elif etype == "step_finish":
             current_depth = max(0, current_depth - 1)
             tokens = part.get("tokens", {})
             if isinstance(tokens, dict):
-                # Use cumulative session totals (each step_finish is cumulative, not incremental)
-                result.prompt_tokens = tokens.get("input", 0) or 0
-                result.completion_tokens = tokens.get("output", 0) or 0
-                result.reasoning_tokens = tokens.get("reasoning", 0) or 0
-                result.total_tokens = tokens.get("total", 0) or 0
-            # Cost is the cumulative session cost from opencode's own accounting
+                # Token counts are per-step deltas, sum across steps
+                result.prompt_tokens += tokens.get("input", 0) or 0
+                result.completion_tokens += tokens.get("output", 0) or 0
+                result.reasoning_tokens += tokens.get("reasoning", 0) or 0
+                cache = tokens.get("cache", {})
+                if isinstance(cache, dict):
+                    result.cache_read_tokens += cache.get("read", 0) or 0
+                    result.cache_write_tokens += cache.get("write", 0) or 0
+                # Total = actionable tokens only (cache is context reuse, not billed)
+                result.total_tokens = (
+                    result.prompt_tokens + result.completion_tokens + result.reasoning_tokens
+                )
+                result.context_tokens = result.total_tokens + result.cache_read_tokens
+            # Cost is per-step — accumulate across steps
             cost_val = part.get("cost", 0)
             if isinstance(cost_val, (int, float)):
-                result.estimated_cost_usd = float(cost_val)
+                result.estimated_cost_usd += float(cost_val)
 
         # Parse test output from bash tool results
         if etype == "tool_use" and part.get("tool") == "bash":
             state = part.get("state", {})
             output = state.get("output", "") if isinstance(state, dict) else ""
-            if output and ("test" in str(output).lower() or "pass" in str(output).lower() or "fail" in str(output).lower()):
+            if output and (
+                "test" in str(output).lower()
+                or "pass" in str(output).lower()
+                or "fail" in str(output).lower()
+            ):
                 import re
+
                 if "passed" in str(output).lower():
                     # pytest output: X passed, Y failed
-                    m = re.search(r'(\d+)\s+passed', str(output))
+                    m = re.search(r"(\d+)\s+passed", str(output))
                     if m:
                         p = int(m.group(1))
-                        mf = re.search(r'(\d+)\s+failed', str(output))
+                        mf = re.search(r"(\d+)\s+failed", str(output))
                         f = int(mf.group(1)) if mf else 0
                         result.tests_passed = p
                         result.tests_total = p + f

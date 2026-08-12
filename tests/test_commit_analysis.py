@@ -9,8 +9,6 @@ from instrument.commit_analysis import (
     CommitAnalysis,
     StoryAnalysis,
     ConventionRules,
-    PYTHON_CONVENTIONS,
-    TYPESCRIPT_CONVENTIONS,
     get_convention_rules,
     compute_ast_diff,
     score_conventions,

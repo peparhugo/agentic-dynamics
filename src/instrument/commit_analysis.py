@@ -18,20 +18,30 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from .language import detect_language, parse_codebase, LanguageProfile, CodebaseAST
 
 
 # ── Data Structures ────────────────────────────────────────────
 
 @dataclass
+class ConventionRule:
+    """A single naming or forbidden pattern rule."""
+
+    name: str
+    description: str = ""
+    pattern: str = ""
+
+
+@dataclass
 class ConventionRules:
-    """Per-language convention checks."""
+    """Per-language convention checks loaded from YAML."""
 
     language: str
-    naming_patterns: list[str] = field(default_factory=list)
-    required_imports: list[str] = field(default_factory=list)
-    forbidden_patterns: list[str] = field(default_factory=list)
-    docstring_required: bool = False
+    naming_patterns: list[ConventionRule] = field(default_factory=list)
+    forbidden_patterns: list[ConventionRule] = field(default_factory=list)
+    scoring: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -153,36 +163,48 @@ class StoryAnalysis:
 
 # ── Convention Rules ───────────────────────────────────────────
 
-PYTHON_CONVENTIONS = ConventionRules(
-    language="python",
-    naming_patterns=[
-        r"def [a-z_][a-z0-9_]*\(",     # snake_case functions
-        r"class [A-Z][a-zA-Z0-9]*\:",    # PascalCase classes
-    ],
-    required_imports=[],
-    forbidden_patterns=[],
-    docstring_required=False,
-)
+_CONVENTIONS_CACHE: dict[str, ConventionRules] = {}
+_CONVENTIONS_DIR = Path(__file__).resolve().parent.parent.parent / "conventions"
 
-TYPESCRIPT_CONVENTIONS = ConventionRules(
-    language="typescript",
-    naming_patterns=[
-        r"function [a-z][a-zA-Z0-9]*\(",  # camelCase functions
-        r"class [A-Z][a-zA-Z0-9]*\{",      # PascalCase classes
-    ],
-    required_imports=[],
-    forbidden_patterns=[],
-    docstring_required=False,
-)
 
-_CONVENTIONS: dict[str, ConventionRules] = {
-    "python": PYTHON_CONVENTIONS,
-    "typescript": TYPESCRIPT_CONVENTIONS,
-}
+def _load_yaml_conventions(language: str) -> ConventionRules | None:
+    """Load convention rules from a YAML file."""
+    yaml_path = _CONVENTIONS_DIR / f"{language}.yaml"
+    if not yaml_path.exists():
+        return None
+    try:
+        data = yaml.safe_load(yaml_path.read_text())
+    except (yaml.YAMLError, OSError):
+        return None
+
+    naming = [
+        ConventionRule(name=r["name"], description=r["description"], pattern=r["pattern"])
+        for r in data.get("naming_patterns", [])
+    ]
+
+    forbidden = [
+        ConventionRule(name=r["name"], description=r["description"], pattern=r["pattern"])
+        for r in data.get("forbidden_patterns", [])
+    ]
+
+    scoring = data.get("scoring", {})
+
+    return ConventionRules(
+        language=data.get("language", language),
+        naming_patterns=naming,
+        forbidden_patterns=forbidden,
+        scoring=scoring,
+    )
 
 
 def get_convention_rules(language: str) -> ConventionRules:
-    return _CONVENTIONS.get(language, ConventionRules(language=language))
+    """Get convention rules for a language, loaded from YAML conventions file."""
+    if language not in _CONVENTIONS_CACHE:
+        rules = _load_yaml_conventions(language)
+        if rules is None:
+            rules = ConventionRules(language=language)
+        _CONVENTIONS_CACHE[language] = rules
+    return _CONVENTIONS_CACHE[language]
 
 
 # ── AST Diff ───────────────────────────────────────────────────
@@ -312,7 +334,9 @@ def score_conventions(
 ) -> tuple[float, list[str]]:
     """Score how well the current worktree follows language conventions.
 
-    Uses ``git ls-files`` to avoid descending into node_modules.
+    Loads rules from conventions/<language>.yaml. Checks naming patterns
+    (should match), forbidden patterns (should not match), and applies
+    per-category weights from the YAML scoring section.
     """
     if profile is None:
         profile = detect_language(worktree)
@@ -321,10 +345,17 @@ def score_conventions(
 
     rules = get_convention_rules(profile.name)
     violations: list[str] = []
-    checks_passed = 0
-    checks_total = 0
 
-    # Use git ls-files to get only tracked source files (avoids node_modules)
+    # Category scores: naming and forbidden. Weights from YAML.
+    naming_weight = rules.scoring.get("naming_weight", 0.5)
+    forbidden_weight = rules.scoring.get("structure_weight", 0.5)
+    total_weight = naming_weight + forbidden_weight or 1.0
+
+    naming_passed = 0
+    naming_total = 0
+    forbidden_passed = 0
+    forbidden_total = 0
+
     tracked = _run_git(worktree, "ls-files", "--cached", "--others", "--exclude-standard")
     for rel_path in tracked.splitlines():
         rel_path = rel_path.strip()
@@ -338,18 +369,28 @@ def score_conventions(
         except (OSError, UnicodeDecodeError):
             continue
 
-        for pattern in rules.naming_patterns:
-            checks_total += 1
-            if re.search(pattern, content):
-                checks_passed += 1
+        for rule in rules.naming_patterns:
+            naming_total += 1
+            if re.search(rule.pattern, content, re.MULTILINE):
+                naming_passed += 1
             else:
-                violations.append(f"{fp.name}: no match for naming pattern {pattern}")
+                violations.append(f"{fp.name}: {rule.description}")
 
-    if checks_total == 0:
-        return 1.0, []
+        for rule in rules.forbidden_patterns:
+            forbidden_total += 1
+            if not re.search(rule.pattern, content, re.MULTILINE):
+                forbidden_passed += 1
+            else:
+                violations.append(f"{fp.name}: {rule.description}")
 
-    score = checks_passed / checks_total
-    return score, violations
+    naming_score = naming_passed / naming_total if naming_total > 0 else 1.0
+    forbidden_score = forbidden_passed / forbidden_total if forbidden_total > 0 else 1.0
+
+    score = (
+        naming_score * naming_weight + forbidden_score * forbidden_weight
+    ) / total_weight
+
+    return round(score, 3), violations
 
 
 # ── SonarQube Delta ────────────────────────────────────────────

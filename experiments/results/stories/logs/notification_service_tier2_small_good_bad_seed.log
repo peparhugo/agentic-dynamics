@@ -1,0 +1,16 @@
+
+Story: notification_service (5 sessions, python)
+Model: deepseek/deepseek-v4-pro
+Codebase: experiments/codebases/python/tier2_small/good (good, tier2_small)
+Condition: bad_seed
+============================================================
+
+============================================================
+Story complete: notification_service
+  Condition: bad_seed
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0022
+  Total tokens: 239,414
+  Duration: 1782.1s
+  Cascade recovery: no
+  Results: experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_7add6d50bddc.json
