@@ -23,6 +23,13 @@ describe('parseCliArgs', () => {
     expect(options.outputDir).toBe('build');
   });
 
+  it('parses --templates, --template and --layout flags', () => {
+    const options = parseCliArgs(['node', 'ssg', 'build', '--templates', 'themes', '--template', 'post', '--layout', 'wide']);
+    expect(options.templatesDir).toBe('themes');
+    expect(options.defaultTemplate).toBe('post');
+    expect(options.defaultLayout).toBe('wide');
+  });
+
   it('supports --help', () => {
     const options = parseCliArgs(['node', 'ssg', '--help']);
     expect(options.help).toBe(true);

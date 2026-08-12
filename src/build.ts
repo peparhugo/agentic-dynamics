@@ -9,10 +9,14 @@ export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   siteTitle?: string;
+  templatesDir?: string;
+  defaultTemplate?: string;
+  defaultLayout?: string;
 }
 
 export const DEFAULT_CONTENT_DIR = './content';
 export const DEFAULT_OUTPUT_DIR = './dist';
+export const DEFAULT_TEMPLATES_DIR = './templates';
 export const DEFAULT_SITE_TITLE = 'My Static Site';
 
 const MARKDOWN_EXTENSION = /\.(md|markdown)$/i;
@@ -43,7 +47,12 @@ export function slugFor(filePath: string, contentDir: string): string {
 export async function buildSite(options: BuildOptions): Promise<Page[]> {
   const contentDir = path.resolve(options.contentDir);
   const outputDir = path.resolve(options.outputDir);
-  const config: SiteConfig = { title: options.siteTitle ?? DEFAULT_SITE_TITLE };
+  const config: SiteConfig = {
+    title: options.siteTitle ?? DEFAULT_SITE_TITLE,
+    templatesDir: options.templatesDir ? path.resolve(options.templatesDir) : path.resolve(DEFAULT_TEMPLATES_DIR),
+    defaultTemplate: options.defaultTemplate,
+    defaultLayout: options.defaultLayout,
+  };
 
   const pages: Page[] = [];
   for (const file of collectMarkdownFiles(contentDir)) {
@@ -59,6 +68,8 @@ export async function buildSite(options: BuildOptions): Promise<Page[]> {
       data,
       content,
       html,
+      template: data.template,
+      layout: data.layout,
     });
   }
 

@@ -21,6 +21,20 @@ export function parseFrontmatter(source: string): { data: Frontmatter; content: 
   if (Array.isArray(parsed.data.tags)) {
     data.tags = parsed.data.tags.filter((tag): tag is string | number | boolean => tag !== null && tag !== undefined).map(String);
   }
+  if (parsed.data.template !== undefined) {
+    data.template = String(parsed.data.template);
+  }
+  if (parsed.data.layout !== undefined) {
+    data.layout = String(parsed.data.layout);
+  }
+
+  for (const key of Object.keys(parsed.data)) {
+    if (key in data) continue;
+    const value = parsed.data[key];
+    if (value !== undefined && value !== null) {
+      data[key] = value;
+    }
+  }
 
   return { data, content: parsed.content };
 }

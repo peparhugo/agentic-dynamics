@@ -40,4 +40,16 @@ describe('parseFrontmatter', () => {
     const { data } = parseFrontmatter('---\n---\n# Nothing');
     expect(data).toEqual({});
   });
+
+  it('parses template and layout fields', () => {
+    const { data } = parseFrontmatter('---\ntitle: T\ntemplate: post\nlayout: wide\n---\n# Body');
+    expect(data.template).toBe('post');
+    expect(data.layout).toBe('wide');
+  });
+
+  it('keeps arbitrary custom fields for templates', () => {
+    const { data } = parseFrontmatter('---\ntitle: T\nauthor: Ada\ncount: 3\n---\n# Body');
+    expect(data.author).toBe('Ada');
+    expect(data.count).toBe(3);
+  });
 });
