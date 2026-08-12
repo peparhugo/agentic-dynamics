@@ -19,6 +19,8 @@ from functools import wraps
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from celery_tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATA_FILE = os.environ.get("DATA_FILE", "tasks.json")
@@ -124,6 +126,14 @@ def get_user_by_id(user_id: int) -> dict | None:
     return None
 
 
+def _user_email(user_id: int) -> str | None:
+    """Resolve an owner's email address (falling back to a derived address)."""
+    user = get_user_by_id(user_id)
+    if user is None:
+        return None
+    return user.get("email") or f"{user['username']}@example.com"
+
+
 def verify_user(username: str, password: str) -> dict | None:
     user = get_user_by_username(username)
     if user is None:
@@ -177,6 +187,18 @@ def update_task(
                 _write_store(data)
                 return task
         return None
+
+
+def notify_task_completed(task: dict, owner_id: int) -> None:
+    """Dispatch an async email notification for a completed task.
+
+    Sending is delegated to Celery (non-blocking): the task is queued via
+    ``.delay`` and the API response is returned immediately.
+    """
+    email = _user_email(owner_id)
+    if email is None:
+        return
+    send_notification_email.delay(email, task["title"])
 
 
 # ── Auth ──────────────────────────────────────────────────────
@@ -283,9 +305,15 @@ def edit_task(task_id: int):
     status = data.get("status")
     if title is not None and not isinstance(title, str):
         return jsonify({"error": "title must be a string"}), 400
+    previous = get_task(task_id, g.user_id)
     task = update_task(task_id, g.user_id, title=title, status=status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if (
+        task.get("status") == "completed"
+        and (previous is None or previous.get("status") != "completed")
+    ):
+        notify_task_completed(task, g.user_id)
     return jsonify(task)
 
 
