@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import Mock
 
 import pytest
 
@@ -63,6 +64,38 @@ def test_users_only_see_and_modify_their_own_tasks(client):
         f"/tasks/{task_id}", json={"status": "done"}, headers=bob_auth
     ).status_code == 404
     assert client.get("/tasks", headers=alice_auth).get_json()[0]["title"] == "Alice task"
+
+
+def test_completing_task_enqueues_owner_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    auth = {"Authorization": f"Bearer {token(client, 'alice@example.com')}"}
+    created = client.post("/tasks", json={"title": "Write report"}, headers=auth)
+    task_id = created.get_json()["id"]
+    enqueue = Mock()
+    monkeypatch.setattr(api.send_notification_email, "delay", enqueue)
+
+    response = client.put(
+        f"/tasks/{task_id}",
+        json={"status": "completed"},
+        headers=auth,
+    )
+
+    assert response.status_code == 200
+    enqueue.assert_called_once_with("alice@example.com", "Write report")
+
+
+def test_notification_only_runs_on_transition_to_completed(client, monkeypatch):
+    register(client, "alice@example.com")
+    auth = {"Authorization": f"Bearer {token(client, 'alice@example.com')}"}
+    created = client.post("/tasks", json={"title": "Write report"}, headers=auth)
+    task_id = created.get_json()["id"]
+    enqueue = Mock()
+    monkeypatch.setattr(api.send_notification_email, "delay", enqueue)
+
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth)
+    client.put(f"/tasks/{task_id}", json={"title": "Final report"}, headers=auth)
+
+    enqueue.assert_called_once_with("alice@example.com", "Write report")
 
 
 def test_migration_adds_owner_id_and_preserves_existing_tasks(tmp_path, monkeypatch):

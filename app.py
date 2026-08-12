@@ -15,6 +15,8 @@ import binascii
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -250,6 +252,9 @@ def update_task(task_id):
         return jsonify({"error": "title must be a non-empty string"}), 400
     if not isinstance(status, str) or not status.strip():
         return jsonify({"error": "status must be a non-empty string"}), 400
+    status_changed_to_completed = (
+        row["status"] != "completed" and status.strip() == "completed"
+    )
     with get_db() as connection:
         connection.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
@@ -259,6 +264,13 @@ def update_task(task_id):
             "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, g.current_user["id"]),
         ).fetchone()
+    if status_changed_to_completed:
+        try:
+            # The current auth model uses username as the owner's contact address.
+            send_notification_email.delay(g.current_user["username"], updated["title"])
+        except Exception:
+            # Redis availability must not make the task update endpoint fail.
+            app.logger.exception("Unable to enqueue task completion notification")
     return jsonify(serialize_task(updated))
 
 
