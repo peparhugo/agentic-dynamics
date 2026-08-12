@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { buildSite } from '../src/generator';
+import type { Plugin } from '../src/generator';
 
 describe('buildSite', () => {
   test('builds Markdown pages and an index from frontmatter', async () => {
@@ -73,5 +74,26 @@ describe('buildSite', () => {
     await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
 
     expect(await readFile(path.join(output, 'page.html'), 'utf8')).toBe('<main><h1>Default</h1><p>Text</p>\n<footer>Included</footer></main>');
+  });
+
+  test('runs plugin lifecycle hooks in order and allows page transforms', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    await mkdir(content, { recursive: true });
+    await writeFile(path.join(content, 'page.md'), '# Original');
+    const events: string[] = [];
+    const plugin: Plugin = {
+      onStart: () => events.push('start'),
+      beforeBuild: () => events.push('before'),
+      onFile: (page) => { events.push('file'); return { ...page, content: page.content.replace('Original', 'Changed') }; },
+      afterBuild: () => events.push('after'),
+      onEnd: () => events.push('end')
+    };
+
+    await buildSite({ contentDir: content, outputDir: output, plugins: [plugin] });
+
+    expect(events).toEqual(['start', 'before', 'file', 'after', 'end']);
+    expect(await readFile(path.join(output, 'page.html'), 'utf8')).toContain('Changed');
   });
 });

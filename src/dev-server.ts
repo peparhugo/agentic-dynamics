@@ -6,6 +6,7 @@ import { URL } from 'node:url';
 import chokidar, { FSWatcher } from 'chokidar';
 import { WebSocketServer } from 'ws';
 import { buildSite, BuildOptions } from './generator';
+import type { Plugin, PluginContext } from './plugin';
 
 export interface DevServerOptions extends BuildOptions {
   port?: number;
@@ -58,52 +59,56 @@ async function serveFile(request: http.IncomingMessage, response: http.ServerRes
   }
 }
 
+export class DevServerPlugin implements Plugin {
+  private result?: DevServer;
+
+  async onStart(context: PluginContext): Promise<void> {
+    const options = context.options as DevServerOptions;
+    const outputDir = path.resolve(options.outputDir || './dist');
+    const contentDir = path.resolve(options.contentDir || './content');
+    const templatesDir = path.resolve(options.templatesDir || './templates');
+    const clients = new WebSocketServer({ noServer: true });
+    const server = http.createServer((request, response) => {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        response.writeHead(405).end('Method not allowed');
+        return;
+      }
+      void serveFile(request, response, outputDir);
+    });
+    server.on('upgrade', (request, socket, head) => {
+      clients.handleUpgrade(request, socket, head, (client) => clients.emit('connection', client, request));
+    });
+
+    let rebuild = Promise.resolve();
+    const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
+    const rebuildSite = () => {
+      rebuild = rebuild.then(async () => {
+        await buildSite({ ...options, plugins: [] });
+        clients.clients.forEach((client) => client.send('reload'));
+      }).catch((error: unknown) => console.error(`Build failed: ${error instanceof Error ? error.message : error}`));
+    };
+    watcher.on('add', rebuildSite).on('change', rebuildSite).on('unlink', rebuildSite);
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(options.port ?? 3000, '127.0.0.1', () => { server.removeListener('error', reject); resolve(); });
+    });
+    this.result = {
+      server, watcher,
+      close: async () => {
+        await watcher.close(); clients.clients.forEach((client) => client.terminate()); clients.close();
+        await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+      }
+    };
+  }
+
+  getServer(): DevServer {
+    if (!this.result) throw new Error('Development server has not started');
+    return this.result;
+  }
+}
+
 export async function startDevServer(options: DevServerOptions = {}): Promise<DevServer> {
-  const outputDir = path.resolve(options.outputDir || './dist');
-  const contentDir = path.resolve(options.contentDir || './content');
-  const templatesDir = path.resolve(options.templatesDir || './templates');
-  await buildSite(options);
-
-  const clients = new WebSocketServer({ noServer: true });
-  const server = http.createServer((request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      response.writeHead(405).end('Method not allowed');
-      return;
-    }
-    void serveFile(request, response, outputDir);
-  });
-  server.on('upgrade', (request, socket, head) => {
-    clients.handleUpgrade(request, socket, head, (client) => clients.emit('connection', client, request));
-  });
-
-  let rebuild = Promise.resolve();
-  const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
-  const rebuildSite = () => {
-    rebuild = rebuild.then(async () => {
-      await buildSite(options);
-      clients.clients.forEach((client) => client.send('reload'));
-    }).catch((error: unknown) => {
-      console.error(`Build failed: ${error instanceof Error ? error.message : error}`);
-    });
-  };
-  watcher.on('add', rebuildSite).on('change', rebuildSite).on('unlink', rebuildSite);
-
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(options.port ?? 3000, '127.0.0.1', () => {
-      server.removeListener('error', reject);
-      resolve();
-    });
-  });
-
-  return {
-    server,
-    watcher,
-    close: async () => {
-      await watcher.close();
-      clients.clients.forEach((client) => client.terminate());
-      clients.close();
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    }
-  };
+  const plugin = new DevServerPlugin();
+  await buildSite({ ...options, plugins: [plugin] });
+  return plugin.getServer();
 }
