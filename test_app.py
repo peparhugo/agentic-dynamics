@@ -13,6 +13,10 @@ def client():
     app_module.DATABASE = path
     app_module.app.config["TESTING"] = True
     app_module.init_db()
+    # Rate limit counters live in Redis and persist across tests (and
+    # across the low user ids that each fresh temp DB reissues), so reset
+    # them before every test to keep tests independent of each other.
+    app_module.limiter.reset()
 
     with app_module.app.test_client() as client:
         yield client
@@ -162,8 +166,11 @@ def test_list_tasks(client):
 
     response = client.get("/tasks", headers=headers)
     assert response.status_code == 200
-    titles = {task["title"] for task in response.get_json()}
+    body = response.get_json()
+    titles = {task["title"] for task in body["data"]}
     assert titles == {"Task A", "Task B"}
+    assert body["total"] == 2
+    assert body["next_cursor"] is None
 
 
 def test_show_task(client):
@@ -213,8 +220,8 @@ def test_users_only_see_their_own_tasks(client):
     client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers)
     client.post("/tasks", json={"title": "Bob task"}, headers=bob_headers)
 
-    alice_titles = {t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()}
-    bob_titles = {t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()}
+    alice_titles = {t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()["data"]}
+    bob_titles = {t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()["data"]}
 
     assert alice_titles == {"Alice task"}
     assert bob_titles == {"Bob task"}
@@ -443,3 +450,159 @@ def test_send_notification_email_task_prints_message(capsys):
     assert "Ship feature" in captured.out
     assert "alice@example.com" in result
     assert "Ship feature" in result
+
+
+# ── Pagination ────────────────────────────────────────────────
+
+def seed_tasks(headers, count):
+    """Create `count` tasks directly through the repository, bypassing HTTP
+    so seeding large fixtures doesn't itself consume rate-limit budget."""
+    user = app_module.user_repository.find_by_username("alice")
+    for i in range(count):
+        app_module.task_repository.create(title=f"Task {i}", owner_id=user["id"])
+
+
+def test_list_tasks_empty_returns_empty_page(client):
+    headers = auth_headers(client)
+    response = client.get("/tasks", headers=headers)
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
+
+
+def test_list_tasks_default_page_size_is_20(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 25)
+
+    response = client.get("/tasks", headers=headers)
+    body = response.get_json()
+    assert response.status_code == 200
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_cursor_follows_to_next_page(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 25)
+
+    first = client.get("/tasks", headers=headers).get_json()
+    second = client.get(f"/tasks?cursor={first['next_cursor']}", headers=headers).get_json()
+
+    assert len(second["data"]) == 5
+    assert second["next_cursor"] is None
+    assert second["total"] == 25
+    first_ids = {t["id"] for t in first["data"]}
+    second_ids = {t["id"] for t in second["data"]}
+    assert first_ids.isdisjoint(second_ids)
+    assert first_ids | second_ids == {t["id"] for t in first["data"] + second["data"]}
+
+
+def test_list_tasks_cursor_is_id_of_last_item_in_page(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 3)
+
+    response = client.get("/tasks?limit=2", headers=headers).get_json()
+    assert response["next_cursor"] == str(response["data"][-1]["id"])
+
+
+def test_list_tasks_respects_custom_limit(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 10)
+
+    response = client.get("/tasks?limit=5", headers=headers)
+    body = response.get_json()
+    assert len(body["data"]) == 5
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_limit_is_capped_at_100(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 150)
+
+    response = client.get("/tasks?limit=500", headers=headers)
+    body = response.get_json()
+    assert len(body["data"]) == 100
+    assert body["total"] == 150
+
+
+def test_list_tasks_last_page_has_no_next_cursor(client):
+    headers = auth_headers(client)
+    seed_tasks(headers, 20)
+
+    response = client.get("/tasks?limit=20", headers=headers)
+    body = response.get_json()
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_invalid_cursor_returns_400(client):
+    headers = auth_headers(client)
+    response = client.get("/tasks?cursor=not-a-number", headers=headers)
+    assert response.status_code == 400
+
+
+def test_list_tasks_invalid_limit_returns_400(client):
+    headers = auth_headers(client)
+    response = client.get("/tasks?limit=not-a-number", headers=headers)
+    assert response.status_code == 400
+
+
+def test_list_tasks_non_positive_limit_returns_400(client):
+    headers = auth_headers(client)
+    response = client.get("/tasks?limit=0", headers=headers)
+    assert response.status_code == 400
+
+
+def test_list_tasks_pagination_isolated_per_user(client):
+    alice_headers = auth_headers(client, "alice", "pw-alice")
+    seed_tasks(alice_headers, 5)
+    bob_headers = auth_headers(client, "bob", "pw-bob")
+    bob = app_module.user_repository.find_by_username("bob")
+    app_module.task_repository.create(title="Bob task", owner_id=bob["id"])
+
+    response = client.get("/tasks", headers=bob_headers).get_json()
+    assert response["total"] == 1
+    assert [t["title"] for t in response["data"]] == ["Bob task"]
+
+
+# ── Rate limiting ────────────────────────────────────────────
+
+def test_requests_within_limit_succeed(client):
+    headers = auth_headers(client)
+    for _ in range(10):
+        response = client.get("/tasks", headers=headers)
+        assert response.status_code == 200
+
+
+def test_exceeding_rate_limit_returns_429_with_retry_after(client):
+    headers = auth_headers(client)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+
+    assert all(r.status_code == 200 for r in responses[:100])
+    limited = responses[100]
+    assert limited.status_code == 429
+    assert "Retry-After" in limited.headers
+    assert limited.get_json() == {"error": "rate limit exceeded"}
+
+
+def test_rate_limit_is_scoped_per_user(client):
+    alice_headers = auth_headers(client, "alice", "pw-alice")
+    for _ in range(100):
+        client.get("/tasks", headers=alice_headers)
+    # Alice is now at her limit.
+    assert client.get("/tasks", headers=alice_headers).status_code == 429
+
+    # Bob is a different rate-limit key and is unaffected.
+    bob_headers = auth_headers(client, "bob", "pw-bob")
+    assert client.get("/tasks", headers=bob_headers).status_code == 200
+
+
+def test_auth_endpoints_are_rate_limited(client):
+    responses = [
+        client.post("/auth/login", json={"username": "nobody", "password": "wrong"})
+        for _ in range(101)
+    ]
+    assert responses[100].status_code == 429
+    assert "Retry-After" in responses[100].headers

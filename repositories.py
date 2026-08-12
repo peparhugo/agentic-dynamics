@@ -78,13 +78,36 @@ class TaskRepository(BaseRepository):
                 "owner_id": owner_id,
             }
 
-    def list_for_owner(self, owner_id: int) -> list[dict]:
+    def list_for_owner_page(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict], str | None]:
+        """Cursor-paginate tasks for an owner, ordered by id ascending.
+
+        Fetches one extra row beyond `limit` to detect whether a next page
+        exists, so `next_cursor` is only set when there truly is more data.
+        """
         with self._get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-            return [dict(r) for r in rows]
+            if cursor is not None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id > ? "
+                    "ORDER BY id ASC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id ASC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+        tasks = [dict(r) for r in rows[:limit]]
+        next_cursor = str(tasks[-1]["id"]) if len(rows) > limit else None
+        return tasks, next_cursor
+
+    def count_for_owner(self, owner_id: int) -> int:
+        with self._get_db() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()
+            return row["c"]
 
     def find_by_id_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._get_db() as conn:
