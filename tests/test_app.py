@@ -1,9 +1,11 @@
 import asyncio
 import json
+import tempfile
 from urllib.request import urlopen
 
 import pytest
 import pytest_asyncio
+import redis.asyncio as redis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -131,3 +133,51 @@ async def test_channel_endpoints_list_subscribers(server):
             urlopen, f"http://127.0.0.1:{server.bound_port}/channels/system/subscribers"
         )
         assert json.loads(response.read()) == {"channel": "system", "subscribers": [client_id]}
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated():
+    with tempfile.NamedTemporaryFile(suffix=".db") as database:
+        instance = NotificationServer(port=0, database_url=database.name, redis_url="redis://127.0.0.1:1")
+        await instance.start()
+        try:
+            uri = f"ws://127.0.0.1:{instance.bound_port}"
+            async with connect(uri) as connection:
+                await connection.recv()
+                await connection.send(json.dumps({"type": "broadcast", "payload": {"text": "saved"}}))
+                assert (await receive_json(connection))["payload"]["text"] == "saved"
+            response = await asyncio.to_thread(
+                urlopen, f"http://127.0.0.1:{instance.bound_port}/messages?limit=1&offset=0"
+            )
+            result = json.loads(response.read())
+            assert len(result["messages"]) == 1
+            assert result["messages"][0]["type"] == "broadcast"
+            assert result["messages"][0]["payload"] == {"text": "saved"}
+        finally:
+            await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_two_servers_share_redis_backbone():
+    broker = redis.from_url("redis://127.0.0.1:6379/0", decode_responses=True)
+    try:
+        await broker.ping()
+    except redis.RedisError:
+        await broker.close()
+        pytest.skip("Redis is not running")
+    first = NotificationServer(port=0, redis_url="redis://127.0.0.1:6379/0")
+    second = NotificationServer(port=0, redis_url="redis://127.0.0.1:6379/0")
+    await first.start()
+    await second.start()
+    try:
+        async with connect(f"ws://127.0.0.1:{second.bound_port}") as receiver:
+            await receiver.recv()
+            async with connect(f"ws://127.0.0.1:{first.bound_port}") as sender:
+                await sender.recv()
+                await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "redis"}}))
+                message = await asyncio.wait_for(receive_json(receiver), timeout=1)
+                assert message["payload"] == {"text": "redis"}
+    finally:
+        await first.stop()
+        await second.stop()
+        await broker.close()
