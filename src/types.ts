@@ -16,6 +16,7 @@ export interface Page {
   html: string;
   template?: string;
   layout?: string;
+  renderedHtml?: string;
 }
 
 export interface BuildOptions {
