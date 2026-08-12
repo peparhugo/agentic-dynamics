@@ -2,21 +2,23 @@
 import { buildSite } from './generator';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
-export function parseArgs(args: string[]): { command: string; contentDir?: string; outputDir?: string } {
+export function parseArgs(args: string[]): { command: string; contentDir?: string; outputDir?: string; templatesDir?: string } {
   const [command, ...flags] = args;
-  const options: { command: string; contentDir?: string; outputDir?: string } = { command: command || '' };
+  const options: { command: string; contentDir?: string; outputDir?: string; templatesDir?: string } = { command: command || '' };
   for (let index = 0; index < flags.length; index += 1) {
     const flag = flags[index];
-    if (flag === '--content' || flag === '--output') {
+    if (flag === '--content' || flag === '--output' || flag === '--templates') {
       const value = flags[++index];
       if (!value) throw new Error(`${flag} requires a directory`);
       if (flag === '--content') options.contentDir = value;
-      else options.outputDir = value;
+      else if (flag === '--output') options.outputDir = value;
+      else options.templatesDir = value;
     } else if (flag.startsWith('--content=')) options.contentDir = flag.slice('--content='.length);
     else if (flag.startsWith('--output=')) options.outputDir = flag.slice('--output='.length);
+    else if (flag.startsWith('--templates=')) options.templatesDir = flag.slice('--templates='.length);
     else throw new Error(`Unknown option: ${flag}`);
   }
   return options;

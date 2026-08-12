@@ -25,4 +25,43 @@ describe('static site generator', () => {
     expect(index).toContain('href="about.html"');
     expect(index).toContain('href="notes/first.html"');
   });
+
+  it('renders a selected template inside a layout with partials', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'dist');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(content, 'post.md'), '---\ntitle: A Post\ntemplate: article\nlayout: site\n---\n\nHello **there**.');
+    await fs.writeFile(path.join(templates, 'article.hbs'), '{{> nav}}<article><h1>{{title}}</h1>{{{body}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'site.hbs'), '<!doctype html><html><body>{{> header}}{{{body}}}{{> footer}}</body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>Header</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+    await fs.writeFile(path.join(templates, 'partials', 'nav.hbs'), '<nav>Nav</nav>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+    const rendered = await fs.readFile(path.join(output, 'post.html'), 'utf8');
+    expect(rendered).toContain('<header>Header</header>');
+    expect(rendered).toContain('<nav>Nav</nav>');
+    expect(rendered).toContain('<strong>there</strong>');
+    expect(rendered).toContain('<footer>Footer</footer>');
+  });
+
+  it('uses default.hbs when a page has no template', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'dist');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(content, 'home.md'), '# Welcome');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main data-title="{{title}}">{{{content}}}</main>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+    expect(await fs.readFile(path.join(output, 'home.html'), 'utf8')).toBe(
+      '<main data-title="Home"><h1>Welcome</h1>\n</main>',
+    );
+  });
 });
