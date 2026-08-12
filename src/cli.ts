@@ -11,6 +11,8 @@ export interface CliOptions {
   outputDir: string;
   templatesDir: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | { ok: false; error: string } {
@@ -18,6 +20,8 @@ export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | {
   let outputDir = DEFAULT_OUTPUT_DIR;
   let templatesDir = DEFAULT_TEMPLATE_DIR;
   let port: number | undefined = undefined;
+  let incremental: boolean | undefined = undefined;
+  let clean: boolean | undefined = undefined;
 
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -91,10 +95,20 @@ export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | {
       continue;
     }
 
+    if (arg === '--incremental') {
+      incremental = true;
+      continue;
+    }
+
+    if (arg === '--clean') {
+      clean = true;
+      continue;
+    }
+
     if (arg === '-h' || arg === '--help') {
       return {
         ok: false,
-        error: 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]',
+        error: 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]',
       };
     }
 
@@ -112,12 +126,14 @@ export function parseArgs(argv: string[]): { ok: true; options: CliOptions } | {
       outputDir: path.resolve(outputDir),
       templatesDir: path.resolve(templatesDir),
       port,
+      incremental,
+      clean,
     },
   };
 }
 
 export function usage(): string {
-  return 'Usage: ssg <command> [options]\n\nCommands:\n  build  Build the site\n  serve  Start a development server with live reload\n\nOptions:\n  --content <dir>     Content directory (default: content)\n  --output <dir>      Output directory (default: dist)\n  --templates <dir>   Templates directory (default: templates)\n  --port <number>     Port for the dev server (default: 3000)\n  -h, --help          Show this help';
+  return 'Usage: ssg <command> [options]\n\nCommands:\n  build  Build the site\n  serve  Start a development server with live reload\n\nOptions:\n  --content <dir>     Content directory (default: content)\n  --output <dir>      Output directory (default: dist)\n  --templates <dir>   Templates directory (default: templates)\n  --port <number>     Port for the dev server (default: 3000)\n  --incremental       Only rebuild pages whose source or template changed\n  --clean             Ignore the cache and rebuild everything\n  -h, --help          Show this help';
 }
 
 export async function main(argv: string[]): Promise<void> {
@@ -137,9 +153,16 @@ export async function main(argv: string[]): Promise<void> {
       templatesDir,
       plugins: config?.plugins,
       port: parsed.options.port,
+      incremental: parsed.options.incremental,
+      clean: parsed.options.clean,
     });
 
     console.log(`Generated ${result.pages.length} page(s) into ${outputDir}`);
+    if (result.stats) {
+      console.log(
+        `Build stats: ${result.stats.built} built, ${result.stats.skipped} skipped, ${result.stats.timeSaved} ms saved (${result.stats.time} ms total)`,
+      );
+    }
     for (const file of result.files) {
       console.log(`  ${file}`);
     }

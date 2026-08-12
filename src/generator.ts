@@ -14,6 +14,9 @@ export interface BuildOptions {
   plugins?: Plugin[];
   configPath?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
 }
 
 export { collectMarkdownFiles, renderPage, renderIndex, toSlug } from './render';

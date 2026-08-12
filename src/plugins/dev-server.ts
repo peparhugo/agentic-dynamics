@@ -116,7 +116,7 @@ export async function resolveFile(outputDir: string, pathname: string): Promise<
 async function startDevServer(options: ServeOptions): Promise<ServeHandle> {
   const { contentDir, outputDir, templatesDir, port, plugins, configPath } = options;
 
-  await buildSite(contentDir, outputDir, { templatesDir, plugins, configPath });
+  await buildSite(contentDir, outputDir, { templatesDir, plugins, configPath, incremental: true });
 
   const wss = new WebSocketServer({ noServer: true });
   const server = createServer(async (req, res) => {
@@ -198,7 +198,7 @@ async function startDevServer(options: ServeOptions): Promise<ServeHandle> {
     }
     timer = setTimeout(async () => {
       try {
-        await buildSite(contentDir, outputDir, { templatesDir, plugins, configPath });
+        await buildSite(contentDir, outputDir, { templatesDir, plugins, configPath, incremental: true });
         console.log('Rebuilt site');
         broadcastReload();
       } catch (err) {

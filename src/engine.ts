@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { DEFAULT_TEMPLATE_DIR } from './templates';
 import { collectMarkdownFiles, comparePages, renderIndex, toSlug } from './render';
@@ -6,13 +6,25 @@ import { PluginManager, type Plugin, type PluginContext, type PluginFile } from 
 import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/templates';
 import { loadConfig } from './config';
-import type { BuildResult, Page } from './types';
+import {
+  CACHE_FILE,
+  CACHE_VERSION,
+  computeTemplateHash,
+  hashString,
+  loadManifest,
+  saveManifest,
+  type CachedPage,
+} from './cache';
+import type { BuildResult, BuildStats, Page } from './types';
 
 export interface SSGEngineOptions {
   plugins?: Plugin[];
   templatesDir?: string;
   port?: number;
   configPath?: string;
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
 }
 
 export class SSGEngine {
@@ -46,6 +58,32 @@ export class SSGEngine {
 
   async build(contentDir: string, outputDir: string): Promise<BuildResult> {
     const templatesDir = this.options.templatesDir ?? DEFAULT_TEMPLATE_DIR;
+    const incremental = this.options.incremental === true;
+    const clean = this.options.clean === true;
+    const cacheFile = this.options.cacheFile ?? path.join(outputDir, CACHE_FILE);
+    const startedAt = Date.now();
+
+    if (clean) {
+      await rm(cacheFile, { force: true });
+    }
+
+    const templateHash = await computeTemplateHash(templatesDir);
+    const pluginNames = this.manager
+      .getPlugins()
+      .map((plugin) => plugin.name)
+      .sort();
+
+    let manifest: import('./cache').CacheManifest | null = null;
+    if (incremental) {
+      manifest = await loadManifest(cacheFile);
+      if (
+        manifest &&
+        (manifest.templateHash !== templateHash || manifest.plugins.join('\n') !== pluginNames.join('\n'))
+      ) {
+        manifest = null;
+      }
+    }
+
     const context: PluginContext = {
       contentDir,
       outputDir,
@@ -61,8 +99,49 @@ export class SSGEngine {
 
     const works = await this.collectPages(contentDir);
     const pages: PluginFile[] = [];
+    const nextEntries: Record<string, CachedPage> = {};
+    let built = 0;
+    let skipped = 0;
+    let timeSaved = 0;
+
     for (const work of works) {
-      pages.push(await this.manager.runOnFile(work, context));
+      const key = work.source;
+      const sourceHash = hashString(work.raw);
+      const cached = manifest?.entries[key];
+
+      if (cached && cached.sourceHash === sourceHash) {
+        pages.push({
+          ...work,
+          title: cached.title,
+          date: cached.date,
+          tags: cached.tags,
+          html: cached.html,
+          template: cached.template,
+          layout: cached.layout,
+          data: cached.data,
+        });
+        nextEntries[key] = { ...cached, sourceHash };
+        skipped += 1;
+        timeSaved += cached.renderTimeMs;
+      } else {
+        const renderStart = process.hrtime.bigint();
+        const page = await this.manager.runOnFile(work, context);
+        nextEntries[key] = {
+          source: work.source,
+          slug: page.slug,
+          sourceHash,
+          html: page.html,
+          title: page.title,
+          date: page.date,
+          tags: page.tags,
+          template: page.template,
+          layout: page.layout,
+          data: page.data,
+          renderTimeMs: Number(process.hrtime.bigint() - renderStart) / 1e6,
+        };
+        pages.push(page);
+        built += 1;
+      }
     }
     pages.sort(comparePages);
     context.pages = pages;
@@ -80,10 +159,26 @@ export class SSGEngine {
     files.push(indexPath);
     context.files = files;
 
+    await saveManifest(cacheFile, {
+      version: CACHE_VERSION,
+      templateHash,
+      plugins: pluginNames,
+      entries: nextEntries,
+    });
+
     await this.manager.runHook('afterBuild', context);
     await this.manager.runHook('onEnd', context);
 
-    return { pages, files };
+    const stats: BuildStats = {
+      total: pages.length,
+      built,
+      skipped,
+      timeSaved,
+      time: Date.now() - startedAt,
+      incremental,
+    };
+
+    return { pages, files, stats };
   }
 
   private async collectPages(contentDir: string): Promise<PluginFile[]> {

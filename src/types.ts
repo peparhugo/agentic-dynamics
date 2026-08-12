@@ -10,7 +10,17 @@ export interface Page {
   data?: Record<string, unknown>;
 }
 
+export interface BuildStats {
+  total: number;
+  built: number;
+  skipped: number;
+  timeSaved: number;
+  time: number;
+  incremental: boolean;
+}
+
 export interface BuildResult {
   pages: Page[];
   files: string[];
+  stats?: BuildStats;
 }
