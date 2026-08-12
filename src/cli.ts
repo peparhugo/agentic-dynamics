@@ -2,20 +2,21 @@
 import { buildSite } from './site-generator';
 
 function usage(): void {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
 }
 
-function parseOptions(args: string[]): { contentDir?: string; outputDir?: string } {
-  const options: { contentDir?: string; outputDir?: string } = {};
+function parseOptions(args: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string } {
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string } = {};
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
-    if (option !== '--content' && option !== '--output') {
+    if (option !== '--content' && option !== '--output' && option !== '--templates') {
       throw new Error(`Unknown option: ${option}`);
     }
     const value = args[++index];
     if (!value || value.startsWith('--')) throw new Error(`${option} requires a directory`);
     if (option === '--content') options.contentDir = value;
-    else options.outputDir = value;
+    else if (option === '--output') options.outputDir = value;
+    else options.templatesDir = value;
   }
   return options;
 }

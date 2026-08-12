@@ -65,4 +65,40 @@ describe('buildSite', () => {
     expect(result.pages).toEqual([]);
     expect(await fs.readFile(path.join(output, 'index.html'), 'utf8')).toContain('<ul>');
   });
+
+  test('renders a selected template, layout, and partials', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(content, 'welcome.md'), [
+      '---', 'title: Welcome', 'template: article', 'layout: site', 'tags: one, two', '---', '', 'Hello **world**.',
+    ].join('\n'));
+    await fs.writeFile(path.join(templates, 'article.hbs'), '{{> header}}<article><h1>{{title}}</h1>{{{body}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'site.hbs'), '<!doctype html><html><body>{{{body}}}{{> footer}}</body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+    const rendered = await fs.readFile(path.join(output, 'welcome.html'), 'utf8');
+
+    expect(rendered).toBe('<!doctype html><html><body><header>Welcome</header><article><h1>Welcome</h1><p>Hello <strong>world</strong>.</p>\n</article><footer>Footer</footer></body></html>');
+  });
+
+  test('uses default.hbs when a template is not specified', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'page.md'), '---\ntitle: Custom\n---\nContent');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<h1>{{title}}</h1>{{{body}}}');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+    expect(await fs.readFile(path.join(output, 'page.html'), 'utf8')).toBe('<h1>Custom</h1><p>Content</p>\n');
+  });
 });

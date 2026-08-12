@@ -7,6 +7,8 @@ export interface Frontmatter {
   title?: string;
   date?: string | Date;
   tags?: string[] | string;
+  template?: string;
+  layout?: string;
   [key: string]: unknown;
 }
 
@@ -17,11 +19,15 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  template?: string;
+  layout?: string;
 }
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
+  defaultTemplate?: string;
 }
 
 export interface BuildResult {
@@ -40,6 +46,8 @@ function formatDate(value: Frontmatter['date']): string | undefined {
   return value instanceof Date ? value.toISOString().slice(0, 10) : String(value);
 }
 
+const pageFrontmatter = new WeakMap<Page, Frontmatter>();
+
 export function parseMarkdown(source: string, sourcePath = ''): Page {
   const parsed = matter(source);
   const data = parsed.data as Frontmatter;
@@ -47,14 +55,18 @@ export function parseMarkdown(source: string, sourcePath = ''): Page {
     ? data.title.trim()
     : path.basename(sourcePath, path.extname(sourcePath));
 
-  return {
+  const page: Page = {
     sourcePath,
     outputPath: sourcePath.replace(/\.md$/i, '.html'),
     title,
     date: formatDate(data.date),
     tags: normalizeTags(data.tags),
     html: marked.parse(parsed.content),
+    template: typeof data.template === 'string' ? data.template : undefined,
+    layout: typeof data.layout === 'string' ? data.layout : undefined,
   };
+  pageFrontmatter.set(page, data);
+  return page;
 }
 
 async function markdownFiles(directory: string): Promise<string[]> {
@@ -91,9 +103,107 @@ function indexDocument(pages: Page[]): string {
   return document('Index', `<main>\n<h1>Pages</h1>\n<ul>\n${links}\n</ul>\n</main>`);
 }
 
+type TemplateValue = Record<string, unknown>;
+
+function lookup(context: TemplateValue, key: string): unknown {
+  if (key === 'this' || key === '.') return context;
+  return key.split('.').reduce<unknown>((value, part) => {
+    if (part === 'this') return value;
+    if (value && typeof value === 'object') return (value as Record<string, unknown>)[part];
+    return undefined;
+  }, context);
+}
+
+function escapeTemplate(value: unknown): string {
+  return escapeHtml(value == null ? '' : String(value));
+}
+
+function truthy(value: unknown): boolean {
+  return Boolean(value) && (!Array.isArray(value) || value.length > 0);
+}
+
+// A small Handlebars-compatible renderer keeps the generator usable without a runtime plugin.
+function renderTemplate(source: string, context: TemplateValue, partials: Map<string, string>): string {
+  const renderBlock = (input: string, scope: TemplateValue): string => {
+    let output = input;
+    const blockPattern = /{{#(if|each)\s+([^}]+)}}([\s\S]*?){{\/\1}}/g;
+    output = output.replace(blockPattern, (_match, type: string, expression: string, content: string) => {
+      const value = lookup(scope, expression.trim());
+      if (type === 'if') return truthy(value) ? renderBlock(content, scope) : '';
+      if (!Array.isArray(value)) return '';
+      return value.map((item) => renderBlock(content, typeof item === 'object' && item !== null
+        ? { ...scope, ...(item as TemplateValue), this: item }
+        : { ...scope, this: item })).join('');
+    });
+    output = output.replace(/{{>\s*([\w./-]+)\s*}}/g, (_match, name: string) => {
+      const partial = partials.get(name);
+      return partial === undefined ? '' : renderBlock(partial, scope);
+    });
+    output = output.replace(/{{{\s*([^}]+?)\s*}}}/g, (_match, expression: string) => {
+      const value = lookup(scope, expression.trim());
+      return value == null ? '' : String(value);
+    });
+    return output.replace(/{{\s*([^{}]+?)\s*}}/g, (_match, expression: string) => {
+      const value = lookup(scope, expression.trim());
+      return escapeTemplate(value);
+    });
+  };
+  return renderBlock(source, context);
+}
+
+async function loadTemplates(directory: string): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return result;
+    throw error;
+  }
+  for (const entry of entries) {
+    if (!entry.isFile() || !/\.(hbs|ejs)$/i.test(entry.name)) continue;
+    const name = entry.name.replace(/\.(hbs|ejs)$/i, '');
+    result.set(name, await fs.readFile(path.join(directory, entry.name), 'utf8'));
+  }
+  return result;
+}
+
+async function renderWithTemplates(
+  page: Page,
+  templatesDir: string,
+  defaultTemplate: string,
+): Promise<string | undefined> {
+  const templates = await loadTemplates(templatesDir);
+  const partials = await loadTemplates(path.join(templatesDir, 'partials'));
+  const selected = page.template || defaultTemplate;
+  const template = templates.get(selected.replace(/\.(hbs|ejs)$/i, ''));
+  if (template === undefined) {
+    if (page.template) throw new Error(`Template not found: ${page.template}`);
+    return undefined;
+  }
+  const context: TemplateValue = {
+    ...pageFrontmatter.get(page),
+    page,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    body: page.html,
+  };
+  let rendered = renderTemplate(template, context, partials);
+  if (page.layout) {
+    const layouts = await loadTemplates(path.join(templatesDir, 'layouts'));
+    const layout = layouts.get(page.layout.replace(/\.(hbs|ejs)$/i, ''));
+    if (layout === undefined) throw new Error(`Layout not found: ${page.layout}`);
+    rendered = renderTemplate(layout, { ...context, body: rendered }, partials);
+  }
+  return rendered;
+}
+
 export async function buildSite(options: BuildOptions = {}): Promise<BuildResult> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
+  const defaultTemplate = options.defaultTemplate ?? 'default';
   const sourceFiles = await markdownFiles(contentDir);
   const pages = await Promise.all(sourceFiles.map(async (sourcePath) => {
     const source = await fs.readFile(sourcePath, 'utf8');
@@ -101,7 +211,8 @@ export async function buildSite(options: BuildOptions = {}): Promise<BuildResult
     const page = parseMarkdown(source, relativePath);
     const destination = path.join(outputDir, page.outputPath);
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, pageDocument(page), 'utf8');
+    const templated = await renderWithTemplates(page, templatesDir, defaultTemplate);
+    await fs.writeFile(destination, templated ?? pageDocument(page), 'utf8');
     return page;
   }));
   pages.sort((a, b) => a.outputPath.localeCompare(b.outputPath));
