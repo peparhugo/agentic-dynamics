@@ -320,6 +320,115 @@ def test_user_cannot_update_others_task(client, token_a, token_b):
     assert resp.status_code == 404
 
 
+# ── Notification trigger ─────────────────────────────────────────
+
+def test_send_notification_email_task_defined():
+    from tasks import send_notification_email
+
+    assert callable(send_notification_email)
+    assert send_notification_email.name == "tasks.send_notification_email"
+
+
+def test_send_notification_email_mock_prints(capsys):
+    from tasks import send_notification_email
+
+    result = send_notification_email("alice@example.com", "Groceries")
+    out = capsys.readouterr().out
+    assert "Groceries" in out
+    assert "alice@example.com" in out
+    assert result == {
+        "sent": True,
+        "to": "alice@example.com",
+        "task_title": "Groceries",
+    }
+
+
+def _dispatch_spy():
+    calls = []
+
+    class FakeTask:
+        @staticmethod
+        def delay(user_email, task_title):
+            calls.append((user_email, task_title))
+
+    return FakeTask, calls
+
+
+def test_completing_task_dispatches_notification(client, token_a, monkeypatch):
+    created = _create(client, "ship feature", token_a).get_json()
+    fake_task, calls = _dispatch_spy()
+    monkeypatch.setattr(app_module, "send_notification_email", fake_task())
+
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    assert calls == [("alice", "ship feature")]
+
+
+def test_completing_task_with_new_title_dispatches_updated_title(
+    client, token_a, monkeypatch
+):
+    created = _create(client, "old title", token_a).get_json()
+    fake_task, calls = _dispatch_spy()
+    monkeypatch.setattr(app_module, "send_notification_email", fake_task())
+
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"title": "new title", "status": "completed"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert calls == [("alice", "new title")]
+
+
+def test_non_completed_status_does_not_dispatch(client, token_a, monkeypatch):
+    created = _create(client, "ship feature", token_a).get_json()
+    fake_task, calls = _dispatch_spy()
+    monkeypatch.setattr(app_module, "send_notification_email", fake_task())
+
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "in_progress"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp.status_code == 200
+    assert calls == []
+
+
+def test_re_completing_task_does_not_dispatch_again(client, token_a, monkeypatch):
+    created = _create(client, "ship feature", token_a).get_json()
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    fake_task, calls = _dispatch_spy()
+    monkeypatch.setattr(app_module, "send_notification_email", fake_task())
+
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert calls == []
+
+
+def test_update_not_found_does_not_dispatch(client, token_a, monkeypatch):
+    fake_task, calls = _dispatch_spy()
+    monkeypatch.setattr(app_module, "send_notification_email", fake_task())
+
+    resp = client.put(
+        "/tasks/9999",
+        json={"status": "completed"},
+        headers={"Authorization": f"Bearer {token_a}"},
+    )
+    assert resp.status_code == 404
+    assert calls == []
+
+
 # ── Schema ───────────────────────────────────────────────────────
 
 def test_tasks_table_has_owner_id(client, token_a):

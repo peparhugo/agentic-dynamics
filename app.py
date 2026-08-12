@@ -19,6 +19,8 @@ import bcrypt
 import jwt
 from flask import Flask, jsonify, request
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-me-in-production")
@@ -151,6 +153,16 @@ def fetch_own_task(task_id, user_id):
     return row
 
 
+def dispatch_completion_notification(user_email, task_title):
+    """Enqueue the notification email without blocking the API response."""
+    try:
+        send_notification_email.delay(user_email, task_title)
+    except Exception:
+        app.logger.exception(
+            "Failed to enqueue notification email for %s", user_email
+        )
+
+
 # ── Auth routes ─────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
@@ -258,12 +270,15 @@ def update_task(task_id):
     else:
         title = row["title"]
     status = data.get("status", row["status"])
+    became_completed = status == "completed" and row["status"] != "completed"
     with get_db() as conn:
         conn.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
             (title, status, task_id),
         )
         conn.commit()
+    if became_completed:
+        dispatch_completion_notification(request.user["username"], title)
     return jsonify(serialize_task(fetch_own_task(task_id, request.user["id"])))
 
 
