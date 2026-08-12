@@ -1,3 +1,15 @@
+import type { Plugin } from './plugin';
+
+export interface BuildOptions {
+  contentDir?: string;
+  outputDir?: string;
+  templateDir?: string;
+  defaultTemplate?: string;
+  defaultLayout?: string;
+  configPath?: string;
+  plugins?: Plugin[];
+}
+
 export interface Frontmatter {
   title?: string;
   date?: string | Date;
@@ -17,4 +29,5 @@ export interface Page {
   layout?: string;
   content: string;
   html: string;
+  rendered?: string;
 }

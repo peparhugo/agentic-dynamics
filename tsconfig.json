@@ -14,6 +14,6 @@
     "sourceMap": false,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts", "__tests__/**/*.ts"],
+  "include": ["src/**/*.ts", "plugins/**/*.ts", "ssg.config.ts", "__tests__/**/*.ts"],
   "exclude": ["node_modules", "dist", "lib"]
 }
