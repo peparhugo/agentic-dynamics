@@ -1,88 +1,87 @@
 """
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+Flask Task Management API.
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
+Storage: flat JSON file (no database), per the "no databases allowed" constraint.
 """
 
 from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
+from datetime import datetime, timezone
+import json
 import os
+import threading
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+DATA_FILE = os.environ.get("DATA_FILE", "tasks.json")
+
+_lock = threading.Lock()
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
+# ── Storage ───────────────────────────────────────────────────
 
 def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
+    """Initialize the flat-file store on startup if it doesn't exist."""
+    if not os.path.exists(DATA_FILE):
+        _write_tasks([])
+
+
+def _read_tasks() -> list:
+    if not os.path.exists(DATA_FILE):
+        return []
+    with open(DATA_FILE, "r") as f:
+        content = f.read().strip()
+        return json.loads(content) if content else []
+
+
+def _write_tasks(tasks: list) -> None:
+    tmp_path = f"{DATA_FILE}.tmp"
+    with open(tmp_path, "w") as f:
+        json.dump(tasks, f, indent=2)
+    os.replace(tmp_path, DATA_FILE)
+
+
+def _next_id(tasks: list) -> int:
+    return max((t["id"] for t in tasks), default=0) + 1
 
 
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
-            (title, now),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
+    with _lock:
+        tasks = _read_tasks()
+        task = {
+            "id": _next_id(tasks),
             "title": title,
             "status": "pending",
-            "created_at": now,
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        tasks.append(task)
+        _write_tasks(tasks)
+        return task
 
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+def get_tasks() -> list:
+    tasks = _read_tasks()
+    return sorted(tasks, key=lambda t: t["created_at"], reverse=True)
 
 
 def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+    tasks = _read_tasks()
+    return next((t for t in tasks if t["id"] == task_id), None)
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
+    with _lock:
+        tasks = _read_tasks()
+        task = next((t for t in tasks if t["id"] == task_id), None)
+        if task is None:
+            return None
         if title is not None:
-            updates.append("title = ?")
-            params.append(title)
+            task["title"] = title
         if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
+            task["status"] = status
+        _write_tasks(tasks)
+        return task
 
 
 # ── Routes ─────────────────────────────────────────────────────
@@ -95,10 +94,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title")
+    if not title or not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
@@ -113,10 +112,19 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+
+    title = data.get("title")
+    if title is not None and (not isinstance(title, str) or not title.strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+
+    status = data.get("status")
+    if status is not None and (not isinstance(status, str) or not status.strip()):
+        return jsonify({"error": "status must be a non-empty string"}), 400
+
     task = update_task(
         task_id,
-        title=data.get("title"),
-        status=data.get("status"),
+        title=title.strip() if title is not None else None,
+        status=status.strip() if status is not None else None,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
