@@ -1,4 +1,4 @@
-"""Async WebSocket notification server backed by Redis and SQLite."""
+"""Async notification server backed by Redis and SQLite."""
 
 from __future__ import annotations
 
@@ -13,8 +13,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 import redis.asyncio as redis
-import websockets
-from websockets.exceptions import ConnectionClosed
+from transport import BaseTransport, Transport, WebSocketTransport
 
 
 MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -42,6 +41,7 @@ class NotificationServer:
         redis_url: str | None = None,
         database_url: str | None = None,
         redis_client: Any | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.websocket_port = websocket_port
@@ -49,11 +49,11 @@ class NotificationServer:
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
         self.database_url = database_url or os.getenv("DATABASE_URL", "sqlite:///messages.db")
         self.instance_id = str(uuid.uuid4())
-        self.clients: dict[str, Any] = {}
+        self.transport = transport or self._transport_from_config(host, websocket_port)
+        self.clients = self.transport.clients if hasattr(self.transport, "clients") else {}
         self.channels: dict[str, set[str]] = {}
         self._clients_lock = asyncio.Lock()
         self._state_lock = asyncio.Lock()
-        self._websocket_server: Any = None
         self._http_server: asyncio.AbstractServer | None = None
         self._redis = redis_client
         self._provided_redis = redis_client is not None
@@ -70,6 +70,16 @@ class NotificationServer:
             "payload TEXT NOT NULL, timestamp TEXT NOT NULL)"
         )
         self._db.commit()
+
+    @staticmethod
+    def timestamp() -> str:
+        return _timestamp()
+
+    def _transport_from_config(self, host: str, port: int) -> BaseTransport:
+        transport = os.getenv("TRANSPORT", "websocket").strip().lower()
+        if transport in {"websocket", "ws"}:
+            return WebSocketTransport(self, host, port)
+        raise ValueError(f"unsupported transport: {transport}")
 
     @staticmethod
     def _database_path_from_url(database_url: str) -> str:
@@ -100,16 +110,14 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.psubscribe(REDIS_PUBSUB_PATTERN)
             self._redis_listener = asyncio.create_task(self._redis_loop())
-        self._websocket_server = await websockets.serve(self._handle_websocket, self.host, self.websocket_port)
+        await self.transport.start()
         self._http_server = await asyncio.start_server(self._handle_http, self.host, self.http_port)
-        self.websocket_port = self._websocket_server.sockets[0].getsockname()[1]
+        if hasattr(self.transport, "port"):
+            self.websocket_port = self.transport.port
         self.http_port = self._http_server.sockets[0].getsockname()[1]
 
     async def stop(self) -> None:
-        if self._websocket_server is not None:
-            self._websocket_server.close()
-            await self._websocket_server.wait_closed()
-            self._websocket_server = None
+        await self.transport.stop()
         if self._http_server is not None:
             self._http_server.close()
             await self._http_server.wait_closed()
@@ -120,11 +128,9 @@ class NotificationServer:
             self._redis_listener = None
         async with self._clients_lock:
             client_ids = list(self.clients)
-            clients = list(self.clients.values())
             self.clients.clear()
             self.channels.clear()
         await asyncio.gather(*(self._unregister_client(client_id) for client_id in client_ids), return_exceptions=True)
-        await asyncio.gather(*(client.close() for client in clients), return_exceptions=True)
         if self._pubsub is not None:
             await self._close_resource(self._pubsub)
             self._pubsub = None
@@ -177,24 +183,7 @@ class NotificationServer:
             else:
                 ids = self.channels.get(message["channel"], set())
                 recipients = [(client_id, self.clients[client_id]) for client_id in ids if client_id in self.clients]
-        results = await asyncio.gather(*(client.send(json.dumps(message)) for _, client in recipients), return_exceptions=True)
-        for (client_id, _), result in zip(recipients, results):
-            if isinstance(result, Exception):
-                await self._remove_client(client_id)
-
-    async def _handle_websocket(self, websocket: Any) -> None:
-        client_id = str(uuid.uuid4())
-        async with self._clients_lock:
-            self.clients[client_id] = websocket
-        await self._register_client(client_id)
-        await websocket.send(json.dumps({"type": "system", "payload": {"client_id": client_id}, "timestamp": _timestamp()}))
-        try:
-            async for raw_message in websocket:
-                await self._handle_message(client_id, raw_message)
-        except (ConnectionClosed, asyncio.CancelledError):
-            pass
-        finally:
-            await self._remove_client(client_id)
+        await self.transport.broadcast(message, recipients)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -253,19 +242,18 @@ class NotificationServer:
         return [{"id": row["id"], "channel": row["channel"], "type": row["type"], "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]} for row in rows]
 
     async def _send_system(self, client_id: str, payload: dict[str, Any]) -> None:
-        async with self._clients_lock:
-            client = self.clients.get(client_id)
-        if client is not None:
-            await client.send(json.dumps({"type": "system", "payload": payload, "timestamp": _timestamp()}))
+        await self.transport.send_message(client_id, {"type": "system", "payload": payload, "timestamp": _timestamp()})
 
-    async def _remove_client(self, client_id: str) -> None:
+    async def _remove_client_state(self, client_id: str) -> None:
         async with self._clients_lock:
             self.clients.pop(client_id, None)
             for channel in list(self.channels):
                 self.channels[channel].discard(client_id)
                 if not self.channels[channel]:
                     del self.channels[channel]
-        await self._unregister_client(client_id)
+
+    async def _remove_client(self, client_id: str) -> None:
+        await self.transport.on_disconnect(client_id)
 
     async def _register_client(self, client_id: str) -> None:
         if self._redis_enabled and self._redis is not None:
