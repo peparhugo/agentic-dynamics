@@ -7,6 +7,8 @@ import os
 import jwt
 import bcrypt
 from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from celery_tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
@@ -16,6 +18,36 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key")
 JWT_EXPIRATION_HOURS = 24
+
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
+
+
+def get_rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ", 1)[1]
+        payload = decode_token(token)
+        if payload:
+            return f"user:{payload['user_id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    app=app,
+    key_func=get_rate_limit_key,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    default_limits=["100 per minute"],
+)
+
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    retry_after = getattr(e, "retry_after", None)
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    if retry_after is not None:
+        response.headers["Retry-After"] = str(int(retry_after))
+    return response
 
 
 def get_db():
@@ -180,7 +212,13 @@ def login():
 @login_required
 def list_tasks():
     user_id = request.current_user["user_id"]
-    return jsonify(task_repo.find_all(user_id))
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", 20, type=int)
+    limit = max(1, min(limit, 100))
+    data, total, next_cursor = task_repo.find_paginated(
+        user_id, cursor=cursor, limit=limit
+    )
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])

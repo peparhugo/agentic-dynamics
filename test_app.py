@@ -1,9 +1,11 @@
+import os
+os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
+
 import pytest
 import json
-import os
 from unittest.mock import patch
 
-from app import app, init_db, get_db, DATABASE
+from app import app, init_db, get_db, DATABASE, limiter
 
 
 @pytest.fixture(autouse=True)
@@ -13,6 +15,7 @@ def fresh_db(monkeypatch):
     if os.path.exists(db_path):
         os.remove(db_path)
     init_db()
+    limiter.reset()
     yield
     if os.path.exists(db_path):
         os.remove(db_path)
@@ -185,12 +188,12 @@ class TestUserIsolation:
         )
 
         resp = client.get("/tasks", headers=_auth_headers(tok_a))
-        data = resp.get_json()
+        data = resp.get_json()["data"]
         assert len(data) == 1
         assert data[0]["title"] == "Alice task"
 
         resp = client.get("/tasks", headers=_auth_headers(tok_b))
-        data = resp.get_json()
+        data = resp.get_json()["data"]
         assert len(data) == 1
         assert data[0]["title"] == "Bob task"
 
@@ -274,8 +277,10 @@ class TestListTasks:
     def test_list_tasks_empty(self, client, auth_headers):
         resp = client.get("/tasks", headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.get_json()
-        assert data == []
+        body = resp.get_json()
+        assert body["data"] == []
+        assert body["total"] == 0
+        assert body["next_cursor"] is None
 
     def test_list_tasks_with_items(self, client, auth_headers):
         client.post(
@@ -286,10 +291,12 @@ class TestListTasks:
         )
         resp = client.get("/tasks", headers=auth_headers)
         assert resp.status_code == 200
-        data = resp.get_json()
+        body = resp.get_json()
+        data = body["data"]
         assert len(data) == 2
         assert data[0]["title"] == "Second"
         assert data[1]["title"] == "First"
+        assert body["total"] == 2
 
     def test_list_tasks_ordered_by_created_at_desc(
         self, client, auth_headers
@@ -304,7 +311,8 @@ class TestListTasks:
             "/tasks", json={"title": "Newer"}, headers=auth_headers
         )
         resp = client.get("/tasks", headers=auth_headers)
-        data = resp.get_json()
+        body = resp.get_json()
+        data = body["data"]
         assert data[0]["title"] == "Newer"
         assert data[1]["title"] == "Older"
 
@@ -560,3 +568,182 @@ class TestNotification:
             )
             assert resp.status_code == 200
             mock_delay.assert_not_called()
+
+
+# ── Pagination tests ───────────────────────────────────────────
+
+
+class TestPagination:
+    def _create_tasks(self, client, auth_headers, count=25):
+        for i in range(count):
+            client.post(
+                "/tasks",
+                json={"title": f"Task {i}"},
+                headers=auth_headers,
+            )
+
+    def test_pagination_default_limit(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=25)
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert "data" in body
+        assert "next_cursor" in body
+        assert "total" in body
+        assert len(body["data"]) == 20
+        assert body["total"] == 25
+        assert body["next_cursor"] is not None
+
+    def test_pagination_next_page_with_cursor(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=25)
+        first_page = client.get("/tasks", headers=auth_headers)
+        body = first_page.get_json()
+        cursor = body["next_cursor"]
+        assert cursor is not None
+
+        resp = client.get(
+            f"/tasks?cursor={cursor}", headers=auth_headers
+        )
+        body2 = resp.get_json()
+        assert resp.status_code == 200
+        assert len(body2["data"]) == 5
+        assert body2["total"] == 25
+        assert body2["next_cursor"] is None
+
+    def test_pagination_custom_limit(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=30)
+        resp = client.get("/tasks?limit=10", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 10
+        assert body["total"] == 30
+        assert body["next_cursor"] is not None
+
+    def test_pagination_limit_exceeds_max(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=120)
+        resp = client.get("/tasks?limit=200", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) <= 100
+
+    def test_pagination_empty_result(self, client, auth_headers):
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert body["data"] == []
+        assert body["total"] == 0
+        assert body["next_cursor"] is None
+
+    def test_pagination_fewer_items_than_limit(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=5)
+        resp = client.get("/tasks?limit=20", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 5
+        assert body["total"] == 5
+        assert body["next_cursor"] is None
+
+    def test_pagination_exact_limit_items(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=20)
+        resp = client.get("/tasks?limit=20", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 20
+        assert body["total"] == 20
+        assert body["next_cursor"] is None
+
+    def test_pagination_user_isolation(self, client):
+        _seed_user(client, "alice", "pass1")
+        _seed_user(client, "bob", "pass2")
+        tok_a = _login(client, "alice", "pass1")
+        tok_b = _login(client, "bob", "pass2")
+
+        for i in range(15):
+            client.post(
+                "/tasks",
+                json={"title": f"Alice {i}"},
+                headers=_auth_headers(tok_a),
+            )
+        for i in range(5):
+            client.post(
+                "/tasks",
+                json={"title": f"Bob {i}"},
+                headers=_auth_headers(tok_b),
+            )
+
+        resp_a = client.get("/tasks", headers=_auth_headers(tok_a))
+        body_a = resp_a.get_json()
+        assert body_a["total"] == 15
+        assert len(body_a["data"]) == 15
+
+        resp_b = client.get("/tasks", headers=_auth_headers(tok_b))
+        body_b = resp_b.get_json()
+        assert body_b["total"] == 5
+        assert len(body_b["data"]) == 5
+
+    def test_pagination_cursor_beyond_results(self, client, auth_headers):
+        self._create_tasks(client, auth_headers, count=5)
+        resp = client.get("/tasks?cursor=99999", headers=auth_headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 5
+        assert body["total"] == 5
+        assert body["next_cursor"] is None
+
+
+# ── Rate limiting tests ────────────────────────────────────────
+
+
+class TestRateLimiting:
+    def test_rate_limit_exceeded_on_tasks(self, client, auth_headers):
+        for _ in range(100):
+            resp = client.get("/tasks", headers=auth_headers)
+            assert resp.status_code == 200
+
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 429
+        assert "error" in resp.get_json()
+
+    def test_rate_limit_retry_after_header(self, client, auth_headers):
+        for _ in range(101):
+            resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 429
+        if "Retry-After" in resp.headers:
+            assert int(resp.headers["Retry-After"]) > 0
+
+    def test_different_users_have_separate_limits(self, client, auth_headers):
+        _seed_user(client, "bob", "pass2")
+        tok_b = _login(client, "bob", "pass2")
+        headers_b = _auth_headers(tok_b)
+
+        client.post("/tasks", json={"title": "B"}, headers=headers_b)
+
+        for _ in range(101):
+            resp = client.get("/tasks", headers=auth_headers)
+
+        assert resp.status_code == 429
+
+        resp_b = client.get("/tasks", headers=headers_b)
+        assert resp_b.status_code == 200
+
+    def test_rate_limit_applies_to_auth_endpoints(self, client):
+        for _ in range(100):
+            client.post(
+                "/auth/register",
+                json={"username": f"u{_}", "password": "pass"},
+            )
+
+        resp = client.post(
+            "/auth/register",
+            json={"username": "extra", "password": "pass"},
+        )
+        assert resp.status_code == 429
+        assert "error" in resp.get_json()
+
+    def test_rate_limit_respects_auth_on_protected(self, client, auth_headers):
+        for _ in range(100):
+            resp = client.get("/tasks/1", headers=auth_headers)
+            assert resp.status_code in (200, 404)
+
+        resp = client.get("/tasks/1", headers=auth_headers)
+        assert resp.status_code == 429
