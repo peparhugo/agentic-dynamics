@@ -1,6 +1,7 @@
 import asyncio
 import json
 from urllib.request import urlopen
+from urllib.parse import quote
 
 import pytest
 import pytest_asyncio
@@ -162,6 +163,60 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
         assert body["offset"] == 1
         assert len(body["messages"]) == 1
         assert body["messages"][0]["payload"] == {"client_id": "missing", "n": 2}
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_an_error_without_dropping_the_request(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    instance = NotificationServer("127.0.0.1", 0)
+    await instance.start()
+    try:
+        async with connect(f"ws://127.0.0.1:{instance.port}") as client:
+            await client.recv()
+            for number in (1, 2):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"n": number}}))
+                assert (await receive_json(client))["payload"] == {"n": number}
+            await client.send(json.dumps({"type": "broadcast", "payload": {"n": 3}}))
+            assert (await receive_json(client))["payload"] == {"error": "rate limit exceeded"}
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_reports_more(tmp_path):
+    instance = NotificationServer(
+        "127.0.0.1", 0, database_url=f"sqlite:///{tmp_path / 'history.sqlite'}"
+    )
+    await instance.start()
+    try:
+        async with connect(f"ws://127.0.0.1:{instance.port}") as client:
+            await client.recv()
+            await client.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+            await client.recv()
+            for number in (1, 2, 3):
+                await client.send(json.dumps({
+                    "type": "broadcast", "channel": "alerts", "payload": {"n": number}
+                }))
+                await client.recv()
+            await client.send(json.dumps({
+                "type": "broadcast", "channel": "other", "payload": {"n": 4}
+            }))
+        response = await asyncio.to_thread(
+            urlopen, f"http://127.0.0.1:{instance.port}/history?channel=alerts&limit=2"
+        )
+        first_page = json.loads(response.read())
+        assert [message["payload"]["n"] for message in first_page["messages"]] == [1, 2]
+        assert first_page["has_more"] is True
+        since = first_page["messages"][0]["timestamp"]
+        response = await asyncio.to_thread(
+            urlopen,
+            f"http://127.0.0.1:{instance.port}/history?channel=alerts&since={quote(since, safe='')}&limit=50",
+        )
+        second_page = json.loads(response.read())
+        assert [message["payload"]["n"] for message in second_page["messages"]] == [2, 3]
+        assert second_page["has_more"] is False
     finally:
         await instance.stop()
 
