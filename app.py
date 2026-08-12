@@ -1,11 +1,6 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Flask API for managing tasks stored in SQLite."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from datetime import datetime
 import sqlite3
 import os
@@ -23,6 +18,8 @@ def get_db():
 
 def init_db():
     with get_db() as conn:
+        # WAL allows readers and writers to proceed concurrently.
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -33,24 +30,11 @@ def init_db():
         )
 
 
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
         conn.commit()
@@ -73,10 +57,8 @@ def get_task(task_id: int) -> dict | None:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return dict(row) if row else None
 
-
-
 def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
+    """Compatibility alias for callers that use the older helper name."""
     return get_task(task_id)
 
 
@@ -113,7 +95,11 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    if not isinstance(data, dict):
+        data = {}
+    title = data.get("title")
+    if isinstance(title, str):
+        title = title.strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -131,6 +117,8 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        data = {}
     task = update_task(
         task_id,
         title=data.get("title"),
@@ -141,6 +129,10 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+# Initialize the schema when the application module is loaded by a WSGI server
+# or the test runner, not only when this file is executed directly.
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
