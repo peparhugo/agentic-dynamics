@@ -12,13 +12,13 @@ import os
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+DATABASE = os.environ.get("DATABASE", ":memory:")
+_connection = sqlite3.connect(DATABASE, check_same_thread=False)
+_connection.row_factory = sqlite3.Row
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return _connection
 
 
 def init_db():
@@ -31,6 +31,7 @@ def init_db():
             "  created_at TEXT NOT NULL"
             ")"
         )
+        conn.commit()
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -95,7 +96,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    title = data.get("title")
+    if not isinstance(title, str):
+        title = ""
+    title = title.strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -123,6 +127,8 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
