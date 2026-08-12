@@ -19,3 +19,7 @@ export interface BuildOptions {
   outputDir?: string;
   templatesDir?: string;
 }
+
+export interface DevServerOptions extends BuildOptions {
+  port?: number;
+}
