@@ -50,4 +50,36 @@ This is **important**.
     expect(page).toContain('<li>one</li>');
     expect(page).toContain('<li>two</li>');
   });
+
+  it('renders a default Handlebars template, layout, and partial', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(content, 'hello.md'), '---\ntitle: Hello\n---\n<p>Markdown</p>');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '{{> header}}<section>{{{body}}}</section>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<html><body>{{{body}}}</body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+
+    await buildSite({ contentDir: content, outputDir: path.join(root, 'dist'), templatesDir: templates });
+    const page = await fs.readFile(path.join(root, 'dist', 'hello.html'), 'utf8');
+    expect(page).toBe('<html><body><header>Hello</header><section><p>Markdown</p></section></body></html>');
+  });
+
+  it('selects a page template and layout from frontmatter', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(content, { recursive: true });
+    await fs.writeFile(path.join(content, 'custom.md'), '---\ntitle: Custom\ntemplate: post.hbs\nlayout: bare\n---\nText');
+    await fs.writeFile(path.join(templates, 'post.hbs'), '<h1>{{title}}</h1>{{{content}}}');
+    await fs.writeFile(path.join(templates, 'layouts', 'bare.ejs'), '<main><%- body %></main>');
+
+    await buildSite({ contentDir: content, outputDir: path.join(root, 'dist'), templatesDir: templates });
+    const page = await fs.readFile(path.join(root, 'dist', 'custom.html'), 'utf8');
+    expect(page).toBe('<main><h1>Custom</h1><p>Text</p>\n</main>');
+  });
 });

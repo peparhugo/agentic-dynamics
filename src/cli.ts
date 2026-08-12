@@ -2,7 +2,7 @@
 import { buildSite } from './ssg';
 
 function usage(): never {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
   process.exit(1);
 }
 
@@ -11,15 +11,17 @@ async function main(): Promise<void> {
   if (args.shift() !== 'build') usage();
   let contentDir: string | undefined;
   let outputDir: string | undefined;
+  let templatesDir: string | undefined;
   while (args.length) {
     const option = args.shift();
-    if (option !== '--content' && option !== '--output') usage();
+    if (option !== '--content' && option !== '--output' && option !== '--templates') usage();
     const value = args.shift();
     if (!value || value.startsWith('--')) usage();
     if (option === '--content') contentDir = value;
-    else outputDir = value;
+    else if (option === '--output') outputDir = value;
+    else templatesDir = value;
   }
-  const pages = await buildSite({ contentDir, outputDir });
+  const pages = await buildSite({ contentDir, outputDir, templatesDir });
   console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
 }
 
