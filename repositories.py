@@ -140,16 +140,38 @@ class TaskRepository(BaseRepository):
                     "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
                 )
 
-    def list_for_owner(self, owner_id):
+    def list_for_owner(self, owner_id, cursor=None, limit=20):
         with self._connect() as connection:
-            return connection.execute(
+            parameters = [owner_id]
+            cursor_filter = ""
+            if cursor is not None:
+                cursor_filter = """
+                    AND (
+                        created_at < (SELECT created_at FROM tasks WHERE id = ?)
+                        OR (
+                            created_at = (SELECT created_at FROM tasks WHERE id = ?)
+                            AND id < ?
+                        )
+                    )
                 """
+                parameters.extend((cursor, cursor, cursor))
+            parameters.append(limit)
+            return connection.execute(
+                f"""
                 SELECT * FROM tasks
                 WHERE owner_id = ?
+                {cursor_filter}
                 ORDER BY created_at DESC, id DESC
+                LIMIT ?
                 """,
-                (owner_id,),
+                parameters,
             ).fetchall()
+
+    def count_for_owner(self, owner_id):
+        with self._connect() as connection:
+            return connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
 
     def get_for_owner(self, task_id, owner_id):
         with self._connect() as connection:

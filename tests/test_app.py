@@ -11,6 +11,7 @@ def client(tmp_path):
     task_app.DATABASE = os.fspath(tmp_path / "test.db")
     task_app.init_db()
     task_app.app.config["TESTING"] = True
+    task_app.limiter.reset()
     with task_app.app.test_client() as test_client:
         yield test_client
     task_app.DATABASE = original_database
@@ -70,7 +71,11 @@ def test_users_only_see_and_update_their_own_tasks(client):
         "/auth/login", json={"username": "bob", "password": "secret"}
     ).json["token"]
     headers = {"Authorization": f"Bearer {bob_token}"}
-    assert client.get("/tasks", headers=headers).json == []
+    assert client.get("/tasks", headers=headers).json == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task['id']}", headers=headers).status_code == 404
     assert client.put(
         f"/tasks/{task['id']}", json={"status": "done"}, headers=headers
@@ -108,7 +113,46 @@ def test_list_tasks_is_newest_first(auth_client):
     response = auth_client.get("/tasks")
 
     assert response.status_code == 200
-    assert [task["title"] for task in response.json] == ["Second", "First"]
+    assert [task["title"] for task in response.json["data"]] == ["Second", "First"]
+    assert response.json["next_cursor"] is None
+    assert response.json["total"] == 2
+
+
+def test_list_tasks_supports_cursor_pagination(auth_client):
+    for title in ("First", "Second", "Third"):
+        auth_client.post("/tasks", json={"title": title})
+
+    first_page = auth_client.get("/tasks?limit=2")
+    assert first_page.status_code == 200
+    assert [task["title"] for task in first_page.json["data"]] == ["Third", "Second"]
+    assert first_page.json["next_cursor"] == str(first_page.json["data"][-1]["id"])
+    assert first_page.json["total"] == 3
+
+    second_page = auth_client.get(
+        f"/tasks?cursor={first_page.json['next_cursor']}&limit=2"
+    )
+    last_task = second_page.json["data"][0]
+    assert [task["title"] for task in second_page.json["data"]] == ["First"]
+    assert second_page.json == {
+        "data": [last_task],
+        "next_cursor": None,
+        "total": 3,
+    }
+
+
+def test_list_tasks_rejects_invalid_pagination_parameters(auth_client):
+    assert auth_client.get("/tasks?limit=0").status_code == 400
+    assert auth_client.get("/tasks?limit=101").status_code == 400
+    assert auth_client.get("/tasks?cursor=not-an-id").status_code == 400
+
+
+def test_authenticated_user_is_rate_limited(auth_client):
+    for _ in range(100):
+        assert auth_client.get("/tasks").status_code == 200
+
+    limited = auth_client.get("/tasks")
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"]
 
 
 def test_get_task_and_missing_task(auth_client):

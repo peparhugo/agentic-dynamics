@@ -10,6 +10,7 @@ import json
 import os
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_tasks import send_notification_email
@@ -19,6 +20,7 @@ from repositories import DuplicateUserError, TaskRepository, UserRepository
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-this-development-secret")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 
 def init_db():
@@ -59,6 +61,34 @@ def decode_token(token):
     if decoded_header.get("alg") != "HS256" or not isinstance(decoded_payload.get("sub"), int):
         raise ValueError("invalid token claims")
     return decoded_payload
+
+
+def rate_limit_key():
+    """Use the authenticated user when possible, otherwise the client IP."""
+    authorization = request.headers.get("Authorization", "")
+    if authorization.startswith("Bearer "):
+        try:
+            return f"user:{decode_token(authorization[7:])['sub']}"
+        except (
+            ValueError,
+            KeyError,
+            TypeError,
+            binascii.Error,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+        ):
+            pass
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=REDIS_URL,
+    headers_enabled=True,
+    in_memory_fallback_enabled=True,
+)
 
 
 def require_auth(view):
@@ -147,8 +177,36 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    rows = TaskRepository(DATABASE).list_for_owner(g.user["id"])
-    return jsonify([task_json(row) for row in rows])
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer between 1 and 100"}), 400
+    if not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be an integer between 1 and 100"}), 400
+
+    raw_cursor = request.args.get("cursor")
+    cursor = None
+    if raw_cursor is not None:
+        try:
+            cursor = int(raw_cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be an integer"}), 400
+        if cursor < 1:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    repository = TaskRepository(DATABASE)
+    rows = repository.list_for_owner(g.user["id"], cursor=cursor, limit=limit + 1)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = str(rows[-1]["id"]) if has_more else None
+    return jsonify(
+        {
+            "data": [task_json(row) for row in rows],
+            "next_cursor": next_cursor,
+            "total": repository.count_for_owner(g.user["id"]),
+        }
+    )
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
