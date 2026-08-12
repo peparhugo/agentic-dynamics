@@ -64,4 +64,53 @@ describe('static site generator', () => {
     expect(result).toContain('<p>Text</p>');
     expect(result).toContain('<nav>Nav</nav>');
   });
+
+  it('skips unchanged pages and invalidates changed sources', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const cachePath = path.join(output, '.ssg-cache.json');
+    const first = JSON.parse(await fs.readFile(cachePath, 'utf8'));
+    expect(first.stats).toEqual(expect.objectContaining({ pagesBuilt: 2, pagesSkipped: 0 }));
+
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const second = JSON.parse(await fs.readFile(cachePath, 'utf8'));
+    expect(second.stats.pagesBuilt).toBe(0);
+    expect(second.stats.pagesSkipped).toBe(2);
+    expect(second.stats.timeSaved).toBeGreaterThanOrEqual(0);
+
+    await fs.writeFile(path.join(content, 'two.md'), '# Changed');
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const third = JSON.parse(await fs.readFile(cachePath, 'utf8'));
+    expect(third.stats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 1 }));
+    expect(await fs.readFile(path.join(output, 'two.html'), 'utf8')).toContain('<h1>Changed</h1>');
+  });
+
+  it('invalidates rendered pages when templates change and supports clean builds', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(content, 'page.md'), '# Page');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{html}}}</article>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section>{{{html}}}</section>');
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    const changed = JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8'));
+    expect(changed.stats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 0 }));
+    expect(await fs.readFile(path.join(output, 'page.html'), 'utf8')).toContain('<section>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, clean: true });
+    const clean = JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8'));
+    expect(clean.stats.pagesBuilt).toBe(1);
+    expect(clean.stats.pagesSkipped).toBe(0);
+  });
 });

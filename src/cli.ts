@@ -11,7 +11,7 @@ function argumentValue(args: string[], option: string): string | undefined {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] !== 'build' && args[0] !== 'serve') {
-    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] | ssg serve [--port <number>]');
+     throw new Error('Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>] | ssg serve [--port <number>]');
   }
   const content = argumentValue(args, '--content');
   const output = argumentValue(args, '--output');
@@ -27,8 +27,12 @@ async function main(): Promise<void> {
     process.stdout.write(`Serving ${path.resolve(output ?? './dist')} at http://localhost:${port}\n`);
     return;
   }
-  const pages = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
-  process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+  const started = Date.now();
+  const pages = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: args.includes('--incremental'), clean: args.includes('--clean') });
+  const cachePath = path.join(path.resolve(output ?? './dist'), '.ssg-cache.json');
+  let stats = { pagesBuilt: pages.length, pagesSkipped: 0, timeSaved: 0 };
+  try { stats = JSON.parse(await (await import('node:fs/promises')).readFile(cachePath, 'utf8')).stats ?? stats; } catch { /* stats are informational */ }
+  process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} (${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSaved}ms saved, ${Date.now() - started}ms total).\n`);
 }
 
 main().catch((error: unknown) => {

@@ -28,11 +28,15 @@ export class TemplatePlugin implements Plugin {
     const defaultTemplate = context.options.defaultTemplate;
     await Promise.all(context.pages.map(async (page: Page) => {
       const outputPath = path.join(context.outputDir, page.slug); await fs.mkdir(path.dirname(outputPath), { recursive: true });
+      const cached = context.cache.pages[page.sourcePath];
+      if (context.renderCacheEnabled && context.stats.pagesSkipped > 0 && cached?.renderedHtml !== undefined && cached.page.slug === page.slug) { await fs.writeFile(outputPath, cached.renderedHtml); return; }
+      const started = Date.now();
       const metadata = [page.date ? `<p class="date">${escapeHtml(page.date)}</p>` : '', page.tags.length ? `<p class="tags">${page.tags.map(escapeHtml).join(', ')}</p>` : ''].join('');
       const content = `<main><h1>${escapeHtml(page.title)}</h1>${metadata}${page.html}</main>`;
       const data: Context = { ...(page.data ?? {}), ...page, content, body: content }; const selected = await template(context.templatesDir, page.template ?? defaultTemplate); let body = selected ? (selected.extension === '.ejs' ? ejs(selected.source, data, partialMap) : handlebars(selected.source, data, partialMap)) : content;
       const layout = await template(context.templatesDir, page.layout ?? 'default', 'layouts'); if (layout) { const layoutData = { ...data, body }; body = layout.extension === '.ejs' ? ejs(layout.source, layoutData, partialMap) : handlebars(layout.source, layoutData, partialMap); }
-      await fs.writeFile(outputPath, selected || layout ? body : document(page.title, body));
+      const rendered = selected || layout ? body : document(page.title, body); await fs.writeFile(outputPath, rendered);
+      if (cached) { cached.page = page; cached.renderedHtml = rendered; cached.renderDurationMs = Date.now() - started; }
     }));
     const links = context.pages.map((p) => `<li><a href="${escapeHtml(p.slug)}">${escapeHtml(p.title)}</a>${p.date ? ` <time>${escapeHtml(p.date)}</time>` : ''}</li>`).join('\n');
     await fs.writeFile(path.join(context.outputDir, 'index.html'), document('Home', `<main><h1>Pages</h1><ul>${links}</ul></main>`));

@@ -7,6 +7,29 @@ export interface BuildContext {
   templatesDir: string;
   files: string[];
   pages: Page[];
+  cache: BuildCache;
+  stats: BuildStats;
+  renderCacheEnabled: boolean;
+}
+
+export interface CachePage {
+  sourceHash: string;
+  templateHash: string;
+  page: Page;
+  renderedHtml?: string;
+  renderDurationMs?: number;
+}
+
+export interface BuildCache {
+  version: 1;
+  pages: Record<string, CachePage>;
+  stats?: BuildStats;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSaved: number;
 }
 
 export interface Plugin {
