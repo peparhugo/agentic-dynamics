@@ -1,0 +1,7 @@
+#!/usr/bin/env node
+const cli = require('../lib/cli.js');
+
+cli.run(process.argv.slice(2)).catch((error) => {
+  process.stderr.write(`Error: ${error.message}\n`);
+  process.exit(1);
+});
