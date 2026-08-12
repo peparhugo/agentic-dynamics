@@ -19,13 +19,14 @@ Session 3: Added async email notifications.
 from functools import wraps
 
 from flask import Flask, request, jsonify, g
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone, datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 import jwt
 
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -88,7 +89,22 @@ def init_db():
         conn.commit()
 
 
+# ── Repositories ──────────────────────────────────────────────
+#
+# All SQL lives in the repository classes. ``get_db`` is injected as a
+# factory rather than baked in, so repositories always pick up the
+# *current* value of ``DATABASE`` (e.g. when tests monkeypatch it) instead
+# of a stale connection/path captured at import time.
+
+user_repository = UserRepository(get_db)
+task_repository = TaskRepository(get_db)
+
+
 # ── User model ────────────────────────────────────────────────
+#
+# Thin wrappers around UserRepository, kept as module-level functions so
+# callers (routes, tests) have a stable, storage-agnostic API. No SQL
+# appears here or in the routes below — it all lives in UserRepository.
 
 def create_user(username: str, password: str, email: str | None = None) -> dict:
     password_hash = generate_password_hash(password)
@@ -96,27 +112,17 @@ def create_user(username: str, password: str, email: str | None = None) -> dict:
     # user has *some* email on file for notifications (registration keeps
     # working without callers needing to change).
     email = email or f"{username}@example.com"
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username, "email": email}
+    return user_repository.create(
+        username=username, password_hash=password_hash, email=email
+    )
 
 
 def get_user_by_username(username: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        return dict(row) if row else None
+    return user_repository.get_by_username(username)
 
 
 def get_user_by_id(user_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(row) if row else None
+    return user_repository.get_by_id(user_id)
 
 
 # ── JWT helpers ───────────────────────────────────────────────
@@ -163,39 +169,20 @@ def token_required(f):
 
 
 # ── Task model ────────────────────────────────────────────────
+#
+# Thin wrappers around TaskRepository. No SQL here or in the routes below
+# — it all lives in TaskRepository.
 
 def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    return task_repository.create(title=title, owner_id=owner_id)
 
 
 def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    return task_repository.get_all_for_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-        return dict(row) if row else None
+    return task_repository.get_by_id_for_owner(task_id, owner_id)
 
 
 def update_task(
@@ -204,27 +191,7 @@ def update_task(
     title: str | None = None,
     status: str | None = None,
 ) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            params.append(owner_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-                params,
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return task_repository.update(task_id, owner_id, title=title, status=status)
 
 
 # ── Auth routes ───────────────────────────────────────────────
