@@ -106,10 +106,30 @@ class TaskRepository(BaseRepository):
     def for_owner(self, owner_id):
         with self.connection() as connection:
             rows = connection.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
+                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC",
                 (owner_id,),
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def page_for_owner(self, owner_id, cursor=None, limit=20):
+        with self.connection() as connection:
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            if cursor is None:
+                rows = connection.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit),
+                ).fetchall()
+            data = [dict(row) for row in rows]
+            next_cursor = str(data[-1]["id"]) if len(data) == limit else None
+            return data, next_cursor, total
 
     def get_for_owner(self, task_id, owner_id):
         with self.connection() as connection:

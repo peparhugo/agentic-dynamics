@@ -10,6 +10,7 @@ import app
 def client(tmp_path, monkeypatch):
     database = tmp_path / "tasks.db"
     monkeypatch.setattr(app, "DATABASE", str(database))
+    app.limiter.reset()
     app.init_db()
     return app.app.test_client()
 
@@ -65,7 +66,8 @@ def test_create_and_list_tasks(client):
     assert response.status_code == 201
     assert response.get_json()["status"] == "pending"
     assert response.get_json()["owner_id"] == 1
-    assert client.get("/tasks", headers=headers).get_json()[0]["title"] == "First task"
+    response = client.get("/tasks", headers=headers)
+    assert response.get_json()["data"][0]["title"] == "First task"
 
 
 def test_missing_title_returns_json_error(client):
@@ -124,7 +126,9 @@ def test_users_only_see_and_modify_their_own_tasks(client):
     register(client, "bob")
     bob_headers = auth(login(client, "bob"))
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [], "next_cursor": None, "total": 0
+    }
     assert client.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"title": "Stolen"}, headers=bob_headers).status_code == 404
 
@@ -155,3 +159,39 @@ def test_database_migration_and_wal_preserve_existing_tasks(tmp_path, monkeypatc
         assert "owner_id" in columns
         assert connection.execute("SELECT title FROM tasks WHERE id = 1").fetchone()[0] == "Legacy"
         assert connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+
+
+def test_tasks_are_cursor_paginated(client):
+    register(client)
+    headers = auth(login(client))
+    for title in ("one", "two", "three"):
+        client.post("/tasks", json={"title": title}, headers=headers)
+
+    first = client.get("/tasks?limit=2", headers=headers).get_json()
+    assert [task["title"] for task in first["data"]] == ["three", "two"]
+    assert first["total"] == 3
+    assert first["next_cursor"] == str(first["data"][-1]["id"])
+
+    second = client.get(
+        f"/tasks?cursor={first['next_cursor']}&limit=2", headers=headers
+    ).get_json()
+    assert [task["title"] for task in second["data"]] == ["one"]
+    assert second["next_cursor"] is None
+
+
+def test_tasks_pagination_validates_parameters(client):
+    register(client)
+    headers = auth(login(client))
+    assert client.get("/tasks?limit=101", headers=headers).status_code == 400
+    assert client.get("/tasks?cursor=invalid", headers=headers).status_code == 400
+
+
+def test_rate_limit_returns_retry_after_for_authenticated_user(client):
+    register(client)
+    headers = auth(login(client))
+    app.limiter.reset()
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+    response = client.get("/tasks", headers=headers)
+    assert response.status_code == 429
+    assert response.headers.get("Retry-After")

@@ -9,6 +9,8 @@ import os
 import logging
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from tasks import send_notification_email
@@ -20,6 +22,23 @@ logger = logging.getLogger(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_EXPIRATION_HOURS = 24
+RATE_LIMIT = "100 per minute"
+
+
+def rate_limit_key():
+    """Use the authenticated user when available, including for task routes."""
+    user = get_authenticated_user()
+    identity = f"user:{user['id']}" if user else f"ip:{get_remote_address()}"
+    return f"{DATABASE}:{identity}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=[RATE_LIMIT],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", os.environ.get("REDIS_URL", "redis://localhost:6379/0")),
+    headers_enabled=True,
+)
 
 
 def get_db():
@@ -29,6 +48,15 @@ def get_db():
 def init_db():
     """Create the schema and migrate databases created by older versions."""
     initialize_database(DATABASE)
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    if error.retry_after is not None:
+        response.headers["Retry-After"] = str(error.retry_after)
+    return response
 
 
 def _encode_part(value):
@@ -142,7 +170,23 @@ def update_task(task_id, owner_id, title=None, status=None):
 
 @app.get("/tasks")
 def list_tasks():
-    return jsonify(get_tasks(g.user["id"]))
+    cursor = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        limit = int(limit_value)
+        if limit < 1 or limit > 100:
+            raise ValueError
+        if cursor is not None:
+            cursor = int(cursor)
+            if cursor < 1:
+                raise ValueError
+    except (TypeError, ValueError):
+        return jsonify({"error": "cursor must be a positive integer and limit must be between 1 and 100"}), 400
+
+    data, next_cursor, total = TaskRepository(DATABASE).page_for_owner(
+        g.user["id"], cursor, limit
+    )
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.post("/tasks")
