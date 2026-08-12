@@ -20,6 +20,16 @@ export interface BuildOptions {
   templatesDir?: string;
   configFile?: string;
   plugins?: unknown[];
+  incremental?: boolean;
+  clean?: boolean;
+  onStats?: (stats: BuildStats) => void;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+  durationMs: number;
 }
 
 export interface DevServerOptions extends BuildOptions {

@@ -64,4 +64,48 @@ describe('static site generator', () => {
       '<main data-title="Home"><h1>Welcome</h1>\n</main>',
     );
   });
+
+  it('skips unchanged pages and rebuilds only changed sources', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'dist');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(content, 'first.md'), '# First');
+    await fs.writeFile(path.join(content, 'second.md'), '# Second');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '{{{content}}}');
+
+    const firstStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, onStats: (stats) => firstStats.push(stats) });
+    expect(firstStats[0]).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8')).pages['first.md'].frontmatter.title).toBe('First');
+
+    const secondStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, onStats: (stats) => secondStats.push(stats) });
+    expect(secondStats[0]).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await fs.writeFile(path.join(content, 'second.md'), '# Updated');
+    const thirdStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, onStats: (stats) => thirdStats.push(stats) });
+    expect(thirdStats[0]).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(await fs.readFile(path.join(output, 'second.html'), 'utf8')).toContain('Updated');
+  });
+
+  it('invalidates all rendered pages when a template changes', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'dist');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(content, 'page.md'), '# Page');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<div>{{{content}}}</div>');
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section>{{{content}}}</section>');
+    const stats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, onStats: (value) => stats.push(value) });
+    expect(stats[0]).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+    expect(await fs.readFile(path.join(output, 'page.html'), 'utf8')).toContain('<section>');
+  });
 });
