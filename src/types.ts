@@ -1,3 +1,5 @@
+import type { Plugin } from './plugin';
+
 export interface Page {
   slug: string;
   title: string;
@@ -14,4 +16,6 @@ export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templateDir?: string;
+  plugins?: Plugin[];
+  configFile?: string;
 }

@@ -1,9 +1,9 @@
 export {
+  DevServerPlugin,
   RELOAD_PATH,
   RELOAD_SCRIPT,
-  DevServerPlugin,
   injectReloadScript,
   startDevServer,
   type DevServer,
   type ServeOptions,
-} from './plugins/dev-server';
+} from '../src/plugins/dev-server';
