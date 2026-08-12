@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
+import fsSync from 'fs';
 import path from 'path';
-import matter from 'gray-matter';
-import { marked } from 'marked';
+import { MarkdownPlugin, markdownFiles, setMarkdownSource } from './plugins/markdown';
+import { TemplatePlugin, getRenderedHtml } from './plugins/template';
+import { Plugin, PluginContext, resolveBuildOptions } from './plugin';
 
 export interface Frontmatter {
   title?: string;
@@ -28,59 +30,18 @@ export interface BuildOptions {
   outputDir?: string;
   templatesDir?: string;
   defaultTemplate?: string;
+  configFile?: string;
+  plugins?: Plugin[];
 }
 
 export interface BuildResult {
   pages: Page[];
   indexPath: string;
 }
+export { parseMarkdown } from './plugins/markdown';
+export type { Plugin, PluginContext } from './plugin';
 
-function normalizeTags(value: Frontmatter['tags']): string[] {
-  if (Array.isArray(value)) return value.map(String);
-  if (typeof value === 'string') return value.split(',').map((tag) => tag.trim()).filter(Boolean);
-  return [];
-}
-
-function formatDate(value: Frontmatter['date']): string | undefined {
-  if (!value) return undefined;
-  return value instanceof Date ? value.toISOString().slice(0, 10) : String(value);
-}
-
-const pageFrontmatter = new WeakMap<Page, Frontmatter>();
-
-export function parseMarkdown(source: string, sourcePath = ''): Page {
-  const parsed = matter(source);
-  const data = parsed.data as Frontmatter;
-  const title = typeof data.title === 'string' && data.title.trim()
-    ? data.title.trim()
-    : path.basename(sourcePath, path.extname(sourcePath));
-
-  const page: Page = {
-    sourcePath,
-    outputPath: sourcePath.replace(/\.md$/i, '.html'),
-    title,
-    date: formatDate(data.date),
-    tags: normalizeTags(data.tags),
-    html: marked.parse(parsed.content),
-    template: typeof data.template === 'string' ? data.template : undefined,
-    layout: typeof data.layout === 'string' ? data.layout : undefined,
-  };
-  pageFrontmatter.set(page, data);
-  return page;
-}
-
-async function markdownFiles(directory: string): Promise<string[]> {
-  const entries = await fs.readdir(directory, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...await markdownFiles(entryPath));
-    else if (entry.isFile() && /\.md$/i.test(entry.name)) files.push(entryPath);
-  }
-  return files.sort();
-}
-
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[character] as string));
@@ -103,121 +64,76 @@ function indexDocument(pages: Page[]): string {
   return document('Index', `<main>\n<h1>Pages</h1>\n<ul>\n${links}\n</ul>\n</main>`);
 }
 
-type TemplateValue = Record<string, unknown>;
-
-function lookup(context: TemplateValue, key: string): unknown {
-  if (key === 'this' || key === '.') return context;
-  return key.split('.').reduce<unknown>((value, part) => {
-    if (part === 'this') return value;
-    if (value && typeof value === 'object') return (value as Record<string, unknown>)[part];
-    return undefined;
-  }, context);
-}
-
-function escapeTemplate(value: unknown): string {
-  return escapeHtml(value == null ? '' : String(value));
-}
-
-function truthy(value: unknown): boolean {
-  return Boolean(value) && (!Array.isArray(value) || value.length > 0);
-}
-
-// A small Handlebars-compatible renderer keeps the generator usable without a runtime plugin.
-function renderTemplate(source: string, context: TemplateValue, partials: Map<string, string>): string {
-  const renderBlock = (input: string, scope: TemplateValue): string => {
-    let output = input;
-    const blockPattern = /{{#(if|each)\s+([^}]+)}}([\s\S]*?){{\/\1}}/g;
-    output = output.replace(blockPattern, (_match, type: string, expression: string, content: string) => {
-      const value = lookup(scope, expression.trim());
-      if (type === 'if') return truthy(value) ? renderBlock(content, scope) : '';
-      if (!Array.isArray(value)) return '';
-      return value.map((item) => renderBlock(content, typeof item === 'object' && item !== null
-        ? { ...scope, ...(item as TemplateValue), this: item }
-        : { ...scope, this: item })).join('');
-    });
-    output = output.replace(/{{>\s*([\w./-]+)\s*}}/g, (_match, name: string) => {
-      const partial = partials.get(name);
-      return partial === undefined ? '' : renderBlock(partial, scope);
-    });
-    output = output.replace(/{{{\s*([^}]+?)\s*}}}/g, (_match, expression: string) => {
-      const value = lookup(scope, expression.trim());
-      return value == null ? '' : String(value);
-    });
-    return output.replace(/{{\s*([^{}]+?)\s*}}/g, (_match, expression: string) => {
-      const value = lookup(scope, expression.trim());
-      return escapeTemplate(value);
-    });
-  };
-  return renderBlock(source, context);
-}
-
-async function loadTemplates(directory: string): Promise<Map<string, string>> {
-  const result = new Map<string, string>();
-  let entries;
-  try {
-    entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return result;
-    throw error;
+export async function buildSite(options: BuildOptions = {}): Promise<BuildResult> {
+  const resolved = resolveBuildOptions(options);
+  const configuredPlugins = await loadConfiguredPlugins(resolved.configFile, resolved.plugins);
+  const plugins = [new MarkdownPlugin(), ...configuredPlugins, new TemplatePlugin()];
+  const context: PluginContext = { options: resolved, pages: [] };
+  await runLifecycle(plugins, 'onStart', context);
+  await runLifecycle(plugins, 'beforeBuild', context);
+  const sourceFiles = await markdownFiles(resolved.contentDir);
+  for (const sourcePath of sourceFiles) {
+    const source = await fs.readFile(sourcePath, 'utf8');
+    const relativePath = path.relative(resolved.contentDir, sourcePath);
+    let page: Page = { sourcePath: relativePath, outputPath: relativePath.replace(/\.md$/i, '.html'), title: path.basename(relativePath, path.extname(relativePath)), tags: [], html: '' };
+    setMarkdownSource(page, source);
+    for (const plugin of plugins) {
+      if (plugin.onFile) page = (await plugin.onFile(page, context)) ?? page;
+      setMarkdownSource(page, source);
+    }
+    context.pages.push(page);
   }
-  for (const entry of entries) {
-    if (!entry.isFile() || !/\.(hbs|ejs)$/i.test(entry.name)) continue;
-    const name = entry.name.replace(/\.(hbs|ejs)$/i, '');
-    result.set(name, await fs.readFile(path.join(directory, entry.name), 'utf8'));
+  context.pages.sort((a, b) => a.outputPath.localeCompare(b.outputPath));
+  await fs.mkdir(resolved.outputDir, { recursive: true });
+  for (const page of context.pages) {
+    const destination = path.join(resolved.outputDir, page.outputPath);
+    await fs.mkdir(path.dirname(destination), { recursive: true });
+    await fs.writeFile(destination, getRenderedHtml(page) ?? pageDocument(page), 'utf8');
   }
+  const indexPath = path.join(resolved.outputDir, 'index.html');
+  await fs.writeFile(indexPath, indexDocument(context.pages), 'utf8');
+  const result = { pages: context.pages, indexPath };
+  context.result = result;
+  await runLifecycle(plugins, 'afterBuild', context);
+  await runLifecycle(plugins, 'onEnd', context);
   return result;
 }
 
-async function renderWithTemplates(
-  page: Page,
-  templatesDir: string,
-  defaultTemplate: string,
-): Promise<string | undefined> {
-  const templates = await loadTemplates(templatesDir);
-  const partials = await loadTemplates(path.join(templatesDir, 'partials'));
-  const selected = page.template || defaultTemplate;
-  const template = templates.get(selected.replace(/\.(hbs|ejs)$/i, ''));
-  if (template === undefined) {
-    if (page.template) throw new Error(`Template not found: ${page.template}`);
-    return undefined;
-  }
-  const context: TemplateValue = {
-    ...pageFrontmatter.get(page),
-    page,
-    title: page.title,
-    date: page.date,
-    tags: page.tags,
-    body: page.html,
-  };
-  let rendered = renderTemplate(template, context, partials);
-  if (page.layout) {
-    const layouts = await loadTemplates(path.join(templatesDir, 'layouts'));
-    const layout = layouts.get(page.layout.replace(/\.(hbs|ejs)$/i, ''));
-    if (layout === undefined) throw new Error(`Layout not found: ${page.layout}`);
-    rendered = renderTemplate(layout, { ...context, body: rendered }, partials);
-  }
-  return rendered;
+async function runLifecycle(plugins: Plugin[], hook: 'onStart' | 'beforeBuild' | 'afterBuild' | 'onEnd', context: PluginContext): Promise<void> {
+  for (const plugin of plugins) if (plugin[hook]) await plugin[hook]!(context);
 }
 
-export async function buildSite(options: BuildOptions = {}): Promise<BuildResult> {
-  const contentDir = path.resolve(options.contentDir ?? './content');
-  const outputDir = path.resolve(options.outputDir ?? './dist');
-  const templatesDir = path.resolve(options.templatesDir ?? './templates');
-  const defaultTemplate = options.defaultTemplate ?? 'default';
-  const sourceFiles = await markdownFiles(contentDir);
-  const pages = await Promise.all(sourceFiles.map(async (sourcePath) => {
-    const source = await fs.readFile(sourcePath, 'utf8');
-    const relativePath = path.relative(contentDir, sourcePath);
-    const page = parseMarkdown(source, relativePath);
-    const destination = path.join(outputDir, page.outputPath);
-    await fs.mkdir(path.dirname(destination), { recursive: true });
-    const templated = await renderWithTemplates(page, templatesDir, defaultTemplate);
-    await fs.writeFile(destination, templated ?? pageDocument(page), 'utf8');
-    return page;
-  }));
-  pages.sort((a, b) => a.outputPath.localeCompare(b.outputPath));
-  await fs.mkdir(outputDir, { recursive: true });
-  const indexPath = path.join(outputDir, 'index.html');
-  await fs.writeFile(indexPath, indexDocument(pages), 'utf8');
-  return { pages, indexPath };
+async function loadConfiguredPlugins(configFile: string, explicit: Plugin[]): Promise<Plugin[]> {
+  if (explicit.length) return explicit;
+  let configPath = path.resolve(configFile);
+  if (!fsSync.existsSync(configPath) && configPath.endsWith('.ts') && fsSync.existsSync(configPath.replace(/\.ts$/, '.js'))) configPath = configPath.replace(/\.ts$/, '.js');
+  let loaded: Record<string, unknown>;
+  try { loaded = loadConfigModule(configPath); } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'MODULE_NOT_FOUND') return [];
+    throw error;
+  }
+  const value: unknown = loaded.default ?? loaded.plugins ?? loaded;
+  const values = Array.isArray(value) ? value : [value];
+  return values.flatMap((item) => {
+    if (typeof item === 'function') return [item() as Plugin];
+    if (item && typeof item === 'object' && 'plugins' in item && Array.isArray(item.plugins)) return item.plugins as Plugin[];
+    return item ? [item as Plugin] : [];
+  });
+}
+
+function loadConfigModule(configPath: string): Record<string, unknown> {
+  if (!configPath.endsWith('.ts')) return require(configPath) as Record<string, unknown>;
+  const previous = require.extensions['.ts'];
+  require.extensions['.ts'] = (module: NodeModule, filename: string): void => {
+    // This keeps the CLI able to consume the TypeScript config it advertises.
+    const typescript = require('typescript') as typeof import('typescript');
+    const source = fsSync.readFileSync(filename, 'utf8');
+    const output = typescript.transpileModule(source, { compilerOptions: { module: typescript.ModuleKind.CommonJS, target: typescript.ScriptTarget.ES2020 } });
+    module._compile(output.outputText, filename);
+  };
+  try { return require(configPath) as Record<string, unknown>; }
+  finally {
+    if (previous) require.extensions['.ts'] = previous;
+    else delete require.extensions['.ts'];
+  }
 }
