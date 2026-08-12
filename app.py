@@ -9,11 +9,12 @@ import uuid
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 from websockets.asyncio.server import ServerConnection, serve
 
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def timestamp() -> str:
@@ -24,11 +25,22 @@ class _HealthHandler(BaseHTTPRequestHandler):
     server_version = "NotificationHealth/1.0"
 
     def do_GET(self) -> None:  # noqa: N802 - required by BaseHTTPRequestHandler
-        if self.path != "/health":
+        owner: NotificationServer = self.server.owner  # type: ignore[attr-defined]
+        path = urlparse(self.path).path
+        if path == "/health":
+            body_data = {"connected_clients": owner.client_count}
+        elif path == "/channels":
+            body_data = {"channels": owner.channel_counts()}
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            channel = unquote(path[len("/channels/"):-len("/subscribers")])
+            if not channel or "/" in channel:
+                self.send_error(404)
+                return
+            body_data = {"subscribers": owner.channel_subscribers(channel)}
+        else:
             self.send_error(404)
             return
-        owner: NotificationServer = self.server.owner  # type: ignore[attr-defined]
-        body = json.dumps({"connected_clients": owner.client_count}).encode()
+        body = json.dumps(body_data).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -59,6 +71,8 @@ class NotificationServer:
         self.http_port = http_port
         self.registry_lock = threading.Lock()
         self.clients: dict[str, ServerConnection] = {}
+        self.client_channels: dict[str, set[str]] = {}
+        self.channels: dict[str, set[str]] = {}
         self._websocket_server = None
         self._health_server: _HealthServer | None = None
         self._health_thread: threading.Thread | None = None
@@ -67,6 +81,15 @@ class NotificationServer:
     def client_count(self) -> int:
         with self.registry_lock:
             return len(self.clients)
+
+    def channel_counts(self) -> dict[str, int]:
+        with self.registry_lock:
+            return {name: len(subscribers) for name, subscribers in self.channels.items()
+                    if subscribers}
+
+    def channel_subscribers(self, channel: str) -> list[str]:
+        with self.registry_lock:
+            return sorted(self.channels.get(channel, set()))
 
     async def start(self) -> None:
         self._websocket_server = await serve(
@@ -90,6 +113,8 @@ class NotificationServer:
         with self.registry_lock:
             connections = list(self.clients.values())
             self.clients.clear()
+            self.client_channels.clear()
+            self.channels.clear()
         await asyncio.gather(*(connection.close() for connection in connections),
                              return_exceptions=True)
         if self._health_server is not None:
@@ -102,6 +127,7 @@ class NotificationServer:
         client_id = str(uuid.uuid4())
         with self.registry_lock:
             self.clients[client_id] = connection
+            self.client_channels[client_id] = set()
         await connection.send(self._message("system", {
             "event": "connected", "client_id": client_id
         }))
@@ -111,6 +137,12 @@ class NotificationServer:
         finally:
             with self.registry_lock:
                 self.clients.pop(client_id, None)
+                for channel in self.client_channels.pop(client_id, set()):
+                    subscribers = self.channels.get(channel)
+                    if subscribers is not None:
+                        subscribers.discard(client_id)
+                        if not subscribers:
+                            self.channels.pop(channel, None)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -120,24 +152,52 @@ class NotificationServer:
         if not isinstance(message, dict):
             return
         message_type = message.get("type")
-        payload = message.get("payload")
+        payload = message.get("payload", {})
         if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict):
+            return
+        channel = message.get("channel", payload.get("channel"))
+        if message_type in {"subscribe", "unsubscribe"}:
+            if not isinstance(channel, str) or not channel:
+                return
+            with self.registry_lock:
+                if sender_id not in self.clients:
+                    return
+                subscribed = self.client_channels.setdefault(sender_id, set())
+                if message_type == "subscribe":
+                    subscribed.add(channel)
+                    self.channels.setdefault(channel, set()).add(sender_id)
+                else:
+                    subscribed.discard(channel)
+                    subscribers = self.channels.get(channel)
+                    if subscribers is not None:
+                        subscribers.discard(sender_id)
+                        if not subscribers:
+                            self.channels.pop(channel, None)
             return
         outgoing = {
             "type": message_type,
             "payload": payload,
             "timestamp": message.get("timestamp") or timestamp(),
         }
+        if isinstance(channel, str) and channel:
+            outgoing["channel"] = channel
         encoded = json.dumps(outgoing)
         if message_type == "direct":
             target_id = payload.get("client_id") or payload.get("target_id")
             with self.registry_lock:
                 target = self.clients.get(target_id)
+                if channel:
+                    target = target if target_id in self.channels.get(channel, set()) else None
             if target is not None:
                 await target.send(encoded)
             return
         with self.registry_lock:
-            recipients = list(self.clients.values())
+            if isinstance(channel, str) and channel:
+                recipients = [self.clients[client_id]
+                              for client_id in self.channels.get(channel, set())
+                              if client_id in self.clients]
+            else:
+                recipients = list(self.clients.values())
         await asyncio.gather(*(client.send(encoded) for client in recipients),
                              return_exceptions=True)
 
