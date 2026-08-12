@@ -86,6 +86,40 @@ class TaskRepository(BaseRepository):
                 (owner_id,),
             ).fetchall()
 
+    def count_for_owner(self, owner_id):
+        """Count the tasks belonging to the given owner."""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+        return row["total"]
+
+    def list_for_owner_page(
+        self, owner_id, limit, before_created_at=None, before_id=None
+    ):
+        """Fetch a page of a user's tasks, newest first.
+
+        Rows are ordered by ``created_at DESC, id DESC``. When a cursor is
+        supplied the page only contains tasks that sort strictly before the
+        cursor row (the id of the last item on the previous page).
+        """
+        if before_created_at is not None and before_id is not None:
+            query = (
+                "SELECT * FROM tasks WHERE owner_id = ? AND "
+                "(created_at < ? OR (created_at = ? AND id < ?)) "
+                "ORDER BY created_at DESC, id DESC LIMIT ?"
+            )
+            params = (owner_id, before_created_at, before_created_at, before_id, limit)
+        else:
+            query = (
+                "SELECT * FROM tasks WHERE owner_id = ? "
+                "ORDER BY created_at DESC, id DESC LIMIT ?"
+            )
+            params = (owner_id, limit)
+        with self._connect() as conn:
+            return conn.execute(query, params).fetchall()
+
 
 class UserRepository(BaseRepository):
     """Data access for the users table."""

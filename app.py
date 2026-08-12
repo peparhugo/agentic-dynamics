@@ -5,9 +5,16 @@ Endpoints:
     POST /auth/register       create a user
     POST /auth/login          obtain a JWT token
     POST /tasks               create a task (auth required)
-    GET  /tasks               list own tasks ordered by created_at desc (auth required)
+    GET  /tasks               list own tasks, cursor-paginated (auth required)
     GET  /tasks/{id}          get a single task (auth required)
     PUT  /tasks/{id}          update task title and/or status (auth required)
+
+Rate limiting:
+    Every endpoint is limited to 100 requests per minute per authenticated
+    user (or per client IP for unauthenticated requests such as login and
+    register). Exceeding the limit returns 429 with a Retry-After header.
+    Flask-Limiter uses Redis as the storage backend; override the storage
+    URI with the RATELIMIT_STORAGE_URI environment variable.
 """
 
 import os
@@ -18,15 +25,21 @@ from functools import wraps
 import bcrypt
 import jwt
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
 
 from tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24
+
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+)
 
 
 SCHEMA = """
@@ -80,6 +93,37 @@ def init_db():
         conn.commit()
 
 
+# ── Rate limiting ───────────────────────────────────────────────
+
+def rate_limit_key():
+    """Identify the caller for rate limiting: user id, else client IP."""
+    user = getattr(request, "user", None)
+    if user is not None:
+        return f"user:{user['id']}"
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+def default_rate_limits():
+    """Default per-key limit, configurable via RATELIMIT_DEFAULT."""
+    return app.config.get("RATELIMIT_DEFAULT", "100 per minute")
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=[default_rate_limits],
+    storage_uri=RATELIMIT_STORAGE_URI,
+)
+
+
+@app.before_request
+def load_current_user():
+    """Populate request.user (if any) before the limiter keys the request."""
+    request.user = current_user()
+
+
+limiter.init_app(app)
+
+
 # ── Auth helpers ─────────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
@@ -125,10 +169,9 @@ def current_user():
 def auth_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        user = current_user()
+        user = getattr(request, "user", None)
         if user is None:
             return jsonify({"error": "authentication required"}), 401
-        request.user = user
         return f(*args, **kwargs)
 
     return wrapper
@@ -214,8 +257,43 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks():
-    rows = task_repository.list_for_owner(request.user["id"])
-    return jsonify([serialize_task(r) for r in rows])
+    owner_id = request.user["id"]
+
+    try:
+        limit = int(request.args.get("limit", "20"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer"}), 400
+    if limit < 1:
+        return jsonify({"error": "limit must be at least 1"}), 400
+    limit = min(limit, 100)
+
+    cursor = request.args.get("cursor")
+    before_created_at = None
+    before_id = None
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+        cursor_row = task_repository.get_owned(cursor_id, owner_id)
+        if cursor_row is None:
+            return jsonify({"error": "invalid cursor"}), 400
+        before_created_at = cursor_row["created_at"]
+        before_id = cursor_id
+
+    rows = task_repository.list_for_owner_page(
+        owner_id, limit + 1, before_created_at, before_id
+    )
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = str(page[-1]["id"]) if has_more and page else None
+    total = task_repository.count_for_owner(owner_id)
+
+    return jsonify({
+        "data": [serialize_task(r) for r in page],
+        "next_cursor": next_cursor,
+        "total": total,
+    })
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
@@ -259,6 +337,16 @@ def not_found(e):
 @app.errorhandler(405)
 def method_not_allowed(e):
     return jsonify({"error": "method not allowed"}), 405
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    if response.headers.get("Retry-After") is None:
+        retry_after = getattr(e, "retry_after", None)
+        if retry_after is not None:
+            response.headers["Retry-After"] = str(int(retry_after))
+    return response, 429
 
 
 if __name__ == "__main__":
