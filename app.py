@@ -13,8 +13,9 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Iterable
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from redis.asyncio import Redis
@@ -180,6 +181,59 @@ class ClientRegistry:
             return len(self._clients)
 
 
+class BaseTransport(ABC):
+    """Delivery interface used by the notification protocol."""
+
+    @abstractmethod
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        """Register a newly connected client with the transport."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Remove a client from the transport."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> None:
+        """Deliver an encoded message to one client."""
+
+    @abstractmethod
+    async def broadcast(self, message: str, client_ids: Iterable[str]) -> None:
+        """Deliver an encoded message to the selected clients."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport."""
+
+    def __init__(self) -> None:
+        self._connections: dict[str, ServerConnection] = {}
+
+    async def on_connect(self, client_id: str, connection: ServerConnection) -> None:
+        self._connections[client_id] = connection
+
+    async def on_disconnect(self, client_id: str) -> None:
+        self._connections.pop(client_id, None)
+
+    async def send_message(self, client_id: str, message: str) -> None:
+        connection = self._connections.get(client_id)
+        if connection is not None:
+            await connection.send(message)
+
+    async def broadcast(self, message: str, client_ids: Iterable[str]) -> None:
+        connections = [
+            self._connections[client_id]
+            for client_id in client_ids
+            if client_id in self._connections
+        ]
+        if connections:
+            await asyncio.gather(
+                *(connection.send(message) for connection in connections),
+                return_exceptions=True,
+            )
+
+
+TRANSPORTS: dict[str, type[BaseTransport]] = {"websocket": WebSocketTransport}
+
+
 def make_message(
     message_type: str, payload: dict[str, Any], channel: str | None = None
 ) -> dict[str, Any]:
@@ -192,10 +246,11 @@ def make_message(
 
 
 class NotificationServer:
-    """WebSocket notification server with broadcast and direct delivery."""
+    """Notification server with transport-independent notification logic."""
 
     def __init__(self, host: str = "localhost", port: int = 8765,
-                 redis_url: str | None = None, database_url: str | None = None) -> None:
+                 redis_url: str | None = None, database_url: str | None = None,
+                 transport: BaseTransport | None = None) -> None:
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
@@ -203,6 +258,11 @@ class NotificationServer:
         self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
         self.broker: RedisBroker | None = None
         self._server: Any = None
+        transport_name = os.getenv("TRANSPORT", "websocket").strip().lower()
+        transport_type = TRANSPORTS.get(transport_name)
+        if transport is None and transport_type is None:
+            raise ValueError(f"unsupported transport: {transport_name}")
+        self.transport: BaseTransport = transport or transport_type()
 
     async def start(self) -> None:
         if self.redis_url:
@@ -279,13 +339,16 @@ class NotificationServer:
             if self.broker is not None and requested_id:
                 for channel in await self.broker.subscriptions(client_id):
                     self.registry.subscribe(client_id, channel)
-            await connection.send(
+            await self.transport.on_connect(client_id, connection)
+            await self.transport.send_message(
+                client_id,
                 json.dumps(make_message("system", {"event": "connected", "client_id": client_id}))
             )
             async for raw_message in connection:
                 await self._handle_message(client_id, raw_message)
         finally:
             self.registry.remove(client_id)
+            await self.transport.on_disconnect(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -310,7 +373,9 @@ class NotificationServer:
         except (json.JSONDecodeError, TypeError, ValueError):
             sender = self.registry.get(sender_id)
             if sender is not None:
-                await sender.send(json.dumps(make_message("system", {"error": "invalid message"})))
+                await self.transport.send_message(
+                    sender_id, json.dumps(make_message("system", {"error": "invalid message"}))
+                )
             return
 
         channel = channel.strip() if isinstance(channel, str) else None
@@ -335,12 +400,11 @@ class NotificationServer:
             else:
                 # System messages are server-generated; clients may send them only
                 # to themselves, which keeps the message contract predictable.
-                sender = self.registry.get(sender_id)
-                if sender is not None and (
+                if self.registry.get(sender_id) is not None and (
                     channel is None
                     or sender_id in self.registry.channel_subscribers(channel)
                 ):
-                    await sender.send(json.dumps(outgoing))
+                    await self.transport.send_message(sender_id, json.dumps(outgoing))
 
     async def _publish(self, message: dict[str, Any], routing: dict[str, Any]) -> None:
         envelope = {"message": message, **routing}
@@ -359,12 +423,13 @@ class NotificationServer:
             target = self.registry.get(target_id) if isinstance(target_id, str) else None
             channel = message.get("channel")
             if target is not None and (channel is None or target_id in self.registry.channel_subscribers(channel)):
-                await target.send(json.dumps(message))
+                await self.transport.send_message(target_id, json.dumps(message))
 
     async def _send_control(self, client_id: str, event: str, channel: str) -> None:
         client = self.registry.get(client_id)
         if client is not None:
-            await client.send(
+            await self.transport.send_message(
+                client_id,
                 json.dumps(make_message("system", {"event": event, "channel": channel}))
             )
 
@@ -372,14 +437,13 @@ class NotificationServer:
         encoded = json.dumps(message)
         clients = self.registry.snapshot()
         if channel is not None:
-            clients = {
-                client_id: connection
-                for client_id, connection in clients.items()
+            client_ids = {
+                client_id for client_id in clients
                 if client_id in self.registry.channel_subscribers(channel)
             }
-        connections = clients.values()
-        if connections:
-            await asyncio.gather(*(connection.send(encoded) for connection in connections), return_exceptions=True)
+        else:
+            client_ids = clients.keys()
+        await self.transport.broadcast(encoded, client_ids)
 
 
 async def run_server(host: str = "localhost", port: int = 8765) -> None:
