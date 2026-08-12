@@ -1,5 +1,6 @@
 import asyncio
 import json
+from urllib.parse import quote
 
 import pytest
 import websockets
@@ -204,3 +205,53 @@ async def test_servers_share_redis_pubsub_backbone(tmp_path):
     await first.stop()
     await second.stop()
     await broker.close()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_instead_of_dropping_message(monkeypatch, tmp_path):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    server = NotificationServer("127.0.0.1", 0, redis_url="disabled",
+                                database_url=f"sqlite:///{tmp_path / 'rate.db'}")
+    await server.start()
+    port = server._server.sockets[0].getsockname()[1]
+    client = await websockets.connect(f"ws://127.0.0.1:{port}")
+    await receive_json(client)
+
+    for value in (1, 2):
+        await client.send(json.dumps({"type": "broadcast", "payload": {"value": value}}))
+        assert (await receive_json(client))["payload"] == {"value": value}
+    await client.send(json.dumps({"type": "broadcast", "payload": {"value": 3}}))
+    error = await receive_json(client)
+    assert error["type"] == "system"
+    assert error["payload"]["error"] == "rate limit exceeded"
+
+    await client.close()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_since_and_reports_more_pages(tmp_path):
+    server = NotificationServer("127.0.0.1", 0, redis_url="disabled",
+                                database_url=f"sqlite:///{tmp_path / 'history-query.db'}")
+    await server.start()
+    port = server._server.sockets[0].getsockname()[1]
+    client = await websockets.connect(f"ws://127.0.0.1:{port}")
+    await receive_json(client)
+    await client.send(json.dumps({"type": "subscribe", "channel": "history"}))
+    await client.send(json.dumps({"type": "broadcast", "channel": "history", "payload": {"value": 1}}))
+    first = await receive_json(client)
+    await client.send(json.dumps({"type": "broadcast", "channel": "history", "payload": {"value": 2}}))
+    second = await receive_json(client)
+    await client.send(json.dumps({"type": "broadcast", "channel": "other", "payload": {"value": 3}}))
+
+    result = await http_json(
+        port, f"/history?channel=history&since={quote(first['timestamp'])}&limit=1"
+    )
+    assert [message["payload"]["value"] for message in result["messages"]] == [1]
+    assert result["has_more"] is True
+    result = await http_json(port, f"/history?channel=history&since={quote(second['timestamp'])}&limit=50")
+    assert [message["payload"]["value"] for message in result["messages"]] == [2]
+    assert result["has_more"] is False
+
+    await client.close()
+    await server.stop()
