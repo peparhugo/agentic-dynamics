@@ -8,6 +8,8 @@ import secrets
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
@@ -38,6 +40,7 @@ def init_db():
             );
         """)
         migrate_tasks_owner_id(conn)
+        migrate_users_email(conn)
 
 
 def migrate_tasks_owner_id(conn):
@@ -45,6 +48,22 @@ def migrate_tasks_owner_id(conn):
     if "owner_id" not in columns:
         conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
         conn.commit()
+
+
+def migrate_users_email(conn):
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    if "email" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+
+
+def resolve_user_email(user_id, fallback):
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    email = row["email"] if row is not None else None
+    return email or fallback
 
 
 def serialize_task(row):
@@ -112,6 +131,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = str(data.get("username", "")).strip()
     password = data.get("password", "")
+    email = str(data.get("email", "")).strip() or None
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
     with get_db() as conn:
@@ -122,8 +142,8 @@ def register():
             return jsonify({"error": "username already taken"}), 409
         password_hash = generate_password_hash(str(password))
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
         user_id = cursor.lastrowid
@@ -213,6 +233,9 @@ def update_task(user, task_id):
         updated = conn.execute(
             "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+    if status == "completed" and row["status"] != "completed":
+        user_email = resolve_user_email(user["user_id"], user["username"])
+        send_notification_email.delay(user_email, updated["title"])
     return jsonify(serialize_task(updated))
 
 
