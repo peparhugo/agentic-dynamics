@@ -3,3 +3,4 @@ dist/
 coverage/
 *.db
 *.log
+.ssg-cache.json

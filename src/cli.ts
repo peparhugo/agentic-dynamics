@@ -13,6 +13,8 @@ export interface CliOptions {
   outputDir: string;
   templateDir: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function printHelp(): void {
@@ -29,6 +31,8 @@ Options:
   -o, --output <dir>      Output directory for generated HTML (default: ${DEFAULT_OUTPUT_DIR})
   -t, --templates <dir>   Template directory with .hbs templates (default: ${DEFAULT_TEMPLATE_DIR})
   -p, --port <port>       Port for the dev server (default: ${DEFAULT_PORT})
+      --incremental       Only rebuild pages whose source or template changed
+      --clean             Force a full rebuild, ignoring the cache
   -h, --help              Show this help message
 `);
 }
@@ -100,6 +104,12 @@ export function parseArgs(argv: string[]): {
         options.port = port;
         break;
       }
+      case '--incremental':
+        options.incremental = true;
+        break;
+      case '--clean':
+        options.clean = true;
+        break;
       default:
         throw new Error(`Unknown option or command: ${arg}`);
     }
@@ -121,9 +131,18 @@ export async function run(argv: string[]): Promise<void> {
       contentDir: path.resolve(parsed.options.contentDir),
       outputDir: path.resolve(parsed.options.outputDir),
       templateDir: path.resolve(parsed.options.templateDir),
+      incremental: parsed.options.incremental,
+      clean: parsed.options.clean,
     };
 
-    const pages = await buildSite(options);
+    const pages = await buildSite(options, (stats) => {
+      if (parsed.options.incremental) {
+        console.log(
+          `Build stats: ${stats.built} built, ${stats.skipped} skipped, ` +
+            `time saved ~${stats.timeSavedMs}ms`
+        );
+      }
+    });
     console.log(
       `Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${options.outputDir}`
     );

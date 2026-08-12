@@ -8,6 +8,17 @@ import {
   renderIndexHtml,
   slugFromSource,
 } from './core';
+import { parseFrontmatter } from './markdown';
+import { computeHash } from './hash';
+import {
+  CacheManifest,
+  CachedPage,
+  BuildStats,
+  loadCache,
+  saveCache,
+  CACHE_VERSION,
+} from './cache';
+import { computeTemplateHash, computePartialsFingerprint } from './template';
 import { defaultPlugins } from './plugins';
 import { DEFAULT_TEMPLATE_DIR } from './template';
 
@@ -25,6 +36,13 @@ function dedupePlugins(plugins: Plugin[]): Plugin[] {
 export class SsgEngine {
   readonly context: SsgContext;
   readonly plugins: Plugin[];
+  lastBuildStats: BuildStats = {
+    built: 0,
+    skipped: 0,
+    total: 0,
+    timeSavedMs: 0,
+    totalMs: 0,
+  };
 
   constructor(
     readonly options: BuildOptions,
@@ -48,9 +66,27 @@ export class SsgEngine {
 
   async build(): Promise<Page[]> {
     await this.runHook('beforeBuild');
-    const pages = await this.buildPages();
+    const buildStart = Date.now();
+
+    const cache =
+      this.options.incremental && !this.options.clean
+        ? await loadCache(this.options.outputDir)
+        : undefined;
+
+    const { pages, manifest, built, skipped, timeSavedMs } =
+      await this.buildPages(cache);
+
     this.context.pages = pages;
     await this.writeOutput(pages);
+    await saveCache(this.options.outputDir, manifest);
+
+    this.lastBuildStats = {
+      built,
+      skipped,
+      total: pages.length,
+      timeSavedMs,
+      totalMs: Date.now() - buildStart,
+    };
     await this.runHook('afterBuild');
     return pages;
   }
@@ -68,10 +104,49 @@ export class SsgEngine {
     }
   }
 
-  private async buildPages(): Promise<Page[]> {
+  private async buildPages(cache?: CacheManifest): Promise<{
+    pages: Page[];
+    manifest: CacheManifest;
+    built: number;
+    skipped: number;
+    timeSavedMs: number;
+  }> {
     const sources = await collectMarkdownFiles(this.options.contentDir);
     const pages: Page[] = [];
+    const manifestPages: Record<string, CachedPage> = {};
+    const templateDir = this.context.templateDir;
+
+    let built = 0;
+    let skipped = 0;
+    let timeSavedMs = 0;
+
+    const partialsFingerprint = await computePartialsFingerprint(templateDir);
+
     for (const source of sources) {
+      const absPath = path.join(this.options.contentDir, source);
+      const raw = await fs.readFile(absPath, 'utf-8');
+      const hash = computeHash(raw);
+      const frontmatter = parseFrontmatter(raw);
+      const templateHash = await computeTemplateHash(
+        templateDir,
+        { template: frontmatter.template, layout: frontmatter.layout },
+        partialsFingerprint
+      );
+
+      const cached = cache?.pages[source];
+      if (
+        cached &&
+        cached.hash === hash &&
+        cached.templateHash === templateHash
+      ) {
+        pages.push({ ...cached.page });
+        manifestPages[source] = cached;
+        skipped++;
+        timeSavedMs += cached.buildMs;
+        continue;
+      }
+
+      const pageStart = Date.now();
       let page: Page = {
         slug: slugFromSource(source),
         source,
@@ -87,9 +162,24 @@ export class SsgEngine {
           if (result) page = result;
         }
       }
+      const buildMs = Date.now() - pageStart;
       pages.push(page);
+      built++;
+      manifestPages[source] = {
+        hash,
+        templateHash,
+        buildMs,
+        page,
+      };
     }
-    return pages;
+
+    const manifest: CacheManifest = {
+      version: CACHE_VERSION,
+      generatedAt: new Date().toISOString(),
+      pages: manifestPages,
+    };
+
+    return { pages, manifest, built, skipped, timeSavedMs };
   }
 
   private async writeOutput(pages: Page[]): Promise<void> {
@@ -117,12 +207,17 @@ export function createEngine(
   return new SsgEngine(options, plugins ?? [], config ?? {});
 }
 
-export async function buildSite(options: BuildOptions): Promise<Page[]> {
+export async function buildSite(
+  options: BuildOptions,
+  onStats?: (stats: BuildStats) => void
+): Promise<Page[]> {
   const { plugins, config } = await loadConfiguredPlugins();
   const engine = createEngine(options, plugins, config);
   await engine.start();
   try {
-    return await engine.build();
+    const pages = await engine.build();
+    if (onStats) onStats(engine.lastBuildStats);
+    return pages;
   } finally {
     await engine.close();
   }

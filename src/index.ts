@@ -6,6 +6,19 @@ export {
   injectLiveReloadScript,
   liveReloadClientScript,
 } from './serve';
+export { computeHash } from './hash';
+export {
+  loadCache,
+  saveCache,
+  cacheFilePath,
+  CACHE_FILE,
+  CACHE_VERSION,
+} from './cache';
+export type {
+  CacheManifest,
+  CachedPage,
+  BuildStats,
+} from './cache';
 export {
   isTemplateFile,
   registerPartials,
@@ -13,6 +26,8 @@ export {
   renderLayout,
   renderPageWithTemplates,
   templateDirExists,
+  computeTemplateHash,
+  computePartialsFingerprint,
 } from './template';
 export type { Page, Frontmatter, BuildOptions } from './types';
 export type { ServeOptions, DevServer } from './serve';

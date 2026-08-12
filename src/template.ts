@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import Handlebars from 'handlebars';
+import { computeHash } from './hash';
 import { Page } from './types';
 
 export const DEFAULT_TEMPLATE_NAME = 'default';
@@ -145,4 +146,56 @@ export async function renderPageWithTemplates(
 ): Promise<string> {
   const content = await renderPageTemplate(page, templateDir);
   return renderLayout(content, page, templateDir);
+}
+
+export async function computePartialsFingerprint(
+  templateDir: string
+): Promise<string> {
+  const partialsDir = path.join(templateDir, 'partials');
+  let entries;
+  try {
+    entries = await fs.readdir(partialsDir, { withFileTypes: true });
+  } catch {
+    return 'no-partials';
+  }
+  const parts: string[] = [];
+  entries.sort((a, b) => a.name.localeCompare(b.name));
+  for (const entry of entries) {
+    if (!entry.isFile() || !isTemplateFile(entry.name)) continue;
+    const source = await fs.readFile(path.join(partialsDir, entry.name), 'utf-8');
+    parts.push(`${entry.name}:${source}`);
+  }
+  return computeHash(parts.join('\n'));
+}
+
+export async function computeTemplateHash(
+  templateDir: string,
+  pageMeta?: { template?: string; layout?: string },
+  partialsFingerprint?: string
+): Promise<string> {
+  const templateName = pageMeta?.template ?? DEFAULT_TEMPLATE_NAME;
+  const layoutName = pageMeta?.layout ?? DEFAULT_LAYOUT_NAME;
+
+  if (!(await templateDirExists(templateDir))) {
+    return computeHash(`no-template-dir:${path.resolve(templateDir)}`);
+  }
+
+  const parts: string[] = [];
+  parts.push(`dir:${path.resolve(templateDir)}`);
+  const pageSource = await resolveTemplateSource(templateDir, templateName);
+  parts.push(`page:${templateName}:${pageSource ?? '__DEFAULT_PAGE_TEMPLATE__'}`);
+  const layoutSource = await resolveTemplateSource(
+    templateDir,
+    layoutName,
+    'layouts'
+  );
+  parts.push(`layout:${layoutName}:${layoutSource ?? '__DEFAULT_LAYOUT_TEMPLATE__'}`);
+
+  if (partialsFingerprint !== undefined) {
+    parts.push(`partials:${partialsFingerprint}`);
+  } else {
+    parts.push(`partials:${await computePartialsFingerprint(templateDir)}`);
+  }
+
+  return computeHash(parts.join('\n'));
 }
