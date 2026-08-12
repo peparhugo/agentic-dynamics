@@ -1,4 +1,4 @@
-"""Async WebSocket notification server with a small health endpoint."""
+"""Notification server with a pluggable client transport and health endpoint."""
 
 from __future__ import annotations
 
@@ -10,11 +10,10 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import parse_qs, urlparse
 
 from aiohttp import web
 from redis.asyncio import Redis
-from websockets.asyncio.server import ServerConnection, serve
+from transport import BaseTransport, WebSocketTransport
 
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -34,10 +33,10 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._lock = threading.RLock()
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients: dict[str, Any] = {}
         self._subscriptions: dict[str, set[str]] = {}
 
-    def add(self, connection: ServerConnection, client_id: str | None = None) -> str:
+    def add(self, connection: Any, client_id: str | None = None) -> str:
         client_id = client_id or str(uuid.uuid4())
         with self._lock:
             self._clients[client_id] = connection
@@ -73,11 +72,11 @@ class ClientRegistry:
                 if client_ids
             }
 
-    def get(self, client_id: str) -> ServerConnection | None:
+    def get(self, client_id: str) -> Any | None:
         with self._lock:
             return self._clients.get(client_id)
 
-    def snapshot(self) -> dict[str, ServerConnection]:
+    def snapshot(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._clients)
 
@@ -172,11 +171,12 @@ class RedisBackbone:
 
 
 class NotificationServer:
-    """Run the WebSocket and HTTP health services on the current event loop."""
+    """Run notification routing independently of the client transport."""
 
     def __init__(self, host: str = "127.0.0.1", websocket_port: int = 8765,
                  health_port: int = 8080, redis_url: str | None = None,
-                 database_url: str | None = None) -> None:
+                 database_url: str | None = None,
+                 transport: BaseTransport | None = None) -> None:
         self.host = host
         self.websocket_port = websocket_port
         self.health_port = health_port
@@ -184,7 +184,13 @@ class NotificationServer:
         self.store = MessageStore(database_url)
         self.redis_url = redis_url or os.environ.get("REDIS_URL")
         self.backbone: RedisBackbone | None = None
-        self._websocket_server = None
+        transport_name = os.environ.get("TRANSPORT", "websocket").lower()
+        if transport is not None:
+            self.transport = transport
+        elif transport_name == "websocket":
+            self.transport = WebSocketTransport(host, websocket_port)
+        else:
+            raise ValueError(f"unsupported transport: {transport_name}")
         self._http_runner: web.AppRunner | None = None
         self._health_site: web.TCPSite | None = None
 
@@ -196,11 +202,12 @@ class NotificationServer:
                 self.backbone = candidate
             except Exception:
                 await candidate.close()
-        self._websocket_server = await serve(
-            self._handle_connection, self.host, self.websocket_port
+        await self.transport.start(
+            self._transport_connect, self._handle_message, self._transport_disconnect,
+            self._transport_ready,
         )
-        websocket_socket = self._websocket_server.sockets[0]
-        self.websocket_port = websocket_socket.getsockname()[1]
+        if isinstance(self.transport, WebSocketTransport):
+            self.websocket_port = self.transport.port
 
         app = web.Application()
         app.router.add_get("/health", self._health)
@@ -218,10 +225,7 @@ class NotificationServer:
         return self
 
     async def stop(self) -> None:
-        if self._websocket_server is not None:
-            self._websocket_server.close()
-            await self._websocket_server.wait_closed()
-            self._websocket_server = None
+        await self.transport.stop()
         if self._http_runner is not None:
             await self._http_runner.cleanup()
             self._http_runner = None
@@ -256,22 +260,21 @@ class NotificationServer:
             return web.json_response({"error": "limit must be 1..1000 and offset must be non-negative"}, status=400)
         return web.json_response(await asyncio.to_thread(self.store.list, limit, offset))
 
-    async def _handle_connection(self, connection: ServerConnection) -> None:
-        path = getattr(getattr(connection, "request", None), "path", "")
-        requested_id = parse_qs(urlparse(path).query).get("client_id", [None])[0]
+    async def _transport_connect(self, connection: Any, requested_id: str | None) -> str:
         client_id = self.clients.add(connection, requested_id)
         if self.backbone:
             await self.backbone.save_client(client_id)
             for channel in await self.backbone.subscriptions(client_id):
                 self.clients.subscribe(client_id, channel)
-        try:
-            await connection.send(json.dumps(_message("system", {
-                "event": "connected", "client_id": client_id
-            })))
-            async for raw_message in connection:
-                await self._handle_message(client_id, raw_message)
-        finally:
-            self.clients.remove(client_id)
+        return client_id
+
+    async def _transport_ready(self, client_id: str) -> None:
+        await self.transport.send_message(client_id, _message("system", {
+            "event": "connected", "client_id": client_id
+        }))
+
+    async def _transport_disconnect(self, client_id: str) -> None:
+        self.clients.remove(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -318,7 +321,7 @@ class NotificationServer:
         payload = message.get("payload", {})
         delivered = {key: value for key, value in message.items() if key != "_recipient_id"}
         if recipient_id:
-            await self._send_connection(self.clients.get(recipient_id), delivered)
+            await self._send_to(recipient_id, delivered)
         elif self._valid_channel(payload.get("channel")):
             await self._broadcast_channel(payload["channel"], delivered)
         else:
@@ -330,28 +333,14 @@ class NotificationServer:
 
     async def _broadcast_channel(self, channel: str, message: dict[str, Any]) -> None:
         subscribers = self.clients.channel_snapshot().get(channel, [])
-        await asyncio.gather(*(
-            self._send_connection(self.clients.get(client_id), message)
-            for client_id in subscribers
-        ))
+        await self.transport.broadcast(message, subscribers)
 
     async def _broadcast(self, message: dict[str, Any]) -> None:
-        await asyncio.gather(*(
-            self._send_connection(connection, message)
-            for connection in self.clients.snapshot().values()
-        ))
+        await self.transport.broadcast(message, self.clients.snapshot())
 
     async def _send_to(self, client_id: str, message: dict[str, Any]) -> None:
-        await self._send_connection(self.clients.get(client_id), message)
-
-    async def _send_connection(self, connection: ServerConnection | None,
-                                message: dict[str, Any]) -> None:
-        if connection is not None:
-            try:
-                await connection.send(json.dumps(message))
-            except Exception:
-                # A connection can close between taking the registry snapshot and send.
-                pass
+        if self.clients.get(client_id) is not None:
+            await self.transport.send_message(client_id, message)
 
     async def run_forever(self) -> None:
         await self.start()
