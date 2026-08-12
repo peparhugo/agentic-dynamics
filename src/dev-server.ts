@@ -5,6 +5,7 @@ import chokidar, { FSWatcher } from 'chokidar';
 import { buildSite } from './generator';
 import { DevServerOptions } from './types';
 import { WebSocketServer, WebSocket } from 'ws';
+import { Plugin, PluginContext } from './plugin';
 
 const LIVE_RELOAD_SCRIPT = `<script>(function(){var ws=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);ws.onmessage=function(event){if(event.data==='reload')location.reload();};ws.onclose=function(){setTimeout(function(){location.reload();},1000);};})();</script>`;
 
@@ -13,6 +14,25 @@ export interface DevServer {
   watcher: FSWatcher;
   port: number;
   close(): Promise<void>;
+}
+
+/** Starts the existing development server as part of a plugin lifecycle. */
+export class DevServerPlugin implements Plugin {
+  private devServer?: DevServer;
+
+  constructor(private readonly options: DevServerOptions = {}) {}
+
+  async onStart(context: PluginContext): Promise<void> {
+    this.devServer = await startDevServer({ ...context.options, ...this.options });
+  }
+
+  async onEnd(): Promise<void> {
+    await this.devServer?.close();
+  }
+
+  get server(): DevServer | undefined {
+    return this.devServer;
+  }
 }
 
 function contentType(filePath: string): string {

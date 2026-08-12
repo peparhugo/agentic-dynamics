@@ -18,6 +18,8 @@ export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
   templatesDir?: string;
+  configFile?: string;
+  plugins?: unknown[];
 }
 
 export interface DevServerOptions extends BuildOptions {
