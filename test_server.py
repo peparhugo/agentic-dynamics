@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import tempfile
 import pytest
 
 from websockets.asyncio.client import connect
@@ -358,3 +360,293 @@ async def test_dynamic_subscribe_unsubscribe():
             await asyncio.wait_for(ws.recv(), timeout=5)
             resp = await http_get("localhost", PORT, "/channels")
             assert resp == {}
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_returns_stored_messages():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"message": "test persistence"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        messages = await http_get("localhost", PORT, "/messages")
+        assert len(messages) >= 1
+        assert messages[0]["type"] == "broadcast"
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_respects_limit_offset():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            for i in range(5):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": f"msg {i}"},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        messages = await http_get("localhost", PORT, "/messages?limit=2&offset=1")
+        assert len(messages) == 2
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_includes_all_fields():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"message": "field test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        messages = await http_get("localhost", PORT, "/messages?limit=1")
+        assert len(messages) == 1
+        msg = messages[0]
+        assert "id" in msg
+        assert "channel" in msg
+        assert "type" in msg
+        assert "payload" in msg
+        assert "timestamp" in msg
+        assert msg["type"] == "broadcast"
+
+
+@pytest.mark.asyncio
+async def test_direct_message_persisted():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws1:
+            raw1 = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+            client1_id = raw1["payload"]["client_id"]
+
+            async with connect(f"ws://localhost:{PORT}") as ws2:
+                raw2 = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+                client2_id = raw2["payload"]["client_id"]
+
+                await ws1.send(json.dumps({
+                    "type": "direct",
+                    "payload": {"recipient": client2_id, "message": "persisted dm"},
+                }))
+
+                await asyncio.wait_for(ws1.recv(), timeout=5)
+                await asyncio.wait_for(ws2.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        messages = await http_get("localhost", PORT, "/messages")
+        direct_msgs = [m for m in messages if m["type"] == "direct"]
+        assert len(direct_msgs) >= 1
+        assert json.loads(direct_msgs[0]["payload"])["message"] == "persisted dm"
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_broadcast():
+    import fakeredis.aioredis as faioredis
+    import server
+
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    try:
+        server.REDIS_URL = "redis://localhost:6379/0"
+        server.redis_client = faioredis.FakeRedis()
+        await server.redis_client.initialize()
+        sub_task = asyncio.create_task(server._redis_subscriber_task())
+
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws1:
+                await asyncio.wait_for(ws1.recv(), timeout=5)
+                async with connect(f"ws://localhost:{PORT}") as ws2:
+                    await asyncio.wait_for(ws2.recv(), timeout=5)
+
+                    await ws1.send(json.dumps({
+                        "type": "broadcast",
+                        "payload": {"message": "via redis backbone"},
+                    }))
+
+                    received1 = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                    received2 = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+
+                    assert received1["payload"]["message"] == "via redis backbone"
+                    assert received2["payload"]["message"] == "via redis backbone"
+
+        sub_task.cancel()
+        try:
+            await sub_task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        del os.environ["REDIS_URL"]
+        server.REDIS_URL = ""
+        server.redis_client = None
+        server._subscriber_task = None
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_channel_broadcast():
+    import fakeredis.aioredis as faioredis
+    import server
+
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    try:
+        server.REDIS_URL = "redis://localhost:6379/0"
+        server.redis_client = faioredis.FakeRedis()
+        await server.redis_client.initialize()
+        sub_task = asyncio.create_task(server._redis_subscriber_task())
+
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws1:
+                await asyncio.wait_for(ws1.recv(), timeout=5)
+                async with connect(f"ws://localhost:{PORT}") as ws2:
+                    await asyncio.wait_for(ws2.recv(), timeout=5)
+
+                    await ws1.send(json.dumps({
+                        "type": "subscribe",
+                        "payload": {"channel": "redis-chan"},
+                    }))
+                    await asyncio.wait_for(ws1.recv(), timeout=5)
+
+                    await ws1.send(json.dumps({
+                        "type": "broadcast",
+                        "payload": {"channel": "redis-chan", "message": "channel via redis"},
+                    }))
+
+                    received = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                    assert received["payload"]["message"] == "channel via redis"
+
+                    non_sub_wait = await asyncio.wait_for(ws2.recv(), timeout=1) if False else None
+
+        sub_task.cancel()
+        try:
+            await sub_task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        del os.environ["REDIS_URL"]
+        server.REDIS_URL = ""
+        server.redis_client = None
+        server._subscriber_task = None
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_direct_message():
+    import fakeredis.aioredis as faioredis
+    import server
+
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    try:
+        server.REDIS_URL = "redis://localhost:6379/0"
+        server.redis_client = faioredis.FakeRedis()
+        await server.redis_client.initialize()
+        sub_task = asyncio.create_task(server._redis_subscriber_task())
+
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws1:
+                raw1 = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                client1_id = raw1["payload"]["client_id"]
+
+                async with connect(f"ws://localhost:{PORT}") as ws2:
+                    raw2 = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+                    client2_id = raw2["payload"]["client_id"]
+
+                    await ws1.send(json.dumps({
+                        "type": "direct",
+                        "payload": {"recipient": client2_id, "message": "dm via redis"},
+                    }))
+
+                    echo = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                    assert echo["type"] == "direct"
+                    assert echo["payload"]["from"] == client1_id
+                    assert echo["payload"]["message"] == "dm via redis"
+
+                    received = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+                    assert received["type"] == "direct"
+                    assert received["payload"]["from"] == client1_id
+                    assert received["payload"]["message"] == "dm via redis"
+
+        sub_task.cancel()
+        try:
+            await sub_task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        del os.environ["REDIS_URL"]
+        server.REDIS_URL = ""
+        server.redis_client = None
+        server._subscriber_task = None
+
+
+@pytest.mark.asyncio
+async def test_messages_persisted_across_connections():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"message": "first"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"message": "second"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        messages = await http_get("localhost", PORT, "/messages")
+        broadcast_msgs = [m for m in messages if m["type"] == "broadcast"]
+        assert len(broadcast_msgs) >= 2
+
+
+@pytest.mark.asyncio
+async def test_redis_persistence_combined():
+    import fakeredis.aioredis as faioredis
+    import server
+
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    try:
+        server.REDIS_URL = "redis://localhost:6379/0"
+        server.redis_client = faioredis.FakeRedis()
+        await server.redis_client.initialize()
+        sub_task = asyncio.create_task(server._redis_subscriber_task())
+
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws:
+                await asyncio.wait_for(ws.recv(), timeout=5)
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "redis + sqlite"},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await asyncio.sleep(0.1)
+
+            messages = await http_get("localhost", PORT, "/messages?limit=10")
+            assert len(messages) >= 1
+            persisted = messages[0]
+            payload = json.loads(persisted["payload"])
+            assert payload["message"] == "redis + sqlite"
+
+        sub_task.cancel()
+        try:
+            await asyncio.wait_for(sub_task, timeout=1)
+        except (asyncio.CancelledError, asyncio.TimeoutError):
+            pass
+    finally:
+        del os.environ["REDIS_URL"]
+        server.REDIS_URL = ""
+        server.redis_client = None
+        server._subscriber_task = None

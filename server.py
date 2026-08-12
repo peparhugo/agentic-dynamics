@@ -1,11 +1,22 @@
 import asyncio
 import json
+import os
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosedOK, ConnectionClosedError
+
+REDIS_URL = os.environ.get("REDIS_URL", "")
+DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+REDIS_CHANNEL = "chat:messages"
+
+redis_client = None
+_message_db_initialized = False
+_subscriber_task = None
 
 
 class ClientRegistry:
@@ -70,6 +81,49 @@ class ClientRegistry:
 registry = ClientRegistry()
 
 
+def _init_message_db():
+    global _message_db_initialized
+    if _message_db_initialized:
+        return
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            channel TEXT,
+            type TEXT,
+            payload TEXT,
+            timestamp TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+    _message_db_initialized = True
+
+
+def store_message(channel, msg_type, payload, timestamp):
+    _init_message_db()
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.execute(
+        "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+        (channel or "", msg_type, json.dumps(payload), timestamp)
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_messages(limit=50, offset=0):
+    _init_message_db()
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM messages ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+        (limit, offset)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def make_message(msg_type, payload):
     return json.dumps({
         "type": msg_type,
@@ -117,6 +171,58 @@ async def send_direct(recipient_id, message):
         registry.remove(recipient_id)
 
 
+async def init_redis():
+    global redis_client, _subscriber_task
+    if REDIS_URL:
+        import redis.asyncio as aioredis
+        redis_client = aioredis.Redis.from_url(REDIS_URL)
+        _subscriber_task = asyncio.create_task(_redis_subscriber_task())
+
+
+async def _redis_subscriber_task():
+    while True:
+        try:
+            async with redis_client.pubsub() as pubsub:
+                await pubsub.subscribe(REDIS_CHANNEL)
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        raw = message["data"]
+                        if isinstance(raw, bytes):
+                            raw = raw.decode()
+                        data = json.loads(raw)
+                        msg_type = data.get("type", "broadcast")
+                        payload = data.get("payload", {})
+
+                        if msg_type == "broadcast":
+                            channel = payload.get("channel")
+                            if channel:
+                                client_ids = registry.get_clients_for_channel(channel)
+                                await broadcast_to_clients(client_ids, raw)
+                            else:
+                                await broadcast(raw)
+                        elif msg_type == "direct":
+                            recipient = payload.get("recipient")
+                            if recipient:
+                                await send_direct(recipient, raw)
+                            sender_id = payload.get("from")
+                            if sender_id:
+                                sender_ws = registry.get(sender_id)
+                                if sender_ws:
+                                    try:
+                                        await sender_ws.send(raw)
+                                    except Exception:
+                                        registry.remove(sender_id)
+                        elif msg_type == "system":
+                            await broadcast(raw)
+        except Exception:
+            await asyncio.sleep(1)
+
+
+async def publish_to_redis(message_str):
+    if redis_client:
+        await redis_client.publish(REDIS_CHANNEL, message_str)
+
+
 async def handler(websocket):
     client_id = str(uuid.uuid4())
     registry.add(client_id, websocket)
@@ -162,23 +268,35 @@ async def handler(websocket):
                     })
                     await websocket.send(confirm)
             elif msg_type == "broadcast":
-                channel = payload.get("channel")
-                if channel:
-                    broadcast_msg = make_message("broadcast", payload)
-                    client_ids = registry.get_clients_for_channel(channel)
-                    await broadcast_to_clients(client_ids, broadcast_msg)
+                payload_for_storage = dict(payload)
+                ts = datetime.now(timezone.utc).isoformat()
+                store_message(payload.get("channel", ""), "broadcast", payload_for_storage, ts)
+                broadcast_msg = make_message("broadcast", payload)
+                if REDIS_URL:
+                    await publish_to_redis(broadcast_msg)
                 else:
-                    broadcast_msg = make_message("broadcast", payload)
-                    await broadcast(broadcast_msg)
+                    channel = payload.get("channel")
+                    if channel:
+                        client_ids = registry.get_clients_for_channel(channel)
+                        await broadcast_to_clients(client_ids, broadcast_msg)
+                    else:
+                        await broadcast(broadcast_msg)
             elif msg_type == "direct":
                 recipient = payload.get("recipient")
                 if recipient:
-                    direct_msg = make_message("direct", {
+                    ts = datetime.now(timezone.utc).isoformat()
+                    direct_payload = {
                         "from": client_id,
-                        "message": payload.get("message", "")
-                    })
-                    await send_direct(recipient, direct_msg)
-                    await websocket.send(direct_msg)
+                        "message": payload.get("message", ""),
+                        "recipient": recipient
+                    }
+                    store_message("", "direct", direct_payload, ts)
+                    direct_msg = make_message("direct", direct_payload)
+                    if REDIS_URL:
+                        await publish_to_redis(direct_msg)
+                    else:
+                        await send_direct(recipient, direct_msg)
+                        await websocket.send(direct_msg)
     except (ConnectionClosedOK, ConnectionClosedError):
         pass
     except Exception:
@@ -219,10 +337,23 @@ def process_request(connection, request):
             )
             response.headers["Content-Type"] = "application/json"
             return response
+    if request.path.startswith("/messages"):
+        parsed = urlparse(request.path)
+        qs = parse_qs(parsed.query)
+        limit = int(qs.get("limit", ["50"])[0])
+        offset = int(qs.get("offset", ["0"])[0])
+        messages = get_messages(limit=limit, offset=offset)
+        response = connection.respond(
+            200,
+            json.dumps(messages),
+        )
+        response.headers["Content-Type"] = "application/json"
+        return response
     return None
 
 
 async def main():
+    await init_redis()
     async with serve(handler, "localhost", 8765, process_request=process_request):
         await asyncio.Future()
 
