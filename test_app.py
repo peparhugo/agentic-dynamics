@@ -89,6 +89,37 @@ def test_update_task_fields(client):
     assert response.json["status"] == "done"
 
 
+def test_completing_task_enqueues_owner_notification(client, monkeypatch):
+    register(client)
+    headers = auth(token(client))
+    created = client.post("/tasks", json={"title": "Ship feature"}, headers=headers).json
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    response = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Ship feature")]
+
+
+def test_notification_is_only_sent_on_transition_to_completed(client, monkeypatch):
+    register(client)
+    headers = auth(token(client))
+    created = client.post("/tasks", json={"title": "Already complete"}, headers=headers).json
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{created['id']}", json={"title": "Renamed"}, headers=headers)
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    assert queued == [("alice", "Already complete")]
+
+
 def test_old_schema_is_migrated_without_losing_tasks(tmp_path, monkeypatch):
     database = tmp_path / "legacy.db"
     monkeypatch.setattr(task_app, "DATABASE", str(database))

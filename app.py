@@ -13,6 +13,8 @@ from functools import wraps
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
@@ -210,9 +212,12 @@ def edit_task(task_id):
         return jsonify({"error": "title must be a non-empty string"}), 400
     if "status" in data and not isinstance(data["status"], str):
         return jsonify({"error": "status must be a string"}), 400
+    previous_task = get_task(task_id, g.user["id"])
     task = update_task(task_id, g.user["id"], data.get("title", "").strip() if "title" in data else None, data.get("status"))
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        send_notification_email.delay(g.user["username"], task["title"])
     return jsonify(task)
 
 
