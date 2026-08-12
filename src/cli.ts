@@ -4,12 +4,14 @@ export interface CliOptions {
   command: 'build';
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
   let command: 'build' = 'build';
   let contentDir = './content';
   let outputDir = './dist';
+  let templatesDir = './templates';
 
   const args = argv.slice(2);
   for (let i = 0; i < args.length; i += 1) {
@@ -26,13 +28,18 @@ export function parseArgs(argv: string[]): CliOptions {
       i += 1;
     } else if (arg.startsWith('--output=')) {
       outputDir = arg.slice('--output='.length);
+    } else if (arg === '--templates' || arg === '-t') {
+      templatesDir = args[i + 1] ?? templatesDir;
+      i += 1;
+    } else if (arg.startsWith('--templates=')) {
+      templatesDir = arg.slice('--templates='.length);
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
     }
   }
 
-  return { command, contentDir, outputDir };
+  return { command, contentDir, outputDir, templatesDir };
 }
 
 export function printHelp(): void {
@@ -42,15 +49,18 @@ export function printHelp(): void {
     'Generate a static site from Markdown files.',
     '',
     'Options:',
-    '  --content <dir>   Content directory (default: ./content)',
-    '  --output <dir>    Output directory (default: ./dist)',
-    '  --help, -h        Show this help message',
+    '  --content <dir>     Content directory (default: ./content)',
+    '  --output <dir>      Output directory (default: ./dist)',
+    '  --templates <dir>   Templates directory (default: ./templates)',
+    '  --help, -h          Show this help message',
   ];
   console.log(lines.join('\n'));
 }
 
 export function run(argv: string[]): void {
   const options = parseArgs(argv);
-  const pages = buildSite(options.contentDir, options.outputDir);
+  const pages = buildSite(options.contentDir, options.outputDir, {
+    templatesDir: options.templatesDir,
+  });
   console.log(`Built ${pages.length} pages into ${options.outputDir}`);
 }

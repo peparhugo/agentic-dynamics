@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Index</title>
+</head>
+<body>
+  {{> header}}
+  <h1>Pages</h1>
+  <ul>
+{{#each pages}}    <li><a href="{{this.slug}}.html">{{this.title}}</a>{{#if this.date}} <time>{{this.date}}</time>{{/if}}{{#if this.tags.length}} <span class="tags">{{#each this.tags}}#{{this}} {{/each}}</span>{{/if}}</li>
+{{/each}}  </ul>
+  {{> footer}}
+</body>
+</html>

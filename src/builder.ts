@@ -2,8 +2,19 @@ import fs from 'fs';
 import path from 'path';
 import { Page } from './types';
 import { parseMarkdown, slugify } from './markdown';
+import {
+  DEFAULT_TEMPLATES_DIR,
+  DEFAULT_PAGE_TEMPLATE_NAME,
+  DEFAULT_LAYOUT_NAME,
+  TemplateEngine,
+  pageToContext,
+} from './template';
 
 const MARKDOWN_RE = /\.(md|markdown)$/i;
+
+export interface BuildSiteOptions {
+  templatesDir?: string;
+}
 
 export function collectMarkdownFiles(contentDir: string): string[] {
   if (!fs.existsSync(contentDir)) {
@@ -34,6 +45,9 @@ export function readPages(contentDir: string): Page[] {
       title: doc.title,
       date: doc.date,
       tags: doc.tags,
+      template: doc.template,
+      layout: doc.layout,
+      data: doc.data,
       content: doc.content,
     };
   });
@@ -59,7 +73,7 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function renderPage(page: Page): string {
+export function renderPageBody(page: Page): string {
   const dateTag = page.date
     ? `    <p class="date"><time datetime="${escapeHtml(page.date)}">${escapeHtml(
         page.date,
@@ -70,6 +84,13 @@ export function renderPage(page: Page): string {
         .map((t) => `<span class="tag">${escapeHtml(t)}</span>`)
         .join(' ')}</p>\n`
     : '';
+  return `  <article>
+    <h1>${escapeHtml(page.title)}</h1>
+${dateTag}${tags}    ${page.content}
+  </article>`;
+}
+
+export function renderPage(page: Page): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -78,10 +99,7 @@ export function renderPage(page: Page): string {
   <title>${escapeHtml(page.title)}</title>
 </head>
 <body>
-  <article>
-    <h1>${escapeHtml(page.title)}</h1>
-${dateTag}${tags}    ${page.content}
-  </article>
+${renderPageBody(page)}
   <p><a href="index.html">&larr; Back to index</a></p>
 </body>
 </html>
@@ -120,14 +138,69 @@ ${items}
 `;
 }
 
-export function buildSite(contentDir: string, outputDir: string): Page[] {
+export function renderPageWithEngine(page: Page, engine: TemplateEngine): string {
+  const name = page.template ?? DEFAULT_PAGE_TEMPLATE_NAME;
+  const template = engine.getPageTemplate(name);
+  let bodyHtml: string;
+  if (template) {
+    bodyHtml = engine.render(template.source, template.ext, pageToContext(page));
+  } else {
+    bodyHtml = renderPageBody(page);
+  }
+
+  const layoutName = page.layout ?? DEFAULT_LAYOUT_NAME;
+  const layout = engine.getLayout(layoutName);
+  if (layout) {
+    return engine.render(
+      layout.source,
+      layout.ext,
+      pageToContext(page, bodyHtml),
+    );
+  }
+  return bodyHtml;
+}
+
+export function renderIndexWithEngine(pages: Page[], engine: TemplateEngine): string {
+  const indexTemplate = engine.getIndexTemplate();
+  if (indexTemplate) {
+    return engine.render(
+      indexTemplate.source,
+      indexTemplate.ext,
+      {
+        page: {},
+        title: 'Index',
+        date: undefined,
+        tags: [],
+        content: '',
+        pages,
+        site: { pages },
+      },
+    );
+  }
+  return renderIndex(pages);
+}
+
+export function buildSite(
+  contentDir: string,
+  outputDir: string,
+  options: BuildSiteOptions | string = {},
+): Page[] {
+  const opts: BuildSiteOptions =
+    typeof options === 'string' ? { templatesDir: options } : options;
   const pages = sortPages(readPages(contentDir));
+  const templatesDir = opts.templatesDir ?? DEFAULT_TEMPLATES_DIR;
+  const engine = new TemplateEngine(templatesDir);
+
   fs.mkdirSync(outputDir, { recursive: true });
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
+  fs.writeFileSync(
+    path.join(outputDir, 'index.html'),
+    engine.enabled ? renderIndexWithEngine(pages, engine) : renderIndex(pages),
+    'utf8',
+  );
   for (const page of pages) {
     fs.writeFileSync(
       path.join(outputDir, `${page.slug}.html`),
-      renderPage(page),
+      engine.enabled ? renderPageWithEngine(page, engine) : renderPage(page),
       'utf8',
     );
   }
