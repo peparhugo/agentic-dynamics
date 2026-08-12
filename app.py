@@ -4,6 +4,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -19,6 +20,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 _redis: aioredis.Redis | None = None
 _db: aiosqlite.Connection | None = None
 _listener_task: asyncio.Task | None = None
+_transport = None
 
 
 class ClientRegistry:
@@ -89,6 +91,144 @@ def _make_timestamp():
     return datetime.now(timezone.utc).isoformat()
 
 
+class BaseTransport(ABC):
+    @abstractmethod
+    async def on_connect(self, connection) -> str:
+        ...
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str):
+        ...
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict):
+        ...
+
+    @abstractmethod
+    async def broadcast(self, message: dict):
+        ...
+
+
+class WebSocketTransport(BaseTransport):
+    async def on_connect(self, websocket) -> str:
+        client_id = registry.add(websocket)
+        welcome = {
+            "type": "system",
+            "payload": {"client_id": client_id, "message": "connected"},
+            "timestamp": _make_timestamp(),
+        }
+        await websocket.send(json.dumps(welcome))
+        return client_id
+
+    async def on_disconnect(self, client_id: str):
+        registry.remove(client_id)
+
+    async def send_message(self, client_id: str, message: dict):
+        ws = registry.get_all().get(client_id)
+        if ws is not None:
+            try:
+                await ws.send(json.dumps(message))
+            except Exception:
+                pass
+
+    async def broadcast(self, message: dict):
+        message_str = json.dumps(message)
+        clients = registry.get_all()
+        tasks = [asyncio.create_task(ws.send(message_str)) for ws in clients.values()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def _get_transport() -> BaseTransport:
+    global _transport
+    if _transport is None:
+        transport_type = os.environ.get("TRANSPORT", "websocket").lower()
+        if transport_type == "websocket":
+            _transport = WebSocketTransport()
+        else:
+            raise ValueError(f"Unknown TRANSPORT: {transport_type}")
+    return _transport
+
+
+class NotificationServer:
+    def __init__(self, transport: BaseTransport):
+        self._transport = transport
+
+    async def handle_connect(self, connection) -> str:
+        return await self._transport.on_connect(connection)
+
+    async def handle_disconnect(self, client_id: str):
+        await self._transport.on_disconnect(client_id)
+        await _broadcast(
+            {
+                "type": "system",
+                "payload": {"client_id": client_id, "message": "disconnected"},
+                "timestamp": _make_timestamp(),
+            }
+        )
+
+    async def handle_message(self, client_id: str, data: dict):
+        msg_type = data.get("type", "broadcast")
+        payload = data.get("payload", {})
+        timestamp = _make_timestamp()
+
+        if msg_type == "subscribe":
+            channel = data.get("channel")
+            if channel:
+                registry.subscribe(client_id, channel)
+                await self._transport.send_message(
+                    client_id,
+                    {
+                        "type": "system",
+                        "payload": {
+                            "message": f"subscribed to {channel}",
+                            "channel": channel,
+                        },
+                        "timestamp": timestamp,
+                    },
+                )
+        elif msg_type == "unsubscribe":
+            channel = data.get("channel")
+            if channel:
+                registry.unsubscribe(client_id, channel)
+                await self._transport.send_message(
+                    client_id,
+                    {
+                        "type": "system",
+                        "payload": {
+                            "message": f"unsubscribed from {channel}",
+                            "channel": channel,
+                        },
+                        "timestamp": timestamp,
+                    },
+                )
+        elif msg_type == "direct":
+            target = payload.get("target")
+            if target is not None:
+                await _send_direct(
+                    target,
+                    {
+                        "type": "direct",
+                        "payload": {
+                            "from": client_id,
+                            "message": payload.get("message", {}),
+                        },
+                        "timestamp": timestamp,
+                    },
+                )
+        else:
+            channel = data.get("channel")
+            message = {
+                "type": msg_type,
+                "payload": {"from": client_id, **payload},
+                "timestamp": timestamp,
+            }
+            if channel:
+                await _broadcast_to_channel(channel, message)
+            else:
+                await _broadcast(message)
+
+
 async def _init_redis():
     global _redis
     if _redis is None:
@@ -131,34 +271,20 @@ async def _redis_publish(channel, message):
 
 
 async def _local_broadcast(message):
-    message_str = json.dumps(message)
-    clients = registry.get_all()
-    tasks = []
-    for ws in clients.values():
-        tasks.append(asyncio.create_task(ws.send(message_str)))
-    if tasks:
-        await asyncio.gather(*tasks, return_exceptions=True)
+    await _get_transport().broadcast(message)
 
 
-async def _local_broadcast_to_channel(message, subscribers, clients):
-    message_str = json.dumps(message)
+async def _local_broadcast_to_channel(message, subscribers):
+    transport = _get_transport()
     tasks = []
     for cid in subscribers:
-        ws = clients.get(cid)
-        if ws is not None:
-            tasks.append(asyncio.create_task(ws.send(message_str)))
+        tasks.append(asyncio.create_task(transport.send_message(cid, message)))
     if tasks:
         await asyncio.gather(*tasks, return_exceptions=True)
 
 
-async def _local_direct(target_id, message, clients):
-    ws = clients.get(target_id)
-    if ws is None:
-        return
-    try:
-        await ws.send(json.dumps(message))
-    except Exception:
-        pass
+async def _local_direct(target_id, message):
+    await _get_transport().send_message(target_id, message)
 
 
 async def _redis_listener():
@@ -196,16 +322,15 @@ async def _redis_listener():
                 if channel.startswith("ws:broadcast:"):
                     ch_name = channel[len("ws:broadcast:"):]
                     subscribers = registry.get_subscribers(ch_name)
-                    clients = registry.get_all()
-                    await _local_broadcast_to_channel(message, subscribers, clients)
+                    await _local_broadcast_to_channel(message, subscribers)
                 elif channel.startswith("ws:direct:"):
                     target_id = channel[len("ws:direct:"):]
-                    clients = registry.get_all()
-                    await _local_direct(target_id, message, clients)
+                    await _local_direct(target_id, message)
 
 
 async def _start_background():
     global _listener_task
+    _get_transport()
     await _init_redis()
     await _init_db()
     if _listener_task is None:
@@ -213,7 +338,7 @@ async def _start_background():
 
 
 async def _stop_background():
-    global _listener_task, _redis, _db
+    global _listener_task, _redis, _db, _transport
     if _listener_task is not None:
         _listener_task.cancel()
         try:
@@ -227,6 +352,7 @@ async def _stop_background():
     if _db is not None:
         await _db.close()
         _db = None
+    _transport = None
 
 
 async def _broadcast(message):
@@ -251,93 +377,20 @@ async def _send_direct(target_id, message):
 
 
 async def handler(websocket):
-    client_id = registry.add(websocket)
+    transport = _get_transport()
+    server = NotificationServer(transport)
+    client_id = await server.handle_connect(websocket)
     try:
-        welcome = {
-            "type": "system",
-            "payload": {"client_id": client_id, "message": "connected"},
-            "timestamp": _make_timestamp(),
-        }
-        await websocket.send(json.dumps(welcome))
-
         async for raw in websocket:
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
                 continue
-
-            msg_type = data.get("type", "broadcast")
-            payload = data.get("payload", {})
-            timestamp = _make_timestamp()
-
-            if msg_type == "subscribe":
-                channel = data.get("channel")
-                if channel:
-                    registry.subscribe(client_id, channel)
-                    await websocket.send(
-                        json.dumps(
-                            {
-                                "type": "system",
-                                "payload": {
-                                    "message": f"subscribed to {channel}",
-                                    "channel": channel,
-                                },
-                                "timestamp": timestamp,
-                            }
-                        )
-                    )
-            elif msg_type == "unsubscribe":
-                channel = data.get("channel")
-                if channel:
-                    registry.unsubscribe(client_id, channel)
-                    await websocket.send(
-                        json.dumps(
-                            {
-                                "type": "system",
-                                "payload": {
-                                    "message": f"unsubscribed from {channel}",
-                                    "channel": channel,
-                                },
-                                "timestamp": timestamp,
-                            }
-                        )
-                    )
-            elif msg_type == "direct":
-                target = payload.get("target")
-                if target is not None:
-                    await _send_direct(
-                        target,
-                        {
-                            "type": "direct",
-                            "payload": {
-                                "from": client_id,
-                                "message": payload.get("message", {}),
-                            },
-                            "timestamp": timestamp,
-                        },
-                    )
-            else:
-                channel = data.get("channel")
-                message = {
-                    "type": msg_type,
-                    "payload": {"from": client_id, **payload},
-                    "timestamp": timestamp,
-                }
-                if channel:
-                    await _broadcast_to_channel(channel, message)
-                else:
-                    await _broadcast(message)
+            await server.handle_message(client_id, data)
     except ConnectionClosed:
         pass
     finally:
-        registry.remove(client_id)
-        await _broadcast(
-            {
-                "type": "system",
-                "payload": {"client_id": client_id, "message": "disconnected"},
-                "timestamp": _make_timestamp(),
-            }
-        )
+        await server.handle_disconnect(client_id)
 
 
 async def process_request(connection, request):
@@ -403,8 +456,8 @@ async def start_server(host="0.0.0.0", port=8765):
             host,
             port,
             process_request=process_request,
-        ) as server:
-            await server.serve_forever()
+        ) as server_inst:
+            await server_inst.serve_forever()
     finally:
         await _stop_background()
 
