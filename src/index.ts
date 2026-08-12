@@ -1,6 +1,7 @@
 export {
   Ssg,
   buildSite,
+  buildSiteDetailed,
   collectMarkdownFiles,
   slugFor,
   DEFAULT_CONTENT_DIR,
@@ -8,7 +9,7 @@ export {
   DEFAULT_TEMPLATES_DIR,
   DEFAULT_SITE_TITLE,
 } from './ssg';
-export type { BuildOptions } from './ssg';
+export type { BuildOptions, BuildResult, BuildStats } from './ssg';
 
 export { PluginPipeline } from './plugin';
 export type { Plugin, PluginHookName, SsgContext } from './plugin';
@@ -30,6 +31,18 @@ export type { SsgConfig } from './config';
 
 export { parseFrontmatter } from './frontmatter';
 export { markdownToHtml } from './markdown';
+export {
+  CACHE_FILE_NAME,
+  CACHE_VERSION,
+  collectTemplateDependencies,
+  deleteCache,
+  hashFile,
+  hashSource,
+  readCache,
+  templatesUnchanged,
+  writeCache,
+} from './cache';
+export type { BuildCache, CachePageEntry } from './cache';
 export { pageTitle, renderIndex, renderPage } from './template';
 export type { SiteConfig } from './template';
 export { detectEngine, findTemplateFile, renderLayoutTemplate, renderNamedTemplate } from './template-engine';

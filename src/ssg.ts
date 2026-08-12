@@ -5,6 +5,18 @@ import { parseFrontmatter } from './frontmatter';
 import { PluginPipeline, type Plugin, type SsgContext } from './plugin';
 import type { SiteConfig } from './template';
 import type { Page } from './types';
+import {
+  CACHE_VERSION,
+  cacheMatches,
+  collectTemplateDependencies,
+  deleteCache,
+  hashSource,
+  readCache,
+  templatesUnchanged,
+  writeCache,
+  type BuildCache,
+  type CachePageEntry,
+} from './cache';
 
 export interface BuildOptions {
   contentDir: string;
@@ -14,6 +26,20 @@ export interface BuildOptions {
   defaultTemplate?: string;
   defaultLayout?: string;
   configPath?: string;
+  incremental?: boolean;
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  total: number;
+  built: number;
+  skipped: number;
+  timeSavedMs: number;
+}
+
+export interface BuildResult {
+  pages: Page[];
+  stats: BuildStats;
 }
 
 export const DEFAULT_CONTENT_DIR = './content';
@@ -65,6 +91,26 @@ function createContext(options: BuildOptions): SsgContext {
   };
 }
 
+function outputPathFor(context: SsgContext, slug: string): string {
+  return path.join(context.outputDir, `${slug}.html`);
+}
+
+function removeStaleOutputs(context: SsgContext, kept: Set<string>): void {
+  const cache = readCache(context.outputDir);
+  if (!cache) return;
+  for (const key of Object.keys(cache.pages)) {
+    if (kept.has(key)) continue;
+    const slug = key.replace(MARKDOWN_EXTENSION, '');
+    const output = path.join(context.outputDir, `${slug}.html`);
+    if (output === context.outputDir || !output.startsWith(context.outputDir + path.sep)) continue;
+    try {
+      fs.rmSync(output, { force: true });
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export class Ssg {
   private readonly pipeline: PluginPipeline;
 
@@ -86,45 +132,143 @@ export class Ssg {
   }
 
   rebuild(options: BuildOptions): Promise<Page[]> {
-    return this.run(options, false);
+    return this.run(options, false, true);
   }
 
-  private async run(options: BuildOptions, runStart: boolean): Promise<Page[]> {
+  buildDetailed(options: BuildOptions): Promise<BuildResult> {
+    return this.runDetailed(options, true);
+  }
+
+  private async run(options: BuildOptions, runStart: boolean, forceIncremental = false): Promise<Page[]> {
+    const result = await this.runDetailed(options, runStart, forceIncremental);
+    return result.pages;
+  }
+
+  private async runDetailed(options: BuildOptions, runStart: boolean, forceIncremental = false): Promise<BuildResult> {
     const context = createContext(options);
+    const incremental = options.incremental === true || forceIncremental;
+    const clean = options.clean === true;
+    const stats: BuildStats = { total: 0, built: 0, skipped: 0, timeSavedMs: 0 };
+
+    if (clean) {
+      deleteCache(context.outputDir);
+    }
+
+    const cached = incremental && !clean ? readCache(context.outputDir) : null;
+    const canReuse = cached !== null && cacheMatches(cached, context);
 
     if (runStart) {
       await this.pipeline.onStart(context);
     }
     await this.pipeline.beforeBuild(context);
 
-    for (const file of collectMarkdownFiles(context.contentDir)) {
+    const files = collectMarkdownFiles(context.contentDir);
+    stats.total = files.length;
+
+    const nextPages: Record<string, CachePageEntry> = {};
+
+    for (const file of files) {
+      const key = path.relative(context.contentDir, file).replace(/\\/g, '/');
       const source = fs.readFileSync(file, 'utf8');
-      const { data, content } = parseFrontmatter(source);
+      const sourceHash = hashSource(source);
       const slug = slugFor(file, context.contentDir);
-      const page: Page = {
-        slug,
-        link: `${slug}.html`,
-        outputPath: path.join(context.outputDir, `${slug}.html`),
-        filePath: file,
-        data,
-        content,
-        html: '',
-        template: data.template,
-        layout: data.layout,
-      };
-      context.pages.push(page);
-      await this.pipeline.onFile(page, context);
+      const outputPath = outputPathFor(context, slug);
+      const prior = canReuse ? cached.pages[key] : undefined;
+
+      let page: Page;
+      let entry: CachePageEntry;
+
+      if (
+        prior !== undefined &&
+        prior.sourceHash === sourceHash &&
+        templatesUnchanged(prior.templates, context.siteConfig, {
+          template: prior.data.template,
+          layout: prior.data.layout,
+        })
+      ) {
+        stats.skipped += 1;
+        stats.timeSavedMs += prior.buildMs;
+        page = {
+          slug,
+          link: `${slug}.html`,
+          outputPath,
+          filePath: file,
+          data: prior.data,
+          content: prior.content,
+          html: prior.html,
+          template: prior.data.template,
+          layout: prior.data.layout,
+        };
+        context.pages.push(page);
+        fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+        fs.writeFileSync(outputPath, prior.html, 'utf8');
+        entry = { ...prior };
+      } else {
+        stats.built += 1;
+        const startedAt = Date.now();
+        const { data, content } = parseFrontmatter(source);
+        page = {
+          slug,
+          link: `${slug}.html`,
+          outputPath,
+          filePath: file,
+          data,
+          content,
+          html: '',
+          template: data.template,
+          layout: data.layout,
+        };
+        context.pages.push(page);
+        await this.pipeline.onFile(page, context);
+        let renderedHtml = page.html;
+        try {
+          if (fs.existsSync(outputPath)) {
+            renderedHtml = fs.readFileSync(outputPath, 'utf8');
+          }
+        } catch {
+          // fall back to page.html
+        }
+        entry = {
+          sourceHash,
+          templates: collectTemplateDependencies(context.siteConfig, page),
+          data,
+          content,
+          html: renderedHtml,
+          buildMs: Date.now() - startedAt,
+        };
+      }
+
+      nextPages[key] = entry;
     }
 
     fs.mkdirSync(context.outputDir, { recursive: true });
     await this.pipeline.afterBuild(context);
     await this.pipeline.onEnd(context);
 
-    return context.pages;
+    removeStaleOutputs(context, new Set(Object.keys(nextPages)));
+
+    const manifest: BuildCache = {
+      version: CACHE_VERSION,
+      contentDir: context.contentDir,
+      outputDir: context.outputDir,
+      siteTitle: context.siteConfig.title,
+      templatesDir: context.siteConfig.templatesDir ?? '',
+      defaultTemplate: context.siteConfig.defaultTemplate,
+      defaultLayout: context.siteConfig.defaultLayout,
+      pages: nextPages,
+    };
+    writeCache(context.outputDir, manifest);
+
+    return { pages: context.pages, stats };
   }
 }
 
 export async function buildSite(options: BuildOptions): Promise<Page[]> {
   const engine = await Ssg.create({ configPath: options.configPath });
   return engine.build(options);
+}
+
+export async function buildSiteDetailed(options: BuildOptions): Promise<BuildResult> {
+  const engine = await Ssg.create({ configPath: options.configPath });
+  return engine.buildDetailed(options);
 }

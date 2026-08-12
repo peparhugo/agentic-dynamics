@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import * as path from 'path';
-import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR, DEFAULT_SITE_TITLE } from './build';
+import { buildSiteDetailed, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR, DEFAULT_SITE_TITLE } from './build';
 import { startDevServer, DEFAULT_PORT } from './dev-server';
 
 export interface CliOptions {
@@ -13,6 +13,8 @@ export interface CliOptions {
   defaultTemplate?: string;
   defaultLayout?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
   help?: boolean;
 }
 
@@ -61,6 +63,10 @@ export function parseCliArgs(argv: string[]): CliOptions {
       options.port = parsePort(arg.slice('--port='.length));
     } else if (arg === '--help' || arg === '-h') {
       options.help = true;
+    } else if (arg === '--incremental') {
+      options.incremental = true;
+    } else if (arg === '--clean') {
+      options.clean = true;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
@@ -92,6 +98,8 @@ function printUsage(): void {
   console.log('  --template <name>   Default page template to use when none is set');
   console.log('  --layout <name>     Default layout to use when none is set');
   console.log('  --title <text>      Site title used in the generated pages');
+  console.log('  --incremental       Only rebuild pages whose source or template changed');
+  console.log('  --clean             Force a full clean build, ignoring the cache');
   console.log('  -h, --help          Show this help');
   console.log('');
   console.log('ssg serve [options]');
@@ -158,10 +166,18 @@ export async function run(argv: string[]): Promise<number> {
       return await runServe(options);
     }
 
-    const pages = await buildSite(options);
+    const result = await buildSiteDetailed(options);
     const content = path.resolve(options.contentDir);
     const output = path.resolve(options.outputDir);
-    console.log(`Generated ${pages.length} page(s) from ${content} into ${output}`);
+    const { pages, stats } = result;
+    if (options.incremental) {
+      console.log(
+        `Generated ${stats.built} page(s) from ${content} into ${output} ` +
+          `(${stats.skipped} skipped, ${stats.timeSavedMs}ms saved)`
+      );
+    } else {
+      console.log(`Generated ${pages.length} page(s) from ${content} into ${output}`);
+    }
     return 0;
   } catch (error) {
     const message = (error as Error).message;

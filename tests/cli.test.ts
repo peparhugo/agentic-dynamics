@@ -60,6 +60,18 @@ describe('parseCliArgs', () => {
   it('throws on unknown arguments', () => {
     expect(() => parseCliArgs(['node', 'ssg', 'build', '--bogus'])).toThrow(/Unknown argument/);
   });
+
+  it('parses --incremental and --clean flags', () => {
+    const options = parseCliArgs(['node', 'ssg', 'build', '--incremental', '--clean']);
+    expect(options.incremental).toBe(true);
+    expect(options.clean).toBe(true);
+  });
+
+  it('does not set incremental or clean by default', () => {
+    const options = parseCliArgs(['node', 'ssg', 'build']);
+    expect(options.incremental).toBeUndefined();
+    expect(options.clean).toBeUndefined();
+  });
 });
 
 describe('run', () => {
