@@ -73,6 +73,41 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_message(tmp_path, monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "1")
+    server = NotificationServer("127.0.0.1", 0, database_url=str(tmp_path / "messages.sqlite"))
+    await server.start()
+    client = await websockets.connect(f"ws://127.0.0.1:{server.port}")
+    try:
+        await client.send(json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+        assert json.loads(await client.recv())["payload"] == {"n": 1}
+        await client.send(json.dumps({"type": "broadcast", "payload": {"n": 2}}))
+        assert json.loads(await client.recv()) == {"error": "rate limit exceeded"}
+    finally:
+        await client.close()
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_since_and_reports_more(tmp_path):
+    server = NotificationServer("127.0.0.1", 0, database_url=str(tmp_path / "messages.sqlite"))
+    await server.start()
+    try:
+        await server.broadcast("system", {"n": 1}, channel="audit")
+        first = server.store.history("audit")[0][0]
+        await server.broadcast("system", {"n": 2}, channel="audit")
+        await server.broadcast("system", {"n": 3}, channel="other")
+        result = await asyncio.to_thread(
+            get_json,
+            f"http://127.0.0.1:{server.port}/history?channel=audit&since={first['timestamp']}&limit=1",
+        )
+        assert [message["payload"] for message in result["messages"]] == [{"n": 2}]
+        assert result["has_more"] is False
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
 async def test_redis_delivers_between_server_instances():
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
