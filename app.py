@@ -8,12 +8,14 @@ import hmac
 import json
 import os
 import sqlite3
+from sqlite3 import IntegrityError
 from functools import wraps
 
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import send_notification_email
+from repositories import TaskRepository, UserRepository, initialize_database
 
 
 app = Flask(__name__)
@@ -27,38 +29,6 @@ def get_db():
     connection = sqlite3.connect(app.config["DATABASE"])
     connection.row_factory = sqlite3.Row
     return connection
-
-
-def create_tasks_table(connection):
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            created_at TEXT NOT NULL,
-            owner_id INTEGER
-        )
-        """
-    )
-    columns = {row["name"] for row in connection.execute("PRAGMA table_info(tasks)")}
-    if "owner_id" not in columns:
-        connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
-
-
-def initialize_database(connection):
-    """Create the schema and migrate databases created by older versions."""
-    connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL
-        )
-        """
-    )
-    create_tasks_table(connection)
-    connection.commit()
 
 
 def _encode_part(value):
@@ -128,14 +98,13 @@ def register():
     with get_db() as connection:
         initialize_database(connection)
         try:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+            user_id = UserRepository(connection).create(
+                {"username": username, "password_hash": generate_password_hash(password)}
             )
             connection.commit()
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             return jsonify({"error": "username already exists"}), 409
-    return jsonify({"id": cursor.lastrowid, "username": username}), 201
+    return jsonify({"id": user_id, "username": username}), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -147,7 +116,7 @@ def login():
         return jsonify({"error": "invalid credentials"}), 401
     with get_db() as connection:
         initialize_database(connection)
-        user = connection.execute("SELECT * FROM users WHERE username = ?", (username.strip(),)).fetchone()
+        user = UserRepository(connection).find_by_username(username.strip())
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
@@ -170,13 +139,7 @@ def create_task(user_id):
     with get_db() as connection:
         # The schema is created lazily when the first task is inserted.
         initialize_database(connection)
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-            (title, created_at, user_id),
-        )
-        row = connection.execute(
-            "SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)
-        ).fetchone()
+        row = TaskRepository(connection).create_for_owner(title, created_at, user_id)
         connection.commit()
     return jsonify(task_from_row(row)), 201
 
@@ -186,18 +149,14 @@ def create_task(user_id):
 def list_tasks(user_id):
     with get_db() as connection:
         initialize_database(connection)
-        rows = connection.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC", (user_id,)
-        ).fetchall()
+        rows = TaskRepository(connection).list_for_owner(user_id)
     return jsonify([task_from_row(row) for row in rows])
 
 
 def find_task(task_id, user_id):
     with get_db() as connection:
         initialize_database(connection)
-        return connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, user_id)
-        ).fetchone()
+        return TaskRepository(connection).find_for_owner(task_id, user_id)
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
@@ -215,46 +174,34 @@ def update_task(user_id, task_id):
     data = request.get_json(silent=True) or {}
     fields = []
     values = []
+    updates = {}
     if "title" in data:
         if not isinstance(data["title"], str) or not data["title"].strip():
             return jsonify({"error": "title must be a non-empty string"}), 400
         fields.append("title = ?")
-        values.append(data["title"].strip())
+        title = data["title"].strip()
+        values.append(title)
+        updates["title"] = title
     if "status" in data:
         if not isinstance(data["status"], str) or not data["status"].strip():
             return jsonify({"error": "status must be a non-empty string"}), 400
         fields.append("status = ?")
-        values.append(data["status"].strip())
+        status = data["status"].strip()
+        values.append(status)
+        updates["status"] = status
     if not fields:
         return jsonify({"error": "title or status is required"}), 400
 
-    values.append(task_id)
-    try:
-        with get_db() as connection:
-            initialize_database(connection)
-            existing = connection.execute(
-                """
-                SELECT tasks.status, tasks.title, users.username AS user_email
-                FROM tasks
-                JOIN users ON users.id = tasks.owner_id
-                WHERE tasks.id = ? AND tasks.owner_id = ?
-                """,
-                (task_id, user_id),
-            ).fetchone()
-            if existing is None:
-                return jsonify({"error": "task not found"}), 404
-
-            cursor = connection.execute(
-                f"UPDATE tasks SET {', '.join(fields)} WHERE id = ? AND owner_id = ?", values + [user_id]
-            )
-            if cursor.rowcount == 0:
-                return jsonify({"error": "task not found"}), 404
-            row = connection.execute(
-                "SELECT * FROM tasks WHERE id = ?", (task_id,)
-            ).fetchone()
-            connection.commit()
-    except sqlite3.OperationalError:
-        return jsonify({"error": "task not found"}), 404
+    with get_db() as connection:
+        initialize_database(connection)
+        repository = TaskRepository(connection)
+        existing = repository.find_with_owner_for_update(task_id, user_id)
+        if existing is None:
+            return jsonify({"error": "task not found"}), 404
+        changed, row = repository.update_and_get_for_owner(task_id, user_id, updates)
+        if changed == 0:
+            return jsonify({"error": "task not found"}), 404
+        connection.commit()
     status_changed_to_completed = (
         existing["status"] != "completed" and row["status"] == "completed"
     )
