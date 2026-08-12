@@ -92,3 +92,47 @@ def test_legacy_tasks_are_preserved_during_migration(tmp_path, monkeypatch):
         row = connection.execute("SELECT title, owner_id FROM tasks WHERE id = 1").fetchone()
     assert "owner_id" in columns
     assert row == ("old task", None)
+
+
+def test_completing_task_queues_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    token = login(client, "alice@example.com")
+    task = client.post("/tasks", headers=auth(token), json={"title": "Ship it"})
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task.get_json()['id']}",
+        headers=auth(token),
+        json={"status": "completed"},
+    )
+
+    assert response.status_code == 200
+    assert calls == [("alice@example.com", "Ship it")]
+
+
+def test_repeated_completed_update_does_not_queue_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    token = login(client, "alice@example.com")
+    task = client.post(
+        "/tasks", headers=auth(token), json={"title": "Already done", "status": "completed"}
+    )
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task.get_json()['id']}",
+        headers=auth(token),
+        json={"title": "Still done"},
+    )
+
+    assert response.status_code == 200
+    assert calls == []

@@ -9,6 +9,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-production")
@@ -219,6 +221,9 @@ def update_task(task_id):
     if "status" in data and not isinstance(data["status"], str):
         return jsonify({"error": "status must be a string"}), 400
 
+    should_notify = False
+    notification_email = None
+    notification_title = None
     with get_db() as connection:
         row = connection.execute(
             f"SELECT {TASK_SELECT} FROM tasks WHERE id = ? AND owner_id = ?",
@@ -226,14 +231,24 @@ def update_task(task_id):
         ).fetchone()
         if row is None:
             return jsonify({"error": "task not found"}), 404
+        new_status = data.get("status", row["status"])
+        should_notify = row["status"] != "completed" and new_status == "completed"
+        notification_email = g.current_user["username"]
+        notification_title = data.get("title", row["title"])
         connection.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
-            (data.get("title", row["title"]), data.get("status", row["status"]),
+            (data.get("title", row["title"]), new_status,
              task_id, g.current_user["id"]),
         )
         updated = connection.execute(
             f"SELECT {TASK_SELECT} FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+    if should_notify:
+        try:
+            send_notification_email.delay(notification_email, notification_title)
+        except Exception:
+            # A broker outage must not turn a successful task update into an API error.
+            app.logger.exception("Unable to queue task completion notification")
     return jsonify(task_dict(updated))
 
 

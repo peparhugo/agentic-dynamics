@@ -2,3 +2,5 @@ Flask
 PyJWT
 Werkzeug
 pytest
+celery
+redis
