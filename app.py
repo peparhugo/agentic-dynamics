@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import redis.asyncio as redis
-from websockets.asyncio.server import Server, ServerConnection, serve
+from transport import BaseTransport, WebSocketTransport
 
 LOGGER = logging.getLogger(__name__)
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -52,6 +52,7 @@ class NotificationServer:
         health_port: int | None = None,
         redis_url: str | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.websocket_port = websocket_port
@@ -61,10 +62,15 @@ class NotificationServer:
             "DATABASE_URL", ":memory:"
         )
         self._instance_id = str(uuid.uuid4())
-        self._clients: dict[str, ServerConnection] = {}
+        selected_transport = os.getenv("TRANSPORT", "websocket").lower()
+        if transport is not None:
+            self.transport = transport
+        elif selected_transport in {"websocket", "ws"}:
+            self.transport = WebSocketTransport()
+        else:
+            raise ValueError(f"unsupported transport: {selected_transport}")
         self._subscriptions: dict[str, set[str]] = {}
         self._clients_lock = threading.RLock()
-        self._websocket_server: Server | None = None
         self._health_server: asyncio.AbstractServer | None = None
         self._redis: redis.Redis | None = None
         self._pubsub: redis.client.PubSub | None = None
@@ -91,15 +97,15 @@ class NotificationServer:
         return self.database_url
 
     @property
-    def clients(self) -> dict[str, ServerConnection]:
+    def clients(self) -> dict[str, Any]:
         """Return a snapshot of connected clients, never the mutable registry."""
         with self._clients_lock:
-            return dict(self._clients)
+            return self.transport.clients
 
     @property
     def client_count(self) -> int:
         with self._clients_lock:
-            return len(self._clients)
+            return len(self.transport.clients)
 
     @property
     def channels(self) -> dict[str, set[str]]:
@@ -115,8 +121,9 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.subscribe(REDIS_CHANNEL)
             self._redis_task = asyncio.create_task(self._redis_listener())
-        self._websocket_server = await serve(
-            self._websocket_handler, self.host, self.websocket_port
+        await self.transport.start(
+            self.host, self.websocket_port, self._client_connected,
+            self._handle_client_message, self._client_disconnected,
         )
         self._health_server = await asyncio.start_server(
             self._health_handler, self.host, self.health_port
@@ -128,12 +135,7 @@ class NotificationServer:
             self._health_server.close()
             await self._health_server.wait_closed()
             self._health_server = None
-        if self._websocket_server is not None:
-            self._websocket_server.close()
-            await self._websocket_server.wait_closed()
-            self._websocket_server = None
-        for connection in self.clients.values():
-            await connection.close()
+        await self.transport.stop()
         if self._redis_task is not None:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
@@ -145,15 +147,13 @@ class NotificationServer:
             await self._redis.close()
             self._redis = None
         with self._clients_lock:
-            self._clients.clear()
             self._subscriptions.clear()
         with self._database_lock:
             self._database.close()
 
     async def wait_closed(self) -> None:
         """Wait for either listener to be closed by the caller."""
-        if self._websocket_server is not None:
-            await self._websocket_server.wait_closed()
+        await self.transport.wait_closed()
 
     async def broadcast(self, payload: dict[str, Any], channel: str | None = None) -> None:
         """Send a broadcast message to every currently connected client."""
@@ -214,9 +214,9 @@ class NotificationServer:
                         subscriber_ids = self._subscriptions.get(channel, set())
                 with self._clients_lock:
                     recipients = {
-                        client_id: self._clients[client_id]
+                        client_id: self.clients[client_id]
                         for client_id in subscriber_ids
-                        if client_id in self._clients
+                        if client_id in self.clients
                     }
         await self._send_to_many(message, recipients)
 
@@ -240,32 +240,24 @@ class NotificationServer:
             for row in rows
         ]
 
-    async def _websocket_handler(self, connection: ServerConnection) -> None:
-        client_id = str(uuid.uuid4())
-        with self._clients_lock:
-            self._clients[client_id] = connection
+    async def _client_connected(self, client_id: str) -> None:
         if self._redis is not None:
             await self._redis.set(
                 f"notification:client:{client_id}",
                 json.dumps({"instance_id": self._instance_id, "connected": True}),
             )
-        try:
-            await connection.send(
-                json.dumps(make_message("system", {"client_id": client_id}))
-            )
-            async for raw_message in connection:
-                await self._handle_client_message(client_id, raw_message)
-        except Exception as exc:
-            LOGGER.debug("WebSocket %s closed: %s", client_id, exc)
-        finally:
-            with self._clients_lock:
-                self._clients.pop(client_id, None)
-                for channel in list(self._subscriptions):
-                    self._subscriptions[channel].discard(client_id)
-                    if not self._subscriptions[channel]:
-                        del self._subscriptions[channel]
-            if self._redis is not None:
-                await self._redis.delete(f"notification:client:{client_id}")
+        await self.transport.send_message(
+            client_id, make_message("system", {"client_id": client_id})
+        )
+
+    async def _client_disconnected(self, client_id: str) -> None:
+        with self._clients_lock:
+            for channel in list(self._subscriptions):
+                self._subscriptions[channel].discard(client_id)
+                if not self._subscriptions[channel]:
+                    del self._subscriptions[channel]
+        if self._redis is not None:
+            await self._redis.delete(f"notification:client:{client_id}")
 
     async def _handle_client_message(self, client_id: str, raw_message: str) -> None:
         try:
@@ -306,17 +298,9 @@ class NotificationServer:
                 await self.send_direct(recipient, payload)
 
     async def _send_to_many(
-        self, message: dict[str, Any], clients: dict[str, ServerConnection]
+        self, message: dict[str, Any], clients: dict[str, Any]
     ) -> None:
-        encoded = json.dumps(message)
-        results = await asyncio.gather(
-            *(connection.send(encoded) for connection in clients.values()),
-            return_exceptions=True,
-        )
-        for client_id, result in zip(clients, results):
-            if isinstance(result, Exception):
-                with self._clients_lock:
-                    self._clients.pop(client_id, None)
+        await self.transport.broadcast(message, set(clients))
 
     async def _health_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
