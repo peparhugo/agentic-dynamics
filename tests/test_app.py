@@ -4,6 +4,7 @@ import app as task_app
 def clear_tasks():
     with task_app.get_db() as connection:
         connection.execute("DELETE FROM tasks")
+        connection.execute("DELETE FROM users")
         connection.commit()
 
 
@@ -13,8 +14,22 @@ def client():
     return task_app.app.test_client()
 
 
+def authenticated_client(api, username="alice", password="secret"):
+    response = api.post("/auth/register", json={"username": username, "password": password})
+    assert response.status_code == 201
+    response = api.post("/auth/login", json={"username": username, "password": password})
+    assert response.status_code == 200
+    api.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {response.get_json()['token']}"
+    return api
+
+
+def auth_header(api, username, password="secret"):
+    response = api.post("/auth/login", json={"username": username, "password": password})
+    return {"Authorization": f"Bearer {response.get_json()['token']}"}
+
+
 def test_create_task_uses_pending_status():
-    response = client().post("/tasks", json={"title": "Write tests"})
+    response = authenticated_client(client()).post("/tasks", json={"title": "Write tests"})
 
     assert response.status_code == 201
     body = response.get_json()
@@ -25,7 +40,7 @@ def test_create_task_uses_pending_status():
 
 
 def test_create_task_requires_nonblank_title():
-    api = client()
+    api = authenticated_client(client())
 
     assert api.post("/tasks", json={}).status_code == 400
     response = api.post("/tasks", json={"title": "  "})
@@ -35,7 +50,7 @@ def test_create_task_requires_nonblank_title():
 
 
 def test_list_tasks_is_ordered_newest_first():
-    api = client()
+    api = authenticated_client(client())
     first = api.post("/tasks", json={"title": "First"}).get_json()
     second = api.post("/tasks", json={"title": "Second"}).get_json()
 
@@ -46,7 +61,7 @@ def test_list_tasks_is_ordered_newest_first():
 
 
 def test_get_and_update_task():
-    api = client()
+    api = authenticated_client(client())
     created = api.post("/tasks", json={"title": "Old title"}).get_json()
 
     response = api.get(f"/tasks/{created['id']}")
@@ -63,9 +78,41 @@ def test_get_and_update_task():
 
 
 def test_missing_task_returns_json_404():
-    api = client()
+    api = authenticated_client(client())
 
     for method in (api.get, api.put):
         response = method("/tasks/999999", json={} if method == api.put else None)
         assert response.status_code == 404
         assert response.get_json() == {"error": "task not found"}
+
+
+def test_tasks_require_a_valid_bearer_token():
+    api = client()
+    assert api.get("/tasks").status_code == 401
+    assert api.get("/tasks", headers={"Authorization": "Bearer not-a-token"}).status_code == 401
+    assert api.get("/tasks", headers={"Authorization": "Basic credentials"}).status_code == 401
+
+
+def test_register_login_and_duplicate_user():
+    api = client()
+    response = api.post("/auth/register", json={"username": "alice", "password": "secret"})
+    assert response.status_code == 201
+    assert response.get_json()["username"] == "alice"
+    assert api.post("/auth/register", json={"username": "alice", "password": "secret"}).status_code == 409
+    assert api.post("/auth/login", json={"username": "alice", "password": "wrong"}).status_code == 401
+    response = api.post("/auth/login", json={"username": "alice", "password": "secret"})
+    assert response.status_code == 200
+    assert response.get_json().get("token")
+
+
+def test_users_only_see_and_modify_their_own_tasks():
+    api = authenticated_client(client(), "alice")
+    task = api.post("/tasks", json={"title": "Alice task"}).get_json()
+
+    api.post("/auth/register", json={"username": "bob", "password": "secret"})
+    bob_headers = auth_header(api, "bob")
+
+    assert api.get("/tasks", headers=bob_headers).get_json() == []
+    assert api.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
+    assert api.put(f"/tasks/{task['id']}", json={"title": "hacked"}, headers=bob_headers).status_code == 404
+    assert api.get(f"/tasks/{task['id']}").get_json()["title"] == "Alice task"
