@@ -98,9 +98,28 @@ class TaskRepository(BaseRepository):
 
     def list_for_owner(self, owner_id: int) -> list[dict]:
         rows = self.find_all(
-            where="owner_id = ?", parameters=(owner_id,), order_by="created_at DESC"
+            where="owner_id = ?", parameters=(owner_id,), order_by="id DESC"
         )
         return [dict(row) for row in rows]
+
+    def list_page_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict], bool, int]:
+        total = self.connection.execute(
+            "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()[0]
+        where = "owner_id = ?"
+        parameters: tuple[Any, ...] = (owner_id,)
+        if cursor is not None:
+            where += " AND id < ?"
+            parameters += (cursor,)
+        rows = self.find_all(
+            where=where,
+            parameters=parameters,
+            order_by="id DESC",
+        )[: limit + 1]
+        has_more = len(rows) > limit
+        return [dict(row) for row in rows[:limit]], has_more, total
 
     def find_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         row = self.find_one(id=task_id, owner_id=owner_id)

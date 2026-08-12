@@ -55,9 +55,52 @@ def test_list_tasks_is_ordered_newest_first():
     second = api.post("/tasks", json={"title": "Second"}).get_json()
 
     response = api.get("/tasks")
-
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    body = response.get_json()
+    assert [task["id"] for task in body["data"]] == [second["id"], first["id"]]
+    assert body["next_cursor"] is None
+    assert body["total"] == 2
+
+
+def test_list_tasks_supports_cursor_pagination():
+    api = authenticated_client(client())
+    created = [
+        api.post("/tasks", json={"title": title}).get_json()
+        for title in ("First", "Second", "Third")
+    ]
+
+    response = api.get("/tasks?limit=2")
+    first_page = response.get_json()
+    assert [task["id"] for task in first_page["data"]] == [created[2]["id"], created[1]["id"]]
+    assert first_page["next_cursor"] == str(created[1]["id"])
+    assert first_page["total"] == 3
+
+    response = api.get(f"/tasks?cursor={first_page['next_cursor']}&limit=2")
+    second_page = response.get_json()
+    assert [task["id"] for task in second_page["data"]] == [created[0]["id"]]
+    assert second_page["next_cursor"] is None
+    assert second_page["total"] == 3
+
+
+def test_list_tasks_rejects_invalid_pagination_parameters():
+    api = authenticated_client(client())
+
+    assert api.get("/tasks?limit=0").status_code == 400
+    assert api.get("/tasks?limit=101").status_code == 400
+    assert api.get("/tasks?cursor=not-an-id").status_code == 400
+
+
+def test_rate_limit_returns_retry_after_header():
+    api = authenticated_client(client())
+    for _ in range(99):
+        response = api.get("/tasks")
+        assert response.status_code == 200
+
+    response = api.get("/tasks")
+    assert response.status_code == 200
+    response = api.get("/tasks")
+    assert response.status_code == 429
+    assert response.headers.get("Retry-After")
 
 
 def test_get_and_update_task():
@@ -145,7 +188,9 @@ def test_users_only_see_and_modify_their_own_tasks():
     api.post("/auth/register", json={"username": "bob", "password": "secret"})
     bob_headers = auth_header(api, "bob")
 
-    assert api.get("/tasks", headers=bob_headers).get_json() == []
+    assert api.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [], "next_cursor": None, "total": 0
+    }
     assert api.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert api.put(f"/tasks/{task['id']}", json={"title": "hacked"}, headers=bob_headers).status_code == 404
     assert api.get(f"/tasks/{task['id']}").get_json()["title"] == "Alice task"

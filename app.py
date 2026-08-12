@@ -8,6 +8,8 @@ Designed as a baseline for multi-session stories.
 from functools import wraps
 import jwt
 from flask import Flask, request, jsonify, g
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 import sqlite3
 import os
 import time
@@ -18,6 +20,34 @@ from repositories import TaskRepository, UserRepository, initialize_database
 app = Flask(__name__)
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_SECONDS"] = 3600
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "REDIS_URL", "redis://localhost:6379/0"
+)
+
+
+def rate_limit_key() -> str:
+    """Use the authenticated user when possible, otherwise the client address."""
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        try:
+            payload = jwt.decode(
+                header[7:], app.config["JWT_SECRET"], algorithms=["HS256"]
+            )
+            return f"user:{payload['sub']}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+    retry_after="delta-seconds",
+    in_memory_fallback_enabled=True,
+)
 
 DATABASE = os.environ.get("DATABASE", ":memory:")
 _connection = sqlite3.connect(DATABASE, check_same_thread=False)
@@ -91,6 +121,10 @@ def get_tasks(owner_id: int):
     return task_repository().list_for_owner(owner_id)
 
 
+def get_task_page(owner_id: int, cursor: int | None, limit: int):
+    return task_repository().list_page_for_owner(owner_id, cursor, limit)
+
+
 def get_task(task_id: int, owner_id: int) -> dict | None:
     return task_repository().find_for_owner(task_id, owner_id)
 
@@ -133,10 +167,32 @@ def login():
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
 
+
+@app.errorhandler(RateLimitExceeded)
+def rate_limit_exceeded(error):
+    return jsonify({"error": "rate limit exceeded"}), 429
+
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.current_user["id"]))
+    raw_cursor = request.args.get("cursor")
+    raw_limit = request.args.get("limit", "20")
+    try:
+        cursor = int(raw_cursor) if raw_cursor is not None else None
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if cursor is not None and cursor <= 0:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    tasks, has_more, total = get_task_page(g.current_user["id"], cursor, limit)
+    return jsonify({
+        "data": tasks,
+        "next_cursor": str(tasks[-1]["id"]) if has_more else None,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
