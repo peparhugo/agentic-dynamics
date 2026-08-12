@@ -89,6 +89,35 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_by_owner_paginated(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> list[dict]:
+        """Return a page of tasks for an owner ordered by id DESC.
+
+        When a cursor is provided only tasks with a smaller id are returned,
+        giving stable, offset-free cursor pagination.
+        """
+        if cursor is not None:
+            sql = (
+                "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                "ORDER BY id DESC LIMIT ?"
+            )
+            params: tuple = (owner_id, cursor, limit)
+        else:
+            sql = "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?"
+            params = (owner_id, limit)
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def count_by_owner(self, owner_id: int) -> int:
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+        return row["total"]
+
     def get_by_id_and_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(

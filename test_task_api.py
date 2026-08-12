@@ -3,6 +3,7 @@ import os
 import pytest
 
 os.environ["TASK_DATABASE"] = "test_tasks.db"
+os.environ["RATE_LIMIT_FAKE_REDIS"] = "1"
 
 import task_api
 from task_api import app, init_db
@@ -15,6 +16,8 @@ def client(tmp_path):
     task_api.DATABASE = str(tmp_path / "test_tasks.db")
     init_db()
     app.config["TESTING"] = True
+    task_api.limiter.reset()
+    task_api.RATE_LIMIT_PER_MINUTE = 100
     with app.test_client() as c:
         yield c
 
@@ -184,7 +187,7 @@ def test_list_tasks_ordered_by_created_at_desc(client):
     client.post("/tasks", json={"title": "third"}, headers=headers)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    data = resp.get_json()
+    data = resp.get_json()["data"]
     assert len(data) == 3
     titles = [t["title"] for t in data]
     assert titles == ["third", "second", "first"]
@@ -292,8 +295,8 @@ def test_users_only_see_their_own_tasks(client):
     client.post("/tasks", json={"title": "alice task"}, headers=alice)
     client.post("/tasks", json={"title": "bob task"}, headers=bob)
 
-    alice_tasks = client.get("/tasks", headers=alice).get_json()
-    bob_tasks = client.get("/tasks", headers=bob).get_json()
+    alice_tasks = client.get("/tasks", headers=alice).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob).get_json()["data"]
     assert [t["title"] for t in alice_tasks] == ["alice task"]
     assert [t["title"] for t in bob_tasks] == ["bob task"]
 
@@ -450,3 +453,215 @@ def test_init_db_idempotent(tmp_path):
         tasks = conn.execute("PRAGMA table_info(tasks)").fetchall()
     cols = {row[1] for row in tasks}
     assert "owner_id" in cols
+
+
+# ── Rate limiting ──────────────────────────────────────────────
+
+def test_requests_below_limit_succeed(client):
+    task_api.RATE_LIMIT_PER_MINUTE = 5
+    try:
+        headers = auth_headers(client)
+        for _ in range(5):
+            resp = client.get("/tasks", headers=headers)
+            assert resp.status_code == 200
+    finally:
+        task_api.RATE_LIMIT_PER_MINUTE = 100
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(client):
+    task_api.RATE_LIMIT_PER_MINUTE = 3
+    try:
+        headers = auth_headers(client)
+        for _ in range(3):
+            assert client.get("/tasks", headers=headers).status_code == 200
+        resp = client.get("/tasks", headers=headers)
+        assert resp.status_code == 429
+        body = resp.get_json()
+        assert body["error"] == "rate limit exceeded"
+        assert "Retry-After" in resp.headers
+        assert int(resp.headers["Retry-After"]) > 0
+    finally:
+        task_api.RATE_LIMIT_PER_MINUTE = 100
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    task_api.RATE_LIMIT_PER_MINUTE = 2
+    try:
+        resp = client.post(
+            "/auth/login", json={"username": "x", "password": "y"}
+        )
+        assert resp.status_code == 401
+        resp = client.post(
+            "/auth/login", json={"username": "x", "password": "y"}
+        )
+        assert resp.status_code == 401
+        resp = client.post(
+            "/auth/login", json={"username": "x", "password": "y"}
+        )
+        assert resp.status_code == 429
+        assert "Retry-After" in resp.headers
+    finally:
+        task_api.RATE_LIMIT_PER_MINUTE = 100
+
+
+def test_rate_limit_is_per_user(client):
+    task_api.RATE_LIMIT_PER_MINUTE = 3
+    try:
+        alice = auth_headers(client, username="alice")
+        bob = auth_headers(client, username="bob")
+        for _ in range(3):
+            assert client.get("/tasks", headers=alice).status_code == 200
+        assert client.get("/tasks", headers=alice).status_code == 429
+        assert client.get("/tasks", headers=bob).status_code == 200
+    finally:
+        task_api.RATE_LIMIT_PER_MINUTE = 100
+
+
+def test_rate_limit_applies_to_protected_creates(client):
+    task_api.RATE_LIMIT_PER_MINUTE = 3
+    try:
+        headers = auth_headers(client)
+        for i in range(3):
+            resp = client.post(
+                "/tasks", json={"title": f"task {i}"}, headers=headers
+            )
+            assert resp.status_code == 201
+        resp = client.post(
+            "/tasks", json={"title": "blocked"}, headers=headers
+        )
+        assert resp.status_code == 429
+    finally:
+        task_api.RATE_LIMIT_PER_MINUTE = 100
+
+
+# ── Pagination ─────────────────────────────────────────────────
+
+def test_pagination_response_shape(client):
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "one"}, headers=headers)
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert set(data.keys()) == {"data", "next_cursor", "total"}
+    assert isinstance(data["data"], list)
+    assert data["total"] == 1
+
+
+def test_pagination_default_limit_is_20(client):
+    headers = auth_headers(client)
+    for i in range(25):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=headers)
+    data = client.get("/tasks", headers=headers).get_json()
+    assert len(data["data"]) == 20
+    assert data["total"] == 25
+    assert data["next_cursor"] == str(data["data"][-1]["id"])
+
+
+def test_pagination_with_cursor_no_overlap(client):
+    headers = auth_headers(client)
+    for i in range(25):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=headers)
+
+    first = client.get("/tasks?limit=10", headers=headers).get_json()
+    assert len(first["data"]) == 10
+    assert first["total"] == 25
+    assert first["next_cursor"] == str(first["data"][-1]["id"])
+
+    second = client.get(
+        f"/tasks?cursor={first['next_cursor']}&limit=10", headers=headers
+    ).get_json()
+    assert len(second["data"]) == 10
+    assert second["next_cursor"] == str(second["data"][-1]["id"])
+
+    first_ids = {t["id"] for t in first["data"]}
+    second_ids = {t["id"] for t in second["data"]}
+    assert first_ids.isdisjoint(second_ids)
+
+    third = client.get(
+        f"/tasks?cursor={second['next_cursor']}&limit=10", headers=headers
+    ).get_json()
+    assert len(third["data"]) == 5
+    assert third["next_cursor"] is None
+
+    seen = [t["id"] for t in first["data"] + second["data"] + third["data"]]
+    assert len(seen) == 25
+    assert len(set(seen)) == 25
+
+
+def test_pagination_fully_walked(client):
+    headers = auth_headers(client)
+    for i in range(25):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=headers)
+
+    cursor = None
+    collected = []
+    total = None
+    while True:
+        url = "/tasks?limit=7"
+        if cursor is not None:
+            url += f"&cursor={cursor}"
+        data = client.get(url, headers=headers).get_json()
+        total = data["total"]
+        collected.extend(t["id"] for t in data["data"])
+        if data["next_cursor"] is None:
+            break
+        cursor = data["next_cursor"]
+
+    assert total == 25
+    assert len(collected) == 25
+    assert len(set(collected)) == 25
+
+
+def test_pagination_limit_capped_at_max(client):
+    headers = auth_headers(client)
+    for i in range(5):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=headers)
+    data = client.get("/tasks?limit=500", headers=headers).get_json()
+    assert len(data["data"]) == 5
+    assert data["total"] == 5
+
+
+def test_pagination_invalid_limit_uses_default(client):
+    headers = auth_headers(client)
+    for i in range(30):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=headers)
+    data = client.get("/tasks?limit=0", headers=headers).get_json()
+    assert len(data["data"]) == 20
+    assert data["next_cursor"] == str(data["data"][-1]["id"])
+    data = client.get("/tasks?limit=-5", headers=headers).get_json()
+    assert len(data["data"]) == 20
+    data = client.get("/tasks?limit=abc", headers=headers).get_json()
+    assert len(data["data"]) == 20
+
+
+def test_pagination_empty_list(client):
+    headers = auth_headers(client)
+    data = client.get("/tasks", headers=headers).get_json()
+    assert data == {"data": [], "next_cursor": None, "total": 0}
+
+
+def test_pagination_invalid_cursor_returns_empty(client):
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "one"}, headers=headers)
+    data = client.get("/tasks?cursor=0", headers=headers).get_json()
+    assert data == {"data": [], "next_cursor": None, "total": 1}
+
+
+def test_pagination_cursor_past_last_id_returns_remaining(client):
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "one"}, headers=headers)
+    data = client.get("/tasks?cursor=999999", headers=headers).get_json()
+    assert [t["title"] for t in data["data"]] == ["one"]
+    assert data["total"] == 1
+
+
+def test_pagination_does_not_leak_other_users_tasks(client):
+    alice = auth_headers(client, username="alice")
+    bob = auth_headers(client, username="bob")
+    for i in range(5):
+        client.post("/tasks", json={"title": f"alice {i}"}, headers=alice)
+    for i in range(5):
+        client.post("/tasks", json={"title": f"bob {i}"}, headers=bob)
+    data = client.get("/tasks", headers=alice).get_json()
+    assert data["total"] == 5
+    assert all(t["title"].startswith("alice") for t in data["data"])

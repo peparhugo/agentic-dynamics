@@ -12,12 +12,16 @@ Each user only sees and manages their own tasks.
 
 import os
 import sqlite3
+import time
 from datetime import datetime, timedelta
 from functools import wraps
 
 import jwt
 from celery import Celery
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import (
@@ -47,6 +51,61 @@ SECRET_KEY = os.environ.get("TASK_SECRET_KEY", "dev-secret-key-change-me")
 TOKEN_TTL_SECONDS = int(os.environ.get("TOKEN_TTL_SECONDS", "3600"))
 
 VALID_STATUSES = {"pending", "in_progress", "completed"}
+
+# ── Pagination configuration ───────────────────────────────────
+
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+
+# ── Rate limiting configuration ────────────────────────────────
+
+RATE_LIMIT_STORAGE_URI = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379"
+)
+RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "100"))
+
+
+def rate_limit_value() -> str:
+    """Rate limit string applied to every endpoint."""
+    return f"{RATE_LIMIT_PER_MINUTE}/minute"
+
+
+def rate_limit_storage_options() -> dict:
+    """Allow tests to swap the Redis backend for a fake Redis."""
+    if os.environ.get("RATE_LIMIT_FAKE_REDIS", "").lower() in ("1", "true", "yes"):
+        import fakeredis
+
+        return {"connection_class": fakeredis.FakeRedisConnection}
+    return {}
+
+
+def rate_limit_key() -> str:
+    """Limit each authenticated user independently; fall back to remote IP."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+        user = get_user_from_token(token)
+        if user is not None:
+            return f"user:{user['id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    storage_options=rate_limit_storage_options(),
+    headers_enabled=True,
+    retry_after="delta-seconds",
+    app=app,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(max(60 - (int(time.time()) % 60), 1))
+    return response
 
 
 def get_db():
@@ -161,6 +220,7 @@ def queue_notification_email(user_email: str, task_title: str):
 # ── Auth endpoints ──────────────────────────────────────────────
 
 @app.post("/auth/register")
+@limiter.limit(rate_limit_value)
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -176,6 +236,7 @@ def register():
 
 
 @app.post("/auth/login")
+@limiter.limit(rate_limit_value)
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -192,6 +253,7 @@ def login():
 # ── Task endpoints (protected) ──────────────────────────────────
 
 @app.post("/tasks")
+@limiter.limit(rate_limit_value)
 @require_auth
 def create_task(user: dict):
     data = request.get_json(silent=True) or {}
@@ -210,13 +272,25 @@ def create_task(user: dict):
 
 
 @app.get("/tasks")
+@limiter.limit(rate_limit_value)
 @require_auth
 def list_tasks(user: dict):
-    rows = task_repository.list_by_owner(user["id"])
-    return jsonify(rows)
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", default=DEFAULT_PAGE_SIZE, type=int)
+    if limit is None or limit < 1:
+        limit = DEFAULT_PAGE_SIZE
+    limit = min(limit, MAX_PAGE_SIZE)
+
+    total = task_repository.count_by_owner(user["id"])
+    rows = task_repository.list_by_owner_paginated(user["id"], cursor, limit + 1)
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = str(page[-1]["id"]) if has_more and page else None
+    return jsonify({"data": page, "next_cursor": next_cursor, "total": total})
 
 
 @app.get("/tasks/<int:task_id>")
+@limiter.limit(rate_limit_value)
 @require_auth
 def get_task(user: dict, task_id: int):
     row = task_repository.get_by_id_and_owner(task_id, user["id"])
@@ -226,6 +300,7 @@ def get_task(user: dict, task_id: int):
 
 
 @app.put("/tasks/<int:task_id>")
+@limiter.limit(rate_limit_value)
 @require_auth
 def update_task(user: dict, task_id: int):
     row = task_repository.get_by_id_and_owner(task_id, user["id"])
@@ -252,6 +327,7 @@ def update_task(user: dict, task_id: int):
 
 
 @app.delete("/tasks/<int:task_id>")
+@limiter.limit(rate_limit_value)
 @require_auth
 def delete_task(user: dict, task_id: int):
     if not task_repository.delete_for_owner(task_id, user["id"]):
