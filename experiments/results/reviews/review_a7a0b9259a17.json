@@ -1,0 +1,221 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "a7a0b9259a17",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "afb121b0e4143fc9c7a698ac56d76681b709f9e4",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Generated TypeScript declaration files (generator.d.ts, index.d.ts, parser.d.ts) appear to be committed, which is consistent with vendored/build output (likely from a dependency) rather than authored code; these should be gitignored or sourced from the package rather than checked in."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Greenfield commit adds 13 files / 4167 lines including a 3667-line package-lock.json plus a large vendored type surface in one commit, making review and later refactors (Session N) harder to isolate."
+        }
+      ],
+      "strengths": [
+        "Clean greenfield scaffold with standard TypeScript tooling (jest, ts-jest, typescript, ts-node preset) and declared runtime deps (gray-matter, marked) appropriate for a static site generator.",
+        "SonarQube delta is positive: 0 new bugs, 14 fewer smells, cognitive complexity -40, duplications -7.9%.",
+        "package-lock.json committed with integrity hashes pins the dependency tree for reproducible installs."
+      ],
+      "summary": "A reasonable greenfield SSG scaffold using standard tooling, but the 0.47 convention score is dominated by ~2994 naming violations in generated .d.ts files rather than authored code, and those vendored declaration files (plus a large single-session commit) are the main technical debt concern.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "38e3d9562561ef27d68b52b56565519fc04cf6af",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Convention score of 0.47 is driven by 2994 violations that appear to be entirely in generated .d.ts declaration files (PascalCase warnings on classes/interfaces/constants). These are build artifacts, not authored source \u2014 likely a measurement artifact rather than real convention drift in the TypeScript source."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "Adds handlebars ^4.7.9 (a heavyweight templating dependency, and not the current 5.x major) to replace ~85 lines of hand-written render helpers. Legitimate but arguably overkill for an SSG that already had a simple, well-tested render path."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports +2 new smells in this commit, unspecified by the measurements; worth inspecting the new TemplateEngine for the flagged issues."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "generateSite now mixes setup responsibilities by constructing and init'ing the TemplateEngine internally; the new 3-arg signature with a default keeps compatibility but couples generator lifecycle to the engine's init step."
+        }
+      ],
+      "strengths": [
+        "Cognitive complexity dropped by 10, replacing fragile string-concatenated HTML with a proper template abstraction",
+        "Zero new bugs and zero duplications added",
+        "Comprehensive test coverage added for the TemplateEngine plus template/layout frontmatter parsing",
+        "Backwards compatible: --templates flag and templatesDir default preserve existing CLI behavior",
+        "Consistent with the existing module layout (templates.ts mirrors parser/generator structure) and follows the repo's Snake_case/PascalCase source conventions"
+      ],
+      "summary": "Architecturally sound extraction of rendering into a TemplateEngine that reduces complexity and is well-tested; the 0.47 convention score is a measurement artifact from generated .d.ts files, not a real adherence problem in the authored source.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "17398a37947afc00846301bad9c921e69e32cc01",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.47,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Generated declaration files (generator.d.ts, index.d.ts, parser.d.ts) are present in the tree and fail convention checks; build artifacts appear committed alongside source, polluting the repo and the lint surface"
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "The low 0.47 convention score is driven entirely by auto-generated .d.ts files (PascalCase/UPPER_CASE violations), not hand-written style; a generated-file exclusion in the convention tool would isolate real violations"
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "ws added as a runtime dependency; if it backs only a dev/live-reload server it should be a devDependency alongside @types/ws for correct install scoping"
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "handlebars pulls minimist and is currently at a version carrying known prototype-pollution CVEs; worth pinning/upgrading for the integration session"
+        }
+      ],
+      "strengths": [
+        "Lock file updates are internally consistent; dev:true flags correctly lifted for packages that became runtime deps via chokidar (anymatch, braces, fill-range, etc.)",
+        "Dependency choices map cleanly to SSG integration goals: handlebars for templating, chokidar for watch mode, ws for live reload",
+        "Type declarations shipped for new deps (@types/ws) consistent with existing @types/* pattern",
+        "No new bugs, negative smells/cognitive complexity, and reduced duplication per SonarQube"
+      ],
+      "summary": "A clean, well-scoped integration commit whose only real marks are committed generated .d.ts artifacts and a possibly mis-scoped ws dependency \u2014 the 0.47 convention score reflects auto-generated declaration files rather than hand-written code quality.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "2675384aa59ce02c4cf0423d924b034e30ca5d3a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "DevServerPlugin implements the Plugin interface but never participates in the plugin lifecycle; it takes SsgEngine as a concrete constructor dependency and wraps it directly, creating engine<->plugin coupling that the BuildContext-based Plugin abstraction was meant to avoid (inversion of dependency)."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score (0.47) is dragged down by 2994 violations concentrated in generated declaration files (generator.d.ts, index.d.ts, parser.d.ts), which are tsc build artifacts rather than hand-written source; flagging this as a discrepancy since the refactored source itself follows PascalCase/camelCase/UPPER_CASE conventions."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Ownership relationship is awkward: SsgEngine takes a plugins array while DevServerPlugin takes the engine, so the wiring in main() must special-case serve instead of flowing through a uniform plugin pipeline."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "No test changes appear in the visible diff for the new plugin/engine abstraction; the refactor converts a tested functional flow to a new dispatch path without visible coverage updates."
+        }
+      ],
+      "strengths": [
+        "Clean plugin lifecycle API (onStart/beforeBuild/onFile/afterBuild/onEnd) that separates build orchestration from content and template concerns",
+        "SonarQube metrics all improve: -4 smells, -46 cognitive complexity, -2.1% duplication, +0 bugs",
+        "Exports a coherent public API surface (SsgEngine, MarkdownPlugin, TemplatePlugin, DevServerPlugin) suitable for library consumers",
+        "Dev-server live-reload moves behind a plugin with proper teardown (watcher/wss cleanup on server close)"
+      ],
+      "summary": "A solid, metrics-validated move to a plugin architecture that improves complexity and maintainability, with the low convention score explainable by generated .d.ts artifacts rather than the refactored source, and only a moderate concern over DevServerPlugin's concrete engine coupling.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "6b365541305dc822426211d03c703734242c2215",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "timeSavedMs is fabricated \u2014 ssg-engine.ts:78 hardcodes perPageTimeMs = 10 rather than measuring real time, so the reported 'time saved' stat the task explicitly requested is misleading."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Cache population couples the engine to the TemplatePlugin's file output: entries are written with pre-template html, then ssg-engine.ts:122-133 reads rendered HTML back from disk (outputDir/<slug>.html) to fix the cache. Fragile if any plugin writes pages to different paths or names."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Skipped pages bypass the plugin onFile pipeline entirely (engine uses cached frontmatter/html). A plugin that transforms content or frontmatter at onFile time will not run on cached pages, producing inconsistent results across incremental builds."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Dead code: distPath() in incremental.test.ts:31 is unused, and CacheManager.getCachedHtmlMap() is only referenced by a test, never in production code."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "BuildStats shape is duplicated: defined in cache.ts and re-declared inline in plugin.ts:10 BuildContext instead of importing the interface."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Convention score 0.47 is dragged down by generated .d.ts declaration files (dist/*.d.ts, 2994 violations) that predate this commit; the authored code (cache.ts, ssg-engine.ts, tests) follows PascalCase/UPPER_CASE conventions correctly."
+        }
+      ],
+      "strengths": [
+        "CacheManager is cleanly separated into its own module with a clear interface (load/save/delete/isStale) and hash-based invalidation",
+        "Comprehensive test coverage \u2014 30 new tests (793 lines) covering content/template/layout/partial changes, corrupted cache, clean flag, frontmatter-only edits, and plugin-pipeline skipping; full suite (79 tests) passes",
+        "Respects the Session 4 plugin architecture: caching is threaded through BuildContext/cachedPages and DevServerPlugin rather than bypassing hooks",
+        "Backward compatible \u2014 incremental/clean are optional flags and build() return widened from void to BuildStats without breaking existing callers or tests",
+        "Robust edge-case handling: missing cache, corrupted manifest (load() falls back), and --clean all handled and tested"
+      ],
+      "summary": "A well-tested, backward-compatible incremental-build feature that fits the plugin architecture, but ships with a fabricated time-saved metric, an awkward disk-read-back cache population path, and a convention score of 0.47 that is an artifact of pre-existing generated .d.ts files rather than this commit's authored code.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Orphaned seed artifact: the root index.ts (an express server importing 'express', which is not in package.json) was never removed or migrated; it is dead code excluded from tsconfig (include: src/**) but `node index.ts` fails to resolve express",
+      "Stale committed dist/: session 5's new modules (cache.js, ssg-engine.js, plugins/) and the --incremental/--clean flags were never compiled into the committed dist/index.js, so the published CLI (bin: ./dist/index.js) lags the source by one full session and cannot exercise the final feature without a rebuild",
+      "Session 1's hand-rolled HTML rendering in generator.ts was wholesale discarded by Session 2's template engine rather than reused, making the initial rendering layer throwaway foundation"
+    ],
+    "key_decisions": [
+      "Session 2: introduced a Handlebars-based TemplateEngine (src/templates.ts) with layout support, replacing the string-built HTML renderers in generator.ts and adding a --templates flag",
+      "Session 3: added an integrated dev server (`serve` command, src/server.ts) with file watchers and ws-based live reload, plus exporting parseArgs and adding a require.main guard to make index.ts importable/testable",
+      "Session 4: the pivotal refactor \u2014 a Plugin interface (onStart/beforeBuild/onFile/afterBuild/onEnd) with a SsgEngine orchestrator, decomposing parse/generate/serve into MarkdownPlugin, TemplatePlugin, and DevServerPlugin, and re-exporting a public API",
+      "Session 5: layered a cross-cutting incremental build via CacheManager (SHA-256 content + template hashing, .ssg-cache.json manifest, --incremental/--clean, BuildStats), plugged into SsgEngine.build and DevServerPlugin \u2014 made possible by the Session 4 engine seam"
+    ],
+    "trajectory_description": "Quality improved monotonically across all five sessions. Each stage built coherently on the prior one \u2014 greenfield parser+generator (S1), template abstraction (S2), dev-server integration (S3), plugin-based engine refactor (S4), and cache-aware incremental builds (S5) \u2014 with the test suite growing strictly 9\u219219\u219228\u219249\u219279 tests, all passing at every commit and the CLI verified working at the end. The architecture matured from monolithic functions to a hook-based plugin pipeline to a cache-aware pipeline, though committed dist/ artifacts lagged the source (session 5's feature is absent from the shipped CLI) and the express-based seed index.ts was never cleaned up.",
+    "summary": "A textbook-coherent, monotonically improving build-out where each session layers a new concern on the prior one, slightly marred by leftover seed code and a stale committed dist/ that omits the final incremental feature."
+  }
+}

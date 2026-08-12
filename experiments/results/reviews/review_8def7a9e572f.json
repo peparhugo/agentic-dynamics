@@ -1,0 +1,216 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "8def7a9e572f",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "79c21d6136c44d62c7a66a7a5b41a3a6a52b7601",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Naming-rule violations flagged by SonarQube (PascalCase/UPPER_CASE) in generator.test.ts, incremental.test.ts, and server.test.ts, driving convention score to 0.47"
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Heavy reliance on non-null assertions (page!) in assertions instead of explicit narrowing/optional checks"
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Tests write real files under a shared .test-tmp directory rather than using a temp-dir helper; parallel test execution could cause collisions across suites"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Single 339-line test file mixing three describe blocks; splitting by module (parse, read, generate) would aid navigation"
+        }
+      ],
+      "strengths": [
+        "Comprehensive greenfield coverage of all three public APIs (parseMarkdownFile, readContentDirectory, generateSite)",
+        "Strong edge-case handling: empty frontmatter, missing directories, code blocks, absent tags, no-title fallback",
+        "Proper temp lifecycle with beforeEach cleanup and afterAll teardown, so tests leave no residue",
+        "SonarQube reports 0 bugs, 0 smells, and 0.0% duplication on a +4511-line change"
+      ],
+      "summary": "Solid, well-scoped greenfield test commit with zero bugs/smells and good edge-case coverage, but the measured convention score of 0.47 (driven by PascalCase/UPPER_CASE naming rules on test files) is the main drag \u2014 flagged as a possible false positive since the visible diff contains no actual class/interface declarations, making the qualitative convention assessment higher than the static score.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "d056cd32da76cf6dd85629ff9e5966d46ae9a365",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Measured convention score 0.47; the touched generator.test.ts carries 'Classes/Interfaces should use PascalCase' violations, though the bulk of the 2990 flagged items (incremental.test.ts, server.test.ts) are pre-existing and untouched by this commit."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity increased by +9 across the new TemplateEngine and its tests; acceptable for a render engine feature but worth monitoring."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "parseMarkdownFile now emits layout/template frontmatter fields onto the page object, coupling content parsing to rendering concerns; the coupling is lightweight and tested but introduces an implicit contract."
+        }
+      ],
+      "strengths": [
+        "Comprehensive test coverage: 9 new cases covering default layout, partials, custom layout, custom template, fallback, index rendering, and uninitialized-engine null path",
+        "Zero new bugs, zero smells, zero duplications per SonarQube delta",
+        "Follows existing test patterns (createContentDir/writeFile helpers, tmpDir isolation) and integrates through the existing generateSite/parseMarkdownFile seam",
+        "Clean separation of TemplateEngine as a new module (src/templates) rather than inlining rendering into generator"
+      ],
+      "summary": "Well-tested, low-risk feature addition that slots cleanly into the existing generator architecture, with a low convention score driven largely by pre-existing test-file violations rather than new code.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "f9e2be08a29d253ea2bc51edb1303daad9c748f2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "server.test.ts triggers naming-linter flags (Classes/Interfaces should use PascalCase, Constants should be UPPER_CASE), contributing to the 0.47 convention score; the new test file could align helper/test naming more strictly."
+        },
+        {
+          "category": "other",
+          "severity": "info",
+          "description": "Discrepancy: most reported convention violations (generator.test.ts, incremental.test.ts) reference files NOT present in this commit's diff (+2 files: server.test.ts, package-lock.json), so the 0.47 score appears to include pre-existing debt not introduced here."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "makeRequest in server.test.ts has no timeout or socket-close handling, so a hung server could stall the test suite indefinitely."
+        },
+        {
+          "category": "dependency",
+          "severity": "info",
+          "description": "SonarQube delta shows +1 smell and +2 cognitive complexity in the new test code; low impact but worth simplifying the dev-server test setup."
+        }
+      ],
+      "strengths": [
+        "Uses an ephemeral port (0) plus real HTTP requests, giving genuine integration coverage without port conflicts.",
+        "Thorough injectLiveReload edge-case coverage (missing body tag, multiple body tags) and non-HTML passthrough verification.",
+        "Correct async lifecycle with temp-dir cleanup in beforeEach/afterAll and proper server.close() teardown."
+      ],
+      "summary": "A clean, well-structured integration test addition that fits the existing __tests__ patterns and introduces no technical debt, though the low convention score largely reflects violations in files outside this commit and should not be attributed to it.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "4b8e672aedb0717f57d50d281183bc1b86edefc0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "loadPluginsFromConfig in src/plugin.ts uses synchronous require() on an extensionless 'ssg.config' path and swallows all errors with an empty catch block, silently hiding real config failures and breaking in ESM/TS-node contexts where require is not available"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The Plugin interface declares a 'name' field that is never read by any lifecycle dispatch in generateSite, leaving a dead contract field"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity increased by +41 per SonarQube; the repeated manual dispatch blocks (if (p.onStart) p.onStart(); if (p.beforeBuild) ... etc.) in generateSite could be factored into a single lifecycle-runner helper to keep the loop readable"
+        },
+        {
+          "category": "testing",
+          "severity": "major",
+          "description": "A new plugin system (Plugin interface, lifecycle hooks, loadPluginsFromConfig, MarkdownPlugin/TemplatePlugin) is introduced with zero new tests; the only test change is a tmp dir rename in server.test.ts, so the plugin pipeline is uncovered"
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Measured convention score 0.47 (PascalCase violations on classes/interfaces/constants) \u2014 but flagged: the listed violations live in generator.test.ts and incremental.test.ts, which this commit does not touch, so they are pre-existing rather than introduced here"
+        }
+      ],
+      "strengths": [
+        "Clean modularization: generator.ts drops from 122 lines to ~29 by extracting markdown/template/devserver concerns into plugins/, matching the +363/-243 net reduction in code",
+        "Backward compatibility preserved by re-exporting parseMarkdownFile and readContentDirectory from plugins/markdown rather than breaking downstream imports",
+        "Simple, well-scoped plugin lifecycle (onStart/beforeBuild/onFile/afterBuild/onEnd) provides an extension point without over-engineering"
+      ],
+      "summary": "A net-positive architectural refactor that extracts a clean plugin pipeline and preserves the public API, but ships with a fragile require()-based config loader, un-covered plugin code, and a low convention score (0.47, largely from pre-existing test-file violations).",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "771cdf7e32a117001f168591f2741f4ff3e09591",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.74,
+      "convention_adherence": 0.47,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "New incremental.test.ts introduces naming violations (e.g. `tmpDir` constant should be UPPER_CASE; camelCase helper functions clash with project style), contributing to the 0.47 convention score. Flag: the overall 0.47 includes pre-existing violations in untouched files (generator.test.ts, server.test.ts); only the incremental.test.ts entries are attributable to this commit."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube delta shows +4 smells and +3 cognitive complexity from the added cache logic \u2014 suggests the BuildCache manifest/change-detection flow could be decomposed into smaller helpers."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "475-line test file duplicates near-identical scaffolding (createContentDir/createTemplatesDir/writeFile helpers) instead of sharing a fixtures module; large single-file test suites reduce readability."
+        }
+      ],
+      "strengths": [
+        "Thorough test coverage of the new BuildCache: hash consistency, content and template change detection, manifest clear, corrupted-manifest recovery, and full first/second incremental build semantics including mtime skip assertions.",
+        "Zero new bugs and zero duplication added (SonarQube: bugs +0, duplications +0.0%), and changes integrate cleanly through the existing generateSite options object rather than new top-level APIs.",
+        "Follows the established test layout (describe/it blocks, beforeEach/afterAll tmp cleanup, __tests__/ placement) consistent with neighboring generator.test.ts and server.test.ts."
+      ],
+      "summary": "Coherent cross-cutting incremental-build feature with solid test coverage and no new bugs, but it drags the convention score via test-file naming violations and adds minor smells/complexity.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Session 1 committed the entire node_modules tree (5,205 files) into git; every later commit carries 5,000+ dependency files, bloating the repo and making diffs unreadable",
+      "Build artifacts (dist/ with compiled JS + sourcemaps, 340 files) committed from Session 2 onward, creating churn in every subsequent diff and risking drift between src/ and dist/",
+      "The plugin loader in Session 4 uses CommonJS require() on a TypeScript config file (ssg.config.ts), so the advertised plugin-config mechanism is effectively non-functional",
+      "Each session re-discovered the node/npm toolchain from scratch (three different node install paths: /tmp/opencode/node-v20.11.0, /home/drseuss/node, /tmp/node-v20.18.1), burning steps on environment archaeology instead of feature work",
+      "Several sessions committed mid-session broken states (Session 2 had a syntax error in the test file TS1005; Session 5 shipped 7 failing incremental-cache tests that were only fixed in the final run before commit)"
+    ],
+    "key_decisions": [
+      "Greenfield wipe: delete the seed Todo API entirely and rebuild a static site generator from scratch (Session 1)",
+      "Markdown\u2192HTML core with gray-matter frontmatter + marked, plus a strict TypeScript/jest scaffold (Session 1)",
+      "Handlebars template engine with graceful fallback to the built-in renderer \u2014 templating is additive and optional rather than replacing the core path (Session 2)",
+      "Dev server with chokidar file watching, WebSocket live-reload injection, MIME handling, and path-traversal protection (Session 3)",
+      "Plugin architecture (onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle) that split generator, markdown, template, and devserver concerns into src/plugins/ (Session 4)",
+      "MD5 content-hash incremental build cache with manifest persistence, template-directory hash invalidation, and --incremental/--clean CLI flags (Session 5)"
+    ],
+    "trajectory_description": "Quality improved steadily and significantly across the five sessions. Session 1 delivered a clean single-purpose generator with a real CLI and 339 lines of tests; Session 2 added a genuinely useful templating layer; Session 3 integrated a production-grade dev server with live reload and security guards; Session 4 reorganized into a plugin architecture; and Session 5 topped it off with incremental caching and a 475-line test suite. The final state is a coherent, feature-complete SSG with 56 tests passing. The arc was not perfectly smooth, though: Sessions 2, 4, and 5 each broke the test suite mid-session before recovering, and the refactor in Session 4 was somewhat theatrical \u2014 the MarkdownPlugin.onFile and TemplatePlugin.onFile hooks are no-ops, the dev server was never registered as a plugin, and server.ts was reduced to a re-export shim. The end-of-story code is the strongest state of the project, but it is built on a polluted git history (node_modules and dist committed) and a plugin system that is partly structural rather than functional.",
+    "summary": "A highly coherent five-session arc that transforms a single-file seed into a complete, tested static site generator with templating, live-reload dev server, plugin architecture, and incremental builds \u2014 the strongest session is the last, though progress was periodically interrupted by broken intermediate states and poor repo hygiene."
+  }
+}

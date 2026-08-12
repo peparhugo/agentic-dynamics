@@ -17,6 +17,13 @@ experiments/results/stories/logs/
 # Backfill backups
 .backfill_backup/
 
+# Review intermediate files (per-session + story, merged by finalize_reviews.py)
+experiments/results/reviews/review_*_S*.json
+experiments/results/reviews/review_*_story.json
+
+# Stray worktrees / embedded repos
+ssg_check/
+
 # Opencode worktrees (transient temp dirs)
 /tmp/
 

@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-08-12T01:45:37.510401+00:00",
+  "generated_at": "2026-08-12T19:25:03.289506+00:00",
   "counts": {
-    "db_sessions_total": 627,
-    "db_sessions_experiments": 263,
-    "worktrees_total": 43,
-    "worktrees_experiments": 12,
-    "worktrees_other": 31,
+    "db_sessions_total": 1537,
+    "db_sessions_experiments": 490,
+    "worktrees_total": 61,
+    "worktrees_experiments": 13,
+    "worktrees_other": 48,
     "result_files": 26,
-    "config_files": 34
+    "config_files": 35
   },
   "costs": {
-    "total_all_sessions": 200.2543,
-    "total_experiment_sessions": 5.7916,
-    "tokens_all_sessions": 36435342,
-    "tokens_experiment_sessions": 8928960
+    "total_all_sessions": 214.3436,
+    "total_experiment_sessions": 13.6586,
+    "tokens_all_sessions": 53125309,
+    "tokens_experiment_sessions": 10841184
   },
   "model_breakdown": {
     "deepseek/deepseek-v4-pro": {
@@ -21,10 +21,20 @@
       "cost": 5.7444,
       "tokens": 8693460
     },
+    "anthropic/claude-sonnet-5": {
+      "sessions": 10,
+      "cost": 4.6368,
+      "tokens": 172925
+    },
+    "openai/gpt-5.6-luna": {
+      "sessions": 170,
+      "cost": 3.085,
+      "tokens": 1075066
+    },
     "deepseek/deepseek-v4-flash": {
-      "sessions": 62,
-      "cost": 0.0472,
-      "tokens": 235500
+      "sessions": 109,
+      "cost": 0.1925,
+      "tokens": 899733
     }
   },
   "results": [
@@ -215,13 +225,13 @@
       "num_runs": 7,
       "total_cost": 0.8173,
       "operators": [
-        "remove_critical_constraint",
-        "invert_constraint",
-        "baseline",
         "inject_competing_goal",
         "shift_framing",
+        "inject_alien_vocab",
+        "invert_constraint",
         "inject_phantom_success",
-        "inject_alien_vocab"
+        "remove_critical_constraint",
+        "baseline"
       ]
     },
     {
@@ -231,13 +241,13 @@
       "num_runs": 7,
       "total_cost": 0.0039,
       "operators": [
-        "remove_critical_constraint",
-        "invert_constraint",
-        "baseline",
         "inject_competing_goal",
         "shift_framing",
+        "inject_alien_vocab",
+        "invert_constraint",
         "inject_phantom_success",
-        "inject_alien_vocab"
+        "remove_critical_constraint",
+        "baseline"
       ]
     },
     {
@@ -247,13 +257,13 @@
       "num_runs": 7,
       "total_cost": 0.1044,
       "operators": [
-        "remove_critical_constraint",
-        "invert_constraint",
-        "baseline",
         "inject_competing_goal",
         "shift_framing",
+        "inject_alien_vocab",
+        "invert_constraint",
         "inject_phantom_success",
-        "inject_alien_vocab"
+        "remove_critical_constraint",
+        "baseline"
       ]
     }
   ],
@@ -505,6 +515,14 @@
         "invert_constraint",
         "inject_competing_goal"
       ]
+    },
+    {
+      "file": "experiments/configs/plans.yaml",
+      "name": null,
+      "model": null,
+      "task_preview": null,
+      "constraints": 0,
+      "operators": []
     },
     {
       "file": "experiments/configs/recovery_cost.yaml",
@@ -963,6 +981,28 @@
       }
     },
     {
+      "path": "/tmp/exp_upbol744",
+      "name": "exp_upbol744",
+      "mtime": "2026-08-12T16:00:31.745401+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0094bfb71ffewu9wGGP8Leexvu",
+        "directory": "/tmp/exp_upbol744",
+        "title": "meta_batch_20260812_160019",
+        "cost": 0.0010994759999999998,
+        "tokens_input": 5877,
+        "tokens_output": 482,
+        "tokens_reasoning": 327,
+        "tokens_cache_read": 17920,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786550420622,
+        "time_updated": 1786550431596
+      }
+    },
+    {
       "path": "/tmp/exp_vkxyl2tc",
       "name": "exp_vkxyl2tc",
       "mtime": "2026-08-10T01:08:23.646300+00:00",
@@ -1119,6 +1159,20 @@
       }
     },
     {
+      "path": "/tmp/exp_304grfxa",
+      "name": "exp_304grfxa",
+      "mtime": "2026-08-12T18:16:52.304766+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7kyy8e0d",
+      "name": "exp_7kyy8e0d",
+      "mtime": "2026-08-12T15:56:27.997554+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp__bncuzzz",
       "name": "exp__bncuzzz",
       "mtime": "2026-08-10T14:09:37.685232+00:00",
@@ -1139,6 +1193,20 @@
         "time_created": 1786370950849,
         "time_updated": 1786370977575
       }
+    },
+    {
+      "path": "/tmp/exp__c0hvhwh",
+      "name": "exp__c0hvhwh",
+      "mtime": "2026-08-12T16:16:38.421537+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp__jfy_3fv",
+      "name": "exp__jfy_3fv",
+      "mtime": "2026-08-12T18:16:30.777121+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_a2nywthe",
@@ -1183,6 +1251,13 @@
         "time_created": 1786336357456,
         "time_updated": 1786336385700
       }
+    },
+    {
+      "path": "/tmp/exp_akuk_b2u",
+      "name": "exp_akuk_b2u",
+      "mtime": "2026-08-12T18:16:52.236767+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_biwm7aej",
@@ -1251,6 +1326,13 @@
       }
     },
     {
+      "path": "/tmp/exp_bz4g4ceo",
+      "name": "exp_bz4g4ceo",
+      "mtime": "2026-08-12T16:08:54.268880+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_c_kl8epb",
       "name": "exp_c_kl8epb",
       "mtime": "2026-08-10T14:04:42.166008+00:00",
@@ -1295,6 +1377,13 @@
       }
     },
     {
+      "path": "/tmp/exp_djf0gxyu",
+      "name": "exp_djf0gxyu",
+      "mtime": "2026-08-12T15:56:33.345463+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_e1304jtf",
       "name": "exp_e1304jtf",
       "mtime": "2026-08-12T00:17:33.607988+00:00",
@@ -1315,6 +1404,13 @@
         "time_created": 1786493815322,
         "time_updated": 1786493853486
       }
+    },
+    {
+      "path": "/tmp/exp_e9iolnvx",
+      "name": "exp_e9iolnvx",
+      "mtime": "2026-08-12T16:30:55.995761+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_et4bgmaz",
@@ -1361,6 +1457,13 @@
       }
     },
     {
+      "path": "/tmp/exp_huxg3_kh",
+      "name": "exp_huxg3_kh",
+      "mtime": "2026-08-12T16:36:34.990179+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_hzaihspa",
       "name": "exp_hzaihspa",
       "mtime": "2026-08-10T14:09:55.616939+00:00",
@@ -1405,6 +1508,42 @@
       }
     },
     {
+      "path": "/tmp/exp_i_9ot72j",
+      "name": "exp_i_9ot72j",
+      "mtime": "2026-08-12T16:00:19.073617+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0094ca523ffe3cp3XSowceO81V",
+        "directory": "/tmp/exp_i_9ot72j",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260812_155935",
+        "cost": 0.0022257144,
+        "tokens_input": 9195,
+        "tokens_output": 1687,
+        "tokens_reasoning": 1292,
+        "tokens_cache_read": 37248,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786550377180,
+        "time_updated": 1786550418932
+      }
+    },
+    {
+      "path": "/tmp/exp_imq8iu7p",
+      "name": "exp_imq8iu7p",
+      "mtime": "2026-08-12T16:41:14.385558+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ivtf4vp4",
+      "name": "exp_ivtf4vp4",
+      "mtime": "2026-08-12T16:36:28.614284+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_j6dm2g8k",
       "name": "exp_j6dm2g8k",
       "mtime": "2026-08-10T14:09:09.465693+00:00",
@@ -1425,6 +1564,13 @@
         "time_created": 1786370916603,
         "time_updated": 1786370949365
       }
+    },
+    {
+      "path": "/tmp/exp_jjhxlbij",
+      "name": "exp_jjhxlbij",
+      "mtime": "2026-08-12T18:16:30.845120+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_kr22of_s",
@@ -1515,6 +1661,28 @@
       }
     },
     {
+      "path": "/tmp/exp_q2x3oy33",
+      "name": "exp_q2x3oy33",
+      "mtime": "2026-08-12T15:59:13.158738+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0094d74daffe6LFRlqnl1M17Al",
+        "directory": "/tmp/exp_q2x3oy33",
+        "title": "meta_analyze_exp_0s36_d3n_20260812_155842",
+        "cost": 0.002059988,
+        "tokens_input": 8631,
+        "tokens_output": 1388,
+        "tokens_reasoning": 1404,
+        "tokens_cache_read": 24960,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786550324005,
+        "time_updated": 1786550353005
+      }
+    },
+    {
       "path": "/tmp/exp_qkc3lf50",
       "name": "exp_qkc3lf50",
       "mtime": "2026-08-10T01:08:10.630502+00:00",
@@ -1535,6 +1703,13 @@
         "time_created": 1786324068622,
         "time_updated": 1786324090534
       }
+    },
+    {
+      "path": "/tmp/exp_r4ypmym9",
+      "name": "exp_r4ypmym9",
+      "mtime": "2026-08-12T16:33:41.789036+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_s1b2dffm",
@@ -1669,6 +1844,28 @@
       }
     },
     {
+      "path": "/tmp/exp_wfypqfz0",
+      "name": "exp_wfypqfz0",
+      "mtime": "2026-08-12T15:59:35.790353+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0094cfd8effeI3VkjGSbt0lKdl",
+        "directory": "/tmp/exp_wfypqfz0",
+        "title": "meta_analyze_exp_0s36_d3n_20260812_155913",
+        "cost": 0.0018017495999999998,
+        "tokens_input": 8581,
+        "tokens_output": 1037,
+        "tokens_reasoning": 859,
+        "tokens_cache_read": 24832,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786550354545,
+        "time_updated": 1786550375647
+      }
+    },
+    {
       "path": "/tmp/exp_y9xp6l1k",
       "name": "exp_y9xp6l1k",
       "mtime": "2026-08-12T00:17:54.019722+00:00",
@@ -1689,6 +1886,13 @@
         "time_created": 1786493855146,
         "time_updated": 1786493873900
       }
+    },
+    {
+      "path": "/tmp/exp_yyigzy9l",
+      "name": "exp_yyigzy9l",
+      "mtime": "2026-08-12T16:50:13.577751+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_zodtpgzf",
@@ -3554,6 +3758,1595 @@
       "model_id": "deepseek-v4-flash",
       "cost": 4.77848e-05,
       "tokens_output": 22
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011097359999999997,
+      "tokens_output": 2849
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.1403142,
+      "tokens_output": 6141
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01563064,
+      "tokens_output": 5734
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.2874084,
+      "tokens_output": 18081
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01104839,
+      "tokens_output": 2408
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016838769999999996,
+      "tokens_output": 5098
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.3350914,
+      "tokens_output": 12940
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020832410000000003,
+      "tokens_output": 4476
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.42716469999999984,
+      "tokens_output": 14957
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 1.5290639,
+      "tokens_output": 47708
+    },
+    {
+      "title": "API spec false premise mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0012682712,
+      "tokens_output": 25
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.010711019999999998,
+      "tokens_output": 2951
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.10829079999999999,
+      "tokens_output": 3973
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.2033254,
+      "tokens_output": 11774
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013669679999999998,
+      "tokens_output": 4692
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02174573,
+      "tokens_output": 4365
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.32918339999999996,
+      "tokens_output": 13366
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016228950000000002,
+      "tokens_output": 5075
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016713040000000002,
+      "tokens_output": 3754
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.417972,
+      "tokens_output": 16007
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "anthropic",
+      "model_id": "claude-sonnet-5",
+      "cost": 0.8589403000000001,
+      "tokens_output": 27494
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01394041,
+      "tokens_output": 3341
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.00943152,
+      "tokens_output": 2399
+    },
+    {
+      "title": "Mutation compiler spec: inject false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000194544,
+      "tokens_output": 202
+    },
+    {
+      "title": "Mutation compiler spec injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000186424,
+      "tokens_output": 205
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01407446,
+      "tokens_output": 3519
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.00928537,
+      "tokens_output": 2367
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01667855,
+      "tokens_output": 4991
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01613657,
+      "tokens_output": 5008
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02200578,
+      "tokens_output": 5223
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017783580000000004,
+      "tokens_output": 5169
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01024565,
+      "tokens_output": 2426
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012026920000000002,
+      "tokens_output": 2652
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01333672,
+      "tokens_output": 2632
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01631227,
+      "tokens_output": 2239
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017196180000000002,
+      "tokens_output": 4678
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01658949,
+      "tokens_output": 5079
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01701687,
+      "tokens_output": 4547
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012525569999999998,
+      "tokens_output": 3838
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016700609999999998,
+      "tokens_output": 3818
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.023014809999999997,
+      "tokens_output": 4281
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.026734070000000002,
+      "tokens_output": 3978
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020853739999999996,
+      "tokens_output": 4288
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011526999999999999,
+      "tokens_output": 3291
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011142530000000001,
+      "tokens_output": 2571
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014022030000000001,
+      "tokens_output": 3567
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0103979,
+      "tokens_output": 2747
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01476718,
+      "tokens_output": 4603
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.023154349999999997,
+      "tokens_output": 5628
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01779993,
+      "tokens_output": 5644
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.019400089999999995,
+      "tokens_output": 4929
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.026888359999999997,
+      "tokens_output": 5980
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01852298,
+      "tokens_output": 3045
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012230930000000001,
+      "tokens_output": 2410
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011512250000000002,
+      "tokens_output": 2567
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01907717,
+      "tokens_output": 5020
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018011149999999997,
+      "tokens_output": 5397
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01668148,
+      "tokens_output": 4927
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02613539,
+      "tokens_output": 4305
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018028250000000003,
+      "tokens_output": 3999
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018892359999999997,
+      "tokens_output": 3612
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014271100000000002,
+      "tokens_output": 4844
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0003077424,
+      "tokens_output": 196
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02067894,
+      "tokens_output": 4417
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014962029999999996,
+      "tokens_output": 4578
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01108695,
+      "tokens_output": 2660
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012671410000000003,
+      "tokens_output": 4479
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018047050000000002,
+      "tokens_output": 5474
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01661695,
+      "tokens_output": 4420
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016759029999999998,
+      "tokens_output": 4751
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01776136,
+      "tokens_output": 4483
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01556459,
+      "tokens_output": 3998
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011985199999999998,
+      "tokens_output": 3535
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0159751,
+      "tokens_output": 2856
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.03051836,
+      "tokens_output": 8363
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02369118,
+      "tokens_output": 7140
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014901199999999998,
+      "tokens_output": 4044
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01742256,
+      "tokens_output": 4595
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.019603729999999996,
+      "tokens_output": 5059
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.015255349999999999,
+      "tokens_output": 3880
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01888308,
+      "tokens_output": 4153
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02512777,
+      "tokens_output": 5808
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02095452,
+      "tokens_output": 5529
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013886800000000001,
+      "tokens_output": 4575
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013078989999999999,
+      "tokens_output": 4011
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012385999999999998,
+      "tokens_output": 4294
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01568074,
+      "tokens_output": 4421
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020086000000000003,
+      "tokens_output": 5106
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01616798,
+      "tokens_output": 4624
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01737744,
+      "tokens_output": 4704
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017615640000000002,
+      "tokens_output": 4244
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012627370000000002,
+      "tokens_output": 3957
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014967590000000001,
+      "tokens_output": 4282
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.015184210000000002,
+      "tokens_output": 3900
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.027671839999999996,
+      "tokens_output": 7605
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01711649,
+      "tokens_output": 4752
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02294817,
+      "tokens_output": 6849
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02168207,
+      "tokens_output": 6109
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01757607,
+      "tokens_output": 5722
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022384189999999998,
+      "tokens_output": 5443
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020661540000000003,
+      "tokens_output": 5358
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022368650000000004,
+      "tokens_output": 4974
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.025828740000000003,
+      "tokens_output": 7483
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013288209999999998,
+      "tokens_output": 4755
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013191679999999999,
+      "tokens_output": 4117
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013259009999999998,
+      "tokens_output": 4255
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022853550000000004,
+      "tokens_output": 5917
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0175171,
+      "tokens_output": 4572
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017521150000000003,
+      "tokens_output": 4996
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018046049999999998,
+      "tokens_output": 5646
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01716611,
+      "tokens_output": 4221
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01298561,
+      "tokens_output": 4243
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014674610000000001,
+      "tokens_output": 3770
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016760249999999997,
+      "tokens_output": 4528
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01659501,
+      "tokens_output": 4201
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.024237709999999996,
+      "tokens_output": 6223
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.03519537,
+      "tokens_output": 10383
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.021712950000000005,
+      "tokens_output": 6376
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.019996500000000007,
+      "tokens_output": 5181
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02773263,
+      "tokens_output": 8551
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01899361,
+      "tokens_output": 4830
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01465097,
+      "tokens_output": 4463
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.021313540000000006,
+      "tokens_output": 5111
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01513889,
+      "tokens_output": 4332
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011758179999999998,
+      "tokens_output": 3913
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013222480000000002,
+      "tokens_output": 3543
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014345150000000001,
+      "tokens_output": 3616
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01301177,
+      "tokens_output": 3338
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020699190000000003,
+      "tokens_output": 4396
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.021293789999999996,
+      "tokens_output": 6105
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.024977320000000004,
+      "tokens_output": 5911
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.03446454,
+      "tokens_output": 7140
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02272025,
+      "tokens_output": 4472
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01620567,
+      "tokens_output": 3607
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0006647424,
+      "tokens_output": 179
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01194695,
+      "tokens_output": 3149
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017171540000000002,
+      "tokens_output": 3796
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014306620000000003,
+      "tokens_output": 3027
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.021857570000000003,
+      "tokens_output": 5791
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.030432879999999995,
+      "tokens_output": 5220
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01666266,
+      "tokens_output": 4030
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02233007,
+      "tokens_output": 4338
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018095640000000003,
+      "tokens_output": 3120
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0211438,
+      "tokens_output": 4311
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.03936308,
+      "tokens_output": 5662
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013356559999999998,
+      "tokens_output": 4163
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.012640729999999998,
+      "tokens_output": 4203
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022144479999999998,
+      "tokens_output": 4628
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.0120333,
+      "tokens_output": 3200
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.043515380000000006,
+      "tokens_output": 6975
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02159274,
+      "tokens_output": 5059
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022134130000000002,
+      "tokens_output": 6261
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02120952,
+      "tokens_output": 5731
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.015470950000000002,
+      "tokens_output": 3018
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020507370000000004,
+      "tokens_output": 4399
+    },
+    {
+      "title": "API spec mutation with false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000145964,
+      "tokens_output": 16
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 9.3044e-05,
+      "tokens_output": 29
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0041282696,
+      "tokens_output": 1714
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004626753599999999,
+      "tokens_output": 3543
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011015720000000001,
+      "tokens_output": 3845
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018295050000000004,
+      "tokens_output": 4558
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014082679999999998,
+      "tokens_output": 3756
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02162771,
+      "tokens_output": 5068
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0038854648000000006,
+      "tokens_output": 2484
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.016420189999999998,
+      "tokens_output": 4353
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.011948289999999999,
+      "tokens_output": 3029
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01651924,
+      "tokens_output": 4913
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02773143,
+      "tokens_output": 8077
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.033480920000000004,
+      "tokens_output": 7323
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02139789,
+      "tokens_output": 3752
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01281406,
+      "tokens_output": 3880
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01799645,
+      "tokens_output": 4874
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.017871049999999996,
+      "tokens_output": 4947
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01881653,
+      "tokens_output": 3998
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01171802,
+      "tokens_output": 3025
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.03083662,
+      "tokens_output": 5752
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.015069470000000003,
+      "tokens_output": 3732
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.018289209999999997,
+      "tokens_output": 5517
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01866826,
+      "tokens_output": 4155
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.022581480000000004,
+      "tokens_output": 6346
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01485116,
+      "tokens_output": 2855
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.013153570000000002,
+      "tokens_output": 2920
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.019392579999999996,
+      "tokens_output": 3766
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01776556,
+      "tokens_output": 4179
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01467003,
+      "tokens_output": 3629
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.024560460000000003,
+      "tokens_output": 6933
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.02235542,
+      "tokens_output": 4175
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.020753169999999998,
+      "tokens_output": 4357
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.014066699999999998,
+      "tokens_output": 2808
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-luna",
+      "cost": 0.01820233,
+      "tokens_output": 3209
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0042193928,
+      "tokens_output": 2314
+    },
+    {
+      "title": "Task manager API 5-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0063230496,
+      "tokens_output": 3070
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0072294712,
+      "tokens_output": 2319
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003879904,
+      "tokens_output": 2598
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004398839200000001,
+      "tokens_output": 2752
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005261681599999999,
+      "tokens_output": 3309
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0056278096,
+      "tokens_output": 4042
+    },
+    {
+      "title": "AI commit review: task notification integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000584024,
+      "tokens_output": 112
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004567539200000001,
+      "tokens_output": 3038
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0058183440000000005,
+      "tokens_output": 3176
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0045410680000000005,
+      "tokens_output": 2210
+    },
+    {
+      "title": "AI commit review: task completion email",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0014959728000000002,
+      "tokens_output": 402
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0041975864,
+      "tokens_output": 2737
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003954664000000001,
+      "tokens_output": 1707
+    },
+    {
+      "title": "API spec mutation with false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 8.5764e-05,
+      "tokens_output": 37
+    },
+    {
+      "title": "Task manager API story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0070774536,
+      "tokens_output": 3026
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006734308,
+      "tokens_output": 3721
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004909699200000001,
+      "tokens_output": 3034
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0041064016,
+      "tokens_output": 2785
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001247792,
+      "tokens_output": 7
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001405992,
+      "tokens_output": 27
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 9.36376e-05,
+      "tokens_output": 27
+    },
+    {
+      "title": "meta_batch_20260812_160019",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010994759999999998,
+      "tokens_output": 482
+    },
+    {
+      "title": "Inject false premise into API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001275792,
+      "tokens_output": 32
+    },
+    {
+      "title": "API spec mutation: false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0017802456,
+      "tokens_output": 95
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0008811375999999999,
+      "tokens_output": 350
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 3.99896e-05,
+      "tokens_output": 10
+    },
+    {
+      "title": "False premise mutation of API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 9.79328e-05,
+      "tokens_output": 40
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001052128,
+      "tokens_output": 40
+    },
+    {
+      "title": "API spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 7.86128e-05,
+      "tokens_output": 16
+    },
+    {
+      "title": "Notification service commit story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011571453600000003,
+      "tokens_output": 5723
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0028347591999999997,
+      "tokens_output": 1682
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005744127199999999,
+      "tokens_output": 2854
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0046774168000000005,
+      "tokens_output": 3340
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0036311184,
+      "tokens_output": 1658
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0046791024,
+      "tokens_output": 2797
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007048507199999999,
+      "tokens_output": 3255
     }
   ]
 }

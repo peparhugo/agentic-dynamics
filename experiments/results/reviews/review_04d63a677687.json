@@ -1,0 +1,237 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "04d63a677687",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "3b1b218ede6c623e591be0b0a94afc95fb71a1b0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.47,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Commits the entire compiled build/ directory (cli.js, generator.js, .d.ts, source maps) to source control; generated output should be gitignored and produced by a build step, otherwise every source change creates noisy diffs and drift risk."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score of 0.47 with 3048 violations (camelCase/PascalCase/UPPER_CASE on cache.d.ts, cli.d.ts, etc.); while much of this is Sonar flagging auto-generated .d.ts files, the root cause is tracking generated artifacts instead of excluding them."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +110 and smells +10 in a greenfield commit, suggesting the generator/parser logic should be split into smaller helpers rather than monolithic render functions."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Duplications of 1.6% introduced immediately \u2014 tag/date rendering is repeated across renderPageHtml and renderIndexHtml and should be extracted."
+        },
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "htmlEncode escapes &, <, >, \" but not the single quote, which can leave attribute-context injection holes; escaping ' too is the defensive convention."
+        }
+      ],
+      "strengths": [
+        "Zero bugs and no external runtime dependencies (only Node built-ins fs/path).",
+        "Straightforward, readable argument parsing with a clear usage string for unknown commands.",
+        "User-provided content (titles, tags, dates) is consistently HTML-escaped before rendering.",
+        "Directory recursion and output mkdir with recursive:true make the pipeline robust to missing paths."
+      ],
+      "summary": "A clean, dependency-free minimal SSG, but it should not have committed compiled build artifacts \u2014 that single decision is what drags the convention score to 0.47 and constitutes the main debt.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "61e15d6e0d3a59a45d8b1336e53187aeea2825de",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Commit ships generated build artifacts (build/*.js, *.js.map, *.d.ts) and the low 0.47 convention score is entirely driven by naming violations in auto-generated declaration files (cache.d.ts, cli.d.ts) \u2014 a measurement artifact, but committing build output bloats diffs and will keep inflating convention checks."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "loadTemplates/registerPartials repeat the same existsSync/readdirSync/filter('.hbs')/readFileSync/compile block three times (partials, layouts, page templates), matching the +2 SonarQube smells."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Single commit is large (+590/-42 lines across 7 files) mixing CLI parsing, generator signature change, and a new Handlebars engine, plus regenerated sourcemaps."
+        }
+      ],
+      "strengths": [
+        "Backwards-compatible feature: templateDir is an optional parameter so existing generateSite callers are unaffected",
+        "Cognitive complexity decreased by 5 with zero new bugs and no duplications",
+        "Usage string updated alongside the new --templates flag so docs stay in sync",
+        "Clean separation of partials, layouts, and page templates in the Handlebars integration"
+      ],
+      "summary": "Adds a backward-compatible --templates feature with lower cognitive complexity and no new bugs, but commits generated build artifacts whose .d.ts naming violations account for the low 0.47 convention score.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "3dc7a617c10f32abd0304179034c10b4f011e1fb",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "The parseDirectory + generateSite + console.log block is duplicated verbatim in both the 'build' and 'serve' branches instead of being factored into a shared helper \u2014 matches the +2.9% duplication delta."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "SonarQube cognitive complexity +141 for a two-command CLI is disproportionate; the new server.ts (156 lines with rebuild/close plumbing) carries most of it and appears over-engineered for a static 'serve' feature."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Generated build artifacts (build/server.js, *.map, *.d.ts) are committed, which both inflates the diff (+761/-27) and sources the bulk of the 3048 convention violations in the .d.ts files."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "port is assigned via parseInt without NaN/range validation, so `--port abc` silently yields an invalid port at runtime."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The +8 smells and convention score of 0.47 are largely driven by compiler-emitted .d.ts files (cli.d.ts, cache.d.ts: camelCase/PascalCase naming) rather than handwritten source \u2014 flagging as a measurement discrepancy."
+        }
+      ],
+      "strengths": [
+        "Replaced unconditional CLI execution with explicit build/serve/usage dispatch, making the command contract clearer.",
+        "Server concerns are properly isolated in a new module rather than inlined into cli.js, respecting separation of concerns.",
+        "Reuses existing parseDirectory/generateSite entry points instead of reimplementing parsing logic."
+      ],
+      "summary": "A functionally sound feature (serve command + extracted server module) that fits the existing CLI architecture, but the duplicated build block, +141 cognitive complexity, and committed build artifacts add real technical debt.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "9a364241680a961a3cd98d63587897896d8c4262",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.47,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "other",
+          "severity": "minor",
+          "description": "In the serve branch, `const pages = engine.pages` is captured before `await engine.build()` completes, so the logged page count reads a stale (likely empty) array; build branch reads `engine.pages.length` only after await, showing inconsistent async usage."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Refactor adds +179 cognitive complexity and +6 smells per SonarQube; a refactor that restructures the pipeline should reduce, not nearly double, complexity."
+        },
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "Convention score 0.47 with 3048 violations (camelCase/PascalCase/UPPER_CASE naming on cache.d.ts, cli.d.ts). Flagged discrepancy: these violations are on generated declaration/build files, so part of the low score may be measurement noise rather than authored code quality."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Build branch hardcodes `port: 3000` in the SSGEngine options even though serve-only config is irrelevant to build, leaving an unused/misleading config value."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "loadConfigPlugins swallows all errors with a bare catch and silently falls back to defaults, which can mask a genuinely broken ssg.config.js during debugging."
+        }
+      ],
+      "strengths": [
+        "Introduces a plugin-based SSGEngine architecture with clean extension points (markdown/template/devserver plugins) and config-file-driven plugin loading.",
+        "Refactors top-level logic into async main() with centralized error handling and a non-zero exit on failure.",
+        "Config loading correctly handles both CommonJS and default-export interop for ssg.config.js.",
+        "Good separation of concerns: engine orchestration, plugin registry, and parse/config helpers are distinct."
+      ],
+      "summary": "Sound architectural direction toward a plugin engine, but the refactor regresses with an async sequencing defect, a large cognitive-complexity increase, and low convention adherence, making it net worse than the structure it replaced.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b877a872778c66e976bd2b5472638875777824a8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.47,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "critical",
+          "description": "Convention score 0.47 with 3048 violations (camelCase/PascalCase/UPPER_CASE naming rules) across cache.d.ts, cli.d.ts and related files; bulk of the +1446 lines violates enforced naming conventions"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Compiled output (build/cache.js, build/cache.d.ts, build/cache.d.ts.map, sourceMappingURL artifacts) is committed to git; generated artifacts should be gitignored and produced by the build step, and the low convention score is driven largely by lint running over these generated files"
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "+1446 lines added with no tests in the diff; a BuildCache with content/template hashing and cache invalidation logic is exactly the kind of logic that needs unit coverage"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "load() and clear() swallow all exceptions via bare catch {}, silently masking corrupted-cache and I/O errors which complicates debugging cache failures"
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Cognitive complexity +7 with +1 class and +4 functions added in a single cross-cutting commit; mixing the cache feature with 24 new imports into one 1446-line change widens review surface"
+        }
+      ],
+      "strengths": [
+        "Content-addressable hashing (sha256 over file content) with a separate template hash is a sound incremental-build invalidation design",
+        "Template hash computation sorts directory entries, making the hash deterministic across filesystems",
+        "Corrupted or missing cache is handled gracefully by resetting to a fresh manifest instead of crashing the build",
+        "Cache manifest cleanly separates contentHashes, templateHash, and per-page/index HTML entries, making invalidation logic explicit"
+      ],
+      "summary": "Solid cache-invalidation design but the commit is worse overall: convention score dropped to 0.47 with 3048 naming violations and generated build artifacts committed to git \u2014 a discrepancy worth noting is that the majority of the flagged violations land on compiled .d.ts files, so the 0.47 score is inflated by linting generated output rather than genuine source-style drift.",
+      "session_number": 5
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 1's inline HTML rendering (renderPageHtml/renderIndexHtml) was never retired; Session 2 added a Handlebars engine as an alternative and sessions 3-5 kept both paths alive in generator.ts, leaving two competing rendering implementations to maintain.",
+      "Session 4's plugin refactor hard-couples serve() to a plugin named 'devserver' (engine.serve throws if not found) instead of depending on an interface, constraining how serving can be composed.",
+      "Session 4 moved page population into MarkdownPlugin.beforeBuild, so engine.pages stays empty until build() runs; the CLI's serve path reads engine.pages before the pipeline completes, a latent ordering fragility that persisted into session 5.",
+      "Session 5's incremental cache only activates when a template directory exists (requires templateHash !== ''), so the default no-templates path gets no build speedup.",
+      "Compiled build/*.js + source maps were committed from session 1 and node_modules (~12k lines) was committed in session 3, bloating the repo and compounding as every session re-touches generated artifacts."
+    ],
+    "key_decisions": [
+      "S1 greenfield: discarded the Express Todo API seed entirely and built a markdown static site generator (parser via gray-matter/marked, generator, CLI) from scratch.",
+      "S2 feature_addition: adopted Handlebars as the template engine with layouts, partials, and per-page templates, while keeping inline HTML rendering as the fallback.",
+      "S3 integration: added a dev server using chokidar file watching + WebSocket live reload with path-traversal protection and a new 'serve' command.",
+      "S4 refactor: extracted an extensible plugin architecture (SSGEngine + onStart/beforeBuild/onFile/afterBuild/onEnd hooks) with Markdown/Template/DevServer plugins configured via ssg.config.",
+      "S5 cross_cutting: added an incremental build cache keyed on SHA-256 content and template hashes with two-tier invalidation (parser skips re-parse, generator skips re-render) plus stale-output cleanup."
+    ],
+    "trajectory_description": "Quality steadily improved across the five sessions. Session 1 produced a minimal but clean MVP; session 2 added real templating with solid test growth (3 to 8 generator tests); session 3 integrated a full dev server with live reload and security guardrails; session 4 consolidated the growing monolith into a clean plugin architecture that made the system extensible; session 5 layered a sophisticated two-tier incremental cache (content hashes in the parser, template hashes in the generator) with a large 667-line test suite. The arc is a natural feature-addition-then-refactor rhythm, with the only regression risk being mild accumulated technical debt: dual rendering paths, committed build artifacts and node_modules, and a couple of coupling/ordering smells that the plugin refactor left behind.",
+    "summary": "A highly coherent five-session arc that progresses naturally from greenfield MVP through templating, dev-server integration, plugin refactor, and a well-tested cross-cutting cache, with quality improving each session despite mild accumulated hygiene debt."
+  }
+}

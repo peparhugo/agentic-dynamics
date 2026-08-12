@@ -1,0 +1,110 @@
+{
+  "story_name": "static_site_gen",
+  "story_id": "4c1f8dd819b2",
+  "model": "deepseek/deepseek-v4-flash",
+  "commit_reviews": [
+    {
+      "commit_hash": "074a77dd675d9670acfd71e8998b66080d59b00a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.62,
+      "convention_adherence": 0.46,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "+8 smells and +141 cognitive complexity in a 4K-line greenfield seed suggest the initial architecture packs too much logic into few files/functions rather than decomposing from the start."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "2.9% duplication introduced at genesis indicates shared rendering/templating logic is being repeated instead of factored into a common module."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score of 0.46 with thousands of flagged violations; however several listed violations (Classes/Interfaces should use PascalCase, Constants should be UPPER_CASE) reference constructs the AST diff shows do not exist (+0 classes, no UPPER_CASE constants in the visible diff) \u2014 the score appears to overstate actual convention breaks and includes misattributed checks."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Wholesale deletion of the prior index.ts seed replaces the existing structure rather than building on it; acceptable for a greenfield story but constitutes a pattern break with the prior baseline."
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "Tests assert on exact rendered HTML fragments and positional ordering (indexOf comparisons), which are brittle to future markup/templating changes."
+        }
+      ],
+      "strengths": [
+        "Comprehensive behavior-level test suite (15 cases) covering happy paths, nonexistent-content errors, XSS escaping, tag-less pages, and date-sorted index rendering.",
+        "Clean test scaffolding with tmpDir/writeMarkdown helpers and proper afterEach cleanup \u2014 no orphaned fixtures.",
+        "Sensible src/ + __tests__/ module decomposition with a single, discoverable build entry point.",
+        "Defensive behavior baked in (throws on missing content dir, graceful empty-dir handling, slug fallback title)."
+      ],
+      "summary": "Solid, well-tested greenfield foundation (architecture fit ~0.62), but the low 0.46 convention score and the +8 smells / +141 complexity / 2.9% duplication mean it seeds real technical debt; note the flagged PascalCase/UPPER_CASE violations misattribute constructs that don't exist per the +0 classes measurement, so actual convention breaks are fewer than the score implies.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "ddbac1450eb36bb66c073011694496fe0bce2f55",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.46,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "SonarQube convention score 0.46 with naming violations (PascalCase classes/interfaces, UPPER_CASE constants, camelCase functions) reported across build.test.ts, index.ts, and index-browser.ts."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +179 for ~490 added lines; the template-rendering logic and test fixtures pack significant branching (conditionals, loops) into nested template strings."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Duplication +1.8%: setupTemplatesDir writes default.hbs/layouts/partials that individual tests immediately overwrite, duplicating fixture content and hiding which fixture a test actually exercises."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Test fixture override pattern means assertions depend on the latest writeTemplate call; the shared setup content is effectively dead in several tests."
+        }
+      ],
+      "strengths": [
+        "Feature integrates cleanly with the existing build pipeline: build() gains an optional templatesDir with a built-in fallback, preserving the old signature (existing tests unchanged).",
+        "Comprehensive coverage: default/custom/frontmatter templates, layout wrapping via {{{body}}}, partials, index.hbs pages array, fallback, and missing-template error path.",
+        "Respects existing test conventions: reuses tmpDir/writeMarkdown helpers and setup/teardown cleanup patterns.",
+        "Proper error handling (throws /Template not found/) instead of silent degradation."
+      ],
+      "summary": "A backward-compatible template feature with strong test coverage that fits the SSG architecture but lands with real convention debt (score 0.46) and elevated complexity/duplication \u2014 note the flagged naming violations appear to target template-fixture content rather than actual code identifiers.",
+      "session_number": 2
+    }
+  ],
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Seed codebase (Express Auth API, index.ts) was entirely unrelated to the static-site-generator story and was deleted wholesale in Session 1, so the seed provided zero reusable value and effectively forced a greenfield start",
+      "Two parallel template systems now coexist \u2014 the built-in string templates (src/template.ts) and the new Handlebars TemplateEngine \u2014 with branching in build() to pick between them, adding maintenance surface",
+      "node_modules/ and package-lock artifacts committed in Session 1 create large, noisy diffs that obscure the actual source changes",
+      "The stated premise of 5 sessions does not match the commit log, which contains only 2 story sessions plus the seed commit"
+    ],
+    "key_decisions": [
+      "Discarding the unrelated Auth API seed outright and building the SSG from scratch as a clean CLI/module split (types.ts, template.ts, build.ts, index.ts)",
+      "Adopting a test-first approach with a comprehensive jest suite (16 tests in Session 1) pinned to frontmatter metadata, date-descending sort, and HTML escaping",
+      "Session 2 introduced a pluggable Handlebars TemplateEngine with layouts, partials, and index templates, wired via a new --templates flag",
+      "Preserving backward compatibility by falling back to built-in string templates whenever the templates dir is absent or lacks a template",
+      "Extending PageMeta with per-page template/layout frontmatter fields instead of a global template setting, keeping per-page flexibility"
+    ],
+    "trajectory_description": "Quality improved across the two sessions. Session 1 delivered a clean, fully tested static site generator (16 passing tests) with a sound separation between CLI, build logic, types, and rendering. Session 2 extended it with a well-factored Handlebars templating layer (layouts, partials, index) without breaking the existing API \u2014 after one transient test failure that was resolved, the final state had 27 passing tests and the added TemplateEngine is coherent with the original architecture rather than bolted on. Coverage, test depth, and feature richness all rose while code quality stayed consistent.",
+    "summary": "A coherent, improving two-session arc in which a greenfield, well-tested SSG core was cleanly extended with a backward-compatible templating engine \u2014 though the unrelated seed commit was discarded outright and the story ran 2 sessions rather than the expected 5."
+  }
+}

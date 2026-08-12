@@ -482,7 +482,11 @@ def _load_review_data() -> dict:
     total_commit_reviews = 0
     total_story_reviews = 0
 
-    for f in reviews_dir.glob("*.json"):
+    for f in reviews_dir.glob("review_*.json"):
+        # Skip per-session files (review_{id}_S{n}.json) and story files
+        # (review_{id}_story.json) — only aggregate review_{id}.json counts.
+        if "_S" in f.stem or f.stem.endswith("_story"):
+            continue
         try:
             d = json.loads(f.read_text())
         except (json.JSONDecodeError, OSError):
