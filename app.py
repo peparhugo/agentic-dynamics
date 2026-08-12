@@ -14,10 +14,12 @@ from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
 import redis.asyncio as redis
-from websockets.asyncio.server import Request, Server, ServerConnection, serve
+from websockets.asyncio.server import Request, ServerConnection
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Response
+
+from transport import BaseTransport, WebSocketTransport
 
 LOGGER = logging.getLogger(__name__)
 MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -37,14 +39,22 @@ class NotificationServer:
         port: int = 8765,
         redis_url: str | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host, self.port = host, port
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.database_url = database_url or os.getenv("DATABASE_URL", "sqlite:///messages.db")
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport is not None:
+            self.transport = transport
+        elif transport_name in {"websocket", "ws"}:
+            self.transport = WebSocketTransport(port)
+        else:
+            raise ValueError(f"Unsupported transport: {transport_name}")
         self.clients: dict[str, ServerConnection] = {}
         self.channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
-        self._server: Server | None = None
+        self._server: Any = None
         self._redis: redis.Redis | None = None
         self._pubsub: Any = None
         self._redis_task: asyncio.Task[None] | None = None
@@ -75,9 +85,7 @@ class NotificationServer:
 
     @property
     def bound_port(self) -> int:
-        if self._server is None or not self._server.sockets:
-            return self.port
-        return self._server.sockets[0].getsockname()[1]
+        return self.transport.bound_port
 
     async def client_count(self) -> int:
         with self._lock:
@@ -138,6 +146,7 @@ class NotificationServer:
         client_id = str(uuid.uuid4())
         with self._lock:
             self.clients[client_id] = connection
+        await self.transport.on_connect(client_id, connection)
         if self._redis:
             await self._redis.hset(f"notifications:client:{client_id}", mapping={"server": self._instance_id})
         return client_id
@@ -149,6 +158,7 @@ class NotificationServer:
                 self.channels[name].discard(client_id)
                 if not self.channels[name]:
                     del self.channels[name]
+        await self.transport.on_disconnect(client_id)
         if self._redis:
             subscriptions = await self._redis.smembers(f"notifications:client:{client_id}:subscriptions")
             for channel in subscriptions:
@@ -156,12 +166,8 @@ class NotificationServer:
             await self._redis.delete(f"notifications:client:{client_id}:subscriptions")
             await self._redis.delete(f"notifications:client:{client_id}")
 
-    async def _send_to(self, connection: ServerConnection, message: str) -> bool:
-        try:
-            await connection.send(message)
-            return True
-        except ConnectionClosed:
-            return False
+    async def _send_to(self, client_id: str, message: str) -> bool:
+        return await self.transport.send_message(client_id, message)
 
     async def _deliver(self, envelope: dict[str, Any]) -> None:
         message = envelope["message"]
@@ -169,15 +175,14 @@ class NotificationServer:
         channel = envelope.get("channel")
         with self._lock:
             if target_id:
-                recipients = [(target_id, self.clients[target_id])] if target_id in self.clients else []
+                recipients = [target_id] if target_id in self.clients else []
             elif channel is None:
-                recipients = list(self.clients.items())
+                recipients = list(self.clients)
             else:
-                recipients = [(i, self.clients[i]) for i in self.channels.get(channel, set()) if i in self.clients]
-        results = await asyncio.gather(*(self._send_to(c, message) for _, c in recipients))
-        for (client_id, _), sent in zip(recipients, results):
-            if not sent:
-                await self._remove(client_id)
+                recipients = [i for i in self.channels.get(channel, set()) if i in self.clients]
+        failed = await self.transport.broadcast(message, recipients)
+        for client_id in failed:
+            await self._remove(client_id)
 
     async def broadcast(self, message_type: str, payload: dict[str, Any], channel: str | None = None, target_id: str | None = None) -> None:
         message = json.loads(self._make_message(message_type, payload))
@@ -206,9 +211,9 @@ class NotificationServer:
                 raise ValueError("type must be supported and payload must be an object")
         except (json.JSONDecodeError, AttributeError, TypeError, ValueError) as exc:
             with self._lock:
-                connection = self.clients.get(client_id)
-            if connection:
-                await self._send_to(connection, self._make_message("system", {"error": str(exc)}))
+                connected = client_id in self.clients
+            if connected:
+                await self._send_to(client_id, self._make_message("system", {"error": str(exc)}))
             return
         channel = payload.get("channel", message.get("channel"))
         if channel is not None and (not isinstance(channel, str) or not channel.strip()):
@@ -241,13 +246,13 @@ class NotificationServer:
 
     async def _send_error(self, client_id: str, error: str) -> None:
         with self._lock:
-            connection = self.clients.get(client_id)
-        if connection:
-            await self._send_to(connection, self._make_message("system", {"error": error}))
+            connected = client_id in self.clients
+        if connected:
+            await self._send_to(client_id, self._make_message("system", {"error": error}))
 
     async def _handler(self, connection: ServerConnection) -> None:
         client_id = await self._register(connection)
-        await connection.send(self._make_message("system", {"event": "connected", "client_id": client_id}))
+        await self._send_to(client_id, self._make_message("system", {"event": "connected", "client_id": client_id}))
         try:
             async for raw_message in connection:
                 await self._handle_message(client_id, raw_message)
@@ -271,13 +276,11 @@ class NotificationServer:
             if self._redis:
                 await self._redis.close()
             self._redis = None
-        self._server = await serve(self._handler, self.host, self.port, process_request=self._process_request)
+        self._server = await self.transport.start(self._handler, self._process_request, self.host, self.port)
 
     async def stop(self) -> None:
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
+        await self.transport.stop()
+        self._server = None
         if self._redis_task:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
