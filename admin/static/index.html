@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>dynamic-code · control plane</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>dynamic-code</h1>
+    <span class="subtitle">control plane</span>
+  </header>
+  <nav>
+    <button data-view="matrix" class="active">Matrix</button>
+    <button data-view="inspector">Cell Inspector</button>
+    <button data-view="routing">Routing</button>
+  </nav>
+  <main>
+    <section id="view-matrix" class="view active">
+      <div id="summary"></div>
+      <div id="matrix"></div>
+    </section>
+    <section id="view-inspector" class="view">
+      <div class="toolbar">
+        <select id="cell-select"></select>
+        <button id="clear-transcript">Clear</button>
+      </div>
+      <pre id="transcript"></pre>
+    </section>
+    <section id="view-routing" class="view">
+      <div id="routing"></div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -33,6 +33,8 @@ REDIS_BASE_DELAY = 2.0  # seconds, doubled each retry
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
+from instrument.live import LivePublisher  # noqa: E402
+
 
 def log(msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
@@ -119,6 +121,8 @@ def main() -> None:
 
         cell_id = cell["cell_id"]
         _safe_hset(r, STATUS_KEY, cell_id, "running")
+        publisher = LivePublisher(cell_id)
+        publisher.publish_status("running")
         log(f"[{cell_id}] Starting ({completed+failed+1}/30)")
 
         t0 = time.monotonic()
@@ -137,6 +141,7 @@ def main() -> None:
                 capture_output=True,
                 text=True,
                 timeout=TIMEOUT_PER_CELL,
+                env={**os.environ, "FINOPS_CELL_ID": cell_id},
             )
 
             elapsed = time.monotonic() - t0
@@ -155,10 +160,12 @@ def main() -> None:
             if ok:
                 log(f"[{cell_id}] OK ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "done")
+                publisher.publish_status("done")
                 completed += 1
             else:
                 log(f"[{cell_id}] FAILED ret={proc.returncode} ({elapsed:.0f}s)")
                 _safe_hset(r, STATUS_KEY, cell_id, "failed")
+                publisher.publish_status("failed")
                 error_log = log_dir / f"{cell_id}.error.log"
                 error_log.write_text(proc.stderr or proc.stdout)
                 failed += 1
@@ -168,11 +175,13 @@ def main() -> None:
             log(f"[{cell_id}] TIMEOUT ({elapsed:.0f}s)")
             r = _connect_redis()
             _safe_hset(r, STATUS_KEY, cell_id, "timeout")
+            publisher.publish_status("timeout")
             failed += 1
 
         except Exception as e:
             log(f"[{cell_id}] EXCEPTION: {e}")
             _safe_hset(r, STATUS_KEY, cell_id, "failed")
+            publisher.publish_status("failed")
             failed += 1
             # Reconnect — the exception may have been a Redis error mid-run
             r = _connect_redis()

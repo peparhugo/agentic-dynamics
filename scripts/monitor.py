@@ -3,6 +3,7 @@
 Usage:
     python scripts/monitor.py             # One-shot summary
     python scripts/monitor.py --watch     # Live updating (Ctrl+C to exit)
+    python scripts/monitor.py --json      # One-shot summary as JSON
     python scripts/monitor.py --clear     # Clear all experiment data from Redis
 """
 
@@ -87,6 +88,7 @@ def print_status(status: dict, clear_screen: bool = True) -> None:
 def main() -> None:
     watch = "--watch" in sys.argv
     clear = "--clear" in sys.argv
+    json_out = "--json" in sys.argv
 
     r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
@@ -97,16 +99,19 @@ def main() -> None:
         print("Queue cleared.")
         return
 
+    status = get_status(r)
+    if json_out:
+        print(json.dumps(status))
+        return
+
     if watch:
         try:
             while True:
-                status = get_status(r)
-                print_status(status)
+                print_status(get_status(r))
                 time.sleep(5)
         except KeyboardInterrupt:
             print("\nMonitor stopped.")
     else:
-        status = get_status(r)
         print_status(status, clear_screen=False)
 
 

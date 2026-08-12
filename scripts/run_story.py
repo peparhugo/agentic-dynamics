@@ -52,6 +52,12 @@ def main():
         "--model", default="deepseek/deepseek-v4-pro", help="Model ID"
     )
     parser.add_argument(
+        "--backend",
+        choices=["auto", "opencode", "claude_cli"],
+        default="auto",
+        help="Backend to execute sessions (auto routes anthropic/* to claude_cli)",
+    )
+    parser.add_argument(
         "--codebase",
         default=None,
         help="Path to seed codebase (overrides --codebase-quality and --tier)",
@@ -152,6 +158,7 @@ def main():
         thinking_budget_tokens=args.thinking_budget,
         output_token_limit=args.output_limit,
         standardize=args.standardize,
+        backend=None if args.backend == "auto" else args.backend,
     )
 
     # Save results

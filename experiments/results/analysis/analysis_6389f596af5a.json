@@ -4,9 +4,9 @@
   "language": "typescript",
   "summary": {
     "commits": 5,
-    "total_lines_added": 0,
-    "total_lines_removed": 0,
-    "net_lines": 0,
+    "total_lines_added": 822,
+    "total_lines_removed": 261,
+    "net_lines": 561,
     "average_convention_score": 0.461
   },
   "commits": [
@@ -15,23 +15,23 @@
       "commit_message": "[story] Session 1: greenfield",
       "session_number": 1,
       "ast": {
-        "files_added": 0,
+        "files_added": 6,
         "files_modified": 0,
-        "files_deleted": 0,
-        "functions_added": 0,
-        "functions_removed": 0,
+        "files_deleted": 1,
+        "functions_added": 7,
+        "functions_removed": 6,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 5,
+        "imports_removed": 2,
+        "lines_added": 179,
+        "lines_removed": 106
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": -4,
+        "complexity_delta": 43,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -89,23 +89,23 @@
       "commit_message": "[story] Session 2: feature_addition",
       "session_number": 2,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 1,
+        "files_modified": 2,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 6,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 4,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 152,
+        "lines_removed": 4
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": -27,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -163,23 +163,23 @@
       "commit_message": "[story] Session 3: integration",
       "session_number": 3,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 1,
+        "files_modified": 2,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 3,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 7,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 143,
+        "lines_removed": 2
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 1,
+        "complexity_delta": 5,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -237,23 +237,23 @@
       "commit_message": "[story] Session 4: refactor",
       "session_number": 4,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 6,
+        "files_modified": 2,
         "files_deleted": 0,
-        "functions_added": 0,
-        "functions_removed": 0,
+        "functions_added": 13,
+        "functions_removed": 8,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 14,
+        "imports_removed": 2,
+        "lines_added": 203,
+        "lines_removed": 143
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": -1,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -312,22 +312,22 @@
       "session_number": 5,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
+        "files_modified": 3,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 3,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 1,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 145,
+        "lines_removed": 6
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 1,
+        "complexity_delta": -4,
         "duplications_delta": 0.0
       },
       "convention": {

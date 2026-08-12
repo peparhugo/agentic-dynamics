@@ -17,6 +17,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "src"))
 INVENTORY_PATH = ROOT / "experiments" / "inventory.json"
 SUMMARY_PATH = ROOT / "experiments" / "results" / "_results_summary.json"
 REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
@@ -26,6 +27,8 @@ OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 DATA_DIR = ROOT / "experiments" / "data"
 
 from _constants import WORKTREE_ROOT, MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
+
+from instrument.routing import compute_routing  # noqa: E402
 
 MODEL_DISPLAY_ORDER = [
     "deepseek/deepseek-v4-pro",
@@ -972,6 +975,7 @@ def build():
         "perturbation_class_breakdown": pert_class_summary,
         "energy_ranking": energy_ranking,
         "strategy_distribution": summary.get("strategy_distribution", {}),
+        "routing": compute_routing(entries),
         "grit_matrix": _load_grit_matrix(),
         "sonar": _compute_sonar(entries),
         "design_parameters": {

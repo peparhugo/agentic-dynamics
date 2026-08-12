@@ -35,6 +35,11 @@ from .graph import Neo4jClient
 from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
 from .opencode import run_opencode_agentic, AgenticResult, normalize_opencode_event
+from .streaming import stream_subprocess, StreamResult
+from .claude_adapter import run_claude_agentic, ClaudeStreamAdapter, adapt_usage
+from .backends import get_backend_for_model, resolve_backend, run_agentic
+from .live import LivePublisher, make_publisher
+from .routing import compute_routing, normalize_task, recommend_route, simulate_strategies
 
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
 from .language import (
@@ -121,6 +126,11 @@ __all__ = [
     "OllamaAnalyzer", "load_summary_data",
     "OpencodeAnalyzer", "REPORTS_DIR",
     "run_opencode_agentic", "AgenticResult", "normalize_opencode_event",
+    "stream_subprocess", "StreamResult",
+    "run_claude_agentic", "ClaudeStreamAdapter", "adapt_usage",
+    "get_backend_for_model", "resolve_backend", "run_agentic",
+    "LivePublisher", "make_publisher",
+    "compute_routing", "normalize_task", "recommend_route", "simulate_strategies",
     # v0.6
     "LanguageProfile", "CodebaseAST", "detect_language", "parse_codebase",
     "get_parser", "collect_functions", "collect_imports",

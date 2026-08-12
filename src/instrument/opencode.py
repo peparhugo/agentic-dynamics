@@ -14,9 +14,13 @@ import os
 import subprocess
 import tempfile
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+from .live import make_publisher
+from .streaming import stream_subprocess
 
 # Resolve opencode binary: env override or default ~/.opencode/bin/opencode
 _OPENCODE_BIN = os.environ.get("OPENCODE_BIN", "")
@@ -181,6 +185,8 @@ def run_opencode_agentic(
     timeout: int = 300,
     session_name: str = "",
     init_git: bool = True,
+    on_event: Callable[[dict[str, Any]], None] | None = None,
+    transcript_path: str | None = None,
 ) -> AgenticResult:
     """Spawn an opencode agentic session in an isolated worktree.
 
@@ -203,6 +209,10 @@ def run_opencode_agentic(
         timeout: Maximum session duration in seconds.
         session_name: Name for the session (logging).
         init_git: Whether to initialize a git repo in the workdir.
+        on_event: Optional callback invoked per parsed opencode event. Falls
+            back to Redis live publishing (``FINOPS_CELL_ID``) when omitted.
+        transcript_path: Optional path for the session JSONL transcript.
+            Defaults to ``<workdir>/.instrument/session.jsonl``.
 
     Returns:
         AgenticResult with complete execution trace.
@@ -233,17 +243,7 @@ def run_opencode_agentic(
 
     # Initialize git for version control tracking
     if init_git:
-        subprocess.run(["git", "init"], cwd=workdir, capture_output=True)
-        subprocess.run(
-            ["git", "config", "user.email", "experiment@instrument.local"],
-            cwd=workdir,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True
-        )
-        subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True)
-        subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
+        _init_git_workdir(workdir)
 
     # Store files before for change detection
     files_before = _list_files(workdir)
@@ -266,62 +266,85 @@ def run_opencode_agentic(
     if prompt:
         cmd.append(prompt)
 
-    try:
-        proc = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=workdir,
-            stdin=subprocess.DEVNULL,
-        )
-        result.exit_code = proc.returncode
-        result.error = proc.stderr.strip() if proc.returncode != 0 else ""
+    publisher = make_publisher() if on_event is None else None
 
-        # Store raw transcript for artifact bundling
-        result.raw_transcript = proc.stdout
+    def _on_line(line: str) -> None:
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        if not isinstance(obj, dict):
+            return
+        if on_event is not None:
+            on_event(obj)
+        elif publisher is not None:
+            publisher.publish_event(obj)
 
-        # Parse JSONL output even on non-zero exit (partial output)
-        if proc.stdout:
-            _parse_session_output(proc.stdout, result)
-
-    except subprocess.TimeoutExpired as e:
+    on_line = _on_line if (on_event is not None or publisher is not None) else None
+    stream = stream_subprocess(cmd, workdir=workdir, timeout=timeout, on_line=on_line)
+    if stream.timed_out:
         result.error = f"Timeout after {timeout}s"
         result.exit_code = -1
-        # Try to parse any partial output
-        if e.stdout:
-            _parse_session_output(
-                e.stdout.decode() if isinstance(e.stdout, bytes) else str(e.stdout), result
-            )
-    except Exception as e:
-        result.error = str(e)
-        result.exit_code = -2
+    else:
+        result.exit_code = stream.exit_code
+        result.error = stream.stderr.strip() if stream.exit_code != 0 else ""
+
+    # Store raw transcript for artifact bundling
+    result.raw_transcript = stream.stdout
+
+    # Parse JSONL output even on non-zero exit (partial output)
+    if stream.stdout:
+        _parse_session_output(stream.stdout, result)
 
     result.duration_s = time.monotonic() - t0
 
     # Detect file changes (filter out venv, pip, pytest cache)
-    files_after = _list_files(workdir)
-
-    def _is_artifact(p):
-        parts = p.split("/")
-        for skip in [".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git"]:
-            if skip in parts:
-                return True
-        return False
-
-    result.files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
-    result.files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
+    result.files_created, result.files_modified = _diff_workdir(workdir, files_before)
 
     # Persist session transcript for post-hoc artifact bundling
     if result.raw_transcript:
-        inst_dir = Path(workdir) / ".instrument"
-        inst_dir.mkdir(parents=True, exist_ok=True)
-        (inst_dir / "session.jsonl").write_text(result.raw_transcript)
+        out_path = (
+            Path(transcript_path)
+            if transcript_path
+            else Path(workdir) / ".instrument" / "session.jsonl"
+        )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(result.raw_transcript)
 
     # Extract final response from the last assistant message
     # (already set during parsing)
 
     return result
+
+
+def _init_git_workdir(workdir: str) -> None:
+    """Initialize a git repo in the workdir for version-control tracking."""
+    subprocess.run(["git", "init"], cwd=workdir, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "experiment@instrument.local"],
+        cwd=workdir,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True
+    )
+    subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True)
+    subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
+
+
+def _diff_workdir(workdir: str, files_before: set[str]) -> tuple[list[str], list[str]]:
+    """Compute files created/modified relative to a prior snapshot."""
+    files_after = _list_files(workdir)
+
+    def _is_artifact(p: str) -> bool:
+        return any(
+            skip in p.split("/")
+            for skip in (".venv", "venv", "__pycache__", ".pytest_cache", "node_modules", ".git")
+        )
+
+    files_created = sorted(f for f in (files_after - files_before) if not _is_artifact(f))
+    files_modified = sorted(f for f in (files_after & files_before) if not _is_artifact(f))
+    return files_created, files_modified
 
 
 def _list_files(dirpath: str) -> set[str]:
@@ -513,7 +536,7 @@ def normalize_opencode_event(event: dict, schema_version: int | None = None) -> 
         # v2 detection: type matches v2 naming convention (tool_use, step_start, etc.)
         # or has a non-empty part dict
         v2_types = {"tool_use", "tool_result", "step_follow", "step_start", "step_finish"}
-        if etype in v2_types or (has_part and etype == "text"):
+        if etype in v2_types or (has_part and etype in ("text", "reasoning")):
             schema_version = 2
         else:
             schema_version = 1
@@ -542,6 +565,10 @@ def normalize_opencode_event(event: dict, schema_version: int | None = None) -> 
 
         elif etype == "text":
             canonical["type"] = "text"
+            canonical["text"] = str(part.get("text", ""))
+
+        elif etype == "reasoning":
+            canonical["type"] = "reasoning"
             canonical["text"] = str(part.get("text", ""))
 
         elif etype == "step_start":

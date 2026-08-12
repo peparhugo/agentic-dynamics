@@ -4,9 +4,9 @@
   "language": "python",
   "summary": {
     "commits": 5,
-    "total_lines_added": 0,
-    "total_lines_removed": 0,
-    "net_lines": 0,
+    "total_lines_added": 825,
+    "total_lines_removed": 307,
+    "net_lines": 518,
     "average_convention_score": 0.879
   },
   "commits": [
@@ -15,23 +15,23 @@
       "commit_message": "[story] Session 1: greenfield",
       "session_number": 1,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 3,
-        "functions_added": 0,
-        "functions_removed": 0,
-        "classes_added": 0,
+        "files_added": 2,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 6,
+        "functions_removed": 16,
+        "classes_added": 2,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 15,
+        "imports_removed": 10,
+        "lines_added": 261,
+        "lines_removed": 255
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 0,
+        "complexity_delta": 14,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -52,23 +52,23 @@
       "commit_message": "[story] Session 2: feature_addition",
       "session_number": 2,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 3,
+        "files_added": 1,
+        "files_modified": 1,
+        "files_deleted": 0,
         "functions_added": 0,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 1,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 90,
+        "lines_removed": 1
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 1,
+        "complexity_delta": 38,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -90,22 +90,22 @@
       "session_number": 3,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 3,
-        "functions_added": 0,
+        "files_modified": 4,
+        "files_deleted": 0,
+        "functions_added": 2,
         "functions_removed": 0,
-        "classes_added": 0,
+        "classes_added": 3,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 5,
+        "imports_removed": 1,
+        "lines_added": 222,
+        "lines_removed": 22
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 0,
+        "complexity_delta": 46,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -126,23 +126,23 @@
       "commit_message": "[story] Session 4: refactor",
       "session_number": 4,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 3,
+        "files_added": 1,
+        "files_modified": 1,
+        "files_deleted": 0,
         "functions_added": 0,
         "functions_removed": 0,
-        "classes_added": 0,
+        "classes_added": 2,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 6,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 80,
+        "lines_removed": 28
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 10,
+        "complexity_delta": 194,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -164,22 +164,22 @@
       "session_number": 5,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 3,
-        "functions_added": 0,
+        "files_modified": 3,
+        "files_deleted": 0,
+        "functions_added": 4,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 3,
+        "imports_removed": 1,
+        "lines_added": 172,
+        "lines_removed": 1
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": 36,
         "duplications_delta": 0.0
       },
       "convention": {

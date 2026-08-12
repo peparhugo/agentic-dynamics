@@ -4,9 +4,9 @@
   "language": "python",
   "summary": {
     "commits": 5,
-    "total_lines_added": 0,
-    "total_lines_removed": 0,
-    "net_lines": 0,
+    "total_lines_added": 868,
+    "total_lines_removed": 322,
+    "net_lines": 546,
     "average_convention_score": 0.727
   },
   "commits": [
@@ -15,23 +15,23 @@
       "commit_message": "[story] Session 1: greenfield",
       "session_number": 1,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 4,
-        "functions_added": 0,
-        "functions_removed": 0,
-        "classes_added": 0,
+        "files_added": 3,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 8,
+        "functions_removed": 14,
+        "classes_added": 1,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 14,
+        "imports_removed": 10,
+        "lines_added": 203,
+        "lines_removed": 239
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": -2,
+        "complexity_delta": 9,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -54,22 +54,22 @@
       "session_number": 2,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 4,
-        "functions_added": 0,
-        "functions_removed": 0,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 1,
+        "functions_removed": 1,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 1,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 102,
+        "lines_removed": 14
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 5,
+        "complexity_delta": 63,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -91,23 +91,23 @@
       "commit_message": "[story] Session 3: integration",
       "session_number": 3,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 4,
-        "functions_added": 0,
+        "files_added": 1,
+        "files_modified": 4,
+        "files_deleted": 0,
+        "functions_added": 3,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 7,
+        "imports_removed": 1,
+        "lines_added": 258,
+        "lines_removed": 20
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": 28,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -130,22 +130,22 @@
       "session_number": 4,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 4,
+        "files_modified": 1,
+        "files_deleted": 0,
         "functions_added": 0,
         "functions_removed": 0,
-        "classes_added": 0,
+        "classes_added": 2,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 1,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 135,
+        "lines_removed": 48
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": -2,
+        "complexity_delta": -35,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -167,23 +167,23 @@
       "commit_message": "[story] Session 5: cross_cutting",
       "session_number": 5,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
-        "files_deleted": 4,
-        "functions_added": 0,
+        "files_added": 1,
+        "files_modified": 4,
+        "files_deleted": 0,
+        "functions_added": 2,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 1,
+        "imports_removed": 1,
+        "lines_added": 170,
+        "lines_removed": 1
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": -2,
+        "complexity_delta": 35,
         "duplications_delta": 0.0
       },
       "convention": {

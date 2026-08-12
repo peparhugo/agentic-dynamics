@@ -1,12 +1,16 @@
 """Enqueue experiment cells into Redis for parallel execution.
 
 Usage:
-    python scripts/enqueue.py              # Fill queue with all 30 cells
-    python scripts/enqueue.py --dry-run    # Print the plan without enqueueing
-    python scripts/enqueue.py --clear      # Clear the queue (reset)
+    python scripts/enqueue.py                # Fill queue with all cells (DeepSeek)
+    python scripts/enqueue.py --model anthropic/claude-sonnet-4-5   # Claude cells
+    python scripts/enqueue.py --dry-run      # Print the plan without enqueueing
+    python scripts/enqueue.py --clear        # Clear the queue (reset)
+
+Model is read from FINOPS_MODEL env var or --model flag.
 """
 
 import json
+import os
 import sys
 from typing import Any
 
@@ -16,7 +20,7 @@ import redis
 
 STORIES = ["task_manager_api", "static_site_gen", "notification_service"]
 TIERS = ["tier1_minimal", "tier2_small"]
-MODEL = "deepseek/deepseek-v4-pro"
+MODEL = os.environ.get("FINOPS_MODEL", "deepseek/deepseek-v4-pro")
 
 GOOD_CONDITIONS = ["clean", "bad_seed", "early_degrade"]
 BAD_CONDITIONS = ["clean", "early_degrade"]
@@ -28,7 +32,7 @@ STATUS_KEY = "story_status"       # Redis hash: cell_id -> status
 RESULTS_KEY = "story_results"     # Redis hash: cell_id -> result path
 
 
-def build_cells() -> list[dict[str, Any]]:
+def build_cells(model: str = MODEL) -> list[dict[str, Any]]:
     """Build the full experiment matrix."""
     cells = []
     for story in STORIES:
@@ -44,7 +48,7 @@ def build_cells() -> list[dict[str, Any]]:
                         "tier": tier,
                         "quality": quality,
                         "condition": condition,
-                        "model": MODEL,
+                        "model": model,
                     })
     return cells
 
@@ -52,12 +56,17 @@ def build_cells() -> list[dict[str, Any]]:
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
     clear = "--clear" in sys.argv
+    model = MODEL
+    if "--model" in sys.argv:
+        idx = sys.argv.index("--model")
+        if idx + 1 < len(sys.argv):
+            model = sys.argv[idx + 1]
 
-    cells = build_cells()
+    cells = build_cells(model=model)
     total = len(cells)
 
     if dry_run:
-        print(f"Would enqueue {total} cells:")
+        print(f"Would enqueue {total} cells (model={model}):")
         for i, cell in enumerate(cells):
             print(f"  [{i+1}/{total}] {cell['cell_id']}")
         return

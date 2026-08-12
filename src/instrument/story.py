@@ -25,7 +25,8 @@ from typing import Any
 
 import yaml
 
-from .opencode import run_opencode_agentic, AgenticResult
+from .backends import run_agentic
+from .opencode import AgenticResult
 from .language import detect_language, parse_codebase, LanguageProfile
 from .mutation import (
     MutationArtifact,
@@ -402,6 +403,7 @@ def run_story(
     silent_mode: bool | None = None,
     standardize: bool = True,
     enforce_pytest: bool = True,
+    backend: str | None = None,
 ) -> StoryResult:
     """Run a complete multi-session story.
 
@@ -421,6 +423,8 @@ def run_story(
         silent_mode: None=natural, True=forced-silent, False=forced-verbose.
         standardize: Apply standardized prompt constraints.
         enforce_pytest: Require pytest execution.
+        backend: Optional backend override (``opencode`` or ``claude_cli``);
+            defaults to auto-routing via ``get_backend_for_model``.
 
     Returns:
         StoryResult with per-session results and aggregate summary.
@@ -502,6 +506,7 @@ def run_story(
                 silent_mode=silent_mode,
                 standardize=standardize,
                 enforce_pytest=enforce_pytest,
+                backend=backend,
             )
             result.sessions.append(session_result)
 
@@ -576,6 +581,7 @@ def _run_session(
     silent_mode: bool | None,
     standardize: bool,
     enforce_pytest: bool,
+    backend: str | None = None,
 ) -> SessionResult:
     """Run one session in the story and commit its output.
 
@@ -586,7 +592,11 @@ def _run_session(
     files_before = _list_tracked_files(worktree)
     t0 = time.monotonic()
 
-    agentic = run_opencode_agentic(
+    # Per-session transcript, preserved across sessions (each session would
+    # otherwise overwrite the single .instrument/session.jsonl file).
+    transcript_path = worktree / ".instrument" / f"session_{spec.session_number}.jsonl"
+
+    agentic = run_agentic(
         spec.prompt,
         model=model,
         workdir=str(worktree),
@@ -597,7 +607,14 @@ def _run_session(
         standardize=standardize,
         enforce_pytest=enforce_pytest,
         session_name=session_name,
+        backend=backend,
+        transcript_path=str(transcript_path),
     )
+
+    # Mirror the current session's transcript to the canonical session.jsonl so
+    # single-file consumers (continuation logic, artifact bundling) keep working.
+    if transcript_path.exists():
+        shutil.copy2(transcript_path, worktree / ".instrument" / "session.jsonl")
 
     total_cost = agentic.estimated_cost_usd if agentic else 0.0
     total_tokens = agentic.total_tokens if agentic else 0
@@ -605,8 +622,15 @@ def _run_session(
     continuation_cost = 0.0
     continuation_tokens = 0
 
-    # If timed out, automatically continue the session
-    if agentic is not None and agentic.error and "timeout" in agentic.error.lower():
+    # If timed out, automatically continue the session. This continuation uses
+    # opencode's --session --fork mechanism, so it only applies to the opencode
+    # backend (Claude CLI has no equivalent forkable session id).
+    if (
+        agentic is not None
+        and agentic.error
+        and "timeout" in agentic.error.lower()
+        and (backend or "").lower() not in ("claude_cli", "claude")
+    ):
         jsonl_path = worktree / ".instrument" / "session.jsonl"
         session_id = ""
         if jsonl_path.exists():

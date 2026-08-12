@@ -123,6 +123,18 @@ def test_v2_step_start_event():
     assert ev["_schema"] == 2
 
 
+def test_v2_reasoning_event():
+    raw = {
+        "type": "reasoning",
+        "sessionID": "ses_xxx",
+        "part": {"type": "reasoning", "text": "Planning the fix..."},
+    }
+    ev = normalize_opencode_event(raw)
+    assert ev["type"] == "reasoning"
+    assert ev["text"] == "Planning the fix..."
+    assert ev["_schema"] == 2
+
+
 # ── Edge cases ───────────────────────────────────────────────────────────────
 
 def test_non_dict_returns_error():

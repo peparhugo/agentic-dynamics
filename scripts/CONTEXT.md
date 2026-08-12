@@ -15,7 +15,7 @@
 
 | Script | Lines | Purpose |
 |--------|-------|---------|
-| `run.py` | 488 | Primary runner. `python scripts/run.py --config <yaml>`. Produces JSON + Markdown game reports. |
+| `run.py` | 488 | Primary runner. `python scripts/run.py --config <yaml>`. Produces JSON + Markdown game reports. `--backend {auto,opencode,claude_cli}` routes `anthropic/*` to the Claude CLI adapter. |
 | `batch_run.py` | 110 | Parallel batch runs on DeepSeek via `ThreadPoolExecutor`. |
 | `multi_phase.py` | 128 | Iterative development: understand → build → refactor → add_feature. Measures compounding effects. |
 | `remaining_batch.py` | 81 | Runs remaining uncompleted experiment cells one at a time. |
@@ -38,11 +38,15 @@
 |--------|-------|---------|
 | `inventory.py` | 402 | Reads opencode.db, worktrees, results JSONs, config YAMLs. Commands: `refresh`, `list`, `stats`, `worktrees`, `report`. |
 | `_constants.py` | 30 | Shared constants (DB path, result dirs, model configs). Imported by inventory, analyze, and lab scripts. |
-| `build_data.py` | 562 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[X] measurements for the website. |
+| `build_data.py` | 562 | Produces `window.DYNAMICS_DATA` with provenance-tagged [M]/[C]/[H]/[X] measurements for the website. Includes a `routing` section from `instrument.routing.compute_routing`. |
 | `backfill_artifacts.py` | 263 | Copies generated code from `/tmp/exp_*` to `experiments/results/reports/`. Extracts session transcripts from SQLite. |
+| `backfill_story_transcripts.py` | 120 | Recovers per-session `session_{n}.jsonl` transcripts for story worktrees from `opencode.db` (merges `(fork #N)` continuations). Writes to `experiments/results/stories/transcripts/`. |
 | `regen_typescript_ssg.py` | 172 | Reconstructs TypeScript SSG worktrees from opencode DB part records. |
 | `batch_analyze_ts_ssg.py` | 159 | Runs `analyze_worktrees` on just the typescript_ssg worktrees. |
 | `recovery_cost_table.py` | 99 | Extracts baseline vs perturbed cost by operator×strength from DB. |
+| `enqueue.py` | 89 | Fills Redis `story_jobs` queue (30 cells) + seeds `story_status` hash. |
+| `worker.py` | 190 | `BRPOP` worker: runs `run_story.py`, sets `FINOPS_CELL_ID`, publishes status transitions to Redis. |
+| `monitor.py` | 120 | Redis queue dashboard. `--watch` live, `--json` machine output (used by `admin/` dashboard). |
 
 ## Lab Books (14 scripts)
 
@@ -62,3 +66,12 @@
 | `lab_basin_topology_neo4j.py` | What is basin topology via Neo4j? | Graph-based attractor basin classification |
 | `lab_opencode_meta_analysis.py` | What patterns in opencode experiments? | Meta-analysis of experiment structure + outcomes |
 | `lab_sonar_quality.py` | What code quality signals exist? | Sonar-based code quality analysis |
+
+## Admin Portal (`admin/`)
+
+| File | Purpose |
+|------|---------|
+| `admin/server.py` | Flask backend — `/api/matrix`, `/api/status` (SSE), `/api/events/<cell>` (SSE), `/api/routing`, `POST /api/experiments`. Serves `admin/static/`. Port 8000 (`FINOPS_PORT`). |
+| `admin/static/` | Vanilla-JS dashboard: Matrix grid, Cell Inspector (live transcript), Routing board. |
+
+The portal is a human-facing live dashboard; the control-plane agent pulls state via `.opencode/tools/dashboard.ts` (which calls `monitor.py --json`). No events are pushed back into opencode — Redis is the single shared state.

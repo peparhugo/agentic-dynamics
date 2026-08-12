@@ -38,6 +38,12 @@ def main():
     parser.add_argument(
         "--no-sonar", action="store_true", help="Skip SonarQube analysis"
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=1,
+        help="Number of parallel story analyses (default 1; 4-8 for sonar)",
+    )
 
     args = parser.parse_args()
 
@@ -48,13 +54,40 @@ def main():
             print(f"No results directory: {results_dir}")
             return
 
-        for result_file in sorted(results_dir.glob("*.json")):
-            print(f"\nAnalyzing: {result_file.name}")
+        result_files = sorted(results_dir.glob("*.json"))
+        print(f"Analyzing {len(result_files)} stories with {args.workers} workers")
+
+        if args.workers <= 1:
+            for result_file in result_files:
+                print(f"\nAnalyzing: {result_file.name}")
+                try:
+                    story_result = load_story_result(result_file)
+                    _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar)
+                except Exception as e:
+                    print(f"  ERROR: {e}")
+            return
+
+        # Parallel analysis via ThreadPoolExecutor
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        def _run(result_file: Path) -> tuple[str, str]:
             try:
                 story_result = load_story_result(result_file)
                 _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar)
+                return (result_file.name, "")
             except Exception as e:
-                print(f"  ERROR: {e}")
+                return (result_file.name, str(e))
+
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            futures = {pool.submit(_run, rf): rf for rf in result_files}
+            done = 0
+            for fut in as_completed(futures):
+                name, err = fut.result()
+                done += 1
+                if err:
+                    print(f"  [{done}/{len(result_files)}] ERROR {name}: {err}")
+                else:
+                    print(f"  [{done}/{len(result_files)}] done {name}")
         return
 
     # Analyze single worktree

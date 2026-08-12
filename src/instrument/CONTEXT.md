@@ -52,6 +52,16 @@ Prompt ──→ perturb.py ──→ adapter.py ──→ [LLM] ──→ traje
 | `constraint_detection.py` | 268 | Detects whether model notices removed constraints | `ConstraintDetection` |
 | `semantic_validation.py` | 300 | 3 signals: pragmatic markers, AST edit distance, tool-call latency | `MarkerProfile`, `ASTProfile`, `EscapeProfile`, `analyze_markers()`, `analyze_ast()`, `analyze_escape()` |
 
+### Backend, Telemetry & Routing
+
+| Module | Lines | Purpose | Key Exports |
+|--------|-------|---------|-------------|
+| `streaming.py` | 110 | Shared line-by-line subprocess runner (live telemetry, timeout-safe) | `stream_subprocess()`, `StreamResult` |
+| `claude_adapter.py` | 320 | Drives the Claude CLI (`stream-json`) and translates to opencode events | `run_claude_agentic()`, `ClaudeStreamAdapter`, `adapt_usage()` |
+| `backends.py` | 55 | Routes `anthropic/*` → Claude CLI, else opencode | `run_agentic()`, `get_backend_for_model()` |
+| `live.py` | 110 | Redis Pub/Sub telemetry (status + per-cell event stream + replay log) | `LivePublisher`, `make_publisher()` |
+| `routing.py` | 170 | Task-optimal routing: per-task model recommendation + strategy simulation | `compute_routing()`, `recommend_route()` |
+
 ### Output
 
 | Module | Lines | Purpose |
@@ -63,12 +73,14 @@ Prompt ──→ perturb.py ──→ adapter.py ──→ [LLM] ──→ traje
 
 | Script | Modules Used |
 |--------|-------------|
-| `scripts/run.py` | opencode (run_opencode_agentic), perturb, all measurement modules |
+| `scripts/run.py` | backends (run_agentic), opencode, claude_adapter, perturb, all measurement modules |
+| `scripts/worker.py` | live (LivePublisher) — publishes status + sets FINOPS_CELL_ID |
 | `scripts/analyze_worktrees.py` | solution, basin, efficiency, strategy, game_report, opencode_analyzer |
 | `scripts/analyze_trajectories.py` | trajectory |
 | `scripts/validate_session.py` | solution (test pass/fail) |
 | `scripts/lab_*.py` (all 14) | efficiency, solution, strategy, basin, sonar, embeddings, graph, ollama_analyzer |
-| `scripts/build_data.py` | (reads JSON output, not Python modules directly) |
+| `scripts/build_data.py` | routing (compute_routing), plus JSON output reads |
+| `admin/server.py` | live (channel/key constants), routing (compute_routing) |
 
 Note: `experiment.py`, `adapter.py`, and `lab_book.py` are deprecated (Phase 1B added deprecation warnings). Use `opencode.py` / `run_opencode_agentic()` for running experiments.
 

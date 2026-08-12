@@ -4,9 +4,9 @@
   "language": "typescript",
   "summary": {
     "commits": 2,
-    "total_lines_added": 0,
-    "total_lines_removed": 0,
-    "net_lines": 0,
+    "total_lines_added": 4553,
+    "total_lines_removed": 204,
+    "net_lines": 4349,
     "average_convention_score": 0.464
   },
   "commits": [
@@ -15,24 +15,24 @@
       "commit_message": "[story] Session 1: greenfield",
       "session_number": 1,
       "ast": {
-        "files_added": 0,
+        "files_added": 9,
         "files_modified": 0,
-        "files_deleted": 0,
-        "functions_added": 0,
-        "functions_removed": 0,
+        "files_deleted": 1,
+        "functions_added": 5,
+        "functions_removed": 1,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
-        "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "imports_added": 13,
+        "imports_removed": 5,
+        "lines_added": 4063,
+        "lines_removed": 200
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "smells_delta": 8,
+        "complexity_delta": 141,
+        "duplications_delta": 2.9
       },
       "convention": {
         "score": 0.464,
@@ -3004,24 +3004,24 @@
       "commit_message": "[story] Session 2: feature_addition",
       "session_number": 2,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 7,
+        "files_modified": 6,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 3,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 5,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 490,
+        "lines_removed": 4
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "smells_delta": 6,
+        "complexity_delta": 179,
+        "duplications_delta": 1.8
       },
       "convention": {
         "score": 0.464,

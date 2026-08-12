@@ -4,9 +4,9 @@
   "language": "typescript",
   "summary": {
     "commits": 4,
-    "total_lines_added": 0,
-    "total_lines_removed": 0,
-    "net_lines": 0,
+    "total_lines_added": 5814,
+    "total_lines_removed": 38,
+    "net_lines": 5776,
     "average_convention_score": 0.465
   },
   "commits": [
@@ -15,23 +15,23 @@
       "commit_message": "[story] Session 1: greenfield",
       "session_number": 1,
       "ast": {
-        "files_added": 0,
+        "files_added": 12,
         "files_modified": 0,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 4,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 21,
         "imports_removed": 0,
-        "lines_added": 0,
+        "lines_added": 4555,
         "lines_removed": 0
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 5,
+        "complexity_delta": 54,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -3070,23 +3070,23 @@
       "commit_message": "[story] Session 2: feature_addition",
       "session_number": 2,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 7,
+        "files_modified": 7,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 1,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 13,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 615,
+        "lines_removed": 12
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": 3,
+        "complexity_delta": 28,
         "duplications_delta": 0.0
       },
       "convention": {
@@ -6125,24 +6125,24 @@
       "commit_message": "[story] Session 3: integration",
       "session_number": 3,
       "ast": {
-        "files_added": 0,
-        "files_modified": 0,
+        "files_added": 2,
+        "files_modified": 3,
         "files_deleted": 0,
-        "functions_added": 0,
+        "functions_added": 4,
         "functions_removed": 0,
         "classes_added": 0,
         "classes_removed": 0,
-        "imports_added": 0,
+        "imports_added": 12,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 618,
+        "lines_removed": 10
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
-        "duplications_delta": 0.0
+        "smells_delta": 6,
+        "complexity_delta": 140,
+        "duplications_delta": 1.7
       },
       "convention": {
         "score": 0.465,
@@ -9181,7 +9181,7 @@
       "session_number": 4,
       "ast": {
         "files_added": 0,
-        "files_modified": 0,
+        "files_modified": 3,
         "files_deleted": 0,
         "functions_added": 0,
         "functions_removed": 0,
@@ -9189,14 +9189,14 @@
         "classes_removed": 0,
         "imports_added": 0,
         "imports_removed": 0,
-        "lines_added": 0,
-        "lines_removed": 0
+        "lines_added": 26,
+        "lines_removed": 16
       },
       "sonar": {
-        "available": false,
+        "available": true,
         "bugs_delta": 0,
-        "smells_delta": 0,
-        "complexity_delta": 0,
+        "smells_delta": -4,
+        "complexity_delta": 50,
         "duplications_delta": 0.0
       },
       "convention": {

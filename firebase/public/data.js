@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 16:05:05 UTC by build_data.py */
+/* Generated 2026-08-12 18:20:05 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T16:05:05.162826+00:00",
+    "generated_at": "2026-08-12T18:20:05.185773+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -242,6 +242,23 @@ window.DYNAMICS_DATA = {
   "energy_ranking": [],
   "strategy_distribution": {
     "?": 12
+  },
+  "routing": {
+    "_meta": {
+      "tasks_analyzed": 0,
+      "total_valid_entries": 0
+    },
+    "per_task": [],
+    "strategies": {
+      "grit_routed": {
+        "n": 0,
+        "total_cost": 0.0,
+        "avg_cost": 0.0,
+        "avg_correctness": 0.0,
+        "routing_distribution": {}
+      }
+    },
+    "routing_distribution": {}
   },
   "grit_matrix": [
     {
@@ -3263,7 +3280,7 @@ window.DYNAMICS_DATA = {
       "successful": 347,
       "failed": 0
     },
-    "generated_at": "2026-08-12T16:05:05.198472+00:00"
+    "generated_at": "2026-08-12T18:20:05.226373+00:00"
   },
   "reviews": {
     "models": [
@@ -3377,50 +3394,50 @@ window.DYNAMICS_DATA = {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
         "commits": 166,
-        "lines_added": 0,
-        "lines_removed": 0,
-        "functions_added": 0,
-        "classes_added": 0,
-        "imports_added": 0,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
+        "lines_added": 97420,
+        "lines_removed": 7199,
+        "functions_added": 1238,
+        "classes_added": 247,
+        "imports_added": 1179,
+        "sonar_available": 166,
+        "sonar_bugs_delta": 6,
+        "sonar_smells_delta": 78,
+        "sonar_complexity_delta": 4111,
         "avg_convention": 0.695
       },
       {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
         "commits": 170,
-        "lines_added": 0,
-        "lines_removed": 0,
-        "functions_added": 0,
-        "classes_added": 0,
-        "imports_added": 0,
-        "sonar_available": 0,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
+        "lines_added": 27509,
+        "lines_removed": 9481,
+        "functions_added": 843,
+        "classes_added": 102,
+        "imports_added": 1033,
+        "sonar_available": 170,
+        "sonar_bugs_delta": 2,
+        "sonar_smells_delta": 89,
+        "sonar_complexity_delta": 4750,
         "avg_convention": 0.675
       },
       {
         "model": "claude-sonnet-5",
         "label": "Claude Sonnet 5",
         "commits": 10,
-        "lines_added": 0,
-        "lines_removed": 0,
-        "functions_added": 0,
-        "classes_added": 0,
-        "imports_added": 0,
-        "sonar_available": 0,
+        "lines_added": 4033,
+        "lines_removed": 439,
+        "functions_added": 259,
+        "classes_added": 6,
+        "imports_added": 88,
+        "sonar_available": 10,
         "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 0,
-        "sonar_complexity_delta": 0,
+        "sonar_smells_delta": 4,
+        "sonar_complexity_delta": 301,
         "avg_convention": 0.667
       }
     ],
     "stories_analyzed": 71,
     "commits_analyzed": 346,
-    "sonar_commits_available": 0
+    "sonar_commits_available": 346
   }
 };
