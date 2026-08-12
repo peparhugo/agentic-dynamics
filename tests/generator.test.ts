@@ -29,6 +29,33 @@ describe('static site generator', () => {
   });
 
   test('uses defaults and accepts command options', () => {
-    expect(parseArgs(['--content', 'posts', '--output', 'public'])).toEqual({ contentDir: 'posts', outputDir: 'public' });
+    expect(parseArgs(['--content', 'posts', '--output', 'public', '--templates', 'views'])).toEqual({ contentDir: 'posts', outputDir: 'public', templatesDir: 'views' });
+  });
+
+  test('renders a page template, layout, and partial with frontmatter data', () => {
+    const templates = path.join(root, 'templates');
+    fs.mkdirSync(path.join(templates, 'layouts'), { recursive: true });
+    fs.mkdirSync(path.join(templates, 'partials'), { recursive: true });
+    fs.writeFileSync(path.join(templates, 'article.hbs'), '{{> header}}<article>{{title}}: {{{html}}}</article>');
+    fs.writeFileSync(path.join(templates, 'layouts', 'site.hbs'), '<html><body>{{{body}}}</body></html>');
+    fs.writeFileSync(path.join(templates, 'partials', 'header.hbs'), '<header>{{author}}</header>');
+    fs.writeFileSync(path.join(root, 'content', 'old.md'), '---\ntitle: Old\nauthor: Ada\ntemplate: article\nlayout: site\n---\nHello');
+
+    const output = path.join(root, 'site');
+    buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
+    const page = fs.readFileSync(path.join(output, 'old.html'), 'utf8');
+    expect(page).toContain('<header>Ada</header>');
+    expect(page).toContain('<article>Old: <p>Hello</p>\n</article>');
+    expect(page).toContain('<html><body>');
+  });
+
+  test('uses the default template and still supports the built-in output', () => {
+    const templates = path.join(root, 'templates');
+    fs.mkdirSync(templates, { recursive: true });
+    fs.writeFileSync(path.join(templates, 'page.hbs'), '<h1>{{title}}</h1>{{{content}}}');
+    const output = path.join(root, 'site');
+    buildSite({ contentDir: path.join(root, 'content'), outputDir: output, templatesDir: templates });
+    expect(fs.readFileSync(path.join(output, 'old.html'), 'utf8')).toContain('<h1>Old</h1><p>Old text.</p>');
+    expect(fs.readFileSync(path.join(output, 'index.html'), 'utf8')).toContain('<!doctype html>');
   });
 });
