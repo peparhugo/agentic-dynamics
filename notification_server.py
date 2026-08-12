@@ -5,12 +5,15 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
+import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import websockets
+from redis.asyncio import Redis
 from websockets.exceptions import ConnectionClosed
 
 
@@ -106,24 +109,89 @@ class ClientRegistry:
 
 
 class NotificationServer:
-    """WebSocket notification server and HTTP health endpoint."""
+    """WebSocket notification server backed by Redis and SQLite."""
 
     def __init__(self, host: str = "127.0.0.1", websocket_port: int = 8765,
-                 http_port: int = 8080) -> None:
+                 http_port: int = 8080, redis_url: str | None = None,
+                 database_url: str | None = None) -> None:
         self.host = host
         self.websocket_port = websocket_port
         self.http_port = http_port
         self.clients = ClientRegistry()
+        self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
+        self.database_url = database_url if database_url is not None else os.getenv(
+            "DATABASE_URL", "sqlite:///notifications.db"
+        )
+        self._database_path = self._sqlite_path(self.database_url)
+        self._database = sqlite3.connect(self._database_path, check_same_thread=False)
+        self._database.row_factory = sqlite3.Row
+        self._database_lock = asyncio.Lock()
+        self._redis: Redis | None = None
+        self._redis_pubsub: Any | None = None
+        self._redis_task: asyncio.Task[None] | None = None
+        self._broker_channel = "notifications:messages"
         self._websocket_server: Any | None = None
         self._http_server: asyncio.AbstractServer | None = None
 
-    async def broadcast(self, message: dict[str, Any]) -> None:
-        """Send a message to all clients, or only subscribers of its channel."""
+    @staticmethod
+    def _sqlite_path(database_url: str) -> str:
+        if database_url.startswith("sqlite:///"):
+            return database_url[10:]
+        if database_url.startswith("sqlite://"):
+            return database_url[9:]
+        return database_url
+
+    async def _init_database(self) -> None:
+        async with self._database_lock:
+            self._database.execute(
+                "CREATE TABLE IF NOT EXISTS messages ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, type TEXT NOT NULL, "
+                "payload TEXT NOT NULL, timestamp TEXT NOT NULL)"
+            )
+            self._database.commit()
+
+    async def _save_message(self, message: dict[str, Any]) -> None:
+        async with self._database_lock:
+            self._database.execute(
+                "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                (message.get("channel"), message["type"], json.dumps(message["payload"]), message["timestamp"]),
+            )
+            self._database.commit()
+
+    async def _messages(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        async with self._database_lock:
+            rows = self._database.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
+            ).fetchall()
+        return [
+            {"id": row["id"], "channel": row["channel"], "type": row["type"],
+             "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
+            for row in rows
+        ]
+
+    async def _publish(self, message: dict[str, Any]) -> None:
+        if self._redis is None:
+            await self._deliver(message)
+        else:
+            await self._redis.publish(self._broker_channel, json.dumps(message))
+
+    async def _redis_listener(self) -> None:
+        assert self._redis_pubsub is not None
+        async for item in self._redis_pubsub.listen():
+            if item["type"] == "message":
+                await self._deliver(json.loads(item["data"]))
+
+    async def _deliver(self, message: dict[str, Any]) -> None:
         encoded = json.dumps(message)
         channel = message.get("channel")
-        clients = (await self.clients.channel_clients(channel)
-                   if isinstance(channel, str)
-                   else await self.clients.snapshot())
+        if message.get("type") == "direct":
+            recipient_id = message.get("payload", {}).get("client_id") or message.get("payload", {}).get("recipient_id")
+            recipient = await self.clients.get(recipient_id) if isinstance(recipient_id, str) else None
+            clients = {recipient_id: recipient} if recipient is not None else {}
+        else:
+            clients = (await self.clients.channel_clients(channel)
+                       if isinstance(channel, str) else await self.clients.snapshot())
         if clients:
             results = await asyncio.gather(
                 *(websocket.send(encoded) for websocket in clients.values()),
@@ -133,13 +201,21 @@ class NotificationServer:
                 if isinstance(result, Exception):
                     await self.clients.remove(client_id)
 
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        """Send a message to all clients, or only subscribers of its channel."""
+        await self._save_message(message)
+        await self._publish(message)
+
     async def broadcast_payload(self, payload: dict[str, Any]) -> None:
         await self.broadcast(make_message("broadcast", payload))
 
     async def _handle_websocket(self, websocket: Any, *_: Any) -> None:
         client_id = await self.clients.add(websocket)
+        await self._store_client_state(client_id, [])
         try:
-            await websocket.send(json.dumps(make_message("system", {"client_id": client_id})))
+            welcome = make_message("system", {"client_id": client_id})
+            await self._save_message(welcome)
+            await websocket.send(json.dumps(welcome))
             async for raw_message in websocket:
                 await self._handle_message(client_id, raw_message)
         except (ConnectionClosed, asyncio.CancelledError):
@@ -148,6 +224,27 @@ class NotificationServer:
             LOGGER.exception("WebSocket client %s failed", client_id)
         finally:
             await self.clients.remove(client_id)
+            await self._remove_client_state(client_id)
+
+    async def _store_client_state(self, client_id: str, channels: list[str]) -> None:
+        if self._redis is not None:
+            await self._redis.hset(
+                f"notifications:client:{client_id}",
+                mapping={"connected": "1", "channels": json.dumps(channels)},
+            )
+
+    async def _remove_client_state(self, client_id: str) -> None:
+        if self._redis is not None:
+            state = await self._redis.hget(f"notifications:client:{client_id}", "channels")
+            if state:
+                for channel in json.loads(state):
+                    await self._redis.srem(f"notifications:channel:{channel}", client_id)
+            await self._redis.delete(f"notifications:client:{client_id}")
+
+    async def _shared_subscribers(self, channel: str) -> list[str] | None:
+        if self._redis is None:
+            return None
+        return sorted(await self._redis.smembers(f"notifications:channel:{channel}"))
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -171,8 +268,15 @@ class NotificationServer:
                 return
             if message_type == "subscribe":
                 await self.clients.subscribe(sender_id, channel)
+                if self._redis is not None:
+                    await self._redis.sadd(f"notifications:channel:{channel}", sender_id)
             else:
                 await self.clients.unsubscribe(sender_id, channel)
+                if self._redis is not None:
+                    await self._redis.srem(f"notifications:channel:{channel}", sender_id)
+            if self._redis is not None:
+                channels = await self.clients.channel_subscribers()
+                await self._store_client_state(sender_id, [name for name, ids in channels.items() if sender_id in ids])
             return
 
         outgoing = make_message(message_type, payload, channel)
@@ -187,7 +291,8 @@ class NotificationServer:
             if recipient_id not in subscribed:
                 recipient = None
         if recipient is not None:
-            await recipient.send(json.dumps(outgoing))
+            await self._save_message(outgoing)
+            await self._publish(outgoing)
 
     async def _send_error(self, client_id: str) -> None:
         sender = await self.clients.get(client_id)
@@ -204,13 +309,33 @@ class NotificationServer:
                 status = "200 OK"
             elif method == "GET" and route == "/channels":
                 channels = await self.clients.channel_subscribers()
+                if self._redis is not None:
+                    names = await self._redis.keys("notifications:channel:*")
+                    channels = {
+                        name.removeprefix("notifications:channel:"): sorted(
+                            await self._redis.smembers(name)
+                        )
+                        for name in names
+                    }
                 body = json.dumps({"channels": {name: len(ids) for name, ids in channels.items()}}).encode()
                 status = "200 OK"
             elif method == "GET" and route.startswith("/channels/") and route.endswith("/subscribers"):
                 name = unquote(route[len("/channels/"):-len("/subscribers")].rstrip("/"))
                 channels = await self.clients.channel_subscribers()
-                body = json.dumps({"channel": name, "subscribers": channels.get(name, [])}).encode()
+                subscribers = await self._shared_subscribers(name)
+                body = json.dumps({"channel": name, "subscribers": subscribers if subscribers is not None else channels.get(name, [])}).encode()
                 status = "200 OK"
+            elif method == "GET" and route == "/messages":
+                query = parse_qs(urlsplit(path).query)
+                try:
+                    limit = max(0, min(1000, int(query.get("limit", ["50"])[0])))
+                    offset = max(0, int(query.get("offset", ["0"])[0]))
+                except (TypeError, ValueError):
+                    body = json.dumps({"error": "invalid pagination"}).encode()
+                    status = "400 Bad Request"
+                else:
+                    body = json.dumps({"messages": await self._messages(limit, offset)}).encode()
+                    status = "200 OK"
             else:
                 body = json.dumps({"error": "not found"}).encode()
                 status = "404 Not Found"
@@ -228,6 +353,12 @@ class NotificationServer:
             await writer.wait_closed()
 
     async def start(self) -> None:
+        await self._init_database()
+        if self.redis_url:
+            self._redis = Redis.from_url(self.redis_url, decode_responses=True)
+            self._redis_pubsub = self._redis.pubsub()
+            await self._redis_pubsub.subscribe(self._broker_channel)
+            self._redis_task = asyncio.create_task(self._redis_listener())
         self._websocket_server = await websockets.serve(
             self._handle_websocket, self.host, self.websocket_port
         )
@@ -244,6 +375,18 @@ class NotificationServer:
             self._http_server.close()
             await self._http_server.wait_closed()
             self._http_server = None
+        if self._redis_task is not None:
+            self._redis_task.cancel()
+            await asyncio.gather(self._redis_task, return_exceptions=True)
+            self._redis_task = None
+        if self._redis_pubsub is not None:
+            await self._redis_pubsub.close()
+            self._redis_pubsub = None
+        if self._redis is not None:
+            await self._redis.close()
+            self._redis = None
+        async with self._database_lock:
+            self._database.close()
 
     async def run(self) -> None:
         await self.start()

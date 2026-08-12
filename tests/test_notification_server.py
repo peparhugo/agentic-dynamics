@@ -1,11 +1,19 @@
 import asyncio
 import json
+import shutil
+import socket
 
 import pytest
 import pytest_asyncio
 import websockets
 
 from notification_server import NotificationServer, make_message
+
+
+def free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
 
 
 async def http_health(server: NotificationServer) -> dict:
@@ -28,6 +36,18 @@ async def http_get(server: NotificationServer, path: str) -> dict:
     writer.close()
     await writer.wait_closed()
     return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
+async def http_get_with_status(server: NotificationServer, path: str) -> tuple[int, dict]:
+    port = server._http_server.sockets[0].getsockname()[1]
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    status = int(response.split(b" ", 2)[1])
+    return status, json.loads(response.split(b"\r\n\r\n", 1)[1])
 
 
 @pytest_asyncio.fixture
@@ -94,6 +114,64 @@ async def test_direct_message_targets_client(server):
         await asyncio.wait_for(first.recv(), timeout=0.05)
     await first.close()
     await second.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    server = NotificationServer(
+        websocket_port=0, http_port=0,
+        database_url=f"sqlite:///{tmp_path / 'messages.sqlite'}",
+    )
+    await server.start()
+    try:
+        client = await websockets.connect(websocket_url(server))
+        await client.recv()
+        await client.send(json.dumps({"type": "broadcast", "payload": {"text": "saved"}}))
+        await client.recv()
+
+        status, result = await http_get_with_status(server, "/messages?limit=1&offset=0")
+        assert status == 200
+        assert result["messages"][0]["type"] == "broadcast"
+        assert result["messages"][0]["payload"] == {"text": "saved"}
+        await client.close()
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(shutil.which("redis-server") is None, reason="redis-server is not installed")
+async def test_redis_backbone_delivers_between_server_instances(tmp_path):
+    redis_port = free_port()
+    process = await asyncio.create_subprocess_exec(
+        "redis-server", "--save", "", "--appendonly", "no", "--port", str(redis_port),
+        stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.DEVNULL,
+    )
+    first = second = None
+    try:
+        await asyncio.sleep(0.1)
+        redis_url = f"redis://127.0.0.1:{redis_port}/0"
+        first = NotificationServer(websocket_port=0, http_port=0, redis_url=redis_url,
+                                   database_url=f"sqlite:///{tmp_path / 'first.db'}")
+        second = NotificationServer(websocket_port=0, http_port=0, redis_url=redis_url,
+                                    database_url=f"sqlite:///{tmp_path / 'second.db'}")
+        await first.start()
+        await second.start()
+        first_client = await websockets.connect(websocket_url(first))
+        second_client = await websockets.connect(websocket_url(second))
+        await first_client.recv()
+        await second_client.recv()
+        await first_client.send(json.dumps({"type": "broadcast", "payload": {"shared": True}}))
+        assert json.loads(await first_client.recv())["payload"] == {"shared": True}
+        assert json.loads(await second_client.recv())["payload"] == {"shared": True}
+        await first_client.close()
+        await second_client.close()
+    finally:
+        if first is not None:
+            await first.stop()
+        if second is not None:
+            await second.stop()
+        process.terminate()
+        await process.wait()
 
 
 @pytest.mark.asyncio
