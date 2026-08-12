@@ -1,8 +1,10 @@
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
+import redis.asyncio as redis
 import websockets
 
 from app import NotificationServer
@@ -11,6 +13,16 @@ from app import NotificationServer
 async def http_health(host: str, port: int) -> dict:
     reader, writer = await asyncio.open_connection(host, port)
     writer.write(b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
+async def http_get(host: str, port: int, path: str) -> dict:
+    reader, writer = await asyncio.open_connection(host, port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
     await writer.drain()
     response = await reader.read()
     writer.close()
@@ -65,3 +77,57 @@ async def test_client_ids_are_monotonic_and_direct_messages_work(server):
         message = json.loads(await asyncio.wait_for(second.recv(), 1))
         assert message["type"] == "direct"
         assert message["payload"]["value"] == 3
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path: Path):
+    database = f"sqlite:///{tmp_path / 'messages.sqlite'}"
+    instance = NotificationServer(port=0, database_url=database, redis_url="redis://localhost:63999")
+    running = await instance.start()
+    instance.port = running.sockets[0].getsockname()[1]
+    uri = f"ws://{instance.host}:{instance.port}/"
+    async with websockets.connect(uri) as client:
+        await client.send(json.dumps({"type": "subscribe", "channel": "audit"}))
+        await client.send(json.dumps({"type": "system", "channel": "audit", "payload": {"ok": True}}))
+        message = json.loads(await asyncio.wait_for(client.recv(), 1))
+        assert message["payload"] == {"ok": True}
+    await instance.stop()
+
+    restarted = NotificationServer(port=0, database_url=database, redis_url="redis://localhost:63999")
+    running = await restarted.start()
+    restarted.port = running.sockets[0].getsockname()[1]
+    try:
+        result = await http_get(restarted.host, restarted.port, "/messages?limit=1&offset=0")
+        assert result["messages"][0]["channel"] == "audit"
+        assert result["messages"][0]["payload"] == {"ok": True}
+    finally:
+        await restarted.stop()
+
+
+@pytest.mark.asyncio
+async def test_servers_share_redis_pubsub(tmp_path: Path):
+    redis_url = "redis://localhost:6379/15"
+    broker = redis.from_url(redis_url, decode_responses=True)
+    try:
+        await broker.ping()
+    except Exception:
+        await broker.close()
+        pytest.skip("Redis is not available")
+    await broker.flushdb()
+    first = NotificationServer(port=0, redis_url=redis_url, database_url=f"sqlite:///{tmp_path / 'first.sqlite'}")
+    second = NotificationServer(port=0, redis_url=redis_url, database_url=f"sqlite:///{tmp_path / 'second.sqlite'}")
+    first_running = await first.start()
+    second_running = await second.start()
+    first.port = first_running.sockets[0].getsockname()[1]
+    second.port = second_running.sockets[0].getsockname()[1]
+    try:
+        async with websockets.connect(f"ws://{first.host}:{first.port}/") as subscriber:
+            await subscriber.send(json.dumps({"type": "subscribe", "channel": "shared"}))
+            async with websockets.connect(f"ws://{second.host}:{second.port}/") as publisher:
+                await publisher.send(json.dumps({"type": "broadcast", "channel": "shared", "payload": {"n": 1}}))
+            message = json.loads(await asyncio.wait_for(subscriber.recv(), 2))
+            assert message["payload"] == {"n": 1}
+    finally:
+        await first.stop()
+        await second.stop()
+        await broker.close()
