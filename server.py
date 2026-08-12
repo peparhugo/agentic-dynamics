@@ -4,6 +4,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
 
@@ -13,8 +14,57 @@ from websockets.exceptions import ConnectionClosed
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+TRANSPORT = os.environ.get("TRANSPORT", "websocket")
 
 _server_id = str(uuid.uuid4())
+
+
+class BaseTransport(ABC):
+    @abstractmethod
+    async def on_connect(self, client_id):
+        pass
+
+    @abstractmethod
+    async def on_disconnect(self, client_id):
+        pass
+
+    @abstractmethod
+    async def send_message(self, client_id, message):
+        pass
+
+    @abstractmethod
+    async def broadcast(self, client_ids, message):
+        pass
+
+
+class WebSocketTransport(BaseTransport):
+    async def on_connect(self, client_id):
+        pass
+
+    async def on_disconnect(self, client_id):
+        pass
+
+    async def send_message(self, client_id, message):
+        ws = registry.get_client(client_id)
+        if ws is not None:
+            try:
+                await ws.send(message)
+            except ConnectionClosed:
+                pass
+
+    async def broadcast(self, client_ids, message):
+        for cid in client_ids:
+            await self.send_message(cid, message)
+
+
+def _create_transport():
+    name = TRANSPORT
+    if name == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"Unknown transport: {name}")
+
+
+transport = _create_transport()
 
 
 class MessageStore:
@@ -106,6 +156,10 @@ class ClientRegistry:
     def get_client(self, client_id):
         with self._lock:
             return self._clients.get(client_id)
+
+    def get_ids(self):
+        with self._lock:
+            return set(self._clients.keys())
 
     def clear(self):
         with self._lock:
@@ -252,17 +306,9 @@ async def redis_subscriber():
             payload = data.get("payload", {})
             msg = make_message(msg_type, payload)
             if channel_name == "global":
-                ws_list = registry.get_all_websockets()
+                await transport.broadcast(registry.get_ids(), msg)
             else:
-                sub_ids = channels.get_subscribers(channel_name)
-                ws_list = [registry.get_client(sid) for sid in sub_ids]
-            for ws in ws_list:
-                if ws is None:
-                    continue
-                try:
-                    await ws.send(msg)
-                except ConnectionClosed:
-                    pass
+                await transport.broadcast(channels.get_subscribers(channel_name), msg)
     except Exception:
         pass
 
@@ -270,8 +316,9 @@ async def redis_subscriber():
 async def handler(websocket):
     client_id = str(uuid.uuid4())
     registry.add(client_id, websocket)
+    await transport.on_connect(client_id)
     try:
-        await websocket.send(make_message("system", {
+        await transport.send_message(client_id, make_message("system", {
             "message": f"Connected as {client_id}",
             "client_id": client_id,
         }))
@@ -302,35 +349,20 @@ async def handler(websocket):
                 await _publish_to_redis(channel, "broadcast", payload)
                 msg = make_message("broadcast", payload)
                 if channel:
-                    for sub_id in channels.get_subscribers(channel):
-                        sub_ws = registry.get_client(sub_id)
-                        if sub_ws:
-                            try:
-                                await sub_ws.send(msg)
-                            except ConnectionClosed:
-                                pass
+                    await transport.broadcast(channels.get_subscribers(channel), msg)
                 else:
-                    for ws in registry.get_all_websockets():
-                        try:
-                            await ws.send(msg)
-                        except ConnectionClosed:
-                            pass
+                    await transport.broadcast(registry.get_ids(), msg)
             elif msg_type == "direct":
                 target_id = payload.get("target")
                 timestamp = datetime.now(timezone.utc).isoformat()
                 message_store.store("direct", "direct", payload, timestamp)
                 await _publish_to_redis("direct", "direct", payload)
-                target_ws = registry.get_client(target_id)
-                if target_ws:
-                    msg = make_message("direct", payload)
-                    try:
-                        await target_ws.send(msg)
-                    except ConnectionClosed:
-                        pass
+                await transport.send_message(target_id, make_message("direct", payload))
     finally:
         channels.remove_client(client_id)
         registry.remove(client_id)
         await _sync_disconnect_to_redis(client_id)
+        await transport.on_disconnect(client_id)
 
 
 async def http_handler(reader, writer):
