@@ -1,10 +1,15 @@
 import { readdir, readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { parseMarkdown, renderMarkdown } from './markdown';
+import { DEFAULT_TEMPLATE_DIR, TemplateEngine } from './templates';
 import type { BuildResult, Page } from './types';
 
 export const DEFAULT_CONTENT_DIR = 'content';
 export const DEFAULT_OUTPUT_DIR = 'dist';
+
+export interface BuildOptions {
+  templatesDir?: string;
+}
 
 async function collectMarkdownFiles(dir: string): Promise<string[]> {
   const files: string[] = [];
@@ -75,6 +80,9 @@ export async function loadPages(contentDir: string): Promise<Page[]> {
       slug,
       source: relative,
       html: renderMarkdown(body),
+      template: typeof data.template === 'string' && data.template.trim() ? data.template.trim() : undefined,
+      layout: typeof data.layout === 'string' && data.layout.trim() ? data.layout.trim() : undefined,
+      data: { ...(data as Record<string, unknown>) },
     });
   }
 
@@ -147,16 +155,20 @@ ${items}
 `;
 }
 
-export async function buildSite(contentDir: string, outputDir: string): Promise<BuildResult> {
+export async function buildSite(contentDir: string, outputDir: string, options: BuildOptions = {}): Promise<BuildResult> {
   const pages = await loadPages(contentDir);
+  const engine = new TemplateEngine(options.templatesDir ?? DEFAULT_TEMPLATE_DIR);
+  await engine.load();
+  const useTemplates = engine.hasTemplates();
   const files: string[] = [];
 
   await mkdir(outputDir, { recursive: true });
 
   for (const page of pages) {
+    const html = useTemplates ? engine.renderPage(page, page.html) : renderPage(page);
     const outPath = path.join(outputDir, `${page.slug}.html`);
     await mkdir(path.dirname(outPath), { recursive: true });
-    await writeFile(outPath, renderPage(page), 'utf8');
+    await writeFile(outPath, html, 'utf8');
     files.push(outPath);
   }
 

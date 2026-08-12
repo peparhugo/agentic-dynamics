@@ -7,6 +7,8 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string | string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface ParsedMarkdown {

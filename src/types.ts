@@ -5,6 +5,9 @@ export interface Page {
   slug: string;
   source: string;
   html: string;
+  template?: string;
+  layout?: string;
+  data?: Record<string, unknown>;
 }
 
 export interface BuildResult {

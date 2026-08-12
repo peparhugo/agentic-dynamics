@@ -24,6 +24,15 @@ describe('parseArgs', () => {
     if (parsed.ok) {
       expect(parsed.options.contentDir).toBe(path.resolve('src/pages'));
       expect(parsed.options.outputDir).toBe(path.resolve('public'));
+      expect(parsed.options.templatesDir).toBe(path.resolve('templates'));
+    }
+  });
+
+  it('parses --templates', () => {
+    const parsed = parseArgs(['--templates', 'theme', '--templates=other']);
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.options.templatesDir).toBe(path.resolve('other'));
     }
   });
 
@@ -92,5 +101,29 @@ describe('ssg build (end to end)', () => {
     const { code, stderr } = await runCli(dir, ['serve']);
     expect(code).toBe(1);
     expect(stderr).toContain('Usage');
+  });
+
+  it('renders pages with templates, layouts, and partials via --templates', async () => {
+    const dir = makeTempDir();
+    mkdirSync(path.join(dir, 'content'));
+    writeFileSync(path.join(dir, 'content', 'hello.md'), '---\ntitle: Hello\ndate: 2024-05-01\n---\n# Hello World\n', 'utf8');
+    mkdirSync(path.join(dir, 'templates'), { recursive: true });
+    writeFileSync(path.join(dir, 'templates', 'default.hbs'), '{{> header}}<h1>{{title}}</h1>{{{body}}}{{> footer}}', 'utf8');
+    mkdirSync(path.join(dir, 'templates', 'layouts'), { recursive: true });
+    writeFileSync(path.join(dir, 'templates', 'layouts', 'default.hbs'), '<html><body>{{{body}}}</body></html>', 'utf8');
+    mkdirSync(path.join(dir, 'templates', 'partials'), { recursive: true });
+    writeFileSync(path.join(dir, 'templates', 'partials', 'header.hbs'), '<header>Header</header>', 'utf8');
+    writeFileSync(path.join(dir, 'templates', 'partials', 'footer.hbs'), '<footer>Footer</footer>', 'utf8');
+
+    const { stdout, code } = await runCli(dir, ['build', '--templates', 'templates']);
+
+    expect(code).toBe(0);
+    expect(stdout).toContain('Generated 1 page(s)');
+
+    const html = readFileSync(path.join(dir, 'dist', 'hello.html'), 'utf8');
+    expect(html).toContain('<html><body><header>Header</header>');
+    expect(html).toContain('<h1>Hello</h1>');
+    expect(html).toContain('<h1>Hello World</h1>');
+    expect(html).toContain('<footer>Footer</footer>');
   });
 });
