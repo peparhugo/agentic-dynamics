@@ -4,6 +4,7 @@ import path from 'node:path';
 import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from './generator';
 import { serve, DEFAULT_PORT, type ServeOptions } from './serve';
 import { DEFAULT_TEMPLATE_DIR } from './templates';
+import { loadConfig } from './config';
 
 export interface CliOptions {
   contentDir: string;
@@ -131,7 +132,12 @@ export async function main(argv: string[]): Promise<void> {
     }
 
     const { contentDir, outputDir, templatesDir } = parsed.options;
-    const result = await buildSite(contentDir, outputDir, { templatesDir });
+    const config = loadConfig();
+    const result = await buildSite(contentDir, outputDir, {
+      templatesDir,
+      plugins: config?.plugins,
+      port: parsed.options.port,
+    });
 
     console.log(`Generated ${result.pages.length} page(s) into ${outputDir}`);
     for (const file of result.files) {
@@ -148,11 +154,14 @@ export async function main(argv: string[]): Promise<void> {
       return;
     }
 
+    const config = loadConfig();
+
     const serveOptions: ServeOptions = {
       contentDir: parsed.options.contentDir,
       outputDir: parsed.options.outputDir,
       templatesDir: parsed.options.templatesDir,
       port: parsed.options.port ?? DEFAULT_PORT,
+      plugins: config?.plugins,
     };
 
     await serve(serveOptions);
