@@ -14,6 +14,8 @@ import jwt
 from flask import Flask, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -30,9 +32,12 @@ def get_db():
 
 def migrate(conn):
     """Additive migrations so existing data is preserved."""
-    cols = [r["name"] for r in conn.execute("PRAGMA table_info(tasks)").fetchall()]
-    if "owner_id" not in cols:
+    task_cols = [r["name"] for r in conn.execute("PRAGMA table_info(tasks)").fetchall()]
+    if "owner_id" not in task_cols:
         conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+    user_cols = [r["name"] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "email" not in user_cols:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def init_db():
@@ -106,17 +111,18 @@ def register():
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
     password_hash = generate_password_hash(password)
+    email = (data.get("email") or "").strip() or username
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
         except sqlite3.IntegrityError:
             return jsonify({"error": "username already exists"}), 409
         user_id = cursor.lastrowid
-    return jsonify({"id": user_id, "username": username}), 201
+    return jsonify({"id": user_id, "username": username, "email": email}), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -205,6 +211,13 @@ def update_task(task_id: int):
         updated = conn.execute(
             "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+    if row["status"] != "completed" and updated["status"] == "completed":
+        with get_db() as conn:
+            user = conn.execute(
+                "SELECT * FROM users WHERE id = ?", (request.user_id,)
+            ).fetchone()
+        user_email = (user["email"] if user and user["email"] else None) or request.username
+        send_notification_email.delay(user_email, updated["title"])
     return jsonify(_row_to_task(updated))
 
 

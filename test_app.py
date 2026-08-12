@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest import mock
 
 import pytest
 
@@ -229,3 +230,93 @@ def test_user_sees_only_own_tasks(client):
 
     alice_tasks = client.get("/tasks", headers=auth_headers(alice_token)).get_json()
     assert [t["id"] for t in alice_tasks] == [created["id"]]
+
+
+def _patch_delay(monkeypatch):
+    import app as app_module
+
+    delay = mock.MagicMock()
+    monkeypatch.setattr(app_module.send_notification_email, "delay", delay)
+    return delay
+
+
+def test_completing_task_triggers_notification(client, auth, monkeypatch):
+    created = client.post(
+        "/tasks", json={"title": "finish report"}, headers=auth
+    ).get_json()
+    delay = _patch_delay(monkeypatch)
+
+    res = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth
+    )
+
+    assert res.status_code == 200
+    assert res.get_json()["status"] == "completed"
+    delay.assert_called_once_with("alice", "finish report")
+
+
+def test_notification_uses_registered_email(client, monkeypatch):
+    register(client, "bob", password="secret")
+    res = client.post(
+        "/auth/register",
+        json={"username": "carol", "password": "secret", "email": "carol@example.com"},
+    )
+    assert res.status_code == 201
+    assert res.get_json()["email"] == "carol@example.com"
+    carol_token = login(client, "carol").get_json()["token"]
+    carol_auth = auth_headers(carol_token)
+
+    created = client.post(
+        "/tasks", json={"title": "book meeting"}, headers=carol_auth
+    ).get_json()
+    delay = _patch_delay(monkeypatch)
+
+    res = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=carol_auth
+    )
+
+    assert res.status_code == 200
+    delay.assert_called_once_with("carol@example.com", "book meeting")
+
+
+def test_no_notification_when_status_unchanged(client, auth, monkeypatch):
+    created = client.post(
+        "/tasks", json={"title": "just started"}, headers=auth
+    ).get_json()
+    delay = _patch_delay(monkeypatch)
+
+    res = client.put(
+        f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth
+    )
+
+    assert res.status_code == 200
+    assert res.get_json()["status"] == "in_progress"
+    delay.assert_not_called()
+
+
+def test_no_duplicate_notification_when_already_completed(client, auth, monkeypatch):
+    created = client.post(
+        "/tasks", json={"title": "already done"}, headers=auth
+    ).get_json()
+    delay = _patch_delay(monkeypatch)
+
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth
+    )
+    delay.assert_called_once_with("alice", "already done")
+
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth
+    )
+    delay.assert_called_once_with("alice", "already done")
+
+
+def test_email_task_runs_and_sends_mock_email(capsys):
+    from tasks import send_notification_email
+
+    send_notification_email.apply(args=("bob@example.com", "Buy milk"))
+
+    out = capsys.readouterr().out
+    assert "bob@example.com" in out
+    assert "Buy milk" in out
+    assert "completed" in out
