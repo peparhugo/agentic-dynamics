@@ -1,14 +1,10 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Flask API for managing tasks stored in SQLite."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
-from flask import Flask, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 import os
+
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -37,7 +33,7 @@ def init_db():
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         cursor = conn.execute(
             "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
@@ -95,7 +91,12 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body must be an object"}), 400
+    title = data.get("title")
+    if not isinstance(title, str):
+        title = ""
+    title = title.strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -113,6 +114,16 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "JSON body must be an object"}), 400
+    if get_task(task_id) is None:
+        return jsonify({"error": "task not found"}), 404
+    if "title" not in data and "status" not in data:
+        return jsonify({"error": "title or status is required"}), 400
+    if "title" in data and not isinstance(data["title"], str):
+        return jsonify({"error": "title must be a string"}), 400
+    if "status" in data and not isinstance(data["status"], str):
+        return jsonify({"error": "status must be a string"}), 400
     task = update_task(
         task_id,
         title=data.get("title"),
@@ -123,6 +134,10 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+# Ensure the database is usable when the application is imported by a WSGI
+# server or a test runner, not only when this module is executed as a script.
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
