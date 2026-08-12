@@ -10,6 +10,17 @@ export interface Page {
   template?: string;
   layout?: string;
   data?: Record<string, unknown>;
+  sourceFile?: string;
+}
+
+export interface BuildStats {
+  incremental: boolean;
+  clean: boolean;
+  total: number;
+  built: number;
+  skipped: number;
+  timeSavedMs: number;
+  durationMs: number;
 }
 
 export interface BuildOptions {
@@ -18,4 +29,8 @@ export interface BuildOptions {
   templateDir?: string;
   plugins?: Plugin[];
   configFile?: string;
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
+  onStats?: (stats: BuildStats) => void;
 }

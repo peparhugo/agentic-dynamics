@@ -2,11 +2,14 @@
 import * as path from 'path';
 import { build } from './ssg';
 import { startDevServer, type ServeOptions } from './serve';
+import type { BuildStats } from './types';
 
 export interface CliOptions {
   contentDir: string;
   outputDir: string;
   templateDir: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export type ParseResult = CliOptions | ServeOptions | 'help' | 'invalid';
@@ -24,6 +27,8 @@ Options:
   --content <dir>   Directory containing Markdown content (default: ./content)
   --output <dir>    Directory to write the generated HTML (default: ./dist)
   --templates <dir> Directory containing Handlebars templates (default: ./templates)
+  --incremental     Only rebuild pages whose source or template changed
+  --clean           Force a full rebuild, ignoring any cached build
   --port <number>   Port for the dev server (default: 3000)
   --help, -h        Show this help message
 `);
@@ -94,6 +99,14 @@ export function parseArgs(args: string[]): ParseResult {
     if (arg === '--help' || arg === '-h') {
       return 'help';
     }
+    if (arg === '--incremental') {
+      options.incremental = true;
+      continue;
+    }
+    if (arg === '--clean') {
+      options.clean = true;
+      continue;
+    }
     if (arg === '--content' || arg === '--output' || arg === '--templates') {
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
@@ -143,12 +156,24 @@ async function main(): Promise<void> {
     }
   }
   try {
-    const pages = await build(parsed);
+    const pages = await build({
+      ...parsed,
+      onStats: (stats) => printBuildStats(stats),
+    });
     console.log(`Generated ${pages.length} page(s) in ${path.resolve(parsed.outputDir)}`);
   } catch (err) {
     console.error(`Build failed: ${(err as Error).message}`);
     process.exitCode = 1;
   }
+}
+
+function printBuildStats(stats: BuildStats): void {
+  if (!stats.incremental) {
+    return;
+  }
+  console.log(
+    `Incremental build: ${stats.built} built, ${stats.skipped} skipped, saved ${stats.timeSavedMs}ms`
+  );
 }
 
 if (require.main === module) {

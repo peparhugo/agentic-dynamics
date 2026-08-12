@@ -5,6 +5,7 @@ import type { BuildOptions, Page } from './types';
 import { PluginPipeline, type Plugin, type PluginContext } from './plugin';
 import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/templates';
+import { BuildCache, CACHE_KEY } from './cache';
 
 export interface SSGConfig {
   plugins?: Plugin[];
@@ -67,12 +68,18 @@ export class SSGEngine {
   }
 
   async build(options: BuildOptions): Promise<Page[]> {
+    const startedAt = Date.now();
+    const cache = await BuildCache.create(options);
+
     const ctx: PluginContext = {
       options,
       pages: [],
       outputs: new Map(),
       shared: new Map(),
     };
+    if (cache) {
+      ctx.shared.set(CACHE_KEY, cache);
+    }
 
     await this.pipeline.runStart(ctx);
     await this.pipeline.runBeforeBuild(ctx);
@@ -87,6 +94,22 @@ export class SSGEngine {
       writes.push(fs.writeFile(path.join(options.outputDir, relative), html, 'utf8'));
     }
     await Promise.all(writes);
+
+    if (cache) {
+      await cache.removeStaleOutputs();
+      await cache.save();
+      options.onStats?.(cache.report(Date.now() - startedAt));
+    } else {
+      options.onStats?.({
+        incremental: false,
+        clean: !!options.clean,
+        total: ctx.outputs.size,
+        built: ctx.outputs.size,
+        skipped: 0,
+        timeSavedMs: 0,
+        durationMs: Date.now() - startedAt,
+      });
+    }
 
     await this.pipeline.runOnEnd(ctx);
     return ctx.pages;

@@ -5,6 +5,7 @@ import matter from 'gray-matter';
 
 import type { Page } from '../types';
 import type { Plugin, PluginContext } from '../plugin';
+import { BuildCache, CACHE_KEY, type CacheDecision } from '../cache';
 
 export function slugify(name: string): string {
   return name
@@ -81,14 +82,34 @@ export async function parseMarkdownFile(filePath: string): Promise<Page> {
   };
 }
 
+export async function parseMarkdownFileCached(
+  filePath: string,
+  cache?: BuildCache | null
+): Promise<Page> {
+  if (cache) {
+    const decision: CacheDecision = await cache.decide(filePath);
+    if (decision.skipped && decision.page) {
+      return decision.page;
+    }
+  }
+  const startedAt = Date.now();
+  const page = await parseMarkdownFile(filePath);
+  page.sourceFile = filePath;
+  if (cache) {
+    cache.recordParsed(filePath, page, startedAt);
+  }
+  return page;
+}
+
 export class MarkdownPlugin implements Plugin {
   name = 'markdown';
 
   async beforeBuild(ctx: PluginContext): Promise<void> {
+    const cache = ctx.shared.get(CACHE_KEY) as BuildCache | undefined;
     const files = await listMarkdownFiles(ctx.options.contentDir);
     const pages: Page[] = [];
     for (const file of files) {
-      pages.push(await parseMarkdownFile(file));
+      pages.push(await parseMarkdownFileCached(file, cache));
     }
     ctx.pages.push(...pages);
   }
