@@ -4,7 +4,9 @@ import json
 import pytest
 import pytest_asyncio
 import websockets
+import fakeredis.aioredis
 
+import app
 from app import NotificationServer
 
 
@@ -103,3 +105,51 @@ async def test_subscribe_multiple_channels_and_unsubscribe(server):
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(client.recv(), timeout=0.05)
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_returns_persisted_history(server):
+    await server.broadcast({"text": "first"}, "events")
+    await server.broadcast({"text": "second"})
+
+    messages = await get_json(server.health_port, "/messages?limit=1&offset=0")
+    assert len(messages) == 1
+    assert messages[0]["type"] == "broadcast"
+    assert messages[0]["payload"] == {"text": "second"}
+    assert messages[0]["channel"] is None
+
+    messages = await get_json(server.health_port, "/messages?limit=10&offset=1")
+    assert messages[0]["payload"] == {"text": "first"}
+    assert messages[0]["channel"] == "events"
+
+
+@pytest.mark.asyncio
+async def test_redis_backbone_delivers_between_server_instances(unused_tcp_port_factory, monkeypatch):
+    fake_server = fakeredis.FakeServer()
+
+    def fake_from_url(_url, decode_responses=True):
+        return fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=decode_responses)
+
+    monkeypatch.setattr(app.redis, "from_url", fake_from_url)
+    first = NotificationServer(
+        websocket_port=unused_tcp_port_factory(), health_port=unused_tcp_port_factory(),
+        redis_url="redis://fake", database_url=":memory:"
+    )
+    second = NotificationServer(
+        websocket_port=unused_tcp_port_factory(), health_port=unused_tcp_port_factory(),
+        redis_url="redis://fake", database_url=":memory:"
+    )
+    await first.start()
+    await second.start()
+    try:
+        client = await websockets.connect(f"ws://127.0.0.1:{second.websocket_port}")
+        await client.recv()
+        await client.send(json.dumps({"type": "subscribe", "channel": "shared", "payload": {}}))
+        await asyncio.sleep(0.05)
+        await first.broadcast({"text": "from another instance"}, "shared")
+        message = json.loads(await asyncio.wait_for(client.recv(), timeout=1))
+        assert message["payload"] == {"text": "from another instance"}
+        await client.close()
+    finally:
+        await first.stop()
+        await second.stop()
