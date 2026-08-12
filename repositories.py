@@ -99,6 +99,24 @@ class TaskRepository(BaseRepository):
                 (owner_id,),
             ).fetchall()
 
+    def list_for_owner_page(self, owner_id, cursor=None, limit=20):
+        query = "SELECT * FROM tasks WHERE owner_id = ? "
+        params = [owner_id]
+        if cursor is not None:
+            query += "AND id < ? "
+            params.append(cursor)
+        query += "ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        with self._connection() as conn:
+            return conn.execute(query, tuple(params)).fetchall()
+
+    def count_for_owner(self, owner_id):
+        with self._connection() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()["total"]
+
 
 class UserRepository(BaseRepository):
     """Repository for user records."""
