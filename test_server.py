@@ -1,7 +1,9 @@
 import asyncio
 import json
 import os
+import sqlite3
 import tempfile
+from datetime import datetime, timedelta, timezone
 import pytest
 
 from websockets.asyncio.client import connect
@@ -650,3 +652,345 @@ async def test_redis_persistence_combined():
         server.REDIS_URL = ""
         server.redis_client = None
         server._subscriber_task = None
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded_in_memory():
+    import server
+    original_rate = server.RATE_LIMIT
+    server.RATE_LIMIT = 3
+    server._rate_limits.clear()
+
+    try:
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws:
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+                for i in range(3):
+                    await ws.send(json.dumps({
+                        "type": "broadcast",
+                        "payload": {"message": f"msg{i}"},
+                    }))
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                    assert msg["type"] == "broadcast"
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "over limit"},
+                }))
+                error_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                assert error_msg["type"] == "system"
+                assert "error" in error_msg["payload"]
+                assert "Rate limit" in error_msg["payload"]["error"]
+
+                await ws.ping()
+    finally:
+        server.RATE_LIMIT = original_rate
+        server._rate_limits.clear()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_connection_stays_alive():
+    import server
+    original_rate = server.RATE_LIMIT
+    server.RATE_LIMIT = 1
+    server._rate_limits.clear()
+
+    try:
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws:
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "first"},
+                }))
+                msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                assert msg["type"] == "broadcast"
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "blocked"},
+                }))
+                error = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                assert "error" in error["payload"]
+
+                await ws.ping()
+
+    finally:
+        server.RATE_LIMIT = original_rate
+        server._rate_limits.clear()
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_by_channel():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "history-chan"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "history-chan", "message": "channel msg"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"message": "global msg"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, "/history?channel=history-chan")
+        assert "messages" in result
+        assert "has_more" in result
+        assert result["has_more"] is False
+        assert len(result["messages"]) >= 1
+        for msg in result["messages"]:
+            assert msg["channel"] == "history-chan"
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_chronological_order():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "chrono-test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "chrono-test", "message": "first"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await asyncio.sleep(0.05)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "chrono-test", "message": "second"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await asyncio.sleep(0.05)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "chrono-test", "message": "third"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, "/history?channel=chrono-test")
+        msgs = result["messages"]
+        typed = [m for m in msgs if m["channel"] == "chrono-test"]
+        assert len(typed) >= 3
+        timestamps = [m["timestamp"] for m in typed[-3:]]
+        assert timestamps == sorted(timestamps)
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_has_more():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "hasmore-test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            for i in range(5):
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"channel": "hasmore-test", "message": f"msg{i}"},
+                }))
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, "/history?channel=hasmore-test&limit=2")
+        assert len(result["messages"]) == 2
+        assert result["has_more"] is True
+
+        result2 = await http_get("localhost", PORT, "/history?channel=hasmore-test&limit=10")
+        assert result2["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_since_filter():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        before = None
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "since-test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "since-test", "message": "old"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await asyncio.sleep(0.1)
+
+            before = datetime.now(timezone.utc).isoformat()
+
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "since-test", "message": "new"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, f"/history?channel=since-test&since={before}")
+        msgs = result["messages"]
+        assert len(msgs) >= 1
+        for msg in msgs:
+            assert msg["timestamp"] > before
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_empty_channel():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        result = await http_get("localhost", PORT, "/history?channel=nonexistent-chan-xyz")
+        assert result["messages"] == []
+        assert result["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_default_limit():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "default-limit"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "default-limit", "message": "test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, "/history?channel=default-limit")
+        assert isinstance(result["messages"], list)
+        assert isinstance(result["has_more"], bool)
+
+
+@pytest.mark.asyncio
+async def test_history_payload_deserialized():
+    async with serve(handler, "localhost", PORT, process_request=process_request):
+        async with connect(f"ws://localhost:{PORT}") as ws:
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "payload-test"},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+            await ws.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "payload-test", "message": "hello", "extra": 42},
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=5)
+
+        await asyncio.sleep(0.1)
+
+        result = await http_get("localhost", PORT, "/history?channel=payload-test")
+        assert len(result["messages"]) >= 1
+        payload = json.loads(result["messages"][0]["payload"])
+        assert payload["message"] == "hello"
+        assert payload["extra"] == 42
+
+
+@pytest.mark.asyncio
+async def test_redis_rate_limit():
+    import fakeredis.aioredis as faioredis
+    import server
+
+    os.environ["REDIS_URL"] = "redis://localhost:6379/0"
+    try:
+        server.REDIS_URL = "redis://localhost:6379/0"
+        server.RATE_LIMIT = 3
+        server.redis_client = faioredis.FakeRedis()
+        await server.redis_client.initialize()
+        sub_task = asyncio.create_task(server._redis_subscriber_task())
+
+        async with serve(handler, "localhost", PORT, process_request=process_request):
+            async with connect(f"ws://localhost:{PORT}") as ws:
+                await asyncio.wait_for(ws.recv(), timeout=5)
+
+                for i in range(3):
+                    await ws.send(json.dumps({
+                        "type": "broadcast",
+                        "payload": {"message": f"redis-msg{i}"},
+                    }))
+                    msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                    assert msg["type"] == "broadcast"
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"message": "redis-over-limit"},
+                }))
+                error_msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+                assert error_msg["type"] == "system"
+                assert "error" in error_msg["payload"]
+                assert "Rate limit" in error_msg["payload"]["error"]
+
+        sub_task.cancel()
+        try:
+            await sub_task
+        except asyncio.CancelledError:
+            pass
+    finally:
+        del os.environ["REDIS_URL"]
+        server.REDIS_URL = ""
+        server.RATE_LIMIT = 100
+        server.redis_client = None
+        server._subscriber_task = None
+
+
+@pytest.mark.asyncio
+async def test_cleanup_old_messages():
+    import server
+    original_ttl = server.MESSAGE_TTL_DAYS
+    server.MESSAGE_TTL_DAYS = 0
+    server._init_message_db()
+
+    conn = sqlite3.connect(server.DATABASE_URL)
+    old_ts = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+    conn.execute(
+        "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+        ("cleanup-test", "broadcast", json.dumps({"message": "expired"}), old_ts),
+    )
+    conn.commit()
+    conn.close()
+
+    server._cleanup_messages_once()
+
+    conn = sqlite3.connect(server.DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM messages WHERE channel = ?", ("cleanup-test",)
+    ).fetchall()
+    conn.close()
+
+    assert len(rows) == 0
+
+    server.MESSAGE_TTL_DAYS = original_ttl

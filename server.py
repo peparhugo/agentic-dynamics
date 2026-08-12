@@ -3,8 +3,9 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 from websockets.asyncio.server import serve
@@ -16,10 +17,15 @@ TRANSPORT = os.environ.get("TRANSPORT", "websocket")
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 REDIS_CHANNEL = "chat:messages"
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 redis_client = None
 _message_db_initialized = False
 _subscriber_task = None
+
+_rate_limits = {}
+_rate_lock = threading.Lock()
 
 
 class ClientRegistry:
@@ -132,6 +138,81 @@ def get_messages(limit=50, offset=0):
     return [dict(r) for r in rows]
 
 
+async def check_rate_limit(client_id):
+    if redis_client:
+        try:
+            key = f"rate:{client_id}"
+            count = await redis_client.incr(key)
+            if count == 1:
+                await redis_client.expire(key, 60)
+            return count <= RATE_LIMIT
+        except Exception:
+            pass
+
+    now = time.monotonic()
+    with _rate_lock:
+        timestamps = _rate_limits.get(client_id, [])
+        timestamps = [t for t in timestamps if now - t < 60]
+        if len(timestamps) >= RATE_LIMIT:
+            _rate_limits[client_id] = timestamps
+            return False
+        timestamps.append(now)
+        _rate_limits[client_id] = timestamps
+        return True
+
+
+def get_history(channel=None, since=None, limit=50):
+    _init_message_db()
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+
+    query = "SELECT * FROM messages"
+    conditions = []
+    params = []
+
+    if channel:
+        conditions.append("channel = ?")
+        params.append(channel)
+
+    if since:
+        conditions.append("timestamp > ?")
+        params.append(since)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY timestamp ASC LIMIT ?"
+    params.append(limit + 1)
+
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+
+    has_more = len(rows) > limit
+    messages = [dict(r) for r in rows[:limit]]
+
+    return {"messages": messages, "has_more": has_more}
+
+
+async def _cleanup_old_messages():
+    while True:
+        try:
+            _cleanup_messages_once()
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
+def _cleanup_messages_once():
+    _init_message_db()
+    conn = sqlite3.connect(DATABASE_URL)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=MESSAGE_TTL_DAYS)).isoformat()
+    conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+    conn.commit()
+    conn.close()
+
+
 def make_message(msg_type, payload):
     return json.dumps({
         "type": msg_type,
@@ -222,6 +303,17 @@ async def handler(websocket):
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError:
+                continue
+
+            if not await check_rate_limit(client_id):
+                err = make_message("system", {
+                    "error": f"Rate limit exceeded. Maximum {RATE_LIMIT} messages per minute.",
+                    "client_id": client_id
+                })
+                try:
+                    await _transport.send_message(client_id, err)
+                except Exception:
+                    pass
                 continue
 
             msg_type = data.get("type", "broadcast")
@@ -329,11 +421,27 @@ def process_request(connection, request):
         )
         response.headers["Content-Type"] = "application/json"
         return response
+    if request.path.startswith("/history"):
+        parsed = urlparse(request.path)
+        qs = parse_qs(parsed.query)
+        channel = qs.get("channel", [None])[0]
+        since = qs.get("since", [None])[0]
+        if since:
+            since = since.replace(" ", "+")
+        limit = int(qs.get("limit", ["50"])[0])
+        result = get_history(channel=channel, since=since, limit=limit)
+        response = connection.respond(
+            200,
+            json.dumps(result),
+        )
+        response.headers["Content-Type"] = "application/json"
+        return response
     return None
 
 
 async def main():
     await init_redis()
+    asyncio.create_task(_cleanup_old_messages())
     async with serve(handler, "localhost", 8765, process_request=process_request):
         await asyncio.Future()
 
