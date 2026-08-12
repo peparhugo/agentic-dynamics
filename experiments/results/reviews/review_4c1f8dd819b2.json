@@ -6,52 +6,46 @@
     {
       "commit_hash": "074a77dd675d9670acfd71e8998b66080d59b00a",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.62,
-      "convention_adherence": 0.46,
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.5,
       "introduces_technical_debt": true,
       "respects_existing_patterns": false,
       "better_or_worse": "neutral",
       "problems": [
         {
+          "category": "convention",
+          "severity": "major",
+          "description": "22 naming violations and a 0.50 convention score: build.ts uses snake_case function names and non-PascalCase interfaces/classes, inconsistent with the PascalCase types (User, Item) of the seed file it replaced"
+        },
+        {
           "category": "maintainability",
           "severity": "major",
-          "description": "+8 smells and +141 cognitive complexity in a 4K-line greenfield seed suggest the initial architecture packs too much logic into few files/functions rather than decomposing from the start."
+          "description": "Cognitive complexity +141 across the greenfield code, suggesting the build logic is concentrated in a few deeply nested functions rather than decomposed"
         },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "2.9% duplication introduced at genesis indicates shared rendering/templating logic is being repeated instead of factored into a common module."
+          "description": "+8 code smells and +2.9% duplication indicate repeated logic, likely in frontmatter parsing or HTML rendering"
         },
         {
-          "category": "convention",
-          "severity": "minor",
-          "description": "Convention score of 0.46 with thousands of flagged violations; however several listed violations (Classes/Interfaces should use PascalCase, Constants should be UPPER_CASE) reference constructs the AST diff shows do not exist (+0 classes, no UPPER_CASE constants in the visible diff) \u2014 the score appears to overstate actual convention breaks and includes misattributed checks."
-        },
-        {
-          "category": "architecture",
-          "severity": "minor",
-          "description": "Wholesale deletion of the prior index.ts seed replaces the existing structure rather than building on it; acceptable for a greenfield story but constitutes a pattern break with the prior baseline."
-        },
-        {
-          "category": "testing",
+          "category": "other",
           "severity": "info",
-          "description": "Tests assert on exact rendered HTML fragments and positional ordering (indexOf comparisons), which are brittle to future markup/templating changes."
+          "description": "Analyzer flags build.test.ts for PascalCase/UPPER_CASE rules, but the visible test helpers (tmpDir, writeMarkdown) are camelCase \u2014 possibly analyzer noise, not real debt"
         }
       ],
       "strengths": [
-        "Comprehensive behavior-level test suite (15 cases) covering happy paths, nonexistent-content errors, XSS escaping, tag-less pages, and date-sorted index rendering.",
-        "Clean test scaffolding with tmpDir/writeMarkdown helpers and proper afterEach cleanup \u2014 no orphaned fixtures.",
-        "Sensible src/ + __tests__/ module decomposition with a single, discoverable build entry point.",
-        "Defensive behavior baked in (throws on missing content dir, graceful empty-dir handling, slug fallback title)."
+        "bugs +0 \u2014 no new defects introduced",
+        "Strong 169-line test suite covering edge cases: XSS escaping, date-descending sort, empty content dir, fallback titles, and code blocks, with proper tmp-dir lifecycle hygiene",
+        "Correctly pivoted the story codebase from the off-domain auth-API seed to the static-site-generator domain in src/ (greenfield)"
       ],
-      "summary": "Solid, well-tested greenfield foundation (architecture fit ~0.62), but the low 0.46 convention score and the +8 smells / +141 complexity / 2.9% duplication mean it seeds real technical debt; note the flagged PascalCase/UPPER_CASE violations misattribute constructs that don't exist per the +0 classes measurement, so actual convention breaks are fewer than the score implies.",
+      "summary": "A directionally correct greenfield foundation with strong tests and zero bugs, dragged down by naming-convention debt (0.50) and a high-complexity build function; the analyzer's complaints about the test file's naming appear to be false positives given its camelCase helpers.",
       "session_number": 1
     },
     {
       "commit_hash": "ddbac1450eb36bb66c073011694496fe0bce2f55",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
-      "convention_adherence": 0.46,
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.5,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "neutral",
@@ -59,52 +53,52 @@
         {
           "category": "convention",
           "severity": "major",
-          "description": "SonarQube convention score 0.46 with naming violations (PascalCase classes/interfaces, UPPER_CASE constants, camelCase functions) reported across build.test.ts, index.ts, and index-browser.ts."
+          "description": "Convention score 0.50 with 22 naming violations across build.ts, index.ts, build.test.ts: snake_case functions in TypeScript, functions not camelCase, classes/interfaces not PascalCase, constants not UPPER_CASE. Note: these checks may be generic heuristics; the snake_case-in-TS finding in build.ts is the most credible violation."
         },
         {
           "category": "maintainability",
           "severity": "major",
-          "description": "Cognitive complexity +179 for ~490 added lines; the template-rendering logic and test fixtures pack significant branching (conditionals, loops) into nested template strings."
+          "description": "+179 cognitive complexity added in +490 lines \u2014 template/layout/partial resolution logic is likely deeply nested and hard to follow; would benefit from decomposition into smaller helpers."
         },
         {
           "category": "maintainability",
           "severity": "minor",
-          "description": "Duplication +1.8%: setupTemplatesDir writes default.hbs/layouts/partials that individual tests immediately overwrite, duplicating fixture content and hiding which fixture a test actually exercises."
+          "description": "+1.8% duplication \u2014 large blocks of template HTML are repeated across test fixtures (default.hbs / layouts/default.hbs and header/footer partials duplicated verbatim)."
         },
         {
-          "category": "testing",
+          "category": "maintainability",
           "severity": "minor",
-          "description": "Test fixture override pattern means assertions depend on the latest writeTemplate call; the shared setup content is effectively dead in several tests."
+          "description": "+6 SonarQube smells introduced; no new bugs."
         }
       ],
       "strengths": [
-        "Feature integrates cleanly with the existing build pipeline: build() gains an optional templatesDir with a built-in fallback, preserving the old signature (existing tests unchanged).",
-        "Comprehensive coverage: default/custom/frontmatter templates, layout wrapping via {{{body}}}, partials, index.hbs pages array, fallback, and missing-template error path.",
-        "Respects existing test conventions: reuses tmpDir/writeMarkdown helpers and setup/teardown cleanup patterns.",
-        "Proper error handling (throws /Template not found/) instead of silent degradation."
+        "Comprehensive test coverage of the template system including edge cases: missing-template throws, built-in template fallback, layout-in-frontmatter, partials, and index page rendering.",
+        "Tests follow existing conventions \u2014 reuses the writeMarkdown/tmpDir helpers and beforeEach/afterEach cleanup pattern already established in the file.",
+        "Adds 0 new bugs per SonarQube and keeps the diff largely test-first, specifying behavior before implementation."
       ],
-      "summary": "A backward-compatible template feature with strong test coverage that fits the SSG architecture but lands with real convention debt (score 0.46) and elevated complexity/duplication \u2014 note the flagged naming violations appear to target template-fixture content rather than actual code identifiers.",
+      "summary": "A large, well-tested template/layout/partial feature that fits the SSG architecture but ships with heavy cognitive complexity, 1.8% duplication, and a 0.50 convention score from 22 naming violations.",
       "session_number": 2
     }
   ],
   "story_review": {
     "story_name": "static_site_gen",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.9,
+    "overall_coherence": 0.88,
     "compounding_issues": [
-      "Seed codebase (Express Auth API, index.ts) was entirely unrelated to the static-site-generator story and was deleted wholesale in Session 1, so the seed provided zero reusable value and effectively forced a greenfield start",
-      "Two parallel template systems now coexist \u2014 the built-in string templates (src/template.ts) and the new Handlebars TemplateEngine \u2014 with branching in build() to pick between them, adding maintenance surface",
-      "node_modules/ and package-lock artifacts committed in Session 1 create large, noisy diffs that obscure the actual source changes",
-      "The stated premise of 5 sessions does not match the commit log, which contains only 2 story sessions plus the seed commit"
+      "Committed dist/ build artifacts into git from Session 3 onward (S3-S5 each add dist/**), bloating history and risking stale-compiled-output drift vs src/",
+      "node_modules and package-lock committed wholesale in Sessions 1-2, adding thousands of lines of noise to every subsequent diff",
+      "Seed codebase (Express auth API) was entirely discarded by Session 1's greenfield rewrite \u2014 the seed's structure provided zero continuity for later sessions",
+      "Existing test suite plateaued at 27 tests through Sessions 3-4 while engine complexity grew; only Session 5 added meaningful new coverage (incremental.test.ts)",
+      "Session 4's plugin refactor concentrated all orchestration logic into SsgEngine (onStart/beforeBuild/onFile/afterBuild/onEnd pipeline), which Session 5 then grew further with cache bookkeeping \u2014 single class risks becoming the bottleneck"
     ],
     "key_decisions": [
-      "Discarding the unrelated Auth API seed outright and building the SSG from scratch as a clean CLI/module split (types.ts, template.ts, build.ts, index.ts)",
-      "Adopting a test-first approach with a comprehensive jest suite (16 tests in Session 1) pinned to frontmatter metadata, date-descending sort, and HTML escaping",
-      "Session 2 introduced a pluggable Handlebars TemplateEngine with layouts, partials, and index templates, wired via a new --templates flag",
-      "Preserving backward compatibility by falling back to built-in string templates whenever the templates dir is absent or lacks a template",
-      "Extending PageMeta with per-page template/layout frontmatter fields instead of a global template setting, keeping per-page flexibility"
+      "Session 1 greenfield: full replacement of seed with a markdown-to-HTML CLI (gray-matter + marked), establishing the build pipeline",
+      "Session 2: introduced a Handlebars TemplateEngine with layouts/partials/caching of compiled templates, cleanly separating presentation from content",
+      "Session 3: added a chokidar-backed dev server with live reload (serve.ts), turning the CLI into a complete tool",
+      "Session 4: refactored to a config-driven plugin architecture (Plugin interface + BuildContext + MarkdownPlugin/TemplatePlugin) \u2014 the most consequential choice, enabling extensibility",
+      "Session 5: implemented content-hash incremental builds (sha256 of source + templates) with --incremental/--clean flags and a versioned cache manifest"
     ],
-    "trajectory_description": "Quality improved across the two sessions. Session 1 delivered a clean, fully tested static site generator (16 passing tests) with a sound separation between CLI, build logic, types, and rendering. Session 2 extended it with a well-factored Handlebars templating layer (layouts, partials, index) without breaking the existing API \u2014 after one transient test failure that was resolved, the final state had 27 passing tests and the added TemplateEngine is coherent with the original architecture rather than bolted on. Coverage, test depth, and feature richness all rose while code quality stayed consistent.",
-    "summary": "A coherent, improving two-session arc in which a greenfield, well-tested SSG core was cleanly extended with a backward-compatible templating engine \u2014 though the unrelated seed commit was discarded outright and the story ran 2 sessions rather than the expected 5."
+    "trajectory_description": "Quality improved steadily across the arc. It opened with a minimal but correct markdown build pipeline and 15 passing tests, matured through templating and a live-reload dev server (27 tests), then underwent a genuine architectural refactor into a plugin system in Session 4 \u2014 the clearest signal of structural growth \u2014 and closed with a clean content-hash incremental cache plus a 442-line test file. Every session's tests passed (tests_passed == tests_total at each step), and each commit extended rather than destabilized the previous design; the only flat spot was the static 27-test suite during the S3-S4 integration/refactor window before Session 5 re-invested in coverage. The main persistent drags were repository hygiene (committed dist/ and node_modules) rather than code quality.",
+    "summary": "A highly coherent, steadily improving story that went from a minimal greenfield CLI to a plugin-architected static site generator with live reload and incremental caching, undermined only by repository-hygiene slipups (committed dist/ and node_modules) and a mid-arc test-coverage plateau."
   }
 }

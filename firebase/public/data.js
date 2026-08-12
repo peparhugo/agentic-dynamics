@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 20:01:26 UTC by build_data.py */
+/* Generated 2026-08-12 20:21:20 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T20:01:26.513525+00:00",
+    "generated_at": "2026-08-12T20:21:20.120920+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -3280,7 +3280,7 @@ window.DYNAMICS_DATA = {
       "successful": 352,
       "failed": 0
     },
-    "generated_at": "2026-08-12T20:01:26.543824+00:00"
+    "generated_at": "2026-08-12T20:21:20.153680+00:00"
   },
   "reviews": {
     "models": [
@@ -3321,31 +3321,31 @@ window.DYNAMICS_DATA = {
         "model": "gpt-5.6-luna",
         "label": "GPT-5.6 Luna",
         "stories": 34,
-        "overall_coherence": 0.889,
+        "overall_coherence": 0.888,
         "architectural_fit": 0.753,
-        "convention_adherence": 0.699,
-        "better_pct": 74.7,
+        "convention_adherence": 0.701,
+        "better_pct": 74.1,
         "worse_pct": 8.8,
-        "neutral_pct": 11.2,
+        "neutral_pct": 11.8,
         "top_issues": [
           {
             "theme": "other",
-            "count": 57
+            "count": 59
           },
           {
             "theme": "security",
             "count": 29
           },
           {
-            "theme": "test gaps",
+            "theme": "incomplete refactor",
             "count": 24
           },
           {
-            "theme": "incomplete refactor",
+            "theme": "test gaps",
             "count": 23
           },
           {
-            "theme": "missing surface",
+            "theme": "coupling",
             "count": 11
           }
         ]
@@ -3354,28 +3354,28 @@ window.DYNAMICS_DATA = {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
         "stories": 35,
-        "overall_coherence": 0.876,
-        "architectural_fit": 0.752,
-        "convention_adherence": 0.716,
-        "better_pct": 67.3,
-        "worse_pct": 10.3,
-        "neutral_pct": 20.0,
+        "overall_coherence": 0.881,
+        "architectural_fit": 0.75,
+        "convention_adherence": 0.72,
+        "better_pct": 61.6,
+        "worse_pct": 11.6,
+        "neutral_pct": 23.2,
         "top_issues": [
           {
             "theme": "other",
-            "count": 52
+            "count": 48
           },
           {
             "theme": "security",
-            "count": 26
+            "count": 31
           },
           {
             "theme": "incomplete refactor",
-            "count": 25
+            "count": 26
           },
           {
             "theme": "test gaps",
-            "count": 22
+            "count": 24
           },
           {
             "theme": "schema drift",
@@ -3384,7 +3384,7 @@ window.DYNAMICS_DATA = {
         ]
       }
     ],
-    "commit_reviews": 350,
+    "commit_reviews": 349,
     "story_reviews": 72,
     "reviewer": "deepseek/deepseek-v4-flash"
   },
@@ -3403,7 +3403,7 @@ window.DYNAMICS_DATA = {
         "sonar_bugs_delta": 6,
         "sonar_smells_delta": 78,
         "sonar_complexity_delta": 4111,
-        "avg_convention": 0.695
+        "avg_convention": 0.713
       },
       {
         "model": "gpt-5.6-luna",
@@ -3418,7 +3418,7 @@ window.DYNAMICS_DATA = {
         "sonar_bugs_delta": 2,
         "sonar_smells_delta": 89,
         "sonar_complexity_delta": 4750,
-        "avg_convention": 0.675
+        "avg_convention": 0.679
       },
       {
         "model": "claude-sonnet-5",

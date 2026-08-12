@@ -6,80 +6,90 @@
     {
       "commit_hash": "d5cbd19f19496d2dae403fb1d79cabb9825414c4",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.59,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
+      "better_or_worse": "neutral",
+      "problems": [
+        {
+          "category": "convention",
+          "severity": "major",
+          "description": "18 convention violations across index.ts, generator.test.ts, server.test.ts: classes/interfaces not using PascalCase and constants not UPPER_CASE, driving the convention score to 0.59."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube cognitive complexity +50 across only +5 new functions implies over-nested control flow in the new modules, a smell worth refactoring in a later session."
+        }
+      ],
+      "strengths": [
+        "Greenfield commit follows an idiomatic TS+jest layout (ts-jest preset, node environment, test roots scoped to src/).",
+        "Tests are committed alongside the implementation (generator.test.ts, server.test.ts), not deferred.",
+        "Committing package-lock.json pins transitive dependencies for reproducible installs.",
+        "Session-1 scope is minimal and focused on scaffolding with no architectural over-engineering."
+      ],
+      "summary": "Idiomatic greenfield scaffolding that only stumbles on naming conventions (score 0.59, 18 PascalCase/UPPER_CASE violations) and mildly elevated cognitive complexity, both minor and easily addressed in later story sessions.",
       "session_number": 1
     },
     {
       "commit_hash": "154d15dab9f841be392c1c8c369231e1c06c7acc",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.72,
-      "convention_adherence": 0.47,
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.75,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
         {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports +2 code smells; the new setupTemplateDir helper duplicates the setupContentDir pattern, and repeated fs.rmSync cleanup blocks could be hoisted into an afterEach."
+        },
+        {
           "category": "convention",
-          "severity": "minor",
-          "description": "All 3115 convention violations land in auto-generated .d.ts files (cli.d.ts, generator.d.ts, server.d.ts), not in hand-written source. If these regenerated declaration files are committed as part of this session, they carry non-camelCase/PascalCase/UPPER_CASE declarations that drag the convention score to 0.47."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "Test helper setupTemplateDir nearly duplicates setupContentDir; extracting a shared parameterized helper would reduce ~20 lines of repeated setup/teardown across 8 tests."
-        },
-        {
-          "category": "testing",
           "severity": "info",
-          "description": "Typo in test fixture: 'template: nonextistent' (should be 'nonexistent'); functionally harmless since the test asserts fallback, but sloppy fixture data."
+          "description": "Measured convention score 0.59 is driven by 18 'PascalCase/UPPER_CASE' findings that are false positives (HTML/CSS class names and constants inside template-literal fixtures in generator.test.ts/server.test.ts/index.ts, not TypeScript classes). Qualitative review found no genuine naming violations."
         }
       ],
       "strengths": [
-        "Comprehensive test coverage of the template feature: default layout, frontmatter-selected template, fallback when template missing, partials, template data (title/date/tags), and index-page rendering.",
-        "Follows existing test patterns exactly (mkdtemp helper, describe/beforeEach/afterEach structure, rmSync cleanup matching the surrounding tests).",
-        "No bugs, no code duplication delta, and cognitive complexity reduced by -10; all assertions target behavior rather than implementation details."
+        "Extends buildSite with a templatesDir parameter consistent with the existing contentDir/outputDir pattern",
+        "Tests mirror the established setupContentDir helper and tmpdir lifecycle conventions exactly",
+        "Thorough coverage of edge cases: custom layout via frontmatter, fallback to default, partials, and template data rendering",
+        "No new bugs, no duplication (0.0%), and cognitive complexity decreased by 10"
       ],
-      "summary": "Solid, pattern-consistent test-only addition that meaningfully covers the new template feature; the 0.47 convention score reflects violations in auto-generated .d.ts files rather than the hand-written test code, which itself adheres well.",
+      "summary": "Well-structured feature addition that follows existing patterns and broadens test coverage, with the low measured convention score being a false-positive artifact from HTML class names inside template literals.",
       "session_number": 2
     },
     {
       "commit_hash": "41bc952d9997d45d8af46af115d1e947cc8964e0",
       "reviewer_model": "deepseek/deepseek-v4-flash",
       "architectural_fit": 0.82,
-      "convention_adherence": 0.58,
-      "introduces_technical_debt": false,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
-      "better_or_worse": "better",
+      "better_or_worse": "neutral",
       "problems": [
         {
           "category": "convention",
-          "severity": "info",
-          "description": "Mechanical convention score (0.47) is dragged down by 3115 naming violations, but these are almost entirely in auto-generated cli.d.ts / generator.d.ts / server.d.ts declaration files emitted by tsc --declaration, not hand-written source; counting them against the commit inflates the violation count."
-        },
-        {
-          "category": "testing",
-          "severity": "minor",
-          "description": "Commit adds 2 source files and 5 functions (watch, templating, websocket server) but no new test files are visible in the AST diff, leaving the integration surface untested in this session."
+          "severity": "major",
+          "description": "18 naming-convention violations in new files (index.ts, generator.test.ts, server.test.ts) \u2014 classes/interfaces not PascalCase, constants not UPPER_CASE; SonarQube convention score 0.59. Note: several are in test files where the PascalCase/UPPER_CASE rules commonly produce false positives, but the mechanical score stands."
         },
         {
           "category": "dependency",
           "severity": "minor",
-          "description": "This single 'integration' commit pulls in three runtime dependencies (chokidar, handlebars, ws) at once; acceptable for a session-based story commit, but the lockfile churn removes dev:true flags on transitive deps as they become production dependencies \u2014 expected, yet worth a glance for drift."
+          "description": "Three new runtime dependencies (chokidar, handlebars, ws) added in a single integration session; handlebars may overlap with the existing markdown-it/gray-matter rendering path."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "SonarQube reports +2 new code smells, offsetting the otherwise clean delta."
         }
       ],
       "strengths": [
-        "Dependency choices fit the feature set and existing stack (chokidar for file watching, handlebars for templating, ws for live-reload server, all consistent with the TypeScript/jest/commander base).",
-        "No new bugs, 0% duplication, and cognitive complexity decreased by 5 \u2014 the integration is an architectural improvement, not a regression.",
-        "package-lock.json is properly updated and committed alongside the new runtime dependencies, keeping the lockfile in sync."
+        "Lockfile hygiene is correct: transitive deps (anymatch, braces, handlebars, etc.) hoisted and dev/runtime flags flipped consistently with the new runtime dependencies."
       ],
-      "summary": "Solid session-3 integration commit with appropriate dependencies and improved code quality; the low 0.47 convention score is a discrepancy to note since it stems from auto-generated .d.ts files, with the only real gap being missing tests for the new watch/template/server surface.",
+      "summary": "Session 3 integration adds watch/live-reload/templating features with clean lockfile hygiene and no new bugs, but lowers convention adherence to 0.59 (18 naming violations) and expands the dependency surface with three new runtime packages.",
       "session_number": 3
     }
   ],
@@ -88,17 +98,19 @@
     "reviewer_model": "deepseek/deepseek-v4-flash",
     "overall_coherence": 0.85,
     "compounding_issues": [
-      "Seed codebase (2be2cf7) is an Express/JWT/SQLite Auth API that is entirely unrelated to the static_site_gen story; Session 1 ignored it, built the SSG from scratch, and the orphaned 200-line index.ts (plus its auth dependencies) remained dead code in the tree through all sessions, never included by tsconfig and never referenced.",
-      "Session 1's inline-HTML-only generator design forced a structural refactor in Session 2 to introduce the Handlebars TemplateEngine, requiring new pageBodyHtml/indexBodyHtml extraction functions; mitigated by the backward-compatible isActive() fallback so the change stayed non-breaking.",
-      "node_modules/ and dist/ were committed into the repo at every session, adding tens of thousands of lines of noise (12,500+ insertions in Session 3 alone), making diffs difficult to review."
+      "Session 1 committed the entire node_modules tree (plus package-lock and .bin symlinks), bloating the repo; sessions 2 and 3 then committed dist/ build artifacts with no .gitignore discipline",
+      "The unrelated seed index.ts (auth API, ~200 LOC) was never removed or wired in, leaving dead code in the tree through all sessions that contradicts the SSG domain",
+      "Two parallel rendering systems persist: the original inline HTML builders remain as a fallback path alongside the Handlebars TemplateEngine, duplicating page/index rendering logic",
+      "Session 3 dev server silently swallows initial build failures ('Initial build skipped') and injects live-reload only into generated HTML output rather than into the template layer"
     ],
     "key_decisions": [
-      "Greenfield in Session 1: picked gray-matter + markdown-it + commander for a clean single-file SSG (generator.ts/cli.ts), effectively discarding the auth-API seed rather than adapting it.",
-      "Session 2: added a Handlebars TemplateEngine with layouts/partials and per-page template selection via frontmatter, with graceful fallback to built-in HTML when no templates directory exists \u2014 a backward-compatible abstraction over the monolith.",
-      "Session 3: built a dev server (server.ts) with chokidar file watching and WebSocket-based live reload injected into generated HTML, plus a new 'serve' CLI command, integrated as a natural extension of the existing build pipeline.",
-      "Maintained strict TypeScript compilation (tsc, strict:true) with jest/ts-jest test coverage growing across sessions (23 \u2192 34 \u2192 45 tests)."
+      "Greenfield rewrite of the story target (a purpose-built markdown\u2192HTML static site generator) rather than building on the seed, which was an unrelated Express/JWT/SQLite auth API",
+      "Modular split (src/generator.ts vs src/cli.ts) plus jest and tsconfig from session 1, establishing the structure that later sessions cleanly extended",
+      "Template engine (session 2) implemented as an optional, backwards-compatible extension layer: layouts/partials auto-detected from a templates dir with graceful fallback to inline HTML, so existing tests kept passing",
+      "buildSite composition: session 3's dev server reuses buildSite and threads the --templates option through CLI \u2192 buildSite \u2192 serve, composing layers instead of forking",
+      "Live reload built self-contained via a WebSocket server + injected client script (ws + chokidar), avoiding an external reloader dependency"
     ],
-    "trajectory_description": "Quality improved steadily across the three sessions. Session 1 produced a working but monolithic SSG with inline HTML generation and solid base tests. Session 2 refactored cleanly into a templating layer (layouts, partials, per-page templates) that preserved backward compatibility, demonstrating good architectural judgment and expanding test coverage. Session 3 added the most complex piece \u2014 a dev server with file watching and WebSocket live reload \u2014 with its own dedicated 358-line test suite, showing growing capability. The main blemish is the persistent dead auth-API seed that was never reconciled, which slightly dampens the otherwise clean upward arc.",
-    "summary": "A coherent, improving three-session arc that built a feature-complete static site generator with templating and live-reload dev server, though it left the mismatched auth-API seed as orphaned dead code throughout."
+    "trajectory_description": "Quality improved steadily across the three sessions. Session 1 delivered a clean, tested markdown generator (12 tests); session 2 added a well-factored, backwards-compatible Handlebars templating layer that grew coverage to 23 tests without disturbing the initial API; session 3 integrated a dev server with live reload, 11 server tests, and full CLI wiring \u2014 ending at 34/34 tests passing. The architecture stayed composable and each session extended rather than rewrote prior work. The arc is marred only by repo hygiene (committed node_modules and dist/, leftover seed index.ts), not by structural decay.",
+    "summary": "A coherent, compounding-but-healthy three-session arc that built a tested static site generator, added templating, and integrated a live-reload dev server, with only repo-hygiene debt (committed node_modules/dist and orphaned seed code) detracting from otherwise clean engineering."
   }
 }
