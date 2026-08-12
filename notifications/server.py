@@ -24,11 +24,19 @@ class NotificationServer:
     """A WebSocket notification hub.
 
     Message envelopes follow the shape ``{"type": str, "payload": dict,
-    "timestamp": str}``. Supported types:
+    "timestamp": str}`` and may carry an optional ``"channel"`` field. Supported
+    types:
 
-    * ``broadcast`` — delivered to every connected client.
+    * ``broadcast`` — delivered to every connected client, or only to the
+      subscribers of the named channel when a ``"channel"`` field is present.
     * ``direct`` — routed to the client named in ``payload["target"]``.
     * ``system`` — server-originated messages (e.g. connection events).
+    * ``subscribe`` — subscribes the sender to the named channel.
+    * ``unsubscribe`` — removes the sender from the named channel.
+
+    Clients may subscribe to any number of named channels (``"alerts"``,
+    ``"system"``, ``"chat"``, ...) and channel messages only reach the clients
+    subscribed to that channel.
     """
 
     def __init__(
@@ -70,21 +78,38 @@ class NotificationServer:
 
     # -- HTTP handling ------------------------------------------------------
 
+    @staticmethod
+    def _json_response(body: dict, status: HTTPStatus = HTTPStatus.OK) -> Response:
+        """Build a JSON REST response."""
+        encoded = json.dumps(body).encode("utf-8")
+        return Response(
+            status_code=status,
+            reason_phrase=status.phrase,
+            headers=Headers(
+                [
+                    ("Content-Type", "application/json"),
+                    ("Content-Length", str(len(encoded))),
+                ]
+            ),
+            body=encoded,
+        )
+
     async def _process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
         if request.path == "/health":
-            body = json.dumps({"clients": len(self.registry)}).encode("utf-8")
-            return Response(
-                status_code=HTTPStatus.OK,
-                reason_phrase=HTTPStatus.OK.phrase,
-                headers=Headers(
-                    [
-                        ("Content-Type", "application/json"),
-                        ("Content-Length", str(len(body))),
-                    ]
-                ),
-                body=body,
+            return self._json_response({"clients": len(self.registry)})
+        if request.path == "/channels":
+            return self._json_response(self.registry.channels())
+        if request.path.startswith("/channels/") and request.path.endswith(
+            "/subscribers"
+        ):
+            name = request.path[len("/channels/") : -len("/subscribers")]
+            return self._json_response(
+                {
+                    "channel": name,
+                    "subscribers": sorted(self.registry.channel_members(name)),
+                }
             )
         if request.path != self.path:
             return Response(
@@ -133,11 +158,20 @@ class NotificationServer:
         msg_type = message["type"]
         payload = message["payload"]
         timestamp = message["timestamp"]
+        channel = message.get("channel") or payload.get("channel")
+        if channel is not None and not isinstance(channel, str):
+            channel = None
 
         if msg_type == "broadcast":
             forwarded = dict(payload)
+            forwarded.pop("channel", None)
             forwarded["from"] = sender_id
-            await self.broadcast(forwarded, timestamp=timestamp)
+            if channel:
+                await self.send_to_channel(
+                    channel, forwarded, timestamp=timestamp
+                )
+            else:
+                await self.broadcast(forwarded, timestamp=timestamp)
 
         elif msg_type == "direct":
             target = payload.get("target")
@@ -154,6 +188,30 @@ class NotificationServer:
                     sender_id, {"error": f"no such client: {target}"}
                 )
 
+        elif msg_type == "subscribe":
+            if not channel:
+                await self.send_system(
+                    sender_id,
+                    {"error": "subscribe requires a channel"},
+                )
+                return
+            self.registry.subscribe(sender_id, channel)
+            logger.info(
+                "client %s subscribed to channel %r", sender_id, channel
+            )
+
+        elif msg_type == "unsubscribe":
+            if not channel:
+                await self.send_system(
+                    sender_id,
+                    {"error": "unsubscribe requires a channel"},
+                )
+                return
+            self.registry.unsubscribe(sender_id, channel)
+            logger.info(
+                "client %s unsubscribed from channel %r", sender_id, channel
+            )
+
         else:  # "system"
             await self.send_system(sender_id, dict(payload), timestamp=timestamp)
 
@@ -166,6 +224,28 @@ class NotificationServer:
         """
         raw = make_message("broadcast", payload, timestamp=timestamp)
         return await self._send_all(raw)
+
+    async def send_to_channel(
+        self, channel: str, payload: dict, timestamp: str | None = None
+    ) -> int:
+        """Send a broadcast message to the subscribers of a named channel.
+
+        Returns the number of clients the message was delivered to.
+        """
+        raw = make_message(
+            "broadcast", payload, timestamp=timestamp, channel=channel
+        )
+        delivered = 0
+        for client_id in self.registry.channel_members(channel):
+            connection = self.registry.get(client_id)
+            if connection is None:
+                continue
+            try:
+                await connection.send(raw)
+                delivered += 1
+            except ConnectionClosed:
+                continue
+        return delivered
 
     async def send_direct(
         self, client_id: str, payload: dict, timestamp: str | None = None

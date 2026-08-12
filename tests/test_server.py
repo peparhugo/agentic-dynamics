@@ -291,3 +291,170 @@ def test_registry_is_thread_safe():
 
     ids = [client_id for client_id, _ in registry]
     assert len(set(ids)) == 200
+
+
+# ── channel subscriptions ────────────────────────────────────────────────
+
+
+async def test_subscribe_and_channel_routing(server):
+    ws_a, welcome_a = await connect_client(server.bound_port)
+    ws_b, welcome_b = await connect_client(server.bound_port)
+    ws_c, welcome_c = await connect_client(server.bound_port)
+
+    await ws_a.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws_b.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws_c.send(make_message("subscribe", {"channel": "system"}))
+
+    assert await wait_for(
+        lambda: server.registry.is_subscribed(
+            welcome_a["payload"]["client_id"], "alerts"
+        )
+    )
+    assert await wait_for(
+        lambda: server.registry.is_subscribed(
+            welcome_b["payload"]["client_id"], "alerts"
+        )
+    )
+    assert await wait_for(
+        lambda: server.registry.is_subscribed(
+            welcome_c["payload"]["client_id"], "system"
+        )
+    )
+    assert not server.registry.is_subscribed(
+        welcome_c["payload"]["client_id"], "alerts"
+    )
+
+    await ws_a.send(
+        make_message("broadcast", {"text": "alert!"}, channel="alerts")
+    )
+
+    for ws in (ws_b,):
+        msg = json.loads(await ws.recv())
+        assert msg["type"] == "broadcast"
+        assert msg["channel"] == "alerts"
+        assert msg["payload"]["text"] == "alert!"
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws_c.recv(), timeout=0.2)
+
+    await ws_a.close()
+    await ws_b.close()
+    await ws_c.close()
+
+
+async def test_unsubscribe_stops_delivery(server):
+    ws_a, welcome_a = await connect_client(server.bound_port)
+    ws_b, _ = await connect_client(server.bound_port)
+
+    await ws_b.send(make_message("subscribe", {"channel": "chat"}))
+    await ws_a.send(
+        make_message("broadcast", {"text": "one"}, channel="chat")
+    )
+    msg = json.loads(await ws_b.recv())
+    assert msg["payload"]["text"] == "one"
+
+    await ws_b.send(make_message("unsubscribe", {"channel": "chat"}))
+    await ws_a.send(
+        make_message("broadcast", {"text": "two"}, channel="chat")
+    )
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws_b.recv(), timeout=0.2)
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(server):
+    ws, _ = await connect_client(server.bound_port)
+    await ws.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws.send(make_message("subscribe", {"channel": "system"}))
+    await ws.send(make_message("subscribe", {"channel": "chat"}))
+
+    assert await wait_for(
+        lambda: server.registry.channels()
+        == {"alerts": 1, "system": 1, "chat": 1}
+    )
+
+    await ws.close()
+
+
+async def test_message_without_channel_still_broadcasts_to_all(server):
+    ws_a, _ = await connect_client(server.bound_port)
+    ws_b, _ = await connect_client(server.bound_port)
+
+    await ws_a.send(make_message("broadcast", {"text": "everyone"}))
+
+    for ws in (ws_a, ws_b):
+        msg = json.loads(await ws.recv())
+        assert msg["payload"]["text"] == "everyone"
+        assert "channel" not in msg
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_rest_channels_endpoint(server):
+    ws_a, _ = await connect_client(server.bound_port)
+    ws_b, _ = await connect_client(server.bound_port)
+
+    await ws_a.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws_b.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws_b.send(make_message("subscribe", {"channel": "chat"}))
+
+    assert await wait_for(
+        lambda: server.registry.channels() == {"alerts": 2, "chat": 1}
+    )
+
+    status, body = await http_get(server.bound_port, "/channels")
+    assert status == 200
+    assert json.loads(body) == {"alerts": 2, "chat": 1}
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_rest_channel_subscribers_endpoint(server):
+    ws_a, welcome_a = await connect_client(server.bound_port)
+    ws_b, welcome_b = await connect_client(server.bound_port)
+
+    await ws_a.send(make_message("subscribe", {"channel": "alerts"}))
+    await ws_b.send(make_message("subscribe", {"channel": "alerts"}))
+
+    status, body = await http_get(
+        server.bound_port, "/channels/alerts/subscribers"
+    )
+    assert status == 200
+    data = json.loads(body)
+    assert data["channel"] == "alerts"
+    assert sorted(data["subscribers"]) == sorted(
+        [
+            welcome_a["payload"]["client_id"],
+            welcome_b["payload"]["client_id"],
+        ]
+    )
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_disconnect_cleans_up_channels(server):
+    ws, welcome = await connect_client(server.bound_port)
+    await ws.send(make_message("subscribe", {"channel": "alerts"}))
+    assert await wait_for(
+        lambda: server.registry.channels() == {"alerts": 1}
+    )
+
+    client_id = welcome["payload"]["client_id"]
+    await ws.close()
+    assert await wait_for(lambda: client_id not in server.registry)
+    assert server.registry.channels() == {}
+
+
+async def test_subscribe_without_channel_yields_error(server):
+    ws, _ = await connect_client(server.bound_port)
+    await ws.send(make_message("subscribe", {}))
+    msg = json.loads(await ws.recv())
+    assert msg["type"] == "system"
+    assert "error" in msg["payload"]
+    await ws.close()
