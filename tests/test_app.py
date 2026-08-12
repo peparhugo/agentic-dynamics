@@ -1,5 +1,6 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import websockets
@@ -14,6 +15,20 @@ class FakeWebSocket:
 
     async def send(self, message: str) -> None:
         self.messages.append(json.loads(message))
+
+
+async def http_json(server: NotificationServer, request: str) -> tuple[bytes, dict]:
+    http_server = await asyncio.start_server(NotificationHTTPServer(server).handler, "127.0.0.1", 0)
+    port = http_server.sockets[0].getsockname()[1]
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"{request}\r\nHost: localhost\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    http_server.close()
+    await http_server.wait_closed()
+    return response, json.loads(response.split(b"\r\n\r\n", 1)[1])
 
 
 @pytest.mark.asyncio
@@ -122,3 +137,55 @@ async def test_health_endpoint_returns_current_count() -> None:
         "status": "ok",
         "connected_clients": 0,
     }
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_and_uses_redis_counter(monkeypatch) -> None:
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    broker = aioredis.FakeRedis(decode_responses=True)
+    server = NotificationServer(redis_client=broker)
+    websocket = FakeWebSocket()
+    client_id = server.add_client(websocket)
+    try:
+        for number in range(3):
+            await server.handle_message(
+                client_id, json.dumps({"type": "broadcast", "payload": {"n": number}})
+            )
+        assert [message["type"] for message in websocket.messages] == ["broadcast", "broadcast", "error"]
+        assert websocket.messages[-1]["payload"] == {"error": "rate limit exceeded"}
+        rate_keys = [key for key in await broker.keys("notifications:rate:*")]
+        assert len(rate_keys) == 1
+        assert await broker.get(rate_keys[0]) == "3"
+    finally:
+        await server._backbone.close()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_paginates(tmp_path) -> None:
+    server = NotificationServer(database_url=str(tmp_path / "history-query.db"))
+    client_id = server.add_client(FakeWebSocket())
+    await server.handle_message(client_id, json.dumps({
+        "type": "broadcast", "channel": "news", "payload": {"n": 1}
+    }))
+    first_timestamp = server.store.history("news")[0][0]["timestamp"]
+    await server.handle_message(client_id, json.dumps({
+        "type": "broadcast", "channel": "other", "payload": {"n": 99}
+    }))
+    await server.handle_message(client_id, json.dumps({
+        "type": "broadcast", "channel": "news", "payload": {"n": 2}
+    }))
+
+    response, body = await http_json(server, "GET /history?channel=news&since=" + first_timestamp + "&limit=1 HTTP/1.1")
+    assert b"200 OK" in response
+    assert [message["payload"]["n"] for message in body["messages"]] == [2]
+    assert body["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_cleanup_removes_messages_older_than_configured_ttl(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "7")
+    server = NotificationServer(database_url=str(tmp_path / "expiry.db"))
+    old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat().replace("+00:00", "Z")
+    server.store.save("news", "broadcast", {"old": True}, old)
+    assert await server.cleanup_expired_messages() == 1
+    assert server.store.history("news") == ([], False)

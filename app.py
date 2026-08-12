@@ -8,8 +8,9 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -51,6 +52,10 @@ class MessageStore:
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, type TEXT NOT NULL, "
                 "payload TEXT NOT NULL, timestamp TEXT NOT NULL)"
             )
+            self._connection.execute(
+                "CREATE INDEX IF NOT EXISTS messages_channel_timestamp "
+                "ON messages (channel, timestamp, id)"
+            )
 
     def save(self, channel: str | None, message_type: str, payload: dict[str, Any], timestamp: str) -> None:
         with self._lock, self._connection:
@@ -72,6 +77,35 @@ class MessageStore:
              "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
             for row in rows
         ]
+
+    def history(self, channel: str, since: str | None = None, limit: int = 50) -> tuple[list[dict[str, Any]], bool]:
+        limit = max(1, min(limit, 1000))
+        query = (
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            "WHERE channel = ?"
+        )
+        parameters: list[Any] = [channel]
+        if since is not None:
+            query += " AND timestamp > ?"
+            parameters.append(since)
+        query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        parameters.append(limit + 1)
+        with self._lock:
+            rows = self._connection.execute(query, parameters).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return [
+            {"id": row["id"], "channel": row["channel"], "type": row["type"],
+             "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
+            for row in rows
+        ], has_more
+
+    def delete_older_than(self, cutoff: str) -> int:
+        with self._lock, self._connection:
+            result = self._connection.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+            )
+            return result.rowcount
 
 
 class RedisBackbone:
@@ -133,6 +167,8 @@ class NotificationServer:
         self._lock = threading.RLock()
         self.store = MessageStore(database_url)
         self._backbone: RedisBackbone | None = None
+        self._rate_limit = self._read_int_env("RATE_LIMIT", 100, minimum=0)
+        self._local_rate: dict[str, tuple[int, float]] = {}
         if redis_client is not None:
             self._backbone = RedisBackbone.__new__(RedisBackbone)
             self._backbone.client = redis_client
@@ -142,6 +178,44 @@ class NotificationServer:
         elif redis_url or os.getenv("REDIS_URL"):
             self._backbone = RedisBackbone(redis_url or os.environ["REDIS_URL"], self._receive_event)
         self._broker_started = False
+
+    @staticmethod
+    def _read_int_env(name: str, default: int, minimum: int = 1) -> int:
+        try:
+            return max(minimum, int(os.getenv(name, str(default))))
+        except ValueError:
+            return default
+
+    async def _allow_message(self, client_id: str) -> bool:
+        """Consume one fixed-window token, using Redis when configured."""
+        window = int(time.time() // 60)
+        key = f"notifications:rate:{client_id}:{window}"
+        if self._backbone is not None:
+            count = await self._backbone.client.incr(key)
+            if count == 1:
+                await self._backbone.client.expire(key, 61)
+            return count <= self._rate_limit
+
+        now = time.monotonic()
+        count, started = self._local_rate.get(client_id, (0, now))
+        if now - started >= 60:
+            count, started = 0, now
+        count += 1
+        self._local_rate[client_id] = (count, started)
+        return count <= self._rate_limit
+
+    async def cleanup_expired_messages(self) -> int:
+        ttl_days = self._read_int_env("MESSAGE_TTL_DAYS", 7)
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat().replace("+00:00", "Z")
+        return self.store.delete_older_than(cutoff)
+
+    async def cleanup_loop(self) -> None:
+        try:
+            while True:
+                await self.cleanup_expired_messages()
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            pass
 
     @staticmethod
     def _transport_from_config() -> BaseTransport:
@@ -257,6 +331,10 @@ class NotificationServer:
         if message_type not in MESSAGE_TYPES or not isinstance(payload, dict):
             return
 
+        if not await self._allow_message(sender_id):
+            await self._send_to(sender_id, _message("error", {"error": "rate limit exceeded"}))
+            return
+
         channel = message.get("channel")
         if channel is None:
             channel = payload.get("channel")
@@ -343,6 +421,29 @@ class NotificationHTTPServer:
                     + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode()
                     + body
                 )
+            elif method == "GET" and request.path == "/history":
+                query = parse_qs(request.query)
+                channel = query.get("channel", [None])[0]
+                since = query.get("since", [None])[0]
+                try:
+                    limit = int(query.get("limit", ["50"])[0])
+                except ValueError:
+                    limit = 50
+                if not channel or limit < 1:
+                    body = b'{"error":"channel and a positive limit are required"}'
+                    response = (
+                        b"HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n"
+                        + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode()
+                        + body
+                    )
+                else:
+                    messages, has_more = self.notification_server.store.history(channel, since, limit)
+                    body = json.dumps({"messages": messages, "has_more": has_more}).encode()
+                    response = (
+                        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                        + f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n".encode()
+                        + body
+                    )
             elif method == "GET" and request.path.startswith("/channels/"):
                 channel_path = request.path.removeprefix("/channels/")
                 if channel_path.endswith("/subscribers"):
@@ -392,9 +493,12 @@ async def run_server(
     http_server = await asyncio.start_server(
         NotificationHTTPServer(server).handler, http_host, http_port
     )
+    cleanup_task = asyncio.create_task(server.cleanup_loop())
     try:
         await asyncio.Future()
     finally:
+        cleanup_task.cancel()
+        await asyncio.gather(cleanup_task, return_exceptions=True)
         websocket_server.close()
         await websocket_server.wait_closed()
         http_server.close()
