@@ -3,9 +3,10 @@ import json
 import os
 import sqlite3
 import threading
+import time as _time
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 import redis.asyncio as redis
@@ -15,8 +16,51 @@ from websockets.exceptions import ConnectionClosed
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 TRANSPORT = os.environ.get("TRANSPORT", "websocket")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 _server_id = str(uuid.uuid4())
+
+
+class RateLimiter:
+    def __init__(self, limit=100, redis_client=None):
+        self._limit = limit
+        self._redis = redis_client
+        self._local = {}
+        self._lock = threading.Lock()
+
+    async def check(self, client_id):
+        if self._redis is not None:
+            return await self._check_redis(client_id)
+        return self._check_local(client_id)
+
+    async def _check_redis(self, client_id):
+        try:
+            key = f"rate_limit:{client_id}"
+            count = await self._redis.incr(key)
+            if count == 1:
+                await self._redis.expire(key, 60)
+            return count <= self._limit
+        except Exception:
+            return self._check_local(client_id)
+
+    def _check_local(self, client_id):
+        now = _time.monotonic()
+        with self._lock:
+            if client_id not in self._local:
+                self._local[client_id] = (1, now)
+                return True
+            count, window_start = self._local[client_id]
+            if now - window_start > 60:
+                self._local[client_id] = (1, now)
+                return True
+            if count < self._limit:
+                self._local[client_id] = (count + 1, window_start)
+                return True
+            return False
+
+
+rate_limiter = RateLimiter(limit=RATE_LIMIT)
 
 
 class BaseTransport(ABC):
@@ -120,6 +164,34 @@ class MessageStore:
                 item["payload"] = json.loads(item["payload"])
                 result.append(item)
             return result
+
+    def get_history(self, channel, since=None, limit=50):
+        with self._lock:
+            conn = self._get_conn()
+            query = "SELECT * FROM messages WHERE channel = ?"
+            params = [channel]
+            if since:
+                query += " AND timestamp >= ?"
+                params.append(since)
+            query += " ORDER BY id ASC LIMIT ?"
+            params.append(limit + 1)
+            rows = conn.execute(query, params).fetchall()
+            conn.close()
+            has_more = len(rows) > limit
+            rows = rows[:limit]
+            result = []
+            for r in rows:
+                item = dict(r)
+                item["payload"] = json.loads(item["payload"])
+                result.append(item)
+            return {"messages": result, "has_more": has_more}
+
+    def delete_older_than(self, cutoff):
+        with self._lock:
+            conn = self._get_conn()
+            conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            conn.commit()
+            conn.close()
 
     def clear(self):
         with self._lock:
@@ -332,6 +404,18 @@ async def handler(websocket):
             msg_type = data.get("type")
             payload = data.get("payload", {})
 
+            if not await rate_limiter.check(client_id):
+                await transport.send_message(client_id, json.dumps({
+                    "type": "error",
+                    "payload": {
+                        "code": "rate_limit_exceeded",
+                        "message": "Rate limit exceeded. Max {} messages per minute.".format(
+                            rate_limiter._limit),
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }))
+                continue
+
             if msg_type == "subscribe":
                 channel_name = payload.get("channel")
                 if channel_name:
@@ -409,6 +493,19 @@ async def http_handler(reader, writer):
             offset = 0
         messages = message_store.get_messages(limit=limit, offset=offset)
         body = json.dumps(messages).encode()
+    elif path_only == "/history":
+        channel = qs.get("channel", [None])[0]
+        if not channel:
+            status = b"400 Bad Request"
+            body = json.dumps({"error": "channel query parameter is required"}).encode()
+        else:
+            since = qs.get("since", [None])[0]
+            try:
+                limit = int(qs.get("limit", ["50"])[0])
+            except (ValueError, IndexError):
+                limit = 50
+            result = message_store.get_history(channel=channel, since=since, limit=limit)
+            body = json.dumps(result).encode()
     else:
         status = b"404 Not Found"
         body = json.dumps({"error": "not found"}).encode()
@@ -426,30 +523,49 @@ async def http_handler(reader, writer):
     await writer.wait_closed()
 
 
+async def cleanup_old_messages(ttl_days=MESSAGE_TTL_DAYS):
+    while True:
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+            message_store.delete_older_than(cutoff)
+        except Exception:
+            pass
+        await asyncio.sleep(3600)
+
+
 async def start(ws_host="127.0.0.1", ws_port=8765, http_host="127.0.0.1", http_port=8080,
-                redis_url=None, database_url=None):
-    global REDIS_URL, DATABASE_URL, _server_id
+                redis_url=None, database_url=None, rate_limit=None, message_ttl_days=None):
+    global REDIS_URL, DATABASE_URL, _server_id, rate_limiter, MESSAGE_TTL_DAYS
     if redis_url is not None:
         REDIS_URL = redis_url
     if database_url is not None:
         DATABASE_URL = database_url
         global message_store
         message_store = MessageStore(DATABASE_URL)
+    if message_ttl_days is not None:
+        MESSAGE_TTL_DAYS = message_ttl_days
     _server_id = str(uuid.uuid4())
 
+    limit = rate_limit if rate_limit is not None else RATE_LIMIT
+    rate_limiter = RateLimiter(limit=limit)
+
     await _init_redis()
+
+    if redis_available and redis_client is not None:
+        rate_limiter._redis = redis_client
 
     ws_server = await serve(handler, ws_host, ws_port)
     http_server = await asyncio.start_server(http_handler, http_host, http_port)
 
     subscriber_task = asyncio.create_task(redis_subscriber())
+    cleanup_task = asyncio.create_task(cleanup_old_messages(MESSAGE_TTL_DAYS))
 
-    return ws_server, http_server, subscriber_task
+    return ws_server, http_server, subscriber_task, cleanup_task
 
 
 async def main():
     import os as _os
-    ws_server, http_server = await start(
+    ws_server, http_server, _, _ = await start(
         redis_url=_os.environ.get("REDIS_URL", "redis://localhost:6379"),
         database_url=_os.environ.get("DATABASE_URL", "messages.db"),
     )
