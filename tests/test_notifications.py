@@ -63,6 +63,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "DATABASE", str(db_path))
     app_module.init_db()
 
+    # Avoid cross-test interference on the shared Redis-backed rate limiter.
+    app_module.limiter.reset()
+
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as test_client:
         yield test_client

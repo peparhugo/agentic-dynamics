@@ -14,6 +14,15 @@ Session 3: Added async email notifications.
    Celery task (send_notification_email) is queued to notify the owner.
    The queuing call (`.delay(...)`) is non-blocking, so the API response
    is not delayed by sending the notification.
+
+Session 4: Added rate limiting and cursor-based pagination.
+ - Every endpoint (including /auth/*) is rate limited to 100 requests per
+   minute per identity. Authenticated requests are keyed by user id (so
+   each user gets their own 100/min budget); unauthenticated requests
+   (e.g. /auth/login before a token exists) fall back to the client's IP.
+   Exceeding the limit returns 429 with a ``Retry-After`` header.
+ - GET /tasks now returns a cursor-paginated page instead of the full
+   list: ``{"data": [...], "next_cursor": str|null, "total": int}``.
 """
 
 from functools import wraps
@@ -21,6 +30,8 @@ from functools import wraps
 from flask import Flask, request, jsonify, g
 from datetime import timedelta, timezone, datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 import jwt
@@ -37,6 +48,21 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_MINUTES = int(os.environ.get("JWT_EXP_MINUTES", "60"))
+
+# ── Pagination defaults ───────────────────────────────────────
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+
+# ── Rate limiting ─────────────────────────────────────────────
+#
+# Storage backend is Redis (as required for a real multi-process/worker
+# deployment; Flask-Limiter's default in-memory storage is per-process and
+# wouldn't correctly enforce a shared limit). The URI is overridable via
+# env var so tests/CI can point at a different Redis db than dev/prod.
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+)
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
 
 
 def get_db():
@@ -141,6 +167,49 @@ def decode_token(token: str) -> dict:
     return jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
 
 
+# ── Rate limit identity ───────────────────────────────────────
+#
+# Each *authenticated user* gets their own 100 req/min budget, so one
+# user's activity never eats into another's. Requests that don't carry a
+# valid token (most notably /auth/register and /auth/login, which run
+# before a token exists) fall back to the client's IP address so those
+# endpoints are still protected.
+
+def rate_limit_key() -> str:
+    auth_header = request.headers.get("Authorization", "")
+    parts = auth_header.split()
+    if len(parts) == 2 and parts[0].lower() == "bearer":
+        try:
+            payload = decode_token(parts[1])
+        except jwt.PyJWTError:
+            payload = None
+        if payload is not None and payload.get("sub") is not None:
+            return f"user:{payload['sub']}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    # ``application_limits`` (rather than ``default_limits``) gives each
+    # identity ONE shared 100/min budget across every endpoint. With
+    # ``default_limits`` each route would get its own independent counter,
+    # which would let a user make 100 requests to *each* endpoint per
+    # minute instead of 100 total.
+    application_limits=[RATE_LIMIT],
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def ratelimit_exceeded(e):
+    return (
+        jsonify({"error": "rate limit exceeded", "message": str(e.description)}),
+        429,
+    )
+
+
 def token_required(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -177,8 +246,22 @@ def create_task(title: str, owner_id: int) -> dict:
     return task_repository.create(title=title, owner_id=owner_id)
 
 
-def get_tasks(owner_id: int):
-    return task_repository.get_all_for_owner(owner_id)
+def get_tasks_page(owner_id: int, cursor: int | None, limit: int) -> dict:
+    """Return one cursor-paginated page of tasks for ``owner_id``.
+
+    ``cursor`` is the id of the last item the caller has already seen (or
+    None for the first page). Pages are ordered by id descending, which is
+    equivalent to insertion/created_at order since ids are assigned by an
+    autoincrementing sequence.
+    """
+    rows = task_repository.get_page_for_owner(owner_id, cursor=cursor, limit=limit)
+
+    has_more = len(rows) > limit
+    items = rows[:limit]
+    next_cursor = str(items[-1]["id"]) if has_more and items else None
+    total = task_repository.count_for_owner(owner_id)
+
+    return {"data": items, "next_cursor": next_cursor, "total": total}
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
@@ -235,7 +318,29 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
-    return jsonify(get_tasks(g.current_user["id"]))
+    cursor_param = request.args.get("cursor")
+    limit_param = request.args.get("limit")
+
+    cursor = None
+    if cursor_param is not None and cursor_param != "":
+        try:
+            cursor = int(cursor_param)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer id"}), 400
+
+    limit = DEFAULT_PAGE_LIMIT
+    if limit_param is not None and limit_param != "":
+        try:
+            limit = int(limit_param)
+        except ValueError:
+            return jsonify({"error": "limit must be an integer"}), 400
+
+    if limit < 1:
+        return jsonify({"error": "limit must be at least 1"}), 400
+    limit = min(limit, MAX_PAGE_LIMIT)
+
+    page = get_tasks_page(g.current_user["id"], cursor=cursor, limit=limit)
+    return jsonify(page)
 
 
 @app.route("/tasks", methods=["POST"])

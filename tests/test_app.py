@@ -33,6 +33,11 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "DATABASE", str(db_path))
     app_module.init_db()
 
+    # Each test gets a clean rate-limit budget so requests made by earlier
+    # tests (sharing the same Redis-backed limiter storage) can't cause an
+    # unrelated test to be rejected with 429.
+    app_module.limiter.reset()
+
     app_module.app.config["TESTING"] = True
     with app_module.app.test_client() as test_client:
         yield test_client
@@ -229,8 +234,8 @@ def test_users_only_see_their_own_tasks(client):
     _create_task(client, alice_headers, "Alice's task")
     _create_task(client, bob_headers, "Bob's task")
 
-    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
-    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
+    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()["data"]
 
     assert [t["title"] for t in alice_tasks] == ["Alice's task"]
     assert [t["title"] for t in bob_tasks] == ["Bob's task"]
@@ -318,7 +323,8 @@ def test_list_tasks_empty(client):
     headers = _register_and_login(client)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    body = resp.get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_by_created_at_desc(client):
@@ -329,8 +335,11 @@ def test_list_tasks_ordered_by_created_at_desc(client):
 
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["Third task", "Second task", "First task"]
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
 
 
 # ── GET /tasks/{id} ──────────────────────────────────────────────
