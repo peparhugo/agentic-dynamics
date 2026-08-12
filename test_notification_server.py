@@ -69,3 +69,73 @@ async def test_rejects_invalid_messages_with_system_error(server):
         response = await receive_json(socket)
         assert response["type"] == "system"
         assert "error" in response["payload"]
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_only_reach_subscribers_and_can_unsubscribe(server):
+    url = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(url) as alerts_client, connect(url) as other_client:
+        alerts_info = await receive_json(alerts_client)
+        await receive_json(other_client)
+        channel = "alerts"
+
+        await alerts_client.send(json.dumps({
+            "type": "subscribe", "payload": {"channel": channel}
+        }))
+        await alerts_client.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": channel, "text": "first"},
+        }))
+        assert (await receive_json(alerts_client))["payload"]["text"] == "first"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other_client.recv(), timeout=0.05)
+
+        await alerts_client.send(json.dumps({
+            "type": "unsubscribe", "payload": {"channel": channel}
+        }))
+        await alerts_client.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": channel, "text": "second"},
+        }))
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(alerts_client.recv(), timeout=0.05)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"http://{server.host}:{server.health_port}/channels"
+            ) as response:
+                assert await response.json() == {"channels": []}
+            async with session.get(
+                f"http://{server.host}:{server.health_port}/channels/{channel}/subscribers"
+            ) as response:
+                assert await response.json() == {"subscribers": []}
+
+
+@pytest.mark.asyncio
+async def test_multiple_channel_subscriptions_and_channel_rest_listing(server):
+    url = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(url) as first, connect(url) as second:
+        first_id = (await receive_json(first))["payload"]["client_id"]
+        second_id = (await receive_json(second))["payload"]["client_id"]
+        for channel in ("alerts", "system"):
+            await first.send(json.dumps({
+                "type": "subscribe", "payload": {"channel": channel}
+            }))
+        await second.send(json.dumps({
+            "type": "subscribe", "payload": {"channel": "alerts"}
+        }))
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                f"http://{server.host}:{server.health_port}/channels"
+            ) as response:
+                assert await response.json() == {"channels": [
+                    {"name": "alerts", "subscriber_count": 2},
+                    {"name": "system", "subscriber_count": 1},
+                ]}
+            async with session.get(
+                f"http://{server.host}:{server.health_port}/channels/alerts/subscribers"
+            ) as response:
+                assert (await response.json())["subscribers"] == sorted(
+                    [first_id, second_id]
+                )
