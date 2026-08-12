@@ -8,6 +8,12 @@ Session 2: Added JWT authentication.
  - Users register/login and receive a JWT.
  - All /tasks/* endpoints require a valid JWT (Authorization: Bearer <token>).
  - Tasks are scoped to their owner (Task.owner_id).
+
+Session 3: Added async email notifications.
+ - When a task's status changes to 'completed' via PUT /tasks/{id}, a
+   Celery task (send_notification_email) is queued to notify the owner.
+   The queuing call (`.delay(...)`) is non-blocking, so the API response
+   is not delayed by sending the notification.
 """
 
 from functools import wraps
@@ -18,6 +24,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 import jwt
+
+from tasks import send_notification_email
 
 app = Flask(__name__)
 
@@ -51,7 +59,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -70,20 +79,30 @@ def init_db():
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
 
+        # Migration step for pre-existing databases created before the
+        # notification system needed an email address on file for users.
+        user_columns = [row["name"] for row in conn.execute("PRAGMA table_info(users)")]
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+
         conn.commit()
 
 
 # ── User model ────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
     password_hash = generate_password_hash(password)
+    # Fall back to a synthesized address when none is provided so every
+    # user has *some* email on file for notifications (registration keeps
+    # working without callers needing to change).
+    email = email or f"{username}@example.com"
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "username": username}
+        return {"id": cursor.lastrowid, "username": username, "email": email}
 
 
 def get_user_by_username(username: str) -> dict | None:
@@ -215,6 +234,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
+    email = (data.get("email") or "").strip() or None
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
@@ -222,7 +242,7 @@ def register():
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already exists"}), 409
 
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     return jsonify(user), 201
 
 
@@ -275,14 +295,29 @@ def show_task(task_id: int):
 @token_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+
+    existing = get_task(task_id, g.current_user["id"])
+    if existing is None:
+        return jsonify({"error": "task not found"}), 404
+
+    new_status = data.get("status")
     task = update_task(
         task_id,
         g.current_user["id"],
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+
+    # Fire an async notification email when the status transitions *into*
+    # 'completed'. Using .delay() queues the task on the broker and
+    # returns immediately, so the API response is not blocked waiting for
+    # the (mocked) email to be sent.
+    if new_status == "completed" and existing["status"] != "completed":
+        owner_email = g.current_user.get("email") or f"{g.current_user['username']}@example.com"
+        send_notification_email.delay(owner_email, task["title"])
+
     return jsonify(task)
 
 

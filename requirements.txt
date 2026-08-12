@@ -2,3 +2,5 @@ flask
 pytest
 pyjwt
 werkzeug
+celery
+redis
