@@ -153,10 +153,22 @@ class TaskRepository(BaseRepository):
         rows = self.list("id = ? AND owner_id = ?", (task_id, owner_id))
         return rows[0] if rows else None
 
-    def list_for_owner(self, owner_id):
-        return self.list(
-            "owner_id = ?", (owner_id,), "created_at DESC, id DESC"
-        )
+    def list_for_owner(self, owner_id, cursor=None, limit=None):
+        rows, _ = self.list_page_for_owner(owner_id, cursor, limit)
+        return rows
+
+    def list_page_for_owner(self, owner_id, cursor=None, limit=None):
+        where = "owner_id = ?"
+        parameters = [owner_id]
+        if cursor is not None:
+            where += " AND id < ?"
+            parameters.append(cursor)
+
+        rows = self.list(where, parameters, "created_at DESC, id DESC")
+        total = len(self.list("owner_id = ?", (owner_id,)))
+        if limit is not None:
+            rows = rows[:limit]
+        return rows, total
 
     def update_for_owner(self, task_id, owner_id, values):
         changed = self.update(task_id, values, "owner_id = ?", (owner_id,))

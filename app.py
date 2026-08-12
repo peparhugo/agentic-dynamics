@@ -6,6 +6,8 @@ import os
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -21,6 +23,42 @@ app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "development-secret-key")
 app.config["JWT_EXPIRATION_HOURS"] = 24
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
+
+
+def rate_limit_key():
+    """Use the authenticated user as the limiter key when possible."""
+    header = request.headers.get("Authorization", "")
+    scheme, _, token = header.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(
+                token, app.config["JWT_SECRET_KEY"], algorithms=["HS256"]
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    in_memory_fallback_enabled=True,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def rate_limit_exceeded(exc):
+    response = jsonify({"error": "rate limit exceeded"})
+    for header, value in exc.get_headers():
+        response.headers[header] = value
+    return response, 429
 
 
 def init_db():
@@ -136,8 +174,37 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @authenticated
 def list_tasks():
-    rows = task_repository().list_for_owner(g.user["id"])
-    return jsonify([task_json(row) for row in rows])
+    limit_value = request.args.get("limit", "20")
+    try:
+        limit = int(limit_value)
+    except (TypeError, ValueError):
+        return error("limit must be an integer", 400)
+    if limit < 1 or limit > 100:
+        return error("limit must be between 1 and 100", 400)
+
+    cursor_value = request.args.get("cursor")
+    cursor = None
+    if cursor_value is not None:
+        try:
+            cursor = int(cursor_value)
+        except (TypeError, ValueError):
+            return error("cursor must be an integer", 400)
+        if cursor < 1:
+            return error("cursor must be a positive integer", 400)
+
+    rows, total = task_repository().list_page_for_owner(
+        g.user["id"], cursor=cursor, limit=limit + 1
+    )
+    has_next_page = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = str(rows[-1]["id"]) if has_next_page else None
+    return jsonify(
+        {
+            "data": [task_json(row) for row in rows],
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+    )
 
 
 def find_task(task_id):
