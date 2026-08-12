@@ -1,0 +1,87 @@
+import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from './site';
+
+export interface CliOptions {
+  contentDir: string;
+  outputDir: string;
+}
+
+export interface ParsedArgs {
+  command: string;
+  options: CliOptions;
+}
+
+export function printHelp(): void {
+  console.log(
+    [
+      'Usage: ssg build [options]',
+      '',
+      'Generate a static site from Markdown files.',
+      '',
+      'Options:',
+      '  --content <dir>   directory containing Markdown files (default: ./content)',
+      '  --output <dir>    directory to write the generated site (default: ./dist)',
+      '  -h, --help        show this help message',
+    ].join('\n')
+  );
+}
+
+export function parseArgs(argv: string[]): ParsedArgs {
+  const args = [...argv];
+  let command = 'build';
+  if (args.length > 0 && !args[0].startsWith('-')) {
+    command = args.shift() as string;
+  }
+
+  const options: CliOptions = {
+    contentDir: DEFAULT_CONTENT_DIR,
+    outputDir: DEFAULT_OUTPUT_DIR,
+  };
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--content' || arg === '-c') {
+      const value = args[++i];
+      if (value === undefined) {
+        throw new Error(`missing value for ${arg}`);
+      }
+      options.contentDir = value;
+    } else if (arg === '--output' || arg === '-o') {
+      const value = args[++i];
+      if (value === undefined) {
+        throw new Error(`missing value for ${arg}`);
+      }
+      options.outputDir = value;
+    } else if (arg === '--help' || arg === '-h') {
+      printHelp();
+      process.exit(0);
+    } else {
+      throw new Error(`unknown argument: ${arg}`);
+    }
+  }
+
+  return { command, options };
+}
+
+export function run(argv: string[]): void {
+  let parsed: ParsedArgs;
+  try {
+    parsed = parseArgs(argv);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+
+  if (parsed.command !== 'build') {
+    console.error(`unknown command: ${parsed.command}`);
+    process.exit(1);
+  }
+
+  try {
+    const result = buildSite(parsed.options.contentDir, parsed.options.outputDir);
+    const pagesWord = result.pages === 1 ? 'page' : 'pages';
+    console.log(`Built ${result.pages} ${pagesWord} into ${result.outputDir}`);
+  } catch (err) {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+}
