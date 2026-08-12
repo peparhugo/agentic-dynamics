@@ -72,13 +72,25 @@ class TaskRepository(BaseRepository):
         )
         return self.find_by_id(task_id)
 
-    def list_for_owner(self, owner_id):
+    def list_for_owner(self, owner_id, cursor=None, limit=20):
+        where = "owner_id = ?"
+        params = [owner_id]
+        if cursor is not None:
+            where += " AND id < ?"
+            params.append(cursor)
+        params.append(limit)
         with self.connection_factory() as conn:
             rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
+                f"SELECT * FROM tasks WHERE {where} ORDER BY id DESC LIMIT ?",
+                params,
             ).fetchall()
             return [dict(row) for row in rows]
+
+    def count_for_owner(self, owner_id):
+        with self.connection_factory() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
 
     def find_for_owner(self, task_id, owner_id):
         with self.connection_factory() as conn:

@@ -7,6 +7,7 @@ import app as task_app
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -72,7 +73,7 @@ def test_users_only_see_and_update_their_own_tasks(client):
     register(client, "bob")
     bob_token = token(client, "bob")
 
-    assert client.get("/tasks", headers=auth(bob_token)).json == []
+    assert client.get("/tasks", headers=auth(bob_token)).json["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=auth(bob_token)).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=auth(bob_token)).status_code == 404
     assert client.get(f"/tasks/{task['id']}", headers=auth(alice_token)).json["status"] == "pending"
@@ -118,6 +119,45 @@ def test_notification_is_only_sent_on_transition_to_completed(client, monkeypatc
     client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
 
     assert queued == [("alice", "Already complete")]
+
+
+def test_tasks_are_cursor_paginated(client):
+    register(client)
+    headers = auth(token(client))
+    for title in ["First", "Second", "Third"]:
+        assert client.post("/tasks", json={"title": title}, headers=headers).status_code == 201
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+    assert first_page.status_code == 200
+    assert [task["title"] for task in first_page.json["data"]] == ["Third", "Second"]
+    assert first_page.json["next_cursor"] == str(first_page.json["data"][-1]["id"])
+    assert first_page.json["total"] == 3
+
+    second_page = client.get(
+        f"/tasks?cursor={first_page.json['next_cursor']}&limit=2", headers=headers
+    )
+    assert [task["title"] for task in second_page.json["data"]] == ["First"]
+    assert second_page.json["next_cursor"] is None
+    assert second_page.json["total"] == 3
+
+
+@pytest.mark.parametrize("query", ["?limit=0", "?limit=101", "?limit=nope", "?cursor=nope"])
+def test_task_pagination_rejects_invalid_parameters(client, query):
+    register(client)
+    headers = auth(token(client))
+    assert client.get(f"/tasks{query}", headers=headers).status_code == 400
+
+
+def test_rate_limit_returns_retry_after_for_authenticated_user(client):
+    register(client, "rate-limited")
+    headers = auth(token(client, "rate-limited"))
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+    limited = client.get("/tasks", headers=headers)
+
+    assert limited.status_code == 429
+    assert "Retry-After" in limited.headers
 
 
 def test_old_schema_is_migrated_without_losing_tasks(tmp_path, monkeypatch):
