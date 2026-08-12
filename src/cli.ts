@@ -1,22 +1,28 @@
 #!/usr/bin/env node
+import { access } from 'node:fs/promises';
 import { buildSite } from './generator';
+import { startDevServer } from './dev-server';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
+  return 'Usage: ssg build|serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
 }
 
-function parseOptions(args: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string } {
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string } = {};
+function parseOptions(args: string[], allowPort = false): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } {
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
-    if (flag !== '--content' && flag !== '--output' && flag !== '--templates') {
+    if (flag !== '--content' && flag !== '--output' && flag !== '--templates' && (!allowPort || flag !== '--port')) {
       throw new Error(`Unknown option: ${flag}`);
     }
     const value = args[index + 1];
     if (!value || value.startsWith('--')) {
       throw new Error(`Missing value for ${flag}`);
     }
-    if (flag === '--content') options.contentDir = value;
+    if (flag === '--port') {
+      const port = Number(value);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid port: ${value}`);
+      options.port = port;
+    } else if (flag === '--content') options.contentDir = value;
     else if (flag === '--output') options.outputDir = value;
     else options.templatesDir = value;
     index += 1;
@@ -26,6 +32,19 @@ function parseOptions(args: string[]): { contentDir?: string; outputDir?: string
 
 export async function run(args: string[]): Promise<void> {
   const [command, ...rest] = args;
+  if (command === 'serve') {
+    const options = parseOptions(rest, true);
+    try {
+      await access(options.contentDir || './content');
+    } catch {
+      throw new Error(usage());
+    }
+    const devServer = await startDevServer(options);
+    const address = devServer.server.address();
+    const port = typeof address === 'object' && address ? address.port : 3000;
+    console.log(`Serving ./dist at http://localhost:${port}`);
+    return;
+  }
   if (command !== 'build') throw new Error(usage());
   const pages = await buildSite(parseOptions(rest));
   console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
