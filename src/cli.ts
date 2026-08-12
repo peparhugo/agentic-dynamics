@@ -3,7 +3,7 @@ import { buildSite } from './generator';
 import { startDevServer } from './server';
 
 function usage(): void {
-  console.error('Usage: ssg build|serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]');
+  console.error('Usage: ssg build|serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>] [--incremental] [--clean]');
 }
 
 export async function main(args: string[] = process.argv.slice(2)): Promise<void> {
@@ -12,10 +12,12 @@ export async function main(args: string[] = process.argv.slice(2)): Promise<void
     process.exitCode = 1;
     return;
   }
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
-    if (option === '--content' || option === '--output' || option === '--templates' || option === '--port') {
+    if (option === '--incremental') options.incremental = true;
+    else if (option === '--clean') options.clean = true;
+    else if (option === '--content' || option === '--output' || option === '--templates' || option === '--port') {
       const value = args[index + 1];
       if (!value) throw new Error(`${option} requires a value`);
       if (option === '--port') {
@@ -35,8 +37,8 @@ export async function main(args: string[] = process.argv.slice(2)): Promise<void
     console.log(`Serving ${options.outputDir ?? './dist'} at http://localhost:${(server.server.address() as { port: number }).port}`);
     return;
   }
-  const pages = await buildSite(options);
-  console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
+  const pages = await buildSite({ ...options, onStats: (stats) => console.log(`Built ${stats.pagesBuilt}, skipped ${stats.pagesSkipped} page${stats.pagesSkipped === 1 ? '' : 's'} (time saved: ${stats.timeSaved}).`) });
+  if (!pages.stats.pagesSkipped) console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
 }
 
 if (require.main === module) {

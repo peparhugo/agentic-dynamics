@@ -1,5 +1,23 @@
 import type { BuildOptions, Page } from './generator';
 
+export interface CacheEntry {
+  sourceHash: string;
+  templateHash: string;
+  page: Page;
+  output: string;
+}
+
+export interface BuildCache {
+  entries: Record<string, CacheEntry>;
+  templateHash: string;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSaved: number;
+}
+
 export interface BuildContext {
   options: BuildOptions;
   contentDir: string;
@@ -7,6 +25,9 @@ export interface BuildContext {
   templatesDir: string;
   pages: Page[];
   outputs: Map<string, string>;
+  cache?: BuildCache;
+  skippedOutputs?: Set<string>;
+  stats?: BuildStats;
 }
 
 export interface Plugin {

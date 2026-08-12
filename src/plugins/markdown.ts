@@ -1,8 +1,9 @@
 import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
-import type { Plugin, BuildContext } from '../plugin';
+import type { Plugin, BuildContext, CacheEntry } from '../plugin';
 import type { Page } from '../generator';
 
 const asString = (value: unknown): string | undefined => typeof value === 'string' ? value : undefined;
@@ -28,10 +29,14 @@ async function files(directory: string, relative = ''): Promise<string[]> {
   return result;
 }
 
-export async function readPages(contentDir: string): Promise<Page[]> {
+export async function readPages(contentDir: string, cachedEntries: Record<string, CacheEntry> = {}): Promise<Page[]> {
   const names = (await files(contentDir)).sort();
   return Promise.all(names.map(async (sourcePath) => {
-    const parsed = matter(await fs.readFile(path.join(contentDir, sourcePath), 'utf8'));
+    const source = await fs.readFile(path.join(contentDir, sourcePath), 'utf8');
+    const sourceHash = createHash('sha256').update(source).digest('hex');
+    const cached = cachedEntries[sourcePath];
+    if (cached?.sourceHash === sourceHash) return { ...cached.page, sourcePath };
+    const parsed = matter(source);
     const title = asString(parsed.data.title) ?? path.basename(sourcePath, path.extname(sourcePath));
     return {
       sourcePath,
@@ -48,7 +53,7 @@ export async function readPages(contentDir: string): Promise<Page[]> {
 }
 
 export function MarkdownPlugin(): Plugin {
-  return { name: 'markdown', async onStart(context: BuildContext) { context.pages = await readPages(context.contentDir); } };
+  return { name: 'markdown', async onStart(context: BuildContext) { context.pages = await readPages(context.contentDir, context.cache?.entries); } };
 }
 
 export default MarkdownPlugin;
