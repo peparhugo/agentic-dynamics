@@ -89,6 +89,34 @@ def test_get_and_update_task(client):
     assert client.get(f"/tasks/{task['id']}", headers=headers).get_json()["title"] == "Updated"
 
 
+def test_completing_task_queues_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    headers = auth(login(client, "alice@example.com"))
+    task = client.post("/tasks", json={"title": "Ship release"}, headers=headers).get_json()
+    queued = []
+    monkeypatch.setattr(app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice@example.com", "Ship release")]
+
+
+def test_completed_task_does_not_notify_again(client, monkeypatch):
+    register(client)
+    headers = auth(login(client))
+    task = client.post("/tasks", json={"title": "Already done"}, headers=headers).get_json()
+    calls = []
+    monkeypatch.setattr(app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"title": "Still done"}, headers=headers)
+
+    assert calls == [("alice", "Already done")]
+
+
 def test_users_only_see_and_modify_their_own_tasks(client):
     register(client, "alice")
     alice_headers = auth(login(client, "alice"))

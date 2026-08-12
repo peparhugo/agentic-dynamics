@@ -7,12 +7,16 @@ import hmac
 import json
 import os
 import sqlite3
+import logging
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_EXPIRATION_HOURS = 24
@@ -217,9 +221,16 @@ def edit_task(task_id):
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         data = {}
+    previous_task = get_task(task_id, g.user["id"])
     task = update_task(task_id, g.user["id"], data.get("title"), data.get("status"))
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        try:
+            send_notification_email.delay(g.user["username"], task["title"])
+        except Exception:
+            # A broker outage should not turn a successful task update into an API error.
+            logger.exception("Unable to queue completion notification for task %s", task_id)
     return jsonify(task)
 
 
