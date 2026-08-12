@@ -8,7 +8,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from aiohttp import web
@@ -90,6 +90,7 @@ class MessageStore:
 
     def __init__(self, database_url: str | None = None) -> None:
         self.path = database_url or os.environ.get("DATABASE_URL", "messages.db")
+        self._lock = threading.RLock()
         if self.path.startswith("sqlite:///"):
             self.path = self.path[10:]
         with self._connect() as connection:
@@ -108,23 +109,50 @@ class MessageStore:
     def add(self, message: dict[str, Any]) -> None:
         payload = message["payload"]
         channel = payload.get("channel") if isinstance(payload, dict) else None
-        with self._connect() as connection:
-            connection.execute(
-                "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
-                (channel, message["type"], json.dumps(payload), message["timestamp"]),
-            )
+        with self._lock:
+            with self._connect() as connection:
+                connection.execute(
+                    "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                    (channel, message["type"], json.dumps(payload), message["timestamp"]),
+                )
 
     def list(self, limit: int, offset: int) -> list[dict[str, Any]]:
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT id, channel, type, payload, timestamp FROM messages "
-                "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
-            ).fetchall()
+        with self._lock:
+            with self._connect() as connection:
+                rows = connection.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
+                ).fetchall()
         return [
             {"id": row["id"], "channel": row["channel"], "type": row["type"],
              "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
             for row in rows
         ]
+
+    def list_history(self, channel: str, since: str | None, limit: int) -> list[dict[str, Any]]:
+        query = (
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            "WHERE channel = ?"
+        )
+        parameters: list[Any] = [channel]
+        if since is not None:
+            query += " AND timestamp > ?"
+            parameters.append(since)
+        query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        parameters.append(limit)
+        with self._lock:
+            with self._connect() as connection:
+                rows = connection.execute(query, parameters).fetchall()
+        return [
+            {"id": row["id"], "channel": row["channel"], "type": row["type"],
+             "payload": json.loads(row["payload"]), "timestamp": row["timestamp"]}
+            for row in rows
+        ]
+
+    def delete_older_than(self, cutoff: str) -> None:
+        with self._lock:
+            with self._connect() as connection:
+                connection.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
 
 
 class RedisBackbone:
@@ -149,6 +177,13 @@ class RedisBackbone:
 
     async def publish(self, message: dict[str, Any]) -> None:
         await self.redis.publish(REDIS_CHANNEL, json.dumps(message))
+
+    async def allow_message(self, client_id: str, limit: int) -> bool:
+        key = f"notification:rate-limit:{client_id}"
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, 60)
+        return count <= limit
 
     async def save_client(self, client_id: str) -> None:
         await self.redis.hset(f"notification:client:{client_id}", mapping={"active": "1"})
@@ -184,6 +219,20 @@ class NotificationServer:
         self.store = MessageStore(database_url)
         self.redis_url = redis_url or os.environ.get("REDIS_URL")
         self.backbone: RedisBackbone | None = None
+        try:
+            self.rate_limit = int(os.environ.get("RATE_LIMIT", "100"))
+            if self.rate_limit < 1:
+                raise ValueError
+        except ValueError:
+            raise ValueError("RATE_LIMIT must be a positive integer")
+        try:
+            self.message_ttl_days = float(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+            if self.message_ttl_days <= 0:
+                raise ValueError
+        except ValueError:
+            raise ValueError("MESSAGE_TTL_DAYS must be a positive number")
+        self._rate_windows: dict[str, tuple[float, int]] = {}
+        self._cleanup_task: asyncio.Task[None] | None = None
         transport_name = os.environ.get("TRANSPORT", "websocket").lower()
         if transport is not None:
             self.transport = transport
@@ -214,6 +263,7 @@ class NotificationServer:
         app.router.add_get("/channels", self._channels)
         app.router.add_get("/channels/{name}/subscribers", self._channel_subscribers)
         app.router.add_get("/messages", self._messages)
+        app.router.add_get("/history", self._history)
         self._http_runner = web.AppRunner(app)
         await self._http_runner.setup()
         self._health_site = web.TCPSite(
@@ -222,9 +272,14 @@ class NotificationServer:
         await self._health_site.start()
         if self._health_site._server and self._health_site._server.sockets:
             self.health_port = self._health_site._server.sockets[0].getsockname()[1]
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         return self
 
     async def stop(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         await self.transport.stop()
         if self._http_runner is not None:
             await self._http_runner.cleanup()
@@ -260,6 +315,30 @@ class NotificationServer:
             return web.json_response({"error": "limit must be 1..1000 and offset must be non-negative"}, status=400)
         return web.json_response(await asyncio.to_thread(self.store.list, limit, offset))
 
+    async def _history(self, request: web.Request) -> web.Response:
+        channel = request.query.get("channel")
+        if not self._valid_channel(channel):
+            return web.json_response({"error": "channel is required"}, status=400)
+        since = request.query.get("since")
+        if since is not None:
+            try:
+                datetime.fromisoformat(since.replace("Z", "+00:00"))
+            except ValueError:
+                return web.json_response({"error": "since must be an ISO timestamp"}, status=400)
+        try:
+            limit = int(request.query.get("limit", "50"))
+            if limit < 1 or limit > 1000:
+                raise ValueError
+        except ValueError:
+            return web.json_response({"error": "limit must be 1..1000"}, status=400)
+        messages = await asyncio.to_thread(
+            self.store.list_history, channel, since, limit + 1
+        )
+        return web.json_response({
+            "messages": messages[:limit],
+            "has_more": len(messages) > limit,
+        })
+
     async def _transport_connect(self, connection: Any, requested_id: str | None) -> str:
         client_id = self.clients.add(connection, requested_id)
         if self.backbone:
@@ -277,6 +356,11 @@ class NotificationServer:
         self.clients.remove(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
+        if not await self._allow_message(sender_id):
+            await self._send_to(sender_id, _message("system", {
+                "error": "rate limit exceeded"
+            }))
+            return
         try:
             incoming = json.loads(raw_message)
             message_type = incoming.get("type")
@@ -315,6 +399,29 @@ class NotificationServer:
             await self.backbone.publish(outgoing)
         else:
             await self._receive_published(outgoing)
+
+    async def _allow_message(self, client_id: str) -> bool:
+        if self.backbone is not None:
+            return await self.backbone.allow_message(client_id, self.rate_limit)
+        now = asyncio.get_running_loop().time()
+        window_start, count = self._rate_windows.get(client_id, (now, 0))
+        if now - window_start >= 60:
+            window_start, count = now, 0
+        count += 1
+        self._rate_windows[client_id] = (window_start, count)
+        return count <= self.rate_limit
+
+    async def _cleanup_loop(self) -> None:
+        try:
+            while True:
+                cutoff = datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)
+                await asyncio.to_thread(
+                    self.store.delete_older_than,
+                    cutoff.isoformat().replace("+00:00", "Z"),
+                )
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            raise
 
     async def _receive_published(self, message: dict[str, Any]) -> None:
         recipient_id = message.get("_recipient_id")

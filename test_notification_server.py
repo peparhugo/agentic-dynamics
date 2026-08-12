@@ -170,6 +170,66 @@ async def test_messages_are_persisted_and_paginated(server):
 
 
 @pytest.mark.asyncio
+async def test_history_filters_channel_and_returns_chronological_pages(server):
+    url = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(url) as socket:
+        await receive_json(socket)
+        await socket.send(json.dumps({
+            "type": "subscribe", "payload": {"channel": "history"}
+        }))
+        for value in (1, 2, 3):
+            await socket.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "history", "value": value},
+            }))
+            await receive_json(socket)
+        await socket.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "other", "value": 9},
+        }))
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"http://{server.host}:{server.health_port}/history?channel=history&limit=2"
+        ) as response:
+            first_page = await response.json()
+        since = first_page["messages"][0]["timestamp"]
+        async with session.get(
+            f"http://{server.host}:{server.health_port}/history"
+            f"?channel=history&since={since}&limit=2"
+        ) as response:
+            second_page = await response.json()
+
+    assert [item["payload"]["value"] for item in first_page["messages"]] == [1, 2]
+    assert first_page["has_more"] is True
+    assert [item["payload"]["value"] for item in second_page["messages"]] == [2, 3]
+    assert second_page["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_sends_error_instead_of_dropping_message(server):
+    server.rate_limit = 2
+    url = f"ws://{server.host}:{server.websocket_port}?client_id=limited-client"
+    async with connect(url) as socket:
+        await receive_json(socket)
+        for value in (1, 2):
+            await socket.send(json.dumps({
+                "type": "broadcast", "payload": {"value": value}
+            }))
+            await receive_json(socket)
+        await socket.send(json.dumps({
+            "type": "broadcast", "payload": {"value": 3}
+        }))
+        response = await receive_json(socket)
+
+    assert response == {
+        "type": "system",
+        "payload": {"error": "rate limit exceeded"},
+        "timestamp": response["timestamp"],
+    }
+
+
+@pytest.mark.asyncio
 async def test_redis_backbone_delivers_between_server_instances(tmp_path):
     redis = Redis.from_url("redis://127.0.0.1:6379", decode_responses=True)
     try:
