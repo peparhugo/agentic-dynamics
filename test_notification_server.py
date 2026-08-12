@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from app import NotificationServer, app, notification_server
+from app import NotificationServer, app, init_db, notification_server
 
 
 class FakeWebSocket:
@@ -26,6 +26,57 @@ class IncomingWebSocket(FakeWebSocket):
             return next(self.messages)
         except StopIteration:
             raise StopAsyncIteration
+
+
+class FakeBroker:
+    def __init__(self):
+        self.messages = []
+        self.clients = set()
+        self.subscriptions = []
+
+    def publish(self, message):
+        self.messages.append(message)
+        return False  # Exercise local delivery without a live Redis process.
+
+    def remember_client(self, client_id):
+        self.clients.add(client_id)
+
+    def forget_client(self, client_id):
+        self.clients.discard(client_id)
+
+    def remember_subscription(self, client_id, channel):
+        self.subscriptions.append((client_id, channel))
+
+    def forget_subscription(self, client_id, channel):
+        if (client_id, channel) in self.subscriptions:
+            self.subscriptions.remove((client_id, channel))
+
+
+def test_broker_publish_and_connection_state_are_used():
+    broker = FakeBroker()
+    server = NotificationServer(broker=broker)
+    client_id = server.register(FakeWebSocket())
+    assert client_id in broker.clients
+    server.subscribe(client_id, "updates")
+    assert (client_id, "updates") in broker.subscriptions
+
+
+@pytest.mark.asyncio
+async def test_published_message_is_persisted_and_delivered():
+    broker = FakeBroker()
+    server = NotificationServer(broker=broker)
+    websocket = FakeWebSocket()
+    client_id = server.register(websocket)
+    server.subscribe(client_id, "updates")
+
+    await server.broadcast({"message": "saved"}, channel="updates")
+
+    assert broker.messages
+    assert websocket.sent[0]["payload"] == {"message": "saved"}
+    response = app.test_client().get("/messages?limit=1&offset=0")
+    assert response.status_code == 200
+    assert response.get_json()[0]["payload"] == {"message": "saved"}
+    server.unregister(client_id)
 
 
 @pytest.mark.asyncio

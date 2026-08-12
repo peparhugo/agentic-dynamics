@@ -16,9 +16,124 @@ import uuid
 
 import websockets
 
+try:
+    import redis
+except ImportError:  # pragma: no cover - redis is an optional runtime dependency
+    redis = None
+
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+DATABASE_URL = os.environ.get("DATABASE_URL", os.environ.get("DATABASE", "todos.db"))
+# Retain the old name for callers that imported the seed application's setting.
+DATABASE = DATABASE_URL
+REDIS_CHANNEL = "notification_messages"
+
+
+def _database_path() -> str:
+    """Convert the supported SQLite URL forms to a filesystem path."""
+    if DATABASE_URL.startswith("sqlite:///"):
+        return DATABASE_URL[10:]
+    if DATABASE_URL.startswith("sqlite://"):
+        return DATABASE_URL[9:]
+    return DATABASE_URL
+
+
+class RedisBroker:
+    """Small Redis pub/sub adapter, with an unavailable-broker fallback."""
+
+    def __init__(self, url=REDIS_URL):
+        self.url = url
+        self.client = None
+        self.pubsub = None
+        self._thread = None
+        self._stopping = threading.Event()
+
+    def connect(self) -> bool:
+        if self.client is not None:
+            return True
+        if redis is None:
+            return False
+        try:
+            client = redis.Redis.from_url(self.url, decode_responses=True,
+                                          socket_connect_timeout=0.2,
+                                          socket_timeout=0.2)
+            client.ping()
+            self.client = client
+            return True
+        except Exception:
+            self.client = None
+            return False
+
+    def publish(self, message: str) -> bool:
+        if not self.connect():
+            return False
+        try:
+            self.client.publish(REDIS_CHANNEL, message)
+            return True
+        except Exception:
+            self.client = None
+            return False
+
+    def remember_client(self, client_id: str) -> None:
+        if self.connect():
+            try:
+                self.client.hset("notification:clients", client_id, "connected")
+            except Exception:
+                pass
+
+    def forget_client(self, client_id: str) -> None:
+        if self.client is not None:
+            try:
+                self.client.hdel("notification:clients", client_id)
+                self.client.delete(f"notification:subscriptions:{client_id}")
+            except Exception:
+                pass
+
+    def remember_subscription(self, client_id: str, channel: str) -> None:
+        if self.connect():
+            try:
+                self.client.sadd(f"notification:subscriptions:{client_id}", channel)
+            except Exception:
+                pass
+
+    def forget_subscription(self, client_id: str, channel: str) -> None:
+        if self.client is not None:
+            try:
+                self.client.srem(f"notification:subscriptions:{client_id}", channel)
+            except Exception:
+                pass
+
+    def start(self, callback) -> bool:
+        if not self.connect() or self._thread is not None:
+            return self._thread is not None
+        self.pubsub = self.client.pubsub(ignore_subscribe_messages=True)
+        self.pubsub.subscribe(REDIS_CHANNEL)
+        self._stopping.clear()
+
+        def listen():
+            try:
+                for item in self.pubsub.listen():
+                    if self._stopping.is_set():
+                        break
+                    if item.get("type") == "message":
+                        callback(item["data"])
+            except Exception:
+                pass
+
+        self._thread = threading.Thread(target=listen, daemon=True)
+        self._thread.start()
+        return True
+
+    def stop(self) -> None:
+        self._stopping.set()
+        if self.pubsub is not None:
+            try:
+                self.pubsub.close()
+            except Exception:
+                pass
+        self.pubsub = None
+        self._thread = None
 
 
 class _WebSocketAdapter:
@@ -39,11 +154,14 @@ class _WebSocketAdapter:
 class NotificationServer:
     """Async WebSocket notification server with a thread-safe client registry."""
 
-    def __init__(self):
+    def __init__(self, broker=None):
         self.clients = {}
         self.channels = {}
         self._clients_lock = threading.RLock()
         self._server = None
+        self.broker = broker or RedisBroker()
+        self._loop = None
+        self._origin = str(uuid.uuid4())
 
     @property
     def client_count(self) -> int:
@@ -54,6 +172,7 @@ class NotificationServer:
         client_id = str(uuid.uuid4())
         with self._clients_lock:
             self.clients[client_id] = websocket
+        self.broker.remember_client(client_id)
         return client_id
 
     def unregister(self, client_id: str) -> None:
@@ -63,6 +182,7 @@ class NotificationServer:
                 self.channels[channel].discard(client_id)
                 if not self.channels[channel]:
                     del self.channels[channel]
+        self.broker.forget_client(client_id)
 
     def subscribe(self, client_id: str, channel: str) -> bool:
         if not isinstance(channel, str) or not channel.strip():
@@ -72,6 +192,7 @@ class NotificationServer:
             if client_id not in self.clients:
                 return False
             self.channels.setdefault(channel, set()).add(client_id)
+        self.broker.remember_subscription(client_id, channel)
         return True
 
     def unsubscribe(self, client_id: str, channel: str) -> bool:
@@ -86,6 +207,7 @@ class NotificationServer:
             subscribers.discard(client_id)
             if not subscribers:
                 del self.channels[channel]
+        self.broker.forget_subscription(client_id, channel)
         return removed
 
     def channel_subscribers(self, channel: str) -> list[str]:
@@ -100,12 +222,33 @@ class NotificationServer:
             }
 
     @staticmethod
-    def _message(message_type: str, payload: dict) -> str:
-        return json.dumps({
+    def _message(message_type: str, payload: dict, channel=None, recipient=None, origin=None) -> str:
+        message = {
             "type": message_type,
             "payload": payload,
             "timestamp": datetime.utcnow().isoformat() + "Z",
-        })
+        }
+        if channel:
+            message["channel"] = channel
+        if recipient:
+            message["recipient"] = recipient
+        if origin:
+            message["origin"] = origin
+        return json.dumps(message)
+
+    @staticmethod
+    def _persist_message(message: str) -> None:
+        try:
+            item = json.loads(message)
+            payload = item.get("payload", {})
+            with get_db() as conn:
+                conn.execute(
+                    "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                    (item.get("channel"), item.get("type"), json.dumps(payload), item.get("timestamp")),
+                )
+                conn.commit()
+        except (sqlite3.Error, TypeError, json.JSONDecodeError):
+            pass
 
     async def _send(self, websocket, message: str) -> bool:
         try:
@@ -114,14 +257,13 @@ class NotificationServer:
         except Exception:
             return False
 
-    async def broadcast(
-        self, payload: dict, message_type: str = "broadcast", channel: str | None = None
-    ) -> None:
-        message = self._message(message_type, payload)
+    async def _deliver(self, message: str, channel: str | None = None,
+                       recipient: str | None = None) -> None:
         with self._clients_lock:
-            if channel is None:
-                channel = payload.get("channel")
-            if not isinstance(channel, str) or not channel.strip():
+            if recipient:
+                client = self.clients.get(recipient)
+                clients = [(recipient, client)] if client is not None else []
+            elif not isinstance(channel, str) or not channel.strip():
                 clients = list(self.clients.items())
             else:
                 channel = channel.strip()
@@ -139,12 +281,38 @@ class NotificationServer:
             if not delivered:
                 self.unregister(client_id)
 
+    def _on_broker_message(self, raw_message: str) -> None:
+        try:
+            message = json.loads(raw_message)
+            if message.get("origin") == self._origin:
+                return
+            loop = self._loop
+            if loop and loop.is_running():
+                asyncio.run_coroutine_threadsafe(
+                    self._deliver(raw_message, message.get("channel"), message.get("recipient")), loop
+                )
+        except (TypeError, json.JSONDecodeError):
+            return
+
+    async def broadcast(
+        self, payload: dict, message_type: str = "broadcast", channel: str | None = None
+    ) -> None:
+        if channel is None:
+            channel = payload.get("channel")
+        message = self._message(message_type, payload, channel=channel, origin=self._origin)
+        self._persist_message(message)
+        self.broker.publish(message)
+        await self._deliver(message, channel)
+
     async def send_direct(self, client_id: str, payload: dict) -> bool:
         with self._clients_lock:
             websocket = self.clients.get(client_id)
         if websocket is None:
             return False
-        delivered = await self._send(websocket, self._message("direct", payload))
+        message = self._message("direct", payload, recipient=client_id, origin=self._origin)
+        self._persist_message(message)
+        self.broker.publish(message)
+        delivered = await self._send(websocket, message)
         if not delivered:
             self.unregister(client_id)
         return delivered
@@ -190,6 +358,8 @@ class NotificationServer:
             self.unregister(client_id)
 
     async def start(self, host="localhost", port=8765):
+        self._loop = asyncio.get_running_loop()
+        self.broker.start(self._on_broker_message)
         self._server = await websockets.serve(self.websocket_handler, host, port)
         return self._server
 
@@ -198,13 +368,15 @@ class NotificationServer:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
+        self.broker.stop()
+        self._loop = None
 
 
 notification_server = NotificationServer()
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(_database_path())
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -219,6 +391,19 @@ def init_db():
             "  created_at TEXT NOT NULL"
             ")"
         )
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS messages ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  channel TEXT,"
+            "  type TEXT NOT NULL,"
+            "  payload TEXT NOT NULL,"
+            "  timestamp TEXT NOT NULL"
+            ")"
+        )
+
+
+# Keep the API usable when imported by WSGI servers and test clients.
+init_db()
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -314,6 +499,29 @@ def list_channel_subscribers(name: str):
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
     return jsonify(get_tasks())
+
+
+@app.route("/messages", methods=["GET"])
+def list_messages():
+    try:
+        limit = max(0, min(int(request.args.get("limit", 50)), 1000))
+        offset = max(0, int(request.args.get("offset", 0)))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be integers"}), 400
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["payload"] = json.loads(item["payload"])
+        except json.JSONDecodeError:
+            pass
+        result.append(item)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])
