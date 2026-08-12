@@ -50,6 +50,13 @@ class BaseRepository(ABC):
         with closing(self._connection()) as connection:
             return connection.execute(query, values).fetchall()
 
+    def _count(self, where=None, values=()):
+        query = f"SELECT COUNT(*) FROM {self.table}"
+        if where:
+            query += f" WHERE {where}"
+        with closing(self._connection()) as connection:
+            return connection.execute(query, values).fetchone()[0]
+
     def _update(self, changes, where, values):
         assignments = ", ".join(f"{column} = ?" for column in changes)
         with self._connection() as connection:
@@ -135,6 +142,20 @@ class TaskRepository(BaseRepository):
         return self._list(
             "owner_id = ?", (owner_id,), self.columns, "created_at DESC, id DESC"
         )
+
+    def page_for_owner(self, owner_id, cursor=None, limit=20):
+        where = "owner_id = ?"
+        values = [owner_id]
+        if cursor is not None:
+            where += " AND id < ?"
+            values.append(cursor)
+        rows = self._list(
+            where,
+            tuple(values),
+            self.columns,
+            "created_at DESC, id DESC",
+        )
+        return rows[:limit + 1], self._count("owner_id = ?", (owner_id,))
 
     def update(self, record_id, **fields):
         self._update(fields, "id = ?", (record_id,))
