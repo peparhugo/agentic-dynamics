@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import urllib.request
 
 import pytest
@@ -9,6 +10,11 @@ from app import NotificationServer
 
 
 def get_health(url: str) -> dict:
+    with urllib.request.urlopen(url) as response:
+        return json.load(response)
+
+
+def get_json(url: str) -> dict:
     with urllib.request.urlopen(url) as response:
         return json.load(response)
 
@@ -49,3 +55,43 @@ async def test_health_returns_connected_client_count():
     finally:
         await asyncio.gather(*(client.close() for client in clients))
         await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    server = NotificationServer("127.0.0.1", 0, database_url=str(tmp_path / "messages.sqlite"))
+    await server.start()
+    try:
+        await server.broadcast("system", {"event": "started"}, channel="audit")
+        await server.broadcast("broadcast", {"event": "ready"})
+        result = await asyncio.to_thread(get_json, f"http://127.0.0.1:{server.port}/messages?limit=1&offset=1")
+        assert result["messages"][0]["type"] == "broadcast"
+        assert result["messages"][0]["payload"] == {"event": "ready"}
+        assert result["messages"][0]["channel"] is None
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_delivers_between_server_instances():
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        pytest.skip("set REDIS_URL to run the Redis integration test")
+    first_server = NotificationServer("127.0.0.1", 0, redis_url=redis_url)
+    second_server = NotificationServer("127.0.0.1", 0, redis_url=redis_url)
+    try:
+        await first_server.start()
+        await second_server.start()
+    except Exception as error:
+        await first_server.stop()
+        await second_server.stop()
+        pytest.skip(f"Redis is unavailable: {error}")
+    client = await websockets.connect(f"ws://127.0.0.1:{second_server.port}")
+    try:
+        await first_server.broadcast("system", {"event": "from-first"})
+        message = json.loads(await asyncio.wait_for(client.recv(), timeout=2))
+        assert message["payload"] == {"event": "from-first"}
+    finally:
+        await client.close()
+        await first_server.stop()
+        await second_server.stop()
