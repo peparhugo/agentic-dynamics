@@ -3,6 +3,11 @@ import tempfile
 import pytest
 from unittest.mock import Mock
 
+import fakeredis
+import redis
+from limits.storage.redis import RedisStorage
+from limits.strategies import STRATEGIES
+
 DATABASE = os.environ.get("TEST_DATABASE")
 
 if DATABASE is None:
@@ -17,10 +22,29 @@ import app as app_module
 app_module.DATABASE = DATABASE
 app_module.init_db()
 
+# Run Flask-Limiter against an in-process Redis emulation (fakeredis) so the
+# rate limiting tests do not require a live Redis server.
+#
+# The limiter is already initialized (init_app ran at import). Re-running
+# init_app would register a *second* set of request hooks, so instead we swap
+# the storage and strategy on the existing limiter instance. The storage stays
+# a genuine RedisStorage (fakeredis just emulates the Redis server protocol),
+# matching the production Redis backend.
+_REDIS_POOL = redis.ConnectionPool(connection_class=fakeredis.FakeRedisConnection)
+_RATE_LIMIT_STORAGE = RedisStorage(
+    "redis://localhost:6379/0", connection_pool=_REDIS_POOL
+)
+app_module.limiter._storage = _RATE_LIMIT_STORAGE
+app_module.limiter._limiter = STRATEGIES[app_module.limiter._strategy](
+    _RATE_LIMIT_STORAGE
+)
+
 
 @pytest.fixture(autouse=True)
 def clean_db():
     yield
+    app_module.limiter.reset()
+    _restore_default_rate_limit()
     with app_module.get_db() as conn:
         conn.execute("DELETE FROM tasks")
         conn.execute("DELETE FROM users")
@@ -154,8 +178,8 @@ def test_list_tasks_ordered_desc(client):
     client.post("/tasks", json={"title": "second"}, headers=headers)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    tasks = resp.get_json()
-    assert [t["title"] for t in tasks] == ["second", "first"]
+    body = resp.get_json()
+    assert [t["title"] for t in body["data"]] == ["second", "first"]
 
 
 def test_list_tasks_only_own(client):
@@ -167,9 +191,9 @@ def test_list_tasks_only_own(client):
     client.post("/tasks", json={"title": "bob task"}, headers=bob)
 
     resp = client.get("/tasks", headers=alice)
-    assert [t["title"] for t in resp.get_json()] == ["alice task"]
+    assert [t["title"] for t in resp.get_json()["data"]] == ["alice task"]
     resp = client.get("/tasks", headers=bob)
-    assert [t["title"] for t in resp.get_json()] == ["bob task"]
+    assert [t["title"] for t in resp.get_json()["data"]] == ["bob task"]
 
 
 def test_get_task(client):
@@ -342,3 +366,212 @@ def test_send_notification_email_task(capsys):
     out = capsys.readouterr().out
     assert "alice@example.com" in out
     assert "buy milk" in out
+
+
+# ── Rate limiting tests ───────────────────────────────────────
+
+
+def _apply_rate_limit(per_minute):
+    """Swap the active application-wide rate limit at runtime.
+
+    Avoids re-running Flask's setup phase (no re-init_app needed once the
+    app has served its first request) while keeping the counters in the same
+    fakeredis-backed storage.
+    """
+    from flask_limiter._limits import ApplicationLimit
+
+    app_module.limiter.limit_manager.set_application_limits(
+        [ApplicationLimit(f"{per_minute} per minute").bind(app_module.limiter)]
+    )
+    app_module.limiter.reset()
+
+
+def _restore_default_rate_limit():
+    _apply_rate_limit(100)
+
+
+def set_rate_limit(per_minute):
+    """Set the application-wide budget and clear existing counters."""
+    _apply_rate_limit(per_minute)
+
+
+def test_rate_limit_uses_redis_storage():
+    from limits.storage.redis import RedisStorage
+
+    assert isinstance(app_module.limiter.storage, RedisStorage)
+
+
+def test_rate_limit_default_is_100_per_minute():
+    assert app_module.RATE_LIMIT_PER_MINUTE == 100
+    limits = app_module.limiter.limit_manager.application_limits
+    assert len(limits) == 1
+    assert limits[0].limit.amount == 100
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(client):
+    set_rate_limit(2)
+    register(client)
+    token = login(client).get_json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    assert client.get("/tasks", headers=headers).status_code == 200
+    assert client.get("/tasks", headers=headers).status_code == 200
+    blocked = client.get("/tasks", headers=headers)
+
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    set_rate_limit(3)
+    codes = [
+        client.post(
+            "/auth/login", json={"username": "x", "password": "y"}
+        ).status_code
+        for _ in range(4)
+    ]
+
+    assert codes == [401, 401, 401, 429]
+
+
+def test_rate_limit_is_per_user(client):
+    set_rate_limit(5)
+    register(client, username="alice")
+    register(client, username="bob")
+    alice_headers = auth_headers(client, username="alice")
+    bob_headers = auth_headers(client, username="bob")
+
+    for _ in range(5):
+        assert client.get("/tasks", headers=alice_headers).status_code == 200
+    assert client.get("/tasks", headers=alice_headers).status_code == 429
+    assert client.get("/tasks", headers=bob_headers).status_code == 200
+
+
+# ── Pagination tests ──────────────────────────────────────────
+
+
+def create_tasks(client, headers, count):
+    ids = []
+    for i in range(count):
+        resp = client.post(
+            "/tasks", json={"title": f"task {i}"}, headers=headers
+        )
+        assert resp.status_code == 201
+        ids.append(resp.get_json()["id"])
+    return ids
+
+
+def test_list_tasks_default_page_size(client):
+    register(client)
+    headers = auth_headers(client)
+    create_tasks(client, headers, 25)
+
+    body = client.get("/tasks", headers=headers).get_json()
+
+    assert set(body) == {"data", "next_cursor", "total"}
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_cursor_pagination(client):
+    register(client)
+    headers = auth_headers(client)
+    created_ids = create_tasks(client, headers, 25)
+
+    page1 = client.get(
+        "/tasks", query_string={"limit": 10}, headers=headers
+    ).get_json()
+    assert len(page1["data"]) == 10
+    assert page1["next_cursor"] is not None
+
+    page2 = client.get(
+        "/tasks",
+        query_string={"cursor": page1["next_cursor"], "limit": 10},
+        headers=headers,
+    ).get_json()
+    assert len(page2["data"]) == 10
+    assert page2["next_cursor"] is not None
+
+    page3 = client.get(
+        "/tasks",
+        query_string={"cursor": page2["next_cursor"], "limit": 10},
+        headers=headers,
+    ).get_json()
+    assert len(page3["data"]) == 5
+    assert page3["next_cursor"] is None
+    assert page3["total"] == 25
+
+    seen = [t["id"] for t in page1["data"] + page2["data"] + page3["data"]]
+    assert len(seen) == len(set(seen))
+    assert sorted(seen) == sorted(set(seen))
+    assert sorted(seen) == sorted(created_ids)
+
+
+def test_list_tasks_cursor_is_last_item_id(client):
+    register(client)
+    headers = auth_headers(client)
+    ids = create_tasks(client, headers, 5)
+
+    body = client.get(
+        "/tasks", query_string={"limit": 2}, headers=headers
+    ).get_json()
+
+    assert body["next_cursor"] == str(ids[-2])
+    assert body["data"][0]["id"] == ids[-1]
+
+
+def test_list_tasks_limit_clamped_to_max(client):
+    set_rate_limit(150)
+    register(client)
+    headers = auth_headers(client)
+    create_tasks(client, headers, 120)
+
+    body = client.get(
+        "/tasks", query_string={"limit": 500}, headers=headers
+    ).get_json()
+
+    assert len(body["data"]) == 100
+    assert body["total"] == 120
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_limit_defaults_on_invalid(client):
+    register(client)
+    headers = auth_headers(client)
+    create_tasks(client, headers, 3)
+
+    body = client.get(
+        "/tasks", query_string={"limit": "abc"}, headers=headers
+    ).get_json()
+    assert len(body["data"]) == 3
+    assert body["total"] == 3
+
+    body = client.get(
+        "/tasks", query_string={"limit": 0}, headers=headers
+    ).get_json()
+    assert len(body["data"]) == 3
+
+
+def test_list_tasks_pagination_respects_owner(client):
+    register(client, username="alice")
+    register(client, username="bob")
+    alice_headers = auth_headers(client, username="alice")
+    bob_headers = auth_headers(client, username="bob")
+    create_tasks(client, alice_headers, 3)
+    create_tasks(client, bob_headers, 2)
+
+    alice_body = client.get(
+        "/tasks", query_string={"limit": 5}, headers=alice_headers
+    ).get_json()
+    bob_body = client.get(
+        "/tasks", query_string={"limit": 5}, headers=bob_headers
+    ).get_json()
+
+    assert alice_body["total"] == 3
+    assert bob_body["total"] == 2
+    assert len(alice_body["data"]) == 3
+    assert len(bob_body["data"]) == 2
+    assert {t["id"] for t in alice_body["data"]}.isdisjoint(
+        {t["id"] for t in bob_body["data"]}
+    )

@@ -28,6 +28,8 @@ import sqlite3
 import os
 import jwt
 
+from flask_limiter import Limiter
+
 from tasks import send_notification_email
 
 from repositories import TaskRepository, UserRepository
@@ -37,6 +39,19 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 TOKEN_TTL_HOURS = 24
+
+# Pagination defaults for GET /tasks
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
+
+# Rate limiting configuration. Redis is the storage backend; the connection
+# can be pointed elsewhere via RATE_LIMIT_STORAGE (or swapped for a test
+# double by passing storage_options to create_limiter).
+RATE_LIMIT_STORAGE = os.environ.get(
+    "RATE_LIMIT_STORAGE", "redis://localhost:6379/0"
+)
+RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "100"))
+RATE_LIMIT_KEY_PREFIX = "task_api"
 
 
 def get_db():
@@ -111,6 +126,46 @@ def decode_token(token: str) -> int | None:
         return None
 
 
+# ── Rate limiting ─────────────────────────────────────────────
+
+
+def get_rate_limit_key() -> str:
+    """Identify the caller for rate limiting.
+
+    Authenticated callers are keyed by their user id (from the JWT), so each
+    user gets their own 100 requests/minute budget. Unauthenticated callers
+    (e.g. register/login) fall back to their client IP.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):].strip()
+    user_id = decode_token(token) if token else None
+    if user_id is not None:
+        return f"user:{user_id}"
+    return f"ip:{request.remote_addr}"
+
+
+def create_limiter(storage_uri: str | None = None, storage_options: dict | None = None) -> Limiter:
+    """Build the application-wide rate limiter.
+
+    Uses Flask-Limiter with Redis as the storage backend. A single
+    application-level budget of ``RATE_LIMIT_PER_MINUTE`` requests per minute
+    is shared across ALL endpoints (including auth), per caller.
+    """
+    return Limiter(
+        key_func=get_rate_limit_key,
+        application_limits=[f"{RATE_LIMIT_PER_MINUTE} per minute"],
+        storage_uri=storage_uri or RATE_LIMIT_STORAGE,
+        storage_options=storage_options,
+        headers_enabled=True,
+        key_prefix=RATE_LIMIT_KEY_PREFIX,
+    )
+
+
+limiter = create_limiter()
+
+
 def notify_task_completed(owner_id: int, task_title: str) -> None:
     """Enqueue an async notification email to the task owner.
 
@@ -172,7 +227,32 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repo.get_tasks(g.user_id))
+    """Cursor-paginated task listing.
+
+    Query params: ``?cursor=<id>&limit=<n>`` (default limit=20, max=100).
+    ``cursor`` is the id of the last item on the previous page; omitting it
+    returns the first page. Response is ``{data, next_cursor, total}``.
+    """
+    cursor_raw = request.args.get("cursor")
+    cursor = None
+    if cursor_raw is not None:
+        try:
+            cursor = int(cursor_raw)
+        except (TypeError, ValueError):
+            cursor = None
+
+    try:
+        limit = int(request.args.get("limit", DEFAULT_PAGE_SIZE))
+    except (TypeError, ValueError):
+        limit = DEFAULT_PAGE_SIZE
+    if limit < 1:
+        limit = DEFAULT_PAGE_SIZE
+    limit = min(limit, MAX_PAGE_SIZE)
+
+    data, next_cursor, total = task_repo.get_tasks_paginated(
+        g.user_id, cursor=cursor, limit=limit
+    )
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
@@ -215,6 +295,8 @@ def edit_task(task_id: int):
         notify_task_completed(g.user_id, task["title"])
     return jsonify(task)
 
+
+limiter.init_app(app)
 
 init_db()
 

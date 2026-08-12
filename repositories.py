@@ -105,6 +105,37 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_tasks_paginated(
+        self,
+        owner_id: int,
+        cursor: int | None = None,
+        limit: int = 20,
+    ) -> tuple:
+        """Return ``(data, next_cursor, total)`` for cursor-based pagination.
+
+        Tasks are ordered newest-first by id. ``cursor`` is the id of the
+        last item on the previous page; the next page contains items with
+        smaller ids. ``next_cursor`` is ``None`` when there are no more
+        items to page through.
+        """
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            query = "SELECT * FROM tasks WHERE owner_id = ?"
+            params = [owner_id]
+            if cursor is not None:
+                query += " AND id < ?"
+                params.append(cursor)
+            query += " ORDER BY id DESC LIMIT ?"
+            params.append(limit + 1)
+            rows = conn.execute(query, params).fetchall()
+        data = [dict(r) for r in rows[:limit]]
+        next_cursor = None
+        if len(rows) > limit:
+            next_cursor = str(data[-1]["id"])
+        return data, next_cursor, total
+
     def get_task(self, task_id: int, owner_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
