@@ -1,11 +1,14 @@
 import app as task_app
 
 
-def authenticated_client(tmp_path, monkeypatch, username="alice"):
+def authenticated_client(tmp_path, monkeypatch, username="alice", email=None):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
     client = task_app.app.test_client()
-    client.post("/auth/register", json={"username": username, "password": "secret"})
+    registration = {"username": username, "password": "secret"}
+    if email is not None:
+        registration["email"] = email
+    client.post("/auth/register", json=registration)
     token = client.post(
         "/auth/login", json={"username": username, "password": "secret"}
     ).get_json()["token"]
@@ -33,6 +36,42 @@ def test_task_lifecycle(tmp_path, monkeypatch):
     assert updated.status_code == 200
     assert updated.get_json()["title"] == "Ship tests"
     assert updated.get_json()["status"] == "done"
+
+
+def test_completion_dispatches_notification_async(tmp_path, monkeypatch):
+    client = authenticated_client(tmp_path, monkeypatch)
+    task = client.post("/tasks", json={"title": "Finish report"}).get_json()
+    dispatched = []
+
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda email, title: dispatched.append((email, title)),
+    )
+
+    response = client.put(f"/tasks/{task['id']}", json={"status": "completed"})
+
+    assert response.status_code == 200
+    assert dispatched == [("alice", "Finish report")]
+
+
+def test_completion_notification_uses_registered_email_and_only_sends_on_transition(
+    tmp_path, monkeypatch
+):
+    client = authenticated_client(tmp_path, monkeypatch, email="alice@example.com")
+    client.post("/tasks", json={"title": "Initial report"})
+    client.put("/tasks/1", json={"title": "Updated report"})
+    dispatched = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda email, title: dispatched.append((email, title)),
+    )
+
+    client.put("/tasks/1", json={"status": "completed"})
+    client.put("/tasks/1", json={"status": "completed"})
+
+    assert dispatched == [("alice@example.com", "Updated report")]
 
 
 def test_list_is_newest_first(tmp_path, monkeypatch):
