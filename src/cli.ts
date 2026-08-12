@@ -2,13 +2,16 @@
 import fs from 'fs';
 import path from 'path';
 import { parseMarkdown, renderMarkdown } from './parser';
-import { buildPageHtml, buildIndexHtml } from './generator';
+import { buildPageHtml, buildIndexHtml, pageTitle } from './generator';
+import { TemplateEngine } from './engine';
+import type { SiteContext } from './engine';
 import type { Page } from './types';
 
 export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
 }
 
 export interface SiteBuildResult {
@@ -23,10 +26,11 @@ Usage:
   ssg build [options]
 
 Options:
-  --content <dir>   Directory containing Markdown files (default: ./content)
-  --output <dir>    Directory where the site is written (default: ./dist)
-  --help            Show this help message
-  --version         Show the version number
+  --content <dir>    Directory containing Markdown files (default: ./content)
+  --output <dir>     Directory where the site is written (default: ./dist)
+  --templates <dir>  Directory containing Handlebars templates (default: ./templates)
+  --help             Show this help message
+  --version          Show the version number
 `;
 
 const VERSION = '1.0.0';
@@ -35,6 +39,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let command = '';
   let contentDir = 'content';
   let outputDir = 'dist';
+  let templatesDir = 'templates';
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -46,6 +51,10 @@ export function parseArgs(argv: string[]): CliOptions {
       outputDir = argv[++i];
     } else if (arg.startsWith('--output=')) {
       outputDir = arg.slice('--output='.length);
+    } else if (arg === '--templates') {
+      templatesDir = argv[++i];
+    } else if (arg.startsWith('--templates=')) {
+      templatesDir = arg.slice('--templates='.length);
     } else if (arg === '--help' || arg === '-h') {
       command = 'help';
     } else if (arg === '--version' || arg === '-v') {
@@ -59,7 +68,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command = 'build';
   }
 
-  return { command, contentDir, outputDir };
+  return { command, contentDir, outputDir, templatesDir };
 }
 
 export function slugify(fileName: string): string {
@@ -71,7 +80,11 @@ export function slugify(fileName: string): string {
   return slug || 'page';
 }
 
-export function buildSite(contentDir: string, outputDir: string): SiteBuildResult {
+export function buildSite(
+  contentDir: string,
+  outputDir: string,
+  templatesDir = 'templates',
+): SiteBuildResult {
   if (!fs.existsSync(contentDir)) {
     throw new Error(`content directory not found: ${contentDir}`);
   }
@@ -113,8 +126,20 @@ export function buildSite(contentDir: string, outputDir: string): SiteBuildResul
     return a.slug.localeCompare(b.slug);
   });
 
+  const engine = fs.existsSync(templatesDir) ? new TemplateEngine(templatesDir) : null;
+  const site: SiteContext = {
+    pages: pages.map((page) => ({
+      slug: page.slug,
+      title: pageTitle(page.data, page.slug),
+      outputFile: page.outputFile,
+      date: page.data.date !== undefined ? String(page.data.date) : undefined,
+    })),
+  };
+
   for (const page of pages) {
-    fs.writeFileSync(path.join(outputDir, page.outputFile), buildPageHtml(page), 'utf-8');
+    const templated = engine ? engine.renderPage(page, site) : null;
+    const html = templated !== null ? templated : buildPageHtml(page);
+    fs.writeFileSync(path.join(outputDir, page.outputFile), html, 'utf-8');
   }
 
   const indexFile = path.join(outputDir, 'index.html');
@@ -140,7 +165,7 @@ export function runCli(argv: string[]): number {
   }
 
   try {
-    const result = buildSite(options.contentDir, options.outputDir);
+    const result = buildSite(options.contentDir, options.outputDir, options.templatesDir);
     process.stdout.write(`Generated ${result.pages.length} page(s) in ${result.outputDir}\n`);
     return 0;
   } catch (err) {

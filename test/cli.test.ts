@@ -59,6 +59,7 @@ describe('parseArgs', () => {
     expect(opts.command).toBe('build');
     expect(opts.contentDir).toBe('content');
     expect(opts.outputDir).toBe('dist');
+    expect(opts.templatesDir).toBe('templates');
   });
 
   it('parses --content and --output as separate arguments', () => {
@@ -71,6 +72,15 @@ describe('parseArgs', () => {
     const opts = parseArgs(['build', '--content=posts', '--output=public']);
     expect(opts.contentDir).toBe('posts');
     expect(opts.outputDir).toBe('public');
+  });
+
+  it('parses --templates as a separate argument', () => {
+    const opts = parseArgs(['build', '--content', 'posts', '--templates', 'theme']);
+    expect(opts.templatesDir).toBe('theme');
+  });
+
+  it('parses --templates with equals syntax', () => {
+    expect(parseArgs(['build', '--templates=theme']).templatesDir).toBe('theme');
   });
 
   it('recognises help and version commands', () => {
