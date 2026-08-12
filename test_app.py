@@ -338,3 +338,294 @@ async def test_concurrent_broadcasts(server):
         assert {"from": "ws2"} in payloads
         for m in msgs:
             assert "timestamp" in m
+
+
+# ── Channel tests ──
+
+
+@pytest.mark.asyncio
+async def test_subscribe_to_channel(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        welcome = await _recv_json(ws)
+        client_id = welcome["payload"]["client_id"]
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        assert "channels" in result
+        assert "alerts" in result["channels"]
+        assert result["channels"]["alerts"] == 1
+
+        subs = await _http_get(server, "/channels/alerts/subscribers")
+        assert subs["channel"] == "alerts"
+        assert client_id in subs["subscribers"]
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_from_channel(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        welcome = await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        assert "alerts" in result["channels"]
+
+        await ws.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        assert "alerts" not in result["channels"]
+
+
+@pytest.mark.asyncio
+async def test_channel_message_only_to_subscribers(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+        ws_connect(await _ws_url(server)) as ws3,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2, ws3])
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws3.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"msg": "hello"},
+        }))
+
+        msg1 = await _recv_json(ws1)
+        assert msg1["type"] == "broadcast"
+        assert msg1["channel"] == "alerts"
+        assert msg1["payload"] == {"msg": "hello"}
+
+        msg3 = await _recv_json(ws3)
+        assert msg3["type"] == "broadcast"
+        assert msg3["channel"] == "alerts"
+        assert msg3["payload"] == {"msg": "hello"}
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.5)
+
+
+@pytest.mark.asyncio
+async def test_multiple_channel_subscriptions(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await ws.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        channels = result["channels"]
+        assert channels == {"alerts": 1, "system": 1, "chat": 1}
+
+
+@pytest.mark.asyncio
+async def test_subscribe_unsubscribe_dynamic(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+        subs = await _http_get(server, "/channels/alerts/subscribers")
+        assert len(subs["subscribers"]) == 1
+
+        await ws.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+        subs = await _http_get(server, "/channels/alerts/subscribers")
+        assert len(subs["subscribers"]) == 0
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+        subs = await _http_get(server, "/channels/alerts/subscribers")
+        assert len(subs["subscribers"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_all_on_disconnect(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        assert len(result["channels"]) == 2
+
+    result = await _http_get(server, "/channels")
+    assert len(result["channels"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_empty(server):
+    result = await _http_get(server, "/channels")
+    assert result == {"channels": {}}
+
+
+@pytest.mark.asyncio
+async def test_channels_subscribers_empty_for_unknown_channel(server):
+    result = await _http_get(server, "/channels/unknown/subscribers")
+    assert result["channel"] == "unknown"
+    assert result["subscribers"] == []
+
+
+@pytest.mark.asyncio
+async def test_send_channel_without_subscribing(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+    ):
+        awaits = await _drain_welcome_and_joins([ws1, ws2])
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws2.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"msg": "yo"},
+        }))
+
+        msg = await _recv_json(ws1)
+        assert msg["channel"] == "alerts"
+        assert msg["payload"] == {"msg": "yo"}
+
+
+@pytest.mark.asyncio
+async def test_broadcast_without_channel_still_works(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+        ws_connect(await _ws_url(server)) as ws3,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2, ws3])
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws2.send(json.dumps({"type": "broadcast", "payload": {"to": "all"}}))
+
+        msg1 = await _recv_json(ws1)
+        assert msg1["payload"] == {"to": "all"}
+
+        msg3 = await _recv_json(ws3)
+        assert msg3["payload"] == {"to": "all"}
+
+
+@pytest.mark.asyncio
+async def test_subscribe_idempotent(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        result = await _http_get(server, "/channels")
+        assert result["channels"]["alerts"] == 1
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_nonexistent_channel_no_error(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        await _recv_json(ws)
+
+        await ws.send(json.dumps({"type": "unsubscribe", "channel": "nonexistent"}))
+        await asyncio.sleep(0.1)
+
+        count = (await _http_get(server, "/health"))["connected_clients"]
+        assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_channel_message_no_subscribers(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "channel": "empty",
+            "payload": {"msg": "noone"},
+        }))
+
+        await asyncio.sleep(0.1)
+
+        await ws2.send(json.dumps({"type": "broadcast", "payload": {"ping": True}}))
+        msg = await _recv_json(ws1)
+        assert msg["payload"] == {"ping": True}
+
+
+@pytest.mark.asyncio
+async def test_system_message_with_channel(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+    ):
+        await _drain_welcome_and_joins([ws1, ws2])
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws2.send(json.dumps({
+            "type": "system",
+            "channel": "alerts",
+            "payload": {"action": "shutdown"},
+        }))
+
+        msg = await _recv_json(ws1)
+        assert msg["type"] == "system"
+        assert msg["channel"] == "alerts"
+        assert msg["payload"] == {"action": "shutdown"}
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.5)
+
+
+@pytest.mark.asyncio
+async def test_channels_subscribers_filters_disconnected(server):
+    async with ws_connect(await _ws_url(server)) as ws:
+        welcome = await _recv_json(ws)
+        client_id = welcome["payload"]["client_id"]
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        subs = await _http_get(server, "/channels/alerts/subscribers")
+        assert client_id in subs["subscribers"]
+
+    subs = await _http_get(server, "/channels/alerts/subscribers")
+    assert subs["subscribers"] == []
+
+
+@pytest.mark.asyncio
+async def test_direct_message_ignores_channel(server):
+    async with (
+        ws_connect(await _ws_url(server)) as ws1,
+        ws_connect(await _ws_url(server)) as ws2,
+    ):
+        welcomes = await _drain_welcome_and_joins([ws1, ws2])
+        target = welcomes[0]["payload"]["client_id"]
+
+        await ws2.send(json.dumps({
+            "type": "direct",
+            "target": target,
+            "channel": "irrelevant",
+            "payload": {"private": True},
+        }))
+
+        msg = await _recv_json(ws1)
+        assert msg["type"] == "direct"
+        assert msg["payload"] == {"private": True}
+        assert "channel" not in msg
