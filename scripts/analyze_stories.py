@@ -82,7 +82,7 @@ def _analyze_from_result(
     print(f"  Model: {story_result.model}")
     print(f"  Sessions: {story_result.session_count}")
 
-    analysis = analyze_story_worktree(worktree_path)
+    analysis = analyze_story_worktree(worktree_path, run_sonar=not no_sonar)
     analysis.story_name = story_result.story_name
     analysis.story_id = story_result.story_id
 

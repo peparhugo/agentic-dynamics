@@ -238,8 +238,8 @@ def compute_ast_diff(
     # Lines: git diff --numstat (instant)
     lines_stat = _run_git(
         worktree, "diff", "--numstat",
-        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
-        f"{parent_commit}..{child_commit}"
+        f"{parent_commit}..{child_commit}",
+        "--", ":(exclude)node_modules", ":(exclude)dist", ":(exclude).instrument", ":(exclude)__pycache__", ":(exclude).pytest_cache",
     )
     lines_added = 0
     lines_removed = 0
@@ -255,8 +255,8 @@ def compute_ast_diff(
     # Files: git diff --name-status (instant)
     files_changed = _run_git(
         worktree, "diff", "--name-status",
-        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
-        f"{parent_commit}..{child_commit}"
+        f"{parent_commit}..{child_commit}",
+        "--", ":(exclude)node_modules", ":(exclude)dist", ":(exclude).instrument", ":(exclude)__pycache__", ":(exclude).pytest_cache",
     )
     files_added = 0
     files_modified = 0
@@ -294,8 +294,8 @@ def compute_ast_diff(
     import re
     diff_text = _run_git(
         worktree, "diff",
-        "--", ":", "!node_modules", ":", "!dist", ":", "!.instrument",
-        f"{parent_commit}..{child_commit}"
+        f"{parent_commit}..{child_commit}",
+        "--", ":(exclude)node_modules", ":(exclude)dist", ":(exclude).instrument", ":(exclude)__pycache__", ":(exclude).pytest_cache",
     )
 
     funcs_added = len(re.findall(func_pattern, diff_text)) + len(re.findall(async_func, diff_text))
@@ -434,14 +434,19 @@ def compute_sonar_delta(
         _run_git(worktree, "worktree", "add", "--detach", str(child_path), child_commit)
 
         try:
-            parent_sm = run_sonar_analysis(
-                parent_path, sonar_url=sonar_url,
-                sonar_user=sonar_token or "", sonar_password="",
-            )
-            child_sm = run_sonar_analysis(
-                child_path, sonar_url=sonar_url,
-                sonar_user=sonar_token or "", sonar_password="",
-            )
+            if sonar_token:
+                parent_sm = run_sonar_analysis(
+                    parent_path, sonar_url=sonar_url,
+                    sonar_user=sonar_token, sonar_password="",
+                )
+                child_sm = run_sonar_analysis(
+                    child_path, sonar_url=sonar_url,
+                    sonar_user=sonar_token, sonar_password="",
+                )
+            else:
+                # Use default local-dev credentials (admin/admin)
+                parent_sm = run_sonar_analysis(parent_path, sonar_url=sonar_url)
+                child_sm = run_sonar_analysis(child_path, sonar_url=sonar_url)
 
             if parent_sm and child_sm and parent_sm.analyzed and child_sm.analyzed:
                 return {
@@ -475,14 +480,28 @@ def analyze_commit(
     parent_commit: str,
     child_commit: str,
     session_number: int = 0,
+    run_sonar: bool = False,
 ) -> CommitAnalysis:
-    """Run all analysis layers on a single commit."""
+    """Run all analysis layers on a single commit.
+
+    SonarQube is opt-in (slow — two scanner runs per commit).
+    """
     analysis = compute_ast_diff(worktree, parent_commit, child_commit)
     analysis.session_number = session_number
+
+    if run_sonar:
+        # SonarQube delta — returns zeros if unreachable or scanner unavailable
+        sonar = compute_sonar_delta(worktree, parent_commit, child_commit)
+        analysis.sonar_available = sonar.get("available", False)
+        analysis.sonar_bugs_delta = sonar.get("bugs_delta", 0)
+        analysis.sonar_smells_delta = sonar.get("smells_delta", 0)
+        analysis.sonar_complexity_delta = sonar.get("complexity_delta", 0)
+        analysis.sonar_duplications_delta = sonar.get("duplications_delta", 0.0)
+
     return analysis
 
 
-def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
+def analyze_story_worktree(worktree: Path, run_sonar: bool = False) -> StoryAnalysis:
     """Analyze all commits in a story worktree.
 
     Walks the git log, finds consecutive commit pairs, and runs
@@ -491,6 +510,7 @@ def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
 
     Args:
         worktree: Path to the story worktree with git history.
+        run_sonar: If True, run SonarQube deltas (slow — opt-in).
 
     Returns:
         StoryAnalysis with per-commit results.
@@ -525,7 +545,10 @@ def analyze_story_worktree(worktree: Path) -> StoryAnalysis:
         # Only analyze session commits (those from our instrument)
         if "[story]" in child_msg or "Session" in child_msg:
             session_num += 1
-            analysis = analyze_commit(worktree, parent_hash, child_hash, session_num)
+            analysis = analyze_commit(
+                worktree, parent_hash, child_hash, session_num,
+                run_sonar=run_sonar,
+            )
             analysis.convention_score = final_score
             analysis.convention_violations = final_violations
             story.commits.append(analysis)

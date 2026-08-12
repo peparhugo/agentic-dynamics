@@ -11,6 +11,7 @@ degrade code quality beyond structural divergence?
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -21,6 +22,50 @@ from typing import Any
 SONAR_URL_DEFAULT = "http://localhost:9000"
 SONAR_USER_DEFAULT = "admin"    # local dev only — override via ENV for prod
 SONAR_PASSWORD_DEFAULT = "admin"  # local dev only — override via ENV for prod
+
+# Known sonar-scanner install locations (checked when not on PATH).
+_SONAR_SCANNER_CANDIDATES = [
+    "/usr/local/bin/sonar-scanner",
+    "/opt/sonar-scanner/bin/sonar-scanner",
+    "/opt/sonar-scanner-*/bin/sonar-scanner",
+]
+
+
+def _find_sonar_scanner() -> str | None:
+    """Locate the sonar-scanner executable, falling back to known paths."""
+    found = shutil.which("sonar-scanner")
+    if found:
+        return found
+    import glob
+    for candidate in _SONAR_SCANNER_CANDIDATES:
+        matches = glob.glob(candidate)
+        for m in matches:
+            if os.path.isfile(m) and os.access(m, os.X_OK):
+                return m
+    # Last resort: any sonar-scanner under /tmp (bundled installs)
+    for m in glob.glob("/tmp/sonar-scanner*/bin/sonar-scanner"):
+        if os.path.isfile(m) and os.access(m, os.X_OK):
+            return m
+    return None
+
+
+def _find_java() -> str | None:
+    """Locate a java executable, preferring a bundled JRE next to the scanner."""
+    scanner = _find_sonar_scanner()
+    if scanner:
+        jre = Path(scanner).resolve().parent.parent / "jre" / "bin" / "java"
+        if jre.is_file() and os.access(jre, os.X_OK):
+            return str(jre)
+    return shutil.which("java")
+
+
+def _scanner_env() -> dict:
+    """Build subprocess env with JAVA_HOME resolved for the scanner."""
+    env = os.environ.copy()
+    java = _find_java()
+    if java:
+        env["JAVA_HOME"] = str(Path(java).resolve().parent.parent)
+    return env
 
 
 @dataclass
@@ -128,7 +173,8 @@ def run_sonar_analysis(
     if not wt.exists():
         return SonarMetrics(project_key=project_key, error="worktree not found")
 
-    if not shutil.which("sonar-scanner"):
+    scanner = _find_sonar_scanner()
+    if not scanner:
         return SonarMetrics(project_key=project_key, error="sonar-scanner not on PATH")
 
     if not project_key:
@@ -144,6 +190,7 @@ sonar.host.url={sonar_url}
 sonar.login={sonar_user}
 sonar.password={sonar_password}
 sonar.exclusions=**/node_modules/**,**/__pycache__/**,**/.git/**,**/venv/**,**/.venv/**
+sonar.scm.disabled=true
 """
     try:
         props_path.write_text(props_content)
@@ -153,11 +200,12 @@ sonar.exclusions=**/node_modules/**,**/__pycache__/**,**/.git/**,**/venv/**,**/.
     t0 = time.monotonic()
     try:
         result = subprocess.run(
-            ["sonar-scanner", "-Dsonar.scanner.skipJreProvisioning=true"],
+            [scanner, "-Dsonar.scanner.javaOpts=-Xmx512m"],
             cwd=str(wt),
             capture_output=True,
             text=True,
             timeout=timeout_sec,
+            env=_scanner_env(),
         )
     except subprocess.TimeoutExpired:
         _cleanup(props_path)
