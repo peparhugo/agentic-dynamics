@@ -40,8 +40,9 @@ ENERGY_PER_REASONING_TOKEN = 0.47  # Joules per reasoning token (RL models)
 # These rates reflect what was actually charged during the v0.5 experiment corpus.
 PROVIDER_PRICING: dict[str, dict[str, float]] = {
     "deepseek": {
-        "input": 0.27, "output": 1.10, "reasoning": 0.14,
-        "cache_read": 0.14, "cache_write": 0.27,
+        "input": 0.435, "output": 0.87, "reasoning": 0.87,
+        "cache_read": 0.003625, "cache_write": 0.435,
+        "source": "api-docs.deepseek.com — DeepSeek V4 Pro pricing (Aug 2026)",
     },
     "anthropic": {
         "input": 3.00, "output": 15.00, "reasoning": 15.00,

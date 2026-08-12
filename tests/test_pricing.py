@@ -4,10 +4,10 @@ from instrument.efficiency import get_pricing, PROVIDER_PRICING
 
 def test_get_pricing_deepseek():
     pricing = get_pricing("deepseek", "deepseek-v4-pro")
-    assert pricing["input"] == 0.27
-    assert pricing["output"] == 1.10
-    assert pricing["cache_read"] == 0.14
-    assert pricing["cache_write"] == 0.27
+    assert pricing["input"] == 0.435
+    assert pricing["output"] == 0.87
+    assert pricing["cache_read"] == 0.003625
+    assert pricing["cache_write"] == 0.435
 
 
 def test_get_pricing_anthropic():
@@ -28,7 +28,7 @@ def test_get_pricing_openai():
 
 def test_get_pricing_detect_by_model_id():
     pricing = get_pricing("unknown", "deepseek-something")
-    assert pricing["input"] == 0.27
+    assert pricing["input"] == 0.435
 
 
 def test_get_pricing_raises_on_unknown():
