@@ -831,3 +831,419 @@ class TestMessagePersistence:
             data = resp.json()
             broadcast_msgs = [m for m in data if m["type"] == "broadcast"]
             assert len(broadcast_msgs) >= 1
+
+
+class TestRateLimiting:
+    @pytest.mark.asyncio
+    async def test_rate_limit_allows_up_to_limit(self, server_url):
+        app.RATE_LIMIT = 5
+        async with websockets.connect(server_url) as ws:
+            await _recv_json(ws)
+            for i in range(5):
+                await ws.send(
+                    json.dumps(
+                        {"type": "subscribe", "channel": f"ch{i}"}
+                    )
+                )
+            for _ in range(5):
+                msg = await _recv_json(ws)
+                assert msg["type"] == "system"
+                assert "subscribed" in msg["payload"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_blocks_after_exceeded(self, server_url):
+        app.RATE_LIMIT = 3
+        async with websockets.connect(server_url) as ws:
+            await _recv_json(ws)
+            for i in range(3):
+                await ws.send(
+                    json.dumps(
+                        {"type": "subscribe", "channel": f"ch{i}"}
+                    )
+                )
+            for _ in range(3):
+                msg = await _recv_json(ws)
+                assert msg["payload"]["channel"] is not None
+
+            await ws.send(
+                json.dumps(
+                    {"type": "subscribe", "channel": "overlimit"}
+                )
+            )
+            msg = await _recv_json(ws)
+            assert msg["type"] == "system"
+            assert msg["payload"].get("error") is True
+            assert msg["payload"]["message"] == "rate limit exceeded"
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_response_format(self, server_url):
+        app.RATE_LIMIT = 1
+        async with websockets.connect(server_url) as ws:
+            await _recv_json(ws)
+            await ws.send(
+                json.dumps({"type": "subscribe", "channel": "first"})
+            )
+            await _recv_json(ws)
+
+            await ws.send(
+                json.dumps({"type": "subscribe", "channel": "second"})
+            )
+            msg = await _recv_json(ws)
+            assert msg["type"] == "system"
+            assert msg["payload"]["error"] is True
+            assert "timestamp" in msg
+            assert "message" in msg["payload"]
+
+    @pytest.mark.asyncio
+    async def test_rate_limit_per_client_independent(self, server_url):
+        app.RATE_LIMIT = 3
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            for i in range(4):
+                await ws1.send(
+                    json.dumps(
+                        {"type": "subscribe", "channel": f"ws1_{i}"}
+                    )
+                )
+
+            for _ in range(3):
+                msg = await _recv_json(ws1)
+                assert msg["type"] == "system"
+                assert "subscribed" in msg["payload"]["message"]
+
+            msg = await _recv_json(ws1)
+            assert msg.get("payload", {}).get("error") is True
+
+            for i in range(3):
+                await ws2.send(
+                    json.dumps(
+                        {"type": "subscribe", "channel": f"ws2_{i}"}
+                    )
+                )
+
+            for _ in range(3):
+                msg = await _recv_json(ws2)
+                assert msg["type"] == "system"
+                assert "subscribed" in msg["payload"]["message"]
+
+
+class TestHistoryEndpoint:
+    @pytest.mark.asyncio
+    async def test_history_returns_messages_for_channel(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps({"type": "subscribe", "channel": "histchan"})
+            )
+            await _recv_json(ws1)
+            await ws2.send(
+                json.dumps({"type": "subscribe", "channel": "histchan"})
+            )
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "histchan",
+                        "payload": {"text": "history test"},
+                    }
+                )
+            )
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=histchan&limit=50"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "messages" in data
+            assert "has_more" in data
+            assert isinstance(data["messages"], list)
+            assert len(data["messages"]) >= 1
+            channel_msgs = [
+                m for m in data["messages"] if m["channel"] == "histchan"
+            ]
+            assert len(channel_msgs) >= 1
+
+    @pytest.mark.asyncio
+    async def test_history_chronological_order(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps({"type": "subscribe", "channel": "orderchan"})
+            )
+            await _recv_json(ws1)
+            await ws2.send(
+                json.dumps({"type": "subscribe", "channel": "orderchan"})
+            )
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "orderchan",
+                        "payload": {"seq": 1},
+                    }
+                )
+            )
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await asyncio.sleep(0.05)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "orderchan",
+                        "payload": {"seq": 2},
+                    }
+                )
+            )
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=orderchan&limit=50"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            seq_msgs = [
+                m
+                for m in data["messages"]
+                if m["channel"] == "orderchan"
+                and m["type"] == "broadcast"
+            ]
+            assert len(seq_msgs) >= 2
+            assert seq_msgs[0]["payload"]["seq"] == 1
+            assert seq_msgs[1]["payload"]["seq"] == 2
+            assert seq_msgs[0]["timestamp"] <= seq_msgs[1]["timestamp"]
+
+    @pytest.mark.asyncio
+    async def test_history_since_filter(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps({"type": "subscribe", "channel": "sincechan"})
+            )
+            await _recv_json(ws1)
+            await ws2.send(
+                json.dumps({"type": "subscribe", "channel": "sincechan"})
+            )
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "sincechan",
+                        "payload": {"text": "before"},
+                    }
+                )
+            )
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await asyncio.sleep(0.1)
+            midpoint = app._make_timestamp()
+            await asyncio.sleep(0.05)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "sincechan",
+                        "payload": {"text": "after"},
+                    }
+                )
+            )
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=sincechan&since={midpoint}&limit=50"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            broadcast_msgs = [
+                m
+                for m in data["messages"]
+                if m["channel"] == "sincechan"
+                and m["type"] == "broadcast"
+            ]
+            assert all("after" in m["payload"]["text"] for m in broadcast_msgs)
+
+    @pytest.mark.asyncio
+    async def test_history_pagination_has_more(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1, websockets.connect(
+            server_url
+        ) as ws2:
+            await _recv_json(ws1)
+            await _recv_json(ws2)
+
+            await ws1.send(
+                json.dumps({"type": "subscribe", "channel": "pagechan"})
+            )
+            await _recv_json(ws1)
+            await ws2.send(
+                json.dumps({"type": "subscribe", "channel": "pagechan"})
+            )
+            await _recv_json(ws2)
+
+            for i in range(5):
+                await ws1.send(
+                    json.dumps(
+                        {
+                            "type": "broadcast",
+                            "channel": "pagechan",
+                            "payload": {"count": i},
+                        }
+                    )
+                )
+                await _recv_json(ws1)
+                await _recv_json(ws2)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=pagechan&limit=2"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["has_more"] is True
+            assert len(data["messages"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_history_pagination_no_more(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with websockets.connect(server_url) as ws1:
+            await _recv_json(ws1)
+
+            await ws1.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "singlechan",
+                        "payload": {"text": "only"},
+                    }
+                )
+            )
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=singlechan&limit=100"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["has_more"] is False
+
+    @pytest.mark.asyncio
+    async def test_history_default_limit(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"{http_url}/history")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert "messages" in data
+            assert "has_more" in data
+            assert isinstance(data["has_more"], bool)
+
+    @pytest.mark.asyncio
+    async def test_history_empty_channel(self, server_url):
+        http_url = server_url.replace("ws://", "http://")
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(
+                f"{http_url}/history?channel=nonexistent"
+            )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["messages"] == []
+            assert data["has_more"] is False
+
+
+class TestMessageExpiry:
+    @pytest.mark.asyncio
+    async def test_expiry_deletes_old_messages(self, server_url):
+        import json as _json
+
+        app.MESSAGE_TTL_DAYS = 0
+
+        db = await app._init_db()
+        old_ts = "2000-01-01T00:00:00+00:00"
+        await db.execute(
+            "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+            ("oldchan", "broadcast", _json.dumps({"text": "old"}), old_ts),
+        )
+        await db.commit()
+
+        cutoff = (app.datetime.now(app.timezone.utc) - app.timedelta(days=0)).isoformat()
+        await db.execute(
+            "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+        )
+        await db.commit()
+
+        rows = await db.execute_fetchall(
+            "SELECT id FROM messages WHERE channel = ?", ("oldchan",)
+        )
+        assert len(rows) == 0
+
+    @pytest.mark.asyncio
+    async def test_expiry_keeps_recent_messages(self, server_url):
+        import json as _json
+
+        app.MESSAGE_TTL_DAYS = 7
+
+        db = await app._init_db()
+        recent_ts = app._make_timestamp()
+        await db.execute(
+            "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+            ("recentchan", "broadcast", _json.dumps({"text": "recent"}), recent_ts),
+        )
+        await db.commit()
+
+        cutoff = (app.datetime.now(app.timezone.utc) - app.timedelta(days=7)).isoformat()
+        await db.execute(
+            "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+        )
+        await db.commit()
+
+        rows = await db.execute_fetchall(
+            "SELECT id FROM messages WHERE channel = ?", ("recentchan",)
+        )
+        assert len(rows) == 1

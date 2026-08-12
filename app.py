@@ -5,7 +5,7 @@ import sqlite3
 import threading
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 import aiosqlite
@@ -16,10 +16,13 @@ from websockets.http11 import Headers, Response
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 _redis: aioredis.Redis | None = None
 _db: aiosqlite.Connection | None = None
 _listener_task: asyncio.Task | None = None
+_expiry_task: asyncio.Task | None = None
 _transport = None
 
 
@@ -255,6 +258,24 @@ async def _init_db():
     return _db
 
 
+async def _check_rate_limit(client_id):
+    r = await _init_redis()
+    key = f"ws:ratelimit:{client_id}"
+    count = await r.incr(key)
+    if count == 1:
+        await r.expire(key, 60)
+    return count > RATE_LIMIT
+
+
+async def _expire_loop():
+    while True:
+        db = await _init_db()
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=MESSAGE_TTL_DAYS)).isoformat()
+        await db.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+        await db.commit()
+        await asyncio.sleep(3600)
+
+
 async def _save_message(channel, msg_type, payload, timestamp):
     db = await _init_db()
     payload_str = json.dumps(payload)
@@ -329,16 +350,25 @@ async def _redis_listener():
 
 
 async def _start_background():
-    global _listener_task
+    global _listener_task, _expiry_task
     _get_transport()
     await _init_redis()
     await _init_db()
     if _listener_task is None:
         _listener_task = asyncio.create_task(_redis_listener())
+    if _expiry_task is None:
+        _expiry_task = asyncio.create_task(_expire_loop())
 
 
 async def _stop_background():
-    global _listener_task, _redis, _db, _transport
+    global _listener_task, _expiry_task, _redis, _db, _transport, RATE_LIMIT, MESSAGE_TTL_DAYS
+    if _expiry_task is not None:
+        _expiry_task.cancel()
+        try:
+            await _expiry_task
+        except asyncio.CancelledError:
+            pass
+        _expiry_task = None
     if _listener_task is not None:
         _listener_task.cancel()
         try:
@@ -352,6 +382,8 @@ async def _stop_background():
     if _db is not None:
         await _db.close()
         _db = None
+    RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+    MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
     _transport = None
 
 
@@ -386,6 +418,16 @@ async def handler(websocket):
                 data = json.loads(raw)
             except json.JSONDecodeError:
                 continue
+            if await _check_rate_limit(client_id):
+                await transport.send_message(
+                    client_id,
+                    {
+                        "type": "system",
+                        "payload": {"error": True, "message": "rate limit exceeded"},
+                        "timestamp": _make_timestamp(),
+                    },
+                )
+                continue
             await server.handle_message(client_id, data)
     except ConnectionClosed:
         pass
@@ -401,6 +443,58 @@ async def process_request(connection, request):
 
     if request.path == "/channels":
         body = json.dumps(registry.get_channels()).encode()
+        headers = Headers({"Content-Type": "application/json"})
+        return Response(200, "OK", headers, body)
+
+    if request.path.startswith("/history"):
+        limit = 50
+        channel = None
+        since = None
+        parsed = urlparse(request.path)
+        if parsed.query:
+            params = parse_qs(parsed.query)
+            if "limit" in params:
+                limit = int(params["limit"][0])
+            if "channel" in params:
+                channel = params["channel"][0]
+            if "since" in params:
+                since = params["since"][0]
+
+        db = await _init_db()
+        where_clauses = []
+        where_params = []
+
+        if channel is not None:
+            where_clauses.append("channel = ?")
+            where_params.append(channel)
+        if since is not None:
+            where_clauses.append("timestamp >= ?")
+            where_params.append(since)
+
+        where_sql = ""
+        if where_clauses:
+            where_sql = "WHERE " + " AND ".join(where_clauses)
+
+        rows = await db.execute_fetchall(
+            f"SELECT id, channel, type, payload, timestamp FROM messages {where_sql} ORDER BY timestamp ASC LIMIT ?",
+            (*where_params, limit + 1),
+        )
+
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        messages = [
+            {
+                "id": row[0],
+                "channel": row[1],
+                "type": row[2],
+                "payload": json.loads(row[3]),
+                "timestamp": row[4],
+            }
+            for row in rows
+        ]
+        body = json.dumps({"messages": messages, "has_more": has_more}).encode()
         headers = Headers({"Content-Type": "application/json"})
         return Response(200, "OK", headers, body)
 
