@@ -112,6 +112,69 @@ async def test_servers_share_redis_pubsub(tmp_path: Path):
         await broker.ping()
     except Exception:
         await broker.close()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_reports_more(tmp_path: Path):
+    instance = NotificationServer(
+        port=0,
+        database_url=f"sqlite:///{tmp_path / 'history.sqlite'}",
+        redis_url="redis://localhost:63999",
+    )
+    running = await instance.start()
+    instance.port = running.sockets[0].getsockname()[1]
+    uri = f"ws://{instance.host}:{instance.port}/"
+    try:
+        async with websockets.connect(uri) as client:
+            await client.send(json.dumps({"type": "subscribe", "channel": "history"}))
+            await client.send(json.dumps({"type": "system", "channel": "history", "payload": {"n": 1}}))
+            first = json.loads(await asyncio.wait_for(client.recv(), 1))
+            await client.send(json.dumps({"type": "system", "channel": "other", "payload": {"n": 2}}))
+            await client.send(json.dumps({"type": "system", "channel": "history", "payload": {"n": 3}}))
+            third = json.loads(await asyncio.wait_for(client.recv(), 1))
+
+        result = await http_get(
+            instance.host,
+            instance.port,
+            f"/history?channel=history&since={first['timestamp']}&limit=1",
+        )
+        assert [message["payload"]["n"] for message in result["messages"]] == [1]
+        assert result["has_more"] is True
+        assert third["timestamp"] > first["timestamp"]
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_connection(tmp_path: Path):
+    redis_url = "redis://localhost:6379/14"
+    broker = redis.from_url(redis_url, decode_responses=True)
+    try:
+        await broker.ping()
+    except Exception:
+        await broker.close()
+        pytest.skip("Redis is not available")
+    await broker.flushdb()
+    instance = NotificationServer(
+        port=0,
+        rate_limit=2,
+        redis_url=redis_url,
+        database_url=f"sqlite:///{tmp_path / 'rate.sqlite'}",
+    )
+    running = await instance.start()
+    instance.port = running.sockets[0].getsockname()[1]
+    try:
+        async with websockets.connect(f"ws://{instance.host}:{instance.port}/") as client:
+            for value in (1, 2):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"n": value}}))
+                assert json.loads(await asyncio.wait_for(client.recv(), 1))["payload"]["n"] == value
+            await client.send(json.dumps({"type": "broadcast", "payload": {"n": 3}}))
+            error = json.loads(await asyncio.wait_for(client.recv(), 1))
+            assert error["type"] == "error"
+            assert error["payload"]["error"] == "rate limit exceeded"
+    finally:
+        await instance.stop()
+        await broker.close()
         pytest.skip("Redis is not available")
     await broker.flushdb()
     first = NotificationServer(port=0, redis_url=redis_url, database_url=f"sqlite:///{tmp_path / 'first.sqlite'}")
