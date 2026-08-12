@@ -1,8 +1,8 @@
 """
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+Flask Todo API
 
 A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
+Uses SQLite for storage and initializes the schema on startup.
 """
 
 from flask import Flask, request, jsonify
@@ -12,11 +12,15 @@ import os
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+DEFAULT_DATABASE = os.environ.get("DATABASE", "todos.db")
+
+
+def database_path() -> str:
+    return os.environ.get("DATABASE", DEFAULT_DATABASE)
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(database_path())
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -36,22 +40,12 @@ def init_db():
 # ── Models ────────────────────────────────────────────────────
 
 
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, ?, ?)",
+            (title, "pending", now),
         )
         conn.commit()
         return {
@@ -72,13 +66,6 @@ def get_task(task_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
@@ -104,6 +91,7 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
 
 
 # ── Routes ─────────────────────────────────────────────────────
+
 
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
@@ -141,6 +129,7 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
