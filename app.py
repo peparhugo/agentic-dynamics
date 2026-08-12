@@ -9,10 +9,134 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import sqlite3
 import os
+import asyncio
+import json
+import threading
+import uuid
+
+import websockets
 
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+
+class _WebSocketAdapter:
+    """Expose the send_text API used by the notification service."""
+
+    def __init__(self, websocket):
+        self.websocket = websocket
+
+    async def send_text(self, message: str):
+        # websockets 10.x calls this operation ``send``.  Keep that detail at
+        # the protocol boundary so NotificationServer only uses send_text.
+        await self.websocket.send(message)
+
+    async def close(self):
+        await self.websocket.close()
+
+
+class NotificationServer:
+    """Async WebSocket notification server with a thread-safe client registry."""
+
+    def __init__(self):
+        self.clients = {}
+        self._clients_lock = threading.RLock()
+        self._server = None
+
+    @property
+    def client_count(self) -> int:
+        with self._clients_lock:
+            return len(self.clients)
+
+    def register(self, websocket) -> str:
+        client_id = str(uuid.uuid4())
+        with self._clients_lock:
+            self.clients[client_id] = websocket
+        return client_id
+
+    def unregister(self, client_id: str) -> None:
+        with self._clients_lock:
+            self.clients.pop(client_id, None)
+
+    @staticmethod
+    def _message(message_type: str, payload: dict) -> str:
+        return json.dumps({
+            "type": message_type,
+            "payload": payload,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        })
+
+    async def _send(self, websocket, message: str) -> bool:
+        try:
+            await websocket.send_text(message)
+            return True
+        except Exception:
+            return False
+
+    async def broadcast(self, payload: dict, message_type: str = "broadcast") -> None:
+        message = self._message(message_type, payload)
+        with self._clients_lock:
+            clients = list(self.clients.items())
+        results = await asyncio.gather(
+            *(self._send(client, message) for _, client in clients),
+            return_exceptions=False,
+        )
+        for (client_id, _), delivered in zip(clients, results):
+            if not delivered:
+                self.unregister(client_id)
+
+    async def send_direct(self, client_id: str, payload: dict) -> bool:
+        with self._clients_lock:
+            websocket = self.clients.get(client_id)
+        if websocket is None:
+            return False
+        delivered = await self._send(websocket, self._message("direct", payload))
+        if not delivered:
+            self.unregister(client_id)
+        return delivered
+
+    async def websocket_handler(self, websocket, path=None):
+        client_id = self.register(_WebSocketAdapter(websocket))
+        try:
+            async for raw_message in websocket:
+                try:
+                    message = json.loads(raw_message)
+                    message_type = message.get("type")
+                    payload = message.get("payload")
+                    if message_type not in {"broadcast", "direct", "system"}:
+                        continue
+                    if not isinstance(payload, dict):
+                        continue
+                except (TypeError, json.JSONDecodeError):
+                    continue
+
+                if message_type == "broadcast":
+                    await self.broadcast(payload)
+                elif message_type == "direct":
+                    recipient = payload.get("client_id") or payload.get("recipient_id")
+                    if recipient:
+                        direct_payload = dict(payload)
+                        direct_payload.pop("client_id", None)
+                        direct_payload.pop("recipient_id", None)
+                        await self.send_direct(recipient, direct_payload)
+                else:
+                    await self.broadcast(payload, "system")
+        finally:
+            self.unregister(client_id)
+
+    async def start(self, host="localhost", port=8765):
+        self._server = await websockets.serve(self.websocket_handler, host, port)
+        return self._server
+
+    async def stop(self):
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+
+
+notification_server = NotificationServer()
 
 
 def get_db():
@@ -104,6 +228,11 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
 
 
 # ── Routes ─────────────────────────────────────────────────────
+
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({"connected_clients": notification_server.client_count})
+
 
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
