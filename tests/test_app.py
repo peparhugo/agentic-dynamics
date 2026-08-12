@@ -4,6 +4,7 @@ import app as task_app
 def authenticated_client(tmp_path, monkeypatch, username="alice", email=None):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
+    task_app.limiter.reset()
     client = task_app.app.test_client()
     registration = {"username": username, "password": "secret"}
     if email is not None:
@@ -81,7 +82,10 @@ def test_list_is_newest_first(tmp_path, monkeypatch):
 
     response = client.get("/tasks")
     assert response.status_code == 200
-    assert [task["title"] for task in response.get_json()] == ["Second", "First"]
+    payload = response.get_json()
+    assert [task["title"] for task in payload["data"]] == ["Second", "First"]
+    assert payload["next_cursor"] is None
+    assert payload["total"] == 2
 
 
 def test_validation_and_not_found_errors(tmp_path, monkeypatch):
@@ -114,6 +118,48 @@ def test_authentication_and_task_isolation(tmp_path, monkeypatch):
 
     first = client.post("/tasks", headers={"Authorization": f"Bearer {one}"}, json={"title": "private"})
     task_id = first.get_json()["id"]
-    assert client.get("/tasks", headers={"Authorization": f"Bearer {two}"}).get_json() == []
+    assert client.get("/tasks", headers={"Authorization": f"Bearer {two}"}).get_json()["data"] == []
     assert client.get(f"/tasks/{task_id}", headers={"Authorization": f"Bearer {two}"}).status_code == 404
     assert client.get("/tasks", headers={"Authorization": "Bearer invalid"}).status_code == 401
+
+
+def test_task_pagination_uses_cursor_and_total(tmp_path, monkeypatch):
+    client = authenticated_client(tmp_path, monkeypatch, username="pager")
+    for number in range(25):
+        assert client.post("/tasks", json={"title": f"Task {number}"}).status_code == 201
+
+    first = client.get("/tasks?limit=10")
+    assert first.status_code == 200
+    first_payload = first.get_json()
+    assert len(first_payload["data"]) == 10
+    assert first_payload["data"][0]["title"] == "Task 24"
+    assert first_payload["total"] == 25
+    assert first_payload["next_cursor"] == str(first_payload["data"][-1]["id"])
+
+    second = client.get(f"/tasks?limit=10&cursor={first_payload['next_cursor']}")
+    assert second.status_code == 200
+    second_payload = second.get_json()
+    assert len(second_payload["data"]) == 10
+    assert second_payload["data"][0]["id"] < first_payload["data"][-1]["id"]
+
+    last = client.get(f"/tasks?limit=10&cursor={second_payload['next_cursor']}")
+    assert len(last.get_json()["data"]) == 5
+    assert last.get_json()["next_cursor"] is None
+
+
+def test_pagination_validates_limit_and_cursor(tmp_path, monkeypatch):
+    client = authenticated_client(tmp_path, monkeypatch, username="validator")
+    assert client.get("/tasks?limit=0").status_code == 400
+    assert client.get("/tasks?limit=101").status_code == 400
+    assert client.get("/tasks?limit=nope").status_code == 400
+    assert client.get("/tasks?cursor=nope").status_code == 400
+
+
+def test_rate_limit_returns_retry_after_for_authenticated_user(tmp_path, monkeypatch):
+    client = authenticated_client(tmp_path, monkeypatch, username="limited")
+    for _ in range(100):
+        assert client.get("/tasks").status_code == 200
+
+    response = client.get("/tasks")
+    assert response.status_code == 429
+    assert response.headers.get("Retry-After")

@@ -88,6 +88,28 @@ class TaskRepository(BaseRepository):
             order_by="created_at DESC",
         )
 
+    def get_tasks_page(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        where = "owner_id = ?"
+        params: tuple[Any, ...] = (owner_id,)
+        if cursor is not None:
+            where += " AND id < ?"
+            params += (cursor,)
+        tasks = self.list(
+            fields="id, title, status, created_at",
+            where=where,
+            params=params,
+            order_by="id DESC",
+        )
+        tasks = tasks[: limit + 1]
+        total = self.list(
+            fields="COUNT(*) AS total",
+            where="owner_id = ?",
+            params=(owner_id,),
+        )[0]["total"]
+        return tasks, total
+
     def get_task(self, task_id: int, owner_id: int) -> dict[str, Any] | None:
         rows = self.list(
             fields="id, title, status, created_at",
