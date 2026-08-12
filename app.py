@@ -13,6 +13,8 @@ import os
 import jwt
 import bcrypt
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
@@ -120,6 +122,14 @@ def get_user_by_username(username: str):
     with get_db() as conn:
         row = conn.execute(
             "SELECT * FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_user(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
         return dict(row) if row else None
 
@@ -249,6 +259,15 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed":
+        user = get_user(task["owner_id"]) or {}
+        try:
+            send_notification_email.delay(
+                user.get("username", ""), task["title"]
+            )
+        except Exception:
+            # Never let a notification failure block or break the API response.
+            app.logger.exception("failed to enqueue notification email")
     return jsonify(task)
 
 
