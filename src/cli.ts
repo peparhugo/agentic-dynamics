@@ -1,7 +1,7 @@
 import { buildSite } from './generator';
 
 function usage(): void {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
 }
 
 function option(args: string[], name: string): string | undefined {
@@ -20,7 +20,11 @@ async function main(): Promise<void> {
     return;
   }
   try {
-    const pages = await buildSite({ contentDir: option(args, '--content'), outputDir: option(args, '--output') });
+    const pages = await buildSite({
+      contentDir: option(args, '--content'),
+      outputDir: option(args, '--output'),
+      templatesDir: option(args, '--templates'),
+    });
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
