@@ -6,14 +6,17 @@ import argparse
 import asyncio
 import json
 import logging
+import os
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import websockets
+import redis.asyncio as redis
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Headers, Response
 
@@ -88,6 +91,47 @@ class ClientRegistry:
             return len(self._clients)
 
 
+class MessageStore:
+    """Small SQLite store kept separate from the asyncio event loop."""
+
+    def __init__(self, url: str | None = None) -> None:
+        url = url or os.getenv("DATABASE_URL", "sqlite:///messages.db")
+        self.path = url[10:] if url.startswith("sqlite:///") else url
+        if self.path == ":memory:":
+            self.path = ":memory:"
+        self._connection = sqlite3.connect(self.path, check_same_thread=False)
+        self._connection.execute(
+            "CREATE TABLE IF NOT EXISTS messages ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT, type TEXT NOT NULL, "
+            "payload TEXT NOT NULL, timestamp TEXT NOT NULL)"
+        )
+        self._connection.commit()
+        self._lock = threading.RLock()
+
+    def add(self, message: dict[str, Any]) -> None:
+        with self._lock:
+            self._connection.execute(
+                "INSERT INTO messages(channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                (message.get("channel"), message["type"], json.dumps(message["payload"]), message["timestamp"]),
+            )
+            self._connection.commit()
+
+    def list(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
+            ).fetchall()
+        return [
+            {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+            for row in rows
+        ]
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
+
 class NotificationServer:
     """WebSocket notification server.
 
@@ -96,17 +140,31 @@ class NotificationServer:
     in ``payload["client_id"]`` (``target_id`` is accepted as an alias).
     """
 
-    def __init__(self, host: str = "localhost", port: int = 8765) -> None:
+    def __init__(self, host: str = "localhost", port: int = 8765, redis_url: str | None = None,
+                 database_url: str | None = None) -> None:
         self.host = host
         self.port = port
         self.clients = ClientRegistry()
         self._server: Any | None = None
+        self._redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
+        self._redis: Any | None = None
+        self._pubsub: Any | None = None
+        self._broker_task: asyncio.Task[None] | None = None
+        self._server_id = str(uuid.uuid4())
+        self.store = MessageStore(database_url)
+
+    @property
+    def broker_channel(self) -> str:
+        return "notification:messages"
 
     @property
     def connected_clients(self) -> int:
         return len(self.clients)
 
     async def process_request(self, _connection: Any, request: Any) -> Response | None:
+        # Let a just-received WebSocket frame finish dispatching before an HTTP
+        # status request observes registry state.
+        await asyncio.sleep(0.01)
         path = urlsplit(request.path).path
         if path == "/channels":
             channels = {
@@ -119,19 +177,83 @@ class NotificationServer:
                 return self._json_response(
                     {"channel": name, "subscribers": self.clients.channel_subscribers(name)}
                 )
+        if path == "/messages":
+            query = parse_qs(urlsplit(request.path).query)
+            try:
+                limit = min(max(int(query.get("limit", [50])[0]), 1), 1000)
+                offset = max(int(query.get("offset", [0])[0]), 0)
+            except (TypeError, ValueError):
+                return self._json_response({"error": "limit and offset must be integers"}, HTTPStatus.BAD_REQUEST)
+            return self._json_response({"messages": self.store.list(limit, offset)})
         if path != "/health":
             return None
         return self._json_response({"status": "ok", "connected_clients": len(self.clients)})
 
     @staticmethod
-    def _json_response(value: dict[str, Any]) -> Response:
+    def _json_response(value: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> Response:
         body = json.dumps(value).encode()
         headers = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
-        return Response(HTTPStatus.OK.value, "OK", headers, body)
+        return Response(status.value, status.phrase, headers, body)
+
+    async def _connect_broker(self) -> None:
+        try:
+            if not self._redis_url.startswith(("redis://", "rediss://")):
+                raise ValueError("REDIS_URL must use redis:// or rediss://")
+            client = redis.from_url(
+                self._redis_url,
+                decode_responses=True,
+                socket_connect_timeout=0.5,
+                socket_timeout=0.5,
+            )
+            await client.ping()
+            self._redis = client
+            self._pubsub = client.pubsub()
+            await self._pubsub.subscribe(self.broker_channel)
+            self._broker_task = asyncio.create_task(self._broker_loop())
+        except Exception as exc:
+            LOGGER.warning("Redis unavailable; using local message delivery: %s", exc)
+            if self._redis is not None:
+                close = getattr(self._redis, "aclose", self._redis.close)
+                result = close()
+                if result is not None:
+                    await result
+            self._redis = None
+
+    async def _broker_loop(self) -> None:
+        assert self._pubsub is not None
+        try:
+            async for item in self._pubsub.listen():
+                if item.get("type") == "message":
+                    await self._deliver(json.loads(item["data"]))
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            LOGGER.warning("Redis listener stopped: %s", exc)
+
+    async def _deliver(self, message: dict[str, Any]) -> None:
+        channel = message.get("channel")
+        if message.get("target_id"):
+            target = self.clients.get(message["target_id"])
+            if target is not None:
+                await self._send(target, message["message"])
+            return
+        await self.broadcast(message["message"], channel)
+
+    async def _publish(self, message: dict[str, Any], target_id: str | None = None) -> None:
+        envelope = {"message": message, "channel": message.get("channel"), "target_id": target_id}
+        if self._redis is None:
+            await self._deliver(envelope)
+        else:
+            await self._redis.publish(self.broker_channel, json.dumps(envelope))
 
     async def handler(self, websocket: Any) -> None:
         client_id = self.clients.add(websocket)
-        await websocket.send(json.dumps(make_message("system", {"event": "connected", "client_id": client_id})))
+        connected = make_message("system", {"event": "connected", "client_id": client_id})
+        self.store.add(connected)
+        await websocket.send(json.dumps(connected))
+        if self._redis is not None:
+            await self._redis.hset(f"notification:client:{client_id}", mapping={"server": self._server_id})
+            await self._redis.expire(f"notification:client:{client_id}", 86400)
         try:
             async for raw_message in websocket:
                 await self.handle_message(raw_message, client_id)
@@ -139,6 +261,8 @@ class NotificationServer:
             pass
         finally:
             self.clients.remove(client_id)
+            if self._redis is not None:
+                await self._redis.delete(f"notification:client:{client_id}")
 
     async def handle_message(self, raw_message: str | bytes, sender_id: str) -> None:
         try:
@@ -170,13 +294,21 @@ class NotificationServer:
                 self.clients.subscribe(sender_id, channel)
             else:
                 self.clients.unsubscribe(sender_id, channel)
+            if self._redis is not None:
+                key = f"notification:subscriptions:{channel}"
+                if message_type == "subscribe":
+                    await self._redis.sadd(key, sender_id)
+                    await self._redis.expire(key, 86400)
+                else:
+                    await self._redis.srem(key, sender_id)
             return
 
         outgoing = make_message(message_type, payload)
         if channel is not None:
             outgoing["channel"] = channel
         if message_type in {"broadcast", "system"}:
-            await self.broadcast(outgoing, channel)
+            self.store.add(outgoing)
+            await self._publish(outgoing)
             return
 
         target_id = payload.get("client_id", payload.get("target_id"))
@@ -185,7 +317,8 @@ class NotificationServer:
                 return
         target = self.clients.get(target_id) if isinstance(target_id, str) else None
         if target is not None:
-            await self._send(target, outgoing)
+            self.store.add(outgoing)
+            await self._publish(outgoing, target_id)
 
     async def _send(self, websocket: Any, message: dict[str, Any]) -> None:
         try:
@@ -207,6 +340,7 @@ class NotificationServer:
                 self.clients.remove(client_id)
 
     async def start(self) -> Any:
+        await self._connect_broker()
         self._server = await websockets.serve(
             self.handler,
             self.host,
@@ -220,6 +354,21 @@ class NotificationServer:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
+        if self._broker_task is not None:
+            self._broker_task.cancel()
+            await asyncio.gather(self._broker_task, return_exceptions=True)
+            self._broker_task = None
+        if self._pubsub is not None:
+            await self._pubsub.unsubscribe(self.broker_channel)
+            await self._pubsub.close()
+            self._pubsub = None
+        if self._redis is not None:
+            close = getattr(self._redis, "aclose", self._redis.close)
+            result = close()
+            if result is not None:
+                await result
+            self._redis = None
+        self.store.close()
 
 
 async def run_server(host: str = "localhost", port: int = 8765) -> None:

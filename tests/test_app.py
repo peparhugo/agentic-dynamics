@@ -3,6 +3,7 @@ import json
 
 import pytest
 import websockets
+import redis.asyncio as redis
 
 from app import NotificationServer
 
@@ -154,3 +155,52 @@ async def test_channel_endpoints_report_subscribers_and_disconnect_cleanup(runni
         "subscribers": [client_id],
     }
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    server = NotificationServer("127.0.0.1", 0, redis_url="disabled",
+                                database_url=f"sqlite:///{tmp_path / 'history.db'}")
+    await server.start()
+    port = server._server.sockets[0].getsockname()[1]
+    client = await websockets.connect(f"ws://127.0.0.1:{port}")
+    await asyncio.wait_for(receive_json(client), timeout=1)
+    await client.send(json.dumps({"type": "subscribe", "channel": "audit"}))
+    await client.send(json.dumps({"type": "broadcast", "channel": "audit", "payload": {"ok": True}}))
+    await asyncio.wait_for(receive_json(client), timeout=1)
+
+    result = await http_json(port, "/messages?limit=1&offset=0")
+    assert result["messages"][0]["type"] == "broadcast"
+    assert result["messages"][0]["channel"] == "audit"
+    assert result["messages"][0]["payload"] == {"ok": True}
+    await client.close()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_servers_share_redis_pubsub_backbone(tmp_path):
+    broker = redis.from_url("redis://127.0.0.1:6379/0")
+    try:
+        await broker.ping()
+    except Exception:
+        await broker.close()
+        pytest.skip("Redis is not running")
+    await broker.flushdb()
+    first = NotificationServer("127.0.0.1", 0, database_url=f"sqlite:///{tmp_path / 'first.db'}")
+    second = NotificationServer("127.0.0.1", 0, database_url=f"sqlite:///{tmp_path / 'second.db'}")
+    await first.start()
+    await second.start()
+    first_port = first._server.sockets[0].getsockname()[1]
+    second_port = second._server.sockets[0].getsockname()[1]
+    left = await websockets.connect(f"ws://127.0.0.1:{first_port}")
+    right = await websockets.connect(f"ws://127.0.0.1:{second_port}")
+    await receive_json(left)
+    await receive_json(right)
+    await left.send(json.dumps({"type": "broadcast", "payload": {"shared": True}}))
+    messages = await asyncio.gather(receive_json(left), receive_json(right))
+    assert [message["payload"] for message in messages] == [{"shared": True}, {"shared": True}]
+    await left.close()
+    await right.close()
+    await first.stop()
+    await second.stop()
+    await broker.close()
