@@ -2,6 +2,8 @@ export interface PageData {
   title?: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface Page {
@@ -14,4 +16,5 @@ export interface Page {
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }

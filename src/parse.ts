@@ -33,6 +33,8 @@ function toData(frontmatter: Record<string, unknown>): PageData {
     title: typeof frontmatter.title === 'string' ? frontmatter.title : undefined,
     date: toDate(frontmatter.date),
     tags: toTags(frontmatter.tags),
+    template: typeof frontmatter.template === 'string' ? frontmatter.template : undefined,
+    layout: typeof frontmatter.layout === 'string' ? frontmatter.layout : undefined,
   };
 }
 

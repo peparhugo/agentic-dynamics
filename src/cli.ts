@@ -5,6 +5,7 @@ import { buildSite } from './build';
 export interface CliArgs {
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
   showHelp: boolean;
   command: string | undefined;
 }
@@ -15,15 +16,17 @@ Commands:
   build       Generate the site from markdown content (default)
 
 Options:
-  --content <dir>   Content directory containing markdown files (default: ./content)
-  --output <dir>    Output directory for generated HTML (default: ./dist)
-  -h, --help        Show this help message
+  --content <dir>    Content directory containing markdown files (default: ./content)
+  --output <dir>     Output directory for generated HTML (default: ./dist)
+  --templates <dir>  Templates directory with .hbs templates, layouts and partials (default: ./templates)
+  -h, --help         Show this help message
 `;
 
 export function parseArgs(argv: string[]): CliArgs {
   const args: CliArgs = {
     contentDir: 'content',
     outputDir: 'dist',
+    templatesDir: 'templates',
     showHelp: false,
     command: undefined,
   };
@@ -40,13 +43,15 @@ export function parseArgs(argv: string[]): CliArgs {
         args.command = 'build';
         break;
       case '--content':
-      case '--output': {
+      case '--output':
+      case '--templates': {
         const next = argv[i + 1];
         if (next === undefined || next.startsWith('-')) {
           throw new Error(`Option ${arg} requires a value`);
         }
         if (arg === '--content') args.contentDir = next;
-        else args.outputDir = next;
+        else if (arg === '--output') args.outputDir = next;
+        else args.templatesDir = next;
         i += 1;
         break;
       }
@@ -76,9 +81,10 @@ export function run(argv: string[]): number {
 
   const contentDir = path.resolve(process.cwd(), args.contentDir);
   const outputDir = path.resolve(process.cwd(), args.outputDir);
+  const templatesDir = path.resolve(process.cwd(), args.templatesDir);
 
   try {
-    const pages = buildSite({ contentDir, outputDir });
+    const pages = buildSite({ contentDir, outputDir, templatesDir });
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${outputDir}`);
     return 0;
   } catch (err) {
