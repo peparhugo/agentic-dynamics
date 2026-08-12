@@ -8,7 +8,7 @@ import os
 import sqlite3
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from abc import ABC, abstractmethod
 from typing import Any
@@ -68,13 +68,39 @@ class MessageStore:
             self._connection.commit()
 
     def list(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        return self._query(
+            "SELECT id, channel, type, payload, timestamp FROM messages "
+            "ORDER BY id LIMIT ? OFFSET ?", (limit, offset)
+        )
+
+    def history(self, channel: str, since: str | None, limit: int) -> tuple[list[dict[str, Any]], bool]:
+        if self._connection is None:
+            return [], False
+        conditions = ["channel = ?"]
+        parameters: list[Any] = [channel]
+        if since is not None:
+            conditions.append("timestamp >= ?")
+            parameters.append(since)
+        parameters.append(limit + 1)
+        rows = self._query(
+            "SELECT id, channel, type, payload, timestamp FROM messages WHERE "
+            + " AND ".join(conditions) + " ORDER BY timestamp ASC, id ASC LIMIT ?",
+            tuple(parameters),
+        )
+        return rows[:limit], len(rows) > limit
+
+    def delete_older_than(self, cutoff: str) -> None:
+        if self._connection is None:
+            return
+        with self._lock:
+            self._connection.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            self._connection.commit()
+
+    def _query(self, query: str, parameters: tuple[Any, ...]) -> list[dict[str, Any]]:
         if self._connection is None:
             return []
         with self._lock:
-            rows = self._connection.execute(
-                "SELECT id, channel, type, payload, timestamp FROM messages "
-                "ORDER BY id LIMIT ? OFFSET ?", (limit, offset)
-            ).fetchall()
+            rows = self._connection.execute(query, parameters).fetchall()
         return [{"id": row[0], "channel": row[1], "type": row[2],
                  "payload": json.loads(row[3]), "timestamp": row[4]} for row in rows]
 
@@ -99,6 +125,26 @@ class _HealthHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "limit and offset must be integers")
                 return
             body_data = {"messages": owner.messages(limit, offset)}
+        elif path == "/history":
+            query = parse_qs(parsed.query)
+            channel = query.get("channel", [""])[0]
+            if not channel:
+                self.send_error(400, "channel is required")
+                return
+            since = query.get("since", [None])[0]
+            if since is not None:
+                try:
+                    datetime.fromisoformat(since.replace("Z", "+00:00"))
+                except ValueError:
+                    self.send_error(400, "since must be an ISO timestamp")
+                    return
+            try:
+                limit = max(1, min(1000, int(query.get("limit", ["50"])[0])))
+            except ValueError:
+                self.send_error(400, "limit must be an integer")
+                return
+            messages, has_more = owner.history(channel, since, limit)
+            body_data = {"messages": messages, "has_more": has_more}
         elif path.startswith("/channels/") and path.endswith("/subscribers"):
             channel = unquote(path[len("/channels/"):-len("/subscribers")])
             if not channel or "/" in channel:
@@ -228,6 +274,11 @@ class NotificationServer:
         self._subscriber_task: asyncio.Task[None] | None = None
         self._redis_pubsub: Any = None
         self._instance_id = str(uuid.uuid4())
+        self.rate_limit = max(0, int(os.getenv("RATE_LIMIT", "100")))
+        self.message_ttl_days = max(0, float(os.getenv("MESSAGE_TTL_DAYS", "7")))
+        self._local_rate_windows: dict[str, tuple[float, int]] = {}
+        self._rate_lock = threading.Lock()
+        self._cleanup_task: asyncio.Task[None] | None = None
 
     def _create_transport(self) -> BaseTransport:
         selected = os.getenv("TRANSPORT", "websocket").strip().lower()
@@ -251,8 +302,12 @@ class NotificationServer:
     def messages(self, limit: int, offset: int) -> list[dict[str, Any]]:
         return self.store.list(limit, offset)
 
+    def history(self, channel: str, since: str | None, limit: int) -> tuple[list[dict[str, Any]], bool]:
+        return self.store.history(channel, since, limit)
+
     async def start(self) -> None:
         self.store.open()
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         if self.redis is None and self.redis_url:
             self.redis = Redis.from_url(self.redis_url, decode_responses=True)
         if self.redis is not None:
@@ -272,6 +327,10 @@ class NotificationServer:
 
     async def stop(self) -> None:
         await self.transport.stop()
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         if self._subscriber_task:
             self._subscriber_task.cancel()
             await asyncio.gather(self._subscriber_task, return_exceptions=True)
@@ -333,6 +392,12 @@ class NotificationServer:
         if not isinstance(message, dict): return
         message_type, payload = message.get("type"), message.get("payload", {})
         if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict): return
+        if message_type not in {"subscribe", "unsubscribe"} and not await self._allow_message(sender_id):
+            await self.transport.send_message(
+                sender_id,
+                self._message("error", {"error": "rate limit exceeded"}),
+            )
+            return
         channel = message.get("channel", payload.get("channel"))
         if message_type in {"subscribe", "unsubscribe"}:
             if not isinstance(channel, str) or not channel: return
@@ -358,6 +423,33 @@ class NotificationServer:
                                                                        "message": outgoing}))
         else:
             await self._deliver(outgoing)
+
+    async def _allow_message(self, client_id: str) -> bool:
+        now = asyncio.get_running_loop().time()
+        if self.rate_limit == 0:
+            return False
+        if self.redis is not None:
+            try:
+                key = f"notifications:rate:{client_id}"
+                count = await self.redis.incr(key)
+                if count == 1:
+                    await self.redis.expire(key, 60)
+                return int(count) <= self.rate_limit
+            except Exception:
+                pass
+        with self._rate_lock:
+            window, count = self._local_rate_windows.get(client_id, (now, 0))
+            if now - window >= 60:
+                window, count = now, 0
+            count += 1
+            self._local_rate_windows[client_id] = (window, count)
+            return count <= self.rate_limit
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+            await asyncio.to_thread(self.store.delete_older_than, cutoff)
+            await asyncio.sleep(3600)
 
     async def _deliver(self, outgoing: dict[str, Any]) -> None:
         channel = outgoing.get("channel")

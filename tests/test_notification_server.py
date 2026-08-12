@@ -170,3 +170,69 @@ async def test_redis_pubsub_delivers_between_server_instances():
         await receiver.close()
         await first.stop()
         await second.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_delivering(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    instance = NotificationServer(websocket_port=0, http_port=0)
+    await instance.start()
+    sender = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+    receiver = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+    try:
+        await receive_json(sender)
+        await receive_json(receiver)
+        for index in range(2):
+            await sender.send(json.dumps({"type": "broadcast", "payload": {"index": index}}))
+            await receive_json(sender)
+            await receive_json(receiver)
+        await sender.send(json.dumps({"type": "broadcast", "payload": {"index": 2}}))
+        error = await asyncio.wait_for(receive_json(sender), timeout=1)
+        assert error["type"] == "error"
+        assert error["payload"]["error"] == "rate limit exceeded"
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(receive_json(receiver), timeout=0.1)
+    finally:
+        await sender.close()
+        await receiver.close()
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_and_paginates_in_chronological_order(monkeypatch):
+    # Keep fixed test timestamps outside the cleanup window.
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "10000")
+    with tempfile.NamedTemporaryFile(suffix=".db") as database:
+        instance = NotificationServer(websocket_port=0, http_port=0,
+                                      database_url=f"sqlite:///{database.name}")
+        await instance.start()
+        try:
+            socket = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+            await receive_json(socket)
+            await socket.send(json.dumps({"type": "subscribe", "channel": "audit", "payload": {}}))
+            for channel, text, sent_at in (
+                ("audit", "second", "2026-01-01T00:00:02+00:00"),
+                ("other", "ignored", "2026-01-01T00:00:03+00:00"),
+                ("audit", "first", "2026-01-01T00:00:01+00:00"),
+            ):
+                await socket.send(json.dumps({"type": "broadcast", "channel": channel,
+                                               "payload": {"text": text}, "timestamp": sent_at}))
+                if channel == "audit":
+                    await receive_json(socket)
+            response = await asyncio.to_thread(
+                urllib.request.urlopen,
+                f"http://127.0.0.1:{instance.http_port}/history?channel=audit&limit=1",
+            )
+            first_page = json.loads(response.read())
+            assert [item["payload"]["text"] for item in first_page["messages"]] == ["first"]
+            assert first_page["has_more"] is True
+            response = await asyncio.to_thread(
+                urllib.request.urlopen,
+                f"http://127.0.0.1:{instance.http_port}/history?channel=audit&since=2026-01-01T00:00:02%2B00:00",
+            )
+            second_page = json.loads(response.read())
+            assert [item["payload"]["text"] for item in second_page["messages"]] == ["second"]
+            assert second_page["has_more"] is False
+            await socket.close()
+        finally:
+            await instance.stop()
