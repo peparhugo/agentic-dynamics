@@ -1,14 +1,32 @@
 """
-Flask Task Management API.
+Flask Task Management API with JWT authentication.
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Uses SQLite for storage, with schema initialized on startup.
+A single-file Flask app with clean structure: models, auth, routes, error
+handling. Uses SQLite for storage, with schema initialized (and migrated)
+on startup.
+
+Auth model:
+    - Users register with a username/password (password stored as a salted
+      hash via werkzeug.security, never in plaintext).
+    - Login exchanges valid credentials for a short-lived JWT.
+    - All /tasks/* endpoints require "Authorization: Bearer <token>".
+    - Tasks are scoped to their owner: users can only see/modify their own
+      tasks. A task belonging to another user (or no task at all) returns
+      404, so existence of other users' tasks is never leaked.
 """
 
-from flask import Flask, request, jsonify, g, current_app
-from datetime import datetime
-import sqlite3
+from datetime import datetime, timedelta, timezone
+from functools import wraps
 import os
+import sqlite3
+
+import jwt
+from flask import Flask, current_app, g, jsonify, request
+from werkzeug.security import check_password_hash, generate_password_hash
+
+
+JWT_ALGORITHM = "HS256"
+TOKEN_EXPIRY_SECONDS = 3600
 
 
 def get_db():
@@ -26,30 +44,76 @@ def close_db(exception=None):
 
 
 def init_db(database_path: str) -> None:
-    """Create the tasks table if it doesn't already exist."""
+    """Create tables if needed and migrate older schemas in place.
+
+    This is safe to run against a pre-existing database created before the
+    ``users`` table / ``tasks.owner_id`` column existed: it only adds what's
+    missing and never drops or rewrites existing rows.
+    """
     conn = sqlite3.connect(database_path)
     try:
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS users ("
+            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  username TEXT NOT NULL UNIQUE,"
+            "  password_hash TEXT NOT NULL"
+            ")"
+        )
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
             "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
+            "  created_at TEXT NOT NULL,"
+            "  owner_id INTEGER"
             ")"
         )
+
+        # ── Migration: add owner_id to tasks tables created before auth ──
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
+        if "owner_id" not in columns:
+            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+
         conn.commit()
     finally:
         conn.close()
 
 
-# ── Models ────────────────────────────────────────────────────
+# ── User models ──────────────────────────────────────────────
 
-def create_task(title: str) -> dict:
+def create_user(username: str, password_hash: str) -> dict:
+    db = get_db()
+    cursor = db.execute(
+        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
+        (username, password_hash),
+    )
+    db.commit()
+    return {"id": cursor.lastrowid, "username": username}
+
+
+def get_user_by_username(username: str):
+    db = get_db()
+    row = db.execute(
+        "SELECT * FROM users WHERE username = ?", (username,)
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int):
+    db = get_db()
+    row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+    return dict(row) if row else None
+
+
+# ── Task models (scoped to an owner) ────────────────────────
+
+def create_task(title: str, owner_id: int) -> dict:
     db = get_db()
     now = datetime.utcnow().isoformat()
     cursor = db.execute(
-        "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
-        (title, now),
+        "INSERT INTO tasks (title, status, created_at, owner_id) "
+        "VALUES (?, 'pending', ?, ?)",
+        (title, now, owner_id),
     )
     db.commit()
     return {
@@ -57,24 +121,30 @@ def create_task(title: str) -> dict:
         "title": title,
         "status": "pending",
         "created_at": now,
+        "owner_id": owner_id,
     }
 
 
-def get_tasks() -> list:
+def get_tasks(owner_id: int) -> list:
     db = get_db()
-    rows = db.execute("SELECT * FROM tasks ORDER BY created_at DESC, id DESC").fetchall()
+    rows = db.execute(
+        "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
+        (owner_id,),
+    ).fetchall()
     return [dict(r) for r in rows]
 
 
-def get_task(task_id: int):
+def get_task(task_id: int, owner_id: int):
     db = get_db()
-    row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    row = db.execute(
+        "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
+    ).fetchone()
     return dict(row) if row else None
 
 
-def update_task(task_id: int, title=None, status=None):
+def update_task(task_id: int, owner_id: int, title=None, status=None):
     db = get_db()
-    task = get_task(task_id)
+    task = get_task(task_id, owner_id)
     if task is None:
         return None
 
@@ -88,25 +158,138 @@ def update_task(task_id: int, title=None, status=None):
         params.append(status)
     if updates:
         params.append(task_id)
-        db.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params)
+        params.append(owner_id)
+        db.execute(
+            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
+            params,
+        )
         db.commit()
-    return get_task(task_id)
+    return get_task(task_id, owner_id)
+
+
+# ── JWT helpers ──────────────────────────────────────────────
+
+def generate_token(secret: str, user_id: int, username: str) -> str:
+    payload = {
+        "user_id": user_id,
+        "username": username,
+        "exp": datetime.now(timezone.utc) + timedelta(seconds=TOKEN_EXPIRY_SECONDS),
+    }
+    token = jwt.encode(payload, secret, algorithm=JWT_ALGORITHM)
+    # PyJWT >= 2 returns a str already; guard against older versions returning bytes.
+    return token.decode("utf-8") if isinstance(token, bytes) else token
+
+
+def decode_token(secret: str, token: str) -> dict:
+    return jwt.decode(token, secret, algorithms=[JWT_ALGORITHM])
+
+
+def login_required(view):
+    """Require a valid ``Authorization: Bearer <jwt>`` header.
+
+    On success, sets ``g.current_user`` (dict with ``id``/``username``) and
+    calls the wrapped view. Otherwise returns a 401 JSON error.
+    """
+
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "missing or invalid authorization header"}), 401
+
+        token = auth_header[len("Bearer "):].strip()
+        if not token:
+            return jsonify({"error": "missing or invalid authorization header"}), 401
+
+        try:
+            payload = decode_token(current_app.config["JWT_SECRET"], token)
+        except jwt.ExpiredSignatureError:
+            return jsonify({"error": "token has expired"}), 401
+        except jwt.InvalidTokenError:
+            return jsonify({"error": "invalid token"}), 401
+
+        user = get_user_by_id(payload.get("user_id"))
+        if user is None:
+            return jsonify({"error": "invalid token"}), 401
+
+        g.current_user = user
+        return view(*args, **kwargs)
+
+    return wrapped
 
 
 # ── App factory ───────────────────────────────────────────────
 
-def create_app(database: str = None) -> Flask:
+def create_app(database: str = None, jwt_secret: str = None) -> Flask:
     app = Flask(__name__)
     app.config["DATABASE"] = database or os.environ.get("DATABASE", "tasks.db")
+    app.config["JWT_SECRET"] = jwt_secret or os.environ.get(
+        "JWT_SECRET", "dev-insecure-secret-change-me"
+    )
 
     with app.app_context():
         init_db(app.config["DATABASE"])
 
     app.teardown_appcontext(close_db)
 
-    # ── Routes ───────────────────────────────────────────────
+    # ── Auth routes ─────────────────────────────────────────
+
+    @app.route("/auth/register", methods=["POST"])
+    def register():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+
+        username = data.get("username")
+        password = data.get("password")
+
+        if not isinstance(username, str) or not username.strip():
+            return jsonify({"error": "username is required"}), 400
+        if not isinstance(password, str) or not password:
+            return jsonify({"error": "password is required"}), 400
+
+        username = username.strip()
+        if get_user_by_username(username) is not None:
+            return jsonify({"error": "username already exists"}), 409
+
+        password_hash = generate_password_hash(password)
+        try:
+            user = create_user(username, password_hash)
+        except sqlite3.IntegrityError:
+            return jsonify({"error": "username already exists"}), 409
+
+        return jsonify(user), 201
+
+    @app.route("/auth/login", methods=["POST"])
+    def login():
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            data = {}
+
+        username = data.get("username")
+        password = data.get("password")
+
+        if (
+            not isinstance(username, str)
+            or not username.strip()
+            or not isinstance(password, str)
+            or not password
+        ):
+            return jsonify({"error": "username and password are required"}), 400
+
+        user = get_user_by_username(username.strip())
+        if user is None or not check_password_hash(user["password_hash"], password):
+            return jsonify({"error": "invalid username or password"}), 401
+
+        token = generate_token(
+            app.config["JWT_SECRET"], user["id"], user["username"]
+        )
+        return jsonify({"token": token, "token_type": "Bearer"})
+
+    # ── Task routes (all protected) ─────────────────────────
 
     @app.route("/tasks", methods=["POST"])
+    @login_required
     def add_task():
         data = request.get_json(silent=True)
         if not isinstance(data, dict):
@@ -114,23 +297,26 @@ def create_app(database: str = None) -> Flask:
         title = data.get("title")
         if not isinstance(title, str) or not title.strip():
             return jsonify({"error": "title is required"}), 400
-        task = create_task(title.strip())
+        task = create_task(title.strip(), g.current_user["id"])
         return jsonify(task), 201
 
     @app.route("/tasks", methods=["GET"])
+    @login_required
     def list_tasks():
-        return jsonify(get_tasks())
+        return jsonify(get_tasks(g.current_user["id"]))
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
+    @login_required
     def show_task(task_id: int):
-        task = get_task(task_id)
+        task = get_task(task_id, g.current_user["id"])
         if task is None:
             return jsonify({"error": "task not found"}), 404
         return jsonify(task)
 
     @app.route("/tasks/<int:task_id>", methods=["PUT"])
+    @login_required
     def edit_task(task_id: int):
-        existing = get_task(task_id)
+        existing = get_task(task_id, g.current_user["id"])
         if existing is None:
             return jsonify({"error": "task not found"}), 404
 
@@ -150,6 +336,7 @@ def create_app(database: str = None) -> Flask:
 
         task = update_task(
             task_id,
+            g.current_user["id"],
             title=title.strip() if title is not None else None,
             status=status.strip() if status is not None else None,
         )
