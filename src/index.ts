@@ -16,11 +16,14 @@ export interface SitePage {
   tags: string[];
   source: string;
   output: string;
+  template?: string;
+  layout?: string;
 }
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 function markdownFiles(directory: string): string[] {
@@ -60,6 +63,8 @@ function pageFromMarkdown(file: string, contentDir: string): SitePage {
     tags: tagsValue(data.tags),
     source: relative.split(path.sep).join('/'),
     output,
+    ...(stringValue(data.template) ? { template: stringValue(data.template) } : {}),
+    ...(stringValue(data.layout) ? { layout: stringValue(data.layout) } : {}),
   };
 }
 
@@ -76,9 +81,78 @@ function indexHtml(pages: SitePage[]): string {
   return `<!doctype html>\n<html>\n<head><meta charset="utf-8"><title>Index</title></head>\n<body>\n  <h1>Pages</h1>\n  <ul>\n${items}\n  </ul>\n</body>\n</html>\n`;
 }
 
+type TemplateContext = Record<string, unknown>;
+
+function templateValue(value: unknown): string {
+  if (value === null || value === undefined || value === false) return '';
+  if (Array.isArray(value)) return value.join(', ');
+  return String(value);
+}
+
+function lookup(context: TemplateContext, key: string): unknown {
+  if (key === 'this' || key === '.') return context;
+  return key.split('.').reduce<unknown>((value, part) => {
+    if (value && typeof value === 'object') return (value as Record<string, unknown>)[part];
+    return undefined;
+  }, context);
+}
+
+function templateName(name: string): string {
+  return name.endsWith('.hbs') ? name : `${name}.hbs`;
+}
+
+function readTemplate(directory: string, name: string, kind: 'template' | 'layout'): string | undefined {
+  const base = kind === 'layout' ? path.join(directory, 'layouts') : directory;
+  const candidate = path.resolve(base, templateName(name));
+  if (!candidate.startsWith(`${path.resolve(base)}${path.sep}`)) {
+    throw new Error(`Invalid ${kind} path: ${name}`);
+  }
+  return fs.existsSync(candidate) ? fs.readFileSync(candidate, 'utf8') : undefined;
+}
+
+function readPartial(directory: string, name: string): string {
+  const partial = readTemplate(path.join(directory, 'partials'), name, 'template');
+  if (partial === undefined) throw new Error(`Partial not found: ${name}`);
+  return partial;
+}
+
+/** Render the small, intentionally data-only Handlebars subset used by sites. */
+export function renderTemplate(source: string, context: TemplateContext, templatesDir?: string): string {
+  const directory = templatesDir ?? path.resolve('./templates');
+  let rendered = source.replace(/\{\{!([\s\S]*?)\}\}/g, '');
+  rendered = rendered.replace(/\{\{>\s*([^\s}]+)(?:\s+([^}]+))?\s*\}\}/g, (_match, name: string, partialContext?: string) => {
+    const values = partialContext ? lookup(context, partialContext.trim()) : context;
+    const child = values && typeof values === 'object' ? values as TemplateContext : context;
+    return renderTemplate(readPartial(directory, name), child, directory);
+  });
+  rendered = rendered.replace(/\{\{\{\s*([^}]+?)\s*\}\}\}/g, (_match, key: string) =>
+    templateValue(lookup(context, key.trim())));
+  return rendered.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, key: string) =>
+    escapeHtml(templateValue(lookup(context, key.trim()))));
+}
+
+function renderPage(parsedContent: string, page: SitePage, data: Frontmatter, templatesDir: string): string {
+  const body = marked.parse(parsedContent) as string;
+  const template = page.template
+    ? readTemplate(templatesDir, page.template, 'template')
+    : readTemplate(templatesDir, 'default', 'template');
+  if (page.template && template === undefined) throw new Error(`Template not found: ${page.template}`);
+
+  const context: TemplateContext = { ...data, page, title: page.title, body, content: body };
+  let result = template === undefined ? body : renderTemplate(template, context, templatesDir);
+  const layoutName = page.layout ?? (readTemplate(templatesDir, 'default', 'layout') !== undefined ? 'default' : undefined);
+  if (layoutName) {
+    const layout = readTemplate(templatesDir, layoutName, 'layout');
+    if (layout === undefined) throw new Error(`Layout not found: ${layoutName}`);
+    result = renderTemplate(layout, { ...context, body: result, content: result }, templatesDir);
+  }
+  return result;
+}
+
 export function buildSite(options: BuildOptions = {}): SitePage[] {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const files = markdownFiles(contentDir);
   const pages: SitePage[] = [];
 
@@ -90,8 +164,7 @@ export function buildSite(options: BuildOptions = {}): SitePage[] {
     const page = pageFromMarkdown(file, contentDir);
     const destination = path.join(outputDir, page.output);
     fs.mkdirSync(path.dirname(destination), { recursive: true });
-    // The parser's result is the complete page and must not be wrapped again.
-    fs.writeFileSync(destination, marked.parse(parsed.content));
+    fs.writeFileSync(destination, renderPage(parsed.content, page, parsed.data as Frontmatter, templatesDir));
     pages.push(page);
   }
 
