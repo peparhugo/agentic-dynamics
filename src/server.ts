@@ -4,6 +4,7 @@ import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import chokidar, { FSWatcher } from 'chokidar';
 import { buildSite, SiteOptions } from './generator';
+import type { Plugin, PluginContext } from './plugin';
 
 export interface DevServerOptions extends SiteOptions {
   port?: number;
@@ -15,6 +16,16 @@ export interface DevServer {
   watcher: FSWatcher;
   port: number;
   close(): Promise<void>;
+}
+
+/** Built-in plugin marker for the development server lifecycle. */
+export class DevServerPlugin implements Plugin {
+  constructor(public readonly options: DevServerOptions = {}) {}
+  onStart(_context: PluginContext): void {}
+  beforeBuild(_context: PluginContext): void {}
+  afterBuild(_context: PluginContext): void {}
+  onFile(_page: import('./generator').Page, _context: PluginContext): void {}
+  onEnd(_context: PluginContext): void {}
 }
 
 const reloadScript = `<script>(function(){var socket=new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host);socket.onmessage=function(event){if(event.data==='reload')location.reload()};socket.onclose=function(){setTimeout(function(){location.reload()},1000)}})();</script>`;
@@ -57,7 +68,8 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
   const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const host = options.host ?? 'localhost';
   const port = options.port ?? 3000;
-  await buildSite({ ...options, contentDir, outputDir, templatesDir });
+  const devPlugin = new DevServerPlugin(options);
+  await buildSite({ ...options, contentDir, outputDir, templatesDir, plugins: [devPlugin] });
 
   const server = http.createServer(async (request, response) => {
     if (request.method !== 'GET' && request.method !== 'HEAD') {
@@ -89,7 +101,7 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
   const rebuild = (): void => {
     buildQueue = buildQueue.then(async () => {
       try {
-        await buildSite({ ...options, contentDir, outputDir, templatesDir });
+        await buildSite({ ...options, contentDir, outputDir, templatesDir, plugins: [devPlugin] });
         for (const socket of sockets) if (socket.readyState === WebSocket.OPEN) socket.send('reload');
       } catch (error) {
         console.error(`Build failed: ${error instanceof Error ? error.message : error}`);
