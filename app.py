@@ -41,6 +41,7 @@ class NotificationServer:
 
     def __init__(self):
         self.clients = {}
+        self.channels = {}
         self._clients_lock = threading.RLock()
         self._server = None
 
@@ -58,6 +59,45 @@ class NotificationServer:
     def unregister(self, client_id: str) -> None:
         with self._clients_lock:
             self.clients.pop(client_id, None)
+            for channel in list(self.channels):
+                self.channels[channel].discard(client_id)
+                if not self.channels[channel]:
+                    del self.channels[channel]
+
+    def subscribe(self, client_id: str, channel: str) -> bool:
+        if not isinstance(channel, str) or not channel.strip():
+            return False
+        channel = channel.strip()
+        with self._clients_lock:
+            if client_id not in self.clients:
+                return False
+            self.channels.setdefault(channel, set()).add(client_id)
+        return True
+
+    def unsubscribe(self, client_id: str, channel: str) -> bool:
+        if not isinstance(channel, str) or not channel.strip():
+            return False
+        channel = channel.strip()
+        with self._clients_lock:
+            subscribers = self.channels.get(channel)
+            if subscribers is None:
+                return False
+            removed = client_id in subscribers
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self.channels[channel]
+        return removed
+
+    def channel_subscribers(self, channel: str) -> list[str]:
+        with self._clients_lock:
+            return sorted(self.channels.get(channel, set()))
+
+    def channel_counts(self) -> dict[str, int]:
+        with self._clients_lock:
+            return {
+                channel: len(subscribers)
+                for channel, subscribers in sorted(self.channels.items())
+            }
 
     @staticmethod
     def _message(message_type: str, payload: dict) -> str:
@@ -74,10 +114,23 @@ class NotificationServer:
         except Exception:
             return False
 
-    async def broadcast(self, payload: dict, message_type: str = "broadcast") -> None:
+    async def broadcast(
+        self, payload: dict, message_type: str = "broadcast", channel: str | None = None
+    ) -> None:
         message = self._message(message_type, payload)
         with self._clients_lock:
-            clients = list(self.clients.items())
+            if channel is None:
+                channel = payload.get("channel")
+            if not isinstance(channel, str) or not channel.strip():
+                clients = list(self.clients.items())
+            else:
+                channel = channel.strip()
+                subscriber_ids = self.channels.get(channel, set())
+                clients = [
+                    (client_id, self.clients[client_id])
+                    for client_id in subscriber_ids
+                    if client_id in self.clients
+                ]
         results = await asyncio.gather(
             *(self._send(client, message) for _, client in clients),
             return_exceptions=False,
@@ -104,7 +157,18 @@ class NotificationServer:
                     message = json.loads(raw_message)
                     message_type = message.get("type")
                     payload = message.get("payload")
-                    if message_type not in {"broadcast", "direct", "system"}:
+                    if message_type not in {
+                        "broadcast", "direct", "system", "subscribe", "unsubscribe"
+                    }:
+                        continue
+                    if message_type in {"subscribe", "unsubscribe"}:
+                        channel = message.get("channel")
+                        if channel is None and isinstance(payload, dict):
+                            channel = payload.get("channel")
+                        if channel is None and isinstance(payload, str):
+                            channel = payload
+                        operation = self.subscribe if message_type == "subscribe" else self.unsubscribe
+                        operation(client_id, channel)
                         continue
                     if not isinstance(payload, dict):
                         continue
@@ -112,7 +176,7 @@ class NotificationServer:
                     continue
 
                 if message_type == "broadcast":
-                    await self.broadcast(payload)
+                    await self.broadcast(payload, channel=message.get("channel"))
                 elif message_type == "direct":
                     recipient = payload.get("client_id") or payload.get("recipient_id")
                     if recipient:
@@ -121,7 +185,7 @@ class NotificationServer:
                         direct_payload.pop("recipient_id", None)
                         await self.send_direct(recipient, direct_payload)
                 else:
-                    await self.broadcast(payload, "system")
+                    await self.broadcast(payload, "system", message.get("channel"))
         finally:
             self.unregister(client_id)
 
@@ -232,6 +296,19 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({"connected_clients": notification_server.client_count})
+
+
+@app.route("/channels", methods=["GET"])
+def list_channels():
+    return jsonify({"channels": notification_server.channel_counts()})
+
+
+@app.route("/channels/<string:name>/subscribers", methods=["GET"])
+def list_channel_subscribers(name: str):
+    return jsonify({
+        "channel": name,
+        "subscribers": notification_server.channel_subscribers(name),
+    })
 
 
 @app.route("/tasks", methods=["GET"])
