@@ -8,13 +8,16 @@
 
 ```bash
 python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek
+python scripts/run_story.py <story> --model <provider/model> --backend <opencode|claude_cli>
 python scripts/pipeline.py --plan <name>
 python scripts/analyze_worktrees.py
 python scripts/inventory.py refresh
+python scripts/sync_data.py          # story results -> parquet (before build_data)
 python scripts/build_data.py
+python admin/server.py               # live control plane (port 8000)
 pytest tests/
 pytest tests/test_<module>.py -v
-firebase deploy --only hosting
+firebase deploy --only hosting       # deploy = inventory -> sync -> build -> deploy
 ```
 
 ## Key files (read on demand, not preemptively)

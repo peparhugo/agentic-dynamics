@@ -39,15 +39,16 @@ compute_efficiency(result, *, model, baseline_metrics) -> EfficiencyMetrics
 
 classify_strategy(reasoning, solution, efficiency) -> StrategyReport
 
-run_story(story, *, model, condition, codebase_path, output_dir, compiler_model) -> StoryResult
+run_story(story, *, codebase_path, model, condition, mutation, worktree_root,
+          timeout, thinking_budget_tokens, output_token_limit, backend) -> StoryResult
   PerturbationCondition: CLEAN, BAD_SEED, EARLY_DEGRADE, LATE_DEGRADE
-  BUILTIN_STORIES: task_manager_story, static_site_gen_story, notification_service_story
+  BUILTIN_STORIES: task_manager_api, static_site_gen, notification_service
 
 compile_mutation(spec, operator, strength, *, codebase_path, model, cache_dir) -> MutationArtifact
 apply_mutation(artifact, target_path) -> bool
 
 analyze_commit(worktree, commit_hash, language, baseline_ast) -> CommitAnalysis
-review_commit(worktree, commit_hash, *, model, timeout) -> CommitReview
+review_commit(worktree, commit_hash, *, model, timeout, story_id) -> CommitReview
 compute_entropy(codebase_path, *, language) -> EntropyProfile
 build_graph(codebase_path, *, language) -> CodebaseGraph
 run_diagnostics(codebase_path, *, language) -> LSPReport
@@ -76,11 +77,15 @@ scripts/run_story.py      — multi-session story CLI
 scripts/analyze_worktrees.py — worktrees → GameReport .md + _results_summary.json
 scripts/analyze_trajectories.py — session.jsonl → trajectory JSON
 scripts/inventory.py      — refresh, list, stats, worktrees, report
-scripts/build_data.py     — inventory+results → firebase/public/data.js
+scripts/sync_data.py      — story results → sessions.parquet + stories.parquet
+scripts/build_data.py     — inventory+results+parquet → firebase/public/data.js
 scripts/validate_session.py — pytest on generated code
 scripts/enqueue.py + worker.py — Redis experiment queue
 scripts/backfill_artifacts.py + backfill_sonar.py — data migration
+scripts/backfill_story_transcripts.py — recover session_{n}.jsonl from opencode.db
 scripts/monitor.py        — Redis queue dashboard (--json for machine output)
+scripts/review_all.py     — review every story (ThreadPoolExecutor, no Redis)
+scripts/review_stories.py + review_worker.py — batch/Redis review runners
 scripts/generate_manifest.py — SHA256 manifest
 scripts/pipeline.py       — YAML-driven phase orchestration (plans.yaml; 11 kinds)
 scripts/plan.py           — [deprecated] hardcoded phase orchestration, superseded by pipeline.py

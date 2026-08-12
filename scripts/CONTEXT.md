@@ -31,6 +31,9 @@
 | `analyze_worktrees.py` | 1263 | **Primary analysis script.** Reads worktrees, evaluates code, runs full analysis stack (solution, basin, strategy), produces GameReport markdown files. `--no-tests` flag skips pytest. |
 | `analyze_trajectories.py` | 350 | Parses `session.jsonl` transcripts. Produces `_trajectory_summary.json` and `_trajectory_aggregate.json`. |
 | `validate_session.py` | 98 | Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test pass/fail. |
+| `review_all.py` | 156 | Review every story directly (ThreadPoolExecutor, no Redis). Writes `reviews/review_{story_id}.json`. Grounds reviews in AST/Sonar/convention mechanics. |
+| `review_stories.py` | 91 | Batch commit + story review runner. |
+| `review_worker.py` | 190 | Redis review-queue worker (SDK bridge). Superseded by `review_all.py`. |
 
 ## Data Pipeline & Maintenance
 
