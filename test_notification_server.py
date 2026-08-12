@@ -235,6 +235,210 @@ async def test_broadcast_skips_disconnected_client(server):
     await ws2.close()
 
 
+# ── channel subscriptions ───────────────────────────────────────────────
+
+
+async def _client(server):
+    """Open a websocket to the server and return (ws, client_id)."""
+    ws = await connect(ws_uri(server))
+    welcome = json.loads(await ws.recv())
+    return ws, welcome["payload"]["client_id"]
+
+
+@pytest.mark.asyncio
+async def test_registry_subscribe_unsubscribe():
+    reg = ClientRegistry()
+    reg.add("c1", object())
+    assert reg.subscribe("c1", "alerts") is True
+    assert reg.subscribe("c1", "system") is True
+    assert reg.channels() == {"alerts": 1, "system": 1}
+    assert reg.subscribers("alerts") == ["c1"]
+    assert reg.channels_of("c1") == {"alerts", "system"}
+
+    reg.add("c2", object())
+    assert reg.subscribe("c2", "alerts") is True
+    assert reg.channels()["alerts"] == 2
+
+    assert reg.unsubscribe("c1", "alerts") is True
+    assert reg.subscribers("alerts") == ["c2"]
+    assert reg.unsubscribe("c1", "alerts") is False
+    assert reg.unsubscribe("nope", "alerts") is False
+
+
+@pytest.mark.asyncio
+async def test_subscribe_unknown_client_fails():
+    reg = ClientRegistry()
+    assert reg.subscribe("ghost", "alerts") is False
+    assert reg.channels() == {}
+
+
+@pytest.mark.asyncio
+async def test_registry_remove_cleans_channels():
+    reg = ClientRegistry()
+    reg.add("c1", object())
+    reg.add("c2", object())
+    reg.subscribe("c1", "alerts")
+    reg.subscribe("c2", "alerts")
+    reg.subscribe("c1", "system")
+    assert reg.remove("c1") is True
+    assert reg.subscribers("alerts") == ["c2"]
+    assert reg.channels() == {"alerts": 1}
+    assert reg.remove("c2") is True
+    assert reg.channels() == {}
+
+
+@pytest.mark.asyncio
+async def test_ws_subscribe_routes_broadcast_to_channel(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    c, id_c = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await b.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await asyncio.sleep(0.05)
+
+        assert sorted(server.subscribers("alerts")) == sorted([id_a, id_b])
+        assert server.channels() == {"alerts": 2}
+
+        server.broadcast({"channel": "alerts", "text": "hi"})
+
+        for ws in (a, b):
+            msg = json.loads(await ws.recv())
+            assert msg["type"] == "broadcast"
+            assert msg["payload"] == {"channel": "alerts", "text": "hi"}
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(c.recv(), timeout=0.2)
+    finally:
+        for ws in (a, b, c):
+            await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_ws_broadcast_with_channel_top_level(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await asyncio.sleep(0.05)
+        await b.send(json.dumps({"type": "broadcast", "channel": "chat", "payload": {"m": 1}}))
+        msg = json.loads(await a.recv())
+        assert msg["payload"] == {"m": 1}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(b.recv(), timeout=0.2)
+    finally:
+        for ws in (a, b):
+            await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_ws_unsubscribe_stops_delivery(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await b.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+        assert server.channels()["alerts"] == 2
+
+        await a.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+        assert server.subscribers("alerts") == [id_b]
+
+        server.broadcast({"channel": "alerts", "text": "x"})
+        msg = json.loads(await b.recv())
+        assert msg["payload"] == {"channel": "alerts", "text": "x"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(a.recv(), timeout=0.2)
+    finally:
+        for ws in (a, b):
+            await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_plain_broadcast_still_reaches_everyone(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+        server.broadcast({"text": "hello everyone"})
+        for ws in (a, b):
+            msg = json.loads(await ws.recv())
+            assert msg["payload"] == {"text": "hello everyone"}
+    finally:
+        for ws in (a, b):
+            await ws.close()
+
+
+@pytest.mark.asyncio
+async def test_server_subscribe_unsubscribe_methods(server):
+    a, id_a = await _client(server)
+    try:
+        assert server.subscribe(id_a, "system") is True
+        assert server.subscribe("ghost", "system") is False
+        assert server.channels() == {"system": 1}
+        assert server.subscribers("system") == [id_a]
+        assert server.unsubscribe(id_a, "system") is True
+        assert server.unsubscribe(id_a, "system") is False
+        assert server.channels() == {}
+    finally:
+        await a.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_removes_channel_membership(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await b.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+        assert server.channels() == {"alerts": 2}
+
+        await a.close()
+        assert await wait_for(lambda: server.channels() == {"alerts": 1})
+        assert server.subscribers("alerts") == [id_b]
+    finally:
+        await b.close()
+
+
+# ── channel REST endpoints ──────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_empty(server):
+    async with httpx.AsyncClient() as http:
+        r = await http.get(f"{http_uri(server)}/channels")
+        assert r.status_code == 200
+        assert r.headers["Content-Type"] == "application/json"
+        assert r.json() == {"channels": {}}
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_counts(server):
+    a, id_a = await _client(server)
+    b, id_b = await _client(server)
+    try:
+        await a.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await a.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await b.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.05)
+
+        async with httpx.AsyncClient() as http:
+            r = await http.get(f"{http_uri(server)}/channels")
+            assert r.json() == {"channels": {"alerts": 2, "system": 1}}
+
+            r = await http.get(f"{http_uri(server)}/channels/alerts/subscribers")
+            assert r.json() == {"channel": "alerts", "subscribers": sorted([id_a, id_b])}
+
+            r = await http.get(f"{http_uri(server)}/channels/unknown/subscribers")
+            assert r.json() == {"channel": "unknown", "subscribers": []}
+    finally:
+        for ws in (a, b):
+            await ws.close()
+
+
 @pytest.mark.asyncio
 async def test_health_decreases_after_multiple_disconnects(server):
     clients = []
