@@ -4,6 +4,7 @@ import os
 import pytest
 
 os.environ.setdefault("CELERY_TASK_ALWAYS_EAGER", "1")
+os.environ.setdefault("FAKEREDIS", "1")
 
 
 @pytest.fixture()

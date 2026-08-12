@@ -122,7 +122,7 @@ def test_get_list_ordered_by_created_at_desc(alice):
 
     resp = alice.get("/tasks", headers=auth_header(alice))
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert titles == ["third", "second", "first"]
 
 
@@ -200,7 +200,7 @@ def test_users_only_see_their_own_tasks(client):
     ).get_json()
     client.post("/tasks", json={"title": "bob task"}, headers=bob_headers)
 
-    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
+    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()["data"]
     assert [t["title"] for t in alice_tasks] == ["alice task"]
 
     resp = client.get(f"/tasks/{alice_task['id']}", headers=bob_headers)
@@ -211,4 +211,4 @@ def test_users_only_see_their_own_tasks(client):
     )
     assert resp.status_code == 404
 
-    assert client.get("/tasks", headers=bob_headers).get_json()[0]["title"] == "bob task"
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"][0]["title"] == "bob task"

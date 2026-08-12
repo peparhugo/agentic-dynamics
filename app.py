@@ -11,9 +11,14 @@ repositories.py); route handlers never touch SQL directly.
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta, timezone
 import os
+import time
 
 import bcrypt
 import jwt
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
+from redis.connection import ConnectionPool
 
 from celery_app import send_notification_email
 from repositories import BaseRepository, TaskRepository, UserRepository, init_db
@@ -25,8 +30,64 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
 user_repo = UserRepository(DATABASE)
 task_repo = TaskRepository(DATABASE)
+
+
+# ── Rate limiting ─────────────────────────────────────────────
+
+def _make_rate_limit_storage():
+    """Return a Redis-backed storage config, using fakeredis in tests."""
+    if os.environ.get("FAKEREDIS") == "1":
+        import fakeredis
+
+        return {
+            "storage_uri": REDIS_URL,
+            "storage_options": {
+                "connection_pool": ConnectionPool(
+                    connection_class=fakeredis.FakeRedisConnection,
+                    server=fakeredis.FakeServer(),
+                )
+            },
+        }
+    return {"storage_uri": REDIS_URL, "storage_options": {}}
+
+
+def _rate_limit_key() -> str:
+    """Key limits by authenticated user id, falling back to client IP."""
+    user = get_current_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
+
+
+_rate_limit_storage = _make_rate_limit_storage()
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    storage_uri=_rate_limit_storage["storage_uri"],
+    storage_options=_rate_limit_storage["storage_options"],
+    default_limits=[RATE_LIMIT],
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def _rate_limit_error(e: RateLimitExceeded):
+    reset_at = getattr(e.limit, "reset_at", None)
+    retry_after = 60
+    if reset_at is not None:
+        try:
+            retry_after = max(1, int(reset_at.timestamp() - time.time()))
+        except Exception:
+            retry_after = 60
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 # ── Auth helpers ───────────────────────────────────────────────
@@ -110,7 +171,20 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repo.list_for_owner(request.current_user["id"]))
+    try:
+        limit = int(request.args.get("limit", 20))
+        cursor_raw = request.args.get("cursor")
+        cursor = int(cursor_raw) if cursor_raw else None
+    except (TypeError, ValueError):
+        return jsonify({"error": "invalid pagination parameters"}), 400
+    if limit < 1:
+        return jsonify({"error": "limit must be a positive integer"}), 400
+    limit = min(limit, 100)
+    total, items, has_more = task_repo.list_for_owner(
+        request.current_user["id"], cursor=cursor, limit=limit
+    )
+    next_cursor = str(items[-1]["id"]) if has_more and items else None
+    return jsonify({"data": items, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])

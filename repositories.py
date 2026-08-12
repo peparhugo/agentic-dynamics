@@ -136,13 +136,36 @@ class TaskRepository(BaseRepository):
             owner_id=owner_id,
         )
 
-    def list_for_owner(self, owner_id: int):
+    def list_for_owner(
+        self, owner_id: int, cursor: int | None = None, limit: int = 20
+    ):
+        """Return ``(total, items, has_more)`` for the owner's tasks page.
+
+        Items are ordered newest-first (``id DESC``). ``cursor`` is the id of
+        the last item from the previous page; the returned page contains items
+        with ``id < cursor``. ``limit`` caps the page size and is clamped to
+        ``[1, 100]``.
+        """
+        limit = max(1, min(int(limit), 100))
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
+            total = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?",
                 (owner_id,),
-            ).fetchall()
-            return [dict(r) for r in rows]
+            ).fetchone()["c"]
+            if cursor is not None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            items = [dict(r) for r in rows[:limit]]
+            return total, items, len(rows) > limit
 
     def get_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self._connect() as conn:
