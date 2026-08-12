@@ -28,3 +28,31 @@ describe('parseArgs', () => {
     expect(() => parseArgs(['build', '--content'])).toThrow('requires a value');
   });
 });
+
+describe('parseArgs serve', () => {
+  it('parses the serve command with default port and host', () => {
+    const args = parseArgs(['serve']);
+    expect(args.command).toBe('serve');
+    expect(args.port).toBe(3000);
+    expect(args.host).toBe('localhost');
+  });
+
+  it('parses --port and --host values', () => {
+    const args = parseArgs(['serve', '--port', '8080', '--host', '0.0.0.0']);
+    expect(args.command).toBe('serve');
+    expect(args.port).toBe(8080);
+    expect(args.host).toBe('0.0.0.0');
+  });
+
+  it('throws on an invalid port', () => {
+    expect(() => parseArgs(['serve', '--port', 'not-a-number'])).toThrow('valid port');
+  });
+
+  it('throws on an out-of-range port', () => {
+    expect(() => parseArgs(['serve', '--port', '70000'])).toThrow('valid port');
+  });
+
+  it('throws when --port is missing its value', () => {
+    expect(() => parseArgs(['serve', '--port'])).toThrow('requires a value');
+  });
+});
