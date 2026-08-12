@@ -1,7 +1,17 @@
 import fs from 'fs';
 import path from 'path';
 import { Plugin, PluginContext, SSGConfig } from './plugin';
-import { BuildOptions, Page } from './types';
+import { BuildOptions, BuildStats, Page } from './types';
+import {
+  CacheManifest,
+  cachePathFor,
+  emptyManifest,
+  hashDir,
+  hashFile,
+  isEntryValid,
+  loadCache,
+  saveCache,
+} from './cache';
 import { MarkdownPlugin } from '../plugins/markdown';
 import { TemplatePlugin } from '../plugins/template';
 
@@ -43,6 +53,7 @@ export function toSlug(sourcePath: string, baseDir?: string): string {
 export class SSGEngine {
   readonly config: SSGConfig;
   private readonly plugins: Plugin[];
+  lastStats: BuildStats | undefined;
 
   constructor(config: SSGConfig = {}) {
     this.config = config;
@@ -95,18 +106,102 @@ export class SSGEngine {
   /**
    * Per-build pipeline: beforeBuild -> onFile (per page) -> afterBuild.
    * Used both by build() and by live-reload rebuilds.
+   *
+   * When `options.incremental` (or `options.clean`) is set, a `.ssg-cache.json`
+   * manifest tracks file hashes and cached output. Pages whose source and
+   * template hashes are unchanged are skipped (no markdown parse, no render);
+   * everything else goes through the normal plugin pipeline.
    */
   buildOnce(options: BuildOptions = {}): Page[] {
     const ctx = this.createContext(options);
+    const useCache = !!(options.incremental || options.clean);
+    const cachePath = cachePathFor(ctx.outputDir);
+    const manifest: CacheManifest | undefined = useCache
+      ? options.clean
+        ? emptyManifest()
+        : loadCache(cachePath) ?? emptyManifest()
+      : undefined;
+    const templateHash = useCache ? hashDir(ctx.templateDir) : '';
+    const stats: BuildStats = {
+      total: 0,
+      built: 0,
+      skipped: 0,
+      timeSaved: 0,
+      cacheFile: useCache ? cachePath : undefined,
+    };
+
     this.runHook('beforeBuild', ctx);
 
     const files = collectMarkdownFiles(ctx.contentDir);
-    const pages = files.map((file) =>
-      this.runOnFile({ sourcePath: file, slug: toSlug(file, ctx.contentDir) } as Page, ctx)
-    );
+    stats.total = files.length;
+    const pages: Page[] = [];
+    const sourceHashes = new Map<string, string>();
+    const onFileMs = new Map<string, number>();
+    const skippedSlugs = new Set<string>();
+
+    for (const file of files) {
+      const slug = toSlug(file, ctx.contentDir);
+      const sourceHash = hashFile(file);
+      sourceHashes.set(slug, sourceHash);
+      const cached = manifest?.entries?.[slug];
+
+      if (useCache && cached && isEntryValid(cached, sourceHash, templateHash)) {
+        pages.push({ ...cached.page, sourcePath: file, rendered: cached.rendered });
+        skippedSlugs.add(slug);
+        stats.skipped += 1;
+        stats.timeSaved += cached.pageMs;
+        continue;
+      }
+
+      const start = Date.now();
+      pages.push(this.runOnFile({ sourcePath: file, slug } as Page, ctx));
+      onFileMs.set(slug, Date.now() - start);
+      stats.built += 1;
+    }
+
     ctx.pages = pages;
 
+    // Remove output and cache entries for pages that no longer exist.
+    if (useCache && manifest) {
+      for (const slug of Object.keys(manifest.entries)) {
+        if (!sourceHashes.has(slug)) {
+          const htmlPath = path.join(ctx.outputDir, `${slug}.html`);
+          if (fs.existsSync(htmlPath)) {
+            fs.rmSync(htmlPath, { force: true });
+          }
+          delete manifest.entries[slug];
+        }
+      }
+    }
+
     this.runHook('afterBuild', ctx);
+
+    // Persist the manifest once rendering finished so cached rendered HTML and
+    // parsed frontmatter are available to later incremental builds.
+    if (useCache && manifest) {
+      for (const page of ctx.pages) {
+        const slug = page.slug;
+        const sourceHash = sourceHashes.get(slug) ?? hashFile(page.sourcePath);
+        const rendered = page.rendered ?? '';
+        const pageMs = skippedSlugs.has(slug)
+          ? manifest.entries[slug]?.pageMs ?? 0
+          : (page.renderMs ?? 0) + (onFileMs.get(slug) ?? 0);
+        const pageData = { ...page } as Record<string, unknown>;
+        delete pageData.rendered;
+        delete pageData.renderMs;
+        manifest.entries[slug] = {
+          source: page.sourcePath,
+          sourceHash,
+          templateHash,
+          page: pageData as unknown as Page,
+          rendered,
+          pageMs,
+        };
+      }
+      saveCache(cachePath, manifest);
+    }
+
+    this.lastStats = stats;
     return pages;
   }
 

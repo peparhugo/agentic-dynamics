@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { build, BuildOptions } from './ssg';
+import { build, buildIncremental, BuildOptions } from './ssg';
 import { startDevServer, DEFAULT_SERVE_PORT } from './serve';
 
 const DEFAULT_COMMAND = 'build';
@@ -21,6 +21,8 @@ Options:
   --content <dir>     Source directory for Markdown files (default: ./content)
   --output <dir>      Output directory for generated HTML (default: ./dist)
   --templates <dir>   Directory for Handlebars templates (default: ./templates)
+  --incremental       Only rebuild pages whose source or templates changed
+  --clean             Force a clean build, ignoring the cache
   --port <number>     Port for the dev server (default: ${DEFAULT_SERVE_PORT})
   --help              Show this help`);
 }
@@ -51,6 +53,14 @@ function parseArgs(argv: string[]): { command: string; options: CliOptions; help
         options.templateDir = argv[idx + 1];
         idx += 2;
         break;
+      case '--incremental':
+        options.incremental = true;
+        idx += 1;
+        break;
+      case '--clean':
+        options.clean = true;
+        idx += 1;
+        break;
       case '--port':
         options.port = Number.parseInt(argv[idx + 1], 10);
         idx += 2;
@@ -77,8 +87,16 @@ function main(): void {
   }
 
   if (command === 'build') {
-    const pages = build(options);
-    console.log(`Generated ${pages.length} page(s) into ${options.outputDir ?? './dist'}`);
+    if (options.incremental || options.clean) {
+      const { pages, stats } = buildIncremental(options);
+      console.log(`Generated ${pages.length} page(s) into ${options.outputDir ?? './dist'}`);
+      console.log(
+        `Incremental build: ${stats.built} page(s) built, ${stats.skipped} page(s) skipped (${stats.timeSaved}ms saved)`
+      );
+    } else {
+      const pages = build(options);
+      console.log(`Generated ${pages.length} page(s) into ${options.outputDir ?? './dist'}`);
+    }
     return;
   }
 

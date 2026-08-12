@@ -8,6 +8,31 @@ export interface BuildOptions {
   defaultLayout?: string;
   configPath?: string;
   plugins?: Plugin[];
+  /**
+   * Incremental build: reuse cached pages whose source and templates have not
+   * changed, skipping their parse and render work.
+   */
+  incremental?: boolean;
+  /**
+   * Clean build: ignore any existing cache and rebuild every page.
+   */
+  clean?: boolean;
+}
+
+/**
+ * Summary of an (incremental) build run.
+ */
+export interface BuildStats {
+  /** Total number of source pages discovered. */
+  total: number;
+  /** Number of pages that were actually (re)built. */
+  built: number;
+  /** Number of pages reused from the cache. */
+  skipped: number;
+  /** Approximate milliseconds saved by skipping cached pages. */
+  timeSaved: number;
+  /** Path of the cache manifest, when one was used. */
+  cacheFile?: string;
 }
 
 export interface Frontmatter {
@@ -30,4 +55,6 @@ export interface Page {
   content: string;
   html: string;
   rendered?: string;
+  /** Internal: how long template rendering took for this page (ms). */
+  renderMs?: number;
 }

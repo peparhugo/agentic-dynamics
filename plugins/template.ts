@@ -18,14 +18,20 @@ export class TemplatePlugin implements Plugin {
       defaultTemplate: ctx.options.defaultTemplate,
       defaultLayout: ctx.options.defaultLayout,
     });
-    fs.rmSync(ctx.outputDir, { recursive: true, force: true });
+    if (!ctx.options.incremental && !ctx.options.clean) {
+      fs.rmSync(ctx.outputDir, { recursive: true, force: true });
+    }
     fs.mkdirSync(ctx.outputDir, { recursive: true });
   }
 
   afterBuild(ctx: PluginContext): void {
     const engine = this.engine ?? new TemplateEngine({ templateDir: ctx.templateDir });
     for (const page of ctx.pages) {
-      page.rendered = engine.renderPage(page);
+      if (!page.rendered) {
+        const start = Date.now();
+        page.rendered = engine.renderPage(page);
+        page.renderMs = Date.now() - start;
+      }
       const filePath = path.join(ctx.outputDir, `${page.slug}.html`);
       fs.mkdirSync(path.dirname(filePath), { recursive: true });
       fs.writeFileSync(filePath, page.rendered, 'utf8');
