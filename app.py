@@ -8,6 +8,7 @@ import os
 import time
 from werkzeug.security import check_password_hash, generate_password_hash
 import jwt
+from tasks import send_notification_email
 
 app = Flask(__name__)
 
@@ -227,6 +228,7 @@ def edit_task(task_id: int):
         return jsonify({"error": "title must be a non-empty string"}), 400
     if "status" in data and not isinstance(data["status"], str):
         return jsonify({"error": "status must be a string"}), 400
+    current_task = get_task(task_id, g.user["id"])
     task = update_task(
         task_id,
         title=data["title"].strip() if "title" in data else None,
@@ -235,6 +237,13 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if current_task["status"] != "completed" and task["status"] == "completed":
+        with get_db() as conn:
+            owner = conn.execute(
+                "SELECT username FROM users WHERE id = ?", (task["owner_id"],)
+            ).fetchone()
+        if owner is not None:
+            send_notification_email.delay(owner["username"], task["title"])
     return jsonify(task)
 
 

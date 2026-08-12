@@ -81,3 +81,44 @@ def test_old_tasks_schema_is_migrated_without_data_loss(tmp_path, monkeypatch):
         columns = {item[1] for item in conn.execute("PRAGMA table_info(tasks)")}
     assert dict(row) == {"title": "legacy", "owner_id": None}
     assert "owner_id" in columns
+
+
+def test_completing_task_enqueues_notification(client, monkeypatch):
+    register(client, "alice@example.com")
+    user_token = token(client, "alice@example.com")
+    created = client.post(
+        "/tasks", headers=auth(user_token), json={"title": "Write tests"}
+    )
+    calls = []
+    monkeypatch.setattr(
+        "app.send_notification_email.delay",
+        lambda user_email, task_title: calls.append((user_email, task_title)),
+    )
+
+    response = client.put(
+        f"/tasks/{created.get_json()['id']}",
+        headers=auth(user_token),
+        json={"status": "completed"},
+    )
+
+    assert response.status_code == 200
+    assert calls == [("alice@example.com", "Write tests")]
+
+
+def test_notification_only_sends_on_transition_to_completed(client, monkeypatch):
+    register(client, "alice@example.com")
+    user_token = token(client, "alice@example.com")
+    created = client.post(
+        "/tasks", headers=auth(user_token), json={"title": "Ship feature"}
+    )
+    calls = []
+    monkeypatch.setattr(
+        "app.send_notification_email.delay",
+        lambda user_email, task_title: calls.append((user_email, task_title)),
+    )
+
+    task_url = f"/tasks/{created.get_json()['id']}"
+    client.put(task_url, headers=auth(user_token), json={"status": "completed"})
+    client.put(task_url, headers=auth(user_token), json={"title": "Shipped feature"})
+
+    assert calls == [("alice@example.com", "Ship feature")]
