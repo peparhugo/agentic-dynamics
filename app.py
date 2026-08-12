@@ -6,6 +6,8 @@ import os
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
@@ -20,7 +22,33 @@ from repositories import (
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "change-me-in-production")
 app.config["TOKEN_TTL_SECONDS"] = int(os.environ.get("TOKEN_TTL_SECONDS", "3600"))
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
+
+
+def rate_limit_key():
+    """Use the JWT subject when present, otherwise rate-limit by client IP."""
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        try:
+            payload = jwt.decode(
+                header[7:].strip(), app.config["SECRET_KEY"], algorithms=["HS256"]
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+)
 
 
 def init_db():
@@ -140,8 +168,36 @@ def create_task():
 @app.get("/tasks")
 @authenticate_request
 def list_tasks():
-    rows = TaskRepository(DATABASE).list_for_owner(g.current_user["id"])
-    return jsonify([task_dict(row) for row in rows])
+    raw_cursor = request.args.get("cursor")
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    cursor = None
+    if raw_cursor is not None:
+        try:
+            cursor = int(raw_cursor)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+        if cursor < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+
+    rows, total = TaskRepository(DATABASE).list_for_owner(
+        g.current_user["id"], cursor=cursor, limit=limit
+    )
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    return jsonify(
+        {
+            "data": [task_dict(row) for row in rows],
+            "next_cursor": str(rows[-1]["id"]) if has_more else None,
+            "total": total,
+        }
+    )
 
 
 def find_task(task_id):

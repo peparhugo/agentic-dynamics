@@ -132,13 +132,22 @@ class TaskRepository(BaseRepository):
                 (task_id, owner_id),
             ).fetchone()
 
-    def list_for_owner(self, owner_id):
+    def list_for_owner(self, owner_id, cursor=None, limit=20):
         with self._connect() as connection:
-            return connection.execute(
-                f"SELECT {', '.join(self.columns)} FROM tasks "
-                "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-                (owner_id,),
+            where = "WHERE owner_id = ?"
+            parameters = [owner_id]
+            if cursor is not None:
+                where += " AND id < ?"
+                parameters.append(cursor)
+            rows = connection.execute(
+                f"SELECT {', '.join(self.columns)} FROM tasks {where} "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                tuple(parameters) + (limit + 1,),
             ).fetchall()
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+        return rows, total
 
     def update_for_owner(self, task_id, owner_id, values):
         fields = [field for field in values if field in ("title", "status")]

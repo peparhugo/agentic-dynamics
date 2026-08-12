@@ -1,6 +1,7 @@
 import sqlite3
 
 import pytest
+from limits.storage import MemoryStorage
 
 import app as task_app
 
@@ -10,6 +11,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
     task_app.app.config["TESTING"] = True
+    memory_storage = MemoryStorage()
+    task_app.limiter._storage = memory_storage
+    task_app.limiter._limiter.storage = memory_storage
     return task_app.app.test_client()
 
 
@@ -67,7 +71,9 @@ def test_tasks_are_isolated_by_owner(client):
 
     created = client.post("/tasks", headers=auth(alice), json={"title": "private"})
     task_id = created.get_json()["id"]
-    assert client.get("/tasks", headers=auth(bob)).get_json() == []
+    assert client.get("/tasks", headers=auth(bob)).get_json() == {
+        "data": [], "next_cursor": None, "total": 0
+    }
     assert client.get(f"/tasks/{task_id}", headers=auth(bob)).status_code == 404
     assert client.put(
         f"/tasks/{task_id}", headers=auth(bob), json={"title": "stolen"}
@@ -136,3 +142,40 @@ def test_repeated_completed_update_does_not_queue_notification(client, monkeypat
 
     assert response.status_code == 200
     assert calls == []
+
+
+def test_tasks_use_cursor_pagination(client):
+    register(client, "alice")
+    token = login(client, "alice")
+    for title in ("one", "two", "three"):
+        assert client.post("/tasks", headers=auth(token), json={"title": title}).status_code == 201
+
+    first = client.get("/tasks?limit=2", headers=auth(token))
+    first_body = first.get_json()
+    assert first.status_code == 200
+    assert len(first_body["data"]) == 2
+    assert first_body["total"] == 3
+    assert first_body["next_cursor"] == str(first_body["data"][-1]["id"])
+
+    second = client.get(
+        f"/tasks?cursor={first_body['next_cursor']}&limit=2", headers=auth(token)
+    )
+    second_body = second.get_json()
+    assert [task["title"] for task in second_body["data"]] == ["one"]
+    assert second_body["next_cursor"] is None
+
+
+def test_rate_limit_returns_retry_after(client):
+    register(client, "alice")
+    token = login(client, "alice")
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth(token)).status_code == 200
+    limited = client.get("/tasks", headers=auth(token))
+    assert limited.status_code == 429
+    assert limited.headers.get("Retry-After")
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 401
+    assert client.post("/auth/login", json={}).status_code == 429
