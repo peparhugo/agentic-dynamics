@@ -20,6 +20,7 @@ import jwt
 from flask import Flask, jsonify, request
 
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -55,6 +56,10 @@ def get_db():
     conn = sqlite3.connect(get_database_path())
     conn.row_factory = sqlite3.Row
     return conn
+
+
+task_repository = TaskRepository(get_db)
+user_repository = UserRepository(get_db)
 
 
 def init_db():
@@ -114,11 +119,7 @@ def current_user():
     user_id = payload.get("sub")
     if user_id is None:
         return None
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    return row
+    return user_repository.get(user_id)
 
 
 def auth_required(f):
@@ -144,15 +145,6 @@ def serialize_task(row):
     }
 
 
-def fetch_own_task(task_id, user_id):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
-    return row
-
-
 def dispatch_completion_notification(user_email, task_title):
     """Enqueue the notification email without blocking the API response."""
     try:
@@ -175,18 +167,11 @@ def register():
     if password is None or str(password) == "":
         return jsonify({"error": "password is required"}), 400
     username = str(username).strip()
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing is not None:
-            return jsonify({"error": "username already taken"}), 409
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, hash_password(str(password))),
-        )
-        conn.commit()
-        user_id = cursor.lastrowid
+    if user_repository.find_id_by_username(username) is not None:
+        return jsonify({"error": "username already taken"}), 409
+    user_id = user_repository.create(
+        username=username, password_hash=hash_password(str(password))
+    )
     return jsonify({"id": user_id, "username": username}), 201
 
 
@@ -197,10 +182,7 @@ def login():
     password = data.get("password")
     if username is None or password is None:
         return jsonify({"error": "username and password are required"}), 400
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (str(username).strip(),)
-        ).fetchone()
+    row = user_repository.get_by_username(str(username).strip())
     if row is None or not check_password(str(password), row["password_hash"]):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(row["id"], row["username"])})
@@ -218,14 +200,9 @@ def create_task():
     status = data.get("status") or "pending"
     now = datetime.utcnow().isoformat()
     owner_id = request.user["id"]
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) "
-            "VALUES (?, ?, ?, ?)",
-            (str(title).strip(), status, now, owner_id),
-        )
-        conn.commit()
-        task_id = cursor.lastrowid
+    task_id = task_repository.create(
+        title=str(title).strip(), status=status, created_at=now, owner_id=owner_id
+    )
     return jsonify({
         "id": task_id,
         "title": str(title).strip(),
@@ -237,19 +214,14 @@ def create_task():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks():
-    owner_id = request.user["id"]
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
+    rows = task_repository.list_for_owner(request.user["id"])
     return jsonify([serialize_task(r) for r in rows])
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @auth_required
 def get_task(task_id):
-    row = fetch_own_task(task_id, request.user["id"])
+    row = task_repository.get_owned(task_id, request.user["id"])
     if row is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(serialize_task(row))
@@ -258,7 +230,7 @@ def get_task(task_id):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @auth_required
 def update_task(task_id):
-    row = fetch_own_task(task_id, request.user["id"])
+    row = task_repository.get_owned(task_id, request.user["id"])
     if row is None:
         return jsonify({"error": "task not found"}), 404
     data = request.get_json(silent=True) or {}
@@ -271,15 +243,10 @@ def update_task(task_id):
         title = row["title"]
     status = data.get("status", row["status"])
     became_completed = status == "completed" and row["status"] != "completed"
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
-            (title, status, task_id),
-        )
-        conn.commit()
+    task_repository.update(task_id, title=title, status=status)
     if became_completed:
         dispatch_completion_notification(request.user["username"], title)
-    return jsonify(serialize_task(fetch_own_task(task_id, request.user["id"])))
+    return jsonify(serialize_task(task_repository.get_owned(task_id, request.user["id"])))
 
 
 # ── Error handlers ──────────────────────────────────────────────
