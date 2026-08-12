@@ -4,7 +4,11 @@ describe('parseArgs', () => {
   it('defaults command to build with default directories', () => {
     const { command, options } = parseArgs([]);
     expect(command).toBe('build');
-    expect(options).toEqual({ contentDir: 'content', outputDir: 'dist' } as CliOptions);
+    expect(options).toEqual({
+      contentDir: 'content',
+      outputDir: 'dist',
+      templatesDir: 'templates',
+    } as CliOptions);
   });
 
   it('parses an explicit command with options', () => {
@@ -18,6 +22,14 @@ describe('parseArgs', () => {
     expect(command).toBe('build');
     expect(options.contentDir).toBe('src/content');
     expect(options.outputDir).toBe('public');
+  });
+
+  it('parses the templates directory option', () => {
+    const { options } = parseArgs(['build', '--templates', 'themes/base']);
+    expect(options.templatesDir).toBe('themes/base');
+
+    const short = parseArgs(['build', '-t', 'custom']);
+    expect(short.options.templatesDir).toBe('custom');
   });
 
   it('parses shorthand flags', () => {

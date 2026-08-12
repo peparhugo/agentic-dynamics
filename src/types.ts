@@ -7,6 +7,8 @@ export interface Page {
   html: string;
   excerpt: string;
   filePath: string;
+  template?: string;
+  layout?: string;
 }
 
 export interface BuildResult {

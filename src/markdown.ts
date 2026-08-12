@@ -51,6 +51,9 @@ export function parseMarkdown(content: string, filePath: string): Page {
   const rawSlug = typeof data.slug === 'string' ? data.slug : '';
   const slug = slugify(rawSlug.trim() ? rawSlug : title);
 
+  const rawTemplate = typeof data.template === 'string' ? data.template.trim() : '';
+  const rawLayout = typeof data.layout === 'string' ? data.layout.trim() : '';
+
   const html = md.render(body);
   const excerpt = stripHtml(html).trim().replace(/\s+/g, ' ').slice(0, 200);
 
@@ -63,5 +66,7 @@ export function parseMarkdown(content: string, filePath: string): Page {
     html,
     excerpt,
     filePath,
+    template: rawTemplate || undefined,
+    layout: rawLayout || undefined,
   };
 }

@@ -1,8 +1,14 @@
-import { buildSite, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from './site';
+import {
+  buildSite,
+  DEFAULT_CONTENT_DIR,
+  DEFAULT_OUTPUT_DIR,
+} from './site';
+import { DEFAULT_TEMPLATES_DIR } from './template';
 
 export interface CliOptions {
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
 }
 
 export interface ParsedArgs {
@@ -18,9 +24,10 @@ export function printHelp(): void {
       'Generate a static site from Markdown files.',
       '',
       'Options:',
-      '  --content <dir>   directory containing Markdown files (default: ./content)',
-      '  --output <dir>    directory to write the generated site (default: ./dist)',
-      '  -h, --help        show this help message',
+      '  --content <dir>    directory containing Markdown files (default: ./content)',
+      '  --output <dir>     directory to write the generated site (default: ./dist)',
+      '  --templates <dir>  directory containing templates (default: ./templates)',
+      '  -h, --help         show this help message',
     ].join('\n')
   );
 }
@@ -35,6 +42,7 @@ export function parseArgs(argv: string[]): ParsedArgs {
   const options: CliOptions = {
     contentDir: DEFAULT_CONTENT_DIR,
     outputDir: DEFAULT_OUTPUT_DIR,
+    templatesDir: DEFAULT_TEMPLATES_DIR,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -51,6 +59,12 @@ export function parseArgs(argv: string[]): ParsedArgs {
         throw new Error(`missing value for ${arg}`);
       }
       options.outputDir = value;
+    } else if (arg === '--templates' || arg === '-t') {
+      const value = args[++i];
+      if (value === undefined) {
+        throw new Error(`missing value for ${arg}`);
+      }
+      options.templatesDir = value;
     } else if (arg === '--help' || arg === '-h') {
       printHelp();
       process.exit(0);
@@ -77,7 +91,11 @@ export function run(argv: string[]): void {
   }
 
   try {
-    const result = buildSite(parsed.options.contentDir, parsed.options.outputDir);
+    const result = buildSite(
+      parsed.options.contentDir,
+      parsed.options.outputDir,
+      parsed.options.templatesDir
+    );
     const pagesWord = result.pages === 1 ? 'page' : 'pages';
     console.log(`Built ${result.pages} ${pagesWord} into ${result.outputDir}`);
   } catch (err) {
