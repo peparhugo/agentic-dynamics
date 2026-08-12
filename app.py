@@ -6,13 +6,13 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 import logging
 
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from tasks import send_notification_email
+from repositories import DuplicateUserError, TaskRepository, UserRepository, initialize_database
 
 
 app = Flask(__name__)
@@ -23,36 +23,12 @@ JWT_EXPIRATION_HOURS = 24
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return UserRepository(DATABASE).connection()
 
 
 def init_db():
     """Create the schema and migrate databases created by older versions."""
-    with get_db() as conn:
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER REFERENCES users(id)"
-            ")"
-        )
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            # Nullable keeps legacy task rows readable while new rows are owned.
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
-        conn.commit()
+    initialize_database(DATABASE)
 
 
 def _encode_part(value):
@@ -90,8 +66,7 @@ def get_authenticated_user():
             return None
         if claims.get("sub") is None:
             return None
-        with get_db() as conn:
-            return conn.execute("SELECT * FROM users WHERE id = ?", (claims["sub"],)).fetchone()
+        return UserRepository(DATABASE).get(claims["sub"])
     except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeError):
         return None
 
@@ -114,16 +89,13 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
     try:
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            conn.commit()
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user = UserRepository(DATABASE).create({
+            "username": username,
+            "password_hash": generate_password_hash(password),
+        })
+    except DuplicateUserError:
         return jsonify({"error": "username already exists"}), 409
-    return jsonify({"id": user_id, "username": username}), 201
+    return jsonify({"id": user["id"], "username": username}), 201
 
 
 @app.post("/auth/login")
@@ -131,8 +103,7 @@ def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
-    with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    user = UserRepository(DATABASE).find_by_username(username)
     if not user or not isinstance(password, str) or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
@@ -140,56 +111,33 @@ def login():
 
 def create_task(title, owner_id):
     now = datetime.now(timezone.utc).isoformat()
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone())
+    return TaskRepository(DATABASE).create({
+        "title": title, "status": "pending", "created_at": now, "owner_id": owner_id,
+    })
 
 
 def get_tasks(owner_id):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
-        ).fetchall()
-        return [dict(row) for row in rows]
+    return TaskRepository(DATABASE).for_owner(owner_id)
 
 
 def get_task(task_id, owner_id):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-        return dict(row) if row else None
+    return TaskRepository(DATABASE).get_for_owner(task_id, owner_id)
 
 
 def fetch_task(task_id, owner_id=None):
     """Compatibility alias for callers that use the older helper name."""
     if owner_id is None:
-        with get_db() as conn:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-            return dict(row) if row else None
+        return TaskRepository(DATABASE).get_any(task_id)
     return get_task(task_id, owner_id)
 
 
 def update_task(task_id, owner_id, title=None, status=None):
-    if get_task(task_id, owner_id) is None:
-        return None
-    updates, params = [], []
+    updates = {}
     if title is not None:
-        updates.append("title = ?")
-        params.append(title)
+        updates["title"] = title
     if status is not None:
-        updates.append("status = ?")
-        params.append(status)
-    if updates:
-        params.extend([task_id, owner_id])
-        with get_db() as conn:
-            conn.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?", params)
-            conn.commit()
-    return get_task(task_id, owner_id)
+        updates["status"] = status
+    return TaskRepository(DATABASE).update_for_owner(task_id, owner_id, updates)
 
 
 @app.get("/tasks")
