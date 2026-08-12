@@ -20,26 +20,132 @@ def client():
     os.unlink(path)
 
 
+def register(client, username="alice", password="hunter2"):
+    return client.post("/auth/register", json={"username": username, "password": password})
+
+
+def login(client, username="alice", password="hunter2"):
+    return client.post("/auth/login", json={"username": username, "password": password})
+
+
+def auth_headers(client, username="alice", password="hunter2"):
+    register(client, username, password)
+    token = login(client, username, password).get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+# ── Auth: register ───────────────────────────────────────────
+
+def test_register_creates_user(client):
+    response = register(client)
+    assert response.status_code == 201
+    body = response.get_json()
+    assert body["username"] == "alice"
+    assert "id" in body
+    assert "password" not in body
+    assert "password_hash" not in body
+
+
+def test_register_missing_username_returns_400(client):
+    response = client.post("/auth/register", json={"password": "hunter2"})
+    assert response.status_code == 400
+
+
+def test_register_missing_password_returns_400(client):
+    response = client.post("/auth/register", json={"username": "alice"})
+    assert response.status_code == 400
+
+
+def test_register_duplicate_username_returns_409(client):
+    register(client)
+    response = register(client)
+    assert response.status_code == 409
+
+
+def test_password_is_hashed_not_stored_plaintext(client):
+    register(client)
+    user = app_module.get_user_by_username("alice")
+    assert user["password_hash"] != "hunter2"
+
+
+# ── Auth: login ──────────────────────────────────────────────
+
+def test_login_returns_token(client):
+    register(client)
+    response = login(client)
+    assert response.status_code == 200
+    assert "token" in response.get_json()
+
+
+def test_login_wrong_password_returns_401(client):
+    register(client)
+    response = login(client, password="wrongpass")
+    assert response.status_code == 401
+
+
+def test_login_unknown_user_returns_401(client):
+    response = login(client, username="ghost")
+    assert response.status_code == 401
+
+
+# ── Task endpoints require auth ─────────────────────────────
+
+def test_list_tasks_without_token_returns_401(client):
+    response = client.get("/tasks")
+    assert response.status_code == 401
+
+
+def test_post_task_without_token_returns_401(client):
+    response = client.post("/tasks", json={"title": "Buy milk"})
+    assert response.status_code == 401
+
+
+def test_show_task_without_token_returns_401(client):
+    response = client.get("/tasks/1")
+    assert response.status_code == 401
+
+
+def test_edit_task_without_token_returns_401(client):
+    response = client.put("/tasks/1", json={"title": "Nope"})
+    assert response.status_code == 401
+
+
+def test_invalid_token_returns_401(client):
+    response = client.get("/tasks", headers={"Authorization": "Bearer garbage"})
+    assert response.status_code == 401
+
+
+def test_malformed_auth_header_returns_401(client):
+    response = client.get("/tasks", headers={"Authorization": "garbage"})
+    assert response.status_code == 401
+
+
+# ── Task endpoints (authenticated) ──────────────────────────
+
 def test_post_missing_title_returns_400(client):
-    response = client.post("/tasks", json={})
+    headers = auth_headers(client)
+    response = client.post("/tasks", json={}, headers=headers)
     assert response.status_code == 400
     assert response.get_json() == {"error": "title is required"}
 
 
 def test_post_blank_title_returns_400(client):
-    response = client.post("/tasks", json={"title": "   "})
+    headers = auth_headers(client)
+    response = client.post("/tasks", json={"title": "   "}, headers=headers)
     assert response.status_code == 400
     assert response.get_json() == {"error": "title is required"}
 
 
 def test_post_no_body_returns_400(client):
-    response = client.post("/tasks")
+    headers = auth_headers(client)
+    response = client.post("/tasks", headers=headers)
     assert response.status_code == 400
     assert response.get_json() == {"error": "title is required"}
 
 
 def test_post_creates_task(client):
-    response = client.post("/tasks", json={"title": "Buy milk"})
+    headers = auth_headers(client)
+    response = client.post("/tasks", json={"title": "Buy milk"}, headers=headers)
     assert response.status_code == 201
     body = response.get_json()
     assert body["title"] == "Buy milk"
@@ -49,33 +155,41 @@ def test_post_creates_task(client):
 
 
 def test_list_tasks(client):
-    client.post("/tasks", json={"title": "Task A"})
-    client.post("/tasks", json={"title": "Task B"})
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "Task A"}, headers=headers)
+    client.post("/tasks", json={"title": "Task B"}, headers=headers)
 
-    response = client.get("/tasks")
+    response = client.get("/tasks", headers=headers)
     assert response.status_code == 200
     titles = {task["title"] for task in response.get_json()}
     assert titles == {"Task A", "Task B"}
 
 
 def test_show_task(client):
-    created = client.post("/tasks", json={"title": "Read book"}).get_json()
+    headers = auth_headers(client)
+    created = client.post("/tasks", json={"title": "Read book"}, headers=headers).get_json()
 
-    response = client.get(f"/tasks/{created['id']}")
+    response = client.get(f"/tasks/{created['id']}", headers=headers)
     assert response.status_code == 200
     assert response.get_json()["title"] == "Read book"
 
 
 def test_show_task_not_found(client):
-    response = client.get("/tasks/999")
+    headers = auth_headers(client)
+    response = client.get("/tasks/999", headers=headers)
     assert response.status_code == 404
     assert response.get_json() == {"error": "task not found"}
 
 
 def test_edit_task(client):
-    created = client.post("/tasks", json={"title": "Old title"}).get_json()
+    headers = auth_headers(client)
+    created = client.post("/tasks", json={"title": "Old title"}, headers=headers).get_json()
 
-    response = client.put(f"/tasks/{created['id']}", json={"title": "New title", "status": "done"})
+    response = client.put(
+        f"/tasks/{created['id']}",
+        json={"title": "New title", "status": "done"},
+        headers=headers,
+    )
     assert response.status_code == 200
     body = response.get_json()
     assert body["title"] == "New title"
@@ -83,6 +197,79 @@ def test_edit_task(client):
 
 
 def test_edit_task_not_found(client):
-    response = client.put("/tasks/999", json={"title": "Nope"})
+    headers = auth_headers(client)
+    response = client.put("/tasks/999", json={"title": "Nope"}, headers=headers)
     assert response.status_code == 404
     assert response.get_json() == {"error": "task not found"}
+
+
+# ── Per-user task isolation ──────────────────────────────────
+
+def test_users_only_see_their_own_tasks(client):
+    alice_headers = auth_headers(client, "alice", "pw-alice")
+    bob_headers = auth_headers(client, "bob", "pw-bob")
+
+    client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers)
+    client.post("/tasks", json={"title": "Bob task"}, headers=bob_headers)
+
+    alice_titles = {t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()}
+    bob_titles = {t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()}
+
+    assert alice_titles == {"Alice task"}
+    assert bob_titles == {"Bob task"}
+
+
+def test_user_cannot_view_another_users_task(client):
+    alice_headers = auth_headers(client, "alice", "pw-alice")
+    bob_headers = auth_headers(client, "bob", "pw-bob")
+
+    created = client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers).get_json()
+
+    response = client.get(f"/tasks/{created['id']}", headers=bob_headers)
+    assert response.status_code == 404
+
+
+def test_user_cannot_edit_another_users_task(client):
+    alice_headers = auth_headers(client, "alice", "pw-alice")
+    bob_headers = auth_headers(client, "bob", "pw-bob")
+
+    created = client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers).get_json()
+
+    response = client.put(
+        f"/tasks/{created['id']}", json={"title": "Hacked"}, headers=bob_headers
+    )
+    assert response.status_code == 404
+
+
+# ── Migration: existing rows without owner_id ────────────────
+
+def test_migration_adds_owner_id_column_to_existing_db(tmp_path):
+    db_path = str(tmp_path / "legacy.db")
+
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE tasks ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  title TEXT NOT NULL,"
+        "  status TEXT NOT NULL DEFAULT 'pending',"
+        "  created_at TEXT NOT NULL"
+        ")"
+    )
+    conn.execute(
+        "INSERT INTO tasks (title, status, created_at) VALUES ('Legacy task', 'pending', '2020-01-01T00:00:00')"
+    )
+    conn.commit()
+    conn.close()
+
+    app_module.DATABASE = db_path
+    app_module.init_db()
+
+    conn = app_module.get_db()
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()}
+    assert "owner_id" in columns
+
+    row = conn.execute("SELECT * FROM tasks WHERE title = 'Legacy task'").fetchone()
+    assert row["owner_id"] is None
+    conn.close()
