@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from app import NotificationServer, app, init_db, notification_server
+from app import NotificationServer, app, get_db, init_db, notification_server
 
 
 class FakeWebSocket:
@@ -10,6 +10,9 @@ class FakeWebSocket:
         self.sent = []
 
     async def send_text(self, message):
+        self.sent.append(json.loads(message))
+
+    async def send(self, message):
         self.sent.append(json.loads(message))
 
 
@@ -50,6 +53,17 @@ class FakeBroker:
     def forget_subscription(self, client_id, channel):
         if (client_id, channel) in self.subscriptions:
             self.subscriptions.remove((client_id, channel))
+
+
+class RateLimitedBroker(FakeBroker):
+    def __init__(self, limit):
+        super().__init__()
+        self.limit = limit
+        self.counts = {}
+
+    def allow_message(self, client_id, limit):
+        self.counts[client_id] = self.counts.get(client_id, 0) + 1
+        return self.counts[client_id] <= self.limit
 
 
 def test_broker_publish_and_connection_state_are_used():
@@ -163,3 +177,40 @@ def test_health_reports_connected_client_count():
 
     assert response.status_code == 200
     assert response.get_json() == {"connected_clients": 0}
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_message(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "1")
+    broker = RateLimitedBroker(limit=1)
+    server = NotificationServer(broker=broker)
+    websocket = IncomingWebSocket([
+        json.dumps({"type": "broadcast", "payload": {"message": "one"}}),
+        json.dumps({"type": "broadcast", "payload": {"message": "two"}}),
+    ])
+
+    await server.websocket_handler(websocket)
+
+    assert websocket.sent[0]["payload"] == {"message": "one"}
+    assert websocket.sent[1] == {"type": "error", "error": "rate limit exceeded"}
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_and_paginates_chronologically():
+    broker = FakeBroker()
+    server = NotificationServer(broker=broker)
+    await server.broadcast({"message": "later"}, channel="history-test")
+    await server.broadcast({"message": "other"}, channel="other-channel")
+    await server.broadcast({"message": "last"}, channel="history-test")
+
+    response = app.test_client().get("/history?channel=history-test&limit=1")
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["has_more"] is True
+    assert [item["payload"]["message"] for item in body["messages"]] == ["later"]
+
+    with get_db() as conn:
+        conn.execute("DELETE FROM messages WHERE channel IN (?, ?)",
+                     ("history-test", "other-channel"))
+        conn.commit()

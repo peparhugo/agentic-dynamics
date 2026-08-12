@@ -82,6 +82,9 @@ class WebSocketTransport(BaseTransport):
                         "broadcast", "direct", "system", "subscribe", "unsubscribe"
                     }:
                         continue
+                    if not server.allow_message(client_id):
+                        await server.send_error(client_id, "rate limit exceeded")
+                        continue
                     if message_type in {"subscribe", "unsubscribe"}:
                         channel = message.get("channel")
                         if channel is None and isinstance(payload, dict):

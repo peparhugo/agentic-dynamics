@@ -6,7 +6,7 @@ Designed as a baseline for multi-session stories.
 """
 
 from flask import Flask, request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import os
 import asyncio
@@ -29,6 +29,21 @@ DATABASE_URL = os.environ.get("DATABASE_URL", os.environ.get("DATABASE", "todos.
 # Retain the old name for callers that imported the seed application's setting.
 DATABASE = DATABASE_URL
 REDIS_CHANNEL = "notification_messages"
+
+
+def _rate_limit() -> int:
+    """Read the limit at use time so deployments can configure it by environment."""
+    try:
+        return max(0, int(os.environ.get("RATE_LIMIT", "100")))
+    except ValueError:
+        return 100
+
+
+def _message_ttl_days() -> int:
+    try:
+        return max(0, int(os.environ.get("MESSAGE_TTL_DAYS", "7")))
+    except ValueError:
+        return 7
 
 
 def _database_path() -> str:
@@ -75,6 +90,27 @@ class RedisBroker:
         except Exception:
             self.client = None
             return False
+
+    def allow_message(self, client_id: str, limit: int | None = None) -> bool | None:
+        """Increment a per-client fixed one-minute Redis counter.
+
+        ``None`` means Redis is unavailable; callers can retain local operation in
+        that case. Redis itself remains the source of truth whenever connected.
+        """
+        if not self.connect():
+            return None
+        limit = _rate_limit() if limit is None else limit
+        if limit == 0:
+            return False
+        key = f"notification:rate:{client_id}"
+        try:
+            count = self.client.incr(key)
+            if count == 1:
+                self.client.expire(key, 60)
+            return count <= limit
+        except Exception:
+            self.client = None
+            return None
 
     def remember_client(self, client_id: str) -> None:
         if self.connect():
@@ -149,6 +185,7 @@ class NotificationServer:
         self._loop = None
         self._origin = str(uuid.uuid4())
         self.transport = transport or self._configured_transport()
+        self._cleanup_task = None
 
     @staticmethod
     def _configured_transport():
@@ -309,8 +346,29 @@ class NotificationServer:
             raise RuntimeError("The configured transport does not support WebSocket connections")
         await handler(websocket, self)
 
+    def allow_message(self, client_id: str) -> bool:
+        allowed = self.broker.allow_message(client_id, _rate_limit()) \
+            if hasattr(self.broker, "allow_message") else True
+        return allowed is not False
+
+    async def send_error(self, client_id: str, message: str) -> None:
+        error = json.dumps({"type": "error", "error": message})
+        await self.transport.send_message(client_id, error)
+
+    async def _cleanup_messages(self):
+        while True:
+            cutoff = (datetime.utcnow() - timedelta(days=_message_ttl_days())).isoformat() + "Z"
+            try:
+                with get_db() as conn:
+                    conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+                    conn.commit()
+            except sqlite3.Error:
+                pass
+            await asyncio.sleep(86400)
+
     async def start(self, host="localhost", port=8765):
         self._loop = asyncio.get_running_loop()
+        self._cleanup_task = asyncio.create_task(self._cleanup_messages())
         self.broker.start(self._on_broker_message)
         self._server = await websockets.serve(self.websocket_handler, host, port)
         return self._server
@@ -321,6 +379,13 @@ class NotificationServer:
             await self._server.wait_closed()
             self._server = None
         self.broker.stop()
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         self._loop = None
 
 
@@ -352,6 +417,18 @@ def init_db():
             "  timestamp TEXT NOT NULL"
             ")"
         )
+
+
+def _message_rows(rows):
+    result = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["payload"] = json.loads(item["payload"])
+        except json.JSONDecodeError:
+            pass
+        result.append(item)
+    return result
 
 
 # Keep the API usable when imported by WSGI servers and test clients.
@@ -465,15 +542,34 @@ def list_messages():
             "SELECT id, channel, type, payload, timestamp FROM messages "
             "ORDER BY id DESC LIMIT ? OFFSET ?", (limit, offset)
         ).fetchall()
-    result = []
-    for row in rows:
-        item = dict(row)
+    return jsonify(_message_rows(rows))
+
+
+@app.route("/history", methods=["GET"])
+def message_history():
+    channel = request.args.get("channel")
+    if not channel:
+        return jsonify({"error": "channel is required"}), 400
+    try:
+        limit = max(1, min(int(request.args.get("limit", 50)), 1000))
+    except ValueError:
+        return jsonify({"error": "limit must be an integer"}), 400
+    since = request.args.get("since")
+    if since:
         try:
-            item["payload"] = json.loads(item["payload"])
-        except json.JSONDecodeError:
-            pass
-        result.append(item)
-    return jsonify(result)
+            datetime.fromisoformat(since.rstrip("Z"))
+        except ValueError:
+            return jsonify({"error": "since must be an ISO timestamp"}), 400
+    query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE channel = ?"
+    params = [channel]
+    if since:
+        query += " AND timestamp >= ?"
+        params.append(since)
+    query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+    params.append(limit + 1)
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+    return jsonify({"messages": _message_rows(rows[:limit]), "has_more": len(rows) > limit})
 
 
 @app.route("/tasks", methods=["POST"])
