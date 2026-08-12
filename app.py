@@ -9,6 +9,12 @@ Session 2: JWT authentication added.
   - POST /auth/register and POST /auth/login
   - All /tasks/* endpoints require a valid JWT
   - Each user only sees their own tasks (Task.owner_id)
+
+Session 3: Async email notifications.
+  - Celery + Redis for background jobs
+  - When a task transitions to 'completed', enqueue send_notification_email
+    to the task owner (email is optional on register, defaults to
+    <username>@example.com)
 """
 
 from flask import Flask, request, jsonify, g
@@ -18,6 +24,8 @@ import sqlite3
 import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+
+from tasks import send_notification_email
 
 app = Flask(__name__)
 
@@ -38,7 +46,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -54,6 +63,10 @@ def init_db():
         cols = [row[1] for row in conn.execute("PRAGMA table_info(tasks)")]
         if "owner_id" not in cols:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        # Migration: add email to pre-existing users tables without it.
+        user_cols = [row[1] for row in conn.execute("PRAGMA table_info(users)")]
+        if "email" not in user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
 
 
@@ -70,14 +83,15 @@ def _notify_admin(task_id, action):
     print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
 
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
+    user_email = (email or "").strip() or f"{username}@example.com"
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, generate_password_hash(password), user_email),
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "username": username}
+        return {"id": cursor.lastrowid, "username": username, "email": user_email}
 
 
 def get_user_by_username(username: str) -> dict | None:
@@ -179,6 +193,19 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
     return get_task(task_id, owner_id)
 
 
+def notify_task_completed(owner_id: int, task_title: str) -> None:
+    """Enqueue an async notification email to the task owner.
+
+    Dispatch is non-blocking: the task is sent to Celery (Redis broker)
+    and the API response returns immediately.
+    """
+    user = get_user(owner_id)
+    if user is None:
+        return
+    user_email = user.get("email") or f"{user['username']}@example.com"
+    send_notification_email.delay(user_email, task_title)
+
+
 # ── Auth helpers ──────────────────────────────────────────────
 
 
@@ -254,6 +281,7 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    previous = get_task(task_id, g.user_id)
     task = update_task(
         task_id,
         g.user_id,
@@ -262,6 +290,11 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if (
+        task["status"] == "completed"
+        and (previous is None or previous["status"] != "completed")
+    ):
+        notify_task_completed(g.user_id, task["title"])
     return jsonify(task)
 
 
