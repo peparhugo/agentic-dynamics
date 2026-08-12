@@ -5,6 +5,7 @@ import { build } from './ssg';
 export interface CliOptions {
   contentDir: string;
   outputDir: string;
+  templateDir: string;
 }
 
 export type ParseResult = CliOptions | 'help' | 'invalid';
@@ -15,9 +16,10 @@ export function printHelp(): void {
 Generate a static site from Markdown files.
 
 Options:
-  --content <dir>  Directory containing Markdown content (default: ./content)
-  --output <dir>   Directory to write the generated HTML (default: ./dist)
-  --help, -h       Show this help message
+  --content <dir>   Directory containing Markdown content (default: ./content)
+  --output <dir>    Directory to write the generated HTML (default: ./dist)
+  --templates <dir> Directory containing Handlebars templates (default: ./templates)
+  --help, -h        Show this help message
 `);
 }
 
@@ -32,21 +34,27 @@ export function parseArgs(args: string[]): ParseResult {
   if (subcommand !== 'build') {
     return 'invalid';
   }
-  const options: CliOptions = { contentDir: 'content', outputDir: 'dist' };
+  const options: CliOptions = {
+    contentDir: 'content',
+    outputDir: 'dist',
+    templateDir: 'templates',
+  };
   for (let i = 1; i < args.length; i++) {
     const arg = args[i];
     if (arg === '--help' || arg === '-h') {
       return 'help';
     }
-    if (arg === '--content' || arg === '--output') {
+    if (arg === '--content' || arg === '--output' || arg === '--templates') {
       const value = args[i + 1];
       if (!value || value.startsWith('--')) {
         return 'invalid';
       }
       if (arg === '--content') {
         options.contentDir = value;
-      } else {
+      } else if (arg === '--output') {
         options.outputDir = value;
+      } else {
+        options.templateDir = value;
       }
       i += 1;
     } else {

@@ -127,7 +127,11 @@ describe('renderIndex', () => {
 
 describe('build', () => {
   it('writes index.html and one HTML file per page to the output directory', async () => {
-    const pages = await build({ contentDir: CONTENT_DIR, outputDir });
+    const pages = await build({
+      contentDir: CONTENT_DIR,
+      outputDir,
+      templateDir: path.join(FIXTURES, 'does-not-exist'),
+    });
     expect(pages).toHaveLength(2);
 
     const files = (await fs.readdir(outputDir)).sort();
@@ -146,13 +150,26 @@ describe('build', () => {
 
 describe('parseArgs', () => {
   it('uses defaults for build', () => {
-    expect(parseArgs(['build'])).toEqual({ contentDir: 'content', outputDir: 'dist' });
+    expect(parseArgs(['build'])).toEqual({
+      contentDir: 'content',
+      outputDir: 'dist',
+      templateDir: 'templates',
+    });
   });
 
   it('honors --content and --output', () => {
     expect(parseArgs(['build', '--content', 'src/posts', '--output', 'public'])).toEqual({
       contentDir: 'src/posts',
       outputDir: 'public',
+      templateDir: 'templates',
+    });
+  });
+
+  it('honors --templates', () => {
+    expect(parseArgs(['build', '--templates', 'theme'])).toEqual({
+      contentDir: 'content',
+      outputDir: 'dist',
+      templateDir: 'theme',
     });
   });
 
@@ -165,6 +182,7 @@ describe('parseArgs', () => {
     expect(parseArgs([])).toBe('invalid');
     expect(parseArgs(['serve'])).toBe('invalid');
     expect(parseArgs(['build', '--content'])).toBe('invalid');
+    expect(parseArgs(['build', '--templates'])).toBe('invalid');
     expect(parseArgs(['build', '--output', '--content', 'x'])).toBe('invalid');
   });
 });

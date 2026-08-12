@@ -4,6 +4,12 @@ import { marked } from 'marked';
 import matter from 'gray-matter';
 
 import type { BuildOptions, Page } from './types';
+import {
+  loadTemplateEngine,
+  renderIndexWithTemplates,
+  renderPageWithTemplates,
+  type FallbackRenderers,
+} from './templates';
 
 function slugify(name: string): string {
   return name
@@ -70,6 +76,14 @@ export async function parseMarkdownFile(filePath: string): Promise<Page> {
       : rawDate instanceof Date && !isNaN(rawDate.getTime())
         ? rawDate.toISOString().slice(0, 10)
         : undefined;
+  const template =
+    typeof frontmatter.template === 'string' && frontmatter.template.trim().length > 0
+      ? frontmatter.template.trim()
+      : undefined;
+  const layout =
+    typeof frontmatter.layout === 'string' && frontmatter.layout.trim().length > 0
+      ? frontmatter.layout.trim()
+      : undefined;
   const html = await marked.parse(parsed.content);
   return {
     slug,
@@ -78,10 +92,13 @@ export async function parseMarkdownFile(filePath: string): Promise<Page> {
     tags: normalizeTags(frontmatter.tags),
     content: parsed.content,
     html,
+    template,
+    layout,
+    data: frontmatter,
   };
 }
 
-export function renderPage(page: Page): string {
+export function renderDocument(page: Page, content: string): string {
   const dateHtml = page.date
     ? `<p class="date"><time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time></p>`
     : '';
@@ -105,7 +122,7 @@ export function renderPage(page: Page): string {
     ${dateHtml}
   </header>
   <main>
-${page.html}
+${content}
 ${tagsHtml}
   </main>
 </body>
@@ -113,8 +130,12 @@ ${tagsHtml}
 `;
 }
 
-export function renderIndex(pages: Page[]): string {
-  const items = [...pages]
+export function renderPage(page: Page): string {
+  return renderDocument(page, page.html);
+}
+
+export function renderIndexItems(pages: Page[]): string {
+  return [...pages]
     .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))
     .map((page) => {
       const date = page.date
@@ -127,6 +148,13 @@ export function renderIndex(pages: Page[]): string {
       return `    <li><a href="${pagePath(page)}">${escapeHtml(page.title)}</a>${date}${tags}</li>`;
     })
     .join('\n');
+}
+
+export function renderIndexBody(pages: Page[]): string {
+  return `    <ul>\n${renderIndexItems(pages)}\n    </ul>`;
+}
+
+export function renderIndex(pages: Page[]): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,9 +167,7 @@ export function renderIndex(pages: Page[]): string {
     <h1>Index</h1>
   </header>
   <main>
-    <ul>
-${items}
-    </ul>
+${renderIndexBody(pages)}
   </main>
 </body>
 </html>
@@ -155,11 +181,23 @@ export async function build(options: BuildOptions): Promise<Page[]> {
     pages.push(await parseMarkdownFile(file));
   }
   await fs.mkdir(options.outputDir, { recursive: true });
-  await Promise.all([
-    fs.writeFile(path.join(options.outputDir, 'index.html'), renderIndex(pages), 'utf8'),
-    ...pages.map((page) =>
-      fs.writeFile(path.join(options.outputDir, pagePath(page)), renderPage(page), 'utf8')
+  const engine = await loadTemplateEngine(options.templateDir ?? 'templates');
+  const fallbacks: FallbackRenderers = {
+    document: renderDocument,
+    indexBody: renderIndexBody,
+    indexDocument: renderIndex,
+  };
+  const writes: Promise<void>[] = [
+    fs.writeFile(
+      path.join(options.outputDir, 'index.html'),
+      engine ? renderIndexWithTemplates(pages, engine, fallbacks) : renderIndex(pages),
+      'utf8'
     ),
-  ]);
+  ];
+  for (const page of pages) {
+    const html = engine ? renderPageWithTemplates(page, engine, fallbacks) : renderPage(page);
+    writes.push(fs.writeFile(path.join(options.outputDir, pagePath(page)), html, 'utf8'));
+  }
+  await Promise.all(writes);
   return pages;
 }
