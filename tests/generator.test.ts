@@ -40,4 +40,39 @@ describe('buildSite', () => {
     const output = await fs.readFile(path.join(root, 'dist', 'untitled.html'), 'utf8');
     expect(output).toContain('<title>untitled</title>');
   });
+
+  it('renders a selected template, layout, and partials', async () => {
+    await fs.mkdir(path.join(root, 'templates', 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(root, 'templates', 'partials'), { recursive: true });
+    await fs.writeFile(path.join(root, 'templates', 'article.hbs'), '{{> header}}<article>{{{body}}}</article>');
+    await fs.writeFile(path.join(root, 'templates', 'layouts', 'site.hbs'), '<html><body>{{{body}}}</body></html>');
+    await fs.writeFile(path.join(root, 'templates', 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(
+      path.join(root, 'content', 'welcome.md'),
+      '---\ntitle: Custom\ntemplate: article\nlayout: site\n---\n# Content',
+    );
+
+    await buildSite({
+      contentDir: path.join(root, 'content'),
+      outputDir: path.join(root, 'dist'),
+      templatesDir: path.join(root, 'templates'),
+    });
+    const output = await fs.readFile(path.join(root, 'dist', 'welcome.html'), 'utf8');
+    expect(output).toBe('<html><body><header>Custom</header><article><h1>Content</h1>\n</article></body></html>');
+  });
+
+  it('uses default EJS templates and escaped values', async () => {
+    await fs.mkdir(path.join(root, 'templates'), { recursive: true });
+    await fs.writeFile(path.join(root, 'templates', 'default.ejs'), '<h1><%= title %></h1><%- content %>');
+    await fs.writeFile(path.join(root, 'content', 'special.md'), '---\ntitle: "A < B"\n---\n**safe**');
+
+    await buildSite({
+      contentDir: path.join(root, 'content'),
+      outputDir: path.join(root, 'dist'),
+      templatesDir: path.join(root, 'templates'),
+    });
+    const output = await fs.readFile(path.join(root, 'dist', 'special.html'), 'utf8');
+    expect(output).toContain('<h1>A &lt; B</h1>');
+    expect(output).toContain('<p><strong>safe</strong></p>');
+  });
 });
