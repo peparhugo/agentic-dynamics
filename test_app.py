@@ -1,5 +1,6 @@
 import os
 import time
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -18,8 +19,11 @@ def client(tmp_path, monkeypatch):
 
 @pytest.fixture()
 def auth(client):
-    def register(username="alice", password="secret123"):
-        return client.post("/auth/register", json={"username": username, "password": password})
+    def register(username="alice", password="secret123", email=None):
+        payload = {"username": username, "password": password}
+        if email is not None:
+            payload["email"] = email
+        return client.post("/auth/register", json=payload)
 
     def login(username="alice", password="secret123"):
         return client.post("/auth/login", json={"username": username, "password": password})
@@ -247,3 +251,114 @@ def test_user_cannot_update_another_users_task(client, auth):
         headers=auth["headers"]("bob", "bobpass"),
     )
     assert rv.status_code == 404
+
+
+# ── Notification trigger (Celery) ─────────────────────────────
+
+def test_completed_status_triggers_notification_email(client, auth, monkeypatch):
+    import app as app_module
+
+    mock_task = MagicMock()
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+
+    created = post_task(client, "Ship the release").get_json()
+
+    rv = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=auth["headers"](),
+    )
+    assert rv.status_code == 200
+    assert rv.get_json()["status"] == "completed"
+
+    mock_task.delay.assert_called_once()
+    user_email, task_title = mock_task.delay.call_args[0]
+    assert user_email == "alice"
+    assert task_title == "Ship the release"
+
+
+def test_completed_status_uses_registered_email(client, auth, monkeypatch):
+    import app as app_module
+
+    auth["register"]("bob", "bobpass", email="bob@example.com")
+    bob_headers = auth["headers"]("bob", "bobpass")
+
+    mock_task = MagicMock()
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+
+    created = client.post(
+        "/tasks", json={"title": "Bob's task"}, headers=bob_headers
+    ).get_json()
+
+    rv = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=bob_headers,
+    )
+    assert rv.status_code == 200
+
+    mock_task.delay.assert_called_once()
+    user_email, _ = mock_task.delay.call_args[0]
+    assert user_email == "bob@example.com"
+
+
+def test_non_completed_status_does_not_trigger_notification(client, auth, monkeypatch):
+    import app as app_module
+
+    mock_task = MagicMock()
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+
+    created = post_task(client, "Still in progress").get_json()
+
+    rv = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "in_progress"},
+        headers=auth["headers"](),
+    )
+    assert rv.status_code == 200
+    mock_task.delay.assert_not_called()
+
+
+def test_already_completed_task_does_not_retrigger_notification(client, auth, monkeypatch):
+    import app as app_module
+
+    mock_task = MagicMock()
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+
+    created = post_task(client, "Already done").get_json()
+    headers = auth["headers"]()
+
+    rv = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+    assert rv.status_code == 200
+    mock_task.delay.assert_called_once()
+
+    rv = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+    assert rv.status_code == 200
+    mock_task.delay.assert_called_once()
+
+
+def test_update_does_not_notify_for_unowned_task(client, auth, monkeypatch):
+    import app as app_module
+
+    auth["register"]("bob", "bobpass")
+    mock_task = MagicMock()
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+
+    created = post_task(client, "alice secret").get_json()
+    rv = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=auth["headers"]("bob", "bobpass"),
+    )
+    assert rv.status_code == 404
+    mock_task.delay.assert_not_called()
+
+
+def test_send_notification_email_task_runs(capsys):
+    from celery_config import send_notification_email
+
+    result = send_notification_email("alice@example.com", "Finish report")
+    assert "alice@example.com" in result
+    assert "Finish report" in result
+    captured = capsys.readouterr()
+    assert "alice@example.com" in captured.out
