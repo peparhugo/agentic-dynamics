@@ -1,0 +1,121 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "7b25ec63a95d63fa21936229cfa3653eb49e079c",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "hand-rolled parseArgs instead of the commander/yargs required by story constraints",
+        "strict-mode tsconfig not verifiable in diff",
+        "output truncated so generator internals/build pass unconfirmed"
+      ],
+      "strengths": [],
+      "summary": "Session 1 correctly discards the mismatched auth seed and scaffolds the SSG exactly per spec \u2014 src/cli.ts + src/generator.ts split, ssg bin, marked/gray-matter deps, jest/ts-jest harness.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "daad5e4b274ed085545ae1d924e8b25b9bea73d1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "redundant dual templatesDir/templateDir options create ambiguity",
+        "renderer re-created per page and index (inefficient)",
+        "no tests for missing template errors",
+        "spread of parsed.data leaks extra frontmatter fields into Page type"
+      ],
+      "strengths": [],
+      "summary": "Cleanly extends the SSG with Handlebars templating that preserves existing defaults and fallbacks while keeping the render pipeline consistent with prior structure.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "dc3494b4906418e4cff72df7f2cf550bfddf701a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "no tests for new server.ts",
+        "build branch calls parseArgs twice",
+        "serve/usage message formatting is verbose"
+      ],
+      "strengths": [],
+      "summary": "Adds a live-reload dev server cleanly integrated through the existing BuildOptions/parseArgs/index-reexport patterns, with solid path-traversal guards and error handling.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "fe445dcc84a62f2a80e0467e329a4ad608da2295",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "duplicated ServeOptions/DevServer types",
+        "(page as Page & {source}) type casts instead of extending Page",
+        "dense one-liner helper functions in dev-server.ts",
+        "possible unverified new dependencies (chokidar",
+        "ws",
+        "gray-matter",
+        "marked",
+        "handlebars)"
+      ],
+      "strengths": [],
+      "summary": "Plugin extraction is a sound direction but re-declares ServeOptions and DevServer types that already exist in src/server.ts instead of reusing them, creating two public sources of truth.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "e986929978f2cb0bf90cac608c5ab859f3ebe3de",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "module-global lastBuildStats state",
+        "_sourceHash/_sourceRelative stored on Page without interface declaration",
+        "duplicate sha256 hashing between markdown.ts and generator.ts",
+        "awkward inline IIFE in markdown.ts",
+        "date behavior change from toISOString() to String(date)",
+        "templateHash coupled into markdown cache entries"
+      ],
+      "strengths": [],
+      "summary": "Adds incremental-build caching across the markdown/template plugins with CLI flags and build stats, but wires it through ad-hoc shared-mutable cache state and hidden page props.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "1a1c7b3f9bdb",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "No runtime toolchain (node/npm/tsc/jest/pytest) was available in any session, so zero tests ever executed and correctness was only statically reviewed; a concrete latent defect slipped through (unbalanced closing brace in src/cli.ts at session 5, 24 open vs 25 close).",
+      "Session 3's dev server was written monolithically against the pre-plugin generator (src/server.ts, ~105 lines with embedded build/reload logic) and had to be substantially rewritten in session 4, collapsing to a thin wrapper around a new DevServerPlugin \u2014 early integration did not anticipate the plugin boundary.",
+      "The seed commit was an unrelated JWT/SQLite auth API that shared nothing with the static-site-gen story; session 1 deleted all 200 lines of it, so the seed provided no usable scaffolding or architectural constraints for later sessions.",
+      "loadPlugins() in src/plugin.ts uses require() at runtime to load a ssg.config.ts, which would fail under the compiled CommonJS tsconfig without a transpile-at-runtime loader \u2014 a defect that runtime testing would have caught but never did."
+    ],
+    "key_decisions": [
+      "Session 1: replace the unrelated seed with a fresh strict-TypeScript SSG project exposing reusable buildSite()/parseArgs() functions plus Jest \u2014 this importable core API made every subsequent session buildable on stable public interfaces.",
+      "Session 2: adopt Handlebars with layout/partial support and frontmatter-as-template-context, while preserving the built-in document renderer as a graceful fallback when no templates exist \u2014 backward compatibility kept the API stable.",
+      "Session 3: implement the dev server (http + chokidar watch + WebSocket live-reload, --port) as a separate module rather than coupling it into the build pipeline.",
+      "Session 4: the pivotal refactor \u2014 a Plugin interface with onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle hooks, a BuildContext, ssg.config.ts plugin loading, and built-in markdown/template/dev-server plugins; this architecture is what made session 5's caching tractable.",
+      "Session 5: incremental builds with SHA-256 source+template hash invalidation, a .ssg-cache.json manifest, deleted-page cleanup, build statistics, and --incremental/--clean flags, implemented cleanly across the plugin lifecycle."
+    ],
+    "trajectory_description": "Quality rose steadily in design maturity across the first four sessions: the greenfield core (S1) gained templating with backward-compatible fallbacks (S2), a live-reload dev server (S3), and then a disciplined plugin refactor that shrunk generator.ts from ~190 to ~70 lines while preserving the public API (S4). Session 5 built naturally on that architecture by threading incremental caching through the plugin lifecycle, but the arc ends on a regression risk: the final cross-cutting session introduced an unbalanced brace in src/cli.ts that breaks compilation, and because no Node toolchain was available in any session, it was never caught by tsc or the 8 added Jest tests \u2014 the whole story is unverified at runtime.",
+    "summary": "A logically coherent five-session progression from greenfield static-site generator to templated, live-reloaded, plugin-architected, incrementally-cached tool where each phase preserved the public API, though a toolchain-less environment left the final session's introduced compile error undetected."
+  }
+}

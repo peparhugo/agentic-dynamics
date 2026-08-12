@@ -61,6 +61,8 @@ scripts/enqueue.py + worker.py — Redis experiment queue
 scripts/backfill_artifacts.py + backfill_sonar.py — data migration
 scripts/monitor.py        — Redis queue dashboard
 scripts/generate_manifest.py — SHA256 manifest
+scripts/pipeline.py       — YAML-driven phase orchestration (plans.yaml; 11 kinds)
+scripts/plan.py           — [deprecated] hardcoded phase orchestration, superseded by pipeline.py
 14 scripts/lab_*.py       — ignore *_DEPRECATED_bge_m3
 ```
 

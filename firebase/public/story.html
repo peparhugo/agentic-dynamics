@@ -64,10 +64,10 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p>That was weeks ago. I burned through <span data-stat="deepseek_cost">$2.04</span> in DeepSeek experiment costs — plus personal sessions, under $13 total for weeks of experimentation.</p>
 
 <div class="stats-grid">
-<div class="stat-card"><div class="v">8</div><div class="l">Models Tested</div></div>
-<div class="stat-card"><div class="v">249</div><div class="l">Instrumented Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">64.98</span></div><div class="l">Total Research Cost</div></div>
-<div class="stat-card"><div class="v cyan"><span data-stat="costgap">69&times;</span></div><div class="l">Measured Cost Gap</div></div>
+<div class="stat-card"><div class="v">3</div><div class="l">Models Tested</div></div>
+<div class="stat-card"><div class="v">347</div><div class="l">Instrumented Sessions</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">12.54</span></div><div class="l">Total Research Cost</div></div>
+<div class="stat-card"><div class="v cyan"><span data-stat="costgap">17&times;</span></div><div class="l">Measured Cost Gap</div></div>
 </div>
 
 <h2>What $12.73 built.</h2>
@@ -85,10 +85,10 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </div>
 
 <div class="stats-grid">
-<div class="stat-card"><div class="v">249</div><div class="l">Total Sessions</div></div>
-<div class="stat-card"><div class="v amber">$<span data-stat="cost">64.98</span></div><div class="l">All-Model Experiment Cost</div></div>
+<div class="stat-card"><div class="v">347</div><div class="l">Total Sessions</div></div>
+<div class="stat-card"><div class="v amber">$<span data-stat="cost">12.54</span></div><div class="l">All-Model Experiment Cost</div></div>
 <div class="stat-card"><div class="v">$12.73</div><div class="l">DeepSeek Spend</div></div>
-<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$47.54</span></div><div class="l">Claude F5 Spend</div></div>
+<div class="stat-card"><div class="v amber"><span data-stat="claude_cost">$4.64</span></div><div class="l">Claude Sonnet 5 Spend</div></div>
 </div>
 
 <blockquote>
@@ -109,8 +109,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p>The measurement produced two dimensions:</p>
 <div class="highlight" style="padding:1.3rem">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
-<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: <span data-stat="claude_narration">11%</span>. DeepSeek: <span data-stat="deepseek_narration">8%</span>. GPT-5-nano: <span data-stat="nano_narration">14%</span>.</li>
-<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead (0.0% penalty). Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate (sessions producing zero code). Measured from 227 experiments.</li>
+<li><strong style="color:var(--am)">Flail rate:</strong> How often the model breaks down completely and produces zero code. Claude: 11%. DeepSeek: 8%. GPT-5-nano: 14%. (Single-session perturbation experiment, 227 runs.)</li>
+<li><strong style="color:var(--cy)">Recovery cost:</strong> When the model DOES succeed, how much extra does it cost to work through the confusion? DeepSeek: negligible narration overhead. Claude: 8.5% narration penalty on successful sessions, plus 11% flail rate. (Single-session perturbation experiment.)</li>
 </ul>
 </div>
 
@@ -120,7 +120,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>We observe an interesting pattern: some models produce fewer reasoning tokens while maintaining performance. Whether this is caused by GRPO training architecture, provider-side caching, or some combination is not yet determined.</p>
 
-<p>Later analysis revealed the deeper layer: both models generate similar token volumes per session. However, equal generated token counts do not equate to identical computational effort — model architecture, activated parameters, hardware generation, inference infrastructure, and provider-side optimizations all differ materially. Claude's tokens cost 13.6&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$15.00 vs $1.10 per 1M output tokens</span>). And Claude writes 20.0K tokens to cache per session at <span class="tip" title="[X] External — provider list pricing">$3.75/Mtok</span> — a hidden tax DeepSeek avoids entirely. The gap is pricing architecture amplified by behavioral architecture.</p>
+<p>Later analysis revealed the deeper layer: equal token counts do not equate to identical cost. Claude Sonnet 5's tokens cost 11.5&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$10.00 vs $0.87 per 1M output tokens</span>). And cache behavior splits the models: DeepSeek reuses only 78% of its context, re-reading the codebase every session at 35K tokens, while Luna and Sonnet trust their cache at 97-98% hit rates and send 6K new tokens. Two models produce the same codebase at wildly different token economics.</p>
 
 <div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
 
@@ -149,7 +149,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <p><strong>This became a cumulative model for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
 </div>
 
-<p>What I didn't expect: When we first published this instrument, we thought the story was 'DeepSeek uses fewer tokens.' It doesn't use fewer generated tokens than Claude in observed sessions. The difference is that each of Claude's tokens costs 13.6&times; more. And the cache write tax — 22,500 tokens written to cache at $3.75/Mtok per session — adds another layer of cost that DeepSeek simply doesn't incur. The framework was right about the gap. The mechanism was more interesting than we thought.</p>
+<p>What I didn't expect: when I first published this instrument, I thought the story was 'DeepSeek uses fewer tokens.' It doesn't. The story was subtler — the multi-session pipeline revealed that what you actually buy with a more expensive model is <em>verification</em>. Luna writes 7 tests per story for $0.09. Sonnet 5 writes 73 for $2.32. Both codebases pass their tests. Only one is actually tested. That's the durable-value gap this whole instrument exists to measure.</p>
 
 <h2>Why I was the person who could build this.</h2>
 
@@ -193,8 +193,8 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">See the Evidence →</a></div>
 
 <footer>
-<strong>AI FinOps Dynamics · v0.5 · August 2026</strong><br>
-<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
+<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>

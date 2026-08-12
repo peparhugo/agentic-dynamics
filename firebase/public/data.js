@@ -1,17 +1,20 @@
-/* Generated 2026-08-12 13:20:46 UTC by build_data.py */
+/* Generated 2026-08-12 15:30:16 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T13:20:46.837248+00:00",
+    "generated_at": "2026-08-12T15:30:15.954491+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
     "worktrees_total": 43,
-    "sessions_total": 263,
+    "sessions_total": 347,
     "game_reports": 224,
-    "total_cost": 5.7916,
+    "total_cost": 12.5446,
     "architectures": 3,
-    "variants": 8,
+    "variants": 3,
+    "stories_total": 71,
+    "story_sessions": 347,
+    "story_total_cost": 12.5446,
     "configs": 34,
     "_provenance": {
       "worktrees_total": "M",
@@ -20,156 +23,186 @@ window.DYNAMICS_DATA = {
       "total_cost": "M",
       "architectures": "M",
       "variants": "M",
+      "stories_total": "C",
+      "story_sessions": "C",
+      "story_total_cost": "C",
       "configs": "M"
     }
   },
   "models": [
     {
-      "id": "deepseek/deepseek-v4-pro",
-      "label": "DeepSeek v4 Pro",
-      "provider": "deepseek",
-      "sessions": 201,
-      "n_reports": 0,
-      "n_valid": 0,
-      "n_narrated": 0,
-      "reports": 0,
-      "reports_valid": 0,
-      "reports_narrated": 0,
-      "avg_cost": 0.0,
-      "total_cost": 5.7444,
-      "cost_ci95": null,
-      "pass_rate": "N/A",
+      "id": "openai/gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "provider": "openai",
+      "cells": 34,
+      "sessions": 170,
+      "total_cost": 3.085027,
+      "avg_cost": 0.090736,
+      "avg_cache_hit": 0.975,
+      "avg_tests": 7.3,
+      "avg_test_code_ratio": 0.281,
+      "avg_tok_per_session": 6324.0,
+      "avg_duration_s": 528.0,
+      "avg_code_lines": 368.0,
+      "tests_total": 249,
+      "tests_passed": 249,
+      "avg_cost_per_session": 0.018147,
+      "pass_rate": "100% (249/249)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 368.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
       "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "avg_loc": 0,
-      "avg_thinking_ratio": 0.0,
-      "avg_escape": 0.0,
+      "reports": 34,
+      "reports_valid": 34,
+      "reports_narrated": 0
+    },
+    {
+      "id": "deepseek/deepseek-v4-pro",
+      "label": "DeepSeek v4 Pro",
+      "provider": "deepseek",
+      "cells": 35,
+      "sessions": 167,
+      "total_cost": 4.822804,
+      "avg_cost": 0.137794,
+      "avg_cache_hit": 0.778,
+      "avg_tests": 33.7,
+      "avg_test_code_ratio": 1.087,
+      "avg_tok_per_session": 34702.0,
+      "avg_duration_s": 1675.0,
+      "avg_code_lines": 373.0,
+      "tests_total": 1178,
+      "tests_passed": 1178,
+      "avg_cost_per_session": 0.028879,
+      "pass_rate": "100% (1178/1178)",
+      "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_arch_divergence": 0.0,
-      "avg_struct_divergence": 0.0,
-      "avg_composite_score": 0.0,
-      "avg_code_quality": 0.0,
-      "avg_comment_ratio": 0.0,
+      "avg_loc": 373.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
-      "correctness_per_dollar": 0.0,
-      "avg_quality_per_joule": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 35,
+      "reports_valid": 35,
+      "reports_narrated": 0
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "cells": 2,
+      "sessions": 10,
+      "total_cost": 4.636755,
+      "avg_cost": 2.318377,
+      "avg_cache_hit": 0.982,
+      "avg_tests": 73.0,
+      "avg_test_code_ratio": 1.634,
+      "avg_tok_per_session": 17293.0,
+      "avg_duration_s": 1103.0,
+      "avg_code_lines": 727.0,
+      "tests_total": 146,
+      "tests_passed": 146,
+      "avg_cost_per_session": 0.463675,
+      "pass_rate": "100% (146/146)",
       "narration_rate": 0,
-      "ast_files": 0.0,
-      "ast_functions": 0,
-      "ast_classes": 0,
-      "ast_type_hint_pct": 0,
-      "ast_docstring_pct": 0,
-      "avg_constraints_met": 0.0,
-      "avg_constraints_total": 0.0,
-      "cost_input": 0,
-      "cost_output": 0,
-      "cost_reasoning": 0,
-      "cost_cache": 0,
-      "tokens_total": 0,
-      "tokens_input": 0,
-      "tokens_output": 0,
-      "tokens_reasoning": 0,
-      "tokens_cache_read": 0,
-      "tokens_cache_write": 0,
-      "_provenance": {
-        "sessions": "M",
-        "n_reports": "M",
-        "n_valid": "M",
-        "n_narrated": "M",
-        "total_cost": "M",
-        "tokens_input": "M",
-        "tokens_output": "M",
-        "tokens_reasoning": "M",
-        "tokens_cache_read": "M",
-        "tokens_cache_write": "M",
-        "tokens_total": "M",
-        "avg_cost": "C",
-        "cost_ci95": "C",
-        "avg_loc": "C",
-        "avg_thinking_ratio": "C",
-        "avg_escape": "C",
-        "avg_narration_penalty": "C",
-        "avg_arch_divergence": "C",
-        "avg_struct_divergence": "C",
-        "avg_composite_score": "C",
-        "avg_code_quality": "C",
-        "avg_comment_ratio": "C",
-        "avg_energy_j": "C",
-        "avg_energy_j_per_loc": "C",
-        "avg_quality_per_joule": "C",
-        "correctness_per_dollar": "C",
-        "ast_files": "C",
-        "ast_functions": "C",
-        "ast_classes": "C",
-        "ast_type_hint_pct": "C",
-        "ast_docstring_pct": "C",
-        "avg_constraints_met": "C",
-        "avg_constraints_total": "C",
-        "narration_rate": "C",
-        "cost_input": "C",
-        "cost_output": "C",
-        "cost_reasoning": "C",
-        "cost_cache": "C",
-        "strategy_cons": "C",
-        "strategy_expl": "C",
-        "strategy_waste": "C",
-        "strategy_efficient": "C",
-        "pass_rate": "H"
-      }
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 727.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 2,
+      "reports_valid": 2,
+      "reports_narrated": 0
     }
   ],
   "charts": {
     "labels": [
-      "DeepSeek v4 Pro"
+      "GPT-5.6 Luna",
+      "DeepSeek v4 Pro",
+      "Claude Sonnet 5"
     ],
     "costData": [
-      0.0
+      0.090736,
+      0.137794,
+      2.318377
     ],
     "narrData": [
+      0,
+      0,
       0
     ],
     "locData": [
-      0
+      368.0,
+      373.0,
+      727.0
     ],
     "costY": [
-      0.0
+      0.090736,
+      0.137794,
+      2.318377
     ],
     "reports": [
-      0
+      34,
+      35,
+      2
     ]
   },
   "calculator": {
     "model_costs": [
       {
+        "n": "GPT-5.6 Luna",
+        "c": 0.090736,
+        "p": 1.0
+      },
+      {
         "n": "DeepSeek v4 Pro",
-        "c": 0.0,
-        "p": 0
+        "c": 0.137794,
+        "p": 1.0
+      },
+      {
+        "n": "Claude Sonnet 5",
+        "c": 2.318377,
+        "p": 1.0
       }
     ],
     "escalation_tiers": [
       {
+        "m": "DS\u2192DeepSeek v4 Pro",
+        "e": 1.5
+      },
+      {
+        "m": "DS\u2192Claude Sonnet 5",
+        "e": 25.6
+      },
+      {
         "m": "\u2192Human ($5/job)",
-        "e": 0
+        "e": 55.1
       }
     ],
     "retry_rate_measured": 0.0,
     "woc_ratio": 1.0
   },
   "derived": {
-    "cost_gap": "N/A",
-    "cost_gap_computation": "",
-    "overall_pass_rate": "N/A",
-    "total_tests_passed": 0,
-    "total_tests_run": 0,
-    "total_cost_all_models": 5.7916,
-    "total_cost_deepseek": 5.7444,
-    "total_cost_claude": 0,
+    "cost_gap": "17\u00d7",
+    "cost_gap_computation": "$2.318377 / $0.137794 = 16.8\u00d7",
+    "overall_pass_rate": "100.0% (1573/1573) [tests]",
+    "total_tests_passed": 1573,
+    "total_tests_run": 1573,
+    "total_cost_all_models": 12.5446,
+    "total_cost_deepseek": 4.8228,
+    "total_cost_claude": 4.6368,
     "total_narrated": 0,
-    "total_valid_reports": 0,
-    "total_reports_analyzed": 0,
+    "total_valid_reports": 71,
+    "total_reports_analyzed": 71,
     "_provenance": {
       "cost_gap": "C",
       "overall_pass_rate": "C",
@@ -187,7 +220,7 @@ window.DYNAMICS_DATA = {
     "unknown": {
       "perturbation_class": "unknown",
       "models": {
-        "deepseek/deepseek-v4-flash": {
+        "DeepSeek v4 Flash": {
           "n": 12,
           "avg_cost": 0.0015,
           "cost_ci95": [
@@ -3102,12 +3135,12 @@ window.DYNAMICS_DATA = {
     "models": [
       {
         "model": "openai/gpt-5.6-luna",
-        "cells": 27,
-        "total_cost": 2.423908,
-        "avg_cost": 0.089774,
-        "total_tokens": 856219,
-        "avg_cache_hit": 0.974,
-        "avg_duration_s": 472.0
+        "cells": 34,
+        "total_cost": 3.085027,
+        "avg_cost": 0.090736,
+        "total_tokens": 1075066,
+        "avg_cache_hit": 0.975,
+        "avg_duration_s": 528.0
       },
       {
         "model": "anthropic/claude-sonnet-5",
@@ -3123,7 +3156,7 @@ window.DYNAMICS_DATA = {
         "cells": 35,
         "total_cost": 4.822804,
         "avg_cost": 0.137794,
-        "total_tokens": 6088089,
+        "total_tokens": 6072866,
         "avg_cache_hit": 0.778,
         "avg_duration_s": 1675.0
       }
@@ -3131,42 +3164,33 @@ window.DYNAMICS_DATA = {
     "conditions": [
       {
         "condition": "bad_seed",
-        "cells": 12,
+        "cells": 14,
         "variants": 6,
-        "total_cost": 1.363081,
-        "avg_cost": 0.11359,
-        "success": 12,
+        "total_cost": 1.557621,
+        "avg_cost": 0.111259,
+        "success": 14,
         "fail": 0
       },
       {
         "condition": "clean",
-        "cells": 28,
+        "cells": 30,
         "variants": 12,
-        "total_cost": 7.497239,
-        "avg_cost": 0.267759,
-        "success": 28,
+        "total_cost": 7.6748,
+        "avg_cost": 0.255827,
+        "success": 30,
         "fail": 0
       },
       {
         "condition": "early_degrade",
-        "cells": 24,
+        "cells": 27,
         "variants": 12,
-        "total_cost": 3.023146,
-        "avg_cost": 0.125964,
-        "success": 24,
+        "total_cost": 3.312164,
+        "avg_cost": 0.122673,
+        "success": 27,
         "fail": 0
       }
     ],
     "stories": [
-      {
-        "story": "notification_service",
-        "cells": 16,
-        "total_cost": 2.099285,
-        "avg_cost": 0.131205,
-        "sessions": 78,
-        "avg_duration_s": 1376.0,
-        "avg_tokens_per_session": 28877.0
-      },
       {
         "story": "static_site_gen",
         "cells": 20,
@@ -3174,7 +3198,16 @@ window.DYNAMICS_DATA = {
         "avg_cost": 0.125431,
         "sessions": 96,
         "avg_duration_s": 1164.0,
-        "avg_tokens_per_session": 23164.0
+        "avg_tokens_per_session": 23011.0
+      },
+      {
+        "story": "notification_service",
+        "cells": 23,
+        "total_cost": 2.760404,
+        "avg_cost": 0.120018,
+        "sessions": 113,
+        "avg_duration_s": 1184.0,
+        "avg_tokens_per_session": 21991.0
       },
       {
         "story": "task_manager_api",
@@ -3206,30 +3239,30 @@ window.DYNAMICS_DATA = {
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 10,
-        "avg_cost": 0.11586,
-        "avg_tokens_per_session": 25157.0,
-        "avg_session_duration_s": 267.0
+        "cells": 13,
+        "avg_cost": 0.110795,
+        "avg_tokens_per_session": 20768.0,
+        "avg_session_duration_s": 246.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 16,
-        "avg_cost": 0.124198,
-        "avg_tokens_per_session": 25501.0,
-        "avg_session_duration_s": 242.0
+        "cells": 20,
+        "avg_cost": 0.118328,
+        "avg_tokens_per_session": 21516.0,
+        "avg_session_duration_s": 219.0
       }
     ],
     "sessions": {
-      "total": 312,
-      "total_cost": 11.883465889999998,
-      "total_tokens": 7117233,
-      "total_cache_reads": 148819281,
-      "cache_hit_rate": 0.977,
-      "duration_s": 73584.40570902891,
-      "successful": 312,
+      "total": 347,
+      "total_cost": 12.544584870000003,
+      "total_tokens": 7320857,
+      "total_cache_reads": 159544215,
+      "cache_hit_rate": 0.978,
+      "duration_s": 78795.21909082611,
+      "successful": 347,
       "failed": 0
     },
-    "generated_at": "2026-08-12T13:20:46.947264+00:00"
+    "generated_at": "2026-08-12T15:30:15.987096+00:00"
   }
 };

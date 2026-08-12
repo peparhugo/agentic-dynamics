@@ -239,7 +239,12 @@ class ReviewPhase(Phase):
             if review_path.exists():
                 try:
                     existing = json.loads(review_path.read_text())
-                    if existing.get("story_review") and len(existing.get("commit_reviews", [])) >= 4:
+                    # Complete if story review exists AND commit reviews
+                    # cover at least session_count - 1 (some stories terminate early).
+                    session_count = story.session_count or 5
+                    needed = max(3, session_count - 1)
+                    if (existing.get("story_review")
+                            and len(existing.get("commit_reviews", [])) >= needed):
                         continue
                 except (json.JSONDecodeError, OSError):
                     pass
@@ -382,6 +387,18 @@ def _execute_phase(phase: Phase, r: redis.Redis, dry_run: bool,
         # Restart dead workers if jobs remain
         queue_size = r.llen(phase.queue_key)
         alive = _workers_alive(phase)
+
+        # Self-heal: if queue is empty but work remains (jobs lost mid-run),
+        # re-generate and re-enqueue the missing jobs.
+        if queue_size == 0 and alive == 0 and not phase.is_complete():
+            missing = phase.generate_jobs()
+            print(f"  Re-enqueuing {len(missing)} lost jobs...")
+            for job in missing:
+                r.lpush(phase.queue_key, json.dumps(job))
+                jid = job.get("job_id") or job.get("cell_id", "?")
+                r.hset(phase.status_key, jid, "queued")
+            queue_size = len(missing)
+
         if queue_size > 0 and alive < phase.worker_count:
             needed = phase.worker_count - alive
             print(f"  {alive}/{phase.worker_count} workers alive, restarting {needed}...")
@@ -393,6 +410,12 @@ def _execute_phase(phase: Phase, r: redis.Redis, dry_run: bool,
         print(f"  {done}/{total} done, {queue_size} in queue, {alive} workers")
 
         if queue_size == 0 and done >= total:
+            _set_state(r, phase.id, status="done", jobs_done=done)
+            return True
+
+        # Fallback: status hash is unreliable (Redis can lose entries).
+        # If queue is empty and no workers are alive, verify against disk.
+        if queue_size == 0 and alive == 0 and phase.is_complete():
             _set_state(r, phase.id, status="done", jobs_done=done)
             return True
 
@@ -424,6 +447,10 @@ def run_plan(plan, start_from=None, dry_run=False, reset=False):
 
         # In-process phases
         if phase.worker_count == 0:
+            # Skip if already done (idempotency for restarts)
+            if _get_state(r, phase.id)["status"] == "done":
+                print(f"  Already done.")
+                continue
             if isinstance(phase, AnalyzePhase):
                 print(f"  Running analyze_stories.py...")
                 if not dry_run:

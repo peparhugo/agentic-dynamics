@@ -4,6 +4,9 @@ import re as _re
 
 MODEL_LABELS = {
     "deepseek/deepseek-v4-pro": "DeepSeek v4 Pro",
+    "openai/gpt-5.6-luna": "GPT-5.6 Luna",
+    "anthropic/claude-sonnet-5": "Claude Sonnet 5",
+    "deepseek/deepseek-v4-flash": "DeepSeek v4 Flash",
     "anthropic/claude-fable-5": "Claude Fable 5",
     "openai/gpt-5": "GPT-5",
     "openai/gpt-5-mini": "GPT-5-mini",

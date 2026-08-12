@@ -259,11 +259,12 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 </div>
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Token Pricing (per 1M tokens)</h3>
-<div class="tbl" style="max-width:700px"><table><thead><tr><th>Provider</th><th>Input</th><th>Output</th><th>Cache Read</th><th>Cache Write</th></tr></thead><tbody>
-<tr><td>DeepSeek</td><td>$0.27</td><td>$1.10</td><td>$0.14</td><td>—</td></tr>
-<tr><td>OpenAI (GPT-4o)</td><td>$1.25</td><td>$10.00</td><td>$0.625</td><td>—</td></tr>
-<tr><td>Anthropic (Sonnet)</td><td>$3.00</td><td>$15.00</td><td>$0.30</td><td>$3.75</td></tr>
+<div class="tbl" style="max-width:700px"><table><thead><tr><th>Provider</th><th>Input (cache miss)</th><th>Input (cache hit)</th><th>Output</th></tr></thead><tbody>
+<tr><td>DeepSeek v4 Pro</td><td>$0.435</td><td>$0.0036</td><td>$0.87</td></tr>
+<tr><td>GPT-5.6 Luna</td><td>$0.20</td><td>$0.02</td><td>$1.20</td></tr>
+<tr><td>Claude Sonnet 5</td><td>$2.00</td><td>$0.20</td><td>$10.00</td></tr>
 </tbody></table></div>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center;margin-top:0.5rem">Per 1M tokens. Sources: api-docs.deepseek.com (Aug 2026), Anthropic/OpenAI list pricing. Verified against the experiment billing database — every measured session cost reconciles to these rates.</p>
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Cache Strategy</h3>
 <p class="lead">Three-layer caching turns the provider economics in your favor. Each layer compounds on the one below.</p>
@@ -297,41 +298,41 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Provider Reference Cards</h3>
 <div class="params">
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">DeepSeek</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.27</strong> (miss) &middot; <strong>$0.14</strong> (hit) &middot; Output: <strong>$1.10</strong><br>Cache: Disk-based prefix cache, TTL ~1hr<br>Rate Limit: ~500 RPM (V3), ~100 RPM (R1)<br><strong>Best:</strong> Default for Tier 1. Long system prompts benefit most from prefix caching.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">OpenAI</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$1.25</strong> (GPT-4o) &middot; <strong>$7.50</strong> (GPT-5.6)<br>Output: <strong>$10.00</strong> (GPT-4o) &middot; <strong>$30.00</strong> (GPT-5.6)<br>Cache: Automatic prompt caching (50% discount on cached input)<br>Rate Limit: Tiered by spend — scales with usage history<br><strong>Best:</strong> Use GPT-4o-mini for Tier 1. Reserve GPT-5.6 for Tier 3 escalation.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Anthropic</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$3.00</strong> (Sonnet) &middot; <strong>$15.00</strong> (Opus)<br>Output: <strong>$15.00</strong> (Sonnet) &middot; <strong>$75.00</strong> (Opus)<br>Cache: Prompt caching with explicit cache breakpoints (set via API)<br>Rate Limit: ~2000 RPM (Haiku), ~1000 RPM (Sonnet), ~200 RPM (Opus)<br><strong>Best:</strong> Use cache breakpoints aggressively. Sonnet for Tier 2, Opus for Tier 3.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">DeepSeek</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.435</strong> (miss) &middot; <strong>$0.0036</strong> (hit) &middot; Output: <strong>$0.87</strong><br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">OpenAI (Luna)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.20</strong> &middot; Output: <strong>$1.20</strong> &middot; Cache hit: <strong>$0.02</strong><br>Cache: 97.5% hit rate measured — 6.3K tokens/session<br><strong>Best:</strong> Cheapest per cell ($0.09) but minimal test coverage (7 tests/cell). Route to low-risk tasks.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Anthropic (Sonnet 5)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 98.2% hit rate measured<br><strong>Best:</strong> 73 tests/cell, test:code ratio 1.63 — deepest verification. Reserve for safety-critical work.</div></div>
 </div>
 
 <h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Escalation Economics</h3>
-<p class="lead">When a cheap model fails, you pay the retry penalty. Here's what that actually costs.</p>
+<p class="lead">When a cheap model fails, you pay the retry penalty — and you lose the verification the expensive model would have written. Here's what that actually costs.</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:700px;margin:1rem auto;text-align:left">
 <div>
-<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 249 sessions</h4>
+<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 71 stories</h4>
 <div class="tbl"><table><tbody>
-<tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">28.3&times; (price ratio)</td></tr>
-<tr><td>Escalation rate</td><td style="color:var(--am)">21.4%</td></tr>
-<tr><td>Claude vs DeepSeek gap</td><td style="color:var(--am)">68.7&times;</td></tr>
+<tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">25.5&times; (Luna &rarr; Sonnet)</td></tr>
+<tr><td>Test coverage gap</td><td style="color:var(--am)">10&times; (7 vs 73 tests/cell)</td></tr>
+<tr><td>Sonnet vs DeepSeek gap</td><td style="color:var(--am)">16.8&times;</td></tr>
 </tbody></table></div>
 </div>
 <div>
 <h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Cost per escalation tier</h4>
 <div class="tbl"><table><tbody>
-<tr><td>Tier 1 (DeepSeek V3)</td><td style="font-family:'JetBrains Mono',monospace">~$0.015</td></tr>
-<tr><td>Tier 1 success (78.6%)</td><td style="font-family:'JetBrains Mono',monospace">$0.015</td></tr>
-<tr><td>Tier 1 &rarr; Tier 3 retry</td><td style="font-family:'JetBrains Mono',monospace">$0.015 + $0.42</td></tr>
-<tr><td>Effective avg cost</td><td style="font-family:'JetBrains Mono',monospace;color:var(--ac)">~$0.11/session</td></tr>
+<tr><td>Tier 1 (Luna)</td><td style="font-family:'JetBrains Mono',monospace">~$0.09</td></tr>
+<tr><td>Tier 2 (DeepSeek)</td><td style="font-family:'JetBrains Mono',monospace">~$0.14</td></tr>
+<tr><td>Tier 3 (Sonnet 5)</td><td style="font-family:'JetBrains Mono',monospace">~$2.32</td></tr>
+<tr><td>Verification depth</td><td style="font-family:'JetBrains Mono',monospace;color:var(--ac)">0.28 &rarr; 1.63 test:code</td></tr>
 </tbody></table></div>
 </div>
 </div>
-<div class="callout-box" style="margin-top:1rem"><strong>The takeaway:</strong> Even with a 21.4% escalation rate, the cascade strategy saves <strong>87%</strong> versus routing everything to a frontier model. The math only fails if your retry rate exceeds ~35%.</div>
+<div class="callout-box" style="margin-top:1rem"><strong>The takeaway:</strong> The cascade doesn't just save money — it buys verification where it matters. Route the happy path to Luna, the refactor-heavy work to DeepSeek, and reserve Sonnet for the safety-critical edge cases that would cost more to miss than to test.</div>
 </div></section>
 
 
 <div style="text-align:center;margin-top:1rem"><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div>
 
 <footer>
-<strong>AI FinOps Dynamics · v0.5 · August 2026</strong><br>
-<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
+<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
 </footer>
 

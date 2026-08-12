@@ -1,0 +1,124 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "277697f068cbfcebc27b8aec60a8fe04410d5b31",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "operator precedence in CLI guard relies on &&/|| binding",
+        "--content/--output with missing values can silently consume the next flag",
+        "no content-dir existence check",
+        "page.slug mutated post-parse rather than set once",
+        "mixed British/undocumented spelling conventions"
+      ],
+      "strengths": [],
+      "summary": "Clean greenfield TypeScript SSG with sound CLI/library separation and solid test coverage, though arg validation is fragile and a few style nits add minor debt.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "0ec47a2d7e03ada92dc67cd9243a8cff4b2a71e6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "regex-based template engine re-implements handlebars/ejs instead of using a library",
+        "Function constructor with `with(context)` poses eval/security risk",
+        "non-convergent do/while block-resolution loop",
+        "arg-validation operator precedence bug carried forward (`&&` vs `||`)",
+        "Page.data dumps raw untyped frontmatter",
+        "~90 lines of engine code inlined in index.ts rather than a module"
+      ],
+      "strengths": [],
+      "summary": "Adds templating support via a hand-rolled regex/EJS engine and new `--templates` CLI option, extending existing interfaces and CLI conventions consistently but at the cost of substantial implementation debt.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "1639f5ed2d32115aad788c7507d9e6d1510d98c0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "collapsed multi-statement lines in markdownFiles",
+        "opaque variable rename fullPath->full",
+        "minimal commit message",
+        "plugins/dev-server barrel references src/plugins/dev-server not shown in diff"
+      ],
+      "strengths": [],
+      "summary": "Extracts markdown/template/dev-server concerns into a plugin architecture with clean public barrel re-exports, though it compresses the recursive `markdownFiles` walker onto single lines, hurting readability.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b0c7b37969ace73c9d9dc55a916ef96faa67cc7e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "cli.ts throw has 5-space indent instead of 4",
+        "incremental skip path is dead code (cache never stores renderedHtml so prior.renderedHtml is always undefined)",
+        "renderDurationMs never written so timeSaved is always 0",
+        "cache file re-read logic duplicated in cli.ts instead of reused",
+        "hashFiles hashes only basenames (collision risk)",
+        "dense nested ternaries deviate from surrounding readable style"
+      ],
+      "strengths": [],
+      "summary": "Adds incremental build caching that fits the BuildContext/plugin architecture, but ships with a misaligned indentation bug, dead skip logic, and unreadable one-liner density.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "d572df8b21cb176a0944ec1ad954c35f9f9ec8f7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "wrong error message when --port given without value (\"require a directory\")",
+        "minified one-line injected reload script hurts readability",
+        "no tests added for the new server",
+        "webSocketServer.close() not awaited",
+        "combined CLI validation condition grows unwieldy"
+      ],
+      "strengths": [],
+      "summary": "Adds a well-integrated live-reload dev server that reuses buildSite and extends the existing manual arg-parser pattern rather than introducing new CLI machinery.",
+      "session_number": 3
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "fcd25f23bcc9",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "The seed codebase (root index.ts, an unrelated 200-line auth API) was never removed and remains dead debris outside the tsconfig include through all 5 sessions.",
+      "Session 2 hand-rolled two template engines (a Handlebars subset and an EJS subset relying on `with(context)` + `Function` eval) inside the monolithic index.ts, creating the god-file that session 4 had to pay down via a large refactor; the dual-engine complexity and eval-based ejs renderer persist.",
+      "Session 4's dev-server 'pluginization' is cosmetic: DevServerPlugin is an empty stub class and startDevServer still calls buildSite directly instead of registering lifecycle hooks, so the dev server was never genuinely integrated into the plugin pipeline.",
+      "Session 5's incremental cache silently disables render caching whenever any user plugin defines an onFile hook (renderCacheEnabled guard), so caching partially degrades under the plugin system it was built on.",
+      "No test was ever executed in any session \u2014 npm/npx/pytest were unavailable in the environment \u2014 so the growing 116-line Jest suite (including the incremental-cache tests) was never actually validated, accumulating unverified correctness risk across sessions."
+    ],
+    "key_decisions": [
+      "Session 1 greenfield: replace the seed with a strict-TypeScript static site generator (package.json/tsconfig/jest setup + markdown parsing + buildSite) rather than extending the auth seed.",
+      "Session 2: implement a custom dual template engine (handlebars + ejs subsets) with frontmatter-selected templates/layouts/data instead of adopting an existing templating library.",
+      "Session 3: add a dev server with chokidar watch and WebSocket live-reload wired into the CLI as `ssg serve`.",
+      "Session 4: decompose the monolith into a plugin architecture with a BuildContext and lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd), an ssg.config.ts loader + defineConfig, and backward-compatible re-export shims (src/server.ts and root plugins/*.ts).",
+      "Session 5: content-addressable incremental builds via SHA-256 source/template hashing with a .ssg-cache.json manifest, --incremental/--clean flags, build stats, and plugin-safe cache invalidation."
+    ],
+    "trajectory_description": "Quality improves across the five sessions in a clear build-up arc: a modest but correct greenfield foundation, a feature session that adds templating capability while concentrating complexity into one file, an integration session that ships a real operational feature (live-reload dev server), a refactor session that consolidates the monolith into a plugin architecture and cuts index.ts by roughly 70% while preserving backward compatibility, and a final cross-cutting session that adds sophisticated content-hashed incremental caching with targeted tests. The arc moves from merely functional to architecturally structured, though two weak seams persist \u2014 the eval-based hand-rolled template engine and the stub dev-server plugin \u2014 and the entire suite was never executed due to a missing Node toolchain.",
+    "summary": "A coherent, well-sequenced incremental build-out of a static site generator whose quality improves from functional greenfield to plugin-architected with incremental caching, held back only by unvalidated tests, leftover seed debris, and a partially-integrated dev-server plugin."
+  }
+}

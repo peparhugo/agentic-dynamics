@@ -8,6 +8,7 @@
 
 ```bash
 python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek
+python scripts/pipeline.py --plan <name>
 python scripts/analyze_worktrees.py
 python scripts/inventory.py refresh
 python scripts/build_data.py

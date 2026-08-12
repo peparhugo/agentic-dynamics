@@ -62,19 +62,52 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>The Evidence</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)">227 experiment runs with game reports across 249 sessions and 8 model variants from 3 provider families. Numbers are tagged by provenance: [M] measured from API/session data &middot; [C] computed from measurements &middot; [H] heuristic estimate &middot; [X] externally sourced. <span style="color:var(--t3)">The 8 variants span 3 provider families: DeepSeek (1), Anthropic (1), and OpenAI (6 size variants &mdash; 5, 5.5, 5.6, 5.6-fast, mini, nano). Architecture internals ("MoE", "dense") are disclosed for some providers but not independently verifiable for closed models. Run <code>python scripts/inventory.py list</code> for a live breakdown.</span></p>
+<p class="lead" style="font-size:1rem;color:var(--t)"><span data-stat="stories_total">71</span> multi-session stories across <span data-stat="story_sessions">347</span> sessions and 3 model families. Each story is a 5-session greenfield build — CRUD API, static site generator, or notification service — with a full code-quality stack: AST diffs, SonarQube, convention scoring, and a second-model review agent. Numbers are tagged by provenance: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external.</p>
 <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-<div class="card" style="text-align:center"><div class="cval" data-stat="worktrees">251</div><div class="cdesc" style="text-align:center">Worktrees on disk</div></div>
-<div class="card" style="text-align:center"><div class="cval" data-stat="reports">224</div><div class="cdesc" style="text-align:center">Game reports</div></div>
-<div class="card" style="text-align:center"><div class="cval">21</div><div class="cdesc" style="text-align:center">TS runs (3 models)</div></div>
-<div class="card" style="text-align:center" title="[M] Measured: Sum of all API charges in database"><div class="cval">$<span data-stat="cost">64.98</span></div><div class="cdesc" style="text-align:center">Total experiment cost</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="stories_total">71</div><div class="cdesc" style="text-align:center">Multi-session stories</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="story_sessions">347</div><div class="cdesc" style="text-align:center">Sessions</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="variants">3</div><div class="cdesc" style="text-align:center">Model families</div></div>
+<div class="card" style="text-align:center" title="[M] Sum of story session costs, verified against provider pricing"><div class="cval">$<span data-stat="story_total_cost">12.54</span></div><div class="cdesc" style="text-align:center">Total story cost</div></div>
 </div>
 </section>
 
+<!-- ==================== STORY PIPELINE: CROSS-MODEL ==================== -->
 <details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence shows</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested across <strong style="color:var(--ac)">227 experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. <strong style="color:var(--am)" title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; different cost.</strong> The gap is pricing architecture, not token volume. The tables below present the full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
+<p><strong style="color:var(--t)">Verification scales with cost.</strong> Three models built the same 30-cell matrix — 5-session greenfield stories under three perturbation conditions. All three pass their own tests at ~100%. But the tests themselves differ by an order of magnitude: Luna writes 7 per story, DeepSeek 34, Sonnet 5 73. Test:code ratio rises from <strong style="color:var(--am)">0.28 to 1.63</strong> across a <strong style="color:var(--ac)">26× cost range</strong>. The cheap model ships code that works; the expensive model ships code that's verified. Below, the full cross-model comparison, followed by the earlier single-session perturbation experiments (search dynamics under degraded input).</p>
+</div>
+</details>
+
+<section class="sec alt">
+<h2 id="story-models">Test Thoroughness Scales With Cost</h2>
+<p class="lead">Three models built the same 30-cell matrix — 3 stories × 2 tiers × 5 perturbation conditions, 5 sessions each. All three pass their tests. But how many tests they write — and whether they verify edge cases — differs by an order of magnitude. The cheap model ships code that works. The expensive model ships code that's actually <em>verified</em>.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Cost/cell</th><th>Tests/cell</th><th>Test:Code ratio</th><th>Cache hit</th><th>Tokens/session</th></tr></thead>
+<tbody>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">$0.09</td><td class="mono amber">7.3</td><td class="mono amber">0.28</td><td class="mono green">97.5%</td><td class="mono">6,324</td></tr>
+<tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">$0.14</td><td class="mono green">33.7</td><td class="mono green">1.09</td><td class="mono amber">77.8%</td><td class="mono amber">34,702</td></tr>
+<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono amber">$2.32</td><td class="mono green">73.0</td><td class="mono green">1.63</td><td class="mono green">98.2%</td><td class="mono green">17,293</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Key insight:</strong> Test:code ratio rises from <strong style="color:var(--am)">0.28 to 1.63</strong> across a <strong>26× cost range</strong>. Luna writes 7 tests per story — it ships working code but barely checks it. Sonnet 5 writes 73 tests — 10× more verification for 26× the price. DeepSeek sits between: 34 tests, but at a 78% cache hit rate it pays for re-reading the codebase every session (35K tokens/session vs Luna's 6K). The FinOps question is not "which model is cheapest" but "what does verification cost at each price point."</div>
+
+<div class="insight" style="border-left-color:var(--cy)"><strong style="color:var(--cy)">Cache is a hidden cost lever:</strong> DeepSeek reuses 78% of its context; Luna and Sonnet reuse 97-98%. A model that trusts its cache sends 6K new tokens per session; a model that re-reads the codebase sends 35K. Same output, 5× the token economics — purely through provider caching policy, not capability.</div>
+</section>
+
+<!-- ==================== LEGACY PERTURBATION PIPELINE ==================== -->
+<section class="sec" style="padding-top:4rem">
+<h2 id="perturbation">Single-Session Perturbation Experiments</h2>
+<p class="lead" style="font-size:0.9rem;color:var(--t3)">The sections below report the <em>earlier</em> perturbation pipeline — single-session experiments measuring search dynamics (basin escape, grit, recovery cost) under controlled specification degradation. This is a distinct measurement from the multi-session story pipeline above. Both remain valid; they measure different things.</p>
+</section>
+
+<section class="sec" style="padding-top:0">
+
+<details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
+<summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> Perturbation TL;DR &mdash; the earlier single-session experiment</summary>
+<div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
+<p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested across <strong style="color:var(--ac)">227 single-session experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. <strong style="color:var(--am)" title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; different cost</strong> — an artifact of this earlier experiment's model set (Claude Fable 5 vs DeepSeek) and per-session pricing. The tables below present that full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
 </div>
 </details>
 
@@ -688,8 +721,8 @@ All cost values measured directly from provider API responses via the openCode d
 <div style="text-align:center;margin-top:1rem"><a href="methodology.html" class="cta-btn">Run the Instrument on Your Data →</a></div>
 
 <footer>
-<strong>AI FinOps Dynamics · v0.5 · August 2026</strong><br>
-<span data-stat="sessions">249</span> experiment sessions · <span data-stat="architectures">3</span> architectures, <span data-stat="variants">8</span> variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+<strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
+<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>

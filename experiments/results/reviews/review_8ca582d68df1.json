@@ -1,0 +1,119 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "50e29000ba794fa7f6c15dac78d85cd09c912c32",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "duplicated channel extraction/validation logic between the general handler path and the subscribe/unsubscribe branch",
+        "redundant \"channel must be a non-empty string\" error string defined twice",
+        "minor debt from re-fetching channel after validation"
+      ],
+      "strengths": [],
+      "summary": "Adds channel subscribe/broadcast support with HTTP introspection endpoints that cleanly extend the existing message-handling and response patterns.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "3b7c3abe5afc89575fa0c24d19c14a1ba07101fb",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "removed existing docstrings on timestamp/bound_port/client_count/_make_message",
+        "collapsed _json_response into an overlong single line",
+        "hand-rolled SQLite URL parser",
+        "history returns dicts instead of dataclasses"
+      ],
+      "strengths": [],
+      "summary": "Session 3 integrates Redis pub/sub and SQLite persistence with a new /messages endpoint, a sound architectural evolution.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "d3c2e55e12e59199e1eac1eff0f62f977ed50689",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "`_server` downgraded to `Any` losing type safety",
+        "`ServerConnection` still leaks into `self.clients` so the abstraction is incomplete",
+        "transport constructor takes `port` while `start()` also takes host/port (redundant/awkward API split)",
+        "`bound_port` now delegates to transport while `self.port` and transport port can drift",
+        "`transport.py` file has no unit tests"
+      ],
+      "strengths": [],
+      "summary": "Adds a sensible transport abstraction (BaseTransport/WebSocketTransport) that decouples the server from websockets and improves testability, but applies it only partially.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "113e9a072d5256991c7d61398a3a1a3f5d794393",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "threading.RLock is redundant inside a single-threaded asyncio loop and can block it if contended",
+        "no __main__ entrypoint or graceful shutdown visible in the diff",
+        "replaced the multi-file seed with one 178-line monolith",
+        "async client_count wraps a sync lock without need"
+      ],
+      "strengths": [],
+      "summary": "Session 1 greenfield implementation faithfully matches the notification_service spec (WebSocket broadcast, GET /health via websockets HTTP hook, JSON message envelope, thread-safe client registry) with clean typing, but it discards the entire seed architecture in a single-file rewrite.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "f07f99450669d386b1cf05fd6a8530689cea1fa8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "_db_keeper connection never closed in stop() (leak across restarts)",
+        "_rate_windows local fallback dict grows unbounded",
+        "RATE_LIMIT=0 disables messaging instead of meaning unlimited",
+        "rate limiting also counts subscribe/unsubscribe control messages",
+        "_connect_db() relies on per-call connections without check_same_thread=False for threaded health-server access"
+      ],
+      "strengths": [],
+      "summary": "Session 5 fully implements the rate-limiting, /history, and TTL-cleanup spec while matching the existing inline-SQLite style and using shared-cache URIs to correctly support in-memory databases.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "8ca582d68df1",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 4's transport refactor left a dual client registry: NotificationServer.clients still stores websocket ServerConnection objects while WebSocketTransport._connections also holds them, so the core remains coupled to the websockets type and 'pluggable transport' is only half-realized",
+      "Direct (non-channel) messages are persisted with an empty channel string in sessions 3-5, so persistence semantics for channel-less messages are inconsistent and /history cannot cleanly separate them",
+      "Session 5 rate limiting counts all inbound messages including subscribe/unsubscribe control traffic, so a client near the limit could be locked out of channel management",
+      "All logic accreted into a single app.py (~400 lines); only the transport was extracted, leaving persistence, rate limiting, and HTTP routing in one class that would be harder to extend"
+    ],
+    "key_decisions": [
+      "Session 1: total rewrite of the seed auth API into a clean single-class async WebSocket server on the websockets library, with a strict {type, payload, timestamp} JSON envelope and thread-safe registry \u2014 this contract stayed stable across all 5 sessions",
+      "Session 1: serving REST endpoints (/health, later /channels, /messages, /history) through the websockets HTTP request hook on one port, keeping HTTP surface growth trivial",
+      "Session 2: channels modeled as dict[str, set[str]] client-id sets with routing resolved at send time inside the single broadcast funnel",
+      "Session 3: Redis pub/sub backbone with automatic local-delivery fallback when Redis is unavailable, plus SQLite persistence and env-based config \u2014 the graceful-degradation pattern was reused for session 5 rate limiting",
+      "Session 3: routing every message type through one broadcast \u2192 persist \u2192 publish funnel, enabling cross-instance delivery and history without duplicating code paths",
+      "Session 4: BaseTransport ABC + WebSocketTransport selected via TRANSPORT env var, preserving the public API and all existing tests unchanged"
+    ],
+    "trajectory_description": "Quality was high from the first commit and compounded steadily. Session 1 established a clean, well-tested WebSocket core; session 2 added channel routing cleanly without breaking anything; session 3 was the biggest swing, adding Redis pub/sub with graceful fallback, SQLite persistence, and integration tests; session 4 delivered a genuine structural refactor (transport extraction) that preserved the API and all tests; session 5 layered rate limiting, paginated history, and a TTL cleanup task on top of the earlier layers. The test suite grew monotonically (5 \u2192 7 \u2192 9 \u2192 9 \u2192 11) with no regressions, and each session built directly on the previous one's stable message contract.",
+    "summary": "A textbook-clean incremental build where each session layered one coherent feature onto a stable message contract and a monotonically growing test suite, with only minor coupling smells from the session 4 transport refactor."
+  }
+}

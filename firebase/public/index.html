@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI FinOps Dynamics — Does your AI assistant make your system better, or just bigger?</title>
-<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 249 sessions, 10 perturbation operators, 8 model variants.">
+<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 347 sessions, 3 models, test thoroughness that scales with cost.">
 <meta property="og:title" content="AI FinOps Dynamics — Success isn't value.">
-<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 249 sessions, 10 operators, 8 models.">
+<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 347 sessions, 3 models, 1573 tests.">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -67,46 +67,48 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
     <h3>Measured Corpus</h3>
-    <div class="proof-card"><span class="label">Sessions</span><div class="value"><span data-stat="sessions">249</span></div></div>
-    <div class="proof-card"><span class="label">Perturbation operators</span><div class="value">10</div></div>
-    <div class="proof-card"><span class="label">Model variants</span><div class="value"><span data-stat="variants">8</span></div></div>
-    <div class="proof-card success"><span class="label">Total experiment cost</span><div class="value">$<span data-stat="cost">64.98</span></div></div>
+    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">347</span></div></div>
+    <div class="proof-card"><span class="label">Model variants</span><div class="value"><span data-stat="variants">3</span></div></div>
+    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">71</span></div></div>
+    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">12.54</span></div></div>
   </aside>
 </div></section>
 
 <!-- Section 2: HOW -->
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">How we measure it</div>
-  <h2>Controlled specification degradation — an experimental independent variable.</h2>
-  <p class="lead">Most benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>what happens when the input degrades?</em> We deliberately corrupt engineering specifications — false premises, removed constraints, contradictory requirements — then run coding agents against them and measure the full chain: decisions made, behavior that emerges, what it costs, whether it works, and what it's worth.</p>
+  <h2>Multi-session builds under controlled degradation.</h2>
+  <p class="lead">Most benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>can it build and maintain a real system across five consecutive sessions — and what does that cost?</em> Each experiment is a <strong>story</strong>: a greenfield build that progresses through feature work, integration, refactoring, and cross-cutting concerns, with git commits between every session.</p>
   <div class="op-grid">
     <div class="op-card">
-      <h4>Specification corruption</h4>
+      <h4>Five-session story arc</h4>
       <ul>
-        <li>Inject false premises into requirements</li>
-        <li>Remove critical constraints silently</li>
-        <li>Insert phantom "successful" intermediate results</li>
-        <li>Add contradictory requirements</li>
+        <li>Session 1: greenfield build from spec</li>
+        <li>Session 2: feature addition</li>
+        <li>Session 3: integration (auth, async, persistence)</li>
+        <li>Session 4: refactor (repository pattern, layering)</li>
+        <li>Session 5: cross-cutting (rate limiting, pagination)</li>
       </ul>
     </div>
     <div class="op-card">
-      <h4>Objective mutation</h4>
+      <h4>Perturbation conditions</h4>
       <ul>
-        <li>Invert constraints ("fast" → "slow")</li>
-        <li>Insert competing goals that can't both be satisfied</li>
+        <li><strong>Clean</strong> — unmodified specifications</li>
+        <li><strong>Bad seed</strong> — the starting codebase is pre-degraded</li>
+        <li><strong>Early degrade</strong> — the first spec is corrupted, cascading through later sessions</li>
       </ul>
     </div>
     <div class="op-card">
-      <h4>Process perturbation</h4>
+      <h4>Full quality stack</h4>
       <ul>
-        <li>Inject alien vocabulary from unrelated domains</li>
-        <li>Shift the framing stance (construction → falsification)</li>
-        <li>Reverse causality (solution before problem)</li>
-        <li>Force abandonment of initial approaches</li>
+        <li>AST diffs and convention scoring per commit</li>
+        <li>SonarQube static analysis</li>
+        <li>A second model reviews every commit</li>
+        <li>Test count, edge cases, and test/code ratio measured</li>
       </ul>
     </div>
   </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">10 deterministic perturbation operators. Each controlled by a strength parameter (0.0–1.0). Not prompt engineering tricks — controlled experimental interventions. The instrument doesn't judge code quality. It measures how agent decisions, recovery behavior, and cost respond to degraded input — and what that means for the value of each outcome.</p>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">71 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 3 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. The instrument doesn't judge code quality — it measures how cost, verification, and recovery respond to degraded input.</p>
 </div></section>
 
 <!-- Section 3: The instrument -->
@@ -114,13 +116,13 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <div class="section-kicker">How it works</div>
   <h2>The measurement pipeline.</h2>
   <div class="pipeline">
-    <div class="pipe-step"><div class="ps-label">Clean task</div>Coding problem with explicit constraints</div>
-    <div class="pipe-step"><div class="ps-label">Perturbation</div>Controlled spec degradation</div>
-    <div class="pipe-step"><div class="ps-label">Agent + harness</div>Isolated workdir, OpenCode harness</div>
-    <div class="pipe-step"><div class="ps-label">Trace capture</div>Reasoning, tool calls, token accounting</div>
-    <div class="pipe-step"><div class="ps-label">Generated artifact</div>Code, tests, docs — frozen for evaluation</div>
-    <div class="pipe-step"><div class="ps-label">Evaluator</div>Agent-authored tests executed; heuristic fallback tagged [H]</div>
-    <div class="pipe-step"><div class="ps-label">Cost + outcome</div>Measured $, correctness evidence, divergence from baseline</div>
+    <div class="pipe-step"><div class="ps-label">Story config</div>Task, tier, model, perturbation condition</div>
+    <div class="pipe-step"><div class="ps-label">Session 1–5</div>Greenfield → feature → integration → refactor → cross-cutting</div>
+    <div class="pipe-step"><div class="ps-label">Trace capture</div>Token accounting, cache reads, cost per step</div>
+    <div class="pipe-step"><div class="ps-label">Static analysis</div>AST diffs, SonarQube, convention scoring</div>
+    <div class="pipe-step"><div class="ps-label">Test measurement</div>Test count, edge cases, test/code ratio</div>
+    <div class="pipe-step"><div class="ps-label">Review agent</div>Second model reviews every commit</div>
+    <div class="pipe-step"><div class="ps-label">Cost + value</div>Measured $, cache efficiency, verification depth</div>
   </div>
   <div class="hero-actions"><a href="methodology.html" class="cta-btn">Full Instrument Spec →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Source Code →</a></div>
 </div></section>
@@ -128,45 +130,44 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 <!-- Section 4: Three findings -->
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">What the corpus shows</div>
-  <h2>Three findings from 249 instrumented sessions.</h2>
+  <h2>Three findings from 347 instrumented story sessions.</h2>
   <div class="finding">
     <div class="fn">Finding 1</div>
-    <h3>Per-token price does not tell you task economics.</h3>
-    <p>Models produce similar generated token volumes yet bill at ratios that have nothing to do with token count. Token pricing, cache write policies, and provider architecture stack into a <span data-stat="costgap">69&times;</span> per-session gap on comparable output. The measured cost is a function of provider economics, not model capability.</p>
+    <h3>Test thoroughness scales with cost — and the curve is steep.</h3>
+    <p>GPT-5.6 Luna writes 7 tests per story for $0.09. DeepSeek v4 Pro writes 34 for $0.14. Claude Sonnet 5 writes 73 for $2.32. All three pass their tests — but test/code ratio jumps from 0.28 to 1.63 across the cost range. The cheap model ships code that works; the expensive model ships code that's actually verified. That gap is the FinOps question.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 2</div>
-    <h3>Agent reliability changes differently as specification quality degrades.</h3>
-    <p>When specifications are corrupted — missing constraints, false premises, contradictory requirements — models don't just get "worse." They exhibit materially different recovery behavior, output patterns, and cost trajectories. Some explore novel solutions. Some narrate their way back to familiar territory at billable token rates.</p>
+    <h3>Cache behavior is a hidden cost lever, not a capability signal.</h3>
+    <p>DeepSeek reuses 78% of its context; Luna and Sonnet reuse 97-98%. Models that trust their cache send 6K new tokens per session; models that re-read the codebase send 35K. Two models can produce the same output at wildly different token economics purely through provider caching policy.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 3</div>
-    <h3>Recovery itself has a cost signature.</h3>
-    <p>When a model succeeds under perturbation, the overhead is measurable — both as extra tokens (Explanation Tax) and as retry/narration cost. Recovery premium varies by model family and perturbation class. Understanding this premium is the difference between pricing a prompt and pricing an outcome.</p>
+    <h3>Perturbation still costs — but differently per model.</h3>
+    <p>When specifications degrade (early_degrade condition), DeepSeek's cost rises 22% while Luna's stays flat. Some models absorb degraded input gracefully; others spend billable tokens recovering from it. Measuring that difference is pricing an outcome, not a prompt.</p>
   </div>
   <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a></div>
 </div></section>
 
-<!-- Section 5: Grit -->
+<!-- Section 5: The concept -->
 <section class="dossier-section"><div class="dossier-inner">
   <div class="section-kicker">The concept</div>
-  <h2>Grit = Ground-Truth Integrity.</h2>
-  <p class="lead">Grit measures how well test-executed task success is preserved as specification quality degrades. Defined operationally:</p>
+  <h2>Correctness is not verification.</h2>
+  <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Grit(s) = P(test-executed&nbsp;success | perturbation&nbsp;strength&nbsp;=s)<br>
-    Retention: R(s) = Grit(s) / Grit(0)<br>
-    Recovery&nbsp;premium: &Delta;C = C(successful&nbsp;perturbed) / C(successful&nbsp;baseline)
+    Test:code ratio = test&nbsp;lines / source&nbsp;lines<br>
+    Luna: 0.28 &nbsp;&middot;&nbsp; DeepSeek: 1.09 &nbsp;&middot;&nbsp; Sonnet&nbsp;5: 1.63
   </p>
-  <p>This is not "latent reasoning topology." It is an empirically measurable quantity: the probability of test-executed success under controlled degradation. Escape (structural divergence from baseline) is an explanatory behavioral measure — it may or may not correlate with robustness.</p>
-  <p>But passing tests at low cost isn't the same as delivering durable value. An agent can produce working code while making an architectural choice that silently compounds future cost — duplicate abstractions, wrong seams, drift from established conventions. The gap between correctness evidence and durable system value is the FinOps question this instrument exists to measure.</p>
-  <div class="hero-actions"><a href="evidence.html#grit-spectrum" class="cta-btn">Explore the Grit Spectrum →</a></div>
+  <p>The three models pass their own tests at roughly equal rates. But the tests themselves differ by an order of magnitude. Luna ships 200 lines of tests that confirm the happy path. Sonnet 5 ships 1,188 lines that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." Only one is actually verified.</p>
+  <p>This is the durable-value gap. Correctness is whether the code passes the tests you have. Verification is whether you have the tests that would catch the failures that matter. An agent can produce working code while silently skimping on the safety net — and that trade-off is exactly what the price buys.</p>
+  <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">See the Verification Gap →</a></div>
 </div></section>
 
 <!-- Section 6: What this means -->
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">What this means</div>
   <h2>If you can measure it, you can route on it.</h2>
-  <p class="lead">Once cost, correctness, and value are measured together, model routing stops being about vendor price sheets and starts being about earned outcomes. Route cheap models to cheap tasks. Route complex work where cheap failure is more expensive than expensive success. The contribution is the <em>degraded specification</em> dimension — nobody else is varying input quality as an experimental variable and measuring the economic consequences.</p>
+  <p class="lead">Once cost, verification depth, and cache efficiency are measured together, model routing stops being about vendor price sheets and starts being about earned outcomes. Route cheap models to code that won't be looked at twice. Route expensive models where a missed edge case is expensive failure. The contribution is the <em>verification</em> dimension — nobody else is measuring how much safety net each dollar buys.</p>
   <div class="hero-actions"><a href="framework.html" class="cta-btn">Operational Framework →</a><a href="evidence.html" class="cta-btn ghost">Evidence →</a></div>
 </div></section>
 
@@ -183,8 +184,8 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 </div></section>
 
 <footer>
-  <strong>AI FinOps Dynamics · v0.5 · August 2026</strong><br>
-  <span data-stat="sessions">249</span> experiment sessions · <span data-stat="variants">8</span> model variants · <span data-stat="reports">224</span> game reports · $<span data-stat="cost">64.98</span> analyzed<br>
+  <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
+  <span data-stat="story_sessions">347</span> story sessions · <span data-stat="variants">3</span> model variants · <span data-stat="stories_total">71</span> stories · $<span data-stat="story_total_cost">12.54</span> measured<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="story.html">Story</a> · <a href="methodology.html">Instrument</a> ·
   <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>

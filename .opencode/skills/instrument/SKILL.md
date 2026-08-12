@@ -170,6 +170,11 @@ python scripts/enqueue.py
 python scripts/worker.py
 python scripts/monitor.py  # dashboard
 
+# Phase orchestration (pipeline.py — replaces manual enqueue+worker for the full matrix):
+python scripts/pipeline.py --plan full_matrix   # DS → Luna → analyze → review → regenerate → deploy
+python scripts/pipeline.py --plan full_matrix --graph   # print DAG
+python scripts/pipeline.py --plan full_matrix --from reviews  # resume mid-pipeline
+
 # Sweep runners:
 python scripts/sweep_parallel.py     # 4 models × 2 modes × 2 ops = 16 parallel
 python scripts/sweep_silent_mode.py  # Explanation Tax decomposition
@@ -192,6 +197,80 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 2. Register in build_operators()
 3. Create config YAML using it
 4. Run with scripts/run.py
+
+### Creating a new experiment config (e.g. Go):
+1. Pick a `name` matching the filename, language-prefixed: `go_`, `rust_`, `typescript_`, or bare for Python/Flask.
+2. Copy the structure of the closest existing same-language config:
+   Go → `go_crawler.yaml`, `go_jobqueue.yaml`, `go_grpc_chat.yaml`
+   Rust → `rust_git_store.yaml`, `rust_redis.yaml`, `rust_proxy.yaml`
+   TypeScript → `typescript_eventbus.yaml`, `typescript_multitenant_api.yaml`
+3. Fill in: `task` (multi-line, detailed spec with a fresh problem), `constraints` (8-10 bullets), `operators` (5-6 of the 10), `strengths`, `model` + `model_id`.
+4. Language flags — critical for correctness measurement:
+   - Go/Rust: `standardized: {enabled: true, enforce_pytest: false}` — runs `go test`/`cargo test`, NOT pytest.
+   - Python: `standardized.enforce_pytest: true` (default pytest).
+5. Run: `python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
+6. Verify: GameReport + artifacts under `experiments/results/`, worktree at `/tmp/exp_*`.
+7. Downstream: `python scripts/analyze_worktrees.py` then `python scripts/pipeline.py --plan deploy` to publish to the website.
+
+Go config skeleton:
+```yaml
+# Go: <task title>
+name: go_<name>
+task: >
+  <detailed Go task spec with concurrency/goroutines/channels,
+   stdlib constraints, and explicit test requirements>
+constraints:
+  - <constraint 1>
+  - <constraint 2>
+  # ...
+operators:
+  - inject_alien_vocab
+  - shift_framing
+  - remove_critical_constraint
+  - inject_false_premise
+  - invert_constraint
+  - inject_competing_goal
+strengths: [0.5]
+model: deepseek
+model_id: deepseek/deepseek-v4-pro
+standardized:
+  enabled: true
+  enforce_pytest: false
+```
+
+### Adding a new language (AST / tree-sitter / LSP / SonarQube):
+`language.py` is the single source of truth — everything downstream keys off `LanguageProfile`.
+Adding a language touches six layers:
+
+1. **Tree-sitter AST (`language.py`)** — add to the `_PROFILES` registry:
+   ```python
+   _PROFILES["java"] = LanguageProfile(
+       name="java", extensions=[".java"], tree_sitter_id="java",
+       test_framework="mvn test", test_file_pattern="*Test.java",
+   )
+   ```
+   Then add the grammar-specific node-type mappings in the three properties
+   `function_node_types`, `class_node_types`, `import_node_types` (keys are tree-sitter
+   node names, e.g. java `method_declaration` / `class_declaration` / `import_declaration`).
+2. **LSP (`lsp_diagnostics.py`)** — add an `LSPToolConfig` to `_TOOLS` with `check_cmd`
+   and `diag_cmd`. If the tool's output isn't `file:line:col: message`, add a `_parse_<tool>()`
+   and a dispatch branch in `_run_tool`, else it falls through to `_parse_generic`.
+3. **SonarQube (`sonar.py`)** — zero code change. It runs `sonar-scanner` with `sonar.sources=.`
+   and SonarQube's own analyzer auto-detects the language. Only prerequisite: the language's
+   analyzer plugin installed on the SonarQube server (e.g. `sonar.java`).
+4. **Conventions (`commit_analysis.py` + `conventions/<lang>.yaml`)** — create the YAML file
+   (naming_patterns / forbidden_patterns / scoring). Only `python.yaml` and `typescript.yaml`
+   exist today — **Go and Rust currently fall back to empty rules**. In `compute_ast_diff`,
+   add a language-specific regex branch if the syntax differs from the `+def`/`+function` fallback.
+5. **Test framework** — `LanguageProfile.test_framework` flows to `review.py`'s prompt; set
+   `standardized.enforce_pytest: false` in the config YAML for non-pytest languages
+   (see `go_crawler.yaml`).
+6. **Verify** — `tests/test_language.py`, `tests/test_lsp.py`, `tests/test_commit_analysis.py`.
+
+Tree-sitter nuance: `tree_sitter_id` resolves via `tree_sitter_languages.get_parser(id)`, which
+bundles ~70 grammars (python, go, rust, typescript, java, c, cpp, csharp, ruby, …). Mainstream
+languages "just work"; for an unbundled grammar you'd swap in `tree_sitter_language_pack` or
+register a grammar manually — the exception, not the rule.
 
 ### Fixing a measurement bug:
 1. Read src/instrument/CONTEXT.md for the module reference

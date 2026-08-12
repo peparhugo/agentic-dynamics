@@ -1,0 +1,119 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "2a2148d8c5e3cec10270dce03a4bd0097b6d2710",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "no tests despite jest.config.js",
+        "bin/ssg.js requires build/cli.js to already exist",
+        "single commit replaces seed todo app with unrelated SSG",
+        "option() flag parser unvalidated for unknown args"
+      ],
+      "strengths": [],
+      "summary": "A clean greenfield static site generator with sensible cli/generator module separation and standard TypeScript tooling, but it ships without any tests and its bin wrapper depends on a prebuilt build/ directory.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "f2d566bc0ee2b5e429e139eac38075739e0716be",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "reimplements a template engine via regex instead of using a library",
+        "nested {{#each}} blocks handled incorrectly by non-greedy regex",
+        "layout function vs layout page field naming collision risk",
+        "per-page fs.stat/readdir adds async I/O overhead",
+        "unvalidated template context casting"
+      ],
+      "strengths": [],
+      "summary": "Adds a templates/partials/layouts feature with a hand-rolled mini template engine that follows existing metadata-parsing conventions but duplicates what a template library would provide.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "83b2634aa0b979973eb7c430d254d680c0e906ce",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "no tests added for the new server module",
+        "reload-script regex injection can corrupt pages with inline `</body>`-like strings",
+        "chokidar/ws are runtime deps for a dev-only feature",
+        "rebuild failures are swallowed silently"
+      ],
+      "strengths": [],
+      "summary": "Adds a `serve` subcommand with a WebSocket live-reload dev server that cleanly reuses the existing `buildSite`/`SiteOptions`/CLI option-parsing patterns.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "31f4dae5119c280455f498a9e6c9ed37d0123d00",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "require() breaks ESM/type resolution in config loading",
+        "resolveModule casts and unknown-type coercion are fragile",
+        "plugin system over-engineered for a small SSG",
+        "MODULE_NOT_FOUND silently swallowed",
+        "barrel re-export stubs add indirection"
+      ],
+      "strengths": [],
+      "summary": "Extracts markdown/template/server behavior into a lifecycle-hooked plugin system, which improves separation of concerns but loads configs via `require()` in an ESM/TS context and forces fragile type gymnastics in `resolveModule`.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "d98af937695ebacce2da12327f713e8e6d2e767e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "BuildPages = Page[] & {stats} attaches stats to an array type (non-idiomatic API)",
+        "pagesBuilt is computed by diffing cache entries instead of counted during the loop",
+        "public buildSite return type change is breaking for any other callers",
+        "manual fs.stat existence checks add redundant I/O alongside the manifest."
+      ],
+      "strengths": [],
+      "summary": "The commit adds incremental builds via hash-based caching (`.ssg-cache.json`) that correctly reuses unchanged pages through the existing plugin/hook architecture.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "6389f596af5a",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Session 2's hand-rolled regex-based template engine ({{#each}}/{{>partial}} only, no #if/#unless, custom in-house renderer instead of handlebars/ejs) persisted through the Session 4 refactor and Session 5 caching, permanently constraining template expressiveness and forcing bespoke maintenance",
+      "Session 4's configuredPlugins() uses require() to load ssg.config.ts, which only works under ts-jest or pre-compiled JS and would fail when the package is actually built/consumed",
+      "Session 5's incremental cache keys on source+template hashes only; plugin output is not part of the cache key, so cached pages skip plugin.onFile entirely and plugin-driven transformations can go stale or be missed",
+      "Session 5's timeSavedMs is an estimate (durationMs * skipped/total) rather than measured wall-clock savings, and pagesBuilt counts via diffing cache entries which can undercount on clean+incremental rebuilds"
+    ],
+    "key_decisions": [
+      "Session 4's extraction of the monolithic generator.ts into a Plugin architecture (onStart/beforeBuild/onFile/afterBuild/onEnd) with MarkdownPlugin and TemplatePlugin, making the build pipeline extensible via ssg.config.ts",
+      "Session 2's decision to write a minimal in-house template/partial/layout renderer rather than adopting a mature templating dependency",
+      "Session 3's integration of a chokidar+WebSocket live-reload dev server with a serialized rebuild queue and path-traversal protection, later re-wired through the plugin system as DevServerPlugin",
+      "Session 5's content-addressable incremental build (SHA-256 over source+template trees) with a versioned .ssg-cache.json manifest and --incremental/--clean CLI flags",
+      "Preserving the seed's single-page-per-markdown model, recursive content walk, and auto-generated index.html as the stable pipeline spine across all five sessions"
+    ],
+    "trajectory_description": "Quality rose monotonically and smoothly. Session 1 laid a clean TypeScript foundation (buildSite + fixed layout + index generation), Session 2 added a substantial template/partial/layout feature with the first test suite, Session 3 contributed a well-structured dev server with proper teardown and serialized rebuilds, and Session 4 was the standout architectural step, shrinking generator.ts by more than half while introducing a coherent plugin interface that cleanly absorbed the Session 2 template logic. Session 5 capped the arc with incremental caching and three targeted tests, though it introduced minor rough edges (estimated time-savings, cache interaction with plugin hooks). Tests grew from none to a meaningful suite covering templates, templates-layouts, and incremental builds, and no regressions are visible across the diffs.",
+    "summary": "A textbook monotonic progression from greenfield foundation to feature, integration, architectural refactor, and cross-cutting optimization, whose only real weaknesses are the persistent bespoke template engine and the incremental cache ignoring plugin effects."
+  }
+}

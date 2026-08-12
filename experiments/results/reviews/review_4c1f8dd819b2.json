@@ -1,0 +1,117 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "074a77dd675d9670acfd71e8998b66080d59b00a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "tests-only diff relies on src/build already existing",
+        "no module-level docs or index additions for new exports"
+      ],
+      "strengths": [],
+      "summary": "Greenfield session correctly removes the stale auth-API seed and lays down a thorough build-module test suite aligned with the static_site_gen story.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "321016a68c706694d2cda6bb2370950afc78b724",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "empty whitespace-only diff in jest.config.js",
+        "unused ServeOptions import",
+        "random ports risk collision between parallel tests",
+        "mock relies on implicit global jest"
+      ],
+      "strengths": [],
+      "summary": "Adds a well-structured serve module integration (chokidar + ws live reload) with thorough HTTP tests and a properly-placed jest mock in `__mocks__/`.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "ddbac1450eb36bb66c073011694496fe0bce2f55",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "test fixtures duplicate template markup from templates/",
+        "mild"
+      ],
+      "strengths": [],
+      "summary": "Adds a backward-compatible template-engine feature with comprehensive tests that exercise the public build() API, mirror the shipped templates/ layout, and preserve fallback to built-in templates.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "c16caa950c8ce068c3681f57023788373f76b477",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "setContext instance-injection replaces the context-argument hook convention",
+        "afterBuild(_pages: Page[]) signature mismatches the Plugin interface's afterBuild(context)",
+        "plugins placed at top-level plugins/*-plugin.ts instead of src/plugins/",
+        "dev-server plugin bundles http+ws+watch+rebuild into one monolith",
+        "template plugin moves core output-writing responsibility out of build into afterBuild (double-write/ordering risk)",
+        "normalizeDate/normalizeTags/normalizeVal duplicated with build.ts",
+        "listen() returns this.server as http.Server with a null path"
+      ],
+      "strengths": [],
+      "summary": "The refactor extracts markdown, templating, and dev-server into plugins, but invents a `setContext`-injection contract that diverges from the codebase's context-passing Plugin interface (`onStart(ctx)`, `afterBuild(ctx)`, `onFile(page, ctx)` in src/plugin.ts:30-36), so the new plugins won't drop into the existing plugin manager.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "b1daa4483c0633a7db1879054bc7458e9436c692",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "circular import between engine.ts and build.ts (BuildOptions/SsgEngine)",
+        "unused CacheEntry import in engine.ts",
+        "flaky mtime-granularity tests (2/19 fail intermittently: \"rebuilds all pages when cache is missing\"",
+        "\"rebuilds only changed pages on incremental run\")",
+        "committed dist/ artifacts including compiled test file",
+        "incremental logic ~200 lines inline in engine instead of extracted"
+      ],
+      "strengths": [],
+      "summary": "Adds a well-integrated incremental-build feature with a clean standalone cache module threaded through the plugin BuildContext, but embeds the logic inline in SsgEngine.build and introduces minor smells.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "4c1f8dd819b2",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 1 committed the entire node_modules tree (~3100 files) with no .gitignore, bloating every subsequent commit \u2014 session 2's diff still carries tracked node_modules changes",
+      "The seed codebase (a NestJS-like auth API in index.ts) was unrelated to the static-site-gen target and was fully discarded in the greenfield session, contributing nothing to the final product",
+      "Two parallel templating systems coexist: the string-based pageTemplate/indexTemplate in src/template.ts are retained as a fallback alongside the new Handlebars engine, doubling the maintenance surface",
+      "The story stopped after 2 of 5 planned sessions \u2014 the feature_addition arc ends mid-flight with no theme/plugin/advanced session to round out the template engine"
+    ],
+    "key_decisions": [
+      "Greenfield discard of the mismatched auth-API seed in favor of a modular TypeScript layout (src/build.ts, src/template.ts, src/types.ts) with a commander CLI",
+      "Session 2's backward-compatible Handlebars template engine: layouts + partials + per-page frontmatter template/layout selection, gracefully falling back to the built-in string templates when no templates dir exists",
+      "Extending PageMeta with template/layout fields and exposing a --templates CLI flag rather than changing the existing build() contract",
+      "Test-driven discipline: the test suite grew from 15 to 27 tests across sessions, and each session ran jest until green and tsc --noEmit clean before committing"
+    ],
+    "trajectory_description": "The arc improved steadily. Session 1 (greenfield) replaced the discarded seed with a clean, well-tested modular SSG core \u2014 build pipeline, string templating, CLI, and a 15-test suite. Session 2 (feature_addition) layered a proper Handlebars template engine with layouts, partials, and frontmatter-driven template selection on top without breaking any existing tests, added 12 new tests, and recovered from two initial test failures (raw markdown leaking instead of rendered HTML into the {{body}} slot) before committing. Each session self-verified with passing jest runs and clean tsc; the only flat note is that the string-template fallback path was kept even after the engine superseded it, leaving deliberate redundancy. The story ends with all 27 tests green and the product notably more capable than it started.",
+    "summary": "Two tightly coherent sessions built a minimal static-site generator and then extended it with a robust, backward-compatible Handlebars templating layer, marred only by committing node_modules and an unrelated seed that was thrown away."
+  }
+}

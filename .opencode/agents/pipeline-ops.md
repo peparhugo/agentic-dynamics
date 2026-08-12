@@ -65,6 +65,28 @@ python scripts/worker.py                # Worker process
 python scripts/monitor.py               # Dashboard
 ```
 
+### Phase Orchestration (pipeline.py)
+YAML-driven DAG orchestration. Plans live in `experiments/configs/plans.yaml`.
+```bash
+python scripts/pipeline.py --plan <name>           # run a plan
+python scripts/pipeline.py --plan <name> --graph   # print dependency tree
+python scripts/pipeline.py --plan <name> --dry-run # preview DAG, no execution
+python scripts/pipeline.py --plan <name> --status  # Redis state
+python scripts/pipeline.py --plan <name> --reset   # clear Redis state
+python scripts/pipeline.py --check-deps            # validate all DAGs
+```
+
+Plans: `ci` (lint→typecheck→test→build), `deploy` (refresh→sync→build_data→firebase),
+`full_matrix` (matrix→analyze→review→regenerate→deploy), `feature` (spec→implement→lint→test→review→ship),
+`ship_features` (parallel workstreams→conflict detect→PR create→merge).
+
+Phase kinds: `shell`, `test`, `lint`, `matrix`, `review`, `pipeline`, `ship`,
+`fan_out`, `conflict_detect`, `pr_create`, `pr_merge`.
+`fan_out` runs parallel workstreams, each a git worktree with a nested phase DAG;
+`conflict_detect`/`pr_create`/`pr_merge` consume the sidecar at
+`experiments/results/workstreams/{plan}_{phase}.json`.
+CLI filters: `--from`, `--until`, `--only`, `--prompt`, `--workers`.
+
 ### Working Directory Map
 - `opencode.db` → `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
 - Worktrees → `/tmp/exp_*`

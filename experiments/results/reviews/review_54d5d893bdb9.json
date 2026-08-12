@@ -1,0 +1,121 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "c14d94819533c5fa74b4cce24ecf854b3f873cca",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.4,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "global connection with check_same_thread=False is a threading hazard in the threaded Flask dev server",
+        "init_db() runs as an import-time side effect",
+        "import-time DB init breaks per-test isolation and couples import to DB state",
+        "no locking around the shared connection"
+      ],
+      "strengths": [],
+      "summary": "Replaces the per-request connection pattern with a shared global connection (check_same_thread=False) to make :memory: DB tests work, adds a solid test suite, and hardens title validation, but sacrifices the safer idiomatic per-request connection for it.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "6eba383248f02f6072c608f65de262e9697d9d92",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "hardcoded development JWT_SECRET fallback",
+        "redundant ALTER TABLE alongside CREATE TABLE already declaring owner_id",
+        "pre-existing tasks get NULL owner_id and become orphaned from all queries with no backfill",
+        "no foreign key constraint on owner_id"
+      ],
+      "strengths": [],
+      "summary": "Adds JWT auth and per-user task ownership that correctly threads owner_id through every query behind a clean require_auth decorator while preserving the existing get_db/init_db Flask+SQLite patterns.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "c5168ec112c8a2e43ba677822a40a085916d66de",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "email/username conflation in create_user",
+        "KeyError risk on g.current_user[\"email\"]",
+        "mock print left in production code",
+        "redundant double 404 check"
+      ],
+      "strengths": [],
+      "summary": "Adds a tested Celery-backed email notification on task completion with a proper PRAGMA-based schema migration and an earlier 404 check, though the `email or username` fallback and the `g.current_user[\"email\"]` access risk KeyError if the field is absent.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "74ac8b2835d2003b5d85aecd5ea693b8344c2ba8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "dead wrapper functions remain in app.py",
+        "inconsistent call paths (some routes use helpers",
+        "others call repositories directly)",
+        "password hashing and email-default logic inline in view layer",
+        "mixed abstraction levels"
+      ],
+      "strengths": [],
+      "summary": "Introduces a clean repository layer that extracts SQLite access from the Flask app, but leaves now-unused wrapper functions behind and leaks hashing/defaulting logic into routes.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "df11570fdd032d09ab371746d9f4a0d2f5f85c66",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "breaking response shape change from bare list to envelope",
+        "redundant JWT re-decode in rate_limit_key duplicating auth logic",
+        "silent order_by change from created_at to id in list_for_owner",
+        "rate-limit test hard-coded to the 100/min default",
+        "no retry_after assertion value check"
+      ],
+      "strengths": [],
+      "summary": "The commit cleanly adds cursor pagination and rate limiting through the existing repository/helper-function structure, but bundles in a breaking API response-shape change and a silent `order_by` semantic shift.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "task_manager_api",
+  "story_id": "54d5d893bdb9",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "task_manager_api",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.8,
+    "compounding_issues": [
+      "Session 1's global shared connection (check_same_thread=False) and import-time init_db() became a permanent threading hazard every later session had to code around",
+      "Session 2's schema change left pre-existing tasks with NULL owner_id (orphaned) and no FK; later owner-scoped queries silently rely on data being populated",
+      "Session 2's hardcoded JWT_SECRET fallback was reused, forcing session 5 to re-decode the JWT in rate_limit_key, duplicating auth logic",
+      "Session 3's email/username conflation carried into session 5, where g.current_user['email'] risks KeyError",
+      "Session 4's repository refactor left dead wrapper functions in app.py and mixed abstraction levels that session 5 had to build on top of",
+      "Session 5 bundled a breaking response-shape change (bare list to envelope) and a silent order_by shift (created_at to id) with its feature work"
+    ],
+    "key_decisions": [
+      "Global in-memory SQLite connection with check_same_thread=False chosen in session 1 to make tests pass \u2014 traded correctness/safety for test convenience and shaped all later data access",
+      "JWT auth behind a require_auth decorator threading owner_id through every query, which consistently enforced per-user task isolation across sessions",
+      "Celery-backed async email notification on task completion, decoupling notification delivery from the request path",
+      "Adopting a BaseRepository ABC + TaskRepository/UserRepository pattern in session 4, extracting SQLite access from app.py (applied incompletely)",
+      "Cursor-based pagination plus per-user rate limiting with a reusable key_func in session 5"
+    ],
+    "trajectory_description": "Quality improved across the arc: tests grew monotonically (5 \u2192 8 \u2192 10 \u2192 10 \u2192 13, all passing) and each session delivered a coherent, functional increment \u2014 auth, async notifications, repository layering, then rate limiting and pagination \u2014 while per-commit review scores trended from 'worse' to 'better' (architectural fit 0.4 \u2192 0.9 \u2192 0.7 \u2192 0.85 \u2192 0.7). However, the trajectory flattened by the end: session 5 was rated 'neutral' because it bundled a breaking response-shape change and a silent ordering semantic shift, and technical debt accreted without any cleanup pass \u2014 dead wrapper functions, mixed abstraction levels, hardcoded secrets, and the session-1 threading hazard persisted to the final commit. It was a rising but never-consolidating build.",
+    "summary": "A coherent, monotonically improving greenfield-to-polish story with real feature growth and a green test suite, whose steady accumulation of small architectural debts (global connection, orphaned rows, dead wrappers, mixed abstractions) was never repaid."
+  }
+}

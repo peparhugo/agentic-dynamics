@@ -1,0 +1,199 @@
+{
+  "story_name": "notification_service",
+  "story_id": "4182ba649c21",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 0,
+    "total_lines_removed": 0,
+    "net_lines": 0,
+    "average_convention_score": 0.879
+  },
+  "commits": [
+    {
+      "commit_hash": "3dd801e0fabbd12b328445e586432a0fe473d4f6",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 3,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "2436729b0c81cd0cd5075ceba23f01f776698c9f",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 3,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "71251810504beb0a20c498f85540039a0c06bb7d",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 3,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "5bd20407fff67c1ed2421872a9783cc0646182c4",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 3,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "ed249c209157d36f5c558c17020bea9b2ab2788a",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 3,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ]
+}

@@ -21,6 +21,29 @@ from typing import Any
 # ── Data Structures ────────────────────────────────────────────
 
 @dataclass
+class ReviewProblem:
+    """A single code quality issue with category and severity."""
+
+    category: str  # architecture, convention, testing, security, performance, etc.
+    severity: str  # critical, major, minor, info
+    description: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "category": self.category, "severity": self.severity,
+            "description": self.description,
+        }
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> "ReviewProblem":
+        return cls(
+            category=d.get("category", "other"),
+            severity=d.get("severity", "info"),
+            description=d.get("description", ""),
+        )
+
+
+@dataclass
 class CommitReview:
     """Structured review of a single commit."""
 
@@ -31,7 +54,7 @@ class CommitReview:
     introduces_technical_debt: bool
     respects_existing_patterns: bool
     better_or_worse: str  # "better", "worse", "neutral", "unclear"
-    problems: list[str] = field(default_factory=list)
+    problems: list[ReviewProblem] = field(default_factory=list)
     strengths: list[str] = field(default_factory=list)
     summary: str = ""
 
@@ -44,7 +67,7 @@ class CommitReview:
             "introduces_technical_debt": self.introduces_technical_debt,
             "respects_existing_patterns": self.respects_existing_patterns,
             "better_or_worse": self.better_or_worse,
-            "problems": self.problems,
+            "problems": [p.to_dict() for p in self.problems],
             "strengths": self.strengths,
             "summary": self.summary,
         }
@@ -59,10 +82,21 @@ class CommitReview:
             introduces_technical_debt=d.get("introduces_technical_debt", False),
             respects_existing_patterns=d.get("respects_existing_patterns", True),
             better_or_worse=d.get("better_or_worse", "unclear"),
-            problems=d.get("problems", []),
+            problems=_parse_problems(d.get("problems", [])),
             strengths=d.get("strengths", []),
             summary=d.get("summary", ""),
         )
+
+
+def _parse_problems(raw: list) -> list[ReviewProblem]:
+    """Parse problems list, handling both old (strings) and new (dict) formats."""
+    problems = []
+    for p in raw:
+        if isinstance(p, dict):
+            problems.append(ReviewProblem.from_dict(p))
+        elif isinstance(p, str):
+            problems.append(ReviewProblem(category="other", severity="info", description=p))
+    return problems
 
 
 @dataclass
@@ -98,14 +132,22 @@ COMMIT: {commit_message}
 DIFF:
 {diff}
 
-Output EXACTLY this format with no other text:
-arch_fit: <0.0-1.0>
-convention: <0.0-1.0>
-debt: <true/false>
-respects_patterns: <true/false>
-better_or_worse: <better|worse|neutral>
-summary: <one sentence>
-problems: <comma-separated list or none>"""
+Output ONLY valid JSON, no other text:
+{{
+  "architectural_fit": <0.0-1.0>,
+  "convention_adherence": <0.0-1.0>,
+  "introduces_technical_debt": <true/false>,
+  "respects_existing_patterns": <true/false>,
+  "better_or_worse": "<better|worse|neutral>",
+  "problems": [
+    {{"category": "<architecture|convention|testing|security|performance|maintainability|dependency|other>",
+      "severity": "<critical|major|minor|info>",
+      "description": "<specific issue>"}},
+    ...
+  ],
+  "strengths": ["<strength>", ...],
+  "summary": "<one sentence>"
+}}"""
 
 _STORY_REVIEW_PROMPT = """You are reviewing a complete multi-session AI coding story.
 Across {session_count} sessions, an AI agent built a software project incrementally.
@@ -143,7 +185,23 @@ COMMIT_SCHEMA = {
         "introduces_technical_debt": {"type": "boolean"},
         "respects_existing_patterns": {"type": "boolean"},
         "better_or_worse": {"type": "string", "enum": ["better", "worse", "neutral"]},
-        "problems": {"type": "array", "items": {"type": "string"}},
+        "problems": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "category": {"type": "string", "enum": [
+                        "architecture", "convention", "testing", "security",
+                        "performance", "maintainability", "dependency", "other"
+                    ]},
+                    "severity": {"type": "string", "enum": [
+                        "critical", "major", "minor", "info"
+                    ]},
+                    "description": {"type": "string"},
+                },
+                "required": ["category", "severity", "description"],
+            },
+        },
         "strengths": {"type": "array", "items": {"type": "string"}},
         "summary": {"type": "string"},
     },
@@ -154,6 +212,7 @@ STORY_SCHEMA = {
     "type": "object",
     "properties": {
         "overall_coherence": {"type": "number", "minimum": 0, "maximum": 1},
+        "overall_quality": {"type": "number", "minimum": 0, "maximum": 1},
         "compounding_issues": {"type": "array", "items": {"type": "string"}},
         "key_decisions": {"type": "array", "items": {"type": "string"}},
         "trajectory_description": {"type": "string"},
@@ -412,28 +471,14 @@ def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> 
     except (json.JSONDecodeError, KeyError, ValueError):
         pass
 
-    # Try key:value format
+    # Try key:value format or JSON embedded in text
     try:
-        arch_fit = _extract_float(response, r"arch_fit:\s*([\d.]+)")
-        convention = _extract_float(response, r"convention:\s*([\d.]+)")
-        debt = _extract_bool(response, r"debt:\s*(true|false)")
-        respects = _extract_bool(response, r"respects_patterns:\s*(true|false)")
-        bow = _extract_str(response, r"better_or_worse:\s*(\w+)")
-        summary = _extract_str(response, r"summary:\s*(.+?)(?:\n|$)")
-        problems = _extract_list(response, r"problems:\s*(.+)")
-
-        if arch_fit is not None:
-            return CommitReview(
-                commit_hash=commit_hash, reviewer_model=model,
-                architectural_fit=max(0.0, min(1.0, arch_fit)),
-                convention_adherence=max(0.0, min(1.0, convention or arch_fit or 0.5)),
-                introduces_technical_debt=debt or False,
-                respects_existing_patterns=respects or True,
-                better_or_worse=bow or "unclear",
-                problems=[p.strip() for p in (problems or "").split(",") if p.strip() and p.strip() != "none"],
-                strengths=[],
-                summary=summary or "Review parsed from text output.",
-            )
+        # First try to extract JSON from the response
+        import re as _re
+        json_match = _re.search(r'\{[\s\S]*\}', response)
+        if json_match:
+            data = json.loads(json_match.group())
+            return CommitReview.from_dict({**data, "commit_hash": commit_hash, "reviewer_model": model})
     except Exception:
         pass
 

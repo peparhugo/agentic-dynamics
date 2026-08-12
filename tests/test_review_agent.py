@@ -46,7 +46,33 @@ class TestCommitReview:
         }
         review = CommitReview.from_dict(d)
         assert review.architectural_fit == 0.6
-        assert review.problems == ["Circular import"]
+        assert len(review.problems) == 1
+        assert review.problems[0].description == "Circular import"
+        assert review.problems[0].category == "other"  # backward compat: string → other
+
+    def test_from_dict_structured_problems(self):
+        """Test that structured problem dicts are parsed correctly."""
+        d = {
+            "commit_hash": "ghi789",
+            "reviewer_model": "test",
+            "architectural_fit": 0.5,
+            "convention_adherence": 0.6,
+            "introduces_technical_debt": False,
+            "respects_existing_patterns": True,
+            "better_or_worse": "neutral",
+            "problems": [
+                {"category": "testing", "severity": "major", "description": "No edge case tests"},
+                {"category": "convention", "severity": "minor", "description": "Missing type hints"},
+            ],
+            "strengths": ["Clean architecture"],
+            "summary": "OK.",
+        }
+        review = CommitReview.from_dict(d)
+        assert len(review.problems) == 2
+        assert review.problems[0].category == "testing"
+        assert review.problems[0].severity == "major"
+        assert review.problems[1].category == "convention"
+        assert review.problems[1].severity == "minor"
 
 
 class TestStoryReview:

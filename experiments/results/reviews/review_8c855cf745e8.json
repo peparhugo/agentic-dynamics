@@ -1,0 +1,116 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "858e12d4281ecb60bcf7f50f3c935e910ed73b38",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [],
+      "strengths": [],
+      "summary": "Greenfield rebuild appropriately discarded the unrelated single-file Express auth seed and replaced it with a well-structured modular TypeScript SSG project (src/ modules, bin entry, jest config, proper package scripts).",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "aa098be666a5a8cd38c1ec1354b0f382e1d73455",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "continues hand-rolled arg parser instead of commander/yargs constraint",
+        "dense one-line reloadScript constant",
+        "no tests added for serve command"
+      ],
+      "strengths": [],
+      "summary": "Clean, well-scoped Session 3 implementation that adds a self-contained `server.ts` dev server (chokidar + ws, live reload, path-traversal guard) wired through cli.ts and index.ts exactly as the story spec requires.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "512d0649b9316f8dbacf7c9d38ed2e5e61b0ab52",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "require() with eslint-disable in an ESM-style TS codebase",
+        ".ts config loading depends on host ts-jest runtime",
+        "broad MODULE_NOT_FOUND swallow can mask real config errors",
+        "helper renames add churn"
+      ],
+      "strengths": [],
+      "summary": "Sound plugin-based decomposition of a monolithic generator, but the runtime config loader leans on a `require()` hack with ts-jest-dependent semantics.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "5d66b6fdd416559d6689d2b5b80f5778674cc67b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "buildSite return type changed to Page[] & {stats} breaking the public contract",
+        "redundant stat reporting via both onStats callback and pages.stats",
+        "Page objects serialized into JSON cache may not round-trip functions/non-serializable fields",
+        "stats.pagesSkipped truthiness check mishandles counts."
+      ],
+      "strengths": [],
+      "summary": "Adds incremental caching, clean flags, and build stats in a way that generally fits the existing plugin/hook architecture, but forces a non-idiomatic API change.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "c488b2c211fae4547d12aedcf7cd6a6286bb1b0d",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "hand-rolled template engine via regex (fragile",
+        "can't match real hbs/ejs semantics)",
+        "ignores library convention (handlebars/marked/gray-matter precedent)",
+        "required `frontmatter: Record<string",
+        "unknown>` added to Page interface (compile breakage",
+        "should be optional or handled in buildSite)",
+        "layout `{{{body}}}` wiring/context not visible and no layout metadata pass-through",
+        "no template-specific tests shown despite prompt requiring them",
+        "duplicated escaping paths"
+      ],
+      "strengths": [],
+      "summary": "The feature maps to the story spec but hand-rolls a regex-based Handlebars/EJS engine instead of using the established library pattern (seed already uses `marked`/`gray-matter`; sibling worktrees add the real `handlebars` dep), and adds a required `frontmatter` field to `Page` that breaks strict construction sites.",
+      "session_number": 2
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "8c855cf745e8",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "No session could actually run the test suite \u2014 node/npm/jest were unavailable in the worktree environment, so every commit shipped unverified (sessions repeatedly reported '0 passed, 0 failed')",
+      "Session 2's hand-rolled regex template engines (Handlebars/EJS subsets, with EJS evaluated via Function + `with`) became a fragile foundation that Session 4 had to carry into plugins/template.ts nearly verbatim, constraining later refactor freedom",
+      "Session 4's plugin refactor added a large untested surface (Plugin lifecycle, BuildContext, ssg.config loading) \u2014 the test file was untouched that session, and no plugin/config tests were ever added",
+      "Session 4 left an architectural inconsistency: src/plugins/dev-server.ts is a marker/dead plugin and src/server.ts was never migrated onto the plugin system it introduced",
+      "Session 5's `timeSaved` stat is actually just the skipped-page count, and cache results are smuggled out via Object.assign on an array \u2014 a correctness/metric smell rather than real timing data"
+    ],
+    "key_decisions": [
+      "Session 1 greenfield: entirely discarded the seed auth API (200 LOC deleted) and reset the project as a markdown static site generator with a minimal, dependency-light core",
+      "Session 2: self-implemented Handlebars + EJS template subsets (regex-based, partials/layouts/frontmatter selection) instead of adopting a mature templating dependency",
+      "Session 4: extracted a lifecycle-hook plugin architecture (onStart/beforeBuild/onFile/afterBuild/onEnd + BuildContext + config-file loading), splitting the monolith into plugins/markdown.ts and plugins/template.ts \u2014 the most consequential structural choice, which then anchored Session 5",
+      "Session 5: content-addressable incremental builds \u2014 sha256 source hashing with template-hash invalidation and a .ssg-cache.json manifest, threading cache/stats through the BuildContext"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions. S1 established a clean, focused core (markdown\u2192HTML, CLI, first tests) after discarding the seed. S2 and S3 broadened feature breadth \u2014 templates/layouts/partials and a live-reload dev server \u2014 with matching tests each time, though nothing ever executed since the runtime was missing. S4 was the pivotal step: a large, behavior-preserving refactor into a plugin architecture that cut generator.ts from ~200 to ~70 lines, slightly raising structural quality while adding an untested extension surface and one dead marker plugin. S5 closed the loop with a genuinely cross-cutting capability (incremental caching) built on the S4 BuildContext, keeping tests green on paper and demonstrating that the architecture could absorb new features cleanly. The arc is one of healthy maturation \u2014 increasing capability and structure \u2014 tempered by untestable commits and growing internal complexity.",
+    "summary": "A coherent, textbook greenfield-to-mature progression (core \u2192 features \u2192 integration \u2192 plugin refactor \u2192 cross-cutting caching) whose quality rose across sessions, undermined mainly by an unverified test story and a few half-integrated seams from the refactor."
+  }
+}

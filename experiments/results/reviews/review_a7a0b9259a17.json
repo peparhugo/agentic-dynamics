@@ -1,0 +1,111 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "afb121b0e4143fc9c7a698ac56d76681b709f9e4",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "package.json not shown in diff",
+        "@types/marked deprecated (marked ships its own types since v5)",
+        "no explicit test script wiring visible",
+        "oversized auto-generated lockfile noise in a session commit"
+      ],
+      "strengths": [],
+      "summary": "A clean greenfield setup with a standard ts-jest config and committed lockfile, though the diff omits package.json/source and leans on a deprecated types package.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "38e3d9562561ef27d68b52b56565519fc04cf6af",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "generateSite's new templatesDir parameter defaults to './templates' duplicating the CLI default (mild coupling)",
+        "frontmatter template/layout are parsed but their consumption is in the truncated portion of the diff so wiring can't be fully verified"
+      ],
+      "strengths": [],
+      "summary": "Converts the hardcoded HTML renderer into a Handlebars-backed TemplateEngine with per-page template/layout frontmatter and a --templates CLI flag, keeping backward-compatible defaults and adding tests that mirror the existing setupContentDir pattern.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "17398a37947afc00846301bad9c921e69e32cc01",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [],
+      "strengths": [],
+      "summary": "Adds well-chosen runtime dependencies (chokidar, handlebars, ws) that fit the SSG integration goal, with a properly regenerated package-lock moving transitive deps out of dev scope.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "2675384aa59ce02c4cf0423d924b034e30ca5d3a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "no ssg.config.ts plugin loading (hardcoded new SsgEngine([...]) in main)",
+        "dev-server.serve() not awaited in async main()",
+        "old parser/generator/server modules may linger as dead code",
+        "DevServerPlugin manages the build loop outside the engine pipeline"
+      ],
+      "strengths": [],
+      "summary": "Genuine plugin-pipeline refactor matching the session-4 spec's lifecycle hooks and engine orchestration, but plugin loading is hardcoded instead of read from ssg.config.ts as required.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "6b365541305dc822426211d03c703734242c2215",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "engine logs via console.log (layering violation)",
+        "timeSavedMs is a fabricated hardcoded perPageTimeMs heuristic",
+        "post-hoc read-back of written HTML to correct cache entries is a workaround for storing pre-template html",
+        "BuildStats/CacheEntry duplicate PageData shape"
+      ],
+      "strengths": [],
+      "summary": "Cleanly separates caching into a testable CacheManager and integrates incrementally through the existing plugin BuildContext, with all callers (index.ts, dev-server.ts) updated consistently.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "a7a0b9259a17",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Session 4's refactor to the plugin architecture never deleted the legacy parser.ts/generator.ts/server.ts \u2014 the final tree contains two parallel implementations (server.ts still imports parseFiles/generateSite, and tests exercise both), leaving dead code the later caching work cannot reach",
+      "ssg.config.ts defines a plugin array that is never imported or consumed by SsgEngine or the CLI \u2014 configuration exists but is bypassed by the hardcoded plugins in src/index.ts",
+      "Session 1 committed node_modules, package-lock, and compiled dist/ output into git (5157 files, ~968K insertions), and later sessions kept committing dist/ artifacts, bloating the history and blurring source vs. build output",
+      "The unrelated NestJS-like auth index.ts from the seed commit was never removed or reconciled with the SSG project, remaining as a root-level distractor",
+      "DevServerPlugin implements the Plugin interface but never uses its hooks \u2014 it exposes a serve() method called directly, so the dev server sidesteps the very plugin pipeline the refactor was meant to unify"
+    ],
+    "key_decisions": [
+      "Session 1: minimal two-phase pipeline (parseFiles via gray-matter+marked, then generateSite) with a small CLI \u2014 a clean foundation that set the scope",
+      "Session 2: dedicated Handlebars TemplateEngine (layouts, partials, custom page templates) wired into the generator, making theming first-class",
+      "Session 3: integrating a chokidar + WebSocket live-reload dev server into the CLI, moving from a batch builder to a development tool",
+      "Session 4: the decisive pivot to a lifecycle-hook plugin architecture (Plugin interface with onStart/beforeBuild/onFile/afterBuild/onEnd + SsgEngine orchestrator), which is what enabled Session 5 to slot in cross-cutting functionality",
+      "Session 5: content+template hashing incremental build cache (CacheManager) threaded through SsgEngine and the CLI as a cross-cutting performance concern \u2014 a natural capstone on the S4 architecture"
+    ],
+    "trajectory_description": "Quality climbs steadily and the arc is a textbook feature-growth curve. Session 1 is minimal but clean and well-scoped. Session 2 adds a real templating layer with a growing test suite. Session 3 broadens into dev-server integration. Session 4 is the high point architecturally \u2014 a genuine refactor to a plugin engine with a 705-line, 46-test suite \u2014 but it is a half-refactor: legacy files, an unused config, and a hook-less DevServerPlugin survive alongside it, so quality gains are offset by accumulating debt. Session 5 builds directly and successfully on the new engine with a 793-line incremental-build test file. Net: quality improved materially from a naive script to an extensible, cached engine, with the strongest gains at S4/S5 and a persistent hygiene debt (committed node_modules/dist, dead code, duplicate config) that never got cleaned up.",
+    "summary": "A highly coherent, progressively-built SSG story whose plugin-architecture refactor and incremental-caching capstone mark genuine quality gains, undercut only by a half-completed refactor that left legacy code, an unused config, and committed build artifacts as standing debt."
+  }
+}

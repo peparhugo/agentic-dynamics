@@ -1,0 +1,116 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "2e74d77d7ec0573ecd74e0d01abd3f52ef63244a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.15,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "deletes baseline index.ts instead of extending it",
+        "domain switch from todo API to ssg with no rationale",
+        "package.json/name targets an unrelated tool (bin ssg dist/cli.js)",
+        "single-file structure replaced rather than refactored",
+        "no reuse of existing models/routes/error-handling patterns"
+      ],
+      "strengths": [],
+      "summary": "The agent deleted the provided Express Todo API seed wholesale and replaced it with an unrelated static-site-generator project, abandoning the existing architecture and seams entirely.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "7809a6f9f122de25dd5163e116e5aa5807ad63f7",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [],
+      "strengths": [],
+      "summary": "Adds chokidar (file watching) and ws (live-reload WebSocket) as runtime deps with @types/ws in devDependencies for the SSG integration session, and the lockfile correctly promotes transitive deps out of dev.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "412439b4a0d4ef3af15fc1c4f566df3dd673c857",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.82,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "hardcoded './templates' default duplicated in cli.ts and generator.ts",
+        "index template conflated as a 'page' kind in TemplateEngine",
+        "sync fs reads in constructor",
+        "layout-fallback test only asserts generic doctype"
+      ],
+      "strengths": [],
+      "summary": "Adds a Handlebars-based TemplateEngine with disk/builtin fallbacks and 13 tests, cleanly replacing the string-built HTML in generator.ts and wiring a --templates flag through cli.ts.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "e2634f9f345b3ed6be84bee60a7d5dfaade93d76",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.55,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "plugin system not wired into cli.ts (dead code)",
+        "loadCliConfig discards plugins and config is non-functional",
+        "require() mixed with ESM imports in cli.ts",
+        "[key:string]:any index signature on BuildContext",
+        "context.engine! non-null assertions",
+        "TemplatePlugin depends on MarkdownPlugin registration order",
+        "no tests for ssg.ts/plugin.ts"
+      ],
+      "strengths": [],
+      "summary": "Introduces a coherent plugin/hook architecture (onStart/beforeBuild/onFile/afterBuild/onEnd) but leaves it completely orphaned \u2014 the CLI never instantiates `SSG`, `loadCliConfig` silently drops `plugins`, and build/serve still run the legacy path.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "e66b11b8925508774ab8b8b755dfe190a29652f6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "render loop duplicated from generator.ts instead of reused",
+        "index-rebuild heuristic (pagesSkipped === 0) is fragile",
+        "page.html input is ignored and re-rendered from content dir",
+        ".ssg-cache.json written inside the output directory"
+      ],
+      "strengths": [],
+      "summary": "Incremental build feature lands as a clean, well-tested extension of the existing generator architecture\u2014`incremental.ts`/`cache.ts` mirror `generator.ts` conventions, `BuildStats` slots into `types.ts`, exports flow through `index.ts`, and the 469-line test mirrors `generator.test.ts` patterns exactly.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "3befdab6020a",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.72,
+    "compounding_issues": [
+      "Session 4's SSG class + plugin lifecycle architecture (ssg.ts, plugin.ts, plugins/*, ssg.config.ts) is dead code \u2014 nothing ever calls new SSG(), loadFromConfig(), or wires plugins into the CLI; the build path still uses parseMarkdownFiles + generateSite directly, leaving two parallel architectures where session 5 built on the old function-based pipeline instead of the new one",
+      "dist/ build artifacts were committed in sessions 3 and 4, then deleted in session 5 \u2014 avoidable repo-hygiene churn that inflates every intervening diff",
+      "generateSiteIncremental duplicates generator.ts rendering logic (own renderPage/renderLayout loop) rather than composing with the existing generateSite, spreading rendering logic across three modules",
+      "SSG.serve() in session 4 is an incomplete stub \u2014 it fires onStart/onEnd plugin hooks but never actually starts a server, an unfinished abstraction shipped into the refactor"
+    ],
+    "key_decisions": [
+      "Session 1 replaced the Todo-API seed with a clean function-based pipeline (parser \u2192 generator \u2192 CLI) plus Jest/ts-jest strict-mode TypeScript baseline",
+      "Session 2 extracted a TemplateEngine backed by Handlebars with .hbs layouts/partials, replacing inline HTML string building in generator.ts",
+      "Session 3 added a dev server (server.ts) with WebSocket live-reload and chokidar file watching, wired into the CLI as a serve subcommand",
+      "Session 4 introduced a plugin abstraction (Plugin interface with onStart/beforeBuild/onFile/afterBuild/onEnd hooks) and config-file loading \u2014 architecturally ambitious but never connected to the CLI entry point",
+      "Session 5 added a content-hash based incremental build cache (CacheManager + .ssg-cache.json manifest) with --incremental/--clean CLI flags and a large test suite"
+    ],
+    "trajectory_description": "Quality improved across the sessions: the greenfield baseline grew into a feature-complete SSG with templating, a live-reload dev server, config support, and incremental builds, with test coverage expanding in lockstep (parser, generator, templates, cli, server, incremental all tested; 878 lines of tests at HEAD) and strict TypeScript throughout. However the arc is not smooth \u2014 session 4's refactor added a sophisticated plugin architecture that was never adopted by the code paths sessions 3 and 5 actually exercised, so the trajectory is two-track: the working pipeline matured steadily while the abstracted rewrite remained disconnected, and session 5's cross-cutting work reinforced the older path rather than consolidating the two.",
+    "summary": "A logical session arc with steadily growing features and tests, undermined by session 4 shipping an unintegrated plugin architecture that sessions 3 and 5's CLI pipeline never used."
+  }
+}

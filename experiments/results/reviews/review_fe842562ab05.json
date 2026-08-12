@@ -1,0 +1,115 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "a8d4286e3b4589abcc30507c895db1bfe20026f0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "generic package name \"ssg\"",
+        "escapeHtml/displayTitle helpers appear unused",
+        "test files not shown in diff"
+      ],
+      "strengths": [],
+      "summary": "The agent cleanly replaced the single-file Express seed with a well-structured static site generator (CLI + generator modules, ts-jest setup, proper bin entry), showing good modular architecture and standard TypeScript conventions.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "10c05ac522d0d0fd839a2c96c2afce32e21303d6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "dual template engines (ejs + handlebars) where one suffices",
+        "registerPartials collects .ejs files but never registers them",
+        "no tests in diff for new template/layout/partial paths",
+        "template data spreads all metadata unbounded"
+      ],
+      "strengths": [],
+      "summary": "Adds templating support cleanly behind BuildOptions with graceful fallback to the existing renderer, but bundles two competing engines and only half-wires EJS.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "d3e5a0684fe210ddbeaae4053ab047bbdabff1be",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.45,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "rebuild calls buildSite with plugins:[] causing behavior divergence",
+        "dev server wired through onStart as a plugin side-effect",
+        "single-line formatting of interfaces/options hurts readability and consistency"
+      ],
+      "strengths": [],
+      "summary": "Refactors the dev server and generator into a plugin architecture, but squishes multi-line declarations into hard-to-read single lines and introduces a rebuild path that strips plugins, making incremental builds behave differently from the initial build.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "8f54fad627dfbf01ddde815eb120091943f6817e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "context.cache added to context object without a typed field",
+        "rendered HTML duplicated in manifest JSON",
+        "cache state lives in a module-level mutable global (lastBuildStats)",
+        "no handling of stale cached outputPath when output dir changes"
+      ],
+      "strengths": [],
+      "summary": "Adds incremental build caching through a persisted manifest, reusing the existing plugin context and emitFile pipeline.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "e62c45610f96e8d24c4421942097008f64f112f8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "hardcoded './dist' in serve log despite configurable output dir",
+        "no jest tests added for the new server",
+        "`access()` check swallows the real error and throws usage()"
+      ],
+      "strengths": [],
+      "summary": "Adds a well-integrated dev server as a new `dev-server.ts` module reusing the existing `buildSite`/`BuildOptions` contract and CLI `run()` flow.",
+      "session_number": 3
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "fe842562ab05",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.88,
+    "compounding_issues": [
+      "Session 2 added templating (Handlebars + EJS) into the already monolithic src/generator.ts, growing it to ~187 lines with coupled renderer/partial/registration logic; Session 4 had to pay down this debt with a full plugin refactor",
+      "Session 3's dev server was deeply coupled to buildSite(); Session 4's refactor had to rewire it into a DevServerPlugin, leaving an awkward reverse dependency (dev-server.ts imports buildSite from generator.ts while generator's TemplatePlugin emits the index that the server serves)",
+      "Session 4 introduced a runtime require/require.extensions TS transpile-loader hack to load ssg.config.ts and plugin modules \u2014 functional but a fragile Node-CommonJS idiom that constrains future ESM adoption",
+      "The seed codebase (Express Todo API, index.ts) was discarded wholesale in Session 1 \u2014 sensible given the prompt mismatch, but it meant the story never exercised incremental evolution of existing code, only greenfield accretion",
+      "Session 5's incremental-cache logic (delete-stale loop, cache short-circuiting of plugin onFile hooks) was committed without test verification \u2014 the agent's `npm test` and `npm run build` both returned exit 127 ('npm: command not found') and it still committed"
+    ],
+    "key_decisions": [
+      "Session 1: greenfield TypeScript rewrite discarding the unrelated Express seed \u2014 clean baseline, strict tsconfig, Jest + ts-jest harness",
+      "Session 2: dual-engine template system (Handlebars + EJS) with partials, layouts, and per-page frontmatter template selection",
+      "Session 3: in-process dev server with chokidar file watching and WebSocket live-reload, path-traversal-guarded static serving",
+      "Session 4: decomposition into a plugin pipeline (MarkdownPlugin, TemplatePlugin, DevServerPlugin) with lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) and an emitFile virtual-output model \u2014 the pivotal architectural choice",
+      "Session 5: content-addressed incremental cache (.ssg-cache.json manifest) keyed by source/template SHA-256 hashes with a getLastBuildStats() CLI report"
+    ],
+    "trajectory_description": "Quality rose steadily across all five sessions. Session 1 delivered a small, clean, well-typed markdown-to-HTML generator with working CLI and tests. Session 2 expanded capability (templating) but at the cost of a growing monolith. Session 3 integrated a featureful dev server but deepened coupling to buildSite. Session 4 was the arc's peak: a disciplined refactor into a plugin architecture with explicit lifecycle hooks that reduced generator.ts from ~187 to ~87 lines and moved each concern into a focused module with better test coverage. Session 5 added a sophisticated incremental cache and build stats, but grew generator.ts back to ~169 lines, added a runtime require-loader, and \u2014 critically \u2014 was committed without ever running the test suite (npm was missing from the runtime environment), so the caching hot path went unverified. Overall the system became more modular and extensible at each step, with the only regression risk concentrated in the unverified Session 5 cache logic.",
+    "summary": "A coherent, genuinely progressive five-session build where each session layered naturally on the last, peaking in Session 4's plugin refactor, but the unverified, complexity-heavy incremental cache in Session 5 is the one decision that could undermine the prior gains."
+  }
+}

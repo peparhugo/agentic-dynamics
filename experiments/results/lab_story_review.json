@@ -1,46 +1,46 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-12T03:46:02.359174",
+  "generated_at": "2026-08-12T17:17:13.416425",
   "summary": {
-    "cells": 35,
-    "sessions": 167,
-    "total_cost": 0.258291,
-    "total_tokens": 6953909,
+    "cells": 71,
+    "sessions": 347,
+    "total_cost": 12.544585,
+    "total_tokens": 8201900,
     "by_condition": {
       "bad_seed": {
-        "count": 3,
+        "count": 10,
         "success_rate": 1.0,
-        "avg_cost": 0.002454
+        "avg_cost": 0.109854
       },
       "clean": {
-        "count": 21,
+        "count": 37,
         "success_rate": 1.0,
-        "avg_cost": 0.009463
+        "avg_cost": 0.229297
       },
       "early_degrade": {
-        "count": 11,
+        "count": 24,
         "success_rate": 1.0,
-        "avg_cost": 0.004747
+        "avg_cost": 0.12342
       }
     },
     "by_story": {
       "notification_service": {
-        "count": 10,
+        "count": 23,
         "success_rate": 1.0,
-        "avg_correctness": 0.9,
-        "avg_cost": 0.006518
+        "avg_correctness": 0.96,
+        "avg_cost": 0.120018
       },
       "static_site_gen": {
-        "count": 10,
+        "count": 20,
         "success_rate": 1.0,
-        "avg_correctness": 0.8,
-        "avg_cost": 0.002714
+        "avg_correctness": 0.4,
+        "avg_cost": 0.125431
       },
       "task_manager_api": {
-        "count": 15,
+        "count": 28,
         "success_rate": 1.0,
-        "avg_correctness": 0.8,
-        "avg_cost": 0.011065
+        "avg_correctness": 0.88,
+        "avg_cost": 0.259841
       }
     }
   },
@@ -60,7 +60,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.003027368,
+      "total_cost": 0.18429738,
       "total_tokens": 267507,
       "worktree": "/tmp/story_1e002365da34",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_1e002365da34.json"
@@ -80,7 +80,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.00217137,
+      "total_cost": 0.16891662,
       "total_tokens": 239414,
       "worktree": "/tmp/story_7add6d50bddc",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_7add6d50bddc.json"
@@ -100,7 +100,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002635114,
+      "total_cost": 0.15003545999999998,
       "total_tokens": 226881,
       "worktree": "/tmp/story_1ac39990faac",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_1ac39990faac.json"
@@ -120,7 +120,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0024157099999999997,
+      "total_cost": 0.13123498,
       "total_tokens": 206716,
       "worktree": "/tmp/story_bb4e1d655f1c",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_bb4e1d655f1c.json"
@@ -140,7 +140,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.02976139,
+      "total_cost": 0.12907079,
       "total_tokens": 198966,
       "worktree": "/tmp/story_c55b0cf5d2e9",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_c55b0cf5d2e9.json"
@@ -158,7 +158,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.015721016,
+      "total_cost": 0.08552881,
       "total_tokens": 117038,
       "worktree": "/tmp/story_e4702df34e1e",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_e4702df34e1e.json"
@@ -178,7 +178,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.00205811,
+      "total_cost": 0.17433376,
       "total_tokens": 252193,
       "worktree": "/tmp/story_117ae6080d3b",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_117ae6080d3b.json"
@@ -198,7 +198,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002481008,
+      "total_cost": 0.16017531,
       "total_tokens": 231984,
       "worktree": "/tmp/story_3461c71fba8e",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_3461c71fba8e.json"
@@ -218,7 +218,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.00248103,
+      "total_cost": 0.19104524,
       "total_tokens": 270355,
       "worktree": "/tmp/story_7cbf73903d92",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_7cbf73903d92.json"
@@ -238,10 +238,270 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002424864,
+      "total_cost": 0.13751602999999998,
       "total_tokens": 193739,
       "worktree": "/tmp/story_b3fbf0d3eca6",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_b3fbf0d3eca6.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08254445,
+      "total_tokens": 29918,
+      "worktree": "/tmp/story_39ec27baa134",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_39ec27baa134.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10346899,
+      "total_tokens": 32664,
+      "worktree": "/tmp/story_3d249683eef3",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_3d249683eef3.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0910706,
+      "total_tokens": 31353,
+      "worktree": "/tmp/story_8ca582d68df1",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_bad_seed_8ca582d68df1.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07543801,
+      "total_tokens": 26970,
+      "worktree": "/tmp/story_4182ba649c21",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4182ba649c21.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0943136,
+      "total_tokens": 30236,
+      "worktree": "/tmp/story_4a6536132fb7",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_4a6536132fb7.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10043743,
+      "total_tokens": 33695,
+      "worktree": "/tmp/story_867cfff06137",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_867cfff06137.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.11954323,
+      "total_tokens": 35477,
+      "worktree": "/tmp/story_9348ce0a2566",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_9348ce0a2566.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10212286,
+      "total_tokens": 34507,
+      "worktree": "/tmp/story_b06c6525b784",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_clean_b06c6525b784.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10294131000000001,
+      "total_tokens": 32762,
+      "worktree": "/tmp/story_00bcc5df94fd",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_early_degrade_00bcc5df94fd.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08735058,
+      "total_tokens": 27298,
+      "worktree": "/tmp/story_53f1d86ed146",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_early_degrade_53f1d86ed146.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.09699668,
+      "total_tokens": 32661,
+      "worktree": "/tmp/story_7535b4407f8c",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_early_degrade_7535b4407f8c.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10416773,
+      "total_tokens": 30621,
+      "worktree": "/tmp/story_a0e5a01351ef",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_early_degrade_a0e5a01351ef.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08785411,
+      "total_tokens": 30071,
+      "worktree": "/tmp/story_b366ecdc6f88",
+      "result_file": "experiments/results/stories/notification_service_openai_gpt-5.6-luna_early_degrade_b366ecdc6f88.json"
     },
     {
       "story": "static_site_gen",
@@ -256,7 +516,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.00105444,
+      "total_cost": 0.09544271,
       "total_tokens": 125839,
       "worktree": "/tmp/story_3b55ef98f7c9",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_3b55ef98f7c9.json"
@@ -274,7 +534,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.00175421,
+      "total_cost": 0.10901352,
       "total_tokens": 133635,
       "worktree": "/tmp/story_ffcde83c22ae",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_bad_seed_ffcde83c22ae.json"
@@ -294,7 +554,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0026508900000000004,
+      "total_cost": 0.15098089999999997,
       "total_tokens": 210592,
       "worktree": "/tmp/story_1b6f0b4967f2",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_1b6f0b4967f2.json"
@@ -314,7 +574,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002627342,
+      "total_cost": 0.14611356,
       "total_tokens": 204380,
       "worktree": "/tmp/story_3befdab6020a",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_3befdab6020a.json"
@@ -334,7 +594,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.003773625,
+      "total_cost": 0.19497288000000002,
       "total_tokens": 278081,
       "worktree": "/tmp/story_a7a0b9259a17",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_a7a0b9259a17.json"
@@ -354,7 +614,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002823266,
+      "total_cost": 0.16954786,
       "total_tokens": 228299,
       "worktree": "/tmp/story_ecb7095c6c25",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_clean_ecb7095c6c25.json"
@@ -374,7 +634,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.003643502,
+      "total_cost": 0.18911411,
       "total_tokens": 255439,
       "worktree": "/tmp/story_04d63a677687",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_early_degrade_04d63a677687.json"
@@ -394,7 +654,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002591005,
+      "total_cost": 0.15349617,
       "total_tokens": 216649,
       "worktree": "/tmp/story_4c1f8dd819b2",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_early_degrade_4c1f8dd819b2.json"
@@ -414,7 +674,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002993989,
+      "total_cost": 0.20246762000000001,
       "total_tokens": 271200,
       "worktree": "/tmp/story_8def7a9e572f",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_early_degrade_8def7a9e572f.json"
@@ -434,10 +694,250 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.003227497,
+      "total_cost": 0.16165693,
       "total_tokens": 229318,
       "worktree": "/tmp/story_b3cab912ad30",
       "result_file": "experiments/results/stories/static_site_gen_deepseek_deepseek-v4-pro_early_degrade_b3cab912ad30.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08814786000000001,
+      "total_tokens": 36097,
+      "worktree": "/tmp/story_77bc6da48426",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_77bc6da48426.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.09600222,
+      "total_tokens": 37746,
+      "worktree": "/tmp/story_fcd25f23bcc9",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_bad_seed_fcd25f23bcc9.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10216039999999998,
+      "total_tokens": 40323,
+      "worktree": "/tmp/story_35b349c12c9c",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_35b349c12c9c.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.10512854999999999,
+      "total_tokens": 39859,
+      "worktree": "/tmp/story_37286c435c79",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_37286c435c79.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08834074,
+      "total_tokens": 34968,
+      "worktree": "/tmp/story_fdd24c10b8cb",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fdd24c10b8cb.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.09723920999999999,
+      "total_tokens": 38917,
+      "worktree": "/tmp/story_fe842562ab05",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_clean_fe842562ab05.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.09691866000000002,
+      "total_tokens": 39658,
+      "worktree": "/tmp/story_1a1c7b3f9bdb",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_1a1c7b3f9bdb.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08318227,
+      "total_tokens": 33125,
+      "worktree": "/tmp/story_549263dfba4b",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_549263dfba4b.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0884819,
+      "total_tokens": 34170,
+      "worktree": "/tmp/story_6389f596af5a",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_6389f596af5a.json"
+    },
+    {
+      "story": "static_site_gen",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 0.0,
+      "correctness_values": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.09021388,
+      "total_tokens": 35570,
+      "worktree": "/tmp/story_8c855cf745e8",
+      "result_file": "experiments/results/stories/static_site_gen_openai_gpt-5.6-luna_early_degrade_8c855cf745e8.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 2.7190426,
+      "total_tokens": 100085,
+      "worktree": "/tmp/story_09f8dec6aafe",
+      "result_file": "experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_09f8dec6aafe.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 1.9177119,
+      "total_tokens": 72840,
+      "worktree": "/tmp/story_fee967220c08",
+      "result_file": "experiments/results/stories/task_manager_api_anthropic_claude-sonnet-5_clean_fee967220c08.json"
     },
     {
       "story": "task_manager_api",
@@ -454,7 +954,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.032117618,
+      "total_cost": 0.13245109,
       "total_tokens": 193894,
       "worktree": "/tmp/story_117533fe8f2f",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_117533fe8f2f.json"
@@ -474,7 +974,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0021628000000000003,
+      "total_cost": 0.11271485,
       "total_tokens": 169292,
       "worktree": "/tmp/story_7aadf42df487",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_7aadf42df487.json"
@@ -494,7 +994,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002271193,
+      "total_cost": 0.12217839999999999,
       "total_tokens": 177779,
       "worktree": "/tmp/story_f9b81f42ece3",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_f9b81f42ece3.json"
@@ -514,7 +1014,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.029679001,
+      "total_cost": 0.09924495,
       "total_tokens": 145030,
       "worktree": "/tmp/story_159eeb8c388a",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_159eeb8c388a.json"
@@ -534,7 +1034,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0030662600000000003,
+      "total_cost": 0.08506124,
       "total_tokens": 148459,
       "worktree": "/tmp/story_192e125a6c89",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_192e125a6c89.json"
@@ -552,7 +1052,7 @@
       "all_successful": true,
       "cascade_recovery": null,
       "timeouts": [],
-      "total_cost": 0.0005956889999999999,
+      "total_cost": 0.02954007,
       "total_tokens": 47507,
       "worktree": "/tmp/story_1bf430da0328",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_1bf430da0328.json"
@@ -572,7 +1072,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.00294719,
+      "total_cost": 0.13524483999999998,
       "total_tokens": 195924,
       "worktree": "/tmp/story_a318530e815a",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_a318530e815a.json"
@@ -592,7 +1092,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0277175,
+      "total_cost": 0.11774659000000001,
       "total_tokens": 179479,
       "worktree": "/tmp/story_f1e988572174",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f1e988572174.json"
@@ -612,7 +1112,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002170099,
+      "total_cost": 0.13220335,
       "total_tokens": 188082,
       "worktree": "/tmp/story_f9e607e131ce",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f9e607e131ce.json"
@@ -632,7 +1132,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.02582804,
+      "total_cost": 0.14142903,
       "total_tokens": 201963,
       "worktree": "/tmp/story_2fc0abd3adf4",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_2fc0abd3adf4.json"
@@ -652,7 +1152,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0022849100000000002,
+      "total_cost": 0.12706744,
       "total_tokens": 189937,
       "worktree": "/tmp/story_3d414997ad3f",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_3d414997ad3f.json"
@@ -672,7 +1172,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.029139923,
+      "total_cost": 0.13286919,
       "total_tokens": 214562,
       "worktree": "/tmp/story_5449b76fe3f4",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_5449b76fe3f4.json"
@@ -692,7 +1192,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002227577,
+      "total_cost": 0.11878885,
       "total_tokens": 190182,
       "worktree": "/tmp/story_6b11ccba8497",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_6b11ccba8497.json"
@@ -712,7 +1212,7 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.002198693,
+      "total_cost": 0.15286759,
       "total_tokens": 208626,
       "worktree": "/tmp/story_879a2d635e81",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_879a2d635e81.json"
@@ -732,10 +1232,230 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
-      "total_cost": 0.0015675659999999998,
+      "total_cost": 0.09843574,
       "total_tokens": 144968,
       "worktree": "/tmp/story_8a07787213e4",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_8a07787213e4.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07440564,
+      "total_tokens": 25652,
+      "worktree": "/tmp/story_15ebef34077e",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_15ebef34077e.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 0.8,
+      "correctness_values": [
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": true,
+      "timeouts": [],
+      "total_cost": 0.09696640000000001,
+      "total_tokens": 28548,
+      "worktree": "/tmp/story_83e669c2a985",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_bad_seed_83e669c2a985.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07726244,
+      "total_tokens": 24047,
+      "worktree": "/tmp/story_39a8522e4ce3",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_39a8522e4ce3.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07906842,
+      "total_tokens": 27713,
+      "worktree": "/tmp/story_4685b7bf0cff",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4685b7bf0cff.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07688408,
+      "total_tokens": 25625,
+      "worktree": "/tmp/story_4d3aa8025ff3",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_4d3aa8025ff3.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08813257999999999,
+      "total_tokens": 30163,
+      "worktree": "/tmp/story_add5e7cdc864",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_add5e7cdc864.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07544756999999999,
+      "total_tokens": 26500,
+      "worktree": "/tmp/story_c9e06c7b6b5c",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_c9e06c7b6b5c.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.07836296,
+      "total_tokens": 25924,
+      "worktree": "/tmp/story_54d5d893bdb9",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_early_degrade_54d5d893bdb9.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.08115831,
+      "total_tokens": 28121,
+      "worktree": "/tmp/story_77b4f79291d5",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_early_degrade_77b4f79291d5.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0918581,
+      "total_tokens": 26380,
+      "worktree": "/tmp/story_b6b23ba07c75",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_early_degrade_b6b23ba07c75.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 0.8,
+      "correctness_values": [
+        0.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": true,
+      "timeouts": [],
+      "total_cost": 0.08141474,
+      "total_tokens": 27727,
+      "worktree": "/tmp/story_cee5347fdd94",
+      "result_file": "experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_early_degrade_cee5347fdd94.json"
     }
   ]
 }

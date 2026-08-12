@@ -1,0 +1,116 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "631aaeb407b1e542638951d2b266ac6f17418581",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "Greenfield session-1 commit establishing the TS/ts-jest test harness and lockfile for the SSG project without straying into implementation.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "15fb14a8a66984a631847d64398f8a9d98fff0dc",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "deprecated @types/handlebars stub package added unnecessarily (handlebars ships its own types)",
+        "package.json dependency ordering not kept alphabetical",
+        "@types/handlebars should be a devDependency",
+        "diff truncated so renderPage/resolution logic unverifiable"
+      ],
+      "strengths": [],
+      "summary": "Introduces a clean Handlebar-based templating abstraction that replaces the hardcoded HTML builders and wires it through a new `--templates` CLI option.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "a51ef98a24c4368336a6176b7335e4fac476208d",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "commits node_modules (60 files) and dist/ build artifacts",
+        "silently swallows rebuild errors in `catch (err) { // nop }`",
+        "user-controlled `req.url` joined onto outputDir without traversal guard",
+        "sparse MIME map (no .ico/.xml)",
+        "no error handling in the yargs `serve` handler"
+      ],
+      "strengths": [],
+      "summary": "Competent, idiomatic integration \u2014 the new `serve` command mirrors the existing yargs command structure, reuses the `build({...})` API rather than duplicating logic, places the module in `src/serve.ts` per layout, and ships a matching 262-line test.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "d5ba3d63f867876149c0839ede5181e0385e8f2e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "truncated diff (engine orchestration/ssg.config loading/tests unverifiable)",
+        "BuildContext [key: string]: any index signature",
+        "DevServerPlugin tightly coupled to SSGEngine via setEngine",
+        "silent error swallowing in rebuild catch",
+        "onFile(page) param unused in TemplatePlugin"
+      ],
+      "strengths": [],
+      "summary": "The refactor cleanly extracts markdown, templates, and the dev server into built-in plugins with the exact lifecycle hooks from the session spec, leaving the engine to orchestrate the pipeline.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "0831c7e544aa37459e529dd5e53aaf40b56df409",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.68,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "duplicate BuildStats type in types.ts and cache.ts requiring alias hack in ssg.ts",
+        "(page as any)._fromCache magic-property casts in three files",
+        "any-typed parseFrontmatterFromFile return",
+        "caching logic scattered across markdown/template plugins",
+        "grab-bag CacheManager getter/setter API"
+      ],
+      "strengths": [],
+      "summary": "Caching is threaded through the existing BuildContext/plugin-hook architecture, but the implementation leaks `any` casts and duplicates shared types.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "1b6f0b4967f2",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "S4 plugin refactor shipped with zero tests, leaving the largest behavioral rewrite (parse/render pipeline re-orchestrated around Plugin lifecycle hooks) unprotected; later sessions had no regression net",
+      "S3's serve.ts held WebSocket/chokidar logic inline and imported build() directly; S4 had to unwind it into dev-server-plugin, which then keeps a reference to SSGEngine via setEngine() \u2014 a tight plugin-engine coupling that persists through S5",
+      "S4 config loading uses require() on ssg.config.ts/.js from __dirname \u2014 fragile (needs ts-node in dev, resolves to dist in prod) and silently best-effort, a latent bug carried into S5",
+      "S5's incremental cache was bolted onto MarkdownPlugin specifically (dirty-check + cache read inside the plugin, skip counting in SSGEngine) instead of being a true cross-cutting infrastructure layer, using type-unsafe (page as any)._fromCache to bridge the abstraction",
+      "S1's hardcoded HTML shell and S2's standalone template-engine.ts both became dead code needing rework by S4's plugin extraction \u2014 minor but real duplication of effort"
+    ],
+    "key_decisions": [
+      "S4 plugin lifecycle architecture (SSGEngine + Plugin interface with onStart/beforeBuild/onFile/afterBuild/onEnd) plus config-driven plugin loading \u2014 the pivotal decision that reshaped the entire pipeline and framed sessions 5+",
+      "S2 adoption of a Handlebars template engine with layouts/partials/index templates, replacing S1's inline HTML strings and decoupling presentation from content parsing",
+      "S3 WebSocket live-reload dev server (chokidar + ws) integrating the build step into a persistent serve loop with static file serving and MIME handling",
+      "S5 content-addressed incremental cache (SHA256 source hashes + templatesHash manifest in .ssg-cache.json) exposed via --incremental/--clean CLI flags with BuildResult stats",
+      "S1 yargs-based CLI command structure (build, later serve) that stayed stable across all sessions, giving the story a consistent entry-point contract"
+    ],
+    "trajectory_description": "Quality improved steadily: S1 delivered a clean but minimal yargs CLI + gray-matter/marked build pipeline with tests; S2 added a genuine Handlebars templating layer with layouts, partials, and an index template while keeping tests green; S3 integrated a live-reload dev server with its own test suite; S4 performed the boldest change \u2014 extracting a plugin engine \u2014 but skipped tests and introduced config-loading fragility and plugin-engine coupling; S5 added a substantial content-addressed incremental build feature with a 376-line test suite, yet its integration is the weakest seam of the whole story, leaking cache logic into the markdown plugin and relying on an any-cast flag. Net: competence and feature surface grew across the arc, while smell accumulation (type-unsafe seams, untested refactor, brittle config loading) rose most sharply in the final two sessions.",
+    "summary": "A well-structured greenfield\u2192feature\u2192integration\u2192refactor\u2192cross-cutting arc with genuine architectural ambition, marred mainly by an untested S4 refactor and an incremental-cache feature in S5 that bypasses the plugin abstraction it was meant to extend."
+  }
+}

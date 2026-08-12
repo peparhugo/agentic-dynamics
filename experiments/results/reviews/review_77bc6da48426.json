@@ -1,0 +1,120 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "3a2fd3dd80005d3b994849e7d958e4d79c3a6dc2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "loadPartials/loadTemplate re-run filesystem I/O per page",
+        "renderHandlebars renders .ejs partials as handlebars",
+        "renderEjs ignores script-only <% %> tags",
+        "hand-rolled regex engine lacks nested expression support"
+      ],
+      "strengths": [],
+      "summary": "Adds a template/layout/partials rendering feature to the SSG, wired through the existing `BuildOptions` and CLI option-parsing patterns.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "aa82b8fbd9eea1c26e45b0def5df343964777219",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.2,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "replaced rather than extended the baseline seed",
+        "unrelated domain (SSG vs Todo API)",
+        "export indirection index.ts -> src/ssg adds little value",
+        "no tests committed despite jest config",
+        "bin points at src/cli.js not dist/src/cli.js",
+        "mixed double/single quotes in escapeHtml"
+      ],
+      "strengths": [],
+      "summary": "The agent threw away the seeded Express Todo API and replaced it with an unrelated static-site-generator project, ignoring the existing architecture rather than extending it.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "b2545a3d0a979dfe3c383c5d5fa80ff63dc63b6b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "port validation range inconsistent between cli (1-65535) and serve (0-65535)",
+        "regex-based HTML injection in injectReloadScript is fragile",
+        "websocket close ordering in close()"
+      ],
+      "strengths": [],
+      "summary": "Adds a dev server feature that reuses the existing `buildSite` pipeline and `BuildOptions` types, wired consistently through the CLI and module exports.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "c72142d5856cdb7168ef9f07fed8a433e43e6137",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "cache not invalidated on plugin/config changes",
+        "per-entry templateHash duplicates the manifest-level hash",
+        "timeSavedMs is an estimate of prior durations not actual wall-clock savings"
+      ],
+      "strengths": [],
+      "summary": "Adds incremental build with content/template hashing and build stats while preserving a backward-compatible buildSite wrapper.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "ef71115263eb98f747f4d9e0ce9cff4bc06ee3bb",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.4,
+      "convention_adherence": 0.2,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "code compressed into single-line functions/interfaces (readability collapse vs the readable multi-line baseline)",
+        "DevServerPlugin omits the required Plugin.name field",
+        "plugins live in root plugins/ instead of the codebase's src/plugins/",
+        "`function type()` shadows the TypeScript type keyword",
+        "DevServerPlugin lacks the startServer(context",
+        "rebuildFn) method that SSGEngine.serve() invokes so the engine can't drive it",
+        "dependency additions (chokidar",
+        "ws) and package.json updates are absent from the diff"
+      ],
+      "strengths": [],
+      "summary": "The refactor heads in a sound direction (extracting dev-server/markdown/template behind a Plugin interface) but the code is minified into unreadable one-liners, placed in a non-standard module location, and mismatches the engine's plugin contract.",
+      "session_number": 4
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "77bc6da48426",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 1's hardcoded pageDocument/indexDocument HTML generation coexisted with the new template system added in Session 2, leaving two competing render paths until the Session 4 plugin refactor unified them under TemplatePlugin",
+      "Session 2 introduced a bespoke regex-based Handlebars/EJS renderer that was carried verbatim into plugins/template.ts in Session 4 \u2014 a hand-maintained template engine with no dependency backing",
+      "Session 3's dev server was built as a full module (src/serve.ts) and then had to be reworked into a plugin in Session 4, retaining a serve.ts compat wrapper alongside the plugin, adding a thin redundant layer",
+      "The incremental cache manifest written into outputDir (.ssg-cache.json) couples cache state with build artifacts, requiring the --clean flag as a workaround for stale cache issues"
+    ],
+    "key_decisions": [
+      "Session 2: frontmatter-driven template/layout/partial selection with a zero-dependency Handlebars/EJS-compatible renderer instead of adding template library dependencies",
+      "Session 3: integrated dev server using chokidar file watching + WebSocket live-reload with path-traversal-safe static serving",
+      "Session 4: plugin architecture with lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) and ssg.config.ts loader, extracting markdown, template, and dev-server into plugins/",
+      "Session 5: incremental build manifest with SHA256 source/template hashing, stale-output removal, and BuildStats surfaced through the CLI"
+    ],
+    "trajectory_description": "Quality improved monotonically across all five sessions. Session 1 established a clean, well-tested markdown-to-HTML core; Session 2 cleanly layered template/layout/partial support onto it without breaking the base; Session 3 integrated a polished dev-server with live reload and defensive path handling; Session 4 was the riskiest step \u2014 a large plugin extraction that removed ~400 lines while preserving external API behavior and all tests (4 tests held green through the refactor); Session 5 added genuinely valuable cross-cutting engineering \u2014 incremental caching, cache invalidation, and build stats \u2014 expanding tests to 6 and deepening the plugin pipeline rather than regressing it. Test coverage grew steadily (2\u21926 tests) and no session regressed previously shipped behavior.",
+    "summary": "A textbook greenfield\u2192feature\u2192integration\u2192refactor\u2192cross-cutting progression that stayed coherent, kept tests green through a major refactor, and delivered steadily improving code quality."
+  }
+}

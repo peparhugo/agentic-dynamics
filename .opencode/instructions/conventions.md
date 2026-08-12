@@ -24,6 +24,8 @@
 - `scripts/analyze_worktrees.py` is 1396 lines — the biggest file. Be careful editing it.
 - `scripts/run.py` and `scripts/analyze_worktrees.py` share similar logic but are NOT unified.
   If you fix a bug in one, check the other.
+- `scripts/plan.py` is DEPRECATED (hardcoded phases). Use `scripts/pipeline.py` (YAML-driven,
+  `experiments/configs/plans.yaml`) for any new orchestration work. Don't edit plan.py.
 - Lab books read `_results_summary.json` and `inventory.json` — always refresh these first.
 - `scripts/build_data.py` generates `firebase/public/data.js` — don't edit that file directly.
 - DeepSeek pricing lives in `efficiency.py:PROVIDER_PRICING["deepseek"]`.

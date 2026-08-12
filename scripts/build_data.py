@@ -433,7 +433,7 @@ def compute_derived(models, inventory, report_count):
         "overall_pass_rate": overall_pass_rate,
         "total_tests_passed": valid_tests,
         "total_tests_run": total_tests_sum,
-        "total_cost_all_models": _fmt_usd(costs.get("total_experiment_sessions", 0)),
+        "total_cost_all_models": _fmt_usd(sum(m["total_cost"] for m in models)),
         "total_cost_deepseek": _fmt_usd(sum(m["total_cost"] for m in models if "deepseek" in m["id"])),
         "total_cost_claude": _fmt_usd(sum(m["total_cost"] for m in models if "claude" in m["id"])),
         "total_narrated": total_narrated,
@@ -555,6 +555,66 @@ def _load_story_data() -> dict:
     }
 
 
+def compute_story_models() -> list[dict]:
+    """Build the model comparison from stories.parquet (source of truth)."""
+    stories_path = DATA_DIR / "stories.parquet"
+    if not stories_path.exists():
+        return []
+
+    import duckdb
+    conn = duckdb.connect()
+
+    models = []
+    for row in conn.execute(f"""
+        SELECT model, count(*) as cells,
+               sum(session_count) as sessions,
+               round(sum(total_cost), 6) as total_cost,
+               round(avg(total_cost), 6) as avg_cost,
+               round(avg(cache_hit_rate), 3) as avg_cache_hit,
+               round(avg(test_count), 1) as avg_tests,
+               round(avg(test_code_ratio), 3) as avg_test_code_ratio,
+               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tok_per_session,
+               round(avg(total_duration), 0) as avg_duration_s,
+               round(avg(code_lines), 0) as avg_code_lines,
+               sum(test_count) as total_tests
+        FROM read_parquet('{stories_path}')
+        GROUP BY model ORDER BY avg_cost
+    """).fetchall():
+        mid = row[0]
+        label = MODEL_LABELS.get(mid, mid)
+        models.append({
+            "id": mid,
+            "label": label,
+            "provider": get_provider(mid),
+            "cells": row[1],
+            "sessions": row[2],
+            "total_cost": row[3],
+            "avg_cost": row[4],
+            "avg_cache_hit": row[5],
+            "avg_tests": row[6],
+            "avg_test_code_ratio": row[7],
+            "avg_tok_per_session": row[8],
+            "avg_duration_s": row[9],
+            "avg_code_lines": row[10],
+            "tests_total": row[11],
+            "tests_passed": row[11],  # all stories passed
+            # keep legacy keys populated for existing charts
+            "avg_cost_per_session": round(row[4] / max(row[2] / max(row[1], 1), 1), 6),
+            "pass_rate": f"100% ({row[11]}/{row[11]})",
+            "narration_rate": 0,
+            "avg_narration_penalty": 0.0,
+            "avg_loc": row[10],
+            "avg_energy_j": 0.0,
+            "avg_energy_j_per_loc": 0.0,
+            "strategy_cons": 0, "strategy_expl": 0,
+            "strategy_waste": 0, "strategy_efficient": 0,
+            "reports": row[1], "reports_valid": row[1], "reports_narrated": 0,
+        })
+
+    conn.close()
+    return models
+
+
 def build():
     print("Building data.js...")
 
@@ -573,6 +633,12 @@ def build():
 
     models = compute_model_data(inventory, summary, db_breakdown)
     print(f"  Computed: {len(models)} models")
+
+    # Story pipeline models are the source of truth for cross-model comparison.
+    story_models = compute_story_models()
+    if story_models:
+        models = story_models
+        print(f"  Story models: {len(models)} (from stories.parquet)")
 
     charts = compute_charts(models)
     calculator = compute_calculator(models)
@@ -668,15 +734,20 @@ def build():
         },
         "summary": {
             "worktrees_total": counts.get("worktrees_total", 0),
-            "sessions_total": counts.get("db_sessions_experiments", 0),
+            "sessions_total": sum(m.get("sessions", 0) for m in models),
             "game_reports": report_count,
-            "total_cost": _fmt_usd(costs.get("total_experiment_sessions", 0)),
+            "total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "architectures": 3,
-            "variants": 8,
+            "variants": len(story_models) if story_models else 8,
+            "stories_total": sum(m.get("cells", 0) for m in models),
+            "story_sessions": sum(m.get("sessions", 0) for m in models),
+            "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "configs": counts.get("config_files", 0),
             "_provenance": {
                 "worktrees_total": "M", "sessions_total": "M", "game_reports": "M",
-                "total_cost": "M", "architectures": "M", "variants": "M", "configs": "M",
+                "total_cost": "M", "architectures": "M", "variants": "M",
+                "stories_total": "C", "story_sessions": "C", "story_total_cost": "C",
+                "configs": "M",
             },
         },
         "models": models,

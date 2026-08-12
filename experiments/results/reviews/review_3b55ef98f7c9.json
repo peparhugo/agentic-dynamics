@@ -3,36 +3,6 @@
     {
       "commit_hash": "0bab9b3fa3ae2dd5c4e59e15a12ea03182d12d06",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.85,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [],
-      "strengths": [],
-      "summary": "Sound greenfield scaffolding for a TypeScript CLI static-site generator with conventional ts-jest config, committed lockfile, and dependency choices (commander, gray-matter, marked) that match the stated task.",
-      "session_number": 1
-    },
-    {
-      "commit_hash": "45ee869ea287cc016f58a97e47a15e85ca00d534",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.82,
-      "convention_adherence": 0.84,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "better",
-      "problems": [
-        "default templates in templates.ts duplicate the fallback markup in generator.ts creating drift risk",
-        "escaped quotes in template literal strings",
-        "no error handling for invalid templatesDir"
-      ],
-      "strengths": [],
-      "summary": "Adds an optional Handlebars templating layer (--templates flag, TemplateEngine class) that cleanly extends the existing build/parse/generate pipeline while staying fully backward compatible.",
-      "session_number": 2
-    },
-    {
-      "commit_hash": "ab83cda493a898dfc5037d87818e8f0cdc7c89b2",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
       "architectural_fit": 0.9,
       "convention_adherence": 0.9,
       "introduces_technical_debt": false,
@@ -40,7 +10,42 @@
       "better_or_worse": "better",
       "problems": [],
       "strengths": [],
-      "summary": "Dependency additions (chokidar, ws, @types/ws) exactly match the Session 3 integration spec's tech directives and are placed correctly (types in devDependencies, transitive deps promoted out of dev as chokidar becomes a runtime dependency).",
+      "summary": "Clean greenfield scaffolding that sets up ts-jest test infra and a dependency set (commander, gray-matter, marked) well-matched to a CLI static site generator.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "45ee869ea287cc016f58a97e47a15e85ca00d534",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "default page/index markup duplicated between templates.ts and generator.ts (two sources of truth)",
+        "two-step init() lifecycle instead of constructor injection",
+        "template/layout frontmatter fields ignored in non-engine path"
+      ],
+      "strengths": [],
+      "summary": "Additive, backward-compatible Handlebars templating with a dedicated `TemplateEngine` module and optional `--templates` CLI flag, cleanly wired through build/generator/parser.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "88b0eb503270b4b52b4756f31f0261e4e1f1be1b",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "timer inflation up to 30s risks masking true regressions",
+        "polling retry loop is a workaround rather than a root-cause fix",
+        "no test-count verification in message",
+        "\"commit noise\" phrasing is informal"
+      ],
+      "strengths": [],
+      "summary": "Coherent test-stability commit that disables parallel Jest workers, swaps polling for awaitWriteFinish, closes WS clients before the server, and extends timeouts.",
       "session_number": 3
     }
   ],
@@ -50,22 +55,22 @@
   "story_review": {
     "story_name": "static_site_gen",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.68,
+    "overall_coherence": 0.78,
     "compounding_issues": [
-      "Seed mismatch: the committed seed (root index.ts) is an unrelated Express Todo API; Session 1 ignored it and built the SSG greenfield, leaving dead, uncompilable seed code (imports express/sqlite3 with no package.json deps) orphaned at repo root for the rest of the story",
-      "Session 1 committed node_modules and dist/ into git (~5,172 files, ~978k insertions) with no .gitignore, so every later session churns thousands of dependency files and bloats each commit",
-      "The story was designed for 5 sessions (plugin refactor + incremental builds) but only 3 sessions of work occurred; Session 3 had to be split into two commits ('integration' + 'integration (continued)') after flaky integration tests, so the intended arc is truncated",
-      "Session 3's initial serve.ts shipped usePolling:true/interval:200 chokidar config and an incorrect close() ordering (watcher closed inside wss callback); both had to be corrected in the continuation commit",
-      "The Handlebars page template uses noEscape:true, disabling escaping for the body in the template path that the string-fallback path does escape"
+      "Session 1 committed node_modules/ and dist/ (~5,248 files, ~978K lines) with no .gitignore, permanently bloating every later commit and polluting AST/convention analysis",
+      "The story run truncated after Session 3 (integration) \u2014 the planned Session 4 refactor and Session 5 incremental-builds sessions never executed, so the full 5-session arc was not realized",
+      "Session 3's live-reload feature was over-scoped, hit the 900s timeout, and required a continuation commit (maxWorkers:1, awaitWriteFinish, WS teardown reorder, inflated timers) to stabilize flaky tests",
+      "generator.ts retains a parallel non-template HTML fallback path even after the TemplateEngine was integrated, duplicating rendering logic and creating two sources of truth",
+      "Templates module uses a two-step init() lifecycle instead of constructor injection, and default page/index markup is duplicated between templates.ts and generator.ts"
     ],
     "key_decisions": [
-      "Greenfield module split (types/parser/generator/build/index) in Session 1, establishing clean seams that Sessions 2 and 3 built directly on (build.ts accepts BuildOptions reused by serve.ts)",
-      "Choosing Handlebars with a dual path in generator.ts: custom TemplateEngine when a templates/ dir exists, string-based fallback otherwise \u2014 preserved all 22 existing tests unchanged in Session 2",
-      "Session 3 integrated the dev server through the existing build() call for rebuilds rather than duplicating render logic, plus a testable ServerInstance contract (ready promise, close())",
-      "Using commander subcommands (build/serve) with native http + ws + chokidar, and a path-traversal guard on served file resolution",
-      "Continuation commit hardened test robustness (polling loops, 15-30s timeouts, awaitWriteFinish) instead of weakening assertions"
+      "Clean module decomposition (parser, generator, templates, build, serve, types) with an optional TemplateEngine injected into generator functions",
+      "Handlebars template engine with layouts, partials, and per-page frontmatter template selection, wired through build/generator",
+      "Optional --templates CLI flag so the build stays functional without templates, falling back to default HTML generation",
+      "Chokidar watcher + ws WebSocket live-reload server with debounced rebuilds, awaitWriteFinish stability handling, and a path-traversal guard (403) in the dev server",
+      "Jest config pinned to maxWorkers:1 with extended timeouts in the continuation commit to fix test flakiness"
     ],
-    "trajectory_description": "Quality rose steadily across the sessions with the greenfield build, the template-engine feature, and the dev-server integration, but the arc is truncated: Session 1 produced a clean layered core with 22 tests, Session 2 extended it cleanly to 44 tests while keeping backward compatibility, and Session 3 attempted the most complex piece (a 191-line live-reload server with a 285-line integration test) whose first pass shipped flaky timing tests and a misconfigured watcher \u2014 the continuation commit recognized and fixed those flakiness and shutdown-ordering bugs, and all 56 tests pass at the end. The main degradations are collateral rather than code-quality: the orphaned seed file, the node_modules-in-git bloat that grows monotonically, and the fact that the final two planned sessions (plugin refactor, incremental builds) never ran.",
-    "summary": "A logical, well-layered greenfield-to-feature-to-integration progression with clean backward compatibility and self-corrected integration flakiness, undermined by a mismatched orphaned seed, node_modules committed to git, and a truncated 3-of-5-session arc."
+    "trajectory_description": "Quality rose steadily but the run was cut short. Session 1 laid a coherent greenfield architecture (parser/generator/build/types) with a thorough test suite, though it committed dependency bloat that haunted every later commit. Session 2 was the cleanest step: a 154-line Handlebars template engine with layouts and partials covered by 384 lines of tests. Session 3 added a well-designed live-reload server (chokidar + ws, debounced rebuilds, path-traversal guard) but over-reached, timing out at 900s; the continuation commit then demonstrated genuine debugging by tightening the watcher config and test timing to stabilize the suite. The visible arc improves feature-by-feature and ends on a stabilizing bug-fix, but the sequence terminates at Session 3, missing the refactor and cross-cutting phases that would have shown how the architecture compounds.",
+    "summary": "A logically progressive, well-architected build for the three sessions it completed, undermined by Session 1's committed dependency bloat and an over-scoped Session 3 that required a continuation commit, with the run ending before the planned refactor and caching sessions."
   }
 }

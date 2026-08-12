@@ -1,0 +1,214 @@
+{
+  "story_name": "notification_service",
+  "story_id": "b06c6525b784",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 0,
+    "total_lines_removed": 0,
+    "net_lines": 0,
+    "average_convention_score": 0.773
+  },
+  "commits": [
+    {
+      "commit_hash": "f70b12e244e29962ac57915ffba923ed051f3cf6",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "test_integration.py: Classes should use PascalCase",
+          "test_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "e5e59782a92de5e889e6bdc270a2d7da464baba7",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "test_integration.py: Classes should use PascalCase",
+          "test_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "f4084978995e46d4f792901275a004bb7acf2cf2",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "test_integration.py: Classes should use PascalCase",
+          "test_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "6da7a5bb66b5e9531eef767bef911f2c4f8d0b4e",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "test_integration.py: Classes should use PascalCase",
+          "test_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "15020edfc1c5bd87e6305a7c18adae3e0a23026f",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "test_app.py: Classes should use PascalCase",
+          "test_app.py: Module-level constants should be UPPER_CASE",
+          "test_integration.py: Classes should use PascalCase",
+          "test_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ]
+}

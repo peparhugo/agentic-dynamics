@@ -93,3 +93,27 @@ Note: `experiment.py`, `adapter.py`, and `lab_book.py` are deprecated (Phase 1B 
 2. Add exports to `src/instrument/__init__.py`
 3. Integrate into `game_report.py` (so it appears in generated reports)
 4. Update `scripts/analyze_worktrees.py` (so post-hoc analysis includes it)
+
+## Adding a New Language
+
+`language.py` is the single source of truth — all downstream modules key off `LanguageProfile`.
+Six touchpoints:
+
+1. **Tree-sitter AST** (`language.py`) — add a `LanguageProfile` to `_PROFILES`
+   (name, extensions, `tree_sitter_id`, `test_framework`, `test_file_pattern`), then add the
+   grammar's node names to `function_node_types` / `class_node_types` / `import_node_types`.
+2. **LSP** (`lsp_diagnostics.py`) — add an `LSPToolConfig` to `_TOOLS` (check_cmd + diag_cmd).
+   Add a `_parse_<tool>()` + `_run_tool` branch if output isn't `file:line:col: message`, else
+   it falls through to `_parse_generic`.
+3. **SonarQube** (`sonar.py`) — no code change. Runs `sonar-scanner` with `sonar.sources=.`;
+   SonarQube auto-detects the language. Requires the language analyzer plugin on the server.
+4. **Conventions** (`commit_analysis.py` + `conventions/<lang>.yaml`) — create the YAML
+   (naming_patterns / forbidden_patterns / scoring). Only `python.yaml` + `typescript.yaml`
+   exist; Go/Rust fall back to empty rules. Add a regex branch in `compute_ast_diff` if syntax
+   differs from the `+def`/`+function` fallback.
+5. **Test framework** — `test_framework` flows to `review.py`; set `standardized.enforce_pytest: false`
+   in the config YAML for non-pytest languages (see `go_crawler.yaml`).
+6. **Verify** — `tests/test_language.py`, `tests/test_lsp.py`, `tests/test_commit_analysis.py`.
+
+Tree-sitter: `tree_sitter_id` resolves via `tree_sitter_languages.get_parser(id)` (~70 bundled
+grammars). For an unbundled grammar, swap in `tree_sitter_language_pack` or register manually.

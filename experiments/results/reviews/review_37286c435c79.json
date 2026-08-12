@@ -1,0 +1,111 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "f59659a4eed5e6323e973461704481b55803edf1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "wholesale deletion of seed without incremental reuse",
+        "require.main CommonJS idiom in a tsc project",
+        "package.json \"prepare\" triggers a build at install time"
+      ],
+      "strengths": [],
+      "summary": "The agent cleanly scaffolds the static-site-gen story's greenfield session, replacing the Express seed with a modular, typed SSG implementation (cli/generator split, jest config) that follows the story's session-commit convention.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "7dae9e8f1f23916e54eea1cfd49d46c93ac16964",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "regex-based template parser is fragile and likely needs replacing",
+        "hand-rolled engine instead of a library",
+        "partial/layout resolution silently no-ops on missing files except template/layout names",
+        "no caching of template reads per page"
+      ],
+      "strengths": [],
+      "summary": "Adds a hand-rolled handlebars/ejs template engine with partials and layouts that extends the existing BuildOptions/parseArgs patterns cleanly and falls back to pageDocument when no template is present.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "0bd878de58dad7590b4114f6939d4885ae04dbc0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [],
+      "strengths": [],
+      "summary": "Adds incremental builds with content/template hashing and stats tracking while keeping the existing public API backward-compatible via optional flags.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "f19314716300ebf7f156958ca806a5e55e2cbfa5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "content-type sniffing is a fragile heuristic",
+        "live-reload script inlined as hardcoded string",
+        "close() has a shutdown race around webSocketServer.close callback"
+      ],
+      "strengths": [],
+      "summary": "Adds a `serve` command with a live-reload dev server (chokidar + ws) that cleanly extends the existing CLI/generator patterns with solid error handling and path-traversal guards.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "8604b0a139e31f16a06b4d518f7abd65a34fa0f9",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "dev-server-plugin writes files directly via node:fs instead of a plugin context write API",
+        "--config plumbing is added but its consumption is unclear",
+        "websocket delivery side of live-reload is unspecified",
+        "re-export-from-generator.ts creates a transitional compatibility surface"
+      ],
+      "strengths": [],
+      "summary": "A clean plugin-architecture refactor that extracts markdown/template rendering and dev-server live-reload out of generator.ts while preserving exports for compatibility.",
+      "session_number": 4
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "37286c435c79",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Session 1 built a monolith (generator.ts ~110 lines with inline HTML templating) with no seam for templating, so Session 2 had to bolt the template engine onto it rather than through a defined interface, forcing the big Session 4 refactor",
+      "Session 2 hand-rolled a regex-based Handlebars/EJS subset ({{#each}}, {{#if}}, partials, EJS tags) instead of adding handlebars/ejs dependencies \u2014 lower feature fidelity and escaping edge-case risk, and the code had to be carried forward through two subsequent sessions",
+      "Session 3's dev server was written standalone (server.ts, 125 lines) with live-reload injection independent of the build pipeline, and Session 4 had to retrofit it into the plugin system (re-wrote server.ts + new dev-server-plugin.ts), a remediation not present in the original design",
+      "Session 4's plugin layer introduced a circular import (plugin.ts imports BuildOptions/Page from generator.ts; generator.ts imports Plugin from plugin.ts) plus a WeakMap metadata side-channel (pageMetadata/parsedPages in markdown-plugin.ts) that Session 5 had to thread cache state through",
+      "ssg.config.ts plugins are loaded via runtime require(), which works for CommonJS/ts-jest but couples the CLI to CJS resolution"
+    ],
+    "key_decisions": [
+      "Session 4's plugin architecture with lifecycle hooks (onStart/beforeBuild/onFile/afterBuild/onEnd) \u2014 the pivotal decision that made Session 5's incremental builds clean; Session 5 consumed changedOutputs/stats from the plugin context instead of adding parallel machinery",
+      "Session 2's choice to hand-roll a template engine with HTML escaping rather than pull in handlebars/ejs \u2014 kept deps lean (gray-matter, marked, chokidar, ws only) at the cost of feature fidelity",
+      "Session 5's hash-based cache design: .ssg-cache.json manifest keyed by source + template hashes, full-invalidate on template change, and cache reuse wired through plugin context rather than as a separate code path",
+      "Session 1's greenfield rewrite of a mismatched seed (Express Todo API) into a TypeScript SSG from scratch \u2014 the seed offered no foundation, so all architecture originated in Session 1",
+      "Tiered output via date-sorted pages + always-written index.html, giving the site stable, deterministic structure across feature additions"
+    ],
+    "trajectory_description": "Quality improved steadily, with a structural step-change at Session 4. Session 1 produced a clean but monolithic greenfield SSG with 3 passing tests. Session 2 added templating (regex HBS/EJS) that worked but grew the monolith and duplicated rendering concerns, expanding tests to 5. Session 3 shipped a functional live-reload dev server but kept it coupled to the generator. Session 4 was the peak: a 224-line reduction of generator.ts into four plugin modules (markdown/template/dev-server/plugin) \u2014 high-risk refactor that preserved behavior and test parity. Session 5 then delivered the hardest feature, incremental builds with hash caching and template invalidation, cleanly on the plugin architecture and grew tests to 7 including a full cache-skip/invalidate/clean cycle. The refactor's payoff is visible in Session 5, which adds 106 lines to generator.ts without disturbing the plugin contracts. The main blemish is a small circular-import / global WeakMap smell in the plugin layer and the hand-rolled template engine's fidelity limits, but overall the arc is one of disciplined, improving engineering.",
+    "summary": "A highly coherent five-session arc that follows greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting, culminating in a strong incremental-build session that was only possible because Session 4's plugin refactor created the right seams \u2014 the primary compounding cost was Session 1/2's monolith and hand-rolled template engine, which Session 4 had to dismantle."
+  }
+}

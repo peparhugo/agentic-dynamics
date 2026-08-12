@@ -1,0 +1,120 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "3286e3ac115dc7395ec42b3783d2719fc71fab51",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "missing tsconfig.json breaks the tsc build script",
+        "`void main()` fire-and-forget swallows top-level await errors",
+        "markdownFiles uses unbounded recursion that can stack-overflow on deep trees"
+      ],
+      "strengths": [],
+      "summary": "Clean greenfield static site generator with sensible CLI/library separation, typed interfaces, and unit tests, though the build script depends on a missing tsconfig.json.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "f7b8bcbef54c088f8441614f92be11e038c6116e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.55,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "module-level pageFrontmatter WeakMap side-channel for raw frontmatter",
+        "reimplements template engine instead of a library",
+        "loadTemplates re-reads all template/partial/layout files on every page",
+        "Page object duplicates data also merged into render context",
+        "defaultTemplate 'default' silently swallowed when templates dir missing"
+      ],
+      "strengths": [],
+      "summary": "Adds a template/layout rendering feature via a hand-rolled Handlebars-subset engine and a module-level WeakMap side-table, extending the generator's capability while introducing real technical debt.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "b5e1b5c529aca9e3b5c1992abe27c82ab63c28c6",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "no tests added for the 110-line dev-server module despite existing test suite",
+        "duplicated path-default resolution logic (mirrors buildSite)",
+        "single-line minified reload script reduces readability"
+      ],
+      "strengths": [],
+      "summary": "Clean, well-separated dev server module that extends BuildOptions and wires into the CLI with minimal disruption to the existing build pipeline.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "99fae20ec4c64da31376df3138d1515e6d1a6299",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.4,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "single-line minified code regresses the readable style it replaced",
+        "runtime require('typescript') via require.extensions hack turns a devDependency into a runtime one",
+        "DevServerPlugin implements Plugin but uses no hooks so it never runs in the pipeline",
+        "MarkdownPlugin/TemplatePlugin are hardcoded into buildSite with implicit ordering and setMarkdownSource/pageFrontmatter WeakMap state coupling",
+        "type-only imports not using import type"
+      ],
+      "strengths": [],
+      "summary": "Extracts markdown/template/dev-server into a lifecycle-hook plugin system with config-file loading while preserving the public API (startDevServer, parseMarkdown re-exports), but the implementation is stateful and partially nominal.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "3bfdb4e53c89b27bfe6fa9bcfd19ba352e846c2f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "skipped pages never re-enter the plugin onFile chain so third-party plugins don't apply to cached output",
+        "core directly imports plugin internals (getRenderedHtml",
+        "setMarkdownSource) coupling site-generator to template/markdown plugins",
+        "cache invalidation keys only on source+template hashes and ignores plugin/config changes",
+        "caching logic was added inline in buildSite() instead of as a plugin",
+        "timeSaved is a heuristic estimate rather than a measured value",
+        "readManifest has redundant duplicate catch returns"
+      ],
+      "strengths": [],
+      "summary": "Well-tested incremental build with a versioned manifest, but implemented inline in the core where it couples to plugin internals and bypasses the onFile pipeline for cached pages.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "35b349c12c9c",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Session 2 chose a hand-rolled, regex-based Handlebars-compatible renderer (subset: #if/#each/partials/triple-stache) instead of the handlebars/ejs dependency the prompt allowed; it became the foundation every later feature (layouts, partials, template-hash cache invalidation in session 5) builds on, and its regex parser is brittle to edge cases",
+      "The seed codebase (an unrelated ~400-line auth API in root index.ts) was never removed or integrated; dead code sat untouched in the repo across all 5 sessions with no cleanup, including the cross-cutting session 5",
+      "Session 4 established a full plugin/lifecycle architecture, but session 5's incremental caching was hardcoded into the core buildSite() instead of implemented as a plugin, leaving the plugin system underutilized",
+      "DevServerPlugin is labeled a Plugin but does not implement any Plugin lifecycle hook (only a start() method); it satisfies the Plugin interface only vacuously and is never wired into the plugin pipeline, an inconsistency left by the session 4 refactor"
+    ],
+    "key_decisions": [
+      "Session 1: build the generator as a reusable library (buildSite + Page/BuildOptions/BuildResult types) with a thin CLI wrapper, which let all later sessions (dev server, caching) compose on the core",
+      "Session 2: reimplement a minimal in-house template engine with WeakMap-bound frontmatter instead of pulling in Handlebars/EJS \u2014 minimized dependencies but re-created a wheel",
+      "Session 3: add a dev server (chokidar file watching + WebSocket live reload) and a `serve` CLI command, reusing buildSite for rebuilds",
+      "Session 4: extract a plugin architecture (PluginContext, onStart/beforeBuild/onFile/afterBuild/onEnd lifecycle, resolveBuildOptions) and split code into plugins/markdown.ts, plugins/template.ts, plugins/dev-server.ts, plus dynamic TypeScript config-file loading via a require hook",
+      "Session 5: add incremental builds with SHA-256 source/template hashing, a .ssg-cache.json manifest, and build stats (pagesBuilt/pagesSkipped/timeSaved) surfaced through the CLI and covered by new tests"
+    ],
+    "trajectory_description": "Quality improved steadily across the five sessions. Session 1 delivered a clean, minimal, well-typed foundation (parse \u2192 build \u2192 index, with tests). Session 2 added a custom template/layout/partial engine that works but introduced fragility by hand-rolling the renderer. Session 3 integrated a polished dev server with live reload, reusing the core. Session 4 was the largest change \u2014 a 336/357 line refactor into a plugin architecture with lifecycle hooks and TS config loading \u2014 a big complexity jump executed cleanly, though it left the plugin system partially nominal and underused. Session 5 capped the arc with incremental caching, build stats, and the most thorough test additions; by the end the project had a coherent plugin-based core, a caching layer, a dev server, and a growing test suite, with minor lingering debts (dead seed file, cache-not-as-plugin).",
+    "summary": "A coherent, improving five-session arc from greenfield generator to a plugin-architecture static site CLI with templates, live-reload dev server, and incremental caching, marred only by a brittle hand-rolled template engine, a never-removed dead seed file, and caching implemented outside the plugin system."
+  }
+}
