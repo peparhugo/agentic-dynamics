@@ -1,10 +1,12 @@
 import asyncio
 import json
+import tempfile
 import urllib.request
 
 import pytest
 import pytest_asyncio
 import websockets
+import fakeredis.aioredis
 
 from app import NotificationServer
 
@@ -106,3 +108,65 @@ async def test_disconnect_removes_client(running_server):
             break
         await asyncio.sleep(0.01)
     assert running_server.client_count == 0
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated():
+    with tempfile.NamedTemporaryFile(suffix=".db") as database:
+        instance = NotificationServer(websocket_port=0, http_port=0,
+                                      database_url=f"sqlite:///{database.name}")
+        await instance.start()
+        try:
+            socket = await websockets.connect(f"ws://127.0.0.1:{instance.websocket_port}")
+            await receive_json(socket)
+            await socket.send(json.dumps({"type": "subscribe", "channel": "audit",
+                                          "payload": {}}))
+            await socket.send(json.dumps({"type": "broadcast", "channel": "audit",
+                                          "payload": {"text": "stored"}}))
+            await receive_json(socket)
+            response = await asyncio.to_thread(
+                urllib.request.urlopen,
+                f"http://127.0.0.1:{instance.http_port}/messages?limit=1&offset=0",
+            )
+            body = json.loads(response.read())
+            assert len(body["messages"]) == 1
+            assert body["messages"][0]["channel"] == "audit"
+            assert body["messages"][0]["payload"] == {"text": "stored"}
+            await socket.close()
+        finally:
+            await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances():
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    first = NotificationServer(websocket_port=0, http_port=0, redis_client=redis)
+    second = NotificationServer(websocket_port=0, http_port=0, redis_client=redis)
+    await first.start()
+    await second.start()
+    sender = await websockets.connect(f"ws://127.0.0.1:{first.websocket_port}")
+    receiver = await websockets.connect(f"ws://127.0.0.1:{second.websocket_port}")
+    try:
+        await receive_json(sender)
+        await receive_json(receiver)
+        await receiver.send(json.dumps({"type": "subscribe", "channel": "shared",
+                                         "payload": {}}))
+        receiver_id = next(iter(second.clients))
+        state_channels = []
+        for _ in range(20):
+            state_channels = json.loads(
+                await redis.hget(f"notifications:client:{receiver_id}", "channels")
+            )
+            if state_channels == ["shared"]:
+                break
+            await asyncio.sleep(0.01)
+        assert state_channels == ["shared"]
+        await sender.send(json.dumps({"type": "broadcast", "channel": "shared",
+                                      "payload": {"text": "cross-instance"}}))
+        message = await asyncio.wait_for(receive_json(receiver), timeout=1)
+        assert message["payload"] == {"text": "cross-instance"}
+    finally:
+        await sender.close()
+        await receiver.close()
+        await first.stop()
+        await second.stop()
