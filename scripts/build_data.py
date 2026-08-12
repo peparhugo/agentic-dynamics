@@ -787,7 +787,8 @@ def compute_story_models() -> list[dict]:
 
     models = []
     for row in conn.execute(f"""
-        SELECT model, count(*) as cells,
+        SELECT model, count(*) as total_runs,
+               count(distinct cell_key) as unique_cells,
                sum(session_count) as sessions,
                round(sum(total_cost), 6) as total_cost,
                round(avg(total_cost), 6) as avg_cost,
@@ -798,38 +799,42 @@ def compute_story_models() -> list[dict]:
                round(avg(total_duration), 0) as avg_duration_s,
                round(avg(code_lines), 0) as avg_code_lines,
                sum(test_count) as total_tests
-        FROM read_parquet('{stories_path}')
-        GROUP BY model ORDER BY avg_cost
+         FROM read_parquet('{stories_path}')
+         GROUP BY model ORDER BY avg_cost
     """).fetchall():
         mid = row[0]
         label = MODEL_LABELS.get(mid, mid)
+        total_runs = row[1]
+        unique_cells = row[2]
         models.append({
             "id": mid,
             "label": label,
             "provider": get_provider(mid),
-            "cells": row[1],
-            "sessions": row[2],
-            "total_cost": row[3],
-            "avg_cost": row[4],
-            "avg_cache_hit": row[5],
-            "avg_tests": row[6],
-            "avg_test_code_ratio": row[7],
-            "avg_tok_per_session": row[8],
-            "avg_duration_s": row[9],
-            "avg_code_lines": row[10],
-            "tests_total": row[11],
-            "tests_passed": row[11],  # all stories passed
+            "cells": total_runs,
+            "unique_cells": unique_cells,
+            "re_runs": total_runs - unique_cells,
+            "sessions": row[3],
+            "total_cost": row[4],
+            "avg_cost": row[5],
+            "avg_cache_hit": row[6],
+            "avg_tests": row[7],
+            "avg_test_code_ratio": row[8],
+            "avg_tok_per_session": row[9],
+            "avg_duration_s": row[10],
+            "avg_code_lines": row[11],
+            "tests_total": row[12],
+            "tests_passed": row[12],  # all stories passed
             # keep legacy keys populated for existing charts
-            "avg_cost_per_session": round(row[4] / max(row[2] / max(row[1], 1), 1), 6),
-            "pass_rate": f"100% ({row[11]}/{row[11]})",
+            "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
+            "pass_rate": f"100% ({row[12]}/{row[12]})",
             "narration_rate": 0,
             "avg_narration_penalty": 0.0,
-            "avg_loc": row[10],
+            "avg_loc": row[11],
             "avg_energy_j": 0.0,
             "avg_energy_j_per_loc": 0.0,
             "strategy_cons": 0, "strategy_expl": 0,
             "strategy_waste": 0, "strategy_efficient": 0,
-            "reports": row[1], "reports_valid": row[1], "reports_narrated": 0,
+            "reports": total_runs, "reports_valid": total_runs, "reports_narrated": 0,
         })
 
     conn.close()
@@ -961,13 +966,16 @@ def build():
             "architectures": 3,
             "variants": len(story_models) if story_models else 8,
             "stories_total": sum(m.get("cells", 0) for m in models),
+            "stories_unique": sum(m.get("unique_cells", 0) for m in models),
+            "stories_re_runs": sum(m.get("re_runs", 0) for m in models),
             "story_sessions": sum(m.get("sessions", 0) for m in models),
             "story_total_cost": _fmt_usd(sum(m.get("total_cost", 0) for m in models)),
             "configs": counts.get("config_files", 0),
             "_provenance": {
                 "worktrees_total": "M", "sessions_total": "M", "game_reports": "M",
                 "total_cost": "M", "architectures": "M", "variants": "M",
-                "stories_total": "C", "story_sessions": "C", "story_total_cost": "C",
+                "stories_total": "C", "stories_unique": "C", "stories_re_runs": "C",
+                "story_sessions": "C", "story_total_cost": "C",
                 "configs": "M",
             },
         },

@@ -66,6 +66,8 @@ STORY_SCHEMA = pa.schema([
     pa.field("quality", pa.string()),
     pa.field("condition", pa.string()),
     pa.field("model", pa.string()),
+    pa.field("cell_key", pa.string()),
+    pa.field("repetition", pa.int32()),
     pa.field("session_count", pa.int32()),
     pa.field("total_tokens", pa.int64()),
     pa.field("total_cache_reads", pa.int64()),
@@ -105,8 +107,12 @@ def sync() -> dict[str, int]:
     """Sync all story results to parquet. Returns row counts."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
+    from collections import Counter
+
     session_rows: list[dict[str, Any]] = []
     story_rows: list[dict[str, Any]] = []
+
+    cell_counts: Counter[str] = Counter()
 
     for f in sorted(RESULTS_DIR.glob("*.json")):
         if "dvs" in f.name or "log" in f.name:
@@ -124,12 +130,21 @@ def sync() -> dict[str, int]:
         summary = d.get("summary", {})
         worktree = d.get("worktree", "")
 
+        # Cell identity: story × model × tier × quality × condition.
+        # Re-runs of the same cell share cell_key but get an increasing
+        # repetition index (0 = first run, 1 = re-run, ...).
+        cell_key = f"{story_name}|{model}|{tier}|{quality}|{condition}"
+        repetition = cell_counts[cell_key]
+        cell_counts[cell_key] += 1
+
         story_rows.append({
             "story_name": story_name,
             "tier": tier,
             "quality": quality,
             "condition": condition,
             "model": model,
+            "cell_key": cell_key,
+            "repetition": repetition,
             "session_count": summary.get("session_count", len(d.get("sessions", []))),
             "total_tokens": summary.get("total_tokens", 0),
             "total_cache_reads": summary.get("total_cache_reads", 0),

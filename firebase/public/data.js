@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 20:21:20 UTC by build_data.py */
+/* Generated 2026-08-12 20:43:07 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T20:21:20.120920+00:00",
+    "generated_at": "2026-08-12T20:43:07.387347+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -13,6 +13,8 @@ window.DYNAMICS_DATA = {
     "architectures": 3,
     "variants": 3,
     "stories_total": 72,
+    "stories_unique": 62,
+    "stories_re_runs": 10,
     "story_sessions": 352,
     "story_total_cost": 15.3238,
     "configs": 35,
@@ -24,6 +26,8 @@ window.DYNAMICS_DATA = {
       "architectures": "M",
       "variants": "M",
       "stories_total": "C",
+      "stories_unique": "C",
+      "stories_re_runs": "C",
       "story_sessions": "C",
       "story_total_cost": "C",
       "configs": "M"
@@ -35,6 +39,8 @@ window.DYNAMICS_DATA = {
       "label": "GPT-5.6 Luna",
       "provider": "openai",
       "cells": 34,
+      "unique_cells": 30,
+      "re_runs": 4,
       "sessions": 170,
       "total_cost": 3.085027,
       "avg_cost": 0.090736,
@@ -66,6 +72,8 @@ window.DYNAMICS_DATA = {
       "label": "DeepSeek v4 Pro",
       "provider": "deepseek",
       "cells": 35,
+      "unique_cells": 30,
+      "re_runs": 5,
       "sessions": 167,
       "total_cost": 4.822804,
       "avg_cost": 0.137794,
@@ -97,6 +105,8 @@ window.DYNAMICS_DATA = {
       "label": "Claude Sonnet 5",
       "provider": "anthropic",
       "cells": 3,
+      "unique_cells": 2,
+      "re_runs": 1,
       "sessions": 15,
       "total_cost": 7.415924,
       "avg_cost": 2.471975,
@@ -3280,7 +3290,7 @@ window.DYNAMICS_DATA = {
       "successful": 352,
       "failed": 0
     },
-    "generated_at": "2026-08-12T20:21:20.153680+00:00"
+    "generated_at": "2026-08-12T20:43:07.416366+00:00"
   },
   "reviews": {
     "models": [
