@@ -1,11 +1,6 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Flask API for managing tasks stored in SQLite."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from datetime import datetime
 import sqlite3
 import os
@@ -33,24 +28,15 @@ def init_db():
         )
 
 
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+# Initialize the schema when the application module is loaded by a WSGI server.
+init_db()
 
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
         conn.commit()
@@ -113,7 +99,9 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    if not isinstance(data, dict) or not isinstance(data.get("title"), str):
+        return jsonify({"error": "title is required"}), 400
+    title = data["title"].strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -131,9 +119,15 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    if "title" in data and (not isinstance(data["title"], str) or not data["title"].strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+    if "status" in data and not isinstance(data["status"], str):
+        return jsonify({"error": "status must be a string"}), 400
     task = update_task(
         task_id,
-        title=data.get("title"),
+        title=data["title"].strip() if "title" in data else None,
         status=data.get("status"),
     )
     if task is None:
@@ -142,5 +136,4 @@ def edit_task(task_id: int):
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
