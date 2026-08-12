@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { build, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR } from './ssg';
+import { buildWithStats, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR } from './ssg';
 import { DEFAULT_PORT, ServeOptions, startServe } from './serve';
 
 export interface CliOptions {
@@ -9,11 +9,13 @@ export interface CliOptions {
   output: string;
   templates: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 /**
  * Parse CLI arguments for the `ssg` binary.
- * Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
+ * Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]
  *        ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]
  */
 export function parseArgs(argv: string[]): CliOptions {
@@ -27,11 +29,21 @@ export function parseArgs(argv: string[]): CliOptions {
     output: DEFAULT_OUTPUT_DIR,
     templates: DEFAULT_TEMPLATES_DIR,
     port: DEFAULT_PORT,
+    incremental: false,
+    clean: false,
   };
 
   const flags = argv.slice(1);
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
+    if (flag === '--incremental') {
+      options.incremental = true;
+      continue;
+    }
+    if (flag === '--clean') {
+      options.clean = true;
+      continue;
+    }
     if (flag === '--content' || flag === '--output' || flag === '--templates' || flag === '--port') {
       const value = flags[i + 1];
       if (value === undefined) {
@@ -66,7 +78,7 @@ export class HelpError extends Error {
   }
 }
 
-export const USAGE = `Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
+export const USAGE = `Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]
        ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]
 
 Build a static site from Markdown files, or run a live-reload dev server.
@@ -80,6 +92,8 @@ Options:
   --output <dir>      Directory where the generated site is written (default: ${DEFAULT_OUTPUT_DIR})
   --templates <dir>   Directory containing templates, layouts, and partials (default: ${DEFAULT_TEMPLATES_DIR})
   --port <port>       Port for the dev server (default: ${DEFAULT_PORT})
+  --incremental       Only rebuild pages whose source or template changed
+  --clean             Ignore the build cache and rebuild everything
   -h, --help          Show this help message
 `;
 
@@ -112,8 +126,16 @@ export function run(argv: string[]): string {
     throw new Error(`Unknown command: ${options.command}\n\n${USAGE}`);
   }
 
-  const pages = build(options.content, options.output, options.templates);
-  return `Built ${pages.length} page(s) into ${options.output}`;
+  const { pages, stats } = buildWithStats(options.content, options.output, options.templates, {
+    incremental: options.incremental,
+    clean: options.clean,
+  });
+
+  const suffix =
+    stats.pagesSkipped > 0 || stats.timeSavedMs > 0
+      ? ` (${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSavedMs}ms saved)`
+      : '';
+  return `Built ${pages.length} page(s) into ${options.output}${suffix}`;
 }
 
 function serveCommand(args: string[]): void {

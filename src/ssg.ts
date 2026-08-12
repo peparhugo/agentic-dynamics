@@ -1,5 +1,6 @@
 import { SSGEngine } from './engine';
 import type { Page } from './types';
+import type { BuildStats } from './cache';
 
 export type { Page } from './types';
 
@@ -24,6 +25,21 @@ export type { TemplateEngine, TemplateFile, TemplateSet } from './templates';
 
 export { SSGEngine } from './engine';
 export type { EngineOptions } from './engine';
+
+export {
+  CACHE_FILE,
+  CACHE_VERSION,
+  emptyCache,
+  emptyStats,
+  hashFile,
+  hashString,
+  indexTemplateHash,
+  loadCache,
+  pruneCacheEntries,
+  saveCache,
+  templateHashFor,
+} from './cache';
+export type { BuildCache, BuildStats, CacheEntry } from './cache';
 
 export { PluginPipeline, PLUGIN_HOOKS } from './plugin';
 export type { Plugin, PluginContext, PluginHook, SSGConfig } from './types';
@@ -50,6 +66,13 @@ import { DEFAULT_TEMPLATES_DIR } from './templates';
 export const DEFAULT_CONTENT_DIR = './content';
 export const DEFAULT_OUTPUT_DIR = './dist';
 
+export interface BuildOptions {
+  /** Only rebuild pages whose source or template changed. */
+  incremental?: boolean;
+  /** Ignore any existing cache and rebuild everything. */
+  clean?: boolean;
+}
+
 /**
  * Generate the whole site: the engine reads Markdown from `contentDir`, runs
  * the built-in plugin pipeline (markdown, templates, live-reload helpers) plus
@@ -59,7 +82,27 @@ export const DEFAULT_OUTPUT_DIR = './dist';
 export function build(
   contentDir: string = DEFAULT_CONTENT_DIR,
   outputDir: string = DEFAULT_OUTPUT_DIR,
-  templatesDir: string = DEFAULT_TEMPLATES_DIR
+  templatesDir: string = DEFAULT_TEMPLATES_DIR,
+  options: BuildOptions = {}
 ): Page[] {
-  return new SSGEngine({ contentDir, outputDir, templatesDir }).build();
+  return buildWithStats(contentDir, outputDir, templatesDir, options).pages;
+}
+
+/**
+ * Same as `build` but also returns build statistics (pages built, pages
+ * skipped, and estimated time saved by skipping unchanged pages).
+ */
+export function buildWithStats(
+  contentDir: string = DEFAULT_CONTENT_DIR,
+  outputDir: string = DEFAULT_OUTPUT_DIR,
+  templatesDir: string = DEFAULT_TEMPLATES_DIR,
+  options: BuildOptions = {}
+): { pages: Page[]; stats: BuildStats } {
+  return new SSGEngine({
+    contentDir,
+    outputDir,
+    templatesDir,
+    incremental: options.incremental,
+    clean: options.clean,
+  }).buildWithStats();
 }

@@ -3,6 +3,8 @@ import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
 import type { Page } from './types';
+import { hashFile } from './cache';
+import type { BuildCache } from './cache';
 
 marked.setOptions({ gfm: true, headerIds: false });
 
@@ -42,7 +44,12 @@ export function parseMarkdown(raw: string, slug: string): Page {
   return { slug, title, date, tags, html, markdown: content, data, template, layout };
 }
 
-export function readPages(contentDir: string): Page[] {
+/**
+ * Read every `.md` file from the content directory. When a `cache` manifest is
+ * provided, pages whose source hash matches a cached entry are restored from
+ * the cache instead of being re-parsed (cached frontmatter + markdown).
+ */
+export function readPages(contentDir: string, cache?: BuildCache | null): Page[] {
   if (!fs.existsSync(contentDir)) {
     throw new Error(`Content directory not found: ${contentDir}`);
   }
@@ -54,8 +61,18 @@ export function readPages(contentDir: string): Page[] {
 
   return files.map((entry) => {
     const slug = path.basename(entry.name, path.extname(entry.name));
-    const raw = fs.readFileSync(path.join(contentDir, entry.name), 'utf8');
-    return parseMarkdown(raw, slug);
+    const filePath = path.join(contentDir, entry.name);
+    const sourceHash = hashFile(filePath);
+
+    const cachedEntry = cache?.entries?.[slug];
+    if (cachedEntry && cachedEntry.sourceHash === sourceHash && cachedEntry.page) {
+      return { ...cachedEntry.page, slug };
+    }
+
+    const raw = fs.readFileSync(filePath, 'utf8');
+    const page = parseMarkdown(raw, slug);
+    page.sourceHash = sourceHash;
+    return page;
   });
 }
 

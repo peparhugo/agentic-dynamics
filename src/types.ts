@@ -1,4 +1,5 @@
 import type { TemplateSet } from './templates';
+import type { BuildCache, BuildStats } from './cache';
 
 export interface Page {
   slug: string;
@@ -10,6 +11,8 @@ export interface Page {
   data: Record<string, unknown>;
   template?: string;
   layout?: string;
+  /** sha256 of the raw Markdown source file, used for incremental builds. */
+  sourceHash?: string;
 }
 
 export interface SSGConfig {
@@ -24,6 +27,12 @@ export interface PluginContext {
   pages: Page[];
   templates: TemplateSet;
   output: Record<string, unknown>;
+  /** Whether an incremental build is active (unused when undefined). */
+  incremental?: boolean;
+  /** The build cache manifest shared across plugins. */
+  cache?: BuildCache;
+  /** Running build statistics. */
+  stats?: BuildStats;
 }
 
 export type PluginHook = 'onStart' | 'beforeBuild' | 'afterBuild' | 'onFile' | 'onEnd';

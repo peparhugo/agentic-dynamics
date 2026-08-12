@@ -5,6 +5,7 @@ export class MarkdownPlugin implements Plugin {
   readonly name = 'markdown';
 
   beforeBuild(ctx: PluginContext): void {
-    ctx.pages = sortPages(readPages(ctx.contentDir));
+    const cache = ctx.incremental === true ? ctx.cache : undefined;
+    ctx.pages = sortPages(readPages(ctx.contentDir, cache));
   }
 }

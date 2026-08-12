@@ -7,12 +7,25 @@ import { loadConfig, loadPluginsFromConfig, resolveConfigPath } from './plugin-l
 import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/template';
 import { DevServerPlugin } from './plugins/dev-server';
+import {
+  CACHE_FILE,
+  emptyCache,
+  emptyStats,
+  loadCache,
+  pruneCacheEntries,
+  saveCache,
+} from './cache';
+import type { BuildCache, BuildStats } from './cache';
 
 export interface EngineOptions {
   contentDir: string;
   outputDir: string;
   templatesDir: string;
   configPath?: string;
+  /** Only rebuild pages whose source or template changed. */
+  incremental?: boolean;
+  /** Ignore any existing cache and rebuild everything. */
+  clean?: boolean;
 }
 
 function emptyTemplateSet(dir: string): PluginContext['templates'] {
@@ -22,12 +35,15 @@ function emptyTemplateSet(dir: string): PluginContext['templates'] {
 export class SSGEngine {
   readonly context: PluginContext;
   readonly pipeline: PluginPipeline;
+  readonly options: EngineOptions;
+  stats: BuildStats = emptyStats();
 
   constructor(options: EngineOptions) {
     const config = loadConfig(options.configPath);
     const configPath = resolveConfigPath(options.configPath);
     const configDir = configPath ? path.dirname(configPath) : process.cwd();
 
+    this.options = options;
     this.context = {
       config,
       contentDir: options.contentDir,
@@ -36,6 +52,7 @@ export class SSGEngine {
       pages: [],
       templates: emptyTemplateSet(options.templatesDir),
       output: {},
+      incremental: options.incremental ?? false,
     };
 
     this.pipeline = new PluginPipeline();
@@ -47,10 +64,7 @@ export class SSGEngine {
     }
   }
 
-  build(): Page[] {
-    const ctx = this.context;
-    fs.mkdirSync(ctx.outputDir, { recursive: true });
-
+  private runPipelineSync(ctx: PluginContext): void {
     this.pipeline.onStart(ctx);
     this.pipeline.beforeBuild(ctx);
 
@@ -60,14 +74,9 @@ export class SSGEngine {
 
     this.pipeline.afterBuild(ctx);
     this.pipeline.onEnd(ctx);
-
-    return ctx.pages;
   }
 
-  async buildAsync(): Promise<Page[]> {
-    const ctx = this.context;
-    fs.mkdirSync(ctx.outputDir, { recursive: true });
-
+  private async runPipelineAsync(ctx: PluginContext): Promise<void> {
     await this.pipeline.runAsync('onStart', ctx);
     await this.pipeline.runAsync('beforeBuild', ctx);
 
@@ -77,6 +86,53 @@ export class SSGEngine {
 
     await this.pipeline.runAsync('afterBuild', ctx);
     await this.pipeline.runAsync('onEnd', ctx);
+  }
+
+  private prepareCache(ctx: PluginContext): void {
+    const cachePath = path.join(ctx.outputDir, CACHE_FILE);
+    const useCache = this.options.incremental === true && this.options.clean !== true;
+    const previous = useCache ? loadCache(cachePath) : null;
+    ctx.cache = previous ?? emptyCache();
+    ctx.stats = emptyStats();
+  }
+
+  private persistCache(ctx: PluginContext): void {
+    const cachePath = path.join(ctx.outputDir, CACHE_FILE);
+    if (ctx.cache) {
+      pruneCacheEntries(ctx.cache, ctx.pages.map((page) => page.slug));
+      saveCache(cachePath, ctx.cache);
+    }
+  }
+
+  build(): Page[] {
+    const ctx = this.context;
+    fs.mkdirSync(ctx.outputDir, { recursive: true });
+
+    this.prepareCache(ctx);
+    this.runPipelineSync(ctx);
+
+    this.stats = ctx.stats ?? emptyStats();
+    this.stats.pages = ctx.pages.length;
+    this.persistCache(ctx);
+
+    return ctx.pages;
+  }
+
+  buildWithStats(): { pages: Page[]; stats: BuildStats } {
+    const pages = this.build();
+    return { pages, stats: this.stats };
+  }
+
+  async buildAsync(): Promise<Page[]> {
+    const ctx = this.context;
+    fs.mkdirSync(ctx.outputDir, { recursive: true });
+
+    this.prepareCache(ctx);
+    await this.runPipelineAsync(ctx);
+
+    this.stats = ctx.stats ?? emptyStats();
+    this.stats.pages = ctx.pages.length;
+    this.persistCache(ctx);
 
     return ctx.pages;
   }
