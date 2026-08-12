@@ -6,6 +6,9 @@ from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta
 from werkzeug.security import check_password_hash
 from functools import wraps
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter import Limit
 import sqlite3
 import jwt
 import os
@@ -18,6 +21,8 @@ app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
 
 
 def get_db():
@@ -28,6 +33,30 @@ def get_db():
 
 task_repo = TaskRepository(get_db)
 user_repo = UserRepository(get_db)
+
+
+def _rate_limit_key():
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            token = auth_header[7:]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            return f"user:{payload['user_id']}"
+        except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    storage_uri=REDIS_URL,
+    default_limits=[
+        Limit(limit_provider=RATE_LIMIT, key_function=_rate_limit_key, scope="global", shared=True),
+    ],
+    storage_options={"socket_connect_timeout": 30},
+    headers_enabled=True,
+)
+limiter.init_app(app)
 
 
 def init_db():
@@ -139,7 +168,13 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(task_repo.find_all_by_owner(g.user_id))
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = max(1, min(limit, 100))
+    data = task_repo.find_by_owner_paginated(g.user_id, cursor=cursor, limit=limit)
+    total = task_repo.count_by_owner(g.user_id)
+    next_cursor = str(data[-1]["id"]) if len(data) == limit else None
+    return jsonify({"data": data, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
@@ -185,6 +220,11 @@ def edit_task(task_id: int):
             send_notification_email.delay(email, task["title"])
 
     return jsonify(task)
+
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    return jsonify({"error": "too many requests"}), 429
 
 
 if __name__ == "__main__":
