@@ -6,9 +6,9 @@ Designed as a baseline for multi-session stories.
 """
 
 from flask import Flask, request, jsonify
-from datetime import datetime
 import sqlite3
 import os
+import time
 
 app = Flask(__name__)
 
@@ -28,16 +28,19 @@ def init_db():
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
             "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
+            "  created_at INTEGER NOT NULL"
             ")"
         )
+
+
+init_db()
 
 
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = int(time.time())
         cursor = conn.execute(
             "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
