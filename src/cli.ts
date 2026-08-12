@@ -1,34 +1,34 @@
 #!/usr/bin/env node
-import fs from 'fs';
-import path from 'path';
-import { parseMarkdown, renderMarkdown } from './parser';
-import { buildPageHtml, buildIndexHtml, pageTitle } from './generator';
-import { TemplateEngine } from './engine';
-import type { SiteContext } from './engine';
-import type { Page } from './types';
+import { slugify, buildSite } from './build';
+import type { SiteBuildResult } from './build';
+import { startDevServer } from './server';
+
+export { slugify, buildSite };
+export type { SiteBuildResult };
 
 export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
   templatesDir: string;
-}
-
-export interface SiteBuildResult {
-  outputDir: string;
-  pages: Page[];
-  indexFile: string;
+  port: number;
 }
 
 const HELP = `ssg — a tiny static site generator
 
 Usage:
   ssg build [options]
+  ssg serve [options]
+
+Commands:
+  build    Build the site into the output directory
+  serve    Start a dev server with live reload on localhost:3000
 
 Options:
   --content <dir>    Directory containing Markdown files (default: ./content)
   --output <dir>     Directory where the site is written (default: ./dist)
   --templates <dir>  Directory containing Handlebars templates (default: ./templates)
+  --port <number>    Port for the dev server (default: 3000, serve only)
   --help             Show this help message
   --version          Show the version number
 `;
@@ -40,6 +40,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let contentDir = 'content';
   let outputDir = 'dist';
   let templatesDir = 'templates';
+  let port = 3000;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -55,6 +56,10 @@ export function parseArgs(argv: string[]): CliOptions {
       templatesDir = argv[++i];
     } else if (arg.startsWith('--templates=')) {
       templatesDir = arg.slice('--templates='.length);
+    } else if (arg === '--port') {
+      port = Number(argv[++i]);
+    } else if (arg.startsWith('--port=')) {
+      port = Number(arg.slice('--port='.length));
     } else if (arg === '--help' || arg === '-h') {
       command = 'help';
     } else if (arg === '--version' || arg === '-v') {
@@ -68,84 +73,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command = 'build';
   }
 
-  return { command, contentDir, outputDir, templatesDir };
-}
-
-export function slugify(fileName: string): string {
-  const slug = fileName
-    .toLowerCase()
-    .replace(/\.[^.]+$/, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-  return slug || 'page';
-}
-
-export function buildSite(
-  contentDir: string,
-  outputDir: string,
-  templatesDir = 'templates',
-): SiteBuildResult {
-  if (!fs.existsSync(contentDir)) {
-    throw new Error(`content directory not found: ${contentDir}`);
-  }
-
-  const mdFiles = fs
-    .readdirSync(contentDir)
-    .filter((f) => {
-      if (!fs.statSync(path.join(contentDir, f)).isFile()) return false;
-      return f.toLowerCase().endsWith('.md');
-    })
-    .sort();
-
-  if (mdFiles.length === 0) {
-    throw new Error(`no markdown files found in: ${contentDir}`);
-  }
-
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  const pages: Page[] = mdFiles.map((file) => {
-    const raw = fs.readFileSync(path.join(contentDir, file), 'utf-8');
-    const { data, body } = parseMarkdown(raw);
-    const slug = slugify(file);
-    return {
-      slug,
-      sourcePath: file,
-      data,
-      body,
-      html: renderMarkdown(body),
-      outputFile: slug === 'index' ? 'index-page.html' : `${slug}.html`,
-    };
-  });
-
-  pages.sort((a, b) => {
-    const dateA = a.data.date ? String(a.data.date) : '';
-    const dateB = b.data.date ? String(b.data.date) : '';
-    if (dateA !== dateB) {
-      return dateA > dateB ? -1 : 1;
-    }
-    return a.slug.localeCompare(b.slug);
-  });
-
-  const engine = fs.existsSync(templatesDir) ? new TemplateEngine(templatesDir) : null;
-  const site: SiteContext = {
-    pages: pages.map((page) => ({
-      slug: page.slug,
-      title: pageTitle(page.data, page.slug),
-      outputFile: page.outputFile,
-      date: page.data.date !== undefined ? String(page.data.date) : undefined,
-    })),
-  };
-
-  for (const page of pages) {
-    const templated = engine ? engine.renderPage(page, site) : null;
-    const html = templated !== null ? templated : buildPageHtml(page);
-    fs.writeFileSync(path.join(outputDir, page.outputFile), html, 'utf-8');
-  }
-
-  const indexFile = path.join(outputDir, 'index.html');
-  fs.writeFileSync(indexFile, buildIndexHtml(pages), 'utf-8');
-
-  return { outputDir, pages, indexFile };
+  return { command, contentDir, outputDir, templatesDir, port };
 }
 
 export function runCli(argv: string[]): number {
@@ -157,6 +85,15 @@ export function runCli(argv: string[]): number {
   }
   if (options.command === 'version') {
     process.stdout.write(`${VERSION}\n`);
+    return 0;
+  }
+  if (options.command === 'serve') {
+    startDevServer({
+      port: options.port,
+      contentDir: options.contentDir,
+      outputDir: options.outputDir,
+      templatesDir: options.templatesDir,
+    });
     return 0;
   }
   if (options.command !== 'build') {

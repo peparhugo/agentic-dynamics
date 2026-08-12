@@ -8,6 +8,16 @@ export {
   PARTIALS_DIR,
 } from './engine';
 export type { TemplateMeta, SiteContext, SitePageRef } from './engine';
-export { buildSite, parseArgs, runCli, slugify } from './cli';
-export type { CliOptions, SiteBuildResult } from './cli';
+export { buildSite, slugify } from './build';
+export type { SiteBuildResult } from './build';
+export { parseArgs, runCli } from './cli';
+export type { CliOptions } from './cli';
+export {
+  startDevServer,
+  injectReloadScript,
+  DEFAULT_PORT,
+  RELOAD_PATH,
+  RELOAD_MESSAGE,
+} from './server';
+export type { DevServer, DevServerOptions } from './server';
 export type { Page, PageData } from './types';
