@@ -11,6 +11,16 @@ async def receive_json(websocket):
     return json.loads(await websocket.recv())
 
 
+async def http_json(port, path):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 @pytest.fixture
 async def running_server():
     server = NotificationServer("127.0.0.1", 0)
@@ -104,4 +114,43 @@ async def test_invalid_json_does_not_disconnect_client(running_server):
     await receive_json(client)
     await client.send("not json")
     assert server.connected_clients == 1
+    await client.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_reaches_only_subscribers_and_can_unsubscribe(running_server):
+    server, port = running_server
+    subscriber = await websockets.connect(f"ws://127.0.0.1:{port}")
+    other = await websockets.connect(f"ws://127.0.0.1:{port}")
+    await receive_json(subscriber)
+    await receive_json(other)
+
+    await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+    await subscriber.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"value": 1}}))
+    message = await asyncio.wait_for(receive_json(subscriber), timeout=1)
+    assert message["channel"] == "alerts"
+    assert message["payload"] == {"value": 1}
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(receive_json(other), timeout=0.05)
+
+    await subscriber.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+    await subscriber.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"value": 2}}))
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(receive_json(subscriber), timeout=0.05)
+    await subscriber.close()
+    await other.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_endpoints_report_subscribers_and_disconnect_cleanup(running_server):
+    server, port = running_server
+    client = await websockets.connect(f"ws://127.0.0.1:{port}")
+    client_id = (await receive_json(client))["payload"]["client_id"]
+    await client.send(json.dumps({"type": "subscribe", "payload": {"channel": "system"}}))
+
+    assert (await http_json(port, "/channels")) == {"channels": {"system": 1}}
+    assert (await http_json(port, "/channels/system/subscribers")) == {
+        "channel": "system",
+        "subscribers": [client_id],
+    }
     await client.close()
