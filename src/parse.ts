@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 import { marked } from 'marked';
 import { Page, PageData } from './types';
 
-function slugify(filePath: string): string {
+export function slugify(filePath: string): string {
   const base = path.basename(filePath, path.extname(filePath));
   const slug = base
     .toLowerCase()
@@ -38,14 +38,17 @@ function toData(frontmatter: Record<string, unknown>): PageData {
   };
 }
 
-export function parseMarkdown(filePath: string): Page {
-  const raw = fs.readFileSync(filePath, 'utf-8');
+export function parseContent(raw: string, slug: string): Page {
   const { content, data } = matter(raw);
   const html = marked.parse(content, { async: false }) as string;
   return {
-    slug: slugify(filePath),
+    slug,
     content,
     html,
     data: toData(data),
   };
+}
+
+export function parseMarkdown(filePath: string): Page {
+  return parseContent(fs.readFileSync(filePath, 'utf-8'), slugify(filePath));
 }

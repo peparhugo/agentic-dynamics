@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import path from 'path';
-import { buildSite } from './build';
-import { startDevServer } from './serve';
+import { SSG } from './engine';
+import { createDevServerPlugin } from './plugins';
+import { loadConfig } from './config';
 
 export interface CliArgs {
   contentDir: string;
@@ -109,19 +110,31 @@ export function run(argv: string[]): number | undefined {
   const templatesDir = path.resolve(process.cwd(), args.templatesDir);
 
   if (args.command === 'serve') {
-    startDevServer({
-      contentDir,
-      outputDir,
-      templatesDir,
-      host: args.host,
-      port: args.port,
+    const config = loadConfig();
+    const dev = createDevServerPlugin({ host: args.host, port: args.port });
+    const engine = new SSG({
+      options: { contentDir, outputDir, templatesDir },
+      plugins: [...config.plugins, dev.plugin],
     });
+    engine.start();
+    try {
+      const pages = engine.build();
+      console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${outputDir}`);
+    } catch (err) {
+      console.error(`Initial build failed: ${(err as Error).message}`);
+    }
     console.log(`Dev server running at http://${args.host}:${args.port}`);
     return undefined;
   }
 
   try {
-    const pages = buildSite({ contentDir, outputDir, templatesDir });
+    const config = loadConfig();
+    const engine = new SSG({
+      options: { contentDir, outputDir, templatesDir },
+      plugins: config.plugins,
+    });
+    engine.start();
+    const pages = engine.build();
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${outputDir}`);
     return 0;
   } catch (err) {
