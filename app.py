@@ -7,12 +7,13 @@ import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 import websockets
 from websockets.exceptions import ConnectionClosed
 
 
-MESSAGE_TYPES = {"broadcast", "direct", "system"}
+MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def _timestamp() -> str:
@@ -32,6 +33,7 @@ class NotificationServer:
         self.websocket_port = websocket_port
         self.http_port = http_port
         self.clients: dict[str, Any] = {}
+        self.channels: dict[str, set[str]] = {}
         self._clients_lock = asyncio.Lock()
         self._websocket_server: Any = None
         self._http_server: asyncio.AbstractServer | None = None
@@ -64,13 +66,23 @@ class NotificationServer:
         async with self._clients_lock:
             clients = list(self.clients.values())
             self.clients.clear()
+            self.channels.clear()
         await asyncio.gather(*(client.close() for client in clients), return_exceptions=True)
 
     async def broadcast(self, message: dict[str, Any]) -> None:
-        """Send a validated message to every currently connected client."""
-        encoded = json.dumps(self._normalise_message(message))
+        """Send a validated message to all clients or its channel subscribers."""
+        normalised = self._normalise_message(message)
+        encoded = json.dumps(normalised)
         async with self._clients_lock:
-            recipients = list(self.clients.items())
+            if normalised.get("channel") is None:
+                recipients = list(self.clients.items())
+            else:
+                subscriber_ids = self.channels.get(normalised["channel"], set())
+                recipients = [
+                    (client_id, self.clients[client_id])
+                    for client_id in subscriber_ids
+                    if client_id in self.clients
+                ]
         results = await asyncio.gather(
             *(client.send(encoded) for _, client in recipients), return_exceptions=True
         )
@@ -105,7 +117,24 @@ class NotificationServer:
             await self._send_system(sender_id, {"error": "invalid message"})
             return
 
-        if normalised["type"] == "broadcast":
+        if normalised["type"] in {"subscribe", "unsubscribe"}:
+            channel = normalised.get("channel")
+            if channel is None:
+                await self._send_system(sender_id, {"error": "subscription requires channel"})
+                return
+            async with self._clients_lock:
+                subscribers = self.channels.setdefault(channel, set())
+                if normalised["type"] == "subscribe":
+                    subscribers.add(sender_id)
+                else:
+                    subscribers.discard(sender_id)
+                    if not subscribers:
+                        self.channels.pop(channel, None)
+            return
+
+        if normalised.get("channel") is not None:
+            await self.broadcast(normalised)
+        elif normalised["type"] == "broadcast":
             await self.broadcast(normalised)
         elif normalised["type"] == "system":
             await self.broadcast(normalised)
@@ -130,7 +159,19 @@ class NotificationServer:
             "type": message_type,
             "payload": payload,
             "timestamp": timestamp if isinstance(timestamp, str) else _timestamp(),
+            **({"channel": channel} if (channel := NotificationServer._message_channel(message)) is not None else {}),
         }
+
+    @staticmethod
+    def _message_channel(message: dict[str, Any]) -> str | None:
+        channel = message.get("channel")
+        if channel is None and message.get("type") in {"subscribe", "unsubscribe"}:
+            channel = message.get("payload", {}).get("channel")
+        if not isinstance(channel, str) or not channel.strip():
+            if channel is None:
+                return None
+            raise ValueError("channel must be a non-empty string")
+        return channel.strip()
 
     async def _send_system(self, client_id: str, payload: dict[str, Any]) -> None:
         async with self._clients_lock:
@@ -141,6 +182,24 @@ class NotificationServer:
     async def _remove_client(self, client_id: str) -> None:
         async with self._clients_lock:
             self.clients.pop(client_id, None)
+            for channel in list(self.channels):
+                self.channels[channel].discard(client_id)
+                if not self.channels[channel]:
+                    del self.channels[channel]
+
+    async def _channel_data(self) -> dict[str, Any]:
+        async with self._clients_lock:
+            return {
+                "channels": {
+                    name: len(subscribers)
+                    for name, subscribers in sorted(self.channels.items())
+                    if subscribers
+                }
+            }
+
+    async def _channel_subscribers(self, channel: str) -> dict[str, Any]:
+        async with self._clients_lock:
+            return {"channel": channel, "subscribers": sorted(self.channels.get(channel, set()))}
 
     async def _handle_http(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
@@ -151,6 +210,17 @@ class NotificationServer:
             if method == "GET" and path == "/health":
                 body = json.dumps({"status": "ok", "connected_clients": self.connected_count}).encode()
                 response = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
+            elif method == "GET" and path == "/channels":
+                body = json.dumps(await self._channel_data()).encode()
+                response = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
+            elif method == "GET" and path.startswith("/channels/") and path.endswith("/subscribers"):
+                channel = unquote(path[len("/channels/") : -len("/subscribers")].rstrip("/"))
+                if not channel:
+                    body = b'{"error":"not found"}'
+                    response = b"HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
+                else:
+                    body = json.dumps(await self._channel_subscribers(channel)).encode()
+                    response = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
             else:
                 body = b'{"error":"not found"}'
                 response = b"HTTP/1.1 404 Not Found\r\nContent-Type: application/json\r\nContent-Length: " + str(len(body)).encode() + b"\r\nConnection: close\r\n\r\n" + body
