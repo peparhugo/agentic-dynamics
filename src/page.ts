@@ -8,6 +8,8 @@ export interface Page {
   date: string;
   tags: string[];
   contentHtml: string;
+  template?: string;
+  layout?: string;
 }
 
 export function pageFromFile(filePath: string): Page {
@@ -20,5 +22,7 @@ export function pageFromFile(filePath: string): Page {
     date: parsed.frontmatter.date ?? '',
     tags: parsed.frontmatter.tags ?? [],
     contentHtml: parsed.contentHtml,
+    template: parsed.frontmatter.template,
+    layout: parsed.frontmatter.layout,
   };
 }

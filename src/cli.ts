@@ -5,6 +5,7 @@ import { Page } from './page';
 export interface CliOptions {
   content: string;
   output: string;
+  templates: string;
 }
 
 export interface ParsedCli {
@@ -14,15 +15,17 @@ export interface ParsedCli {
 
 const DEFAULT_CONTENT = './content';
 const DEFAULT_OUTPUT = './dist';
+const DEFAULT_TEMPLATES = './templates';
 
 function usage(): string {
   return [
     'Usage: ssg build [options]',
     '',
     'Options:',
-    '  --content <dir>   Markdown source directory (default: ./content)',
-    '  --output <dir>    Output directory (default: ./dist)',
-    '  -h, --help        Show this help',
+    '  --content <dir>    Markdown source directory (default: ./content)',
+    '  --output <dir>     Output directory (default: ./dist)',
+    '  --templates <dir>  Template directory (default: ./templates)',
+    '  -h, --help         Show this help',
   ].join('\n');
 }
 
@@ -44,7 +47,7 @@ export function parseArgs(argv: string[]): ParsedCli | null {
   if (command === undefined || command === '-h' || command === '--help') return null;
   if (command !== 'build') return null;
 
-  const options: CliOptions = { content: DEFAULT_CONTENT, output: DEFAULT_OUTPUT };
+  const options: CliOptions = { content: DEFAULT_CONTENT, output: DEFAULT_OUTPUT, templates: DEFAULT_TEMPLATES };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '-h' || arg === '--help') return null;
@@ -60,6 +63,12 @@ export function parseArgs(argv: string[]): ParsedCli | null {
       if (args[i] === '--output') i++;
       continue;
     }
+    const templatesValue = parseFlagValue(args, '--templates', i);
+    if (templatesValue !== null) {
+      options.templates = templatesValue;
+      if (args[i] === '--templates') i++;
+      continue;
+    }
     return null;
   }
   return { command, options };
@@ -73,7 +82,7 @@ export function run(argv: string[]): number {
   }
 
   try {
-    const pages: Page[] = buildSite(parsed.options.content, parsed.options.output);
+    const pages: Page[] = buildSite(parsed.options.content, parsed.options.output, parsed.options.templates);
     process.stdout.write(`Built ${pages.length} page(s) into ${parsed.options.output}\n`);
     return 0;
   } catch (err) {

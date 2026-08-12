@@ -1,0 +1,10 @@
+<ul class="pages">
+{{#each pages}}
+  <li>
+    <a href="{{slug}}.html">{{title}}</a>
+    {{#if meta}}<span class="meta">{{{meta}}}</span>{{/if}}
+  </li>
+{{else}}
+  <p>No pages yet.</p>
+{{/each}}
+</ul>

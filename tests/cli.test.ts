@@ -7,17 +7,34 @@ import { createFixture, cleanupFixture, Fixture } from './helpers';
 describe('parseArgs', () => {
   it('uses defaults for content and output', () => {
     const parsed = parseArgs(['build']);
-    expect(parsed).toEqual({ command: 'build', options: { content: './content', output: './dist' } });
+    expect(parsed).toEqual({
+      command: 'build',
+      options: { content: './content', output: './dist', templates: './templates' },
+    });
   });
 
   it('accepts --content and --output flags', () => {
     const parsed = parseArgs(['build', '--content', 'src/md', '--output', 'public']);
-    expect(parsed).toEqual({ command: 'build', options: { content: 'src/md', output: 'public' } });
+    expect(parsed).toEqual({
+      command: 'build',
+      options: { content: 'src/md', output: 'public', templates: './templates' },
+    });
   });
 
   it('accepts --content=dir syntax', () => {
     const parsed = parseArgs(['build', '--content=posts', '--output=out']);
-    expect(parsed).toEqual({ command: 'build', options: { content: 'posts', output: 'out' } });
+    expect(parsed).toEqual({
+      command: 'build',
+      options: { content: 'posts', output: 'out', templates: './templates' },
+    });
+  });
+
+  it('accepts a --templates flag', () => {
+    const parsed = parseArgs(['build', '--templates', 'themes/site']);
+    expect(parsed).toEqual({
+      command: 'build',
+      options: { content: './content', output: './dist', templates: 'themes/site' },
+    });
   });
 
   it('rejects unknown subcommands', () => {

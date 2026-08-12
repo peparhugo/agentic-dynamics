@@ -11,6 +11,8 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
 }
 
 export interface ParsedMarkdown {
@@ -43,6 +45,8 @@ export function parseMarkdown(raw: string): ParsedMarkdown {
     title: typeof data.title === 'string' ? data.title : undefined,
     date: toDateString(data.date),
     tags: toTags(data.tags),
+    template: typeof data.template === 'string' && data.template.length > 0 ? data.template : undefined,
+    layout: typeof data.layout === 'string' && data.layout.length > 0 ? data.layout : undefined,
   };
   const contentHtml = marked.parse(content.trim());
   return { frontmatter, contentHtml };

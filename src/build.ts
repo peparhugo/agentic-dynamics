@@ -2,6 +2,9 @@ import { mkdirSync, readdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Page, pageFromFile } from './page';
 import { indexHtml, pageHtml } from './templates';
+import { loadTemplates } from './engine';
+
+export const DEFAULT_TEMPLATES_DIR = './templates';
 
 export function listMarkdownFiles(dir: string): string[] {
   const files: string[] = [];
@@ -17,15 +20,19 @@ export function listMarkdownFiles(dir: string): string[] {
   return files;
 }
 
-export function buildSite(contentDir: string, outputDir: string): Page[] {
+export function buildSite(contentDir: string, outputDir: string, templatesDir: string = DEFAULT_TEMPLATES_DIR): Page[] {
   const files = listMarkdownFiles(contentDir);
   const pages = files.map(pageFromFile);
   pages.sort((a, b) => b.date.localeCompare(a.date));
 
+  const engine = loadTemplates(templatesDir);
+
   mkdirSync(outputDir, { recursive: true });
   for (const page of pages) {
-    writeFileSync(join(outputDir, `${page.slug}.html`), pageHtml(page), 'utf8');
+    const html = engine ? engine.renderPage(page) : pageHtml(page);
+    writeFileSync(join(outputDir, `${page.slug}.html`), html, 'utf8');
   }
-  writeFileSync(join(outputDir, 'index.html'), indexHtml(pages), 'utf8');
+  const index = engine ? engine.renderIndex(pages) : indexHtml(pages);
+  writeFileSync(join(outputDir, 'index.html'), index, 'utf8');
   return pages;
 }
