@@ -85,3 +85,57 @@ async def test_invalid_message_returns_system_error(server):
         error = await receive_json(client)
         assert error["type"] == "system"
         assert error["payload"] == {"error": "invalid message"}
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_reaches_only_subscribers(server):
+    async with (
+        connect(f"ws://127.0.0.1:{server.port}") as alerts,
+        connect(f"ws://127.0.0.1:{server.port}") as other,
+    ):
+        await alerts.recv()
+        await other.recv()
+        await alerts.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        confirmation = await receive_json(alerts)
+        assert confirmation["payload"] == {"event": "subscribed", "channel": "alerts"}
+
+        await other.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"text": "warning"},
+        }))
+        received = await receive_json(alerts)
+        assert received["channel"] == "alerts"
+        assert received["payload"] == {"text": "warning"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other.recv(), timeout=0.05)
+
+        await alerts.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+        assert (await receive_json(alerts))["payload"]["event"] == "unsubscribed"
+        await other.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"text": "ignored"},
+        }))
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(alerts.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_channel_endpoints_list_subscribers_and_clean_up(server):
+    async with connect(f"ws://127.0.0.1:{server.port}") as client:
+        connected = await receive_json(client)
+        client_id = connected["payload"]["client_id"]
+        await client.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await receive_json(client)
+
+        response = await asyncio.to_thread(urlopen, f"http://127.0.0.1:{server.port}/channels")
+        assert json.loads(response.read()) == {
+            "channels": [{"name": "system", "subscribers": 1}]
+        }
+        response = await asyncio.to_thread(
+            urlopen, f"http://127.0.0.1:{server.port}/channels/system/subscribers"
+        )
+        assert json.loads(response.read()) == {
+            "channel": "system", "subscribers": [client_id]
+        }

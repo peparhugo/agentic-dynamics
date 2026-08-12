@@ -13,13 +13,14 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def timestamp() -> str:
@@ -32,6 +33,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     def add(self, connection: ServerConnection) -> str:
@@ -43,6 +45,31 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in list(self._channels):
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def channel_subscribers(self, channel: str) -> set[str]:
+        with self._lock:
+            return set(self._channels.get(channel, set()))
+
+    def channels(self) -> dict[str, set[str]]:
+        with self._lock:
+            return {name: set(ids) for name, ids in self._channels.items()}
 
     def get(self, client_id: str) -> ServerConnection | None:
         with self._lock:
@@ -58,10 +85,15 @@ class ClientRegistry:
             return len(self._clients)
 
 
-def make_message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+def make_message(
+    message_type: str, payload: dict[str, Any], channel: str | None = None
+) -> dict[str, Any]:
     if message_type not in SUPPORTED_TYPES:
         raise ValueError(f"unsupported message type: {message_type}")
-    return {"type": message_type, "payload": payload, "timestamp": timestamp()}
+    message = {"type": message_type, "payload": payload, "timestamp": timestamp()}
+    if channel is not None:
+        message["channel"] = channel
+    return message
 
 
 class NotificationServer:
@@ -92,9 +124,28 @@ class NotificationServer:
     async def _process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        if request.path != "/health":
+        path = urlsplit(request.path).path
+        body_data: dict[str, Any] | None = None
+        if path == "/health":
+            body_data = {"status": "ok", "clients": self.registry.count}
+        elif path == "/channels":
+            body_data = {
+                "channels": [
+                    {"name": name, "subscribers": len(subscribers)}
+                    for name, subscribers in sorted(self.registry.channels().items())
+                ]
+            }
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            channel = unquote(path[len("/channels/") : -len("/subscribers")]).strip("/")
+            if not channel:
+                return None
+            body_data = {
+                "channel": channel,
+                "subscribers": sorted(self.registry.channel_subscribers(channel)),
+            }
+        else:
             return None
-        body = json.dumps({"status": "ok", "clients": self.registry.count}).encode()
+        body = json.dumps(body_data).encode()
         return Response(
             200,
             "OK",
@@ -125,7 +176,18 @@ class NotificationServer:
                 raise ValueError
             message_type = message.get("type")
             payload = message.get("payload")
+            if message_type in {"subscribe", "unsubscribe"} and payload is None:
+                payload = {}
             if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict):
+                raise ValueError
+            channel = message.get("channel")
+            if channel is None:
+                channel = payload.get("channel")
+            if channel is not None and (
+                not isinstance(channel, str) or not channel.strip()
+            ):
+                raise ValueError
+            if message_type in {"subscribe", "unsubscribe"} and channel is None:
                 raise ValueError
         except (json.JSONDecodeError, TypeError, ValueError):
             sender = self.registry.get(sender_id)
@@ -133,24 +195,52 @@ class NotificationServer:
                 await sender.send(json.dumps(make_message("system", {"error": "invalid message"})))
             return
 
-        outgoing = make_message(message_type, payload)
-        if message_type == "broadcast":
-            await self.broadcast(outgoing)
-        elif message_type == "direct":
-            target_id = payload.get("client_id") or payload.get("recipient")
-            target = self.registry.get(target_id) if isinstance(target_id, str) else None
-            if target is not None:
-                await target.send(json.dumps(outgoing))
+        channel = channel.strip() if isinstance(channel, str) else None
+        if message_type == "subscribe":
+            self.registry.subscribe(sender_id, channel)
+            await self._send_control(sender_id, "subscribed", channel)
+        elif message_type == "unsubscribe":
+            self.registry.unsubscribe(sender_id, channel)
+            await self._send_control(sender_id, "unsubscribed", channel)
         else:
-            # System messages are server-generated; clients may send them only
-            # to themselves, which keeps the message contract predictable.
-            sender = self.registry.get(sender_id)
-            if sender is not None:
-                await sender.send(json.dumps(outgoing))
+            outgoing = make_message(message_type, payload, channel)
+            if message_type == "broadcast":
+                await self.broadcast(outgoing, channel)
+            elif message_type == "direct":
+                target_id = payload.get("client_id") or payload.get("recipient")
+                target = self.registry.get(target_id) if isinstance(target_id, str) else None
+                if target is not None and (
+                    channel is None
+                    or target_id in self.registry.channel_subscribers(channel)
+                ):
+                    await target.send(json.dumps(outgoing))
+            else:
+                # System messages are server-generated; clients may send them only
+                # to themselves, which keeps the message contract predictable.
+                sender = self.registry.get(sender_id)
+                if sender is not None and (
+                    channel is None
+                    or sender_id in self.registry.channel_subscribers(channel)
+                ):
+                    await sender.send(json.dumps(outgoing))
 
-    async def broadcast(self, message: dict[str, Any]) -> None:
+    async def _send_control(self, client_id: str, event: str, channel: str) -> None:
+        client = self.registry.get(client_id)
+        if client is not None:
+            await client.send(
+                json.dumps(make_message("system", {"event": event, "channel": channel}))
+            )
+
+    async def broadcast(self, message: dict[str, Any], channel: str | None = None) -> None:
         encoded = json.dumps(message)
-        connections = self.registry.snapshot().values()
+        clients = self.registry.snapshot()
+        if channel is not None:
+            clients = {
+                client_id: connection
+                for client_id, connection in clients.items()
+                if client_id in self.registry.channel_subscribers(channel)
+            }
+        connections = clients.values()
         if connections:
             await asyncio.gather(*(connection.send(encoded) for connection in connections), return_exceptions=True)
 
