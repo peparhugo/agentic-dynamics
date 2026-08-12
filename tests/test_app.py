@@ -16,8 +16,76 @@ def client(tmp_path):
     task_app.DATABASE = original_database
 
 
-def test_create_task_uses_pending_status(client):
-    response = client.post("/tasks", json={"title": "Write tests"})
+@pytest.fixture
+def auth_client(client):
+    client.post("/auth/register", json={"username": "alice", "password": "secret"})
+    token = client.post(
+        "/auth/login", json={"username": "alice", "password": "secret"}
+    ).json["token"]
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    return client
+
+
+def test_tasks_require_authentication(client):
+    assert client.get("/tasks").status_code == 401
+    assert client.post("/tasks", json={"title": "Private"}).status_code == 401
+
+
+def test_register_and_login(client):
+    registered = client.post(
+        "/auth/register", json={"username": "alice", "password": "secret"}
+    )
+    assert registered.status_code == 201
+    assert registered.json["username"] == "alice"
+    assert "password" not in registered.json
+
+    logged_in = client.post(
+        "/auth/login", json={"username": "alice", "password": "secret"}
+    )
+    assert logged_in.status_code == 200
+    assert logged_in.json["token"].count(".") == 2
+
+
+def test_register_rejects_duplicate_and_login_rejects_bad_password(client):
+    payload = {"username": "alice", "password": "secret"}
+    assert client.post("/auth/register", json=payload).status_code == 201
+    assert client.post("/auth/register", json=payload).status_code == 409
+    assert client.post(
+        "/auth/login", json={"username": "alice", "password": "wrong"}
+    ).status_code == 401
+
+
+def test_users_only_see_and_update_their_own_tasks(client):
+    client.post("/auth/register", json={"username": "alice", "password": "secret"})
+    alice = client.post(
+        "/auth/login", json={"username": "alice", "password": "secret"}
+    )
+    alice_token = alice.json["token"]
+    task = client.post(
+        "/tasks", json={"title": "Alice task"}, headers={"Authorization": f"Bearer {alice_token}"}
+    ).json
+
+    client.post("/auth/register", json={"username": "bob", "password": "secret"})
+    bob_token = client.post(
+        "/auth/login", json={"username": "bob", "password": "secret"}
+    ).json["token"]
+    headers = {"Authorization": f"Bearer {bob_token}"}
+    assert client.get("/tasks", headers=headers).json == []
+    assert client.get(f"/tasks/{task['id']}", headers=headers).status_code == 404
+    assert client.put(
+        f"/tasks/{task['id']}", json={"status": "done"}, headers=headers
+    ).status_code == 404
+
+
+def test_invalid_token_returns_401(client):
+    response = client.get(
+        "/tasks", headers={"Authorization": "Bearer not.a.valid.token"}
+    )
+    assert response.status_code == 401
+
+
+def test_create_task_uses_pending_status(auth_client):
+    response = auth_client.post("/tasks", json={"title": "Write tests"})
 
     assert response.status_code == 201
     assert response.json["title"] == "Write tests"
@@ -26,36 +94,36 @@ def test_create_task_uses_pending_status(client):
     assert response.json["created_at"]
 
 
-def test_create_task_requires_title(client):
-    response = client.post("/tasks", json={})
+def test_create_task_requires_title(auth_client):
+    response = auth_client.post("/tasks", json={})
 
     assert response.status_code == 400
     assert response.json == {"error": "title is required"}
 
 
-def test_list_tasks_is_newest_first(client):
-    client.post("/tasks", json={"title": "First"})
-    client.post("/tasks", json={"title": "Second"})
+def test_list_tasks_is_newest_first(auth_client):
+    auth_client.post("/tasks", json={"title": "First"})
+    auth_client.post("/tasks", json={"title": "Second"})
 
-    response = client.get("/tasks")
+    response = auth_client.get("/tasks")
 
     assert response.status_code == 200
     assert [task["title"] for task in response.json] == ["Second", "First"]
 
 
-def test_get_task_and_missing_task(client):
-    created = client.post("/tasks", json={"title": "Find me"}).json
+def test_get_task_and_missing_task(auth_client):
+    created = auth_client.post("/tasks", json={"title": "Find me"}).json
 
-    assert client.get(f"/tasks/{created['id']}").json == created
-    missing = client.get("/tasks/999")
+    assert auth_client.get(f"/tasks/{created['id']}").json == created
+    missing = auth_client.get("/tasks/999")
     assert missing.status_code == 404
     assert missing.json == {"error": "task not found"}
 
 
-def test_update_task_title_and_status(client):
-    created = client.post("/tasks", json={"title": "Old"}).json
+def test_update_task_title_and_status(auth_client):
+    created = auth_client.post("/tasks", json={"title": "Old"}).json
 
-    response = client.put(
+    response = auth_client.put(
         f"/tasks/{created['id']}",
         json={"title": "New", "status": "done"},
     )
@@ -66,15 +134,15 @@ def test_update_task_title_and_status(client):
     assert response.json["created_at"] == created["created_at"]
 
 
-def test_update_task_requires_a_supported_field(client):
-    response = client.put("/tasks/999", json={})
+def test_update_task_requires_a_supported_field(auth_client):
+    response = auth_client.put("/tasks/999", json={})
 
     assert response.status_code == 400
     assert response.json == {"error": "title or status is required"}
 
 
-def test_update_missing_task_returns_not_found(client):
-    response = client.put("/tasks/999", json={"status": "done"})
+def test_update_missing_task_returns_not_found(auth_client):
+    response = auth_client.put("/tasks/999", json={"status": "done"})
 
     assert response.status_code == 404
     assert response.json == {"error": "task not found"}
