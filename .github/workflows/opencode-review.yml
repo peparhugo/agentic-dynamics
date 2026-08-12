@@ -1,0 +1,54 @@
+name: Opencode PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: anomalyco/opencode/github@latest
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        with:
+          model: deepseek/deepseek-v4-pro
+          prompt: |
+            Review this PR for the following:
+
+            1. **Measurement correctness** — does any change affect the measurement pipeline
+               (perturb.py, opencode.py, solution.py, basin.py, efficiency.py, strategy.py)?
+               Flag anything that could introduce bias or break apples-to-apples comparison.
+
+            2. **Conventions** — check against conventions/python.yaml and conventions/typescript.yaml.
+               Dataclasses over dicts, snake_case functions, PascalCase classes, type hints on
+               public signatures. See AGENTS.md conventions section.
+
+            3. **Module boundaries** — verify new code uses correct module imports according to
+               the architecture in .opencode/instructions/mental-model.md. language.py is foundation
+               (no internal deps), core measurement chain is standalone.
+
+            4. **Exports** — all new public symbols must be re-exported from src/instrument/__init__.py
+               with entries in __all__.
+
+            5. **Test coverage** — new modules or functions in src/instrument/ should have
+               corresponding tests in tests/. New scripts should be importable.
+
+            6. **Deprecation awareness** — do not use deprecated modules: experiment.py, adapter.py,
+               lab_book.py. Use opencode.py and run_opencode_agentic() instead.
+
+            7. **PROVIDER_PRICING** — never hardcode model prices. Use the PROVIDER_PRICING dict
+               from efficiency.py.
+
+            Focus on issues that affect experimental validity. Be specific about file paths and
+            line numbers. Suggest concrete fixes.

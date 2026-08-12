@@ -1,4 +1,4 @@
-name: Tests & Data Integrity
+name: Tests & Lint
 
 on:
   push:
@@ -26,6 +26,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install pytest pyyaml numpy scikit-learn tree-sitter==0.21.3 tree-sitter-languages
           pip install -e .
+
+      - name: Lint (ruff)
+        run: |
+          pip install ruff
+          ruff check src/ tests/ scripts/
 
       - name: Run core tests (no external services)
         run: |

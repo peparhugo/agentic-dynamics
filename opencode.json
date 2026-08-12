@@ -1,8 +1,10 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "deepseek/deepseek-v4-pro",
+  "small_model": "deepseek/deepseek-chat",
   "instructions": [
-    "AGENTS.md"
+    "AGENTS.md",
+    ".opencode/instructions/mental-model.md"
   ],
   "compaction": {
     "auto": true,
@@ -10,9 +12,16 @@
     "reserved": 15000
   },
   "subagent_depth": 2,
+  "formatter": true,
+  "lsp": true,
   "permission": {
     "edit": "allow",
-    "bash": "allow",
+    "bash": {
+      "*": "allow",
+      "git push *": "ask",
+      "firebase deploy *": "ask",
+      "rm -rf /tmp/exp_*": "ask"
+    },
     "task": "allow",
     "external_directory": "allow",
     "webfetch": "allow",

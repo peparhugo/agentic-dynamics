@@ -1,0 +1,16 @@
+
+Story: task_manager_api (5 sessions, python)
+Model: openai/gpt-5.6-luna
+Codebase: experiments/codebases/python/tier1_minimal/good (good, tier1_minimal)
+Condition: clean
+============================================================
+
+============================================================
+Story complete: task_manager_api
+  Condition: clean
+  Sessions: 5  |  All successful: True
+  Total cost: $0.0754
+  Total tokens: 26,500
+  Duration: 352.1s
+  Cascade recovery: no
+  Results: experiments/results/stories/task_manager_api_openai_gpt-5.6-luna_clean_c9e06c7b6b5c.json

@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import json
 import subprocess
-import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
 
 # ── Data Structures ────────────────────────────────────────────
 
@@ -52,7 +50,7 @@ class CommitReview:
         }
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any]) -> "CommitReview":
+    def from_dict(cls, d: dict[str, Any]) -> CommitReview:
         return cls(
             commit_hash=d.get("commit_hash", ""),
             reviewer_model=d.get("reviewer_model", ""),
@@ -135,6 +133,35 @@ Output ONLY valid JSON, no other text:
 }}"""
 
 
+# ── Review Schemas (for SDK structured output) ──────────────────
+
+COMMIT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "architectural_fit": {"type": "number", "minimum": 0, "maximum": 1},
+        "convention_adherence": {"type": "number", "minimum": 0, "maximum": 1},
+        "introduces_technical_debt": {"type": "boolean"},
+        "respects_existing_patterns": {"type": "boolean"},
+        "better_or_worse": {"type": "string", "enum": ["better", "worse", "neutral"]},
+        "problems": {"type": "array", "items": {"type": "string"}},
+        "strengths": {"type": "array", "items": {"type": "string"}},
+        "summary": {"type": "string"},
+    },
+    "required": ["architectural_fit", "convention_adherence", "better_or_worse"],
+}
+
+STORY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "overall_coherence": {"type": "number", "minimum": 0, "maximum": 1},
+        "compounding_issues": {"type": "array", "items": {"type": "string"}},
+        "key_decisions": {"type": "array", "items": {"type": "string"}},
+        "trajectory_description": {"type": "string"},
+        "summary": {"type": "string"},
+    },
+    "required": ["overall_coherence"],
+}
+
 # ── Review Functions ───────────────────────────────────────────
 
 def review_commit(
@@ -202,6 +229,22 @@ def review_commit(
         diff=diff,
     )
 
+    # Try SDK bridge for guaranteed structured output
+    data = _call_agent_structured(prompt, model, COMMIT_SCHEMA, timeout)
+    if data:
+        return CommitReview(
+            commit_hash=commit_hash, reviewer_model=model,
+            architectural_fit=float(data.get("architectural_fit", 0.5)),
+            convention_adherence=float(data.get("convention_adherence", 0.5)),
+            introduces_technical_debt=bool(data.get("introduces_technical_debt", False)),
+            respects_existing_patterns=bool(data.get("respects_existing_patterns", True)),
+            better_or_worse=str(data.get("better_or_worse", "unclear")),
+            problems=list(data.get("problems", [])),
+            strengths=list(data.get("strengths", [])),
+            summary=str(data.get("summary", "")),
+        )
+
+    # Fall back to CLI subprocess
     response = _call_agent(prompt, model=model, timeout=timeout)
     return _parse_commit_review(response, commit_hash, model)
 
@@ -233,14 +276,61 @@ def review_story(
         commit_log=log,
     )
 
+    # Try SDK bridge for guaranteed structured output
+    data = _call_agent_structured(prompt, model, STORY_SCHEMA, timeout)
+    if data:
+        return StoryReview(
+            story_name=story_name, reviewer_model=model,
+            overall_coherence=float(data.get("overall_coherence", 0.5)),
+            compounding_issues=list(data.get("compounding_issues", [])),
+            key_decisions=list(data.get("key_decisions", [])),
+            trajectory_description=str(data.get("trajectory_description", "")),
+            summary=str(data.get("summary", "")),
+        )
+
+    # Fall back to CLI subprocess
     response = _call_agent(prompt, model=model, timeout=timeout)
     return _parse_story_review(response, story_name, model)
 
 
-def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
-    """Call an LLM agent via opencode CLI."""
+def _call_agent_structured(
+    prompt: str, model: str, schema: dict, timeout: int = 300
+) -> dict | None:
+    """Call an LLM agent via opencode SDK bridge with guaranteed structured output.
+
+    Uses the SDK's json_schema format to enforce valid JSON matching the schema.
+    Falls back to None if the bridge is unavailable or times out.
+    """
     import os
-    import re
+    import shutil
+
+    node_bin = shutil.which("node") or os.environ.get("NODE_BIN", "node")
+    bridge_path = Path(__file__).resolve().parent.parent.parent / "scripts" / "sdk_bridge.mjs"
+
+    if not bridge_path.exists():
+        return None
+
+    try:
+        result = subprocess.run(
+            [node_bin, str(bridge_path)],
+            input=json.dumps({"prompt": prompt, "model": model, "schema": schema, "timeout": timeout}),
+            capture_output=True,
+            text=True,
+            timeout=timeout + 60,
+        )
+        if result.returncode != 0:
+            return None
+        data = json.loads(result.stdout)
+        if data.get("ok") and data.get("structured"):
+            return data["structured"]
+        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+
+
+def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
+    """Call an LLM agent via opencode CLI with structured JSONL output."""
+    import os
 
     opencode_bin = os.environ.get(
         "OPENCODE_BIN",
@@ -249,16 +339,38 @@ def _call_agent(prompt: str, model: str, timeout: int) -> str | None:
 
     try:
         result = subprocess.run(
-            [opencode_bin, "run", prompt, "--model", model, "--auto"],
+            [opencode_bin, "run", prompt, "--model", model, "--format", "json", "--auto"],
             capture_output=True,
             text=True,
             timeout=timeout + 30,
         )
-        output = result.stdout or ""
-        output = re.sub(r'\x1b\[[0-9;]*m', '', output)
-        lines = [l for l in output.splitlines()
-                 if l.strip() and not l.strip().startswith(">")]
-        return "\n".join(lines).strip() or None
+
+        # Parse JSONL output to extract text responses from the model
+        text_parts = []
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(obj, dict):
+                continue
+            if obj.get("type") == "text":
+                part = obj.get("part", {})
+                if isinstance(part, dict) and part.get("text"):
+                    text_parts.append(part["text"])
+
+        if text_parts:
+            return "\n".join(text_parts).strip() or None
+
+        # Fallback: try raw stdout if JSONL parsing produced nothing
+        output = result.stdout
+        if output:
+            return output.strip() or None
+        return None
+
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return None
 
@@ -302,7 +414,6 @@ def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> 
 
     # Try key:value format
     try:
-        import re
         arch_fit = _extract_float(response, r"arch_fit:\s*([\d.]+)")
         convention = _extract_float(response, r"convention:\s*([\d.]+)")
         debt = _extract_bool(response, r"debt:\s*(true|false)")
@@ -555,6 +666,12 @@ def compare_implementations(
         implementations="\n\n".join(impl_parts),
     )
 
+    # Try SDK bridge for guaranteed structured output
+    data = _call_agent_structured(prompt, model, None, timeout)
+    if data:
+        return data
+
+    # Fall back to CLI subprocess
     response = _call_agent(prompt, model=model, timeout=timeout)
     if not response:
         return None

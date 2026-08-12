@@ -1,0 +1,6 @@
+[05:21:52][worker] Started (pid=1615727)
+[05:21:52][worker] Redis connected
+[05:21:52][worker] [test_sonnet5_v2] Starting (1/30)
+[05:37:53][worker] [test_sonnet5_v2] OK (961s)
+[05:39:53][worker] Queue empty after 12 polls. Exiting.
+[05:39:53][worker] Done: 1 ok, 0 failed, 1 total

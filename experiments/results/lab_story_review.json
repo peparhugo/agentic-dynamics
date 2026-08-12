@@ -1,34 +1,34 @@
 {
   "experiment_id": "lab_story_review",
-  "generated_at": "2026-08-12T00:49:07.072575",
+  "generated_at": "2026-08-12T03:46:02.359174",
   "summary": {
-    "cells": 26,
-    "sessions": 122,
-    "total_cost": 0.185399,
-    "total_tokens": 5070627,
+    "cells": 35,
+    "sessions": 167,
+    "total_cost": 0.258291,
+    "total_tokens": 6953909,
     "by_condition": {
       "bad_seed": {
-        "count": 1,
+        "count": 3,
         "success_rate": 1.0,
-        "avg_cost": 0.003027
+        "avg_cost": 0.002454
       },
       "clean": {
-        "count": 17,
+        "count": 21,
         "success_rate": 1.0,
-        "avg_cost": 0.009443
+        "avg_cost": 0.009463
       },
       "early_degrade": {
-        "count": 8,
+        "count": 11,
         "success_rate": 1.0,
-        "avg_cost": 0.002731
+        "avg_cost": 0.004747
       }
     },
     "by_story": {
       "notification_service": {
-        "count": 5,
+        "count": 10,
         "success_rate": 1.0,
-        "avg_correctness": 0.8,
-        "avg_cost": 0.005258
+        "avg_correctness": 0.9,
+        "avg_cost": 0.006518
       },
       "static_site_gen": {
         "count": 10,
@@ -37,10 +37,10 @@
         "avg_cost": 0.002714
       },
       "task_manager_api": {
-        "count": 11,
+        "count": 15,
         "success_rate": 1.0,
-        "avg_correctness": 0.72,
-        "avg_cost": 0.011997
+        "avg_correctness": 0.8,
+        "avg_cost": 0.011065
       }
     }
   },
@@ -67,6 +67,26 @@
     },
     {
       "story": "notification_service",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.00217137,
+      "total_tokens": 239414,
+      "worktree": "/tmp/story_7add6d50bddc",
+      "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_bad_seed_7add6d50bddc.json"
+    },
+    {
+      "story": "notification_service",
       "condition": "clean",
       "sessions": 5,
       "correctness": 1.0,
@@ -84,6 +104,46 @@
       "total_tokens": 226881,
       "worktree": "/tmp/story_1ac39990faac",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_1ac39990faac.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0024157099999999997,
+      "total_tokens": 206716,
+      "worktree": "/tmp/story_bb4e1d655f1c",
+      "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_bb4e1d655f1c.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.02976139,
+      "total_tokens": 198966,
+      "worktree": "/tmp/story_c55b0cf5d2e9",
+      "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_clean_c55b0cf5d2e9.json"
     },
     {
       "story": "notification_service",
@@ -118,10 +178,50 @@
       "all_successful": true,
       "cascade_recovery": false,
       "timeouts": [],
+      "total_cost": 0.00205811,
+      "total_tokens": 252193,
+      "worktree": "/tmp/story_117ae6080d3b",
+      "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_117ae6080d3b.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
       "total_cost": 0.002481008,
       "total_tokens": 231984,
       "worktree": "/tmp/story_3461c71fba8e",
       "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_3461c71fba8e.json"
+    },
+    {
+      "story": "notification_service",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.00248103,
+      "total_tokens": 270355,
+      "worktree": "/tmp/story_7cbf73903d92",
+      "result_file": "experiments/results/stories/notification_service_deepseek_deepseek-v4-pro_early_degrade_7cbf73903d92.json"
     },
     {
       "story": "notification_service",
@@ -361,6 +461,26 @@
     },
     {
       "story": "task_manager_api",
+      "condition": "bad_seed",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0021628000000000003,
+      "total_tokens": 169292,
+      "worktree": "/tmp/story_7aadf42df487",
+      "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_bad_seed_7aadf42df487.json"
+    },
+    {
+      "story": "task_manager_api",
       "condition": "clean",
       "sessions": 5,
       "correctness": 1.0,
@@ -402,6 +522,26 @@
     {
       "story": "task_manager_api",
       "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.0030662600000000003,
+      "total_tokens": 148459,
+      "worktree": "/tmp/story_192e125a6c89",
+      "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_192e125a6c89.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
       "sessions": 3,
       "correctness": 0.0,
       "correctness_values": [
@@ -416,6 +556,26 @@
       "total_tokens": 47507,
       "worktree": "/tmp/story_1bf430da0328",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_1bf430da0328.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "clean",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.00294719,
+      "total_tokens": 195924,
+      "worktree": "/tmp/story_a318530e815a",
+      "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_a318530e815a.json"
     },
     {
       "story": "task_manager_api",
@@ -456,6 +616,26 @@
       "total_tokens": 188082,
       "worktree": "/tmp/story_f9e607e131ce",
       "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_clean_f9e607e131ce.json"
+    },
+    {
+      "story": "task_manager_api",
+      "condition": "early_degrade",
+      "sessions": 5,
+      "correctness": 1.0,
+      "correctness_values": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "all_successful": true,
+      "cascade_recovery": false,
+      "timeouts": [],
+      "total_cost": 0.02582804,
+      "total_tokens": 201963,
+      "worktree": "/tmp/story_2fc0abd3adf4",
+      "result_file": "experiments/results/stories/task_manager_api_deepseek_deepseek-v4-pro_early_degrade_2fc0abd3adf4.json"
     },
     {
       "story": "task_manager_api",
