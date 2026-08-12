@@ -2,7 +2,7 @@ import sqlite3
 
 import pytest
 
-from app import app
+from app import app, limiter
 from celery_config import send_notification_email
 
 
@@ -14,6 +14,7 @@ def client(tmp_path):
         JWT_SECRET="test-secret",
         JWT_EXPIRATION_SECONDS=3600,
     )
+    limiter.reset()
     return app.test_client()
 
 
@@ -43,7 +44,7 @@ def test_users_only_see_and_update_their_own_tasks(client):
     bob = register_and_login(client, "bob")
     task = client.post("/tasks", json={"title": "Alice task"}, headers=alice).json
 
-    assert client.get("/tasks", headers=bob).json == []
+    assert client.get("/tasks", headers=bob).json["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=bob).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"title": "stolen"}, headers=bob).status_code == 404
     assert client.get(f"/tasks/{task['id']}", headers=alice).json["title"] == "Alice task"
@@ -69,7 +70,7 @@ def test_old_tasks_table_is_migrated_without_losing_rows(client, tmp_path):
         count = connection.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
     assert "owner_id" in columns
     assert count == 1
-    assert client.get("/tasks", headers=headers).json == []
+    assert client.get("/tasks", headers=headers).json["data"] == []
 
 
 def test_completing_task_queues_owner_notification(client, monkeypatch):
@@ -97,3 +98,33 @@ def test_notification_is_not_queued_when_status_does_not_transition_to_completed
     client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
 
     assert queued == [("alice@example.com", "Draft v2")]
+
+
+def test_tasks_are_cursor_paginated(client):
+    headers = register_and_login(client, "alice")
+    for title in ("one", "two", "three", "four", "five"):
+        assert client.post("/tasks", json={"title": title}, headers=headers).status_code == 201
+
+    first = client.get("/tasks?limit=2", headers=headers)
+    assert first.status_code == 200
+    assert [task["title"] for task in first.json["data"]] == ["five", "four"]
+    assert first.json["total"] == 5
+    assert first.json["next_cursor"] == str(first.json["data"][-1]["id"])
+
+    second = client.get(f"/tasks?limit=2&cursor={first.json['next_cursor']}", headers=headers)
+    assert [task["title"] for task in second.json["data"]] == ["three", "two"]
+    assert second.json["next_cursor"] == str(second.json["data"][-1]["id"])
+
+    third = client.get(f"/tasks?limit=2&cursor={second.json['next_cursor']}", headers=headers)
+    assert [task["title"] for task in third.json["data"]] == ["one"]
+    assert third.json["next_cursor"] is None
+    assert client.get("/tasks?limit=101", headers=headers).status_code == 400
+
+
+def test_rate_limit_returns_retry_after_for_authenticated_user(client):
+    headers = register_and_login(client, "rate-limit-user")
+    responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+
+    assert all(response.status_code == 200 for response in responses[:100])
+    assert responses[100].status_code == 429
+    assert responses[100].headers.get("Retry-After")

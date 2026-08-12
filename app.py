@@ -12,6 +12,7 @@ from sqlite3 import IntegrityError
 from functools import wraps
 
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_config import send_notification_email
@@ -22,6 +23,9 @@ app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_SECONDS"] = int(os.environ.get("JWT_EXPIRATION_SECONDS", "3600"))
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+)
 
 
 def get_db():
@@ -74,6 +78,22 @@ def get_authenticated_user_id():
         return int(payload["sub"])
     except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error):
         return None
+
+
+def rate_limit_key():
+    """Use the authenticated user as the bucket, falling back to client IP."""
+    user_id = get_authenticated_user_id()
+    return f"user:{user_id}" if user_id is not None else f"ip:{request.remote_addr or 'unknown'}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+    in_memory_fallback_enabled=True,
+)
+limiter.init_app(app)
 
 
 def require_auth(view):
@@ -147,10 +167,39 @@ def create_task(user_id):
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks(user_id):
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return jsonify({"error": "limit must be an integer between 1 and 100"}), 400
+    if not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    raw_cursor = request.args.get("cursor")
+    cursor = None
+    if raw_cursor is not None:
+        try:
+            cursor = int(raw_cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be a task id"}), 400
+        if cursor < 1:
+            return jsonify({"error": "cursor must be a task id"}), 400
+
     with get_db() as connection:
         initialize_database(connection)
-        rows = TaskRepository(connection).list_for_owner(user_id)
-    return jsonify([task_from_row(row) for row in rows])
+        repository = TaskRepository(connection)
+        rows = repository.list_page_for_owner(user_id, cursor, limit + 1)
+        total = repository.count_for_owner(user_id)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+    next_cursor = str(rows[-1]["id"]) if has_more else None
+    return jsonify(
+        {
+            "data": [task_from_row(row) for row in rows],
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+    )
 
 
 def find_task(task_id, user_id):
