@@ -357,9 +357,14 @@ def score_conventions(
     forbidden_total = 0
 
     tracked = _run_git(worktree, "ls-files", "--cached", "--others", "--exclude-standard")
+    _EXCLUDED_DIRS = ("node_modules/", "build/", "dist/", ".instrument/", "__pycache__/", ".pytest_cache/", "venv/", ".venv/")
     for rel_path in tracked.splitlines():
         rel_path = rel_path.strip()
         if not rel_path:
+            continue
+        # Skip dependency/build/generated directories — only score the model's
+        # own source, not committed node_modules or compiled output.
+        if rel_path.startswith(_EXCLUDED_DIRS):
             continue
         fp = worktree / rel_path
         if fp.suffix not in profile.extensions:
