@@ -17,6 +17,8 @@ import redis.asyncio as redis
 import websockets
 from websockets.exceptions import ConnectionClosed
 
+from transport import BaseTransport, WebSocketTransport
+
 
 MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
@@ -125,8 +127,8 @@ class NotificationServer:
     """Manage connected clients and route validated JSON notifications."""
 
     def __init__(self, redis_url: str | None = None, database_url: str | None = None,
-                 redis_client: Any | None = None) -> None:
-        self._clients: dict[str, Any] = {}
+                 redis_client: Any | None = None, transport: BaseTransport | None = None) -> None:
+        self.transport = transport or self._transport_from_config()
         self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
         self.store = MessageStore(database_url)
@@ -140,6 +142,13 @@ class NotificationServer:
         elif redis_url or os.getenv("REDIS_URL"):
             self._backbone = RedisBackbone(redis_url or os.environ["REDIS_URL"], self._receive_event)
         self._broker_started = False
+
+    @staticmethod
+    def _transport_from_config() -> BaseTransport:
+        transport_name = os.getenv("TRANSPORT", "websocket").strip().lower()
+        if transport_name in {"websocket", "ws"}:
+            return WebSocketTransport()
+        raise ValueError(f"Unsupported transport: {transport_name}")
 
     async def _ensure_broker(self) -> None:
         if self._backbone is None or self._broker_started:
@@ -164,23 +173,21 @@ class NotificationServer:
     @property
     def clients(self) -> dict[str, Any]:
         """Return a snapshot of the registry, never the mutable registry itself."""
-        with self._lock:
-            return dict(self._clients)
+        return self.transport.clients
 
     @property
     def connected_client_count(self) -> int:
-        with self._lock:
-            return len(self._clients)
+        return len(self.transport.clients)
 
     def add_client(self, websocket: Any) -> str:
         client_id = str(uuid.uuid4())
         with self._lock:
-            self._clients[client_id] = websocket
+            self.transport.on_connect(client_id, websocket)
         return client_id
 
     def remove_client(self, client_id: str) -> None:
         with self._lock:
-            self._clients.pop(client_id, None)
+            self.transport.on_disconnect(client_id)
             for channel in list(self._channels):
                 self._channels[channel].discard(client_id)
                 if not self._channels[channel]:
@@ -190,7 +197,7 @@ class NotificationServer:
         if not isinstance(channel, str) or not channel:
             return
         with self._lock:
-            if client_id in self._clients:
+            if client_id in self.transport.clients:
                 self._channels.setdefault(channel, set()).add(client_id)
 
     def unsubscribe(self, client_id: str, channel: str) -> None:
@@ -214,27 +221,10 @@ class NotificationServer:
             return sorted(self._channels.get(channel, set()))
 
     async def _send_to(self, client_id: str, message: str) -> None:
-        with self._lock:
-            websocket = self._clients.get(client_id)
-        if websocket is None:
-            return
-        try:
-            await websocket.send(message)
-        except ConnectionClosed:
-            self.remove_client(client_id)
+        await self.transport.send_message(client_id, message)
 
     async def broadcast(self, message: str) -> None:
-        with self._lock:
-            recipients = list(self._clients.items())
-        if not recipients:
-            return
-        results = await asyncio.gather(
-            *(self._send_to(client_id, message) for client_id, _ in recipients),
-            return_exceptions=True,
-        )
-        for result in results:
-            if isinstance(result, Exception):
-                continue
+        await self.transport.broadcast(message)
 
     async def _broadcast_to_channel(self, channel: str, message: str) -> None:
         with self._lock:
