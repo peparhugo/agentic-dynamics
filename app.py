@@ -24,6 +24,8 @@ from flask import Flask, jsonify, request
 
 import jwt
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -82,10 +84,24 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             )
             """
         )
+        # Migration: add email to pre-existing users without breaking data.
+        user_columns = [
+            row["name"]
+            for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        ]
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            # Backfill existing rows with a derived address.
+            for row in conn.execute("SELECT id, username FROM users").fetchall():
+                conn.execute(
+                    "UPDATE users SET email = ? WHERE id = ?",
+                    (f"{row['username']}@example.com", row["id"]),
+                )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS tasks (
@@ -111,6 +127,16 @@ def _next_id(conn):
     row = conn.execute("SELECT MAX(id) AS max_id FROM tasks").fetchone()
     max_id = row["max_id"] if row and row["max_id"] is not None else 0
     return max_id + 1
+
+
+def _dispatch_notification(user_email, task_title):
+    """Enqueue the completion email without blocking the HTTP response."""
+    try:
+        send_notification_email.delay(user_email, task_title)
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        app.logger.warning(
+            "Failed to enqueue notification email: %s", exc
+        )
 
 
 def _serialize(row):
@@ -146,12 +172,13 @@ def register():
         return jsonify({"error": "password is required"}), 400
     username = str(username).strip()
     password = str(password)
+    email = data.get("email") or f"{username}@example.com"
     password_hash = _hash_password(password)
     try:
         with get_db() as conn:
             cur = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, str(email).strip()),
             )
             conn.commit()
             user_id = cur.lastrowid
@@ -159,7 +186,12 @@ def register():
         return jsonify({"error": "username already exists"}), 409
     return (
         jsonify(
-            {"id": user_id, "username": username, "token": _encode_token(user_id)}
+            {
+                "id": user_id,
+                "username": username,
+                "email": str(email).strip(),
+                "token": _encode_token(user_id),
+            }
         ),
         201,
     )
@@ -261,15 +293,25 @@ def update_task(task_id):
         status = data.get("status", row["status"])
         if not title or not str(title).strip():
             return jsonify({"error": "title is required"}), 400
+        title = str(title).strip()
+        status = str(status).strip()
         conn.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
-            (str(title).strip(), str(status).strip(), task_id),
+            (title, status, task_id),
         )
         conn.commit()
         updated = conn.execute(
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, user_id),
         ).fetchone()
+        # Notify the owner asynchronously when the task transitions to
+        # "completed"; never block the API response on email delivery.
+        if row["status"] != "completed" and status == "completed":
+            owner = conn.execute(
+                "SELECT email FROM users WHERE id = ?", (user_id,)
+            ).fetchone()
+            if owner is not None and owner["email"]:
+                _dispatch_notification(owner["email"], title)
     return jsonify(_serialize(updated))
 
 
