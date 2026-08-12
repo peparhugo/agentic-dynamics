@@ -23,6 +23,8 @@ REPORTS_DIR = ROOT / "experiments" / "results" / "reports"
 DB_PATH = Path.home() / ".local" / "share" / "opencode" / "opencode.db"
 OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
+DATA_DIR = ROOT / "experiments" / "data"
+
 from _constants import WORKTREE_ROOT, MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
 
 MODEL_DISPLAY_ORDER = [
@@ -357,7 +359,10 @@ def compute_calculator(models):
                 "m": f"DS→{mc['n'].replace('DeepSeek v4 Pro→','').split(' ')[-1] if 'DeepSeek' in model_costs[0]['n'] else mc['n']}",
                 "e": round(mc["c"] / cheapest, 1),
             })
-    esc_tiers.append({"m": "→Human ($5/job)", "e": round(5 / cheapest, 1)})
+    if cheapest > 0:
+        esc_tiers.append({"m": "→Human ($5/job)", "e": round(5 / cheapest, 1)})
+    else:
+        esc_tiers.append({"m": "→Human ($5/job)", "e": 0})
 
     narrated = sum(1 for m in models for r in range(m.get("reports_narrated", 0)))
     total_runs = sum(m["reports"] for m in models)
@@ -442,6 +447,111 @@ def compute_derived(models, inventory, report_count):
             "total_narrated": "M", "total_valid_reports": "M",
             "total_reports_analyzed": "M",
         },
+    }
+
+
+def _load_story_data() -> dict:
+    """Load story pipeline data from parquet for the website."""
+    sessions_path = DATA_DIR / "sessions.parquet"
+    stories_path = DATA_DIR / "stories.parquet"
+
+    if not sessions_path.exists() or not stories_path.exists():
+        return {"_note": "Run scripts/sync_data.py first"}
+
+    import duckdb
+    conn = duckdb.connect()
+
+    sessions_table = f"read_parquet('{sessions_path}')"
+    stories_table = f"read_parquet('{stories_path}')"
+
+    # Per-model aggregates
+    models = []
+    for row in conn.execute(f"""
+        SELECT model, count(*) as cells, round(sum(total_cost), 6) as total_cost,
+               round(avg(total_cost), 6) as avg_cost, sum(total_tokens) as total_tokens,
+               round(avg(cache_hit_rate), 3) as avg_cache_hit,
+               round(avg(total_duration), 0) as avg_duration_s
+        FROM {stories_table} GROUP BY model ORDER BY total_cost
+    """).fetchall():
+        models.append({
+            "model": row[0], "cells": row[1], "total_cost": row[2],
+            "avg_cost": row[3], "total_tokens": row[4],
+            "avg_cache_hit": row[5], "avg_duration_s": row[6],
+        })
+
+    # Condition comparison
+    conditions = []
+    for row in conn.execute(f"""
+        SELECT condition, count(*) as cells, count(distinct story_name||tier||quality) as variants,
+               round(sum(total_cost), 6) as total_cost, round(avg(total_cost), 6) as avg_cost,
+               cast(sum(case when all_successful then 1 else 0 end) as int) as success,
+               cast(sum(case when not all_successful then 1 else 0 end) as int) as fail
+        FROM {stories_table} GROUP BY condition ORDER BY condition
+    """).fetchall():
+        conditions.append({
+            "condition": row[0], "cells": row[1], "variants": row[2],
+            "total_cost": row[3], "avg_cost": row[4],
+            "success": row[5], "fail": row[6],
+        })
+
+    # Story type comparison
+    stories = []
+    for row in conn.execute(f"""
+        SELECT story_name, count(*) as cells,
+               round(sum(total_cost), 6) as total_cost, round(avg(total_cost), 6) as avg_cost,
+               sum(session_count) as sessions,
+               round(avg(total_duration), 0) as avg_duration_s,
+               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tokens_per_session
+        FROM {stories_table} GROUP BY story_name ORDER BY total_cost
+    """).fetchall():
+        stories.append({
+            "story": row[0], "cells": row[1], "total_cost": row[2],
+            "avg_cost": row[3], "sessions": row[4],
+            "avg_duration_s": row[5], "avg_tokens_per_session": row[6],
+        })
+
+    # Per-session stats
+    session_stats = list(conn.execute(f"""
+        SELECT count(*) as total, sum(cost_usd) as total_cost,
+               sum(total_tokens) as total_tokens,
+               sum(cache_read_tokens) as total_cache_reads,
+               coalesce(sum(cache_read_tokens) * 1.0 / nullif(sum(cache_read_tokens) + sum(prompt_tokens), 0), 0)
+                   as cache_hit_rate,
+               sum(duration_s) as duration_s,
+               sum(case when exit_code = 0 then 1 else 0 end) as successful,
+               sum(case when exit_code != 0 then 1 else 0 end) as failed
+        FROM {sessions_table}
+    """).fetchone())
+
+    # Tier comparison
+    tiers = []
+    for row in conn.execute(f"""
+        SELECT tier, quality, count(*) as cells, round(avg(total_cost), 6) as avg_cost,
+               round(avg(total_tokens * 1.0 / session_count), 0) as avg_tokens_per_session,
+               round(avg(total_duration / session_count), 0) as avg_session_duration_s
+        FROM {stories_table} GROUP BY tier, quality ORDER BY tier, quality
+    """).fetchall():
+        tiers.append({
+            "tier": row[0], "quality": row[1], "cells": row[2],
+            "avg_cost": row[3], "avg_tokens_per_session": row[4],
+            "avg_session_duration_s": row[5],
+        })
+
+    conn.close()
+
+    return {
+        "_provenance": "[M] token counts from session.jsonl; cost from opencode DB verified",
+        "models": models,
+        "conditions": conditions,
+        "stories": stories,
+        "tiers": tiers,
+        "sessions": {
+            "total": session_stats[0], "total_cost": session_stats[1],
+            "total_tokens": session_stats[2], "total_cache_reads": session_stats[3],
+            "cache_hit_rate": round(session_stats[4], 3), "duration_s": session_stats[5],
+            "successful": session_stats[6], "failed": session_stats[7],
+        },
+        "generated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -602,6 +712,7 @@ def build():
             "claude_active_params": {"value": "500B", "provenance": "X", "note": "Conservative estimate"},
             "deepseek_active_params": {"value": "37B", "provenance": "X", "note": "MoE, ~3% active at inference"},
         },
+        "stories": _load_story_data(),
     }
 
     import math
