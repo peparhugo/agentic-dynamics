@@ -9,6 +9,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
@@ -31,6 +33,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                email TEXT,
                 password_hash TEXT NOT NULL
             )
             """
@@ -50,6 +53,11 @@ def init_db():
         }
         if "owner_id" not in columns:
             connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        user_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def task_json(row):
@@ -92,7 +100,7 @@ def authenticated(view):
 
         with get_db() as connection:
             user = connection.execute(
-                "SELECT id, username FROM users WHERE id = ?", (user_id,)
+                "SELECT id, username, email FROM users WHERE id = ?", (user_id,)
             ).fetchone()
         if user is None:
             return error("invalid or expired token", 401)
@@ -107,17 +115,20 @@ def register():
     data = request.get_json(silent=True)
     username = data.get("username") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
+    email = data.get("email") if isinstance(data, dict) else None
     if not isinstance(username, str) or not username.strip():
         return error("username is required", 400)
     if not isinstance(password, str) or not password:
         return error("password is required", 400)
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return error("email must be a non-empty string", 400)
 
     username = username.strip()
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username, email.strip() if email else None, generate_password_hash(password)),
             )
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -217,6 +228,13 @@ def update_task(task_id):
     if not fields:
         return error("title or status is required", 400)
 
+    previous_row = find_task(task_id)
+    if previous_row is None:
+        return error("task not found", 404)
+    status_changed_to_completed = (
+        data.get("status") == "completed" and previous_row["status"] != "completed"
+    )
+
     values.append(task_id)
     with get_db() as connection:
         cursor = connection.execute(
@@ -229,6 +247,10 @@ def update_task(task_id):
             "SELECT id, title, status, created_at FROM tasks WHERE id = ?",
             (task_id,),
         ).fetchone()
+    if status_changed_to_completed:
+        send_notification_email.delay(
+            g.user["email"] or g.user["username"], row["title"]
+        )
     return jsonify(task_json(row))
 
 

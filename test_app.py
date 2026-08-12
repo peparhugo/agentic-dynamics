@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 from app import app, init_db
 
@@ -40,6 +41,17 @@ def _login(client, username):
     return {"Authorization": f"Bearer {token}"}
 
 
+def _login_with_email(client, username, email):
+    client.post(
+        "/auth/register",
+        json={"username": username, "email": email, "password": "secret"},
+    )
+    token = client.post(
+        "/auth/login", json={"username": username, "password": "secret"}
+    ).get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
 def test_post_requires_title(client, auth_headers):
     response = client.post("/tasks", json={}, headers=auth_headers)
 
@@ -71,6 +83,37 @@ def test_update_task_fields(client, auth_headers):
     assert response.status_code == 200
     assert response.get_json()["title"] == "New title"
     assert response.get_json()["status"] == "complete"
+
+
+def test_completing_task_dispatches_email_notification(client):
+    headers = _login_with_email(client, "alice", "alice@example.com")
+    task = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch("app.send_notification_email.delay") as dispatch:
+        response = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    assert response.status_code == 200
+    dispatch.assert_called_once_with("alice@example.com", "Ship feature")
+
+
+def test_completed_task_does_not_dispatch_duplicate_notification(client, auth_headers):
+    task = client.post(
+        "/tasks", json={"title": "Already done"}, headers=auth_headers
+    ).get_json()
+
+    with patch("app.send_notification_email.delay") as dispatch:
+        client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers
+        )
+        client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers
+        )
+
+    dispatch.assert_called_once()
 
 
 def test_missing_task_returns_json_404(client, auth_headers):
