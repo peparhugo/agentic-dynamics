@@ -11,6 +11,7 @@ import app as app_module
 def client(tmp_path):
     app_module.DATA_FILE = str(tmp_path / "tasks.json")
     app_module.init_store()
+    app_module.limiter.reset()
     app_module.app.config["TESTING"] = True
     return app_module.app.test_client()
 
@@ -159,9 +160,12 @@ def test_list_tasks_ordered_desc(authed_client):
     authed_client.post("/tasks", json={"title": "second"})
     resp = authed_client.get("/tasks")
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    body = resp.get_json()
+    tasks = body["data"]
     assert [t["title"] for t in tasks] == ["second", "first"]
     assert [t["id"] for t in tasks] == [2, 1]
+    assert body["total"] == 2
+    assert body["next_cursor"] is None
 
 
 def test_get_task(authed_client):
@@ -231,12 +235,12 @@ def test_users_only_see_own_tasks(client):
     bob_task = client.post("/tasks", json={"title": "Bob's task"}).get_json()
 
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
-    alice_list = client.get("/tasks").get_json()
+    alice_list = client.get("/tasks").get_json()["data"]
     assert [t["title"] for t in alice_list] == ["Alice's task"]
     assert alice_list[0]["owner_id"] == alice_id
 
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
-    bob_list = client.get("/tasks").get_json()
+    bob_list = client.get("/tasks").get_json()["data"]
     assert [t["title"] for t in bob_list] == ["Bob's task"]
     assert bob_list[0]["owner_id"] == bob_id
 
@@ -251,6 +255,122 @@ def test_users_only_see_own_tasks(client):
 
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
     assert client.get(f"/tasks/{alice_task['id']}").get_json()["title"] == "Alice's task"
+
+
+# ── Tasks: pagination ─────────────────────────────────────────
+
+
+def _create_tasks(authed_client, count):
+    ids = []
+    for index in range(count):
+        resp = authed_client.post("/tasks", json={"title": f"task {index}"})
+        assert resp.status_code == 201
+        ids.append(resp.get_json()["id"])
+    return ids
+
+
+def test_pagination_response_shape(authed_client):
+    _create_tasks(authed_client, 3)
+    resp = authed_client.get("/tasks")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) == {"data", "next_cursor", "total"}
+    assert body["total"] == 3
+    assert [t["id"] for t in body["data"]] == [3, 2, 1]
+    assert body["next_cursor"] is None
+
+
+def test_pagination_first_page_without_cursor(authed_client):
+    _create_tasks(authed_client, 3)
+    resp = authed_client.get("/tasks?limit=2")
+    body = resp.get_json()
+    assert body["total"] == 3
+    assert [t["id"] for t in body["data"]] == [3, 2]
+    assert body["next_cursor"] == "2"
+
+
+def test_pagination_walks_all_pages(authed_client):
+    _create_tasks(authed_client, 5)
+    collected = []
+    cursor = None
+    for _ in range(5):
+        url = "/tasks?limit=2"
+        if cursor is not None:
+            url += f"&cursor={cursor}"
+        body = authed_client.get(url).get_json()
+        assert body["total"] == 5
+        collected.extend(t["id"] for t in body["data"])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+    assert collected == [5, 4, 3, 2, 1]
+
+
+def test_pagination_default_limit_is_twenty(authed_client):
+    _create_tasks(authed_client, 25)
+    body = authed_client.get("/tasks").get_json()
+    assert body["total"] == 25
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is not None
+
+
+def test_pagination_limit_capped_at_max(authed_client):
+    _create_tasks(authed_client, 5)
+    resp = authed_client.get("/tasks?limit=1000")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 5
+    assert body["total"] == 5
+
+
+def test_pagination_invalid_limit_falls_back_to_default(authed_client):
+    _create_tasks(authed_client, 3)
+    for bad in ("0", "-5", "abc", "999999999"):
+        resp = authed_client.get(f"/tasks?limit={bad}")
+        assert resp.status_code == 200
+        assert len(resp.get_json()["data"]) == 3
+
+
+def test_pagination_invalid_cursor_returns_400(authed_client):
+    _create_tasks(authed_client, 2)
+    resp = authed_client.get("/tasks?cursor=abc")
+    assert resp.status_code == 400
+    assert resp.get_json() == {"error": "cursor must be an integer"}
+
+
+def test_pagination_below_first_id_returns_empty(authed_client):
+    _create_tasks(authed_client, 2)
+    body = authed_client.get("/tasks?cursor=0").get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 2}
+
+
+def test_pagination_cursor_greater_than_all_ids_returns_all(authed_client):
+    _create_tasks(authed_client, 2)
+    body = authed_client.get("/tasks?cursor=999").get_json()
+    assert body["total"] == 2
+    assert [t["id"] for t in body["data"]] == [2, 1]
+
+
+def test_pagination_isolates_owners(client):
+    alice = client.post("/auth/register", json={"username": "alice", "password": "pw"})
+    bob = client.post("/auth/register", json={"username": "bob", "password": "pw"})
+    alice_token = _token_for(client, "alice", "pw")
+    bob_token = _token_for(client, "bob", "pw")
+
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
+    _create_tasks(client, 3)
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
+    _create_tasks(client, 2)
+
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
+    body = client.get("/tasks?limit=2").get_json()
+    assert body["total"] == 3
+    assert [t["owner_id"] for t in body["data"]] == [alice.get_json()["id"]] * 2
+
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
+    body = client.get("/tasks").get_json()
+    assert body["total"] == 2
+    assert [t["owner_id"] for t in body["data"]] == [bob.get_json()["id"]] * 2
 
 
 # ── Migration ─────────────────────────────────────────────────

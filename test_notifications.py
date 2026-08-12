@@ -18,6 +18,7 @@ class _Recorder:
 def client(tmp_path):
     app_module.DATA_FILE = str(tmp_path / "tasks.json")
     app_module.init_store()
+    app_module.limiter.reset()
     app_module.app.config["TESTING"] = True
     return app_module.app.test_client()
 

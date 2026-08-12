@@ -131,6 +131,41 @@ class TaskRepository(BaseRepository):
         ]
         return sorted(tasks, key=lambda task: task["created_at"], reverse=True)
 
+    def list_page(
+        self,
+        owner_id: int | None = None,
+        cursor: int | None = None,
+        limit: int = 20,
+    ) -> "tuple[list[dict], int, int]":
+        """Return a cursor-based page of tasks for an owner.
+
+        Returns ``(page, total, start)`` where ``page`` contains at most
+        ``limit`` tasks ordered by id descending, ``total`` is the number of
+        matching tasks for the owner, and ``start`` is the index of the first
+        item in ``page`` within the full ordering (used to decide whether more
+        pages exist).
+        """
+        data = self._read_store()
+        tasks = [
+            task
+            for task in data[self._collection]
+            if owner_id is None or task.get("owner_id") == owner_id
+        ]
+        tasks.sort(key=lambda task: task["id"], reverse=True)
+        total = len(tasks)
+
+        start = 0
+        if cursor is not None:
+            for index, task in enumerate(tasks):
+                if task["id"] < cursor:
+                    start = index
+                    break
+            else:
+                start = total
+
+        page = tasks[start : start + limit]
+        return page, total, start
+
     def create(self, title: str, owner_id: int) -> dict:
         with self._lock:
             data = self._read_store()

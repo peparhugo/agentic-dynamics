@@ -15,10 +15,14 @@ route handlers never touch the store directly.
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta, timezone
 import os
+import time
 from functools import wraps
 
 import jwt
 from werkzeug.security import check_password_hash
+
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 
 from celery_tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
@@ -29,7 +33,45 @@ DATA_FILE = os.environ.get("DATA_FILE", "tasks.json")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 JWT_EXPIRES_HOURS = int(os.environ.get("JWT_EXPIRES_HOURS", "24"))
 
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
+RATE_LIMIT_STR = os.environ.get("RATE_LIMIT", "100 per minute")
+
 app.config["SECRET_KEY"] = SECRET_KEY
+
+
+def _rate_limit_key() -> str:
+    """Key rate limits per authenticated user, falling back to IP."""
+    user_id = getattr(g, "user_id", None)
+    if user_id is not None:
+        return f"user:{user_id}"
+    return f"ip:{request.remote_addr}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    strategy="fixed-window",
+)
+limiter.init_app(app)
+
+
+@app.errorhandler(RateLimitExceeded)
+def _handle_rate_limit_exceeded(exc):
+    limit = exc.limit
+    args = [limit.key_func(), limit.scope_for(request.endpoint or "", request.method)]
+    window = limiter.limiter.get_window_stats(limit.limit, *args)
+    retry_after = max(0, int(window[0] + 1 - time.time()))
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
+
+
+per_user_rate_limit = limiter.shared_limit(
+    RATE_LIMIT_STR, scope="user", key_func=_rate_limit_key
+)
 
 
 def _current_data_file() -> str:
@@ -104,6 +146,7 @@ def require_auth(f):
 # ── Routes: auth ─────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@per_user_rate_limit
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
@@ -121,6 +164,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@per_user_rate_limit
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
@@ -138,12 +182,33 @@ def login():
 
 @app.route("/tasks", methods=["GET"])
 @require_auth
+@per_user_rate_limit
 def list_tasks():
-    return jsonify(task_repository.list(g.user_id))
+    limit = request.args.get("limit", default=20, type=int)
+    if limit < 1:
+        limit = 20
+    limit = min(limit, 100)
+
+    cursor = None
+    cursor_raw = request.args.get("cursor")
+    if cursor_raw is not None and cursor_raw != "":
+        try:
+            cursor = int(cursor_raw)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    page, total, start = task_repository.list_page(
+        g.user_id, cursor=cursor, limit=limit
+    )
+    next_cursor = None
+    if page and len(page) == limit and start + len(page) < total:
+        next_cursor = str(page[-1]["id"])
+    return jsonify({"data": page, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
 @require_auth
+@per_user_rate_limit
 def add_task():
     data = request.get_json(silent=True) or {}
     title = data.get("title")
@@ -155,6 +220,7 @@ def add_task():
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
+@per_user_rate_limit
 def show_task(task_id: int):
     task = task_repository.get(task_id, g.user_id)
     if task is None:
@@ -164,6 +230,7 @@ def show_task(task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
+@per_user_rate_limit
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
     title = data.get("title")
