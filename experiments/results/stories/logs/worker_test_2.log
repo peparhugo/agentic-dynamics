@@ -1,6 +1,0 @@
-[04:04:24][worker] Started (pid=1597367)
-[04:04:24][worker] Redis connected
-[04:04:24][worker] [test_luna_tm_t1_good_clean] Starting (1/30)
-[04:10:17][worker] [test_luna_tm_t1_good_clean] OK (353s)
-[04:12:18][worker] Queue empty after 12 polls. Exiting.
-[04:12:18][worker] Done: 1 ok, 0 failed, 1 total

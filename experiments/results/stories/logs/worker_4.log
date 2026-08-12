@@ -1,8 +1,0 @@
-[01:45:39][worker] Started (pid=1494027)
-[01:45:39][worker] Redis connected
-[01:45:39][worker] [notification_service_tier2_small_good_clean] Starting (1/30)
-[02:10:47][worker] [notification_service_tier2_small_good_clean] OK (1508s)
-[02:10:47][worker] [notification_service_tier2_small_bad_early_degrade] Starting (2/30)
-[02:45:16][worker] [notification_service_tier2_small_bad_early_degrade] OK (2069s)
-[02:47:17][worker] Queue empty after 12 polls. Exiting.
-[02:47:17][worker] Done: 2 ok, 0 failed, 2 total

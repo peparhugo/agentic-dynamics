@@ -1,9 +1,0 @@
-All 34 tests pass across 2 test suites. The implementation is complete. Let me verify the final state of all files.
-All tasks are complete. Final state:
-
-- **`src/generator.ts`** — Template engine with Handlebars, loads layouts/partials from `templates/`, supports `{{{body}}}` placeholder, frontmatter `template` field, falls back to inline HTML when no templates
-- **`src/cli.ts`** — Added `--templates <dir>` option (default `./templates`)
-- **`templates/`** — `layouts/default.hbs`, `layouts/post.hbs`, `partials/header.hbs`, `partials/nav.hbs`, `partials/footer.hbs`
-- **Tests** — 23 generator tests (12 original + 11 template-specific), all passing
-
-TESTS: 34 passed, 0 failed

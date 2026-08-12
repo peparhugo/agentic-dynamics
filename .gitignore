@@ -11,6 +11,12 @@ build/
 
 # Experiment results and inventory are now tracked in git
 
+# Runtime logs (worker output, plan controller, experiment runs)
+experiments/results/stories/logs/
+
+# Backfill backups
+.backfill_backup/
+
 # Opencode worktrees (transient temp dirs)
 /tmp/
 
