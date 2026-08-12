@@ -75,4 +75,45 @@ describe('buildSite', () => {
     expect(output).toContain('<h1>A &lt; B</h1>');
     expect(output).toContain('<p><strong>safe</strong></p>');
   });
+
+  it('incrementally rebuilds only changed pages and persists a cache manifest', async () => {
+    const options = {
+      contentDir: path.join(root, 'content'),
+      outputDir: path.join(root, 'dist'),
+      incremental: true,
+    };
+
+    const first = await buildSite(options);
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(fs.access(path.join(root, '.ssg-cache.json'))).resolves.toBeUndefined();
+
+    const second = await buildSite(options);
+    expect(second.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await fs.writeFile(path.join(root, 'content', 'welcome.md'), '---\ntitle: Changed\n---\n# Updated');
+    const third = await buildSite(options);
+    expect(third.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(await fs.readFile(path.join(root, 'dist', 'welcome.html'), 'utf8')).toContain('Changed');
+    expect(await fs.readFile(path.join(root, 'dist', 'notes', 'second.html'), 'utf8')).toContain('Second');
+  });
+
+  it('invalidates every page when a template changes and supports clean builds', async () => {
+    const options = {
+      contentDir: path.join(root, 'content'),
+      outputDir: path.join(root, 'dist'),
+      templatesDir: path.join(root, 'templates'),
+      incremental: true,
+    };
+    await fs.mkdir(options.templatesDir, { recursive: true });
+    await fs.writeFile(path.join(options.templatesDir, 'default.ejs'), '<h1><%= title %></h1><%- content %>');
+    await buildSite(options);
+    expect((await buildSite(options)).stats.pagesSkipped).toBe(2);
+
+    await fs.writeFile(path.join(options.templatesDir, 'default.ejs'), '<main><%= title %></main>');
+    expect((await buildSite(options)).stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+
+    await fs.writeFile(path.join(root, 'dist', 'stale.txt'), 'stale');
+    await buildSite({ ...options, clean: true });
+    await expect(fs.access(path.join(root, 'dist', 'stale.txt'))).rejects.toThrow();
+  });
 });

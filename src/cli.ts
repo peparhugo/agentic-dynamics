@@ -10,10 +10,14 @@ function parseArgs(args: string[]): { command: 'build' | 'serve'; options: Serve
   let templatesDir: string | undefined;
   let config: string | undefined;
   let port = 3000;
+  let incremental = false;
+  let clean = false;
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
-    if ((option === '--content' || option === '--output' || option === '--templates' || option === '--config' || option === '--port') && value && !value.startsWith('--')) {
+    if (option === '--incremental') incremental = true;
+    else if (option === '--clean') clean = true;
+    else if ((option === '--content' || option === '--output' || option === '--templates' || option === '--config' || option === '--port') && value && !value.startsWith('--')) {
       if (option === '--content') contentDir = value;
       else if (option === '--output') outputDir = value;
       else if (option === '--templates') templatesDir = value;
@@ -31,7 +35,7 @@ function parseArgs(args: string[]): { command: 'build' | 'serve'; options: Serve
     command: args[0],
     options: args[0] === 'serve'
       ? { contentDir, outputDir, templatesDir, config, port }
-      : { contentDir, outputDir, templatesDir, config },
+      : { contentDir, outputDir, templatesDir, config, incremental, clean },
   };
 }
 
@@ -43,7 +47,7 @@ export async function run(args: string[] = process.argv.slice(2)): Promise<void>
     return;
   }
   const pages = await buildSite(parsed.options);
-  process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}\n`);
+  process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} (${pages.stats.pagesBuilt} built, ${pages.stats.pagesSkipped} skipped, time saved: ${pages.stats.timeSaved}ms)\n`);
 }
 
 if (require.main === module) {

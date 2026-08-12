@@ -61,9 +61,10 @@ export const TemplatePlugin: Plugin = {
   async afterBuild(context) {
     const templatesDir = path.resolve(context.options.templatesDir ?? './templates');
     const partials = await loadPartials(templatesDir);
-    const index = `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Index</title></head>\n<body><main><h1>Pages</h1><ul>${context.pages.map((page) => `<li><a href="${encodeURI(page.outputPath)}">${escapeHtml(page.title)}</a>${page.date ? ` <time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time>` : ''}</li>`).join('')}</ul></main></body>\n</html>\n`;
+     const index = `<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Index</title></head>\n<body><main><h1>Pages</h1><ul>${context.pages.map((page) => `<li><a href="${encodeURI(page.outputPath)}">${escapeHtml(page.title)}</a>${page.date ? ` <time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time>` : ''}</li>`).join('')}</ul></main></body>\n</html>\n`;
     await fs.writeFile(path.join(context.options.outputDir!, 'index.html'), index);
     for (const page of context.pages) {
+      if (context.build && !context.build.changedOutputs.has(page.outputPath)) continue;
       const metadata: Frontmatter = pageMetadata.get(page) ?? {};
       const selected = frontmatterName(metadata.template);
       const templatePath = selected ? await templateFile(templatesDir, selected) : await templateFile(templatesDir, 'default');

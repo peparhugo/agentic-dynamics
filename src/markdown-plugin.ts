@@ -14,6 +14,11 @@ export interface Frontmatter {
 }
 
 export const pageMetadata = new WeakMap<Page, Frontmatter>();
+const parsedPages = new WeakMap<Page, { data: Frontmatter; content: string; html?: string }>();
+
+export const setParsedPageData = (page: Page, data: Frontmatter, content: string, html?: string): void => {
+  parsedPages.set(page, { data, content, html });
+};
 
 const normalizeTags = (value: unknown): string[] => {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
@@ -29,7 +34,8 @@ const normalizeDate = (value: unknown): string | undefined => {
 
 export const MarkdownPlugin: Plugin = {
   async onFile(page) {
-    const parsed = matter(await fs.readFile(page.sourcePath, 'utf8'));
+    const cached = parsedPages.get(page);
+    const parsed = cached ?? matter(await fs.readFile(page.sourcePath, 'utf8'));
     const metadata = parsed.data as Frontmatter;
     pageMetadata.set(page, metadata);
     page.title = typeof metadata.title === 'string' && metadata.title.trim()
@@ -37,6 +43,6 @@ export const MarkdownPlugin: Plugin = {
       : page.title;
     page.date = normalizeDate(metadata.date);
     page.tags = normalizeTags(metadata.tags);
-    page.html = marked.parse(parsed.content);
+    page.html = cached?.html ?? marked.parse(parsed.content);
   },
 };

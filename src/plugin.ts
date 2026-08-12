@@ -3,6 +3,10 @@ import type { BuildOptions, Page } from './generator';
 export interface PluginContext {
   options: BuildOptions;
   pages: Page[];
+  build?: {
+    changedOutputs: Set<string>;
+    stats: { pagesBuilt: number; pagesSkipped: number; timeSaved: number };
+  };
 }
 
 export interface Plugin {
