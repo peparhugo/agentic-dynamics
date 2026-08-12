@@ -1,5 +1,6 @@
 import os
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -273,3 +274,172 @@ def test_migration_adds_owner_id_column_to_existing_db(tmp_path):
     row = conn.execute("SELECT * FROM tasks WHERE title = 'Legacy task'").fetchone()
     assert row["owner_id"] is None
     conn.close()
+
+
+def test_migration_adds_email_column_to_existing_users_table(tmp_path):
+    db_path = str(tmp_path / "legacy_users.db")
+
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        "CREATE TABLE users ("
+        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        "  username TEXT NOT NULL UNIQUE,"
+        "  password_hash TEXT NOT NULL"
+        ")"
+    )
+    conn.execute(
+        "INSERT INTO users (username, password_hash) VALUES ('legacy', 'hash')"
+    )
+    conn.commit()
+    conn.close()
+
+    app_module.DATABASE = db_path
+    app_module.init_db()
+
+    conn = app_module.get_db()
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    assert "email" in columns
+
+    row = conn.execute("SELECT * FROM users WHERE username = 'legacy'").fetchone()
+    assert row["email"] is None
+    conn.close()
+
+
+# ── Registration email ──────────────────────────────────────
+
+def test_register_defaults_email_from_username(client):
+    response = register(client)
+    body = response.get_json()
+    assert body["email"] == "alice@example.com"
+
+
+def test_register_with_custom_email(client):
+    response = client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "hunter2", "email": "alice@work.com"},
+    )
+    body = response.get_json()
+    assert body["email"] == "alice@work.com"
+
+
+# ── Async notification email on task completion ─────────────
+
+def test_completing_task_triggers_notification_email(client):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        response = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        mock_task.delay.assert_called_once_with("alice@example.com", "Ship feature")
+
+
+def test_completing_task_does_not_block_response_on_failure(client):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        mock_task.delay.side_effect = RuntimeError("broker unreachable")
+        with pytest.raises(RuntimeError):
+            client.put(
+                f"/tasks/{created['id']}",
+                json={"status": "completed"},
+                headers=headers,
+            )
+
+
+def test_non_completed_status_change_does_not_trigger_notification(client):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        response = client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "in_progress"},
+            headers=headers,
+        )
+        assert response.status_code == 200
+        mock_task.delay.assert_not_called()
+
+
+def test_title_only_update_does_not_trigger_notification(client):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        client.put(
+            f"/tasks/{created['id']}", json={"title": "Ship it"}, headers=headers
+        )
+        mock_task.delay.assert_not_called()
+
+
+def test_already_completed_task_does_not_retrigger_notification(client):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        mock_task.delay.assert_not_called()
+
+
+def test_completing_nonexistent_task_does_not_trigger_notification(client):
+    headers = auth_headers(client)
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        response = client.put(
+            "/tasks/999", json={"status": "completed"}, headers=headers
+        )
+        assert response.status_code == 404
+        mock_task.delay.assert_not_called()
+
+
+def test_completing_task_uses_custom_registered_email(client):
+    client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "hunter2", "email": "alice@work.com"},
+    )
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        mock_task.delay.assert_called_once_with("alice@work.com", "Ship feature")
+
+
+# ── Celery task logic (in-process, no broker needed) ─────────
+
+def test_send_notification_email_task_prints_message(capsys):
+    from notifications import send_notification_email
+
+    result = send_notification_email("alice@example.com", "Ship feature")
+
+    captured = capsys.readouterr()
+    assert "alice@example.com" in captured.out
+    assert "Ship feature" in captured.out
+    assert "alice@example.com" in result
+    assert "Ship feature" in result

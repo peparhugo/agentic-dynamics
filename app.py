@@ -14,6 +14,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 
+from notifications import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -43,7 +45,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         # Migration: existing databases created before owner_id existed won't
@@ -53,20 +56,28 @@ def init_db():
         }
         if "owner_id" not in existing_columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        # Migration: existing databases created before email existed won't
+        # have the column, and existing rows will have email = NULL.
+        existing_user_columns = {
+            row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if "email" not in existing_user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
 
 
 # ── User model ────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
+    email = email or f"{username}@example.com"
     with get_db() as conn:
         password_hash = generate_password_hash(password)
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
-        return {"id": cursor.lastrowid, "username": username}
+        return {"id": cursor.lastrowid, "username": username, "email": email}
 
 
 def get_user_by_username(username: str) -> dict | None:
@@ -182,11 +193,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = (data.get("email") or "").strip() or None
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already exists"}), 409
-    user = create_user(username, password)
+    user = create_user(username, password, email)
     return jsonify(user), 201
 
 
@@ -236,14 +248,18 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+    previous_task = get_task(task_id, g.user["id"])
     task = update_task(
         task_id,
         g.user["id"],
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if new_status == "completed" and previous_task["status"] != "completed":
+        send_notification_email.delay(g.user["email"], task["title"])
     return jsonify(task)
 
 
