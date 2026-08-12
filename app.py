@@ -8,8 +8,9 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -58,14 +59,28 @@ class NotificationServer:
         self._redis: redis.Redis | None = None
         self._pubsub: Any = None
         self._redis_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
         self._instance_id = str(uuid.uuid4())
         self._db_lock = threading.Lock()
         self._db_path = self._sqlite_path(self.database_url)
-        with sqlite3.connect(self._db_path) as db:
+        self._db_uri = self._db_path.startswith("file:")
+        self._db_keeper: sqlite3.Connection | None = None
+        if self._db_path == ":memory:":
+            self._db_path = f"file:notifications-{self._instance_id}?mode=memory&cache=shared"
+            self._db_uri = True
+            self._db_keeper = sqlite3.connect(self._db_path, uri=True, check_same_thread=False)
+        self.rate_limit = max(0, int(os.getenv("RATE_LIMIT", "100")))
+        self.message_ttl_days = max(0, float(os.getenv("MESSAGE_TTL_DAYS", "7")))
+        self._rate_windows: dict[str, tuple[int, float]] = {}
+        with self._connect_db() as db:
             db.execute("""CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, channel TEXT NOT NULL,
                 type TEXT NOT NULL, payload TEXT NOT NULL, timestamp TEXT NOT NULL
             )""")
+            db.execute("CREATE INDEX IF NOT EXISTS idx_messages_channel_timestamp ON messages(channel, timestamp)")
+
+    def _connect_db(self) -> sqlite3.Connection:
+        return sqlite3.connect(self._db_path, uri=self._db_uri)
 
     @staticmethod
     def _sqlite_path(url: str) -> str:
@@ -95,20 +110,71 @@ class NotificationServer:
         return json.dumps({"type": message_type, "payload": payload, "timestamp": timestamp()})
 
     def _persist(self, channel: str | None, message: dict[str, Any]) -> None:
-        with self._db_lock, sqlite3.connect(self._db_path) as db:
+        with self._db_lock, self._connect_db() as db:
             db.execute(
                 "INSERT INTO messages(channel,type,payload,timestamp) VALUES (?,?,?,?)",
                 (channel or "", message["type"], json.dumps(message["payload"]), message["timestamp"]),
             )
 
     def _history(self, limit: int, offset: int) -> list[dict[str, Any]]:
-        with self._db_lock, sqlite3.connect(self._db_path) as db:
+        with self._db_lock, self._connect_db() as db:
             rows = db.execute(
                 "SELECT id,channel,type,payload,timestamp FROM messages ORDER BY id LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
         return [{"id": i, "channel": c, "type": t, "payload": json.loads(p), "timestamp": ts}
                 for i, c, t, p, ts in rows]
+
+    def _channel_history(self, channel: str, since: str | None, limit: int) -> tuple[list[dict[str, Any]], bool]:
+        conditions = ["channel = ?"]
+        values: list[Any] = [channel]
+        if since is not None:
+            conditions.append("timestamp >= ?")
+            values.append(since)
+        values.append(limit + 1)
+        with self._db_lock, self._connect_db() as db:
+            rows = db.execute(
+                f"SELECT id,channel,type,payload,timestamp FROM messages WHERE {' AND '.join(conditions)} "
+                "ORDER BY timestamp ASC, id ASC LIMIT ?",
+                values,
+            ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return ([{"id": i, "channel": c, "type": t, "payload": json.loads(p), "timestamp": ts}
+                 for i, c, t, p, ts in rows], has_more)
+
+    def _cleanup_expired(self) -> None:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        with self._db_lock, self._connect_db() as db:
+            db.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+
+    async def _cleanup_loop(self) -> None:
+        try:
+            while True:
+                await asyncio.to_thread(self._cleanup_expired)
+                await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            raise
+
+    async def _allow_message(self, client_id: str) -> bool:
+        if self.rate_limit == 0:
+            return False
+        if self._redis:
+            key = f"notifications:rate:{client_id}"
+            try:
+                count = await self._redis.incr(key)
+                if count == 1:
+                    await self._redis.expire(key, 60)
+                return count <= self.rate_limit
+            except redis.RedisError:
+                LOGGER.warning("Redis rate limiter unavailable; using local limiter")
+        now = time.monotonic()
+        count, started = self._rate_windows.get(client_id, (0, now))
+        if now - started >= 60:
+            count, started = 0, now
+        count += 1
+        self._rate_windows[client_id] = (count, started)
+        return count <= self.rate_limit
 
     def _json_response(self, value: Any, status: int = 200, reason: str = "OK") -> Response:
         body = json.dumps(value).encode()
@@ -128,6 +194,23 @@ class NotificationServer:
             except ValueError:
                 return self._json_response({"error": "limit and offset must be integers"}, 400, "Bad Request")
             return self._json_response({"messages": self._history(limit, offset)})
+        if path == "/history":
+            params = parse_qs(query)
+            channel = params.get("channel", [""])[0].strip()
+            if not channel:
+                return self._json_response({"error": "channel is required"}, 400, "Bad Request")
+            since = params.get("since", [None])[0]
+            if since is not None:
+                try:
+                    datetime.fromisoformat(since.replace("Z", "+00:00"))
+                except ValueError:
+                    return self._json_response({"error": "since must be an ISO timestamp"}, 400, "Bad Request")
+            try:
+                limit = max(1, min(int(params.get("limit", [50])[0]), 1000))
+            except ValueError:
+                return self._json_response({"error": "limit must be an integer"}, 400, "Bad Request")
+            messages, has_more = self._channel_history(channel, since, limit)
+            return self._json_response({"messages": messages, "has_more": has_more})
         if path == "/channels":
             with self._lock:
                 channels = {n: len(s) for n, s in self.channels.items() if s}
@@ -204,6 +287,9 @@ class NotificationServer:
             LOGGER.exception("Redis listener stopped")
 
     async def _handle_message(self, client_id: str, raw_message: str) -> None:
+        if not await self._allow_message(client_id):
+            await self._send_error(client_id, "rate limit exceeded")
+            return
         try:
             message = json.loads(raw_message)
             message_type, payload = message.get("type"), message.get("payload")
@@ -277,6 +363,7 @@ class NotificationServer:
                 await self._redis.close()
             self._redis = None
         self._server = await self.transport.start(self._handler, self._process_request, self.host, self.port)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
         await self.transport.stop()
@@ -285,6 +372,10 @@ class NotificationServer:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
             self._redis_task = None
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         if self._pubsub:
             await self._pubsub.close()
             self._pubsub = None

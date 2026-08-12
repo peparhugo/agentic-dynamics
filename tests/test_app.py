@@ -125,6 +125,7 @@ async def test_channel_endpoints_list_subscribers(server):
     async with connect(uri) as connection:
         client_id = (await receive_json(connection))["payload"]["client_id"]
         await connection.send(json.dumps({"type": "subscribe", "payload": {"channel": "system"}}))
+        await asyncio.sleep(0.01)
         response = await asyncio.to_thread(
             urlopen, f"http://127.0.0.1:{server.bound_port}/channels"
         )
@@ -181,3 +182,51 @@ async def test_two_servers_share_redis_backbone():
         await first.stop()
         await second.stop()
         await broker.close()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_message(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    instance = NotificationServer(port=0, redis_url="redis://127.0.0.1:1")
+    await instance.start()
+    try:
+        async with connect(f"ws://127.0.0.1:{instance.bound_port}") as connection:
+            await connection.recv()
+            for number in range(2):
+                await connection.send(json.dumps({"type": "broadcast", "payload": {"n": number}}))
+                assert (await receive_json(connection))["payload"] == {"n": number}
+            await connection.send(json.dumps({"type": "broadcast", "payload": {"n": 2}}))
+            error = await receive_json(connection)
+            assert error == {
+                "type": "system",
+                "payload": {"error": "rate limit exceeded"},
+                "timestamp": error["timestamp"],
+            }
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_since_and_reports_more_pages():
+    with tempfile.NamedTemporaryFile(suffix=".db") as database:
+        instance = NotificationServer(port=0, database_url=database.name, redis_url="redis://127.0.0.1:1")
+        await instance.start()
+        try:
+            await instance.broadcast("broadcast", {"n": 1}, "alerts")
+            await instance.broadcast("broadcast", {"n": 2}, "other")
+            await instance.broadcast("broadcast", {"n": 3}, "alerts")
+            response = await asyncio.to_thread(
+                urlopen, f"http://127.0.0.1:{instance.bound_port}/history?channel=alerts&limit=1"
+            )
+            result = json.loads(response.read())
+            assert [message["payload"] for message in result["messages"]] == [{"n": 1}]
+            assert result["has_more"] is True
+
+            response = await asyncio.to_thread(
+                urlopen, f"http://127.0.0.1:{instance.bound_port}/history?channel=alerts&limit=50"
+            )
+            result = json.loads(response.read())
+            assert [message["payload"] for message in result["messages"]] == [{"n": 1}, {"n": 3}]
+            assert result["has_more"] is False
+        finally:
+            await instance.stop()
