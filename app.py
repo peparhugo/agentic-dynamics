@@ -7,6 +7,8 @@ import secrets
 
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 
 from celery_app import send_notification_email
 from repositories import TaskRepository, UserRepository
@@ -16,6 +18,11 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+RATE_LIMIT_PER_MINUTE = int(os.environ.get("RATE_LIMIT_PER_MINUTE", "100"))
+RATE_LIMIT_STORAGE_URI = os.environ.get(
+    "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
+app.config["RATE_LIMIT_PER_MINUTE"] = RATE_LIMIT_PER_MINUTE
 
 task_repo = TaskRepository(DATABASE)
 user_repo = UserRepository(DATABASE)
@@ -113,6 +120,50 @@ def require_auth(f):
     return decorated
 
 
+# ── Rate limiting ──────────────────────────────────────────────
+
+
+def get_rate_limit_key():
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1].strip()
+        payload = get_user_from_token(token)
+        if payload is not None:
+            return f"user:{payload['user_id']}"
+    remote = request.access_route[0] if request.access_route else request.remote_addr
+    return f"ip:{remote or 'unknown'}"
+
+
+def get_default_limits():
+    return f"{app.config['RATE_LIMIT_PER_MINUTE']} per minute"
+
+
+_rate_limit_storage_options = {}
+if os.environ.get("FAKE_REDIS", "").lower() in ("1", "true", "yes"):
+    import fakeredis
+
+    _rate_limit_storage_options["connection_pool"] = fakeredis.FakeRedis(
+        decode_responses=True
+    ).connection_pool
+
+limiter = Limiter(
+    key_func=get_rate_limit_key,
+    default_limits=[get_default_limits],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    storage_options=_rate_limit_storage_options,
+    headers_enabled=True,
+    retry_after="delta-seconds",
+)
+limiter.init_app(app)
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    return response
+
+
 # ── Auth endpoints ─────────────────────────────────────────────
 
 
@@ -171,8 +222,36 @@ def create_task(user):
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks(user):
-    rows = task_repo.list_for_owner(user["user_id"])
-    return jsonify([serialize_task(r) for r in rows])
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
+    limit = 20
+    limit_raw = request.args.get("limit")
+    if limit_raw is not None:
+        try:
+            limit = int(limit_raw)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid limit"}), 400
+        limit = max(1, min(limit, 100))
+
+    rows = task_repo.list_for_owner_paginated(
+        user["user_id"], cursor=cursor, limit=limit
+    )
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    total = task_repo.count_for_owner(user["user_id"])
+    next_cursor = str(page[-1]["id"]) if has_more else None
+    return jsonify(
+        {
+            "data": [serialize_task(r) for r in page],
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+    )
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])

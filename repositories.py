@@ -77,6 +77,30 @@ class TaskRepository(BaseRepository):
                 (owner_id,),
             ).fetchall()
 
+    def list_for_owner_paginated(self, owner_id, cursor=None, limit=20):
+        with self._connect() as conn:
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+        return rows
+
+    def count_for_owner(self, owner_id):
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+        return row["total"]
+
     def get_for_owner(self, task_id, owner_id):
         with self._connect() as conn:
             return conn.execute(

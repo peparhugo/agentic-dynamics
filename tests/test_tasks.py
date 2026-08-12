@@ -4,6 +4,7 @@ import pytest
 
 os.environ["DATABASE"] = "test_tasks.db"
 os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["FAKE_REDIS"] = "1"
 import app as task_app
 
 task_app.init_db()
@@ -19,6 +20,7 @@ def client():
 @pytest.fixture(autouse=True)
 def clean_db():
     yield
+    task_app.limiter.reset()
     with task_app.get_db() as conn:
         conn.execute("DELETE FROM tasks")
         conn.execute("DELETE FROM users")
@@ -74,8 +76,8 @@ def test_list_tasks_ordered_by_created_at_desc(client):
     resp = client.get("/tasks", headers=auth(token))
     assert resp.status_code == 200
     data = resp.get_json()
-    assert len(data) == 2
-    assert [t["title"] for t in data] == ["second", "first"]
+    assert len(data["data"]) == 2
+    assert [t["title"] for t in data["data"]] == ["second", "first"]
 
 
 def test_get_task(client):
@@ -141,7 +143,10 @@ def test_empty_list(client):
     token = register_and_login(client)
     resp = client.get("/tasks", headers=auth(token))
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    data = resp.get_json()
+    assert data["data"] == []
+    assert data["next_cursor"] is None
+    assert data["total"] == 0
 
 
 # ── Auth tests ─────────────────────────────────────────────────
@@ -247,7 +252,7 @@ def test_users_only_see_own_tasks(client):
 
     resp = client.get("/tasks", headers=auth(token_b))
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json()["data"] == []
 
     resp = client.get(f"/tasks/{task['id']}", headers=auth(token_b))
     assert resp.status_code == 404

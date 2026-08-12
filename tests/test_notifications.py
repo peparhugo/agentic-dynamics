@@ -4,6 +4,7 @@ import pytest
 
 os.environ["DATABASE"] = "test_tasks.db"
 os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["FAKE_REDIS"] = "1"
 from unittest import mock
 
 import app as task_app
@@ -21,6 +22,7 @@ def client():
 @pytest.fixture(autouse=True)
 def clean_db():
     yield
+    task_app.limiter.reset()
     with task_app.get_db() as conn:
         conn.execute("DELETE FROM tasks")
         conn.execute("DELETE FROM users")
