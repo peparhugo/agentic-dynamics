@@ -13,6 +13,21 @@ Auth model:
     - Tasks are scoped to their owner: users can only see/modify their own
       tasks. A task belonging to another user (or no task at all) returns
       404, so existence of other users' tasks is never leaked.
+
+Rate limiting:
+    - Every endpoint (including /auth/*) is rate limited via Flask-Limiter,
+      backed by Redis. Authenticated requests are limited per-user (keyed
+      off the JWT's ``user_id``); unauthenticated requests fall back to
+      per-IP limiting. The limit is a single shared budget across all
+      endpoints for a given key (not per-route), so a client can't dodge
+      the limit by spreading calls across different endpoints.
+    - Exceeding the limit returns 429 with a ``Retry-After`` header.
+
+Pagination:
+    - GET /tasks uses cursor-based pagination: ``?cursor=<id>&limit=<n>``.
+      The cursor is the ``id`` of the last item of the current page; the
+      next page contains tasks with a smaller id (results are ordered
+      newest-first). Response shape: ``{data, next_cursor, total}``.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -22,6 +37,8 @@ import sqlite3
 
 import jwt
 from flask import Flask, current_app, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from db import close_db, get_db, init_db
@@ -31,6 +48,13 @@ from tasks import send_notification_email
 
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_SECONDS = 3600
+
+# ── Rate limiting ────────────────────────────────────────────
+RATE_LIMIT = "100 per minute"
+
+# ── Pagination ───────────────────────────────────────────────
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
 
 # Repositories are stateless aside from the ``get_db`` accessor they hold,
 # so a single module-level instance per table is reused across requests;
@@ -91,19 +115,62 @@ def login_required(view):
     return wrapped
 
 
+def _rate_limit_key() -> str:
+    """Key requests by authenticated user, falling back to IP address.
+
+    Mirrors the token-parsing logic in ``login_required`` but never raises:
+    a missing/malformed/expired token just means the request is limited by
+    IP instead (the view itself still enforces auth separately). This lets
+    a single rate limit apply uniformly to every endpoint, including
+    /auth/register and /auth/login, where there's no user yet.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):].strip()
+        if token:
+            try:
+                payload = decode_token(current_app.config["JWT_SECRET"], token)
+            except jwt.InvalidTokenError:
+                payload = None
+            if payload is not None and payload.get("user_id") is not None:
+                return f"user:{payload['user_id']}"
+    return f"ip:{get_remote_address()}"
+
+
 # ── App factory ───────────────────────────────────────────────
 
-def create_app(database: str = None, jwt_secret: str = None) -> Flask:
+def create_app(
+    database: str = None,
+    jwt_secret: str = None,
+    redis_url: str = None,
+    rate_limit: str = None,
+) -> Flask:
     app = Flask(__name__)
     app.config["DATABASE"] = database or os.environ.get("DATABASE", "tasks.db")
     app.config["JWT_SECRET"] = jwt_secret or os.environ.get(
         "JWT_SECRET", "dev-insecure-secret-change-me"
     )
+    app.config["REDIS_URL"] = redis_url or os.environ.get(
+        "REDIS_URL", "redis://localhost:6379/2"
+    )
+    app.config["RATE_LIMIT"] = rate_limit or os.environ.get("RATE_LIMIT", RATE_LIMIT)
 
     with app.app_context():
         init_db(app.config["DATABASE"])
 
     app.teardown_appcontext(close_db)
+
+    # A fresh Limiter (and thus a fresh Redis-backed storage handle) is
+    # created per app instance rather than reused as a module-level
+    # singleton, so that separate ``create_app()`` calls (e.g. one per
+    # test) never share rate-limit counters.
+    Limiter(
+        key_func=_rate_limit_key,
+        app=app,
+        application_limits=[app.config["RATE_LIMIT"]],
+        storage_uri=app.config["REDIS_URL"],
+        headers_enabled=True,
+    )
 
     # ── Auth routes ─────────────────────────────────────────
 
@@ -184,7 +251,36 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
     @app.route("/tasks", methods=["GET"])
     @login_required
     def list_tasks():
-        return jsonify(task_repository.get_all(g.current_user["id"]))
+        cursor_param = request.args.get("cursor")
+        limit_param = request.args.get("limit")
+
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit = DEFAULT_PAGE_SIZE
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+            if limit < 1:
+                return jsonify({"error": "limit must be a positive integer"}), 400
+
+        limit = min(limit, MAX_PAGE_SIZE)
+
+        page = task_repository.get_page(g.current_user["id"], cursor=cursor, limit=limit)
+        next_cursor = page["next_cursor"]
+        return jsonify(
+            {
+                "data": page["data"],
+                "next_cursor": str(next_cursor) if next_cursor is not None else None,
+                "total": page["total"],
+            }
+        )
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @login_required
@@ -238,6 +334,10 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
     @app.errorhandler(405)
     def method_not_allowed(_error):
         return jsonify({"error": "method not allowed"}), 405
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(_error):
+        return jsonify({"error": "rate limit exceeded"}), 429
 
     return app
 

@@ -244,8 +244,8 @@ def test_users_only_see_their_own_tasks(client):
     alice_tasks = client.get("/tasks", headers=auth_headers(token_alice)).get_json()
     bob_tasks = client.get("/tasks", headers=auth_headers(token_bob)).get_json()
 
-    assert [t["title"] for t in alice_tasks] == ["Alice task"]
-    assert [t["title"] for t in bob_tasks] == ["Bob task"]
+    assert [t["title"] for t in alice_tasks["data"]] == ["Alice task"]
+    assert [t["title"] for t in bob_tasks["data"]] == ["Bob task"]
 
 
 def test_cannot_get_another_users_task(client):
@@ -348,7 +348,8 @@ def test_create_task_strips_whitespace(client, token):
 def test_list_tasks_empty(client, token):
     resp = client.get("/tasks", headers=auth_headers(token))
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    body = resp.get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc_by_created_at(client, token):
@@ -360,14 +361,17 @@ def test_list_tasks_ordered_desc_by_created_at(client, token):
 
     resp = client.get("/tasks", headers=auth_headers(token))
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["Third", "Second", "First"]
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
 
 
 def test_list_tasks_returns_all_fields(client, token):
     create(client, token, "Task A")
     resp = client.get("/tasks", headers=auth_headers(token))
-    task = resp.get_json()[0]
+    task = resp.get_json()["data"][0]
     assert set(task.keys()) == {"id", "title", "status", "created_at", "owner_id"}
 
 
@@ -492,7 +496,7 @@ def test_schema_initialized_on_startup(tmp_path):
     token = login(client, "alice", "s3cret-pw").get_json()["token"]
     resp = client.get("/tasks", headers=auth_headers(token))
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_migration_adds_owner_id_without_losing_existing_data(tmp_path):

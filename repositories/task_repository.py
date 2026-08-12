@@ -49,6 +49,40 @@ class TaskRepository(BaseRepository):
         ).fetchall()
         return [dict(r) for r in rows]
 
+    def get_page(self, owner_id: int, cursor: int = None, limit: int = 20) -> dict:
+        """Return one cursor-paginated page of an owner's tasks.
+
+        Tasks are ordered newest-first by ``id`` (ids are assigned in
+        creation order, so this doubles as chronological order). ``cursor``
+        -- when given -- is the ``id`` of the last item of the *previous*
+        page: only tasks with a smaller id are considered. Fetching one
+        extra row beyond ``limit`` lets us tell whether another page
+        follows without a second query.
+        """
+        total = self.db.execute(
+            "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()["c"]
+
+        if cursor is None:
+            rows = self.db.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? "
+                "ORDER BY id DESC LIMIT ?",
+                (owner_id, limit + 1),
+            ).fetchall()
+        else:
+            rows = self.db.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                "ORDER BY id DESC LIMIT ?",
+                (owner_id, cursor, limit + 1),
+            ).fetchall()
+
+        has_more = len(rows) > limit
+        page_rows = rows[:limit]
+        items = [dict(r) for r in page_rows]
+        next_cursor = items[-1]["id"] if has_more and items else None
+
+        return {"data": items, "next_cursor": next_cursor, "total": total}
+
     def update(self, task_id: int, owner_id: int, title: str = None, status: str = None):
         task = self.get_by_id(task_id, owner_id)
         if task is None:

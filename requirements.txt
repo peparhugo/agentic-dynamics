@@ -4,4 +4,11 @@ PyJWT>=2.3
 Werkzeug>=2.3
 celery>=5.3
 redis>=5.0
+Flask-Limiter>=3.5
+# Test-only: an in-process Redis stand-in so the Flask-Limiter/Redis code
+# path is exercised in tests without needing a real Redis server. lupa
+# backs fakeredis's Lua scripting support, which the `limits` library's
+# Redis storage backend relies on for atomic increments.
+fakeredis>=2.20
+lupa>=2.0
 
