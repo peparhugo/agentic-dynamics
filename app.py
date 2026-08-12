@@ -10,7 +10,7 @@ ENDPOINTS:
 - POST /auth/register   create a user (JSON body: {username, password})
 - POST /auth/login      return a JWT token (JSON body: {username, password})
 - POST /tasks           create a task (JSON body: {title: str})
-- GET  /tasks           list the authenticated user's tasks by created_at desc
+- GET  /tasks           list the authenticated user's tasks (cursor paginated)
 - GET  /tasks/{id}      get a single task owned by the user
 - PUT  /tasks/{id}      update task title and/or status
 
@@ -18,6 +18,16 @@ AUTH:
 - All /tasks/* endpoints require a valid JWT in the Authorization header
   as "Bearer <token>". Missing/invalid tokens return 401.
 - Each user only sees/edits their own tasks.
+
+PAGINATION:
+- GET /tasks supports cursor-based pagination via ?cursor=<id>&limit=<n>.
+  Default limit is 20, maximum is 100. Response body is:
+  {"data": [...], "next_cursor": str|null, "total": int}.
+
+RATE LIMITING:
+- Flask-Limiter with a Redis storage backend. Each authenticated user is
+  limited to 100 requests per minute; anonymous/auth requests are limited
+  per client IP. Exceeding the limit returns 429 with a Retry-After header.
 
 STORAGE:
 - SQLite. Schema is initialized on startup. A migration step adds the
@@ -33,6 +43,8 @@ from datetime import datetime, timedelta, timezone
 import jwt
 from celery import Celery
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import celery_config
@@ -41,8 +53,15 @@ from repositories import TaskRepository, UserRepository
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
-app.config.setdefault("SECRET_KEY", os.environ.get("SECRET_KEY", "dev-secret-key"))
+if not app.config.get("SECRET_KEY"):
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 app.config.setdefault("JWT_EXPIRATION_HOURS", 24)
+app.config.setdefault(
+    "RATELIMIT_STORAGE_URI",
+    os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+)
+app.config.setdefault("RATELIMIT_STRATEGY", "moving-window")
+app.config.setdefault("RATELIMIT_HEADERS_ENABLED", True)
 
 
 def create_celery():
@@ -141,6 +160,25 @@ def get_current_user():
     return UserRepository(get_db).get(user_id)
 
 
+def rate_limit_key():
+    """Key rate limiting buckets per authenticated user id; fall back to the
+    client IP for unauthenticated requests (e.g. auth endpoints)."""
+    user = get_current_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    app=app,
+    key_func=rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    strategy="moving-window",
+    headers_enabled=True,
+)
+
+
 def require_auth(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -207,8 +245,44 @@ def create_task():
 def list_tasks():
     user = request.current_user
     task_repo = TaskRepository(get_db)
-    tasks = task_repo.find_by_owner(user["id"])
-    return jsonify([task_repo.to_dict(t) for t in tasks])
+
+    limit = 20
+    raw_limit = request.args.get("limit")
+    if raw_limit is not None:
+        try:
+            limit = int(raw_limit)
+        except (TypeError, ValueError):
+            limit = 20
+    if limit < 1:
+        limit = 20
+    if limit > 100:
+        limit = 100
+
+    cursor = None
+    raw_cursor = request.args.get("cursor")
+    if raw_cursor is not None and raw_cursor != "":
+        try:
+            cursor = int(raw_cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+        if cursor < 1:
+            return jsonify({"error": "invalid cursor"}), 400
+
+    tasks = task_repo.find_by_owner_paginated(
+        user["id"], cursor=cursor, limit=limit + 1
+    )
+    total = task_repo.count_by_owner(user["id"])
+    page_tasks = tasks[:limit]
+    next_cursor = None
+    if len(tasks) > limit and page_tasks:
+        next_cursor = str(page_tasks[-1]["id"])
+    return jsonify(
+        {
+            "data": [task_repo.to_dict(t) for t in page_tasks],
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+    )
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])

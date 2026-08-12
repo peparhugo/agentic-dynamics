@@ -151,7 +151,8 @@ def test_list_tasks_ordered_desc(client, alice):
     client.post("/tasks", json={"title": "third"}, headers=auth_headers(alice))
     resp = client.get("/tasks", headers=auth_headers(alice))
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    body = resp.get_json()
+    tasks = body["data"]
     assert [t["title"] for t in tasks] == ["third", "second", "first"]
     assert [t["id"] for t in tasks] == [3, 2, 1]
 
@@ -210,10 +211,10 @@ def test_users_see_only_their_own_tasks(client, alice, bob):
     client.post("/tasks", json={"title": "alice task"}, headers=auth_headers(alice))
     client.post("/tasks", json={"title": "bob task"}, headers=auth_headers(bob))
 
-    alice_tasks = client.get("/tasks", headers=auth_headers(alice)).get_json()
+    alice_tasks = client.get("/tasks", headers=auth_headers(alice)).get_json()["data"]
     assert [t["title"] for t in alice_tasks] == ["alice task"]
 
-    bob_tasks = client.get("/tasks", headers=auth_headers(bob)).get_json()
+    bob_tasks = client.get("/tasks", headers=auth_headers(bob)).get_json()["data"]
     assert [t["title"] for t in bob_tasks] == ["bob task"]
 
 
@@ -350,3 +351,165 @@ def test_completed_task_returns_quickly_without_broker(client, alice, monkeypatc
     )
     assert resp.status_code == 200
     assert resp.get_json()["status"] == "completed"
+
+
+def create_tasks(client, token, count, prefix="task"):
+    headers = auth_headers(token)
+    for i in range(1, count + 1):
+        resp = client.post(
+            "/tasks", json={"title": f"{prefix}-{i}"}, headers=headers
+        )
+        assert resp.status_code == 201, resp.get_json()
+
+
+def test_pagination_default_limit_and_format(client, alice):
+    create_tasks(client, alice, 25)
+    resp = client.get("/tasks", headers=auth_headers(alice))
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body.keys()) == {"data", "next_cursor", "total"}
+    assert body["total"] == 25
+    assert len(body["data"]) == 20
+    assert [t["id"] for t in body["data"]] == list(range(25, 5, -1))
+    assert body["next_cursor"] == "6"
+
+
+def test_pagination_walks_all_pages(client, alice):
+    create_tasks(client, alice, 25)
+    headers = auth_headers(alice)
+    seen = []
+    cursor = None
+    while True:
+        url = "/tasks" if cursor is None else f"/tasks?cursor={cursor}"
+        body = client.get(url, headers=headers).get_json()
+        seen.extend(t["id"] for t in body["data"])
+        if body["next_cursor"] is None:
+            break
+        cursor = body["next_cursor"]
+    assert seen == list(range(25, 0, -1))
+    assert len(seen) == 25
+
+
+def test_pagination_no_cursor_returns_first_page(client, alice):
+    create_tasks(client, alice, 3)
+    body = client.get("/tasks", headers=auth_headers(alice)).get_json()
+    assert [t["id"] for t in body["data"]] == [3, 2, 1]
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
+
+
+def test_pagination_returns_empty_data_when_no_tasks(client, alice):
+    body = client.get("/tasks", headers=auth_headers(alice)).get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
+
+
+def test_pagination_limit_query_param(client, alice):
+    create_tasks(client, alice, 5)
+    body = client.get(
+        "/tasks?limit=2", headers=auth_headers(alice)
+    ).get_json()
+    assert [t["id"] for t in body["data"]] == [5, 4]
+    assert body["next_cursor"] == "4"
+    assert body["total"] == 5
+
+
+def test_pagination_limit_capped_at_max(client, alice):
+    repo = app_module.TaskRepository(app_module.get_db)
+    for i in range(1, 151):
+        repo.create(title=f"task-{i}", status="pending", owner_id=1)
+    body = client.get(
+        "/tasks?limit=500", headers=auth_headers(alice)
+    ).get_json()
+    assert len(body["data"]) == 100
+    assert body["total"] == 150
+    assert body["next_cursor"] == "51"
+
+
+def test_pagination_limit_below_one_defaults(client, alice):
+    create_tasks(client, alice, 25)
+    for bad in ("0", "-3"):
+        body = client.get(
+            f"/tasks?limit={bad}", headers=auth_headers(alice)
+        ).get_json()
+        assert len(body["data"]) == 20
+        assert body["total"] == 25
+
+
+def test_pagination_non_numeric_limit_defaults(client, alice):
+    create_tasks(client, alice, 25)
+    body = client.get(
+        "/tasks?limit=abc", headers=auth_headers(alice)
+    ).get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+
+
+def test_pagination_invalid_cursor_rejected(client, alice):
+    assert (
+        client.get("/tasks?cursor=abc", headers=auth_headers(alice)).status_code
+        == 400
+    )
+    assert (
+        client.get("/tasks?cursor=-5", headers=auth_headers(alice)).status_code
+        == 400
+    )
+
+
+def test_pagination_cursor_filters_to_next_page(client, alice):
+    create_tasks(client, alice, 10)
+    body = client.get(
+        "/tasks?cursor=5&limit=100", headers=auth_headers(alice)
+    ).get_json()
+    assert [t["id"] for t in body["data"]] == [4, 3, 2, 1]
+    assert body["next_cursor"] is None
+    assert body["total"] == 10
+
+
+def test_pagination_isolated_between_users(client, alice, bob):
+    create_tasks(client, alice, 3)
+    create_tasks(client, bob, 2)
+    alice_body = client.get("/tasks", headers=auth_headers(alice)).get_json()
+    bob_body = client.get("/tasks", headers=auth_headers(bob)).get_json()
+    assert [t["title"] for t in alice_body["data"]] == ["task-3", "task-2", "task-1"]
+    assert alice_body["total"] == 3
+    assert [t["title"] for t in bob_body["data"]] == ["task-2", "task-1"]
+    assert bob_body["total"] == 2
+
+
+def test_rate_limit_allows_100_requests(client, alice):
+    for _ in range(100):
+        resp = client.get("/tasks", headers=auth_headers(alice))
+        assert resp.status_code == 200
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(client, alice):
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth_headers(alice)).status_code == 200
+    resp = client.get("/tasks", headers=auth_headers(alice))
+    assert resp.status_code == 429
+    assert resp.headers.get("Retry-After") is not None
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for i in range(100):
+        resp = client.post(
+            "/auth/register", json={"username": f"rl-user-{i}", "password": "pw"}
+        )
+        assert resp.status_code == 201, resp.get_json()
+    resp = client.post(
+        "/auth/register", json={"username": "rl-overflow", "password": "pw"}
+    )
+    assert resp.status_code == 429
+    assert resp.headers.get("Retry-After") is not None
+
+
+def test_rate_limit_keyed_per_user(client):
+    register(client, "rl-a", "pw-a")
+    token_a = login(client, "rl-a", "pw-a")
+    register(client, "rl-b", "pw-b")
+    token_b = login(client, "rl-b", "pw-b")
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth_headers(token_a)).status_code == 200
+    assert client.get("/tasks", headers=auth_headers(token_a)).status_code == 429
+    assert client.get("/tasks", headers=auth_headers(token_b)).status_code == 200
