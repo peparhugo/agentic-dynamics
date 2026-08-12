@@ -9,14 +9,15 @@ function argumentValue(args: string[], option: string): string | undefined {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   if (args[0] !== 'build') {
-    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>]');
+    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
   }
   const content = argumentValue(args, '--content');
   const output = argumentValue(args, '--output');
-  if (content === undefined && args.includes('--content') || output === undefined && args.includes('--output')) {
-    throw new Error('Options --content and --output require a directory');
+  const templates = argumentValue(args, '--templates');
+  if (content === undefined && args.includes('--content') || output === undefined && args.includes('--output') || templates === undefined && args.includes('--templates')) {
+    throw new Error('Options --content, --output, and --templates require a directory');
   }
-  const pages = await buildSite({ contentDir: content, outputDir: output });
+  const pages = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
   process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
 }
 
