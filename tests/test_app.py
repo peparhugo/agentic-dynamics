@@ -3,6 +3,7 @@ import sqlite3
 import pytest
 
 from app import app
+from celery_config import send_notification_email
 
 
 @pytest.fixture
@@ -69,3 +70,30 @@ def test_old_tasks_table_is_migrated_without_losing_rows(client, tmp_path):
     assert "owner_id" in columns
     assert count == 1
     assert client.get("/tasks", headers=headers).json == []
+
+
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    headers = register_and_login(client, "alice@example.com")
+    task = client.post("/tasks", json={"title": "Ship feature"}, headers=headers).json
+    queued = []
+    monkeypatch.setattr(send_notification_email, "delay", lambda *args: queued.append(args))
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice@example.com", "Ship feature")]
+
+
+def test_notification_is_not_queued_when_status_does_not_transition_to_completed(client, monkeypatch):
+    headers = register_and_login(client, "alice@example.com")
+    task = client.post("/tasks", json={"title": "Draft"}, headers=headers).json
+    queued = []
+    monkeypatch.setattr(send_notification_email, "delay", lambda *args: queued.append(args))
+
+    client.put(f"/tasks/{task['id']}", json={"title": "Draft v2"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert queued == [("alice@example.com", "Draft v2")]

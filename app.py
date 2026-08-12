@@ -13,6 +13,8 @@ from functools import wraps
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import send_notification_email
+
 
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
@@ -230,6 +232,18 @@ def update_task(user_id, task_id):
     try:
         with get_db() as connection:
             initialize_database(connection)
+            existing = connection.execute(
+                """
+                SELECT tasks.status, tasks.title, users.username AS user_email
+                FROM tasks
+                JOIN users ON users.id = tasks.owner_id
+                WHERE tasks.id = ? AND tasks.owner_id = ?
+                """,
+                (task_id, user_id),
+            ).fetchone()
+            if existing is None:
+                return jsonify({"error": "task not found"}), 404
+
             cursor = connection.execute(
                 f"UPDATE tasks SET {', '.join(fields)} WHERE id = ? AND owner_id = ?", values + [user_id]
             )
@@ -241,6 +255,11 @@ def update_task(user_id, task_id):
             connection.commit()
     except sqlite3.OperationalError:
         return jsonify({"error": "task not found"}), 404
+    status_changed_to_completed = (
+        existing["status"] != "completed" and row["status"] == "completed"
+    )
+    if status_changed_to_completed:
+        send_notification_email.delay(existing["user_email"], row["title"])
     return jsonify(task_from_row(row))
 
 
