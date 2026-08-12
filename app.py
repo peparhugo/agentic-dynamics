@@ -9,8 +9,14 @@ Uses SQLite for storage and initializes the schema on startup.
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+import hashlib
 import os
 import jwt
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+import redis as redis_lib
 
 from celery_app import send_notification_email
 from repositories import (
@@ -63,6 +69,45 @@ def auth_required(fn):
     return wrapper
 
 
+# ── Rate limiting ─────────────────────────────────────────────
+
+
+def rate_limit_identifier() -> str:
+    """Key each authenticated user by their id; anonymous callers by IP."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        user_id = decode_token(auth[7:].strip())
+        if user_id is not None:
+            return f"user:{user_id}"
+    return get_remote_address()
+
+
+RATE_LIMIT_STORAGE_URI = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+# Namespace rate limit keys by this codebase so independent environments
+# sharing a Redis instance do not interfere with one another's counters.
+_RATE_LIMIT_NAMESPACE = hashlib.md5(
+    os.path.dirname(os.path.abspath(__file__)).encode()
+).hexdigest()[:12]
+
+limiter = Limiter(
+    key_func=rate_limit_identifier,
+    app=app,
+    application_limits=["100 per minute"],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    headers_enabled=True,
+    key_prefix=f"task_api:{_RATE_LIMIT_NAMESPACE}",
+)
+
+
+def reset_rate_limits() -> None:
+    """Clear this app's rate limit counters (and only this app's)."""
+    client = redis_lib.Redis.from_url(RATE_LIMIT_STORAGE_URI)
+    prefix = f"LIMITS:LIMITER/task_api:{_RATE_LIMIT_NAMESPACE}"
+    for key in client.scan_iter(match=f"{prefix}*", count=1000):
+        client.delete(key)
+
+
 # ── Routes ─────────────────────────────────────────────────────
 
 
@@ -96,7 +141,24 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks():
-    return jsonify(task_repository.get_tasks(g.user_id))
+    limit = request.args.get("limit", default=20, type=int)
+    if limit is None or limit < 1:
+        limit = 20
+    limit = min(limit, 100)
+
+    cursor_raw = request.args.get("cursor")
+    cursor = None
+    if cursor_raw is not None and cursor_raw.strip():
+        try:
+            cursor = int(cursor_raw)
+        except ValueError:
+            return jsonify({"error": "invalid cursor"}), 400
+
+    tasks, next_cursor = task_repository.get_tasks(
+        g.user_id, limit=limit, cursor=cursor
+    )
+    total = task_repository.count_tasks(g.user_id)
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
@@ -141,6 +203,13 @@ def edit_task(task_id: int):
             # Never let a notification failure block or break the API response.
             app.logger.exception("failed to enqueue notification email")
     return jsonify(task)
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    return response
 
 
 init_db()

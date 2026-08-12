@@ -156,11 +156,27 @@ class TaskRepository(BaseRepository):
             "owner_id": owner_id,
         }
 
-    def get_tasks(self, owner_id: int):
-        return self._fetch_all(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
+    def get_tasks(self, owner_id: int, limit: int = 20, cursor: int | None = None):
+        where = "owner_id = ?"
+        params = [owner_id]
+        if cursor is not None:
+            where += " AND id < ?"
+            params.append(cursor)
+        rows = self._fetch_all(
+            f"SELECT * FROM tasks WHERE {where} ORDER BY id DESC LIMIT ?",
+            params + [limit + 1],
         )
+        has_more = len(rows) > limit
+        page = rows[:limit]
+        next_cursor = str(page[-1]["id"]) if has_more and page else None
+        return page, next_cursor
+
+    def count_tasks(self, owner_id: int) -> int:
+        with self._get_db() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS n FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()
+            return int(row["n"])
 
     def get_task(self, task_id: int, owner_id: int) -> dict | None:
         return self._fetch_one(

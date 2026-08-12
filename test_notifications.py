@@ -10,6 +10,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE", str(db_path))
     app_module.init_db()
     app_module.app.config["TESTING"] = True
+    app_module.reset_rate_limits()
     celery_app.conf.task_always_eager = True
     with app_module.app.test_client() as c:
         yield c
