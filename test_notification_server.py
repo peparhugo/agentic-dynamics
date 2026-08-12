@@ -3,14 +3,18 @@ import asyncio
 
 import aiohttp
 import pytest
+from redis.asyncio import Redis
 from websockets.asyncio.client import connect
 
 from notification_server import NotificationServer
 
 
 @pytest.fixture
-async def server():
-    instance = NotificationServer(websocket_port=0, health_port=0)
+async def server(tmp_path):
+    instance = NotificationServer(
+        websocket_port=0, health_port=0,
+        database_url=str(tmp_path / "messages.db"),
+    )
     await instance.start()
     yield instance
     await instance.stop()
@@ -139,3 +143,66 @@ async def test_multiple_channel_subscriptions_and_channel_rest_listing(server):
                 assert (await response.json())["subscribers"] == sorted(
                     [first_id, second_id]
                 )
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(server):
+    url = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(url) as socket:
+        await receive_json(socket)
+        await socket.send(json.dumps({
+            "type": "subscribe", "payload": {"channel": "history"}
+        }))
+        await socket.send(json.dumps({
+            "type": "broadcast", "payload": {"channel": "history", "value": 1}
+        }))
+        assert (await receive_json(socket))["payload"]["value"] == 1
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"http://{server.host}:{server.health_port}/messages?limit=1&offset=0"
+        ) as response:
+            messages = await response.json()
+    assert len(messages) == 1
+    assert messages[0]["channel"] == "history"
+    assert messages[0]["type"] == "broadcast"
+    assert messages[0]["payload"]["value"] == 1
+
+
+@pytest.mark.asyncio
+async def test_redis_backbone_delivers_between_server_instances(tmp_path):
+    redis = Redis.from_url("redis://127.0.0.1:6379", decode_responses=True)
+    try:
+        await redis.ping()
+    except Exception:
+        await redis.close()
+        pytest.skip("Redis is not running")
+    await redis.flushdb()
+    first = NotificationServer(
+        websocket_port=0, health_port=0, redis_url="redis://127.0.0.1:6379",
+        database_url=str(tmp_path / "messages.db"),
+    )
+    second = NotificationServer(
+        websocket_port=0, health_port=0, redis_url="redis://127.0.0.1:6379",
+        database_url=str(tmp_path / "messages.db"),
+    )
+    await first.start()
+    await second.start()
+    try:
+        async with connect(f"ws://{second.host}:{second.websocket_port}") as subscriber:
+            await receive_json(subscriber)
+            await subscriber.send(json.dumps({
+                "type": "subscribe", "payload": {"channel": "shared"}
+            }))
+            async with connect(f"ws://{first.host}:{first.websocket_port}") as publisher:
+                await receive_json(publisher)
+                await publisher.send(json.dumps({
+                    "type": "broadcast", "payload": {"channel": "shared", "value": 2}
+                }))
+            delivered = await receive_json(subscriber)
+            assert delivered["payload"]["value"] == 2
+    finally:
+        await first.stop()
+        await second.stop()
+        await redis.flushdb()
+        await redis.close()
