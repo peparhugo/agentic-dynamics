@@ -38,7 +38,7 @@ describe('parseArgs', () => {
   });
 
   it('rejects unknown subcommands', () => {
-    expect(parseArgs(['serve'])).toBeNull();
+    expect(parseArgs(['publish'])).toBeNull();
   });
 
   it('rejects unknown flags', () => {
@@ -73,7 +73,7 @@ describe('run', () => {
 
   it('returns exit code 1 for invalid arguments', () => {
     fixture = createFixture({});
-    expect(run(['serve'])).toBe(1);
+    expect(run(['publish'])).toBe(1);
   });
 });
 

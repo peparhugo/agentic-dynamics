@@ -1,15 +1,18 @@
 #!/usr/bin/env node
 import { buildSite } from './build';
 import { Page } from './page';
+import { DEFAULT_PORT, ServeOptions, startDevServer } from './serve';
 
-export interface CliOptions {
+export interface BuildOptions {
   content: string;
   output: string;
   templates: string;
 }
 
+export type CliOptions = BuildOptions | ServeOptions;
+
 export interface ParsedCli {
-  command: string;
+  command: 'build' | 'serve';
   options: CliOptions;
 }
 
@@ -19,12 +22,17 @@ const DEFAULT_TEMPLATES = './templates';
 
 function usage(): string {
   return [
-    'Usage: ssg build [options]',
+    'Usage: ssg <command> [options]',
+    '',
+    'Commands:',
+    '  build   Build the static site',
+    '  serve   Start the development server with live reload',
     '',
     'Options:',
     '  --content <dir>    Markdown source directory (default: ./content)',
     '  --output <dir>     Output directory (default: ./dist)',
     '  --templates <dir>  Template directory (default: ./templates)',
+    '  --port <number>    Port for the dev server (default: 3000)',
     '  -h, --help         Show this help',
   ].join('\n');
 }
@@ -45,9 +53,11 @@ export function parseArgs(argv: string[]): ParsedCli | null {
   const args = argv.slice();
   const command = args.shift();
   if (command === undefined || command === '-h' || command === '--help') return null;
-  if (command !== 'build') return null;
+  if (command !== 'build' && command !== 'serve') return null;
 
-  const options: CliOptions = { content: DEFAULT_CONTENT, output: DEFAULT_OUTPUT, templates: DEFAULT_TEMPLATES };
+  const options: BuildOptions = { content: DEFAULT_CONTENT, output: DEFAULT_OUTPUT, templates: DEFAULT_TEMPLATES };
+  let port = DEFAULT_PORT;
+
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === '-h' || arg === '--help') return null;
@@ -69,7 +79,24 @@ export function parseArgs(argv: string[]): ParsedCli | null {
       if (args[i] === '--templates') i++;
       continue;
     }
+    if (command === 'serve') {
+      const portValue = parseFlagValue(args, '--port', i);
+      if (portValue !== null) {
+        const parsedPort = Number(portValue);
+        if (Number.isInteger(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+          port = parsedPort;
+        } else {
+          return null;
+        }
+        if (args[i] === '--port') i++;
+        continue;
+      }
+    }
     return null;
+  }
+
+  if (command === 'serve') {
+    return { command, options: { ...options, port } };
   }
   return { command, options };
 }
@@ -82,6 +109,13 @@ export function run(argv: string[]): number {
   }
 
   try {
+    if (parsed.command === 'serve') {
+      const options = parsed.options as ServeOptions;
+      const devServer = startDevServer(options);
+      process.stdout.write(`Serving ${options.output} at ${devServer.address()}\n`);
+      process.stdout.write(`Watching ${options.content} and ${options.templates} for changes...\n`);
+      return 0;
+    }
     const pages: Page[] = buildSite(parsed.options.content, parsed.options.output, parsed.options.templates);
     process.stdout.write(`Built ${pages.length} page(s) into ${parsed.options.output}\n`);
     return 0;
