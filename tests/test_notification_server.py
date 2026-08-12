@@ -19,6 +19,17 @@ async def http_health(server: NotificationServer) -> dict:
     return json.loads(response.split(b"\r\n\r\n", 1)[1])
 
 
+async def http_get(server: NotificationServer, path: str) -> dict:
+    port = server._http_server.sockets[0].getsockname()[1]
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 @pytest_asyncio.fixture
 async def server():
     instance = NotificationServer(websocket_port=0, http_port=0)
@@ -81,6 +92,37 @@ async def test_direct_message_targets_client(server):
     assert message["payload"]["text"] == "private"
     with pytest.raises(asyncio.TimeoutError):
         await asyncio.wait_for(first.recv(), timeout=0.05)
+    await first.close()
+    await second.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_subscriptions_route_messages_and_are_listed(server):
+    first = await websockets.connect(websocket_url(server))
+    second = await websockets.connect(websocket_url(server))
+    first_id = json.loads(await first.recv())["payload"]["client_id"]
+    second_id = json.loads(await second.recv())["payload"]["client_id"]
+
+    await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+    await first.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+    await second.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    assert (await http_get(server, "/channels"))["channels"] == {"alerts": 2, "chat": 1}
+    assert set((await http_get(server, "/channels/alerts/subscribers"))["subscribers"]) == {
+        first_id, second_id
+    }
+
+    await first.send(json.dumps({
+        "type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}
+    }))
+    assert json.loads(await first.recv())["payload"]["text"] == "warning"
+    assert json.loads(await second.recv())["payload"]["text"] == "warning"
+
+    await first.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+    await second.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"n": 1}}))
+    assert json.loads(await second.recv())["payload"]["n"] == 1
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(first.recv(), timeout=0.05)
+
     await first.close()
     await second.close()
 
