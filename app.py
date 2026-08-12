@@ -24,155 +24,20 @@ import jwt
 from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from db import close_db, get_db, init_db
+from repositories import TaskRepository, UserRepository
 from tasks import send_notification_email
 
 
 JWT_ALGORITHM = "HS256"
 TOKEN_EXPIRY_SECONDS = 3600
 
-
-def get_db():
-    """Return a request-scoped SQLite connection, creating it if needed."""
-    if "db" not in g:
-        g.db = sqlite3.connect(current_app.config["DATABASE"])
-        g.db.row_factory = sqlite3.Row
-    return g.db
-
-
-def close_db(exception=None):
-    db = g.pop("db", None)
-    if db is not None:
-        db.close()
-
-
-def init_db(database_path: str) -> None:
-    """Create tables if needed and migrate older schemas in place.
-
-    This is safe to run against a pre-existing database created before the
-    ``users`` table / ``tasks.owner_id`` column existed: it only adds what's
-    missing and never drops or rewrites existing rows.
-    """
-    conn = sqlite3.connect(database_path)
-    try:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL,"
-            "  email TEXT"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER"
-            ")"
-        )
-
-        # ── Migration: add owner_id to tasks tables created before auth ──
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
-
-        # ── Migration: add email to users tables created before notifications ──
-        user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
-        if "email" not in user_columns:
-            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
-
-        conn.commit()
-    finally:
-        conn.close()
-
-
-# ── User models ──────────────────────────────────────────────
-
-def create_user(username: str, password_hash: str, email: str) -> dict:
-    db = get_db()
-    cursor = db.execute(
-        "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-        (username, password_hash, email),
-    )
-    db.commit()
-    return {"id": cursor.lastrowid, "username": username, "email": email}
-
-
-def get_user_by_username(username: str):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM users WHERE username = ?", (username,)
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def get_user_by_id(user_id: int):
-    db = get_db()
-    row = db.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-    return dict(row) if row else None
-
-
-# ── Task models (scoped to an owner) ────────────────────────
-
-def create_task(title: str, owner_id: int) -> dict:
-    db = get_db()
-    now = datetime.utcnow().isoformat()
-    cursor = db.execute(
-        "INSERT INTO tasks (title, status, created_at, owner_id) "
-        "VALUES (?, 'pending', ?, ?)",
-        (title, now, owner_id),
-    )
-    db.commit()
-    return {
-        "id": cursor.lastrowid,
-        "title": title,
-        "status": "pending",
-        "created_at": now,
-        "owner_id": owner_id,
-    }
-
-
-def get_tasks(owner_id: int) -> list:
-    db = get_db()
-    rows = db.execute(
-        "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-        (owner_id,),
-    ).fetchall()
-    return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int):
-    db = get_db()
-    row = db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-    ).fetchone()
-    return dict(row) if row else None
-
-
-def update_task(task_id: int, owner_id: int, title=None, status=None):
-    db = get_db()
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-
-    updates = []
-    params = []
-    if title is not None:
-        updates.append("title = ?")
-        params.append(title)
-    if status is not None:
-        updates.append("status = ?")
-        params.append(status)
-    if updates:
-        params.append(task_id)
-        params.append(owner_id)
-        db.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-            params,
-        )
-        db.commit()
-    return get_task(task_id, owner_id)
+# Repositories are stateless aside from the ``get_db`` accessor they hold,
+# so a single module-level instance per table is reused across requests;
+# ``get_db`` itself resolves to the correct per-request connection (via
+# Flask's ``g``) each time it's called.
+user_repository = UserRepository(get_db)
+task_repository = TaskRepository(get_db)
 
 
 # ── JWT helpers ──────────────────────────────────────────────
@@ -216,7 +81,7 @@ def login_required(view):
         except jwt.InvalidTokenError:
             return jsonify({"error": "invalid token"}), 401
 
-        user = get_user_by_id(payload.get("user_id"))
+        user = user_repository.get_by_id(payload.get("user_id"))
         if user is None:
             return jsonify({"error": "invalid token"}), 401
 
@@ -260,7 +125,7 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
             return jsonify({"error": "email must be a non-empty string"}), 400
 
         username = username.strip()
-        if get_user_by_username(username) is not None:
+        if user_repository.get_by_username(username) is not None:
             return jsonify({"error": "username already exists"}), 409
 
         # Notifications need *some* address to send to; default to a
@@ -270,7 +135,7 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
 
         password_hash = generate_password_hash(password)
         try:
-            user = create_user(username, password_hash, email)
+            user = user_repository.create(username, password_hash, email)
         except sqlite3.IntegrityError:
             return jsonify({"error": "username already exists"}), 409
 
@@ -293,7 +158,7 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
         ):
             return jsonify({"error": "username and password are required"}), 400
 
-        user = get_user_by_username(username.strip())
+        user = user_repository.get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "invalid username or password"}), 401
 
@@ -313,18 +178,18 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
         title = data.get("title")
         if not isinstance(title, str) or not title.strip():
             return jsonify({"error": "title is required"}), 400
-        task = create_task(title.strip(), g.current_user["id"])
+        task = task_repository.create(title.strip(), g.current_user["id"])
         return jsonify(task), 201
 
     @app.route("/tasks", methods=["GET"])
     @login_required
     def list_tasks():
-        return jsonify(get_tasks(g.current_user["id"]))
+        return jsonify(task_repository.get_all(g.current_user["id"]))
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @login_required
     def show_task(task_id: int):
-        task = get_task(task_id, g.current_user["id"])
+        task = task_repository.get_by_id(task_id, g.current_user["id"])
         if task is None:
             return jsonify({"error": "task not found"}), 404
         return jsonify(task)
@@ -332,7 +197,7 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
     @app.route("/tasks/<int:task_id>", methods=["PUT"])
     @login_required
     def edit_task(task_id: int):
-        existing = get_task(task_id, g.current_user["id"])
+        existing = task_repository.get_by_id(task_id, g.current_user["id"])
         if existing is None:
             return jsonify({"error": "task not found"}), 404
 
@@ -351,7 +216,7 @@ def create_app(database: str = None, jwt_secret: str = None) -> Flask:
             return jsonify({"error": "title and/or status is required"}), 400
 
         new_status = status.strip() if status is not None else None
-        task = update_task(
+        task = task_repository.update(
             task_id,
             g.current_user["id"],
             title=title.strip() if title is not None else None,
