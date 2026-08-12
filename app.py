@@ -6,6 +6,8 @@ Designed as a baseline for multi-session stories.
 """
 
 from flask import Flask, request, jsonify, g
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 from functools import wraps
 import sqlite3
@@ -21,6 +23,22 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-do-not-use-i
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24
+RATE_LIMIT_STORAGE_URL = os.environ.get("RATE_LIMIT_STORAGE_URL", "redis://localhost:6379/0")
+
+
+def get_rate_limit_key():
+    user_id = getattr(g, "user_id", None)
+    if user_id is not None:
+        return f"user:{user_id}"
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=get_rate_limit_key,
+    storage_uri=RATE_LIMIT_STORAGE_URL,
+    headers_enabled=True,
+    app=app,
+)
 
 
 def get_db():
@@ -58,6 +76,13 @@ def init_db():
             conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         except sqlite3.OperationalError:
             pass
+
+
+@app.errorhandler(429)
+def ratelimit_error(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    return response
 
 
 # ── Auth helpers ─────────────────────────────────────────────────
@@ -105,6 +130,7 @@ def notify_task_completion(user_email, task_title):
 # ── Auth routes ──────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -119,6 +145,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -136,12 +163,20 @@ def login():
 
 @app.route("/tasks", methods=["GET"])
 @require_auth
+@limiter.limit("100 per minute")
 def list_tasks():
-    return jsonify(task_repo.find_all(g.user_id))
+    cursor = request.args.get("cursor", None, type=int)
+    limit = request.args.get("limit", 20, type=int)
+    limit = max(1, min(limit, 100))
+    tasks, next_cursor, total = task_repo.find_all_paginated(
+        g.user_id, cursor=cursor, limit=limit
+    )
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
 @require_auth
+@limiter.limit("100 per minute")
 def add_task():
     data = request.get_json(silent=True) or {}
     title = data.get("title", "").strip()
@@ -153,6 +188,7 @@ def add_task():
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
+@limiter.limit("100 per minute")
 def show_task(task_id: int):
     task = task_repo.find_by_id(task_id, g.user_id)
     if task is None:
@@ -162,6 +198,7 @@ def show_task(task_id: int):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
+@limiter.limit("100 per minute")
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")

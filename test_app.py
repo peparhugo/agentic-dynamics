@@ -1,8 +1,10 @@
-import pytest
 import os
+os.environ["RATE_LIMIT_STORAGE_URL"] = "memory://"
+
+import pytest
 import tempfile
 from unittest.mock import patch
-from app import app, init_db, get_db
+from app import app, init_db, get_db, limiter
 
 
 @pytest.fixture
@@ -54,6 +56,13 @@ def auth_headers_with_email(client):
 
 def assert_task_keys(task):
     assert set(task.keys()) == {"id", "title", "status", "created_at"}
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    limiter.reset()
+    yield
+    limiter.reset()
 
 
 class TestPostTasks:
@@ -112,7 +121,9 @@ class TestGetTasks:
         response = client.get("/tasks", headers=auth_headers)
         assert response.status_code == 200
         data = response.get_json()
-        assert data == []
+        assert data["data"] == []
+        assert data["next_cursor"] is None
+        assert data["total"] == 0
 
     def test_list_tasks_ordered_by_created_at_desc(self, client, auth_headers):
         client.post(
@@ -126,8 +137,8 @@ class TestGetTasks:
         )
         response = client.get("/tasks", headers=auth_headers)
         data = response.get_json()
-        assert len(data) == 3
-        titles = [t["title"] for t in data]
+        assert len(data["data"]) == 3
+        titles = [t["title"] for t in data["data"]]
         assert titles == ["Third", "Second", "First"]
 
     def test_list_tasks_after_create(self, client, auth_headers):
@@ -136,9 +147,9 @@ class TestGetTasks:
         )
         response = client.get("/tasks", headers=auth_headers)
         data = response.get_json()
-        assert len(data) == 1
-        assert_task_keys(data[0])
-        assert data[0]["title"] == "Task 1"
+        assert len(data["data"]) == 1
+        assert_task_keys(data["data"][0])
+        assert data["data"][0]["title"] == "Task 1"
 
 
 class TestGetTask:
@@ -393,10 +404,10 @@ class TestUserIsolation:
 
         alice_tasks = client.get(
             "/tasks", headers={"Authorization": f"Bearer {alice_token}"}
-        ).get_json()
+        ).get_json()["data"]
         bob_tasks = client.get(
             "/tasks", headers={"Authorization": f"Bearer {bob_token}"}
-        ).get_json()
+        ).get_json()["data"]
 
         assert len(alice_tasks) == 1
         assert alice_tasks[0]["title"] == "Alice Task"
@@ -573,3 +584,163 @@ class TestNotification:
             )
             assert resp.status_code == 200
             mock_notify.assert_not_called()
+
+
+class TestRateLimiting:
+
+    def test_authenticated_user_limited(self, client, auth_headers):
+        for _ in range(100):
+            resp = client.get("/tasks", headers=auth_headers)
+            assert resp.status_code == 200
+
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 429
+        data = resp.get_json()
+        assert "error" in data
+
+    def test_rate_limit_retry_after_header(self, client, auth_headers):
+        for _ in range(100):
+            client.get("/tasks", headers=auth_headers)
+
+        resp = client.get("/tasks", headers=auth_headers)
+        assert resp.status_code == 429
+        assert "Retry-After" in resp.headers
+        assert int(resp.headers["Retry-After"]) > 0
+
+    def test_rate_limit_per_user_isolation(self, client):
+        client.post(
+            "/auth/register", json={"username": "u1", "password": "p"}
+        )
+        client.post(
+            "/auth/register", json={"username": "u2", "password": "p"}
+        )
+        t1 = client.post(
+            "/auth/login", json={"username": "u1", "password": "p"}
+        ).get_json()["token"]
+        t2 = client.post(
+            "/auth/login", json={"username": "u2", "password": "p"}
+        ).get_json()["token"]
+        h1 = {"Authorization": f"Bearer {t1}"}
+        h2 = {"Authorization": f"Bearer {t2}"}
+
+        for _ in range(100):
+            resp = client.get("/tasks", headers=h1)
+            assert resp.status_code == 200
+
+        resp = client.get("/tasks", headers=h1)
+        assert resp.status_code == 429
+
+        resp = client.get("/tasks", headers=h2)
+        assert resp.status_code == 200
+
+    def test_rate_limit_on_auth_endpoint(self, client):
+        for i in range(100):
+            resp = client.post(
+                "/auth/register",
+                json={"username": f"u{i}", "password": "p"},
+            )
+            assert resp.status_code in (201, 409)
+
+        resp = client.post(
+            "/auth/register", json={"username": "overflow", "password": "p"}
+        )
+        assert resp.status_code == 429
+
+
+class TestPagination:
+
+    def test_default_limit_20(self, client, auth_headers):
+        for i in range(25):
+            client.post(
+                "/tasks", json={"title": f"Task {i}"}, headers=auth_headers
+            )
+
+        resp = client.get("/tasks", headers=auth_headers)
+        data = resp.get_json()
+        assert len(data["data"]) == 20
+        assert data["next_cursor"] is not None
+        assert data["total"] == 25
+
+    def test_custom_limit(self, client, auth_headers):
+        for i in range(15):
+            client.post(
+                "/tasks", json={"title": f"Task {i}"}, headers=auth_headers
+            )
+
+        resp = client.get("/tasks?limit=5", headers=auth_headers)
+        data = resp.get_json()
+        assert len(data["data"]) == 5
+        assert data["next_cursor"] is not None
+        assert data["total"] == 15
+
+    def test_cursor_walk_all_pages(self, client, auth_headers):
+        for i in range(25):
+            client.post(
+                "/tasks", json={"title": f"Task {i}"}, headers=auth_headers
+            )
+
+        resp = client.get("/tasks?limit=10", headers=auth_headers)
+        page1 = resp.get_json()
+        assert len(page1["data"]) == 10
+        cursor = page1["next_cursor"]
+        assert cursor is not None
+
+        resp = client.get(
+            f"/tasks?limit=10&cursor={cursor}", headers=auth_headers
+        )
+        page2 = resp.get_json()
+        assert len(page2["data"]) == 10
+        cursor = page2["next_cursor"]
+        assert cursor is not None
+
+        resp = client.get(
+            f"/tasks?limit=10&cursor={cursor}", headers=auth_headers
+        )
+        page3 = resp.get_json()
+        assert len(page3["data"]) == 5
+        assert page3["next_cursor"] is None
+
+    def test_no_more_pages(self, client, auth_headers):
+        for i in range(3):
+            client.post(
+                "/tasks", json={"title": f"Task {i}"}, headers=auth_headers
+            )
+
+        resp = client.get("/tasks", headers=auth_headers)
+        data = resp.get_json()
+        assert len(data["data"]) == 3
+        assert data["next_cursor"] is None
+        assert data["total"] == 3
+
+    def test_limit_clamped_max_100(self, client, auth_headers):
+        resp = client.get("/tasks?limit=200", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["total"] == 0
+
+    def test_limit_clamped_min_1(self, client, auth_headers):
+        resp = client.get("/tasks?limit=0", headers=auth_headers)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["total"] == 0
+
+    def test_total_reflects_user_scoped_counts(self, client):
+        client.post("/auth/register", json={"username": "a", "password": "p"})
+        client.post("/auth/register", json={"username": "b", "password": "p"})
+        ta = client.post(
+            "/auth/login", json={"username": "a", "password": "p"}
+        ).get_json()["token"]
+        tb = client.post(
+            "/auth/login", json={"username": "b", "password": "p"}
+        ).get_json()["token"]
+        ha = {"Authorization": f"Bearer {ta}"}
+        hb = {"Authorization": f"Bearer {tb}"}
+
+        client.post("/tasks", json={"title": "A1"}, headers=ha)
+        client.post("/tasks", json={"title": "A2"}, headers=ha)
+        client.post("/tasks", json={"title": "B1"}, headers=hb)
+
+        data_a = client.get("/tasks", headers=ha).get_json()
+        data_b = client.get("/tasks", headers=hb).get_json()
+        assert data_a["total"] == 2
+        assert data_b["total"] == 1

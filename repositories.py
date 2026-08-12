@@ -82,6 +82,31 @@ class TaskRepository(BaseRepository):
     def exists(self, task_id: int) -> bool:
         return self._fetch_one("SELECT 1 FROM tasks WHERE id = ?", (task_id,)) is not None
 
+    def find_all_paginated(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> tuple[list[dict], str | None, int]:
+        total = self._fetch_one(
+            "SELECT COUNT(*) as cnt FROM tasks WHERE owner_id = ?",
+            (owner_id,),
+        )
+        total = total["cnt"] if total else 0
+
+        if cursor is None:
+            rows = self._fetch_all(
+                "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                (owner_id, limit + 1),
+            )
+        else:
+            rows = self._fetch_all(
+                "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                (owner_id, cursor, limit + 1),
+            )
+
+        has_more = len(rows) > limit
+        if has_more:
+            rows = rows[:limit]
+
+        next_cursor = str(rows[-1]["id"]) if (has_more and rows) else None
+        return rows, next_cursor, total
+
     def update(self, task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
         task = self.find_by_id(task_id, owner_id)
         if task is None:
