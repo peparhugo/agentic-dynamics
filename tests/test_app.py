@@ -4,6 +4,7 @@ from urllib.request import urlopen
 
 import pytest
 import pytest_asyncio
+from redis.asyncio import Redis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -139,3 +140,68 @@ async def test_channel_endpoints_list_subscribers_and_clean_up(server):
         assert json.loads(response.read()) == {
             "channel": "system", "subscribers": [client_id]
         }
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    instance = NotificationServer(
+        "127.0.0.1", 0, database_url=f"sqlite:///{tmp_path / 'messages.sqlite'}"
+    )
+    await instance.start()
+    try:
+        async with connect(f"ws://127.0.0.1:{instance.port}") as client:
+            await client.recv()
+            await client.send(json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+            await client.recv()
+            await client.send(json.dumps({"type": "direct", "payload": {"client_id": "missing", "n": 2}}))
+        response = await asyncio.to_thread(
+            urlopen, f"http://127.0.0.1:{instance.port}/messages?limit=1&offset=1"
+        )
+        body = json.loads(response.read())
+        assert body["limit"] == 1
+        assert body["offset"] == 1
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["payload"] == {"client_id": "missing", "n": 2}
+    finally:
+        await instance.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_broker_delivers_between_server_instances(tmp_path):
+    redis_url = "redis://127.0.0.1:6379/15"
+    redis = Redis.from_url(redis_url)
+    try:
+        await redis.ping()
+    except Exception:
+        await redis.close()
+        pytest.skip("Redis is not running")
+    await redis.flushdb()
+    first = NotificationServer(
+        "127.0.0.1", 0, redis_url=redis_url,
+        database_url=f"sqlite:///{tmp_path / 'first.sqlite'}",
+    )
+    second = NotificationServer(
+        "127.0.0.1", 0, redis_url=redis_url,
+        database_url=f"sqlite:///{tmp_path / 'second.sqlite'}",
+    )
+    await first.start()
+    await second.start()
+    try:
+        async with (
+            connect(f"ws://127.0.0.1:{first.port}") as subscriber,
+            connect(f"ws://127.0.0.1:{second.port}") as publisher,
+        ):
+            await subscriber.recv()
+            await publisher.recv()
+            await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+            await subscriber.recv()
+            await publisher.send(json.dumps({
+                "type": "broadcast", "channel": "alerts", "payload": {"text": "redis"}
+            }))
+            received = await asyncio.wait_for(receive_json(subscriber), timeout=2)
+            assert received["payload"] == {"text": "redis"}
+    finally:
+        await first.stop()
+        await second.stop()
+        await redis.flushdb()
+        await redis.close()
