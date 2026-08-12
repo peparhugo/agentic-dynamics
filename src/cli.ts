@@ -2,7 +2,7 @@ import { buildSite } from './generator';
 import { startDevServer } from './server';
 
 function usage(): void {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]');
   console.error('       ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]');
 }
 
@@ -41,8 +41,10 @@ async function main(): Promise<void> {
       contentDir: option(args, '--content'),
       outputDir: option(args, '--output'),
       templatesDir: option(args, '--templates'),
+      incremental: args.includes('--incremental'),
+      clean: args.includes('--clean'),
     });
-    console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
+    console.log(`Built ${pages.stats.pagesBuilt} page${pages.stats.pagesBuilt === 1 ? '' : 's'}, skipped ${pages.stats.pagesSkipped}. Time saved: ${pages.stats.timeSavedMs}ms.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : error);
     process.exitCode = 1;

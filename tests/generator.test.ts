@@ -52,3 +52,48 @@ describe('buildSite templates', () => {
     expect(page.html).toBe('<html><section>Hello <p>Welcome</p>\n</section></html>');
   });
 });
+
+describe('incremental builds', () => {
+  it('builds once, skips unchanged pages, and invalidates changed sources', async () => {
+    const paths = await fixture();
+    await fs.writeFile(path.join(paths.content, 'one.md'), '# One');
+    await fs.writeFile(path.join(paths.content, 'two.md'), '# Two');
+
+    const first = await buildSite({ ...paths, incremental: true });
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0, incremental: true });
+    expect(JSON.parse(await fs.readFile(path.join(paths.output, '.ssg-cache.json'), 'utf8')).entries['one.md'].sourceHash).toBeDefined();
+
+    const second = await buildSite({ ...paths, incremental: true });
+    expect(second.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await fs.writeFile(path.join(paths.content, 'one.md'), '# Updated');
+    const third = await buildSite({ ...paths, incremental: true });
+    expect(third.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(await fs.readFile(path.join(paths.output, 'one.html'), 'utf8')).toContain('Updated');
+    expect(await fs.readFile(path.join(paths.output, 'two.html'), 'utf8')).toContain('Two');
+  });
+
+  it('invalidates every page when a template changes', async () => {
+    const paths = await fixture();
+    await fs.writeFile(path.join(paths.content, 'one.md'), '# One');
+    await fs.writeFile(path.join(paths.content, 'two.md'), '# Two');
+    await fs.writeFile(path.join(paths.templates, 'default.hbs'), '<div>{{{content}}}</div>');
+
+    await buildSite({ ...paths, incremental: true });
+    await fs.writeFile(path.join(paths.templates, 'default.hbs'), '<section>{{{content}}}</section>');
+    const result = await buildSite({ ...paths, incremental: true });
+
+    expect(result.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(await fs.readFile(path.join(paths.output, 'one.html'), 'utf8')).toContain('<section>');
+  });
+
+  it('performs a clean rebuild when requested', async () => {
+    const paths = await fixture();
+    await fs.writeFile(path.join(paths.content, 'one.md'), '# One');
+    await buildSite({ ...paths, incremental: true });
+    await fs.writeFile(path.join(paths.content, 'two.md'), '# Two');
+    const result = await buildSite({ ...paths, incremental: true, clean: true });
+
+    expect(result.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+  });
+});
