@@ -18,6 +18,17 @@ async def health_count(server: NotificationServer) -> int:
     return json.loads(response.split(b"\r\n\r\n", 1)[1])["connected_clients"]
 
 
+async def http_json(server: NotificationServer, path: str) -> tuple[str, dict]:
+    reader, writer = await asyncio.open_connection("127.0.0.1", server.http_port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    status = response.split(b"\r\n", 1)[0].decode()
+    return status, json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 @pytest_asyncio.fixture
 async def server():
     instance = NotificationServer(websocket_port=0, http_port=0)
@@ -89,3 +100,56 @@ async def test_direct_message_only_reaches_target(server):
     finally:
         await sender.close()
         await target.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_only_reaches_subscribers(server):
+    subscribed = await websockets.connect(f"ws://127.0.0.1:{server.websocket_port}")
+    other = await websockets.connect(f"ws://127.0.0.1:{server.websocket_port}")
+    try:
+        await asyncio.gather(subscribed.recv(), other.recv())
+        await subscribed.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+        for _ in range(20):
+            if "alerts" in server.channels:
+                break
+            await asyncio.sleep(0.01)
+        await server.broadcast({"text": "warning"}, channel="alerts")
+        received = json.loads(await subscribed.recv())
+        assert received["channel"] == "alerts"
+        assert received["payload"] == {"text": "warning"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other.recv(), timeout=0.05)
+    finally:
+        await subscribed.close()
+        await other.close()
+
+
+@pytest.mark.asyncio
+async def test_subscriptions_are_dynamic_and_exposed_over_http(server):
+    client = await websockets.connect(f"ws://127.0.0.1:{server.websocket_port}")
+    try:
+        client_id = json.loads(await client.recv())["payload"]["client_id"]
+        await client.send(json.dumps({
+            "type": "subscribe", "payload": {"channel": "system"},
+        }))
+        for _ in range(20):
+            if "system" in server.channels:
+                break
+            await asyncio.sleep(0.01)
+        status, listing = await http_json(server, "/channels")
+        assert status == "HTTP/1.1 200 OK"
+        assert listing == {"channels": [{"name": "system", "subscriber_count": 1}]}
+        status, subscribers = await http_json(server, "/channels/system/subscribers")
+        assert status == "HTTP/1.1 200 OK"
+        assert subscribers == {"channel": "system", "subscribers": [client_id]}
+
+        await client.send(json.dumps({"type": "unsubscribe", "channel": "system", "payload": {}}))
+        for _ in range(20):
+            if "system" not in server.channels:
+                break
+            await asyncio.sleep(0.01)
+        status, listing = await http_json(server, "/channels")
+        assert status == "HTTP/1.1 200 OK"
+        assert listing == {"channels": []}
+    finally:
+        await client.close()
