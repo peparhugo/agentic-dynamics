@@ -25,6 +25,7 @@ from celery_config import (
     CELERY_RESULT_BACKEND,
     CELERY_TASK_ROUTES,
 )
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -52,6 +53,10 @@ def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+task_repository = TaskRepository(get_db)
+user_repository = UserRepository(get_db)
 
 
 def migrate_db():
@@ -115,11 +120,7 @@ def get_user_from_token(token: str) -> dict | None:
         return None
     if user_id is None:
         return None
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    return dict(row) if row else None
+    return user_repository.get_by_id(user_id)
 
 
 def require_auth(f):
@@ -168,17 +169,9 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     if len(password) < 8:
         return jsonify({"error": "password must be at least 8 characters"}), 400
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing:
-            return jsonify({"error": "username already taken"}), 409
-        conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, generate_password_hash(password)),
-        )
-        conn.commit()
+    if user_repository.get_by_username(username) is not None:
+        return jsonify({"error": "username already taken"}), 409
+    user_repository.create_user(username, generate_password_hash(password))
     return jsonify({"message": "user registered", "username": username}), 201
 
 
@@ -189,10 +182,7 @@ def login():
     password = data.get("password", "")
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
+    row = user_repository.get_by_username(username)
     if row is None or not check_password_hash(row["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     token = create_token(row["id"])
@@ -213,70 +203,43 @@ def create_task(user: dict):
     if status not in VALID_STATUSES:
         return jsonify({"error": "invalid status"}), 400
     now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, owner_id, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (title, status, user["id"], now),
-        )
-        conn.commit()
-        task_id = cursor.lastrowid
-    return jsonify({
-        "id": task_id,
-        "title": title,
-        "status": status,
-        "owner_id": user["id"],
-        "created_at": now,
-    }), 201
+    task = task_repository.create(
+        title=title, status=status, owner_id=user["id"], created_at=now
+    )
+    return jsonify(task), 201
 
 
 @app.get("/tasks")
 @require_auth
 def list_tasks(user: dict):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    rows = task_repository.list_by_owner(user["id"])
+    return jsonify(rows)
 
 
 @app.get("/tasks/<int:task_id>")
 @require_auth
 def get_task(user: dict, task_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
+    row = task_repository.get_by_id_and_owner(task_id, user["id"])
     if row is None:
         return jsonify({"error": "task not found"}), 404
-    return jsonify(dict(row))
+    return jsonify(row)
 
 
 @app.put("/tasks/<int:task_id>")
 @require_auth
 def update_task(user: dict, task_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
-        data = request.get_json(silent=True) or {}
-        title = data.get("title", row["title"])
-        status = data.get("status", row["status"])
-        if not title or not str(title).strip():
-            return jsonify({"error": "title is required"}), 400
-        title = str(title).strip()
-        if status not in VALID_STATUSES:
-            return jsonify({"error": "invalid status"}), 400
-        conn.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
-            (title, status, task_id, user["id"]),
-        )
-        conn.commit()
+    row = task_repository.get_by_id_and_owner(task_id, user["id"])
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
+    data = request.get_json(silent=True) or {}
+    title = data.get("title", row["title"])
+    status = data.get("status", row["status"])
+    if not title or not str(title).strip():
+        return jsonify({"error": "title is required"}), 400
+    title = str(title).strip()
+    if status not in VALID_STATUSES:
+        return jsonify({"error": "invalid status"}), 400
+    task_repository.update_for_owner(task_id, user["id"], title=title, status=status)
     if status == "completed" and row["status"] != "completed":
         queue_notification_email(owner_email(user), title)
     return jsonify({
@@ -291,18 +254,8 @@ def update_task(user: dict, task_id: int):
 @app.delete("/tasks/<int:task_id>")
 @require_auth
 def delete_task(user: dict, task_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
-        conn.execute(
-            "DELETE FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user["id"]),
-        )
-        conn.commit()
+    if not task_repository.delete_for_owner(task_id, user["id"]):
+        return jsonify({"error": "task not found"}), 404
     return jsonify({"message": "task deleted"})
 
 
