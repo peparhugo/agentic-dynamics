@@ -3,7 +3,7 @@ import { buildSite } from './site-generator';
 import { startDevServer } from './dev-server';
 
 function usage(): void {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  console.error('Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>]');
   console.error('       ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]');
 }
 
@@ -12,12 +12,16 @@ interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function parseOptions(args: string[], allowPort = false): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
+    if (option === '--incremental') { options.incremental = true; continue; }
+    if (option === '--clean') { options.clean = true; continue; }
     if (option !== '--content' && option !== '--output' && option !== '--templates' && (!allowPort || option !== '--port')) {
       throw new Error(`Unknown option: ${option}`);
     }
@@ -45,7 +49,7 @@ async function main(): Promise<void> {
   try {
     if (command === 'build') {
       const result = await buildSite(parseOptions(args));
-      console.log(`Built ${result.pages.length} page${result.pages.length === 1 ? '' : 's'}.`);
+      console.log(`Built ${result.stats.pagesBuilt} page${result.stats.pagesBuilt === 1 ? '' : 's'}, skipped ${result.stats.pagesSkipped}; saved ${result.stats.timeSaved}ms.`);
     } else {
       await startDevServer(parseOptions(args, true));
     }

@@ -101,4 +101,58 @@ describe('buildSite', () => {
     await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
     expect(await fs.readFile(path.join(output, 'page.html'), 'utf8')).toBe('<h1>Custom</h1><p>Content</p>\n');
   });
+
+  test('skips unchanged pages on an incremental build and restores cached HTML', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+
+    const first = await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const second = await buildSite({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(second.stats.pagesBuilt).toBe(0);
+    expect(second.stats.pagesSkipped).toBe(2);
+    expect(second.stats.timeSaved).toBeGreaterThan(0);
+    expect(await fs.readFile(path.join(output, 'one.html'), 'utf8')).toContain('<h1 id="one">One</h1>');
+    expect(JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8')).pages['one.md']).toBeDefined();
+  });
+
+  test('rebuilds only changed pages and invalidates all pages when a template changes', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{body}}}</article>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    await fs.writeFile(path.join(content, 'two.md'), '# Changed');
+    const changed = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    expect(changed.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(await fs.readFile(path.join(output, 'two.html'), 'utf8')).toContain('Changed');
+
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section>{{{body}}}</section>');
+    const templateChanged = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    expect(templateChanged.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(await fs.readFile(path.join(output, 'one.html'), 'utf8')).toContain('<section>');
+  });
+
+  test('clean forces an incremental rebuild', async () => {
+    const root = await temporaryDirectory();
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Page');
+
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const clean = await buildSite({ contentDir: content, outputDir: output, incremental: true, clean: true });
+    expect(clean.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+  });
 });
