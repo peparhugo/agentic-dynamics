@@ -1,175 +1,78 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import matter from 'gray-matter';
-import { marked } from 'marked';
+import type { Plugin, PluginConfig, PluginContext } from './plugin';
+import { MarkdownPlugin, pageFromMarkdown } from './plugins/markdown';
+import { TemplatePlugin } from './plugins/template';
+export { renderTemplate } from './template';
+export * from './plugin';
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/template';
+export { DevServerPlugin } from './plugins/dev-server';
 
-export interface Frontmatter {
-  title?: string;
-  date?: string | Date;
-  tags?: string[] | string;
-  [key: string]: unknown;
-}
-
-export interface SitePage {
-  title: string;
-  date?: string;
-  tags: string[];
-  source: string;
-  output: string;
-  template?: string;
-  layout?: string;
-}
-
-export interface BuildOptions {
-  contentDir?: string;
-  outputDir?: string;
-  templatesDir?: string;
-}
+export interface Frontmatter { title?: string; date?: string | Date; tags?: string[] | string; [key: string]: unknown; }
+export interface SitePage { title: string; date?: string; tags: string[]; source: string; output: string; template?: string; layout?: string; }
+export interface BuildOptions { contentDir?: string; outputDir?: string; templatesDir?: string; plugins?: PluginConfig[]; configFile?: string; }
 
 function markdownFiles(directory: string): string[] {
   if (!fs.existsSync(directory)) return [];
-
   const files: string[] = [];
   for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-    const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) files.push(...markdownFiles(entryPath));
-    else if (/\.md$/i.test(entry.name)) files.push(entryPath);
+    const file = path.join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...markdownFiles(file));
+    else if (/\.md$/i.test(entry.name)) files.push(file);
   }
   return files.sort((a, b) => a.localeCompare(b));
 }
 
-function stringValue(value: unknown): string | undefined {
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
-  if (typeof value === 'string' || typeof value === 'number') return String(value);
-  return undefined;
-}
-
-function tagsValue(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String);
-  if (typeof value === 'string') return value.split(',').map((tag) => tag.trim()).filter(Boolean);
-  return [];
-}
-
-function pageFromMarkdown(file: string, contentDir: string): SitePage {
-  const parsed = matter(fs.readFileSync(file, 'utf8'));
-  const data = parsed.data as Frontmatter;
-  const relative = path.relative(contentDir, file);
-  const output = relative.replace(/\.md$/i, '.html').split(path.sep).join('/');
-  const fallbackTitle = path.basename(relative, path.extname(relative));
-
-  return {
-    title: stringValue(data.title) ?? fallbackTitle,
-    date: stringValue(data.date),
-    tags: tagsValue(data.tags),
-    source: relative.split(path.sep).join('/'),
-    output,
-    ...(stringValue(data.template) ? { template: stringValue(data.template) } : {}),
-    ...(stringValue(data.layout) ? { layout: stringValue(data.layout) } : {}),
-  };
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+function loadPlugins(options: BuildOptions): Plugin[] {
+  const configPath = path.resolve(options.configFile ?? './ssg.config.ts');
+  let configured: PluginConfig[] = options.plugins ?? [];
+  if (options.plugins === undefined && fs.existsSync(configPath)) {
+    // Config is intentionally required at build time so it works with ts-jest and ts-node.
+    const loaded = require(configPath) as { default?: PluginConfig[] | { plugins?: PluginConfig[] }; plugins?: PluginConfig[] };
+    const value = loaded.default ?? loaded;
+    configured = Array.isArray(value) ? value : value.plugins ?? [];
+  }
+  return configured.map((entry) => {
+    if (typeof entry === 'string') {
+      const loaded = require(path.resolve(entry));
+      return (loaded.default ?? loaded) as Plugin;
+    }
+    return typeof entry === 'function' ? entry() : entry;
+  });
 }
 
 function indexHtml(pages: SitePage[]): string {
-  const items = pages.map((page) => {
-    const metadata = page.date ? ` <time>${escapeHtml(page.date)}</time>` : '';
-    return `    <li><a href="${escapeHtml(page.output)}">${escapeHtml(page.title)}</a>${metadata}</li>`;
-  }).join('\n');
+  const escape = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const items = pages.map((page) => `    <li><a href="${escape(page.output)}">${escape(page.title)}</a>${page.date ? ` <time>${escape(page.date)}</time>` : ''}</li>`).join('\n');
   return `<!doctype html>\n<html>\n<head><meta charset="utf-8"><title>Index</title></head>\n<body>\n  <h1>Pages</h1>\n  <ul>\n${items}\n  </ul>\n</body>\n</html>\n`;
-}
-
-type TemplateContext = Record<string, unknown>;
-
-function templateValue(value: unknown): string {
-  if (value === null || value === undefined || value === false) return '';
-  if (Array.isArray(value)) return value.join(', ');
-  return String(value);
-}
-
-function lookup(context: TemplateContext, key: string): unknown {
-  if (key === 'this' || key === '.') return context;
-  return key.split('.').reduce<unknown>((value, part) => {
-    if (value && typeof value === 'object') return (value as Record<string, unknown>)[part];
-    return undefined;
-  }, context);
-}
-
-function templateName(name: string): string {
-  return name.endsWith('.hbs') ? name : `${name}.hbs`;
-}
-
-function readTemplate(directory: string, name: string, kind: 'template' | 'layout'): string | undefined {
-  const base = kind === 'layout' ? path.join(directory, 'layouts') : directory;
-  const candidate = path.resolve(base, templateName(name));
-  if (!candidate.startsWith(`${path.resolve(base)}${path.sep}`)) {
-    throw new Error(`Invalid ${kind} path: ${name}`);
-  }
-  return fs.existsSync(candidate) ? fs.readFileSync(candidate, 'utf8') : undefined;
-}
-
-function readPartial(directory: string, name: string): string {
-  const partial = readTemplate(path.join(directory, 'partials'), name, 'template');
-  if (partial === undefined) throw new Error(`Partial not found: ${name}`);
-  return partial;
-}
-
-/** Render the small, intentionally data-only Handlebars subset used by sites. */
-export function renderTemplate(source: string, context: TemplateContext, templatesDir?: string): string {
-  const directory = templatesDir ?? path.resolve('./templates');
-  let rendered = source.replace(/\{\{!([\s\S]*?)\}\}/g, '');
-  rendered = rendered.replace(/\{\{>\s*([^\s}]+)(?:\s+([^}]+))?\s*\}\}/g, (_match, name: string, partialContext?: string) => {
-    const values = partialContext ? lookup(context, partialContext.trim()) : context;
-    const child = values && typeof values === 'object' ? values as TemplateContext : context;
-    return renderTemplate(readPartial(directory, name), child, directory);
-  });
-  rendered = rendered.replace(/\{\{\{\s*([^}]+?)\s*\}\}\}/g, (_match, key: string) =>
-    templateValue(lookup(context, key.trim())));
-  return rendered.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_match, key: string) =>
-    escapeHtml(templateValue(lookup(context, key.trim()))));
-}
-
-function renderPage(parsedContent: string, page: SitePage, data: Frontmatter, templatesDir: string): string {
-  const body = marked.parse(parsedContent) as string;
-  const template = page.template
-    ? readTemplate(templatesDir, page.template, 'template')
-    : readTemplate(templatesDir, 'default', 'template');
-  if (page.template && template === undefined) throw new Error(`Template not found: ${page.template}`);
-
-  const context: TemplateContext = { ...data, page, title: page.title, body, content: body };
-  let result = template === undefined ? body : renderTemplate(template, context, templatesDir);
-  const layoutName = page.layout ?? (readTemplate(templatesDir, 'default', 'layout') !== undefined ? 'default' : undefined);
-  if (layoutName) {
-    const layout = readTemplate(templatesDir, layoutName, 'layout');
-    if (layout === undefined) throw new Error(`Layout not found: ${layoutName}`);
-    result = renderTemplate(layout, { ...context, body: result, content: result }, templatesDir);
-  }
-  return result;
 }
 
 export function buildSite(options: BuildOptions = {}): SitePage[] {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
   const templatesDir = path.resolve(options.templatesDir ?? './templates');
-  const files = markdownFiles(contentDir);
-  const pages: SitePage[] = [];
-
-  fs.rmSync(outputDir, { recursive: true, force: true });
-  fs.mkdirSync(outputDir, { recursive: true });
-
-  for (const file of files) {
-    const parsed = matter(fs.readFileSync(file, 'utf8'));
-    const page = pageFromMarkdown(file, contentDir);
-    const destination = path.join(outputDir, page.output);
-    fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.writeFileSync(destination, renderPage(parsed.content, page, parsed.data as Frontmatter, templatesDir));
-    pages.push(page);
+  const pages = markdownFiles(contentDir).map((file) => pageFromMarkdown(file, contentDir));
+  const context: PluginContext = { options, contentDir, outputDir, templatesDir, pages };
+  const plugins = [new MarkdownPlugin(), ...loadPlugins(options), new TemplatePlugin()];
+  plugins.forEach((plugin) => plugin.onStart?.(context));
+  try {
+    plugins.forEach((plugin) => plugin.beforeBuild?.(context));
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    fs.mkdirSync(outputDir, { recursive: true });
+    pages.forEach((page) => {
+      plugins.forEach((plugin) => plugin.onFile?.(page, context));
+      const rendered = (page as SitePage & { rendered?: string }).rendered ?? '';
+      const destination = path.join(outputDir, page.output);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.writeFileSync(destination, rendered);
+    });
+    pages.sort((a, b) => a.title.localeCompare(b.title));
+    fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml(pages));
+    plugins.forEach((plugin) => plugin.afterBuild?.(context));
+  } finally {
+    plugins.forEach((plugin) => plugin.onEnd?.(context));
   }
-
-  pages.sort((a, b) => a.title.localeCompare(b.title));
-  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml(pages));
   return pages;
 }
 
