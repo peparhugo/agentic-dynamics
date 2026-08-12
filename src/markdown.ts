@@ -28,6 +28,31 @@ function formatDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+export function findMarkdownFiles(contentDir: string): string[] {
+  const results: string[] = [];
+  const walk = (dir: string): void => {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.isFile() && /\.mdx?$/i.test(entry.name)) {
+        results.push(full);
+      }
+    }
+  };
+  walk(contentDir);
+  results.sort();
+  return results;
+}
+
+export function readPages(contentDir: string): Page[] {
+  const files = findMarkdownFiles(contentDir);
+  return files.map((file) =>
+    parseMarkdown(fs.readFileSync(file, 'utf8'), path.relative(contentDir, file))
+  );
+}
+
 export function parseMarkdown(content: string, filePath: string): Page {
   const { data, content: body } = matter(content);
 

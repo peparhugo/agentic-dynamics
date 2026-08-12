@@ -4,7 +4,10 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.slugify = slugify;
+exports.findMarkdownFiles = findMarkdownFiles;
+exports.readPages = readPages;
 exports.parseMarkdown = parseMarkdown;
+const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
 const markdown_it_1 = __importDefault(require("markdown-it"));
 const gray_matter_1 = __importDefault(require("gray-matter"));
@@ -27,6 +30,28 @@ function formatDate(date) {
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     return `${y}-${m}-${d}`;
+}
+function findMarkdownFiles(contentDir) {
+    const results = [];
+    const walk = (dir) => {
+        const entries = fs_1.default.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+            const full = path_1.default.join(dir, entry.name);
+            if (entry.isDirectory()) {
+                walk(full);
+            }
+            else if (entry.isFile() && /\.mdx?$/i.test(entry.name)) {
+                results.push(full);
+            }
+        }
+    };
+    walk(contentDir);
+    results.sort();
+    return results;
+}
+function readPages(contentDir) {
+    const files = findMarkdownFiles(contentDir);
+    return files.map((file) => parseMarkdown(fs_1.default.readFileSync(file, 'utf8'), path_1.default.relative(contentDir, file)));
 }
 function parseMarkdown(content, filePath) {
     const { data, content: body } = (0, gray_matter_1.default)(content);
