@@ -7,186 +7,54 @@ initialized on startup by creating the file if it does not exist.
 Legacy flat-file data is migrated in place: existing tasks without an
 ``owner_id`` keep their data and are assigned ``owner_id: null``, and a
 ``users`` collection is added for JWT-authenticated accounts.
+
+All data access goes through the repository classes in ``repositories``;
+route handlers never touch the store directly.
 """
 
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta, timezone
-import json
 import os
-import threading
 from functools import wraps
 
 import jwt
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash
 
 from celery_tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
 DATA_FILE = os.environ.get("DATA_FILE", "tasks.json")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 JWT_EXPIRES_HOURS = int(os.environ.get("JWT_EXPIRES_HOURS", "24"))
-_lock = threading.RLock()
 
 app.config["SECRET_KEY"] = SECRET_KEY
 
 
-def _empty_store():
-    return {"tasks": [], "users": [], "next_id": 1}
+def _current_data_file() -> str:
+    return DATA_FILE
 
 
-def _migrate(data: dict) -> tuple[dict, bool]:
-    """Bring an existing flat-file store up to the current schema.
-
-    Returns ``(data, changed)`` where ``changed`` is True when the store
-    was modified and should be written back to disk.
-    """
-    changed = False
-    if not isinstance(data, dict):
-        data = {}
-        changed = True
-    if "tasks" not in data:
-        data["tasks"] = []
-        changed = True
-    if "users" not in data:
-        data["users"] = []
-        changed = True
-    if "next_id" not in data or not isinstance(data["next_id"], int):
-        data["next_id"] = 1
-        changed = True
-    for task in data["tasks"]:
-        if not isinstance(task, dict):
-            continue
-        if "owner_id" not in task:
-            task["owner_id"] = None
-            changed = True
-    return data, changed
-
-
-def _read_store() -> dict:
-    with _lock:
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-        except FileNotFoundError:
-            data = _empty_store()
-            _write_store(data)
-            return data
-        except (json.JSONDecodeError, ValueError):
-            data = _empty_store()
-        data, changed = _migrate(data)
-        if changed:
-            _write_store(data)
-        return data
-
-
-def _write_store(data: dict) -> None:
-    tmp = DATA_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(data, fh, indent=2)
-    os.replace(tmp, DATA_FILE)
+task_repository = TaskRepository(_current_data_file)
+user_repository = UserRepository(_current_data_file)
 
 
 def init_store():
     """Initialize the flat-file schema on startup."""
-    _read_store()
+    task_repository._read_store()
 
 
-# ── Models ────────────────────────────────────────────────────
-
-
-def create_user(username: str, password: str) -> dict:
-    with _lock:
-        data = _read_store()
-        if any(u["username"] == username for u in data["users"]):
-            raise ValueError("username already taken")
-        user = {
-            "id": len(data["users"]) + 1,
-            "username": username,
-            "password_hash": generate_password_hash(password),
-        }
-        data["users"].append(user)
-        _write_store(data)
-        return {"id": user["id"], "username": user["username"]}
-
-
-def get_user_by_username(username: str) -> dict | None:
-    data = _read_store()
-    for user in data["users"]:
-        if user["username"] == username:
-            return user
-    return None
-
-
-def get_user_by_id(user_id: int) -> dict | None:
-    data = _read_store()
-    for user in data["users"]:
-        if user["id"] == user_id:
-            return user
-    return None
-
-
-def _user_email(user_id: int) -> str | None:
-    """Resolve an owner's email address (falling back to a derived address)."""
-    user = get_user_by_id(user_id)
-    if user is None:
-        return None
-    return user.get("email") or f"{user['username']}@example.com"
+# ── Auth helpers ─────────────────────────────────────────────
 
 
 def verify_user(username: str, password: str) -> dict | None:
-    user = get_user_by_username(username)
+    user = user_repository.get_by_username(username)
     if user is None:
         return None
     if not check_password_hash(user["password_hash"], password):
         return None
     return {"id": user["id"], "username": user["username"]}
-
-
-def create_task(title: str, owner_id: int) -> dict:
-    with _lock:
-        data = _read_store()
-        task = {
-            "id": data["next_id"],
-            "title": title,
-            "status": "pending",
-            "created_at": datetime.utcnow().isoformat(),
-            "owner_id": owner_id,
-        }
-        data["tasks"].append(task)
-        data["next_id"] += 1
-        _write_store(data)
-        return task
-
-
-def get_tasks(owner_id: int):
-    data = _read_store()
-    tasks = [t for t in data["tasks"] if t.get("owner_id") == owner_id]
-    return sorted(tasks, key=lambda t: t["created_at"], reverse=True)
-
-
-def get_task(task_id: int, owner_id: int) -> dict | None:
-    data = _read_store()
-    for task in data["tasks"]:
-        if task["id"] == task_id and task.get("owner_id") == owner_id:
-            return task
-    return None
-
-
-def update_task(
-    task_id: int, owner_id: int, title: str | None = None, status: str | None = None
-) -> dict | None:
-    with _lock:
-        data = _read_store()
-        for task in data["tasks"]:
-            if task["id"] == task_id and task.get("owner_id") == owner_id:
-                if title is not None:
-                    task["title"] = title
-                if status is not None:
-                    task["status"] = status
-                _write_store(data)
-                return task
-        return None
 
 
 def notify_task_completed(task: dict, owner_id: int) -> None:
@@ -195,13 +63,10 @@ def notify_task_completed(task: dict, owner_id: int) -> None:
     Sending is delegated to Celery (non-blocking): the task is queued via
     ``.delay`` and the API response is returned immediately.
     """
-    email = _user_email(owner_id)
+    email = user_repository.get_email(owner_id)
     if email is None:
         return
     send_notification_email.delay(email, task["title"])
-
-
-# ── Auth ──────────────────────────────────────────────────────
 
 
 def _generate_token(user: dict) -> str:
@@ -229,14 +94,14 @@ def require_auth(f):
             return jsonify({"error": "missing or invalid token"}), 401
         g.user_id = payload.get("sub")
         g.username = payload.get("username")
-        if g.user_id is None or get_user_by_id(g.user_id) is None:
+        if g.user_id is None or user_repository.get(g.user_id) is None:
             return jsonify({"error": "missing or invalid token"}), 401
         return f(*args, **kwargs)
 
     return wrapper
 
 
-# ── Routes: auth ──────────────────────────────────────────────
+# ── Routes: auth ─────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
 def register():
@@ -249,7 +114,7 @@ def register():
         return jsonify({"error": "password is required"}), 400
     username = username.strip()
     try:
-        user = create_user(username, password)
+        user = user_repository.create(username, password)
     except ValueError:
         return jsonify({"error": "username already taken"}), 409
     return jsonify(user), 201
@@ -274,7 +139,7 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    return jsonify(task_repository.list(g.user_id))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -284,14 +149,14 @@ def add_task():
     title = data.get("title")
     if title is None or not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title.strip(), g.user_id)
+    task = task_repository.create(title.strip(), g.user_id)
     return jsonify(task), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
 def show_task(task_id: int):
-    task = get_task(task_id, g.user_id)
+    task = task_repository.get(task_id, g.user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -305,8 +170,8 @@ def edit_task(task_id: int):
     status = data.get("status")
     if title is not None and not isinstance(title, str):
         return jsonify({"error": "title must be a string"}), 400
-    previous = get_task(task_id, g.user_id)
-    task = update_task(task_id, g.user_id, title=title, status=status)
+    previous = task_repository.get(task_id, g.user_id)
+    task = task_repository.update(task_id, g.user_id, title=title, status=status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     if (
