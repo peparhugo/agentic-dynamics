@@ -1,14 +1,10 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""A small SQLite-backed task management API."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
-from flask import Flask, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 import os
+
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -31,29 +27,16 @@ def init_db():
             "  created_at TEXT NOT NULL"
             ")"
         )
-
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+        conn.commit()
 
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
-        conn.commit()
         return {
             "id": cursor.lastrowid,
             "title": title,
@@ -72,13 +55,6 @@ def get_task(task_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
@@ -103,8 +79,6 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
     return get_task(task_id)
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
     return jsonify(get_tasks())
@@ -113,7 +87,8 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
+    title = data.get("title") if isinstance(data, dict) else None
+    title = title.strip() if isinstance(title, str) else ""
     if not title:
         return jsonify({"error": "title is required"}), 400
     task = create_task(title)
@@ -131,14 +106,27 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "request body must be a JSON object"}), 400
+    if "title" not in data and "status" not in data:
+        return jsonify({"error": "title or status is required"}), 400
+    if "title" in data and (not isinstance(data["title"], str) or not data["title"].strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+    if "status" in data and not isinstance(data["status"], str):
+        return jsonify({"error": "status must be a string"}), 400
     task = update_task(
         task_id,
-        title=data.get("title"),
+        title=data.get("title", None).strip() if "title" in data else None,
         status=data.get("status"),
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
+
+
+# Initialize the schema when the application module is loaded, including under
+# WSGI servers and in tests.
+init_db()
 
 
 if __name__ == "__main__":
