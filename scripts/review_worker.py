@@ -2,9 +2,12 @@
 
 Each job: worktree path, commit hash, session number, story metadata.
 Runs the review agent (review_commit or review_story) via opencode SDK bridge.
-Writes results to experiments/results/reviews/.
 
-Designed to run in parallel — multiple workers pop jobs atomically via BRPOP.
+Reliability guarantees:
+  - Failed jobs are re-enqueued with a retry counter (no silent job loss).
+  - Each commit review is written to its own file (review_{story_id}_S{n}.json),
+    eliminating the read-modify-write race when sessions of one story land
+    on different workers. A separate finalize_reviews.py merges them.
 
 Usage:
   python3 scripts/review_worker.py     # single worker
@@ -13,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from datetime import datetime
@@ -32,6 +36,7 @@ REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results"
 
 BLOCK_TIMEOUT = 5
 IDLE_POLLS_BEFORE_EXIT = 6
+MAX_RETRIES = 3
 
 
 def log(msg: str) -> None:
@@ -61,23 +66,40 @@ def _connect_redis() -> redis.Redis:
             delay = min(delay * 2, 30.0)
 
 
-def _load_or_create_review(story_id: str) -> dict:
-    path = REVIEWS_DIR / f"review_{story_id}.json"
-    if path.exists():
-        try:
-            return json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
-    return {"commit_reviews": []}
+def _atomic_write(path: Path, data: dict) -> None:
+    """Write JSON atomically (temp + rename) to avoid partial files."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(data, indent=2))
+    os.replace(tmp, path)
 
 
-def _save_review(story_id: str, data: dict) -> None:
-    path = REVIEWS_DIR / f"review_{story_id}.json"
-    path.write_text(json.dumps(data, indent=2))
+def _write_commit_review(story_id: str, session: int, review_dict: dict) -> None:
+    review_dict = dict(review_dict)
+    review_dict["session_number"] = session
+    path = REVIEWS_DIR / f"review_{story_id}_S{session}.json"
+    _atomic_write(path, review_dict)
+
+
+def _write_story_review(story_id: str, review_dict: dict) -> None:
+    path = REVIEWS_DIR / f"review_{story_id}_story.json"
+    _atomic_write(path, review_dict)
+
+
+def _requeue(r: redis.Redis, job: dict, job_id: str, err: str) -> bool:
+    """Re-enqueue a failed job. Returns True if re-queued (retry), False if dead."""
+    retries = job.get("_retries", 0)
+    if retries >= MAX_RETRIES:
+        return False
+    job["_retries"] = retries + 1
+    r.lpush(QUEUE_KEY, json.dumps(job))
+    r.hset(STATUS_KEY, job_id, f"retry_{retries + 1}")
+    log(f"[{job_id}] FAILED (retry {retries + 1}/{MAX_RETRIES}): {err}")
+    return True
 
 
 def main() -> None:
-    log(f"Started (pid={sys.argv[0]})")
+    log(f"Started (pid={os.getpid()})")
 
     r = _connect_redis()
     log("Redis connected")
@@ -124,6 +146,8 @@ def main() -> None:
 
         if not worktree.exists():
             log(f"[{job_id}] Worktree missing: {worktree}")
+            if _requeue(r, job, job_id, "worktree missing"):
+                continue
             r.hset(STATUS_KEY, job_id, "failed")
             failed += 1
             continue
@@ -134,11 +158,7 @@ def main() -> None:
             if job.get("job_type") == "story_review":
                 log(f"[{job_id}] Story review: {job['story_name']}")
                 review = review_story(worktree, job["story_name"], model=model)
-                data = _load_or_create_review(story_id)
-                data["story_name"] = job["story_name"]
-                data["story_id"] = story_id
-                data["story_review"] = review.to_dict()
-                _save_review(story_id, data)
+                _write_story_review(story_id, review.to_dict())
             else:
                 log(f"[{job_id}] Commit review: S{job['session_number']} {job['story_name']}")
                 review = review_commit(
@@ -148,28 +168,18 @@ def main() -> None:
                     model=model,
                     story_id=story_id,
                 )
-                data = _load_or_create_review(story_id)
-                data["story_name"] = job["story_name"]
-                data["story_id"] = story_id
-                data["model"] = data.get("model", "unknown")
-                # Merge or replace commit review for this session
-                existing = {cr["session_number"]: i for i, cr in enumerate(data.get("commit_reviews", []))}
-                review_dict = review.to_dict()
-                review_dict["session_number"] = job["session_number"]
-                if job["session_number"] in existing:
-                    data["commit_reviews"][existing[job["session_number"]]] = review_dict
-                else:
-                    data["commit_reviews"].append(review_dict)
-                _save_review(story_id, data)
+                _write_commit_review(story_id, job["session_number"], review.to_dict())
 
             r.hset(STATUS_KEY, job_id, "done")
             completed += 1
-            log(f"[{job_id}] OK ({completed+failed}/{completed+failed})")
+            log(f"[{job_id}] OK")
 
         except Exception as e:
-            log(f"[{job_id}] FAILED: {e}")
+            if _requeue(r, job, job_id, str(e)):
+                continue
             r.hset(STATUS_KEY, job_id, "failed")
             failed += 1
+            log(f"[{job_id}] FAILED (permanent): {e}")
 
         r = _connect_redis()
 
