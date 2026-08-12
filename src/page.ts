@@ -12,6 +12,7 @@ export interface Page {
   layout?: string;
   filePath?: string;
   html?: string;
+  cachedOutput?: boolean;
 }
 
 export function pageFromFile(filePath: string): Page {

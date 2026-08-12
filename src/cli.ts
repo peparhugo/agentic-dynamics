@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './build';
+import { buildSite, buildSiteIncremental } from './build';
 import { Page } from './page';
 import { DEFAULT_PORT, ServeOptions, startDevServer } from './serve';
 
@@ -7,6 +7,8 @@ export interface BuildOptions {
   content: string;
   output: string;
   templates: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export type CliOptions = BuildOptions | ServeOptions;
@@ -33,6 +35,8 @@ function usage(): string {
     '  --output <dir>     Output directory (default: ./dist)',
     '  --templates <dir>  Template directory (default: ./templates)',
     '  --port <number>    Port for the dev server (default: 3000)',
+    '  --incremental      Rebuild only changed pages (uses .ssg-cache.json)',
+    '  --clean            Force a clean rebuild, ignoring the cache',
     '  -h, --help         Show this help',
   ].join('\n');
 }
@@ -92,6 +96,16 @@ export function parseArgs(argv: string[]): ParsedCli | null {
         continue;
       }
     }
+    if (command === 'build') {
+      if (arg === '--incremental') {
+        options.incremental = true;
+        continue;
+      }
+      if (arg === '--clean') {
+        options.clean = true;
+        continue;
+      }
+    }
     return null;
   }
 
@@ -116,8 +130,18 @@ export function run(argv: string[]): number {
       process.stdout.write(`Watching ${options.content} and ${options.templates} for changes...\n`);
       return 0;
     }
-    const pages: Page[] = buildSite(parsed.options.content, parsed.options.output, parsed.options.templates);
-    process.stdout.write(`Built ${pages.length} page(s) into ${parsed.options.output}\n`);
+    const options = parsed.options as BuildOptions;
+    if (options.incremental === true || options.clean === true) {
+      const result = buildSiteIncremental(options.content, options.output, options.templates, {
+        clean: options.clean === true,
+      });
+      process.stdout.write(
+        `Built ${result.stats.pagesBuilt} page(s), skipped ${result.stats.pagesSkipped}, saved ${result.stats.timeSavedMs}ms\n`
+      );
+      return 0;
+    }
+    const pages: Page[] = buildSite(options.content, options.output, options.templates);
+    process.stdout.write(`Built ${pages.length} page(s) into ${options.output}\n`);
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

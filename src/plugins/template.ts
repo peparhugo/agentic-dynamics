@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Page } from '../page';
 import { Plugin, PluginContext } from '../plugin';
@@ -26,8 +26,10 @@ export class TemplatePlugin implements Plugin {
   afterBuild(context: PluginContext, pages: Page[]): void {
     mkdirSync(context.outputDir, { recursive: true });
     for (const page of pages) {
-      const html = this.renderPage(page);
-      writeFileSync(join(context.outputDir, `${page.slug}.html`), html, 'utf8');
+      const outputPath = join(context.outputDir, `${page.slug}.html`);
+      if (page.cachedOutput && page.html !== undefined && existsSync(outputPath)) continue;
+      const html = page.cachedOutput && page.html !== undefined ? page.html : this.renderPage(page);
+      writeFileSync(outputPath, html, 'utf8');
     }
     const index = this.engine ? this.engine.renderIndex(pages) : indexHtml(pages);
     writeFileSync(join(context.outputDir, 'index.html'), index, 'utf8');
