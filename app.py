@@ -7,6 +7,7 @@ import json
 import os
 import sqlite3
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
@@ -70,11 +71,74 @@ class MessageStore:
         self.connection.close()
 
 
+class BaseTransport(ABC):
+    """Transport contract used by the notification server."""
+
+    async def start(self, on_connection: Any, host: str, port: int, process_request: Any) -> None:
+        """Start accepting connections, if the transport requires a listener."""
+
+    async def stop(self) -> None:
+        """Stop accepting new connections."""
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> None:
+        """Register transport-specific state for a new connection."""
+
+    @abstractmethod
+    async def on_disconnect(self, connection: Any) -> None:
+        """Release transport-specific state for a disconnected connection."""
+
+    @abstractmethod
+    async def send_message(self, connection: Any, message: str) -> None:
+        """Send one serialized message to a connection."""
+
+    @abstractmethod
+    async def broadcast(self, connections: list[Any], message: str) -> None:
+        """Send one serialized message to a group of connections."""
+
+
+Transport = BaseTransport
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport contract."""
+
+    def __init__(self) -> None:
+        self._server: Any = None
+
+    async def start(self, on_connection: Any, host: str, port: int, process_request: Any) -> None:
+        self._server = await websockets.serve(
+            on_connection, host, port, process_request=process_request
+        )
+
+    async def stop(self) -> None:
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+
+    async def on_connect(self, connection: Any) -> None:
+        return None
+
+    async def on_disconnect(self, connection: Any) -> None:
+        return None
+
+    async def send_message(self, connection: Any, message: str) -> None:
+        try:
+            await connection.send(message)
+        except ConnectionClosed:
+            pass
+
+    async def broadcast(self, connections: list[Any], message: str) -> None:
+        await asyncio.gather(*(self.send_message(connection, message) for connection in connections))
+
+
 class NotificationServer:
     """Manage clients while Redis distributes envelopes between server instances."""
 
     def __init__(self, host: str = "localhost", port: int = 8765,
-                 redis_url: str | None = None, database_url: str | None = None) -> None:
+                 redis_url: str | None = None, database_url: str | None = None,
+                 transport: BaseTransport | None = None) -> None:
         self.host = host
         self.port = port
         self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
@@ -89,6 +153,14 @@ class NotificationServer:
         self._pubsub: Any = None
         self._redis_task: asyncio.Task[Any] | None = None
         self.store = MessageStore(database_url)
+        self.transport = transport or self._create_transport()
+
+    @staticmethod
+    def _create_transport() -> BaseTransport:
+        configured = os.getenv("TRANSPORT", "websocket").strip().lower()
+        if configured in {"websocket", "ws"}:
+            return WebSocketTransport()
+        raise ValueError(f"unsupported transport: {configured}")
 
     async def start(self) -> None:
         if self.redis_url and redis is not None:
@@ -100,17 +172,16 @@ class NotificationServer:
                 self._redis_task = asyncio.create_task(self._redis_loop())
             except Exception:
                 await self._close_redis()
-        self._server = await websockets.serve(
+        await self.transport.start(
             self._handle_connection, self.host, self.port, process_request=self._process_request
         )
-        if self._server.sockets:
+        self._server = getattr(self.transport, "_server", None)
+        if self._server is not None and self._server.sockets:
             self.port = self._server.sockets[0].getsockname()[1]
 
     async def stop(self) -> None:
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
+        await self.transport.stop()
+        self._server = None
         if self._redis_task is not None:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
@@ -187,6 +258,7 @@ class NotificationServer:
             await connection.close(code=1011, reason="unable to determine client id")
             return
         client_id = int(peer[1])
+        await self.transport.on_connect(connection)
         async with self._lock:
             self.clients[client_id] = connection
             restored = await self._state_channels(client_id)
@@ -209,6 +281,7 @@ class NotificationServer:
                             subscribers.discard(client_id)
                             if not subscribers:
                                 self.channels.pop(channel, None)
+            await self.transport.on_disconnect(connection)
 
     async def _state_channels(self, client_id: int) -> set[str]:
         if self._redis is None:
@@ -319,7 +392,7 @@ class NotificationServer:
             else:
                 connections = [self.clients[i] for i in self.channels.get(channel, set()) if i in self.clients]
         message = json.dumps(envelope)
-        await asyncio.gather(*(self._send(connection, message) for connection in connections))
+        await self.transport.broadcast(connections, message)
 
     async def send_to(self, client_id: int, message_type: str, payload: dict[str, Any]) -> None:
         if message_type not in SUPPORTED_TYPES:
@@ -337,13 +410,7 @@ class NotificationServer:
             except Exception:
                 pass
         if connection is not None:
-            await self._send(connection, json.dumps(envelope))
-
-    async def _send(self, connection: Any, message: str) -> None:
-        try:
-            await connection.send(message)
-        except ConnectionClosed:
-            pass
+            await self.transport.send_message(connection, json.dumps(envelope))
 
 
 async def main() -> None:
