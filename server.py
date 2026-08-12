@@ -4,6 +4,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -147,14 +148,82 @@ class RedisMessageBroker:
                     if server_channel:
                         subscribers = channel_manager.get_subscribers(server_channel)
                         if subscribers:
-                            await send_to_clients(subscribers, outbound)
+                            for cid in subscribers:
+                                await registry.send_message(cid, outbound)
                     else:
-                        await broadcast_message(outbound)
+                        await registry.broadcast(outbound)
                 except Exception:
                     pass
 
 
 redis_broker = RedisMessageBroker(REDIS_URL)
+
+
+class BaseTransport(ABC):
+    @abstractmethod
+    async def on_connect(self, connection) -> str:
+        ...
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        ...
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> None:
+        ...
+
+    @abstractmethod
+    async def broadcast(self, message: str) -> None:
+        ...
+
+
+class WebSocketTransport(BaseTransport):
+    def __init__(self):
+        self._clients: dict[str, object] = {}
+        self._lock = threading.Lock()
+
+    async def on_connect(self, connection) -> str:
+        return self.add(connection)
+
+    async def on_disconnect(self, client_id: str) -> None:
+        self.remove(client_id)
+
+    async def send_message(self, client_id: str, message: str) -> None:
+        ws = self.get_ws(client_id)
+        if ws is not None:
+            try:
+                await ws.send(message)
+            except Exception:
+                pass
+
+    async def broadcast(self, message: str) -> None:
+        for client_id, ws in self.get_all():
+            try:
+                await ws.send(message)
+            except Exception:
+                pass
+
+    def add(self, websocket) -> str:
+        client_id = str(uuid.uuid4())
+        with self._lock:
+            self._clients[client_id] = websocket
+        return client_id
+
+    def remove(self, client_id: str) -> None:
+        with self._lock:
+            self._clients.pop(client_id, None)
+
+    def count(self) -> int:
+        with self._lock:
+            return len(self._clients)
+
+    def get_ws(self, client_id: str) -> object | None:
+        with self._lock:
+            return self._clients.get(client_id)
+
+    def get_all(self) -> list[tuple[str, object]]:
+        with self._lock:
+            return list(self._clients.items())
 
 
 class ClientRegistry:
@@ -223,7 +292,12 @@ class ChannelManager:
             self._channels.clear()
 
 
-registry = ClientRegistry()
+def _create_transport():
+    transport_type = os.environ.get("TRANSPORT", "websocket")
+    return WebSocketTransport()
+
+
+registry = _create_transport()
 channel_manager = ChannelManager()
 
 
@@ -236,32 +310,15 @@ def make_message(msg_type: str, payload: dict, timestamp: str = "") -> str:
     })
 
 
-async def broadcast_message(message: str) -> None:
-    for client_id, ws in registry.get_all():
-        try:
-            await ws.send(message)
-        except Exception:
-            pass
-
-
-async def send_to_clients(client_ids: list[str], message: str) -> None:
-    for client_id in client_ids:
-        ws = registry.get_ws(client_id)
-        if ws is not None:
-            try:
-                await ws.send(message)
-            except Exception:
-                pass
-
-
 async def deliver_message(channel: str | None, msg_type: str, payload: dict, timestamp: str) -> None:
     outbound = make_message(msg_type, payload, timestamp)
     if channel:
         subscribers = channel_manager.get_subscribers(channel)
         if subscribers:
-            await send_to_clients(subscribers, outbound)
+            for cid in subscribers:
+                await registry.send_message(cid, outbound)
     else:
-        await broadcast_message(outbound)
+        await registry.broadcast(outbound)
 
 
 async def ws_handler(websocket):
