@@ -11,6 +11,8 @@ interact with SQLite directly.
 from abc import ABC, abstractmethod
 from functools import wraps
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import bcrypt
 import jwt
 import sqlite3
@@ -24,6 +26,19 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", 24 * 3600))
+
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+RATE_LIMIT_STORAGE = os.environ.get(
+    "RATE_LIMIT_STORAGE", "redis://localhost:6379/0"
+)
+RATE_LIMIT_ENABLED = os.environ.get("RATE_LIMIT_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
 
 
 def get_db():
@@ -173,6 +188,40 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(row) for row in rows]
 
+    def get_tasks_page(
+        self,
+        owner_id: int,
+        cursor: int | None = None,
+        limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> tuple[list[dict], int, int | None]:
+        """Return (tasks, total, next_cursor) for cursor-based pagination.
+
+        Tasks are ordered by id descending; ``cursor`` is the id of the last
+        item from the previous page, so we fetch items with a strictly
+        smaller id. ``next_cursor`` is the id of the last item returned on
+        this page, or None when there are no more items.
+        """
+        query = "SELECT * FROM tasks WHERE owner_id = ?"
+        params: list = [owner_id]
+        if cursor is not None:
+            query += " AND id < ?"
+            params.append(cursor)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit + 1)
+
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) AS count FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()["count"]
+            rows = [dict(row) for row in conn.execute(query, tuple(params)).fetchall()]
+
+        next_cursor = None
+        if len(rows) > limit:
+            next_cursor = rows[limit - 1]["id"]
+            rows = rows[:limit]
+        return rows, total, next_cursor
+
     def get_task(self, task_id: int, owner_id: int) -> dict | None:
         with self._connect() as conn:
             row = conn.execute(
@@ -249,6 +298,30 @@ def auth_required(f):
     return wrapper
 
 
+# ── Rate limiting ─────────────────────────────────────────────
+
+def rate_limit_key(*args, **kwargs) -> str:
+    """Key each request by authenticated user id, falling back to client IP.
+
+    This keeps the 100-requests-per-minute bucket scoped per user while still
+    applying a limit to unauthenticated endpoints such as register/login.
+    """
+    user = get_auth_user()
+    if user is not None:
+        return f"user:{user['id']}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    rate_limit_key,
+    app=app,
+    application_limits=[RATE_LIMIT],
+    enabled=RATE_LIMIT_ENABLED,
+    storage_uri=RATE_LIMIT_STORAGE,
+    headers_enabled=True,
+)
+
+
 # ── Routes: auth ──────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
@@ -281,7 +354,30 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks(user_id: int):
-    return jsonify(tasks_repo.get_tasks(user_id))
+    limit = request.args.get("limit", type=int) or DEFAULT_PAGE_LIMIT
+    if limit < 1:
+        limit = DEFAULT_PAGE_LIMIT
+    limit = min(limit, MAX_PAGE_LIMIT)
+
+    cursor = request.args.get("cursor")
+    if cursor is not None and cursor != "":
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be an integer"}), 400
+    else:
+        cursor = None
+
+    data, total, next_cursor = tasks_repo.get_tasks_page(
+        user_id, cursor=cursor, limit=limit
+    )
+    return jsonify(
+        {
+            "data": data,
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.route("/tasks", methods=["POST"])
