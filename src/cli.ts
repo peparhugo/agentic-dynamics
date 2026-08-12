@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 
-import { build, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from './ssg';
+import { build, DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR } from './ssg';
 
 export interface CliOptions {
   command: string;
   content: string;
   output: string;
+  templates: string;
 }
 
 /**
  * Parse CLI arguments for the `ssg` binary.
- * Usage: ssg build [--content <dir>] [--output <dir>]
+ * Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
  */
 export function parseArgs(argv: string[]): CliOptions {
   if (argv.includes('--help') || argv.includes('-h')) {
@@ -21,20 +22,23 @@ export function parseArgs(argv: string[]): CliOptions {
     command: argv[0] ?? '',
     content: DEFAULT_CONTENT_DIR,
     output: DEFAULT_OUTPUT_DIR,
+    templates: DEFAULT_TEMPLATES_DIR,
   };
 
   const flags = argv.slice(1);
   for (let i = 0; i < flags.length; i++) {
     const flag = flags[i];
-    if (flag === '--content' || flag === '--output') {
+    if (flag === '--content' || flag === '--output' || flag === '--templates') {
       const value = flags[i + 1];
       if (value === undefined) {
         throw new Error(`Missing value for ${flag}`);
       }
       if (flag === '--content') {
         options.content = value;
-      } else {
+      } else if (flag === '--output') {
         options.output = value;
+      } else {
+        options.templates = value;
       }
       i++;
     } else {
@@ -52,14 +56,15 @@ export class HelpError extends Error {
   }
 }
 
-export const USAGE = `Usage: ssg build [--content <dir>] [--output <dir>]
+export const USAGE = `Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
 
 Build a static site from Markdown files.
 
 Options:
-  --content <dir>   Directory containing Markdown sources (default: ${DEFAULT_CONTENT_DIR})
-  --output <dir>    Directory where the generated site is written (default: ${DEFAULT_OUTPUT_DIR})
-  -h, --help        Show this help message
+  --content <dir>     Directory containing Markdown sources (default: ${DEFAULT_CONTENT_DIR})
+  --output <dir>      Directory where the generated site is written (default: ${DEFAULT_OUTPUT_DIR})
+  --templates <dir>   Directory containing templates, layouts, and partials (default: ${DEFAULT_TEMPLATES_DIR})
+  -h, --help          Show this help message
 `;
 
 /**
@@ -81,7 +86,7 @@ export function run(argv: string[]): string {
     throw new Error(`Unknown command: ${options.command}\n\n${USAGE}`);
   }
 
-  const pages = build(options.content, options.output);
+  const pages = build(options.content, options.output, options.templates);
   return `Built ${pages.length} page(s) into ${options.output}`;
 }
 

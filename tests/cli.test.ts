@@ -2,7 +2,11 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { parseArgs, run, USAGE, HelpError } from '../src/cli';
-import { DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR } from '../src/ssg';
+import { DEFAULT_CONTENT_DIR, DEFAULT_OUTPUT_DIR, DEFAULT_TEMPLATES_DIR } from '../src/ssg';
+
+function makeTempDir(): string {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'ssg-cli-'));
+}
 
 describe('parseArgs', () => {
   it('uses the default directories when no options are given', () => {
@@ -10,6 +14,7 @@ describe('parseArgs', () => {
     expect(options.command).toBe('build');
     expect(options.content).toBe(DEFAULT_CONTENT_DIR);
     expect(options.output).toBe(DEFAULT_OUTPUT_DIR);
+    expect(options.templates).toBe(DEFAULT_TEMPLATES_DIR);
   });
 
   it('parses --content and --output options', () => {
@@ -17,6 +22,11 @@ describe('parseArgs', () => {
     expect(options.command).toBe('build');
     expect(options.content).toBe('pages');
     expect(options.output).toBe('public');
+  });
+
+  it('parses the --templates option', () => {
+    const options = parseArgs(['build', '--templates', 'theme']);
+    expect(options.templates).toBe('theme');
   });
 
   it('throws when a flag is missing its value', () => {
@@ -60,11 +70,34 @@ describe('run', () => {
     expect(run(['--help'])).toContain('Usage: ssg build');
     expect(USAGE).toContain('--content <dir>');
     expect(USAGE).toContain('--output <dir>');
+    expect(USAGE).toContain('--templates <dir>');
   });
 
   it('surfaces a missing content directory as an error', () => {
     expect(() => run(['build', '--content', 'no-such-dir-xyz'])).toThrow(
       /Content directory not found/
     );
+  });
+
+  it('builds a site through templates when a templates directory is given', () => {
+    const content = makeTempDir();
+    const output = makeTempDir();
+    const templates = makeTempDir();
+    try {
+      fs.writeFileSync(path.join(templates, 'default.hbs'), 'TEMPLATED {{title}}\n{{{html}}}');
+      fs.writeFileSync(path.join(content, 'one.md'), '<!--\ntitle: One\n-->\n# One');
+
+      const message = run(['build', '--content', content, '--output', output, '--templates', templates]);
+
+      expect(message).toContain('Built 1 page(s)');
+      const html = fs.readFileSync(path.join(output, 'one.html'), 'utf8');
+      expect(html).toContain('TEMPLATED One');
+      expect(html).toContain('<h1>One</h1>');
+      expect(fs.existsSync(path.join(output, 'index.html'))).toBe(true);
+    } finally {
+      fs.rmSync(content, { recursive: true, force: true });
+      fs.rmSync(output, { recursive: true, force: true });
+      fs.rmSync(templates, { recursive: true, force: true });
+    }
   });
 });

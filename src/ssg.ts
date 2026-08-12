@@ -2,11 +2,20 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import {
+  DEFAULT_LAYOUT,
+  DEFAULT_TEMPLATE,
+  DEFAULT_TEMPLATES_DIR,
+  loadTemplates,
+  renderTemplateFile,
+  TemplateSet,
+} from './templates';
 
 marked.setOptions({ gfm: true, headerIds: false });
 
 export const DEFAULT_CONTENT_DIR = './content';
 export const DEFAULT_OUTPUT_DIR = './dist';
+export { DEFAULT_TEMPLATES_DIR, DEFAULT_TEMPLATE, DEFAULT_LAYOUT } from './templates';
 
 /** Delimiters used to mark a frontmatter block inside a Markdown file. */
 export const FRONTMATTER_DELIMITERS: [string, string] = ['<!--', '-->'];
@@ -24,6 +33,12 @@ export interface Page {
   html: string;
   /** Raw Markdown source (frontmatter stripped). */
   markdown: string;
+  /** All raw frontmatter fields, exposed to templates. */
+  data: Record<string, unknown>;
+  /** Template name from frontmatter (`template:`). */
+  template?: string;
+  /** Layout name from frontmatter (`layout:`). */
+  layout?: string;
 }
 
 /**
@@ -56,9 +71,18 @@ export function parseMarkdown(raw: string, slug: string): Page {
     ? data.tags.map((tag: unknown) => String(tag))
     : [];
 
+  const template =
+    typeof data.template === 'string' && data.template.trim() !== ''
+      ? data.template.trim()
+      : undefined;
+  const layout =
+    typeof data.layout === 'string' && data.layout.trim() !== ''
+      ? data.layout.trim()
+      : undefined;
+
   const html = marked.parse(content) as string;
 
-  return { slug, title, date, tags, html, markdown: content };
+  return { slug, title, date, tags, html, markdown: content, data, template, layout };
 }
 
 /** Read every `.md` file in the content directory and parse it into a Page. */
@@ -97,6 +121,65 @@ export function escapeHtml(value: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+/** Build the context object handed to page templates and layouts. */
+export function pageContext(page: Page): Record<string, unknown> {
+  return {
+    ...page.data,
+    slug: page.slug,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    html: page.html,
+    markdown: page.markdown,
+  };
+}
+
+/**
+ * Render a page through its template and layout. Falls back to the legacy
+ * standalone `renderPage` output when no matching template is available.
+ */
+export function renderPageWithTemplates(page: Page, templates: TemplateSet): string {
+  const templateName = page.template ?? DEFAULT_TEMPLATE;
+  if (page.template !== undefined && !templates.templates.has(templateName)) {
+    throw new Error(`Template not found: ${templateName}`);
+  }
+
+  const template = templates.templates.get(templateName);
+  if (!template) return renderPage(page);
+
+  const partials = [...templates.partials.values()];
+  const content = renderTemplateFile(template, pageContext(page), partials);
+
+  const layoutName = page.layout ?? DEFAULT_LAYOUT;
+  if (page.layout !== undefined && !templates.layouts.has(layoutName)) {
+    throw new Error(`Layout not found: ${layoutName}`);
+  }
+
+  const layout = templates.layouts.get(layoutName);
+  if (!layout) return content;
+
+  const context = { ...pageContext(page), body: content };
+  return renderTemplateFile(layout, context, partials);
+}
+
+/**
+ * Render the index page through the `index` template (if any), wrapped in the
+ * default layout. Falls back to the legacy `renderIndex` output otherwise.
+ */
+export function renderIndexWithTemplates(pages: Page[], templates: TemplateSet): string {
+  const template = templates.templates.get('index');
+  if (!template) return renderIndex(pages);
+
+  const partials = [...templates.partials.values()];
+  const context: Record<string, unknown> = { pages: pages.map(pageContext) };
+  const content = renderTemplateFile(template, context, partials);
+
+  const layout = templates.layouts.get(DEFAULT_LAYOUT);
+  if (!layout) return content;
+
+  return renderTemplateFile(layout, { ...context, body: content }, partials);
 }
 
 /** Wrap page content in a full standalone HTML document. */
@@ -155,18 +238,33 @@ ${listItems}
 
 /**
  * Generate the whole site: read Markdown from `contentDir`, write one HTML
- * file per page into `outputDir` plus an `index.html`. Returns the pages.
+ * file per page into `outputDir` plus an `index.html`. When a `templatesDir`
+ * contains page templates, pages and the index are rendered through the
+ * template engine (with layouts and partials); otherwise the legacy built-in
+ * renderers are used. Returns the pages.
  */
-export function build(contentDir: string = DEFAULT_CONTENT_DIR, outputDir: string = DEFAULT_OUTPUT_DIR): Page[] {
+export function build(
+  contentDir: string = DEFAULT_CONTENT_DIR,
+  outputDir: string = DEFAULT_OUTPUT_DIR,
+  templatesDir: string = DEFAULT_TEMPLATES_DIR
+): Page[] {
   const pages = sortPages(readPages(contentDir));
+  const templates = loadTemplates(templatesDir);
+  const useTemplates = templates.templates.size > 0;
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   for (const page of pages) {
-    fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), renderPage(page), 'utf8');
+    const html = useTemplates
+      ? renderPageWithTemplates(page, templates)
+      : renderPage(page);
+    fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), html, 'utf8');
   }
 
-  fs.writeFileSync(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
+  const indexHtml = useTemplates
+    ? renderIndexWithTemplates(pages, templates)
+    : renderIndex(pages);
+  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf8');
 
   return pages;
 }
