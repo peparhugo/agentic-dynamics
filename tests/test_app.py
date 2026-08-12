@@ -3,8 +3,17 @@ import json
 
 import pytest
 import websockets
+from fakeredis import aioredis
 
 from app import NotificationHTTPServer, NotificationServer
+
+
+class FakeWebSocket:
+    def __init__(self) -> None:
+        self.messages = []
+
+    async def send(self, message: str) -> None:
+        self.messages.append(json.loads(message))
 
 
 @pytest.mark.asyncio
@@ -41,13 +50,6 @@ async def test_broadcast_reaches_all_clients_and_health_counts() -> None:
 async def test_direct_message_only_reaches_target() -> None:
     notification_server = NotificationServer()
 
-    class FakeWebSocket:
-        def __init__(self) -> None:
-            self.messages = []
-
-        async def send(self, message: str) -> None:
-            self.messages.append(json.loads(message))
-
     sender = FakeWebSocket()
     target = FakeWebSocket()
     sender_id = notification_server.add_client(sender)
@@ -58,6 +60,46 @@ async def test_direct_message_only_reaches_target() -> None:
     )
     assert sender.messages == []
     assert target.messages[0]["payload"]["text"] == "private"
+
+
+@pytest.mark.asyncio
+async def test_redis_backbone_delivers_between_server_instances(tmp_path) -> None:
+    broker = aioredis.FakeRedis(decode_responses=True)
+    first = NotificationServer(redis_client=broker, database_url=str(tmp_path / "first.db"))
+    second = NotificationServer(redis_client=broker, database_url=str(tmp_path / "second.db"))
+    websocket = FakeWebSocket()
+    client_id = second.add_client(websocket)
+    try:
+        await second.handle_message(client_id, json.dumps({"type": "subscribe", "payload": {"channel": "news"}}))
+        await first.handle_message("sender", json.dumps({
+            "type": "broadcast", "channel": "news", "payload": {"text": "from another server"}
+        }))
+        await asyncio.sleep(0.01)
+        assert websocket.messages[-1]["payload"] == {"text": "from another server"}
+        assert await broker.sismember(f"notifications:client:{client_id}:channels", "news")
+    finally:
+        await first._backbone.close()
+        await second._backbone.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_reads_persisted_history(tmp_path) -> None:
+    server = NotificationServer(database_url=str(tmp_path / "history.db"))
+    client_id = server.add_client(FakeWebSocket())
+    await server.handle_message(client_id, json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+    http_server = await asyncio.start_server(NotificationHTTPServer(server).handler, "127.0.0.1", 0)
+    port = http_server.sockets[0].getsockname()[1]
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(b"GET /messages?limit=1&offset=0 HTTP/1.1\r\nHost: localhost\r\n\r\n")
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    http_server.close()
+    await http_server.wait_closed()
+    body = json.loads(response.split(b"\r\n\r\n", 1)[1])
+    assert body["messages"][0]["payload"] == {"n": 1}
+    assert body["messages"][0]["type"] == "broadcast"
 
 
 @pytest.mark.asyncio
