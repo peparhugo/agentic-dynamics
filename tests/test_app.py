@@ -6,6 +6,7 @@ import pytest
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     task_app.init_db()
+    task_app.limiter.reset()
     with task_app.app.test_client() as test_client:
         yield test_client
 
@@ -38,7 +39,10 @@ def test_list_tasks_is_ordered_newest_first(client, auth_headers):
     response = client.get("/tasks", headers=auth_headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    payload = response.get_json()
+    assert [task["id"] for task in payload["data"]] == [second["id"], first["id"]]
+    assert payload["next_cursor"] is None
+    assert payload["total"] == 2
 
 
 def test_create_requires_title(client, auth_headers):
@@ -135,7 +139,7 @@ def test_users_only_see_their_own_tasks(client):
     alice_headers = {"Authorization": f"Bearer {alice_token}"}
     bob_headers = {"Authorization": f"Bearer {bob_token}"}
     task = client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers).get_json()
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob_headers).status_code == 404
 
@@ -145,3 +149,52 @@ def test_invalid_token_returns_401(client):
     assert response.status_code == 401
     malformed = client.get("/tasks", headers={"Authorization": "Bearer a.!.!"})
     assert malformed.status_code == 401
+
+
+def test_list_tasks_supports_cursor_pagination(client, auth_headers):
+    created = [
+        client.post("/tasks", json={"title": f"Task {index}"}, headers=auth_headers).get_json()
+        for index in range(5)
+    ]
+
+    first = client.get("/tasks?limit=2", headers=auth_headers).get_json()
+    assert [task["id"] for task in first["data"]] == [created[-1]["id"], created[-2]["id"]]
+    assert first["total"] == 5
+    assert first["next_cursor"] == str(created[-2]["id"])
+
+    second = client.get(f"/tasks?cursor={first['next_cursor']}&limit=2", headers=auth_headers).get_json()
+    assert [task["id"] for task in second["data"]] == [created[-3]["id"], created[-4]["id"]]
+    assert second["next_cursor"] == str(created[-4]["id"])
+
+    third = client.get(f"/tasks?cursor={second['next_cursor']}&limit=2", headers=auth_headers).get_json()
+    assert [task["id"] for task in third["data"]] == [created[-5]["id"]]
+    assert third["next_cursor"] is None
+
+
+def test_list_tasks_rejects_invalid_pagination_parameters(client, auth_headers):
+    assert client.get("/tasks?limit=0", headers=auth_headers).status_code == 400
+    assert client.get("/tasks?limit=101", headers=auth_headers).status_code == 400
+    assert client.get("/tasks?cursor=not-an-id", headers=auth_headers).status_code == 400
+
+
+def test_rate_limit_returns_retry_after(client, auth_headers):
+    task_app.limiter.reset()
+
+    responses = [client.get("/tasks", headers=auth_headers) for _ in range(101)]
+
+    assert [response.status_code for response in responses[:100]] == [200] * 100
+    assert responses[100].status_code == 429
+    assert responses[100].headers["Retry-After"]
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    task_app.limiter.reset()
+
+    responses = [
+        client.post("/auth/login", json={"username": "missing", "password": "wrong"})
+        for _ in range(101)
+    ]
+
+    assert responses[99].status_code == 401
+    assert responses[100].status_code == 429
+    assert responses[100].headers["Retry-After"]

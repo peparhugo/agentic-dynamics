@@ -6,6 +6,9 @@ Designed as a baseline for multi-session stories.
 """
 
 from flask import Flask, request, jsonify, g
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 import os
 import base64
 import binascii
@@ -22,6 +25,22 @@ app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+
+
+def rate_limit_key() -> str:
+    user_id = current_user_id()
+    return f"user:{user_id}" if user_id is not None else f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=REDIS_URL,
+    headers_enabled=True,
+    in_memory_fallback=["100 per minute"],
+)
 
 
 def user_repository() -> UserRepository:
@@ -90,7 +109,25 @@ def require_auth(view):
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repository().list_for_owner(g.user_id))
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+            if cursor < 1:
+                raise ValueError
+        except ValueError:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+
+    try:
+        limit = int(request.args.get("limit", 20))
+        if limit < 1 or limit > 100:
+            raise ValueError
+    except ValueError:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    tasks, total, has_more = task_repository().list_for_owner_page(g.user_id, cursor, limit)
+    next_cursor = str(tasks[-1]["id"]) if has_more else None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])
@@ -172,6 +209,16 @@ def login():
     if user is None or not check_password_hash(user["password_hash"], data["password"]):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    retry_after = error.get_response().headers.get("Retry-After")
+    if retry_after:
+        response.headers["Retry-After"] = retry_after
+    return response
 
 
 if __name__ == "__main__":

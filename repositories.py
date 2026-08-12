@@ -152,6 +152,26 @@ class TaskRepository(BaseRepository):
             for task in self.list({"owner_id": owner_id}, "created_at DESC")
         ]
 
+    def list_for_owner_page(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]], int, bool]:
+        clauses = ["owner_id = ?"]
+        parameters: list[Any] = [owner_id]
+        if cursor is not None:
+            clauses.append("id < ?")
+            parameters.append(cursor)
+        where = " AND ".join(clauses)
+        with self._connect() as connection:
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            rows = connection.execute(
+                f"SELECT * FROM tasks WHERE {where} ORDER BY id DESC LIMIT ?",
+                (*parameters, limit + 1),
+            ).fetchall()
+        has_more = len(rows) > limit
+        return [self._serialize(task) for task in rows[:limit]], total, has_more
+
     def update_for_owner(
         self, task_id: int, owner_id: int, title: str | None = None, status: str | None = None
     ) -> dict[str, Any] | None:
