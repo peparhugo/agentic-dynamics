@@ -13,6 +13,7 @@ import sqlite3
 import os
 import time
 from werkzeug.security import check_password_hash, generate_password_hash
+from notifications import send_notification_email
 
 app = Flask(__name__)
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
@@ -33,9 +34,13 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
+        user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -53,12 +58,13 @@ def init_db():
 
 # ── Models ────────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
     password_hash = generate_password_hash(password)
+    email = email or username
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
         return {"id": cursor.lastrowid, "username": username}
@@ -168,7 +174,10 @@ def register():
     username = username.strip()
     if find_user(username) is not None:
         return jsonify({"error": "username already exists"}), 409
-    return jsonify(create_user(username, password)), 201
+    email = data.get("email")
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a nonblank string"}), 400
+    return jsonify(create_user(username, password, email.strip() if email else None)), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -214,6 +223,9 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    existing_task = get_task(task_id, g.current_user["id"])
+    if existing_task is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id, g.current_user["id"],
         title=data.get("title"),
@@ -221,6 +233,8 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if existing_task["status"] != "completed" and task["status"] == "completed":
+        send_notification_email.delay(g.current_user["email"] or g.current_user["username"], task["title"])
     return jsonify(task)
 
 

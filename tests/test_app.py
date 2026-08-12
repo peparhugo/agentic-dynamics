@@ -77,6 +77,39 @@ def test_get_and_update_task():
     assert response.get_json()["status"] == "complete"
 
 
+def test_completing_task_enqueues_owner_email(monkeypatch):
+    api = authenticated_client(client())
+    created = api.post("/tasks", json={"title": "Ship feature"}).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    response = api.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    assert response.status_code == 200
+    assert calls == [("alice", "Ship feature")]
+
+
+def test_updating_completed_task_does_not_enqueue_another_email(monkeypatch):
+    api = authenticated_client(client())
+    created = api.post("/tasks", json={"title": "Ship feature"}).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    api.put(f"/tasks/{created['id']}", json={"status": "completed"})
+    response = api.put(f"/tasks/{created['id']}", json={"title": "Shipped"})
+
+    assert response.status_code == 200
+    assert calls == [("alice", "Ship feature")]
+
+
 def test_missing_task_returns_json_404():
     api = authenticated_client(client())
 
