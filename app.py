@@ -13,6 +13,8 @@ import sqlite3
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_tasks import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -246,6 +248,8 @@ def update_task(task_id):
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, g.user["id"]),
         ).fetchone()
+    if row["status"] != "completed" and updated["status"] == "completed":
+        send_notification_email.delay(g.user["username"], updated["title"])
     return jsonify(task_json(updated))
 
 

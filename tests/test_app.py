@@ -146,3 +146,38 @@ def test_update_missing_task_returns_not_found(auth_client):
 
     assert response.status_code == 404
     assert response.json == {"error": "task not found"}
+
+
+def test_completing_task_enqueues_owner_notification(auth_client, monkeypatch):
+    created = auth_client.post("/tasks", json={"title": "Ship feature"}).json
+    queued = []
+
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda user_email, task_title: queued.append((user_email, task_title)),
+    )
+
+    response = auth_client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Ship feature")]
+
+
+def test_notification_is_only_enqueued_on_transition_to_completed(
+    auth_client, monkeypatch
+):
+    created = auth_client.post("/tasks", json={"title": "Already done"}).json
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda user_email, task_title: queued.append((user_email, task_title)),
+    )
+
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+    auth_client.put(f"/tasks/{created['id']}", json={"title": "Updated title"})
+
+    assert queued == [("alice", "Already done")]
