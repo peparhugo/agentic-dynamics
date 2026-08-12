@@ -333,6 +333,81 @@ def test_user_cannot_delete_others_task(client):
     ).status_code == 200
 
 
+# ── Notification trigger (Celery) ──────────────────────────────
+
+def test_completed_status_triggers_email(client, monkeypatch):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_api, "queue_notification_email",
+        lambda email, title: calls.append((email, title)),
+    )
+    resp = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    assert calls == [("alice@example.com", "Ship feature")]
+
+
+def test_non_completed_status_does_not_trigger_email(client, monkeypatch):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_api, "queue_notification_email",
+        lambda email, title: calls.append((email, title)),
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=headers
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"title": "Renamed"}, headers=headers
+    )
+    assert calls == []
+
+
+def test_only_single_email_on_repeated_completed_update(client, monkeypatch):
+    headers = auth_headers(client)
+    created = client.post(
+        "/tasks", json={"title": "Ship feature"}, headers=headers
+    ).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_api, "queue_notification_email",
+        lambda email, title: calls.append((email, title)),
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"title": "Still done"}, headers=headers
+    )
+    assert len(calls) == 1
+
+
+def test_send_notification_email_task_mock(client, capsys):
+    result = task_api.send_notification_email("alice@example.com", "Ship feature")
+    out = capsys.readouterr().out
+    assert result["status"] == "sent"
+    assert result["email"] == "alice@example.com"
+    assert result["task_title"] == "Ship feature"
+    assert "alice@example.com" in out
+    assert "Ship feature" in out
+
+
+def test_owner_email_derives_from_username():
+    assert task_api.owner_email({"username": "bob"}) == "bob@example.com"
+
+
 # ── Migration ───────────────────────────────────────────────────
 
 def test_migrate_preserves_existing_tasks(tmp_path):

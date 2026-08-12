@@ -16,10 +16,30 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 import jwt
+from celery import Celery
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import (
+    CELERY_BROKER_URL,
+    CELERY_RESULT_BACKEND,
+    CELERY_TASK_ROUTES,
+)
+
 app = Flask(__name__)
+
+celery_app = Celery(
+    "task_api",
+    broker=CELERY_BROKER_URL,
+    backend=CELERY_RESULT_BACKEND,
+)
+celery_app.conf.update(
+    task_routes=CELERY_TASK_ROUTES,
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    timezone="UTC",
+)
 
 DATABASE = os.environ.get("TASK_DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("TASK_SECRET_KEY", "dev-secret-key-change-me")
@@ -114,6 +134,27 @@ def require_auth(f):
             return jsonify({"error": "invalid or expired token"}), 401
         return f(user, *args, **kwargs)
     return decorated
+
+
+# ── Notification (Celery) ───────────────────────────────────────
+
+@celery_app.task(name="send_notification_email")
+def send_notification_email(user_email: str, task_title: str):
+    """Mock email notification: logs to the console instead of sending."""
+    message = f"Task '{task_title}' completed - notifying {user_email}"
+    app.logger.info("[email] %s", message)
+    print(message)
+    return {"status": "sent", "email": user_email, "task_title": task_title}
+
+
+def owner_email(user: dict) -> str:
+    """Derive a mock email address for a user (no email column exists)."""
+    return f"{user['username']}@example.com"
+
+
+def queue_notification_email(user_email: str, task_title: str):
+    """Dispatch the notification email asynchronously via Celery."""
+    send_notification_email.delay(user_email, task_title)
 
 
 # ── Auth endpoints ──────────────────────────────────────────────
@@ -236,6 +277,8 @@ def update_task(user: dict, task_id: int):
             (title, status, task_id, user["id"]),
         )
         conn.commit()
+    if status == "completed" and row["status"] != "completed":
+        queue_notification_email(owner_email(user), title)
     return jsonify({
         "id": task_id,
         "title": title,
