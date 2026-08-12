@@ -15,6 +15,7 @@ import threading
 import uuid
 
 import websockets
+from transports import BaseTransport, WebSocketTransport
 
 try:
     import redis
@@ -136,25 +137,10 @@ class RedisBroker:
         self._thread = None
 
 
-class _WebSocketAdapter:
-    """Expose the send_text API used by the notification service."""
-
-    def __init__(self, websocket):
-        self.websocket = websocket
-
-    async def send_text(self, message: str):
-        # websockets 10.x calls this operation ``send``.  Keep that detail at
-        # the protocol boundary so NotificationServer only uses send_text.
-        await self.websocket.send(message)
-
-    async def close(self):
-        await self.websocket.close()
-
-
 class NotificationServer:
-    """Async WebSocket notification server with a thread-safe client registry."""
+    """Notification service independent of the client transport."""
 
-    def __init__(self, broker=None):
+    def __init__(self, broker=None, transport=None):
         self.clients = {}
         self.channels = {}
         self._clients_lock = threading.RLock()
@@ -162,6 +148,14 @@ class NotificationServer:
         self.broker = broker or RedisBroker()
         self._loop = None
         self._origin = str(uuid.uuid4())
+        self.transport = transport or self._configured_transport()
+
+    @staticmethod
+    def _configured_transport():
+        transport_name = os.environ.get("TRANSPORT", "websocket").strip().lower()
+        if transport_name in {"websocket", "ws"}:
+            return WebSocketTransport()
+        raise ValueError(f"Unsupported transport: {transport_name}")
 
     @property
     def client_count(self) -> int:
@@ -172,6 +166,7 @@ class NotificationServer:
         client_id = str(uuid.uuid4())
         with self._clients_lock:
             self.clients[client_id] = websocket
+        self.transport.on_connect(client_id, websocket)
         self.broker.remember_client(client_id)
         return client_id
 
@@ -182,6 +177,7 @@ class NotificationServer:
                 self.channels[channel].discard(client_id)
                 if not self.channels[channel]:
                     del self.channels[channel]
+        self.transport.on_disconnect(client_id)
         self.broker.forget_client(client_id)
 
     def subscribe(self, client_id: str, channel: str) -> bool:
@@ -250,13 +246,6 @@ class NotificationServer:
         except (sqlite3.Error, TypeError, json.JSONDecodeError):
             pass
 
-    async def _send(self, websocket, message: str) -> bool:
-        try:
-            await websocket.send_text(message)
-            return True
-        except Exception:
-            return False
-
     async def _deliver(self, message: str, channel: str | None = None,
                        recipient: str | None = None) -> None:
         with self._clients_lock:
@@ -273,12 +262,9 @@ class NotificationServer:
                     for client_id in subscriber_ids
                     if client_id in self.clients
                 ]
-        results = await asyncio.gather(
-            *(self._send(client, message) for _, client in clients),
-            return_exceptions=False,
-        )
-        for (client_id, _), delivered in zip(clients, results):
-            if not delivered:
+        failed = await self.transport.broadcast(message, [client_id for client_id, _ in clients])
+        for client_id in failed or []:
+            if client_id in self.clients:
                 self.unregister(client_id)
 
     def _on_broker_message(self, raw_message: str) -> None:
@@ -312,50 +298,16 @@ class NotificationServer:
         message = self._message("direct", payload, recipient=client_id, origin=self._origin)
         self._persist_message(message)
         self.broker.publish(message)
-        delivered = await self._send(websocket, message)
+        delivered = await self.transport.send_message(client_id, message)
         if not delivered:
             self.unregister(client_id)
         return delivered
 
     async def websocket_handler(self, websocket, path=None):
-        client_id = self.register(_WebSocketAdapter(websocket))
-        try:
-            async for raw_message in websocket:
-                try:
-                    message = json.loads(raw_message)
-                    message_type = message.get("type")
-                    payload = message.get("payload")
-                    if message_type not in {
-                        "broadcast", "direct", "system", "subscribe", "unsubscribe"
-                    }:
-                        continue
-                    if message_type in {"subscribe", "unsubscribe"}:
-                        channel = message.get("channel")
-                        if channel is None and isinstance(payload, dict):
-                            channel = payload.get("channel")
-                        if channel is None and isinstance(payload, str):
-                            channel = payload
-                        operation = self.subscribe if message_type == "subscribe" else self.unsubscribe
-                        operation(client_id, channel)
-                        continue
-                    if not isinstance(payload, dict):
-                        continue
-                except (TypeError, json.JSONDecodeError):
-                    continue
-
-                if message_type == "broadcast":
-                    await self.broadcast(payload, channel=message.get("channel"))
-                elif message_type == "direct":
-                    recipient = payload.get("client_id") or payload.get("recipient_id")
-                    if recipient:
-                        direct_payload = dict(payload)
-                        direct_payload.pop("client_id", None)
-                        direct_payload.pop("recipient_id", None)
-                        await self.send_direct(recipient, direct_payload)
-                else:
-                    await self.broadcast(payload, "system", message.get("channel"))
-        finally:
-            self.unregister(client_id)
+        handler = getattr(self.transport, "handle_connection", None)
+        if handler is None:
+            raise RuntimeError("The configured transport does not support WebSocket connections")
+        await handler(websocket, self)
 
     async def start(self, host="localhost", port=8765):
         self._loop = asyncio.get_running_loop()
