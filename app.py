@@ -13,6 +13,8 @@ import os
 import bcrypt
 import jwt
 
+from celery_app import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -51,17 +53,19 @@ def init_db():
         )
         if not _column_exists(conn, "tasks", "owner_id"):
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        if not _column_exists(conn, "users", "email"):
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.commit()
 
 
 # ── Auth helpers ───────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
     password_hash = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
     with get_db() as conn:
         cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
         return {"id": cursor.lastrowid, "username": username}
@@ -196,7 +200,8 @@ def register():
         return jsonify({"error": "password is required"}), 400
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already taken"}), 409
-    user = create_user(username, password)
+    email = data.get("email")
+    user = create_user(username, password, email)
     return jsonify({"id": user["id"], "username": user["username"]}), 201
 
 
@@ -243,6 +248,7 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    before = get_task(task_id, request.current_user["id"])
     task = update_task(
         task_id,
         request.current_user["id"],
@@ -251,6 +257,13 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if (
+        before is not None
+        and before["status"] != "completed"
+        and task["status"] == "completed"
+    ):
+        user_email = request.current_user.get("email") or request.current_user["username"]
+        send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
