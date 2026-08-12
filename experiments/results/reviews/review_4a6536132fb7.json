@@ -1,115 +1,228 @@
 {
+  "story_name": "notification_service",
+  "story_id": "4a6536132fb7",
+  "model": "deepseek/deepseek-v4-flash",
   "commit_reviews": [
     {
       "commit_hash": "7e671c62d0534df7ef745661d056c7297cb9ecd7",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.8,
-      "convention_adherence": 0.8,
-      "introduces_technical_debt": false,
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.73,
+      "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
-        "threading.RLock used inside async event loop (blocking risk)",
-        "bare except Exception: pass in _handle_websocket swallows errors"
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "6 naming-convention violations (snake_case/PascalCase/UPPER_CASE) across app.py, test_notification_server.py, and transport.py drop the convention score to 0.73."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +64 with 3 new SonarQube smells across the +252 added lines indicates convoluted control flow in the new server/transport code."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "A threading.RLock guards the client registry inside a single-threaded asyncio event loop \u2014 unnecessary and signals confusion about the concurrency model."
+        }
       ],
-      "strengths": [],
-      "summary": "Replaces a single-file Flask Todo seed with a clean entry-point/module split for an async notification server, using the repo's snake_case/PascalCase/type-hint conventions.",
+      "strengths": [
+        "Clean separation of concerns: entry point (app.py), server class (notification_server.py), and transport module",
+        "Zero new bugs and zero duplication per SonarQube",
+        "Well-formed async lifecycle (start/stop, connection cleanup in finally) with type hints on public signatures",
+        "Complete, testable notification-server implementation delivered in a greenfield session"
+      ],
+      "summary": "Solid greenfield notification-server build with clean module separation and zero new bugs, but naming-convention violations, +64 cognitive complexity, and 3 smells introduce moderate technical debt.",
       "session_number": 1
     },
     {
       "commit_hash": "e38918cec61c6c2242a4bffa76a6c60c1296a8b5",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.92,
-      "convention_adherence": 0.93,
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.85,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
-      "problems": [],
-      "strengths": [],
-      "summary": "Cleanly implements Session 2 channel subscriptions by extending the existing message wire format with an optional channel field and reusing the established RLock registry pattern, while preserving all prior broadcast/direct/system behavior.",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Dual bookkeeping via two inverse maps (channels and _client_channels) must be updated symmetrically in _set_subscription and the disconnect path; a single subscription registry (or helper owning both directions) would reduce drift risk."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "HTTP routing for /channels/{name}/subscribers relies on string startswith/endswith + manual unquote rather than a structured route; fine for two endpoints but will not scale to more routes without a dispatcher."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "subscribe/unsubscribe with a missing or non-string channel returns silently (no error surfaced to the client), which may mask protocol misuse; cognitive complexity +13 reflects the added branching in _handle_message."
+        }
+      ],
+      "strengths": [
+        "New subscribe/unsubscribe logic reuses the existing message wire format, RLock discipline, and async gather pattern rather than inventing new ones.",
+        "message() signature is backward compatible (channel is optional), so existing broadcast/direct/system callers are unaffected.",
+        "Channel-scoped broadcast restricts fanout to subscribers only, avoiding a global broadcast storm as channel count grows.",
+        "Disconnect handler cleans up both _client_channels and channels maps consistently, avoiding subscriber leaks.",
+        "HTTP introspection endpoints (/channels, /channels/{name}/subscribers) mirror the existing /health handler style, with proper 404 handling and URL decoding via unquote.",
+        "Tests added alongside the feature."
+      ],
+      "summary": "A well-fitted, convention-following feature addition that extends the notification server with channel subscriptions using existing patterns and lock discipline, adding only minor maintainability surface from dual-inverse state bookkeeping.",
       "session_number": 2
     },
     {
       "commit_hash": "216ca0e88308b56b71b60f5658d8eb9be7a49cf9",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.6,
-      "convention_adherence": 0.8,
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.74,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
-        "client connection state not stored in Redis despite explicit spec requirement",
-        "silent except-pass swallows pub/sub and ping failures",
-        "synchronous sqlite3 writes block the asyncio loop",
-        "_close_resource getattr fallback is fragile",
-        "single reconnect-less listener with 1.0s polling latency"
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "_store_message performs synchronous SQLite I/O directly on the asyncio event loop (called from async _publish/broadcast/send_direct), blocking the loop; connection is opened without WAL mode or an index on messages."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "_redis_listener swallows every non-cancellation exception with a bare 'except Exception: pass', so a JSON decode error or Redis failure silently drops messages with no logging."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Redis pub/sub fan-out and SQLite persistence are folded directly into NotificationServer rather than extracted, inflating cognitive complexity by +46 in one class."
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "Redis listener polls get_message with timeout=1.0 in a busy loop instead of blocking on a single receive, adding idle wakeups."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Convention score 0.73 is driven by violations in app.py, test_notification_server.py, and transport.py, none of which appear in the visible diff; the added code itself is consistently snake_case/PascalCase \u2014 flagged as a discrepancy between measurement and the commit's own changes."
+        }
       ],
-      "strengths": [],
-      "summary": "Session 3 delivers the Redis pub/sub backbone and SQLite persistence with a graceful no-Redis fallback, but skips the required Redis-hosted client connection state (survives restart) and hides all broker failures behind bare exception swallows.",
+      "strengths": [
+        "Graceful degradation: optional redis import, 0.5s ping timeout, and local _deliver fallback keep the server functional without Redis.",
+        "Correct asyncio hygiene: CancelledError re-raised in _redis_listener and task cancelled in _stop_redis.",
+        "_close_resource robustly handles both aclose() and close() for pubsub/client cleanup.",
+        "Env-driven configuration via REDIS_URL and DATABASE_URL with sensible defaults.",
+        "Reuses existing message() and _deliver helpers rather than duplicating wire-format logic."
+      ],
+      "summary": "A reasonable integration commit (Redis fan-out + SQLite persistence with graceful fallback) that respects existing patterns and conventions, but the +46 cognitive complexity, blocking DB writes on the event loop, and silent exception swallowing in the Redis listener introduce moderate technical debt.",
       "session_number": 3
     },
     {
       "commit_hash": "b8f45758020b6783f13073f3aa2bc02abbe234c8",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.7,
-      "convention_adherence": 0.75,
+      "architectural_fit": 0.68,
+      "convention_adherence": 0.73,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
-        "dict[str",
-        "Any] drops type safety",
-        "getattr(self.transport",
-        "\"port\"",
-        "...) duck-typing hack",
-        "single-implementation abstraction is speculative generality",
-        "serve_forever no longer guards transport startup state",
-        "_create_transport raises on any non-websocket name despite no alternatives"
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Transport abstraction is speculative: TRANSPORT env var accepts only 'websocket' and raises ValueError otherwise, so the seam has exactly one implementation (YAGNI until a second backend lands)"
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube cognitive complexity +194 and +10 smells on this refactor \u2014 moving connection/delivery logic into the transport layer increased complexity despite the cleaner separation"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Type narrowing regressed: self.clients changed from dict[str, ServerConnection] to dict[str, Any] and _on_connect takes connection: Any, losing the concrete type information"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "getattr(self.transport, 'port', self.websocket_port) uses duck-typing instead of a declared property on BaseTransport, weakening the interface contract"
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "New transport.py introduces module-level constants that are not UPPER_CASE, contributing to the 0.73 convention score"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "Pre-existing snake_case/PascalCase/constant violations in app.py and test_notification_server.py appear in the convention report but are not clearly addressed by this commit"
+        }
       ],
-      "strengths": [],
-      "summary": "Cleanly decouples the WebSocket transport behind a BaseTransport abstraction while preserving subscription, locking, and Redis semantics, but the abstraction is speculative (only one concrete transport) and shipping with weak typing.",
+      "strengths": [
+        "Zero new bugs and no duplication added per SonarQube"
+      ],
+      "summary": "",
       "session_number": 4
     },
     {
       "commit_hash": "8d71371733ae08a72f64ba1a4394fa84c82b4454",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.85,
-      "convention_adherence": 0.9,
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.8,
       "introduces_technical_debt": false,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
-        "rate-limit path silently swallows Redis errors via bare except",
-        "local bucket cleanup is keyed per client_id between rollovers",
-        "history endpoint trusts fromisoformat/int parsing to the surrounding handler's error handling"
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "Only the rate-limit path has a test; the new /history endpoint and the TTL cleanup loop have no test coverage."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cleanup interval is hardcoded (asyncio.sleep(3600)) rather than configurable alongside message_ttl_days."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "In-memory _local_rate_limits fallback grows with unique client/bucket keys and is only pruned lazily on each rate-limit check."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Cognitive complexity +18 comes from extending the HTTP dispatch elif chain with the /history branch; consistent with the existing pattern but trending complex."
+        }
       ],
-      "strengths": [],
-      "summary": "Commit adds rate limiting, message TTL cleanup, and a `/history` endpoint that follow the server's existing dispatch, lifecycle, and optional-Redis patterns cleanly.",
+      "strengths": [
+        "Rate limiter with Redis incr/expire plus in-process fallback mirrors the existing dual-mode (Redis-or-local) design throughout the class",
+        "Config via constructor arg with env-var fallback (_env_int) matches the established server configuration pattern",
+        "Async cleanup task lifecycle mirrors _redis_task: created in start(), cancelled and gathered in stop()",
+        "TTL cleanup prevents unbounded messages-table growth; /history uses parameterized SQL with LIMIT+1 pagination (has_more)",
+        "Net quality improves: 0 new bugs, 2 smells removed, no code duplication"
+      ],
+      "summary": "Architecturally well-integrated commit that adds rate limiting, message TTL cleanup, and a paginated /history endpoint while faithfully following existing patterns; the measured 0.73 convention score reflects pre-existing violations in app.py and transport.py (unrelated to this diff), so the commit's own additions are judged convention-clean, though test coverage lags behind the two new features.",
       "session_number": 5
     }
   ],
-  "story_name": "notification_service",
-  "story_id": "4a6536132fb7",
-  "model": "unknown",
   "story_review": {
     "story_name": "notification_service",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.92,
+    "overall_coherence": 0.9,
     "compounding_issues": [
-      "Seed codebase (Flask Todo API) is entirely discarded in Session 1 and replaced by a notification server, so the seed contributes no usable structure \u2014 only a file to be overwritten.",
-      "Session 1 hand-rolled a raw asyncio HTTP server (no web framework), which forced every later session to extend manual request-line parsing (parse_qs/urlsplit routing in S3, /history in S5), growing a bespoke mini-framework instead of reusing a standard one.",
-      "Threading primitives (threading.RLock) introduced in Session 1 are used from asyncio context throughout, mixing concurrency models and requiring careful lock placement in every subsequent change.",
-      "The Session 4 transport abstraction covers only WebSocket delivery; the HTTP endpoint handling remained embedded in NotificationServer, leaving the refactor partial and the server core still HTTP-coupled.",
-      "send_direct returns True for a non-local target whenever Redis is present even if the target does not exist anywhere, a subtle correctness quirk inherited from the S3 Redis integration."
+      "Dual connection bookkeeping: after S4's transport refactor, both NotificationServer.clients and WebSocketTransport._connections track the same connections, creating two sources of truth that must be kept in sync.",
+      "Redundant connect/disconnect wiring in WebSocketTransport._register: on_connect/_on_connect and on_disconnect/_on_disconnect are both called for the same event, leaving ambiguous ownership between injected callbacks and overridden methods.",
+      "S1's per-client registry under a single threading.RLock carried through S2's channel maps (_client_channels) and survived the S4 refactor, so the server retains client-side state that the transport abstraction was meant to encapsulate.",
+      "S5's rate limiter counts every inbound message type (including subscribe/unsubscribe and direct) against one per-minute bucket and relies on an unbounded in-process dict fallback when Redis is absent."
     ],
     "key_decisions": [
-      "Session 1: adopt the websockets asyncio library with a hand-rolled HTTP/health server rather than a web framework, keeping the project dependency-light.",
-      "Session 2: model channels as bidirectional dicts (channels\u2192subscribers and client\u2192channels) with dynamic subscribe/unsubscribe wire types and HTTP /channels introspection.",
-      "Session 3: make Redis pub/sub the optional message backbone with a graceful local-delivery fallback, and persist every message to SQLite as the durable source of truth for /messages.",
-      "Session 4: extract a pluggable BaseTransport abstraction (BaseTransport/WebSocketTransport) so the server core owns identity and routing while transports own I/O \u2014 a clean seam that later sessions reuse.",
-      "Session 5: implement Redis-backed per-client minute-bucket rate limiting with a local fallback, plus a /history endpoint (channel, since, limit, has_more) and TTL-based background message cleanup."
+      "Greenfield in S1 as an async WebSocket notification server with broadcast/direct/system wire types plus a bare HTTP health endpoint",
+      "Channel/subscription model in S2 with channel-scoped broadcasts and HTTP introspection endpoints (/channels, /channels/.../subscribers)",
+      "Redis pub/sub with graceful degradation plus SQLite message persistence in S3 to enable cross-instance delivery and message history",
+      "Transport abstraction in S4 (BaseTransport/WebSocketTransport behind a TRANSPORT env seam) decoupling connection handling from routing logic",
+      "Cross-cutting hardening in S5: Redis-backed rate limiting with local fallback, message TTL cleanup loop, and paginated /history retrieval"
     ],
-    "trajectory_description": "Quality improved steadily and monotonically across all five sessions. Test coverage grew 4 \u2192 6 \u2192 8 \u2192 8 \u2192 10 passing tests with zero regressions at every commit, code grew from a ~154-line greenfield module to a 552-line final codebase with cleanly separated concerns, and the Session 4 refactor paid off by letting Session 5 layer rate limiting and history onto the transport seam without touching transport internals. The main dip in elegance is architectural accumulation: S1's raw HTTP server and threading lock persisted through S5, so the server core gained complexity (30 methods, 440+ lines) rather than shedding it. Overall the sessions form a textbook progression of greenfield \u2192 feature \u2192 integration \u2192 refactor \u2192 cross-cutting, with the refactor correctly placed before the most demanding cross-cutting work.",
-    "summary": "A highly coherent five-session story that progressed logically from greenfield WebSocket server through channels, Redis/SQLite integration, and a transport refactor to rate limiting and message history, with tests passing at every step and quality rising throughout \u2014 marred only by early hand-rolled HTTP/threading choices that accumulated into a growing monolith server class."
+    "trajectory_description": "Quality improved steadily across the five sessions. Session 1 delivered a clean, single-purpose server with solid basics (unique IDs, locking, 4 tests). Session 2 added a coherent channel/subscription feature set with introspection endpoints and matching tests. Session 3 integrated Redis pub/sub and SQLite persistence with graceful degradation when Redis is unavailable, laying the storage groundwork later sessions reused. Session 4 was a genuine architectural improvement rather than churn: extraction of a transport abstraction reduced coupling and broadened extensibility, though it introduced dual connection tracking and redundant callback wiring at the boundary. Session 5 capped the arc with rate limiting, TTL cleanup, and a paginated history endpoint that reuses S3's persistence. Test coverage grew from 4 to 10 tests across all sessions, and all 10 pass at the final commit; the only blemish is the residual bookkeeping overlap introduced by the refactor.",
+    "summary": "A logically sequenced, upward-trending story that progressed from a minimal WebSocket server to a transport-abstracted, Redis-integrated, rate-limited notification system with clean feature reuse, marred only by mild state-duplication fallout from the Session 4 refactor."
   }
 }

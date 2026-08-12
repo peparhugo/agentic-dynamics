@@ -1,0 +1,120 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "38552c26d19bab6b37d98ba1006de083ea33d863",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "process_request returns None implicitly for non-health paths",
+        "duplicated ConnectionClosed exception tuples",
+        "welcome send unguarded",
+        "missing return type hints on handler/process_request"
+      ],
+      "strengths": [],
+      "summary": "A clean greenfield rewrite that replaces the crufty Flask seed (legacy stubs, dead aliases, status insert bug) with a coherent single-file websocket server with thread-safe registry and typed message dispatch.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "9a2e5da89e21192bf509757bf5d05ede78205ce5",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "get_channel_subscribers is a getter with cleanup side effects",
+        "ack-message construction duplicated between _handle_subscribe/_handle_unsubscribe and _handle_system",
+        "inconsistent naming (get_channel_subscribers returns tuples vs get_channel_subscriber_ids returns ids)"
+      ],
+      "strengths": [],
+      "summary": "Adds channel subscriptions cleanly within the existing registry + handler structure, with locking discipline and coverage.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "ae7642f5cfeeca33e56bc7f1759f6cdbd946d2ed",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "global mutable singletons (_store_instance",
+        "_redis",
+        "_server_id)",
+        "silent except Exception: pass on Redis paths",
+        "sqlite connections not closed via context manager/finally",
+        "direct message persisted even when target_id not found",
+        "test-only _reset_store leaked into prod module"
+      ],
+      "strengths": [],
+      "summary": "Integrates SQLite message persistence and Redis pub/sub fan-out with lazy global singletons that mirror the existing ClientRegistry locking style, fulfilling the story's integration goal.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "2e60cc8e1e9c122618eb48d3fe136093b0bc0e47",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.5,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "WebSocketTransport couples to registry (unregister inside broadcast)",
+        "on_connect/on_disconnect are no-ops so real lifecycle logic stays in handler",
+        "missing type hints on public signatures per project convention",
+        "mixes DI (transport param) with global singleton (_get_transport)",
+        "speculative TRANSPORT env indirection for a single implementation",
+        "_handle_direct loses registry.unregister on closed connection (behavior regression)"
+      ],
+      "strengths": [],
+      "summary": "The refactor removes triplicated broadcast-send logic behind a transport abstraction, but the abstraction is incomplete and introduces new coupling.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "fed439e82ae9d73c23f47a32289816266ffa9537",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.88,
+      "convention_adherence": 0.87,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "local timedelta import in delete_older_than is inconsistent with module-level datetime import",
+        "rate-limit counter increments even on rejected messages",
+        "no type hints on new public methods"
+      ],
+      "strengths": [],
+      "summary": "Session 5 adds rate limiting, history queries, and TTL cleanup that cleanly mirror the existing MessageStore/_get_redis/Response and background-task patterns already in the file.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "b3fbf0d3eca6",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Single-file monolith persisted through all 5 sessions (app.py 600 lines, test_app.py 957 lines) \u2014 the greenfield choice to keep everything in one module was never split, constraining maintainability as features stacked.",
+      "Proliferation of module-level global singletons (_store_instance, _transport, _redis, registry, _server_id) \u2014 sessions 3-5 stacked new globals on session 1's global registry, forcing _reset_store/_set_redis/_reset_transport test fixtures to isolate state.",
+      "Silent 'except Exception: pass' fail-open pattern (Redis bridging, rate limiting, cleanup task) grew from session 3 through session 5, masking failures in production paths.",
+      "Session 3's _deliver_from_redis re-duplicated the broadcast send + dead-client unregister loop instead of reusing session 1/2 code; only session 4's transport extraction cleaned it up."
+    ],
+    "key_decisions": [
+      "Session 1 full greenfield rewrite to an async WebSocket push architecture (websockets + asyncio) with a type-dispatched message handler, discarding the Flask seed rather than evolving it.",
+      "Session 2 adopted a channel pub/sub subscription model (subscribe/unsubscribe, channel-scoped broadcast, per-channel subscriber registry) as the core domain abstraction.",
+      "Session 3 added SQLite MessageStore persistence plus a Redis pub/sub bridge with _server_id echo-suppression for cross-server fan-out and message history.",
+      "Session 4 extracted a BaseTransport ABC (WebSocketTransport behind a TRANSPORT env switch) to decouple message delivery from websockets and centralize connection-error handling.",
+      "Session 5 introduced fail-open Redis-backed rate limiting, a TTL-based message retention cleanup task, and cursor-style history pagination with has_more."
+    ],
+    "trajectory_description": "Quality improved steadily across the arc. Session 1 established a clean, minimal, fully-tested core (8 tests); session 2 accreted channel features with tests scaling in lockstep (15); session 3 added persistence and distributed integration (24); session 4 was a disciplined behavior-preserving refactor that kept tests unchanged (24) while removing duplicated send/error logic; session 5 hardened the service operationally (32 tests). Every stage's suite passed (verified 8/8, 15/15, 24/24, 24/24, 32/32), indicating each session built on working state. The only flat spot was architectural: the file and global-state structure never evolved even as the code tripled in size.",
+    "summary": "A highly coherent, well-tested five-session progression from a minimal WebSocket core to a production-hardened, Redis-integrated notification service, marred only by a persistent single-file/global-singleton structure."
+  }
+}

@@ -132,6 +132,13 @@ COMMIT: {commit_message}
 DIFF:
 {diff}
 
+MECHANICAL MEASUREMENTS (computed by static analysis — use these as ground truth):
+{mechanics}
+
+Ground your scores in the mechanical measurements above. If your qualitative judgment
+disagrees with a measurement, flag the discrepancy in the summary. Do NOT invent issues
+that contradict the measurements.
+
 Output ONLY valid JSON, no other text:
 {{
   "architectural_fit": <0.0-1.0>,
@@ -223,6 +230,73 @@ STORY_SCHEMA = {
 
 # ── Review Functions ───────────────────────────────────────────
 
+def _load_commit_mechanics(story_id: str, commit_hash: str) -> dict:
+    """Load pre-computed AST + Sonar + convention metrics for a commit.
+
+    Reads experiments/results/analysis/analysis_{story_id}.json and finds
+    the matching commit entry. Returns a dict of mechanical measurements,
+    or empty strings if the analysis file is missing.
+    """
+    from pathlib import Path as _Path
+    analysis_dir = _Path(__file__).resolve().parent.parent.parent / "experiments" / "results" / "analysis"
+    if not story_id:
+        return {}
+    path = analysis_dir / f"analysis_{story_id}.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+    for c in data.get("commits", []):
+        if c.get("commit_hash") == commit_hash or c.get("commit_hash", "").startswith(commit_hash[:12]):
+            ast = c.get("ast", {})
+            sonar = c.get("sonar", {})
+            convention = c.get("convention", {})
+            return {
+                "ast": ast,
+                "sonar": sonar,
+                "convention": convention,
+            }
+    return {}
+
+
+def _format_mechanics(mechanics: dict) -> str:
+    """Format mechanical measurements for the review prompt."""
+    if not mechanics:
+        return "(none available)"
+    lines = []
+    ast = mechanics.get("ast", {})
+    if ast:
+        lines.append(
+            f"  AST diff: +{ast.get('files_added', 0)} files, "
+            f"+{ast.get('lines_added', 0)}/-{ast.get('lines_removed', 0)} lines, "
+            f"+{ast.get('functions_added', 0)} functions, "
+            f"+{ast.get('classes_added', 0)} classes, "
+            f"+{ast.get('imports_added', 0)} imports"
+        )
+    sonar = mechanics.get("sonar", {})
+    if sonar.get("available"):
+        lines.append(
+            f"  SonarQube delta: bugs {sonar.get('bugs_delta', 0):+d}, "
+            f"smells {sonar.get('smells_delta', 0):+d}, "
+            f"cognitive complexity {sonar.get('complexity_delta', 0):+d}, "
+            f"duplications {sonar.get('duplications_delta', 0):+.1f}%"
+        )
+    else:
+        lines.append("  SonarQube delta: (unavailable)")
+    convention = mechanics.get("convention", {})
+    if convention:
+        score = convention.get("score")
+        viols = convention.get("violations", [])
+        if score is not None:
+            lines.append(f"  Convention score: {score:.2f}")
+        if viols:
+            lines.append(f"  Convention violations ({len(viols)}): " + "; ".join(viols[:8]))
+    return "\n".join(lines) if lines else "(none available)"
+
+
 def review_commit(
     worktree: Path,
     commit_hash: str,
@@ -231,6 +305,7 @@ def review_commit(
     session_number: int = 0,
     model: str = "deepseek/deepseek-v4-flash",
     timeout: int = 300,
+    story_id: str = "",
 ) -> CommitReview:
     """Review a single commit using an LLM agent.
 
@@ -241,6 +316,7 @@ def review_commit(
         session_number: Session number for context.
         model: Model to use for review.
         timeout: Timeout in seconds.
+        story_id: Story id used to load pre-computed AST + Sonar metrics.
 
     Returns:
         CommitReview with scores and findings.
@@ -286,6 +362,7 @@ def review_commit(
         story_name=story_name,
         commit_message=commit_msg,
         diff=diff,
+        mechanics=_format_mechanics(_load_commit_mechanics(story_id, commit_hash)),
     )
 
     # Try SDK bridge for guaranteed structured output
@@ -298,7 +375,7 @@ def review_commit(
             introduces_technical_debt=bool(data.get("introduces_technical_debt", False)),
             respects_existing_patterns=bool(data.get("respects_existing_patterns", True)),
             better_or_worse=str(data.get("better_or_worse", "unclear")),
-            problems=list(data.get("problems", [])),
+            problems=_parse_problems(data.get("problems", [])),
             strengths=list(data.get("strengths", [])),
             summary=str(data.get("summary", "")),
         )
@@ -464,7 +541,7 @@ def _parse_commit_review(response: str | None, commit_hash: str, model: str) -> 
                 introduces_technical_debt=bool(data.get("introduces_technical_debt", False)),
                 respects_existing_patterns=bool(data.get("respects_existing_patterns", True)),
                 better_or_worse=str(data.get("better_or_worse", "unclear")),
-                problems=list(data.get("problems", [])),
+                problems=_parse_problems(data.get("problems", [])),
                 strengths=list(data.get("strengths", [])),
                 summary=str(data.get("summary", "")),
             )

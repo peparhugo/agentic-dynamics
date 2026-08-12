@@ -1,0 +1,117 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "a4be2d876582c0603566fddc07f4abf8b1efbffd",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.78,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "deletes working baseline API wholesale instead of reusing its patterns",
+        "websockets typed as Any",
+        "direct-message routing/handler not visible in diff"
+      ],
+      "strengths": [],
+      "summary": "Clean modular greenfield rewrite with clear separation (entry point / server / registry / message factory) but it discards the entire existing Flask baseline rather than building on its seams.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "d81ebcf6b3766f9e038967292210681c066a1330",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "channel field falls back to payload.get(\"channel\") even when explicitly None",
+        "_handle_message branching grows in complexity",
+        "direct messages silently drop when recipient unsubscribed from channel"
+      ],
+      "strengths": [],
+      "summary": "Implements channel subscriptions cleanly by extending the existing ClientRegistry lock pattern and wire format, adding channel-aware routing, two new REST endpoints, and refactoring duplicated error-send logic into a helper \u2014 all backward compatible.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "ed1c4723d035308d79c74ee246a4bfbd7dc663b8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.6,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "sync sqlite3 in async path blocks event loop",
+        "check_same_thread=False plus asyncio.Lock is a thread-safety smell",
+        "asyncio.Lock created in __init__ requires 3.10+",
+        "_shared_subscribers appears unused",
+        "_deliver client_id-or-recipient_id fallback is fragile",
+        "line lengths exceed style"
+      ],
+      "strengths": [],
+      "summary": "The Redis pub/sub broker and SQLite persistence follow the server's existing patterns, but every message now passes through synchronous `sqlite3` calls on the event loop, turning the async broadcast hot path into blocking I/O.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "0b65cb5d1b936da9de20fec85d400ed821f8ed81",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "leaky abstraction over private server members",
+        "transport holds bidirectional server reference creating tight coupling",
+        "_deliver passes dict where iterable of keys expected",
+        "broadcast re-zips regenerated generator against gather results"
+      ],
+      "strengths": [],
+      "summary": "Clean transport abstraction with ABC + injectable strategy, but WebSocketTransport leaks encapsulation by reaching into NotificationServer private internals (_websocket_server, _store_client_state, _handle_message).",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "c3cc1462f490ca91021f6a6b881af0aeab9d7e38",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.72,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "over-indented body/status lines in /messages handler (PEP8 E117 lint debt at notification_server.py:492-493)",
+        "duplicated row-serialization between _messages and _history",
+        "rate-limit quota consumed before message validation",
+        "opaque cleanup interval magic number (ttl_days * 8640)"
+      ],
+      "strengths": [],
+      "summary": "Cross-cutting session cleanly adds rate limiting, TTL cleanup, and a /history endpoint that mirrors the codebase's established Redis-or-local fallback, background-task lifecycle, and HTTP route conventions.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "39ec27baa134",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.92,
+    "compounding_issues": [
+      "Seed codebase (Flask todo app with _notify_admin stub) was entirely discarded in Session 1's greenfield rewrite; the intended incremental-carve-out never materialized, so no seed logic survived and the initial commit's constraints were moot",
+      "Dual bookkeeping of channel membership: in-memory ClientRegistry._channels is the delivery source of truth while Redis channel sets are maintained in parallel, creating a latent consistency divergence risk in multi-instance mode (e.g. /channels prefers Redis via keys() while _deliver routes locally)",
+      "Transport abstraction created in Session 4 was never exercised \u2014 TRANSPORT env only accepts 'websocket', so the seam has no second implementation validating the interface",
+      "Direct-message delivery checks recipient subscription only when a channel is present, leaving a thin authorization gap for un-channelled directs"
+    ],
+    "key_decisions": [
+      "Session 1 greenfield rewrite: replace the Flask seed with a purpose-built single-file async WebSocket server (notification_server.py) plus a thin app.py entry point and a real test suite",
+      "Backward-compatible channel/subscription model added in Session 2 by extending the message envelope with an optional channel field, defaulting to all-client broadcast when absent",
+      "Session 3 dual-store integration: SQLite for durable message history/pagination plus Redis pub/sub for cross-instance fan-out, with a local fast-path fallback so a single codebase degrades gracefully without Redis",
+      "Session 4 transport abstraction: extract BaseTransport/WebSocketTransport ABC to isolate all socket I/O behind an interface and delegate broadcast/send through it",
+      "Session 5 config-driven cross-cutting services: Redis-backed (with local fallback) per-minute rate limiting and message TTL cleanup/history querying controlled via env vars"
+    ],
+    "trajectory_description": "Quality rose monotonically across all five sessions. Session 1 established a clean, well-structured foundation (locked client registry, wire-format helpers, health endpoint, 4 passing tests). Session 2 added channels/subscriptions as a natural extension of the message envelope without breaking existing semantics. Session 3 integrated SQLite persistence and a Redis pub/sub backbone, introducing substantial but coherent complexity. Session 4 was a clean, non-destructive refactor that extracted a transport interface and re-routed I/O through it while keeping the test suite green. Session 5 layered rate limiting and message retention/history on top of the refactored core, expanding tests to 9 (8 passed, 1 skipped at HEAD). No session introduced a regression or reverted prior work; each stage widened capability and hardened structure.",
+    "summary": "A textbook-coherent story where every session builds directly on the prior one, culminating in a well-architected, tested notification server whose only real debts are the unused seed and a transport abstraction waiting for its second implementation."
+  }
+}

@@ -1,0 +1,121 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "0477e095d941d0c850308fccde1ee07493d93ef8",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "no type hints on public signatures",
+        "threading.Lock used inside asyncio single-event-loop context",
+        "health_handler builds raw HTTP responses manually",
+        "dead/disconnected clients never purged from registry",
+        "main lacks exception handling and clean shutdown"
+      ],
+      "strengths": [],
+      "summary": "A well-structured, thoroughly tested greenfield WebSocket server, but it omits the project's type-hint convention on public signatures and couples a hand-rolled raw-HTTP health endpoint into the asyncio server.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "eb22532e005c3e51f056b414a1c3bafa9e4d6af3",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.85,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "inconsistent message shape (subscribe reads channel from payload",
+        "broadcast reads from top-level data)",
+        "threading.Lock in async context matches existing pattern but perpetuates sync-over-async design"
+      ],
+      "strengths": [],
+      "summary": "Adds a thread-safe ChannelManager that mirrors the existing ClientRegistry pattern and wires in subscribe/unsubscribe plus new HTTP endpoints with tests.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "fb36324657e84020cc632a201b8b0b430bd58546",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.72,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "bare except Exception swallowing errors throughout redis helpers",
+        "new sqlite connection per operation instead of connection reuse",
+        "redis_subscriber silently dies if its loop throws",
+        "direct messages all stored under channel \"direct\" losing target identity",
+        "subscriber/registry cleanup not fully synced with redis state on errors"
+      ],
+      "strengths": [],
+      "summary": "Adds SQLite persistence and optional Redis pub/sub for cross-server broadcast with graceful fallback, following the existing registry/handler patterns.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "f3bd03e703a3db9fb74e79d553ceb1399e6c30ed",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "private attribute access (rate_limiter._limit",
+        "rate_limiter._redis)",
+        "missing type hints on public signatures",
+        "dict returns instead of dataclass",
+        "bare except: pass swallowing errors",
+        "module-global reassignment inside start()",
+        "cleanup loop suppresses all failures"
+      ],
+      "strengths": [],
+      "summary": "Adds rate limiting, message history, and TTL cleanup as cohesive MessageStore/RateLimiter additions, but couples a module-level singleton with private-attribute poking and silent error swallowing.",
+      "session_number": 5
+    },
+    {
+      "commit_hash": "44133fb461e09432ff199918b56cf905e276293e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "partial abstraction (handler and ClientRegistry still store raw websockets; receive path untouched)",
+        "WebSocketTransport forward-references module-global registry defined after transport instantiation",
+        "get_all_websockets left as dead code",
+        "new public methods lack type hints"
+      ],
+      "strengths": [],
+      "summary": "Removes three duplicated send/broadcast loops behind a `BaseTransport`/`WebSocketTransport` abstraction with an env-driven factory, enabling future alternate transports.",
+      "session_number": 4
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "117ae6080d3b",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.9,
+    "compounding_issues": [
+      "Seed app.py (Flask auth API) was abandoned wholesale by Session 1's greenfield and remained as dead, untested code in the repo for all 5 sessions \u2014 never removed or integrated",
+      "Direct messaging is registry-local: the Session 3 Redis pub/sub fan-out only covers broadcasts, so a 'direct' message targeting a client connected to a different node silently no-ops (Redis subscriber relays only into the local registry)",
+      "Architectural seams accreted as global state mutated inside start() (message_store, rate_limiter, DATABASE_URL) \u2014 a fragile module-level singleton pattern that gets harder to test as each session adds a new subsystem",
+      "RateLimiter is constructed at import time and then rebuilt and given a Redis handle post-hoc in start(), leaving two init paths and a bypassable _limit attribute that leaks into the error message"
+    ],
+    "key_decisions": [
+      "Full stack switch in Session 1: abandoned the seed's Flask/JWT stack for asyncio + websockets with a hand-rolled raw-HTTP handler (asyncio.start_server)",
+      "SQLite-backed MessageStore guarded by a threading.Lock as the single source of persistence, history, and TTL cleanup",
+      "Redis pub/sub integration in Session 3 with _server_id dedup to enable multi-instance broadcast fan-out and distributed channel-subscription sync",
+      "Abstract BaseTransport abstraction introduced in Session 4, routing all send/broadcast delivery through a pluggable interface (TRANSPORT env var), which Session 5's rate-limit error delivery cleanly reuses",
+      "Env-var-driven configuration (REDIS_URL, DATABASE_URL, TRANSPORT, RATE_LIMIT, MESSAGE_TTL_DAYS) with per-instance overrides threaded through start()"
+    ],
+    "trajectory_description": "Quality improved steadily across the arc. Session 1 shipped a clean, minimal WebSocket server with broadcast/direct messaging and a solid 248-line test suite; Session 2 added a well-encapsulated ChannelManager plus HTTP channel endpoints; Session 3 integrated SQLite persistence and Redis fan-out with paginated /messages retrieval; Session 4 was a disciplined refactor that consolidated all delivery logic behind the BaseTransport abstraction and removed repeated send-loops; Session 5 capped the story with hardening \u2014 a dual Redis/local RateLimiter, /history with pagination, and a TTL cleanup task. Tests grew from 248 to 1222 lines with all 45 final tests passing, and each session extended rather than regressed prior behavior, though the early decision to abandon the seed stack and the late-arriving global-state seams left some brittleness.",
+    "summary": "A coherent, well-tested five-session progression that grows a minimal WebSocket server into a durable, horizontally-fanned-out notification service with rate limiting and retention management, held back only by dead seed code and a few cross-session integration seams."
+  }
+}

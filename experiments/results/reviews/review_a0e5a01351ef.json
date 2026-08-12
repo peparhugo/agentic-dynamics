@@ -1,121 +1,227 @@
 {
+  "story_name": "notification_service",
+  "story_id": "a0e5a01351ef",
+  "model": "deepseek/deepseek-v4-flash",
   "commit_reviews": [
     {
       "commit_hash": "b3d9a34e03c940f068dd35788b141e5bd36b236d",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.8,
-      "convention_adherence": 0.8,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
+      "architectural_fit": 0.78,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
       "better_or_worse": "better",
       "problems": [
-        "unused results from asyncio.gather in broadcast",
-        "no pruning of stale/dead connections in ClientRegistry",
-        "websocket params typed as Any instead of WebSocketServerProtocol"
+        {
+          "category": "dependency",
+          "severity": "major",
+          "description": "Imports Headers/Response from websockets.http11, an internal/unstable API surface that will break on websockets version upgrades; should use public APIs or pin the version."
+        },
+        {
+          "category": "testing",
+          "severity": "minor",
+          "description": "The new NotificationServer/ClientRegistry logic appears under-tested; test_app.py carries the only flagged convention violations (snake_case class, lowercase module constants), suggesting tests were not brought up to the new module's standard."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "process_request serves /health before any WebSocket upgrade handling, so a WS client connecting to /health receives an HTTP Response instead of an upgrade; non-WS/non-health requests fall through unhandled."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "Complete removal of the prior Flask/JWT/SQLite surface with no compatibility path \u2014 acceptable for a greenfield story session but blocks reuse of prior app functionality."
+        }
       ],
-      "strengths": [],
-      "summary": "Session 1 greenfield replaces the Flask seed with a cleanly factored async WebSocket notification server (ClientRegistry + NotificationServer) with typed public signatures and docstrings.",
+      "strengths": [
+        "Clean modular decomposition (ClientRegistry, NotificationServer) with thread-safe locking.",
+        "SonarQube improvements across the board: smells -7, cognitive complexity -17, duplications -4.5%, bugs +0.",
+        "Strong typing, docstrings, UTC-aware timestamps, and message-type/payload validation.",
+        "Removed the insecure static-salt password hashing and legacy migration helper from the old seed."
+      ],
+      "summary": "This greenfield rewrite replaces the Flask seed with a cleaner, well-typed asyncio WebSocket server \u2014 a net quality improvement that grounds the 'better' rating, though it leans on websockets' internal http11 API and discards prior patterns without a compatibility path.",
       "session_number": 1
     },
     {
       "commit_hash": "f05b089b1f165ef2d3ad240277bfe7de91393b19",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.9,
-      "convention_adherence": 0.9,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [
-        "disconnect cleanup is O(active channels) per removal",
-        "subscription state lives only in-memory (superseded by the planned Redis session)",
-        "direct-message channel gating silently drops sends to non-subscribers"
-      ],
-      "strengths": [],
-      "summary": "Clean feature addition that fits the existing ClientRegistry/NotificationServer architecture, preserves all prior behavior, and follows the module's threading, snapshot, and early-return conventions.",
-      "session_number": 2
-    },
-    {
-      "commit_hash": "5356601f12750a9799d920aa1be652d568e85e3d",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.6,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": true,
-      "respects_existing_patterns": true,
-      "better_or_worse": "neutral",
-      "problems": [
-        "no-op abstract method on_disconnect returns None",
-        "callback signatures in start() differ from abstract methods",
-        "base start() leaks websockets.serve via handler",
-        "WebSocketTransport.start duplicates handler logic instead of delegating to callbacks cleanly",
-        "env-based TRANSPORT selection with no registry",
-        "_create_transport raises ValueError only after websocket check"
-      ],
-      "strengths": [],
-      "summary": "The transport abstraction is directionally reasonable but half-executed, with a no-op abstract `on_disconnect`, mismatched callback vs abstract-method signatures, and websockets-specific server logic leaking into the \"generic\" contract.",
-      "session_number": 4
-    },
-    {
-      "commit_hash": "832e20a7d53b7215da452914855c389cd7bf775c",
-      "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.75,
-      "convention_adherence": 0.8,
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.82,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "better",
       "problems": [
-        "sync sqlite3 calls block the asyncio event loop",
-        "asyncio.sleep(0.01) hack in process_request masks a race condition",
-        "Redis fallback silently degrades to local delivery",
-        "MessageStore channel column nullable but list() returns it without normalization"
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "Cognitive complexity +63 concentrated in the message handling loop: subscribe/unsubscribe branching plus channel extraction/validation are inlined in handle_client instead of being extracted into small methods, which drives the +5 SonarQube smells."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Payload validation was loosened (None payload is now coerced to {} instead of rejected) while allowing channel at either top-level or inside payload, creating two API shapes for the same field and masking malformed client messages."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "Direct messages carrying a channel are silently dropped when the target is not a subscriber; silent failure gives clients no feedback and can be confused with a missing target."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The two measured convention violations (PascalCase class, UPPER_CASE constant) are located only in tests/test_app.py and are not visible in the shown diff hunk \u2014 flagging as a discrepancy between qualitative review and the measurement."
+        }
       ],
-      "strengths": [],
-      "summary": "The commit adds SQLite persistence and a Redis pub/sub broker to the notification server, following the codebase's class/naming/typing conventions with reasonable separation of concerns.",
-      "session_number": 3
+      "strengths": [
+        "Subscription state lives in ClientRegistry under the same RLock discipline as client state, and remove() cleans up subscriptions on disconnect so no stale entries leak",
+        "The _json_response static helper cleanly unifies the HTTP response construction previously inline in the health check",
+        "Channel path handling guards traversal via the '/' check and correctly unquotes names, and urlsplit strips query strings",
+        "broadcast keeps its old signature through a default channel=None parameter, so the change is backward compatible",
+        "Tests cover subscriber-only delivery and the unsubscribe path, not just the happy path"
+      ],
+      "summary": "A coherent, well-scoped feature that fits the existing ClientRegistry/message-dispatch seams and adds tests, but the inline channel logic pushes cognitive complexity (+63) and smells (+5) high enough that it introduces modest technical debt.",
+      "session_number": 2
     },
     {
-      "commit_hash": "dd8d152758891bc5ce856ad7e75d9171018904a1",
+      "commit_hash": "832e20a7d53b7215da452914855c389cd7bf775c",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.55,
-      "convention_adherence": 0.6,
+      "architectural_fit": 0.7,
+      "convention_adherence": 0.82,
       "introduces_technical_debt": true,
       "respects_existing_patterns": true,
       "better_or_worse": "neutral",
       "problems": [
-        "blocking sqlite DELETE in async cleanup loop",
-        "_send_rate_limit_error emits type \"system\" contradicting test's \"error\" assertion",
-        "history duplicates list()'s row-mapping instead of a shared helper",
-        "redis key prefix \"notification:rate\" inconsistent with existing \"notifications:client\"",
-        "rate limit applied before validation and to subscribe/unsubscribe",
-        "duplicated try/except env-var parsing for RATE_LIMIT and MESSAGE_TTL_DAYS"
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "process_request adds `await asyncio.sleep(0.01)` to mask a WebSocket dispatch race \u2014 a timing hack that is fragile under load and hard to reason about; there is no comment explaining the invariant it depends on"
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "MessageStore performs blocking sqlite3 I/O synchronously from async handlers (store.add called inside handler), stalling the event loop despite the docstring claiming the store is kept separate from it; check_same_thread=False + RLock only protects threads, not the loop"
+        },
+        {
+          "category": "performance",
+          "severity": "minor",
+          "description": "Per-message commit inside add() with no transaction reuse or batching; acceptable at low volume but limits history-write throughput"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "`url[10:]` magic-index slice strips the sqlite:/// prefix with no URI-scheme validation, unlike the explicit redis:// rediss:// check in _connect_broker"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "close() fallback via getattr(self._redis, \"aclose\", self._redis.close) is convoluted; a single async close helper would be clearer"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The two measured convention violations (PascalCase class, UPPER_CASE module constant) are in test_app.py, not the app.py code shown in this diff \u2014 the reviewed app.py code itself is convention-clean"
+        }
       ],
-      "strengths": [],
-      "summary": "Cross-cutting additions (history endpoint, rate limiting, TTL cleanup) that follow the existing HTTP-handler and Redis-with-fallback patterns, but block the event loop with synchronous SQLite deletes and send rate-limit errors typed as \"system\" while its own test asserts \"error\".",
+      "strengths": [
+        "Graceful degradation: Redis unavailability falls back to local delivery with a logged warning, keeping the server functional in degraded mode",
+        "MessageStore cleanly isolates SQLite persistence behind a small, typed API with a uniform envelope",
+        "_json_response generalized to accept a status, enabling proper 400 responses for the /messages endpoint",
+        "Shared envelope ({message, channel, target_id}) lets broker and local delivery reuse a single _deliver path instead of duplicating logic"
+      ],
+      "summary": "Sound integration of Redis fan-out and SQLite history with a good graceful-fallback design, but the 0.01s sleep race-hack and blocking sqlite calls inside async handlers add real technical debt.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "5356601f12750a9799d920aa1be652d568e85e3d",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "BaseTransport.start is a non-abstract method that raises NotImplementedError, so a transport that forgets to override it fails at runtime rather than at class definition time; it should be a second @abstractmethod."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "The TRANSPORT env var only supports websocket, so the abstraction is currently speculative (YAGNI) with no second implementation driving the interface shape."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The 2 convention violations (PascalCase class, UPPER_CASE constants) are flagged in test_app.py, which is not touched by this commit's diff; they appear pre-existing, not introduced here."
+        }
+      ],
+      "strengths": [
+        "Decouples NotificationServer from the websockets library via a clean BaseTransport ABC with a concrete WebSocketTransport",
+        "Materially reduces cognitive complexity (-35) and code smells (-2) by moving the broadcast/send/disconnect plumbing out of the server",
+        "Keeps the existing style: snake_case methods, PascalCase classes, PEP 604 union types and dict[str, Any] annotations throughout",
+        "Backward compatible \u2014 transport defaults to WebSocketTransport and the public constructor signature remains usable",
+        "Centralizes the asyncio.gather broadcast logic and error-tolerant send into a single testable unit"
+      ],
+      "summary": "A clean, convention-consistent transport abstraction that measurably reduces complexity and decoupling, with the flagged test_app.py violations pre-existing rather than introduced by this commit.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "dd8d152758891bc5ce856ad7e75d9171018904a1",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.82,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "security",
+          "severity": "minor",
+          "description": "Naive datetimes from the 'since' query parameter are normalized to UTC but not converted (no tzinfo branch), so they are stored/compared in their raw naive form; timezone-aware and naive inputs are not handled symmetrically in store.history."
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "test_app.py: classes not using PascalCase and module-level constants not UPPER_CASE (matches the measured 2 violations; SonarQube smoke count -2 aligns)."
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "SonarQube cognitive complexity +35 for the added handlers/limiter; logic is readable but dense \u2014 the local rate-limit counter pruning and fallback paths could be extracted into a helper."
+        }
+      ],
+      "strengths": [
+        "Rate limiting degrades gracefully: Redis limiter with a local in-process fallback and clear error messaging instead of silently dropping messages",
+        "history() mirrors the existing MessageStore list() pattern (lock, parameterized SQL, row-to-dict mapping) and implements cursor-style pagination with a correct has_more boundary",
+        "Cleanup task lifecycle is properly managed alongside the broker task (create on start, cancel + gather on shutdown), and delete_older_than reuses the established with-lock pattern",
+        "Configuration follows the existing env-var + safe-parse convention (RATE_LIMIT, MESSAGE_TTL_DAYS) and is committed in the DB",
+        "Handler logic matches the existing router structure (bad-request JSON responses via _json_response, HTTPStatus constants) and adds tests"
+      ],
+      "summary": "Session 5 'cross_cutting' fits the architecture well \u2014 new history/rate-limit/cleanup features follow the existing store and handler patterns with graceful Redis fallback, two minor test-file convention slips and a naive-timestamp edge case being the only nits.",
       "session_number": 5
     }
   ],
-  "story_name": "notification_service",
-  "story_id": "a0e5a01351ef",
-  "model": "unknown",
   "story_review": {
     "story_name": "notification_service",
     "reviewer_model": "deepseek/deepseek-v4-flash",
     "overall_coherence": 0.9,
     "compounding_issues": [
-      "Binary build artifacts committed to git from Session 1 onward (__pycache__/*.pyc) and re-committed on every change; Session 5 also commits messages.db",
-      "asyncio.sleep(0.01) timing hack added to process_request in Session 3 (\"let a just-received WebSocket frame finish\") is baked into production code to appease tests and carried through Sessions 4-5",
-      "Seed codebase (Flask Auth API) was wholly discarded in Session 1's greenfield rewrite, so no seed structure carried forward",
-      "Subscription state is duplicated across the Redis set and the local ClientRegistry; delivery filtering relies only on the local registry, so the two can drift",
-      "Session 4's refactor silently dropped per-client dead-connection removal in broadcast (previously tracked via gather result inspection)"
+      "Session 1 discarded the seed codebase (a Flask Auth API) entirely and rewrote it into a WebSocket notification server, so the intended 'build on seed incrementally' premise was void from the start \u2014 the seed provided no scaffolding leverage.",
+      "The project stayed a single 569-line app.py across all sessions despite growing to ~800 LOC and a seed docstring promising a multi-file modular layout; the Session 4 transport abstraction was the only real structural decomposition.",
+      "Session 2 added channels with a sharp complexity spike (+63 complexity delta) that later had to be paid down in Session 4 (-35), showing early growth outpaced structure.",
+      "Convention violations in tests/test_app.py (non-PascalCase classes, non-UPPER_CASE module constants) persisted unchanged across all five sessions \u2014 convention score stuck at 0.818 with the same two violations every session.",
+      "Session 3 introduced Redis as a hard external broker dependency (mitigated only by a local-delivery fallback), coupling the core path to infra availability."
     ],
     "key_decisions": [
-      "Session 1: total rewrite to an asyncio/websockets architecture, discarding the Flask seed entirely",
-      "Session 1: thread-safe ClientRegistry abstraction as the shared state backbone for the server",
-      "Session 3: optional Redis pub/sub with graceful local-delivery fallback, keeping the system runnable and testable without Redis",
-      "Session 3: SQLite MessageStore isolated behind its own thread + RLock, kept separate from the asyncio event loop",
-      "Session 4: BaseTransport ABC extracting WebSocket handling behind a pluggable transport contract, with API and tests kept identical",
-      "Session 5: dual-mode rate limiter (Redis counters primary, in-memory fallback) reusing the Session 3 graceful-degradation pattern"
+      "Session 1: full greenfield rewrite \u2014 replaced the Flask Auth API seed with a WebSocket notification server (ClientRegistry + NotificationServer, broadcast/direct/system message types).",
+      "Session 2: channel-based pub/sub via a subscription registry (ClientRegistry._subscriptions) with subscribe/unsubscribe message types and HTTP /channels endpoints.",
+      "Session 3: Redis pub/sub broker for horizontal scaling across server instances, with a graceful local-delivery fallback when Redis is unreachable.",
+      "Session 3: SQLite MessageStore persistence with synchronous DB writes isolated from the asyncio event loop behind a threading lock.",
+      "Session 4: BaseTransport/WebSocketTransport abstraction \u2014 dependency inversion that decoupled message routing from the websockets library and enabled the clean Session 5 additions.",
+      "Session 5: sliding-window rate limiting (Redis-backed with local in-memory fallback) and TTL-based message retention cleanup loop, built directly on the S3 store and S4 transport abstractions."
     ],
-    "trajectory_description": "Quality improved monotonically. Session 1 produced a small, clean greenfield core (~174 LOC) with passing broadcast/disconnect tests; Session 2 added channel subscriptions and REST channel endpoints with new tests; Session 3 layered Redis pub/sub and SQLite persistence behind a resilient optional-broker design; Session 4 was a disciplined refactor that extracted a BaseTransport abstraction while keeping the public API and all tests byte-for-byte unchanged; Session 5 added rate limiting, /history pagination, and a TTL cleanup task on top of the refactored layer, ending at 569 LOC with all 11 tests passing. The only downward drift was hygiene-related (committed .pyc binaries, a sleep-based timing hack), while the architecture grew steadily more modular and abstract.",
-    "summary": "A near-textbook coherent five-session arc \u2014 greenfield core, feature addition, integration, refactor, cross-cutting \u2014 where each session built directly on the prior one and finished with a transport-abstracted, fully tested notification service."
+    "trajectory_description": "Quality improved across the story with a clear arc: Session 1 laid a solid foundation, Sessions 2-3 grew features (channels, persistence, broker) at the cost of a significant complexity spike (+63 then +28 complexity delta), Session 4 was a disciplined structural refactor that cut complexity (-35) and extracted the transport abstraction, and Session 5 layered cross-cutting concerns (rate limiting, retention cleanup, /history endpoint) by reusing the S3/S4 abstractions rather than bolting on new code. Tests grew monotonically (5\u21927\u21929\u21929\u219211) and all 11 pass, Sonar recorded zero bug deltas and a net reduction in code smells (-7, +5, +3, -2, -2). The only persistent blemish was test-file style violations that never got corrected and a small complexity uptick in the final session.",
+    "summary": "A coherent, improving progression from greenfield build through feature integration, a clean transport refactor, and disciplined cross-cutting additions \u2014 held back only by an abandoned seed, single-file growth, and persistent minor test-style violations."
   }
 }

@@ -146,6 +146,7 @@ def main() -> None:
                     story_name=job["story_name"],
                     session_number=job["session_number"],
                     model=model,
+                    story_id=story_id,
                 )
                 data = _load_or_create_review(story_id)
                 data["story_name"] = job["story_name"]

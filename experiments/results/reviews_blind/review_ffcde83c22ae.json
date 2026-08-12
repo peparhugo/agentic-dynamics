@@ -1,0 +1,72 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "d5cbd19f19496d2dae403fb1d79cabb9825414c4",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [],
+      "strengths": [],
+      "summary": "Clean greenfield scaffold \u2014 ts-jest config, package lock, and declared bin/deps are internally consistent and set up the story session correctly.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "154d15dab9f841be392c1c8c369231e1c06c7acc",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.75,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "repeated inline fs.rmSync cleanup instead of a shared afterEach",
+        "typo \"nonextistent\" in fallback test",
+        "300+ lines added in a single test block"
+      ],
+      "strengths": [],
+      "summary": "Adds comprehensive template-feature tests that follow the existing setupContentDir/mkdtemp patterns and extend buildSite's signature cleanly.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "41bc952d9997d45d8af46af115d1e947cc8964e0",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.8,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [],
+      "strengths": [],
+      "summary": "Adds watch (chokidar), templating (handlebars), and live-reload (ws) dependencies appropriate for an SSG integration session, with correct production vs dev placement in the lockfile.",
+      "session_number": 3
+    }
+  ],
+  "story_name": "static_site_gen",
+  "story_id": "ffcde83c22ae",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "static_site_gen",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.88,
+    "compounding_issues": [
+      "Seed codebase is mismatched: index.ts is an Express auth API (JWT/SQLite/bcrypt), entirely unrelated to the static_site_gen story; it was left orphaned and inert at the repo root (excluded by tsconfig rootDir:./src) instead of being integrated or removed",
+      "Session 2 layered the Handlebars TemplateEngine on top of the hardcoded renderers instead of replacing them, leaving duplicate parallel rendering paths (generatePageHtml/generateIndexHtml fallbacks plus pageBodyHtml/indexBodyHtml) that must be kept in sync",
+      "Layouts receive pre-rendered HTML 'body' fragments via {{{body}}}, so page structure, tag markup, and date styling are baked into code rather than templates, limiting template control and later plugin extraction",
+      "Repo hygiene regressed over time: session 1 committed node_modules, session 3 committed dist/ plus a new node_modules tree (12.5k inserted lines of build/dependency noise)",
+      "Instrumentation artifact (.instrument/session.jsonl) was modified and committed in session 2, leaking measurement data into story history",
+      "Story is truncated: the config defines 5 sessions but only 3 were run, so the intended refactor (plugin system) and cross-cutting (incremental builds) sessions never materialized"
+    ],
+    "key_decisions": [
+      "Adopted Handlebars layout/partial engine with per-page 'template' frontmatter and a default-layout fallback, integrated additively so the existing build path keeps working when no templates dir exists",
+      "Extended buildSite() signature to buildSite(content, output, templates?) with auto-detection (TemplateEngine.isActive()) and graceful fallback to the original hardcoded HTML generation",
+      "Built the live-reload server on native http + ws + chokidar with a debounced 200ms rebuild and a WebSocket 'reload' broadcast plus script injection into served HTML",
+      "Unified CLI via commander with build and serve subcommands, --content/--output/--templates/--port options, all output defaulting to ./dist per constraints",
+      "Maintained strict-mode TypeScript with jest test suites per feature (generator.test.ts, server.test.ts), explicitly preserving prior tests across every session"
+    ],
+    "trajectory_description": "Quality improved consistently and stayed high across the three sessions. Session 1 delivered a complete greenfield generator with a 336-line jest suite; session 2 layered the template engine onto it without breaking existing behavior; session 3 added a functional dev server validated by socket-level integration tests. The final worktree builds cleanly under tsc and passes all 34 tests across both suites. The arc is additive and disciplined \u2014 no correctness regressions \u2014 but it does accumulate structural debt: duplicated rendering paths, orphaned seed code, and node_modules/dist committed to history. The project was cut short at 3 of the planned 5 sessions, so the highest-risk phase (the plugin-system refactor) never exercised the codebase.",
+    "summary": "A highly coherent, test-disciplined additive progression that built a working static site generator end-to-end, undercut only by an unrelated seed, duplicated rendering paths, repo-hygiene bloat, and a truncation before the final two sessions."
+  }
+}

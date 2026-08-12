@@ -1,0 +1,120 @@
+{
+  "commit_reviews": [
+    {
+      "commit_hash": "b93ef22d0614ae236d9074c53239e930a592a335",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.65,
+      "convention_adherence": 0.65,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "threading.Lock redundant in single-threaded asyncio",
+        "broadcast swallows exceptions",
+        "vague object type hints",
+        "dict literal instead of dataclass",
+        "tests spin real server on fixed ports with sleep-based sync",
+        "exception-swallow masks disconnect cleanup"
+      ],
+      "strengths": [],
+      "summary": "Reasonable greenfield WebSocket server, but a threading.Lock in an asyncio-only module is a misdesign and broadcast silently swallows errors.",
+      "session_number": 1
+    },
+    {
+      "commit_hash": "59e0ea9c7d82ab0bc61be9db6c8a64ce871c0b95",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.9,
+      "convention_adherence": 0.9,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        "test-only reset() method in production class",
+        "silent exception swallowing in send_to_clients",
+        "get_ws returns raw socket with no liveness check"
+      ],
+      "strengths": [],
+      "summary": "Mirrors the existing ClientRegistry lock+dict pattern for a new ChannelManager and adds well-tested subscribe/unsubscribe routing with consistent HTTP endpoints.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "c5465eef3ff85e984036c2d2bb5c083ebc365304",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "worse",
+      "problems": [
+        "dead ClientRegistry class",
+        "unused abstract methods",
+        "ignored TRANSPORT env var",
+        "duplicated send logic",
+        "exception swallowing still pass-only"
+      ],
+      "strengths": [],
+      "summary": "Refactor wraps send/broadcast behind a Transport abstraction, but leaves ClientRegistry orphaned, ignores the TRANSPORT env var it reads, and never wires the abstract on_connect/on_disconnect hooks.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "41070b7687905b03d3f6e102938b167a1fcd2b66",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.5,
+      "convention_adherence": 0.6,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "blocking sqlite I/O inside async handlers",
+        "duplicated delivery logic in _listen vs deliver_message",
+        "bare `except Exception: pass` swallows errors in _listen",
+        "fire-and-forget asyncio.create_task for store_client_state",
+        "module-level singleton globals",
+        "enabled property re-reads env instead of using self._redis_url"
+      ],
+      "strengths": [],
+      "summary": "Adds SQLite persistence and Redis pub/sub for multi-server integration, but duplicates the message-delivery path in `_listen` instead of reusing `deliver_message`.",
+      "session_number": 3
+    },
+    {
+      "commit_hash": "b0250f6d3f31c5e3c9bd3546ca0356c6e7a4866a",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.7,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "neutral",
+      "problems": [
+        "RATE_LIMIT env parsed redundantly at module scope and again in is_rate_limited and ws_handler instead of reusing the module constant",
+        "MESSAGE_TTL_DAYS/RATE_LIMIT and their defaults duplicated across three call sites",
+        "delete_older_than blocks the asyncio loop via to_thread (acceptable) but tests duplicate temp-file setup rather than a fixture."
+      ],
+      "strengths": [],
+      "summary": "Adds rate limiting, message TTL cleanup, and a paginated /history endpoint that slot cleanly into the existing MessageStore/broker/handler layering.",
+      "session_number": 5
+    }
+  ],
+  "story_name": "notification_service",
+  "story_id": "bb4e1d655f1c",
+  "model": "unknown",
+  "story_review": {
+    "story_name": "notification_service",
+    "reviewer_model": "deepseek/deepseek-v4-flash",
+    "overall_coherence": 0.85,
+    "compounding_issues": [
+      "Session 1 discarded the seeded app.py (Flask auth API) wholesale and never deleted it, leaving a dead file in the tree across all 5 sessions with zero continuity from the seed",
+      "Session 4's transport refactor is half-finished: _create_transport reads the TRANSPORT env var but ignores it (always returns WebSocketTransport), and the superseded ClientRegistry class remains as dead code at server.py:287",
+      "Session 5's rate limiting is Redis-only \u2014 is_rate_limited returns False when REDIS_URL is unset, so the headline cross-cutting feature silently no-ops in the default single-node deployment that sessions 1-3 established",
+      "Rate limit enforcement in ws_handler only covers the general broadcast branch; subscribe/unsubscribe messages bypass the limit entirely"
+    ],
+    "key_decisions": [
+      "Greenfield rewrite in session 1: replaced the seeded Flask auth API with an asyncio/aiohttp + websockets real-time notification server",
+      "Channel-based pub/sub semantics (ChannelManager with subscribe/unsubscribe) as the core messaging model in session 2",
+      "SQLite MessageStore plus optional Redis pub/sub broker in session 3 for persistence and multi-node fan-out, driven by env-var config",
+      "Transport abstraction (BaseTransport ABC / WebSocketTransport) in session 4 to centralize connection management away from ClientRegistry",
+      "Cross-cutting hardening in session 5: Redis rate limiting, MESSAGE_TTL_DAYS expiry with a background cleanup task, and a paginated /history endpoint with has_more"
+    ],
+    "trajectory_description": "Quality improved steadily across a logical arc: session 1 built a clean minimal broadcast MVP, session 2 added a coherent channel abstraction, session 3 layered on persistence and Redis integration, session 4 performed a structural refactor toward a transport abstraction (slightly incomplete, leaving dead code), and session 5 delivered production-oriented hardening (rate limits, TTL cleanup, history). Sessions 2-3 and 3-5 build directly on prior infrastructure, and the final state passes 72 tests, so the overall arc is upward despite the refactor session's unfinished edges.",
+    "summary": "A highly coherent 5-session progression from a broadcast MVP to a hardened, persistent, channel-based notification service, marred mainly by a seed-app disconnect and a session 4 refactor that introduced but never finished a transport abstraction."
+  }
+}

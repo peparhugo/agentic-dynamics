@@ -1,20 +1,53 @@
 {
+  "story_name": "notification_service",
+  "story_id": "b06c6525b784",
+  "model": "deepseek/deepseek-v4-flash",
   "commit_reviews": [
     {
       "commit_hash": "f70b12e244e29962ac57915ffba923ed051f3cf6",
       "reviewer_model": "deepseek/deepseek-v4-flash",
-      "architectural_fit": 0.5,
-      "convention_adherence": 0.5,
-      "introduces_technical_debt": false,
-      "respects_existing_patterns": true,
-      "better_or_worse": "unclear",
-      "problems": [],
-      "strengths": [],
-      "summary": "Review unavailable.",
+      "architectural_fit": 0.05,
+      "convention_adherence": 0.77,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": false,
+      "better_or_worse": "worse",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "critical",
+          "description": "The session was a greenfield start on the 'Tier 2 Small Flask Auth API' baseline, but the agent replaced the entire multi-file Flask app (Blueprints, JWT, SQLite) with a completely different 'Async WebSocket notification server' \u2014 the wrong application for the task, discarding the entire spec."
+        },
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "The rewrite removed all existing structure rather than extending it: -242 lines deleted with no evolution of the Flask blueprint/module pattern, so any subsequent story sessions must rebuild from scratch."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Module-level constants are not UPPER_CASE (e.g. MESSAGE_TYPES) \u2014 the primary convention violation behind the 0.77 convention score, along with PascalCase issues in test files."
+        },
+        {
+          "category": "maintainability",
+          "severity": "major",
+          "description": "SonarQube delta shows cognitive complexity +40, a large jump concentrated in the new server module's connection/event-handling logic."
+        },
+        {
+          "category": "dependency",
+          "severity": "minor",
+          "description": "Introduces a new third-party dependency (websockets) not present in the baseline application's dependency set."
+        }
+      ],
+      "strengths": [
+        "Duplication reduced -2.1% and bug count down -1 per SonarQube, consistent with a clean single-module rewrite.",
+        "Reasonable type hints, timezone-aware timestamps, and use of an asyncio.Lock for client registry access.",
+        "Convention score of 0.77 shows mostly idiomatic style despite the constant-naming and test-class nits."
+      ],
+      "summary": "Functionally tidy code (0.77 conventions, fewer bugs/duplications), but architecturally catastrophic: the agent replaced the intended Flask Auth API baseline with an entirely different WebSocket notification server, so the commit must be flagged as a critical off-spec rewrite rather than a sound session 1.",
       "session_number": 1
     },
     {
-      "commit_hash": "f4084978995e46d4f792901275a004bb7acf2cf2",
+      "commit_hash": "e5e59782a92de5e889e6bdc270a2d7da464baba7",
       "reviewer_model": "deepseek/deepseek-v4-flash",
       "architectural_fit": 0.5,
       "convention_adherence": 0.5,
@@ -24,30 +57,159 @@
       "problems": [],
       "strengths": [],
       "summary": "Review unavailable.",
+      "session_number": 2
+    },
+    {
+      "commit_hash": "f4084978995e46d4f792901275a004bb7acf2cf2",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.84,
+      "convention_adherence": 0.77,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Redundant/overlapping Redis state tracking: _redis_enabled, _provided_redis, _redis_client_owned, and direct `self._redis is not None` checks encode the same enabled/fallback state in multiple places and can drift out of sync."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "Cognitive complexity +46 confirms start() and the Redis state machine (ping/fallback/listener-launch) have grown too large; the connection+fallback logic belongs in a separate helper or small coordinator."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score 0.77: 5 violations in newly added files (test_app.py, test_integration.py, transport.py) for module-level constants not UPPER_CASE and classes not PascalCase, conflicting with the repo's snake_case/PascalCase conventions."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Silent Redis fallback on ping failure can mask production infrastructure problems; only the explicit-client path re-raises."
+        },
+        {
+          "category": "architecture",
+          "severity": "info",
+          "description": "Direct-message delivery targets a process-local client_id in _deliver, so direct routing is unlikely to work across processes once Redis is enabled."
+        }
+      ],
+      "strengths": [
+        "Redis pub/sub with pattern-based per-channel routing (notifications:*) cleanly extends the existing NotificationServer without changing its public API",
+        "Graceful fallback to in-process routing preserves backward compatibility and local development",
+        "Correct async resource lifecycle: listener task cancellation, aclose/close resolution via inspect, unregister-before-close ordering in stop()",
+        "SQLite persistence guarded by an asyncio lock; SonarQube confirms +0 bugs, +0 smells, +0% duplication"
+      ],
+      "summary": "A well-integrated integration session that adds Redis and SQLite behind a backward-compatible fallback and clean resource lifecycle, scoring below 1.0 mainly on convention violations in new files and modest complexity creep.",
       "session_number": 3
+    },
+    {
+      "commit_hash": "6da7a5bb66b5e9531eef767bef911f2c4f8d0b4e",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.75,
+      "convention_adherence": 0.77,
+      "introduces_technical_debt": true,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "architecture",
+          "severity": "major",
+          "description": "Dual ownership of client state: the core keeps self.clients/channels while BaseTransport also maintains its own clients dict, creating two sources of truth that can drift; the broadcast/on_disconnect flow depends on the server and transport registering the same client_id."
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "hasattr duck-typing checks (hasattr(self.transport, 'clients') and hasattr(self.transport, 'port')) undermine the ABC contract \u2014 BaseTransport already defines clients, so the guard is redundant and masks type errors; a port attribute/property on the interface would be cleaner."
+        },
+        {
+          "category": "architecture",
+          "severity": "minor",
+          "description": "start()/stop() are empty concrete methods on BaseTransport rather than abstract; a subclass could silently skip teardown without enforcement, which is inconsistent with the abstract on_connect/on_disconnect contract."
+        },
+        {
+          "category": "convention",
+          "severity": "minor",
+          "description": "Convention score 0.77 with 5 violations (PascalCase classes and UPPER_CASE module constants in transport.py and test files), matching the SonarQube signal of +7 smells, +33 cognitive complexity, and +4.5% duplications."
+        }
+      ],
+      "strengths": [
+        "Introduces a clean ABC-based transport abstraction that decouples WebSocket handling from the notification core, improving testability via dependency injection.",
+        "Preserves behavior \u2014 net +0 functions and no new bugs while deleting the inline WebSocket handler and connection-error handling from the core.",
+        "Transport selection is config-driven (TRANSPORT env var) with a clear extension point for future protocols."
+      ],
+      "summary": "A net-positive decoupling refactor that extracts WebSocket concerns behind a BaseTransport ABC, but it introduces minor tech debt via hasattr duck-typing and duplicated client-state ownership that partially offset the architectural gain.",
+      "session_number": 4
+    },
+    {
+      "commit_hash": "15020edfc1c5bd87e6305a7c18adae3e0a23026f",
+      "reviewer_model": "deepseek/deepseek-v4-flash",
+      "architectural_fit": 0.85,
+      "convention_adherence": 0.8,
+      "introduces_technical_debt": false,
+      "respects_existing_patterns": true,
+      "better_or_worse": "better",
+      "problems": [
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_cleanup_expired computes the cutoff twice (epoch timestamp then round-trips back to ISO); a timedelta subtraction against datetime.now(timezone.utc) would be simpler and avoid the redundant conversion"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "_local_rate_limits dict never evicts stale per-client entries, so memory grows with the number of distinct senders seen over the process lifetime"
+        },
+        {
+          "category": "maintainability",
+          "severity": "minor",
+          "description": "rate_limit == 0 is treated as deny-all rather than unlimited, which is a surprising semantic for an env default boundary; 0 should arguably mean no limit"
+        },
+        {
+          "category": "maintainability",
+          "severity": "info",
+          "description": "await asyncio.sleep(0) yield trick in _handle_http is a subtle coupling between handler and transport loop timing, only documented by a comment"
+        },
+        {
+          "category": "testing",
+          "severity": "info",
+          "description": "New features (rate limiting, /history endpoint, TTL cleanup) ship with no accompanying tests; the AST diff shows +0 files and the test-file violations are all pre-existing, not new coverage"
+        },
+        {
+          "category": "convention",
+          "severity": "info",
+          "description": "The 0.77 convention score is a repo-wide measurement; all 5 flagged violations live in test_app.py, test_integration.py, and transport.py, none of which this commit touches, so the score reflects pre-existing state rather than this commit's quality"
+        }
+      ],
+      "strengths": [
+        "Atomic Redis INCR rate limiting with one-minute window and graceful local fallback on transient failures, keeping messaging alive when Redis degrades",
+        "Parameterized SQL in the new history endpoint (no injection risk) with has_more pagination and robust ISO timestamp parsing via _parse_since",
+        "New logic decomposed into small, typed helper methods (_env_int, _env_float, _allow_message, _history) that mirror existing static-helper and lock-guard patterns in the class",
+        "TTL cleanup is wired into the server lifecycle with proper task cancellation in shutdown, matching the existing redis_listener pattern"
+      ],
+      "summary": "A clean, well-factored feature addition that slots into the existing NotificationServer patterns (env helpers, db locks, lifecycle tasks) with atomic rate limiting and safe parameterized queries; the low convention score is entirely attributable to pre-existing violations in files this commit did not touch.",
+      "session_number": 5
     }
   ],
-  "story_name": "notification_service",
-  "story_id": "b06c6525b784",
-  "model": "unknown",
   "story_review": {
     "story_name": "notification_service",
     "reviewer_model": "deepseek/deepseek-v4-flash",
-    "overall_coherence": 0.93,
+    "overall_coherence": 0.85,
     "compounding_issues": [
-      "Session 1 committed __pycache__/*.pyc artifacts that polluted every subsequent commit; session 3 added a binary messages.db to git \u2014 repo hygiene never addressed across all 5 sessions",
-      "Session 4 refactor shares the same `clients` dict between NotificationServer and WebSocketTransport but guards it with two distinct locks (server._clients_lock vs transport._clients_lock), a latent data-race that tests don't exercise",
-      "Session 5 rate-limit config is read once at construction time from env vars, making live configuration impossible (test had to work around it by mutating server.rate_limit post-fixture)",
-      "The irrelevant Flask auth seed was discarded wholesale in session 1 rather than adapted, which was correct here but means the 'Initial seed codebase' commit bears zero relation to the notification domain"
+      "Session 1 hardwired WebSocket handling directly inside NotificationServer (single-file app.py), forcing a large, risk-heavy refactor in Session 4 to extract the transport seam; the coupling carried forward as the server now calls transport internals (self.server._register_client, _remove_client_state, _unregister_client) through private API.",
+      "Session 3 baked Redis pub/sub and SQLite persistence into the server with no abstraction, which enlarged the Session 4 refactor and left infrastructure concerns entangled with core delivery logic.",
+      "The _normalise_message one-liner grew increasingly dense as channels, subscribe/unsubscribe, and per-type validation were layered on across sessions 2-5, reducing readability.",
+      "The seed codebase (Flask Auth API) was entirely discarded by the Session 1 greenfield, so the seed imposed no useful constraints on the notification domain \u2014 an opportunity cost rather than a technical debt.",
+      "Session 3 introduced a synchronous sqlite3 connection shared across async tasks guarded by an asyncio lock; later sessions added more DB touches (_persist, _history, _messages, cleanup) all funneling through the same blocking connection, a latent bottleneck carried into Session 5."
     ],
     "key_decisions": [
-      "Session 1 greenfield rewrite: replaced the unrelated Flask auth seed with a clean asyncio/websockets implementation, defining the {type, payload, timestamp} protocol that every later session built on",
-      "Session 3 Redis pub/sub with graceful in-process fallback when Redis is unavailable \u2014 resilient integration that kept the local-only test suite working while adding cross-instance distribution",
-      "Session 3 SQLite persistence layer (messages table, DATABASE_URL config, asyncio-locked sync sqlite calls) that later enabled /messages and /history endpoints",
-      "Session 4 extraction of a pluggable BaseTransport/WebSocketTransport abstraction selected by TRANSPORT env var, completed as an API-preserving refactor with zero test changes",
-      "Session 5 operational hardening: Redis-counter rate limiting with local fallback, TTL-based background message expiry, and a paginated since-filtered /history endpoint"
+      "Session 1: greenfield rewrite from the Flask seed to a self-contained async WebSocket notification server (asyncio + websockets), defining a minimal message protocol (broadcast/direct/system).",
+      "Session 2: in-band channel subscription model \u2014 subscribe/unsubscribe treated as message types over the same WebSocket protocol, with channel\u2192client membership kept server-side.",
+      "Session 3: Redis pub/sub for cross-process delivery plus SQLite persistence through a single _publish path (persist then deliver), with graceful fallback to in-process routing when Redis is unavailable.",
+      "Session 4: transport abstraction \u2014 extraction of transport.py with BaseTransport/WebSocketTransport so the core becomes transport-agnostic and injectable via constructor.",
+      "Session 5: env-driven operational controls (RATE_LIMIT, MESSAGE_TTL_DAYS, TRANSPORT, DATABASE_URL), per-client rate limiting that works with or without Redis, and a TTL-based message cleanup loop."
     ],
-    "trajectory_description": "Quality steadily improved across the five sessions. Session 1 produced a clean, minimal async core with 2 passing tests; session 2 cleanly added channel subscriptions with an honest admission of and fix for a subscription/broadcast race in tests; session 3 was the highest-risk step (Redis + SQLite integration) and was handled capably using fakeredis with 5 passing tests; session 4 was a disciplined, behavior-preserving refactor that left the test count and suite untouched; session 5 rounded out the system with rate limiting, history queries, and TTL cleanup, ending at 7 passing tests. The test suite grew monotonically (2\u21923\u21925\u21925\u21927), every session honored the 'don't break existing behavior' constraint, and each session verified with pytest before committing \u2014 the only recurring blemish was the persistent binary/build-artifact noise in commits.",
+    "trajectory_description": "Quality improved steadily across the five sessions. The codebase evolved from a monolithic single-file WebSocket server (Session 1) into a modular two-module design with a clean transport seam (Session 4) and operational hardening (Session 5). Test coverage grew from 2 unit tests to a 4-test integration suite spanning cross-server pub/sub delivery, persistence, rate limiting, and history pagination, with all 7 tests passing at the final commit. The main quality arc is upward: architecture gained clear separation of concerns, configuration moved from hardcoded to env-driven, and failure modes (rate limits, message expiry, Redis unavailability) were progressively handled. Residual warts are density of the message-normalisation logic and the growing private-API coupling between the server core and transport implementations.",
     "summary": ""
   }
 }
