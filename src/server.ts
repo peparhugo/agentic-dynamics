@@ -4,6 +4,7 @@ import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import chokidar from 'chokidar';
 import { buildSite, type BuildOptions } from './generator';
+import { DevServerPlugin } from './dev-server-plugin';
 
 export interface ServeOptions extends BuildOptions {
   port?: number;
@@ -15,22 +16,6 @@ export interface DevServer {
   watcher: ReturnType<typeof chokidar.watch>;
   close: () => Promise<void>;
 }
-
-const liveReloadScript = (port: number): string => `<script>
-(function () {
-  var socket = new WebSocket('ws://' + location.hostname + ':${port}');
-  socket.onmessage = function (event) { if (event.data === 'reload') location.reload(); };
-  socket.onclose = function () { setTimeout(function () { location.reload(); }, 1000); };
-}());
-</script>`;
-
-const injectLiveReload = (html: string, port: number): string => {
-  const script = liveReloadScript(port);
-  const closingBody = html.lastIndexOf('</body>');
-  return closingBody >= 0
-    ? `${html.slice(0, closingBody)}${script}${html.slice(closingBody)}`
-    : `${html}${script}`;
-};
 
 const contentType = (filePath: string): string => {
   if (filePath.endsWith('.html')) return 'text/html; charset=utf-8';
@@ -48,8 +33,13 @@ export async function startDevServer(options: ServeOptions = {}): Promise<DevSer
   let serverPort = port;
   let rebuilding = false;
   let queued = false;
-
-  await buildSite({ contentDir, outputDir, templatesDir });
+  const buildOptions = () => ({
+    ...options,
+    contentDir,
+    outputDir,
+    templatesDir,
+    plugins: [...(options.plugins ?? []), DevServerPlugin({ port: serverPort })],
+  });
 
   const server = http.createServer(async (request, response) => {
     try {
@@ -61,8 +51,7 @@ export async function startDevServer(options: ServeOptions = {}): Promise<DevSer
         return;
       }
       const file = await fs.readFile(filePath);
-      const body = filePath.endsWith('.html') ? injectLiveReload(file.toString('utf8'), serverPort) : file;
-      response.writeHead(200, { 'Content-Type': contentType(filePath) }).end(body);
+      response.writeHead(200, { 'Content-Type': contentType(filePath) }).end(file);
     } catch {
       response.writeHead(404).end('Not found');
     }
@@ -81,7 +70,7 @@ export async function startDevServer(options: ServeOptions = {}): Promise<DevSer
     }
     rebuilding = true;
     try {
-      await buildSite({ contentDir, outputDir, templatesDir });
+      await buildSite(buildOptions());
       for (const client of clients) if (client.readyState === WebSocket.OPEN) client.send('reload');
     } catch (error) {
       process.stderr.write(`Build failed: ${error instanceof Error ? error.message : String(error)}\n`);
@@ -93,9 +82,6 @@ export async function startDevServer(options: ServeOptions = {}): Promise<DevSer
       }
     }
   };
-  const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
-  watcher.on('all', () => void rebuild());
-
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, () => {
@@ -105,6 +91,10 @@ export async function startDevServer(options: ServeOptions = {}): Promise<DevSer
       resolve();
     });
   });
+
+  await buildSite(buildOptions());
+  const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
+  watcher.on('all', () => void rebuild());
 
   return {
     server,
