@@ -15,4 +15,13 @@ export interface BuildResult {
   pages: number;
   outputDir: string;
   files: string[];
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
 }

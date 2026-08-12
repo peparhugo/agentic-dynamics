@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Page, BuildResult } from './types';
+import { CacheManager } from './cache';
 
 export interface PluginContext {
   contentDir: string;
@@ -10,6 +11,7 @@ export interface PluginContext {
   pages: Page[];
   files: string[];
   rebuild?: () => void;
+  cache?: CacheManager;
 }
 
 export type PluginHook =

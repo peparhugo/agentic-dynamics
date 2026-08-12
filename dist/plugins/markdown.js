@@ -14,7 +14,7 @@ class MarkdownPlugin {
         if (!fs_1.default.existsSync(ctx.contentDir)) {
             throw new Error(`content directory not found: ${ctx.contentDir}`);
         }
-        ctx.pages = (0, markdown_1.readPages)(ctx.contentDir);
+        ctx.pages = (0, markdown_1.readPages)(ctx.contentDir, ctx.cache);
     }
 }
 exports.MarkdownPlugin = MarkdownPlugin;

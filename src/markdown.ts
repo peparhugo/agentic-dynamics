@@ -3,6 +3,7 @@ import path from 'path';
 import MarkdownIt from 'markdown-it';
 import matter from 'gray-matter';
 import { Page } from './types';
+import { CacheManager } from './cache';
 
 const md = new MarkdownIt({ html: true, linkify: true, typographer: true });
 
@@ -46,11 +47,20 @@ export function findMarkdownFiles(contentDir: string): string[] {
   return results;
 }
 
-export function readPages(contentDir: string): Page[] {
+export function readPages(contentDir: string, cache?: CacheManager): Page[] {
   const files = findMarkdownFiles(contentDir);
-  return files.map((file) =>
-    parseMarkdown(fs.readFileSync(file, 'utf8'), path.relative(contentDir, file))
-  );
+  return files.map((file) => {
+    const rel = path.relative(contentDir, file);
+    const raw = fs.readFileSync(file, 'utf8');
+    if (cache) {
+      const sourceHash = cache.hashSourceContent(raw);
+      if (cache.isUnchanged(rel, sourceHash)) {
+        const cached = cache.getPage(rel);
+        if (cached) return cached;
+      }
+    }
+    return parseMarkdown(raw, rel);
+  });
 }
 
 export function parseMarkdown(content: string, filePath: string): Page {

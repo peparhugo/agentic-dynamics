@@ -19,6 +19,8 @@ function printHelp() {
         '  --output <dir>     directory to write the generated site (default: ./dist)',
         '  --templates <dir>  directory containing templates (default: ./templates)',
         '  --port <number>    port for the serve command (default: 3000)',
+        '  --incremental      only rebuild pages whose source or template changed',
+        '  --clean            force a full rebuild, ignoring the build cache',
         '  -h, --help         show this help message',
     ].join('\n'));
 }
@@ -66,6 +68,12 @@ function parseArgs(argv) {
                 throw new Error(`invalid port: ${value}`);
             }
             options.port = port;
+        }
+        else if (arg === '--incremental') {
+            options.incremental = true;
+        }
+        else if (arg === '--clean') {
+            options.clean = true;
         }
         else if (arg === '--help' || arg === '-h') {
             printHelp();
@@ -121,9 +129,18 @@ function run(argv) {
         process.exit(1);
     }
     try {
-        const result = (0, site_1.buildSite)(parsed.options.contentDir, parsed.options.outputDir, parsed.options.templatesDir);
+        const result = (0, site_1.buildSite)(parsed.options.contentDir, parsed.options.outputDir, {
+            templatesDir: parsed.options.templatesDir,
+            incremental: parsed.options.incremental,
+            clean: parsed.options.clean,
+        });
         const pagesWord = result.pages === 1 ? 'page' : 'pages';
-        console.log(`Built ${result.pages} ${pagesWord} into ${result.outputDir}`);
+        const skippedWord = result.pagesSkipped === 1 ? 'page' : 'pages';
+        let message = `Built ${result.pages} ${pagesWord} into ${result.outputDir}`;
+        if (result.pagesSkipped > 0) {
+            message += ` (${result.pagesBuilt} built, ${result.pagesSkipped} ${skippedWord} skipped, ${result.timeSavedMs}ms saved)`;
+        }
+        console.log(message);
     }
     catch (err) {
         console.error(err instanceof Error ? err.message : String(err));

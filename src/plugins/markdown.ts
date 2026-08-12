@@ -9,6 +9,6 @@ export class MarkdownPlugin implements Plugin {
     if (!fs.existsSync(ctx.contentDir)) {
       throw new Error(`content directory not found: ${ctx.contentDir}`);
     }
-    ctx.pages = readPages(ctx.contentDir);
+    ctx.pages = readPages(ctx.contentDir, ctx.cache);
   }
 }

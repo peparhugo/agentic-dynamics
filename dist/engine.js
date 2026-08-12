@@ -7,7 +7,9 @@ exports.SiteEngine = void 0;
 exports.sortPages = sortPages;
 exports.createBuiltinPlugins = createBuiltinPlugins;
 const fs_1 = __importDefault(require("fs"));
+const path_1 = __importDefault(require("path"));
 const plugin_1 = require("./plugin");
+const cache_1 = require("./cache");
 const markdown_1 = require("./plugins/markdown");
 const template_1 = require("./plugins/template");
 const devServer_1 = require("./plugins/devServer");
@@ -64,6 +66,9 @@ class SiteEngine {
             pages: [],
             files: [],
         };
+        this.incremental = options.incremental ?? false;
+        this.clean = options.clean ?? false;
+        this.stats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
     }
     getPlugins() {
         return [...this.plugins];
@@ -76,8 +81,68 @@ class SiteEngine {
         ctx.pages = [];
         ctx.files = [];
         (0, plugin_1.runHooks)(this.plugins, 'onStart', ctx);
-        this.runBuildPhase();
+        this.stats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
+        let cache;
+        if (this.incremental) {
+            const cacheFile = path_1.default.join(ctx.outputDir, cache_1.CACHE_FILE);
+            if (this.clean && fs_1.default.existsSync(cacheFile)) {
+                fs_1.default.rmSync(cacheFile);
+            }
+            cache = new cache_1.CacheManager(cacheFile, ctx.templatesDir, ctx.contentDir, ctx.outputDir);
+            ctx.cache = cache;
+        }
+        else {
+            ctx.cache = undefined;
+        }
+        fs_1.default.mkdirSync(ctx.outputDir, { recursive: true });
+        (0, plugin_1.runHooks)(this.plugins, 'beforeBuild', ctx);
+        const pages = sortPages(ctx.pages);
+        ctx.pages = pages;
+        for (const page of pages) {
+            if (cache && cache.isUnchanged(page.filePath)) {
+                const entry = cache.getEntry(page.filePath);
+                this.stats.pagesSkipped++;
+                if (entry)
+                    this.stats.timeSavedMs += entry.renderMs;
+                const name = `${page.slug}.html`;
+                const outFile = path_1.default.join(ctx.outputDir, name);
+                if (!fs_1.default.existsSync(outFile) && entry) {
+                    fs_1.default.writeFileSync(outFile, entry.html, 'utf8');
+                }
+                if (!ctx.files.includes(name))
+                    ctx.files.push(name);
+                continue;
+            }
+            this.stats.pagesBuilt++;
+            const started = Date.now();
+            let current = page;
+            for (const plugin of this.plugins) {
+                if (typeof plugin.onFile === 'function') {
+                    const out = plugin.onFile(current, ctx);
+                    if (out)
+                        current = out;
+                }
+            }
+            if (cache) {
+                const renderMs = Math.max(1, Date.now() - started);
+                const name = `${current.slug}.html`;
+                const outFile = path_1.default.join(ctx.outputDir, name);
+                let html = '';
+                try {
+                    html = fs_1.default.readFileSync(outFile, 'utf8');
+                }
+                catch {
+                    html = '';
+                }
+                cache.record(current.filePath, current, html, renderMs);
+            }
+        }
         const result = this.finishBuild();
+        if (cache) {
+            const activeFiles = ctx.pages.map((p) => p.filePath);
+            cache.removeStale(activeFiles, ctx.outputDir);
+            cache.save();
+        }
         (0, plugin_1.runHooks)(this.plugins, 'onEnd', ctx);
         return result;
     }
@@ -85,6 +150,8 @@ class SiteEngine {
         const ctx = this.context;
         ctx.pages = [];
         ctx.files = [];
+        this.stats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
+        ctx.cache = undefined;
         this.runBuildPhase();
         return this.finishBuild();
     }
@@ -95,6 +162,7 @@ class SiteEngine {
         const pages = sortPages(ctx.pages);
         ctx.pages = pages;
         for (const page of pages) {
+            this.stats.pagesBuilt++;
             let current = page;
             for (const plugin of this.plugins) {
                 if (typeof plugin.onFile === 'function') {
@@ -111,12 +179,18 @@ class SiteEngine {
             pages: ctx.pages.length,
             outputDir: ctx.outputDir,
             files: [...ctx.files],
+            pagesBuilt: this.stats.pagesBuilt,
+            pagesSkipped: this.stats.pagesSkipped,
+            timeSavedMs: this.stats.timeSavedMs,
         };
         (0, plugin_1.runHooks)(this.plugins, 'afterBuild', ctx, provisional);
         return {
             pages: ctx.pages.length,
             outputDir: ctx.outputDir,
             files: [...ctx.files],
+            pagesBuilt: this.stats.pagesBuilt,
+            pagesSkipped: this.stats.pagesSkipped,
+            timeSavedMs: this.stats.timeSavedMs,
         };
     }
     serve(options) {

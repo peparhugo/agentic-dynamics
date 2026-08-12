@@ -49,9 +49,21 @@ function findMarkdownFiles(contentDir) {
     results.sort();
     return results;
 }
-function readPages(contentDir) {
+function readPages(contentDir, cache) {
     const files = findMarkdownFiles(contentDir);
-    return files.map((file) => parseMarkdown(fs_1.default.readFileSync(file, 'utf8'), path_1.default.relative(contentDir, file)));
+    return files.map((file) => {
+        const rel = path_1.default.relative(contentDir, file);
+        const raw = fs_1.default.readFileSync(file, 'utf8');
+        if (cache) {
+            const sourceHash = cache.hashSourceContent(raw);
+            if (cache.isUnchanged(rel, sourceHash)) {
+                const cached = cache.getPage(rel);
+                if (cached)
+                    return cached;
+            }
+        }
+        return parseMarkdown(raw, rel);
+    });
 }
 function parseMarkdown(content, filePath) {
     const { data, content: body } = (0, gray_matter_1.default)(content);
