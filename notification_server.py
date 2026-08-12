@@ -1,4 +1,4 @@
-"""Async WebSocket notification server with a small health endpoint."""
+"""Async notification server with a small health endpoint."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from typing import Any
 from uuid import uuid4
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from websockets.asyncio.server import Server, ServerConnection, serve
+from transport import BaseTransport, WebSocketTransport
 
 try:
     import redis.asyncio as redis
@@ -40,16 +40,17 @@ class NotificationServer:
 
     def __init__(self, websocket_host: str = "127.0.0.1", websocket_port: int = 8765,
                  http_host: str | None = None, http_port: int = 8080,
-                 redis_url: str | None = None, database_url: str | None = None) -> None:
+                 redis_url: str | None = None, database_url: str | None = None,
+                 transport: BaseTransport | None = None) -> None:
         self.websocket_host = websocket_host
         self.websocket_port = websocket_port
         self.http_host = http_host or websocket_host
         self.http_port = http_port
-        self.clients: dict[str, ServerConnection] = {}
+        self.clients: dict[str, Any] = {}
         self.channels: dict[str, set[str]] = {}
         self._client_channels: dict[str, set[str]] = {}
         self._clients_lock = threading.RLock()
-        self._websocket_server: Server | None = None
+        self.transport = transport or self._create_transport()
         self._http_server: asyncio.AbstractServer | None = None
         self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379/0")
         self.database_url = database_url or os.getenv("DATABASE_URL", "messages.db")
@@ -58,6 +59,13 @@ class NotificationServer:
         self._redis_task: asyncio.Task[None] | None = None
         self._instance_id = str(uuid4())
         self._database = self._open_database(self.database_url)
+
+    def _create_transport(self) -> BaseTransport:
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport_name != "websocket":
+            raise ValueError(f"unsupported transport: {transport_name}")
+        return WebSocketTransport(self.websocket_host, self.websocket_port,
+                                  self._handle_message, self._on_connect, self._on_disconnect)
 
     @staticmethod
     def _open_database(database_url: str) -> sqlite3.Connection:
@@ -84,13 +92,11 @@ class NotificationServer:
 
     async def start(self) -> "NotificationServer":
         await self._start_redis()
-        self._websocket_server = await serve(
-            self._handle_websocket, self.websocket_host, self.websocket_port
-        )
+        await self.transport.start()
         self._http_server = await asyncio.start_server(
             self._handle_http, self.http_host, self.http_port
         )
-        self.websocket_port = self._websocket_server.sockets[0].getsockname()[1]
+        self.websocket_port = getattr(self.transport, "port", self.websocket_port)
         self.http_port = self._http_server.sockets[0].getsockname()[1]
         return self
 
@@ -143,10 +149,7 @@ class NotificationServer:
 
     async def stop(self) -> None:
         await self._stop_redis()
-        if self._websocket_server is not None:
-            self._websocket_server.close()
-            await self._websocket_server.wait_closed()
-            self._websocket_server = None
+        await self.transport.stop()
         if self._http_server is not None:
             self._http_server.close()
             await self._http_server.wait_closed()
@@ -186,16 +189,17 @@ class NotificationServer:
         with self._clients_lock:
             channel = outgoing.get("channel")
             if target is not None:
-                connections = [self.clients[target]] if target in self.clients else []
+                client_ids = [target] if target in self.clients else []
             elif channel is None:
-                connections = list(self.clients.values())
+                client_ids = list(self.clients)
             else:
                 subscriber_ids = self.channels.get(channel, set())
-                connections = [self.clients[client_id] for client_id in subscriber_ids
-                               if client_id in self.clients]
-        if connections:
-            await asyncio.gather(*(client.send(wire_message) for client in connections),
-                                 return_exceptions=True)
+                client_ids = [client_id for client_id in subscriber_ids if client_id in self.clients]
+        if client_ids:
+            if target is not None:
+                await self.transport.send_message(client_ids[0], wire_message)
+            else:
+                await self.transport.broadcast(wire_message, client_ids)
 
     def _set_subscription(self, client_id: str, channel: str, subscribed: bool) -> None:
         with self._clients_lock:
@@ -219,33 +223,29 @@ class NotificationServer:
         await self._publish(message("direct", payload), client_id)
         return True
 
-    async def _handle_websocket(self, websocket: ServerConnection) -> None:
-        client_id = str(uuid4())
+    async def _on_connect(self, client_id: str, connection: Any) -> None:
         with self._clients_lock:
-            self.clients[client_id] = websocket
+            self.clients[client_id] = connection
             self._client_channels[client_id] = set()
         if self._redis is not None:
             await self._redis.hset(f"notification:client:{client_id}", mapping={
                 "server": self._instance_id, "connected": "1"
             })
-        try:
-            await websocket.send(json.dumps(message("system", {"client_id": client_id})))
-            async for raw_message in websocket:
-                await self._handle_message(client_id, raw_message)
-        except Exception:
-            pass
-        finally:
-            with self._clients_lock:
-                self.clients.pop(client_id, None)
-                subscribed_channels = self._client_channels.pop(client_id, set())
-                for channel in subscribed_channels:
-                    subscribers = self.channels.get(channel)
-                    if subscribers is not None:
-                        subscribers.discard(client_id)
-                        if not subscribers:
-                            self.channels.pop(channel, None)
-            if self._redis is not None:
-                await self._redis.delete(f"notification:client:{client_id}")
+        await self.transport.send_message(client_id,
+                                          json.dumps(message("system", {"client_id": client_id})))
+
+    async def _on_disconnect(self, client_id: str) -> None:
+        with self._clients_lock:
+            self.clients.pop(client_id, None)
+            subscribed_channels = self._client_channels.pop(client_id, set())
+            for channel in subscribed_channels:
+                subscribers = self.channels.get(channel)
+                if subscribers is not None:
+                    subscribers.discard(client_id)
+                    if not subscribers:
+                        self.channels.pop(channel, None)
+        if self._redis is not None:
+            await self._redis.delete(f"notification:client:{client_id}")
 
     async def _handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
@@ -345,7 +345,7 @@ class NotificationServer:
             await writer.wait_closed()
 
     async def serve_forever(self) -> None:
-        if self._websocket_server is None or self._http_server is None:
+        if self._http_server is None:
             await self.start()
         await asyncio.Future()
 
