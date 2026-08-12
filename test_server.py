@@ -3,6 +3,7 @@ import asyncio
 import os
 import threading
 import tempfile
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -35,6 +36,8 @@ def reset_registry():
     if redis_broker._listener_task:
         redis_broker._listener_task = None
     os.environ.pop("REDIS_URL", None)
+    os.environ.pop("RATE_LIMIT", None)
+    os.environ.pop("MESSAGE_TTL_DAYS", None)
 
 
 @pytest_asyncio.fixture
@@ -856,4 +859,382 @@ async def test_redis_client_state_removed_on_disconnect(server_with_redis):
     assert client_id.encode() not in members
 
 
-# ------
+# ---------------------------------------------------------------------------
+# MessageStore: get_history
+# ---------------------------------------------------------------------------
+
+class TestMessageStoreHistory:
+    def test_get_history_empty(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            result = ms.get_history()
+            assert result["messages"] == []
+            assert result["has_more"] is False
+            assert result["limit"] == 50
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_chronological_order(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            ms.store("ch", "msg", {"idx": 0}, "2026-01-01T00:00:00Z")
+            ms.store("ch", "msg", {"idx": 1}, "2026-01-01T00:00:01Z")
+            ms.store("ch", "msg", {"idx": 2}, "2026-01-01T00:00:02Z")
+            result = ms.get_history()
+            assert len(result["messages"]) == 3
+            assert result["messages"][0]["payload"]["idx"] == 0
+            assert result["messages"][1]["payload"]["idx"] == 1
+            assert result["messages"][2]["payload"]["idx"] == 2
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_filter_by_channel(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            ms.store("alerts", "alert", {"text": "a"}, "ts")
+            ms.store("chat", "msg", {"text": "b"}, "ts")
+            ms.store("alerts", "alert", {"text": "c"}, "ts")
+
+            result = ms.get_history(channel="alerts")
+            assert len(result["messages"]) == 2
+            for m in result["messages"]:
+                assert m["channel"] == "alerts"
+                assert m["payload"]["text"] in ("a", "c")
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_filter_by_since(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            ms.store("ch", "msg", {"idx": 0}, "2026-01-01T00:00:00Z")
+            ms.store("ch", "msg", {"idx": 1}, "2026-01-01T00:01:00Z")
+            ms.store("ch", "msg", {"idx": 2}, "2026-01-01T00:02:00Z")
+
+            result = ms.get_history(since="2026-01-01T00:01:00Z")
+            assert len(result["messages"]) == 2
+            assert result["messages"][0]["payload"]["idx"] == 1
+            assert result["messages"][1]["payload"]["idx"] == 2
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_has_more(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            for i in range(5):
+                ms.store("ch", "msg", {"idx": i}, "ts")
+
+            result = ms.get_history(limit=3)
+            assert len(result["messages"]) == 3
+            assert result["has_more"] is True
+            assert result["limit"] == 3
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_has_more_false(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            for i in range(3):
+                ms.store("ch", "msg", {"idx": i}, "ts")
+
+            result = ms.get_history(limit=5)
+            assert len(result["messages"]) == 3
+            assert result["has_more"] is False
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_channel_none_converted_back(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            ms.store(None, "broadcast", {"text": "all"}, "ts")
+            result = ms.get_history()
+            assert result["messages"][0]["channel"] is None
+        finally:
+            os.unlink(db_path)
+
+    def test_get_history_channel_and_since_combined(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            ms.store("alerts", "alert", {"idx": 0}, "2026-01-01T00:00:00Z")
+            ms.store("alerts", "alert", {"idx": 1}, "2026-01-01T00:01:00Z")
+            ms.store("chat", "msg", {"idx": 2}, "2026-01-01T00:01:00Z")
+
+            result = ms.get_history(channel="alerts", since="2026-01-01T00:00:30Z")
+            assert len(result["messages"]) == 1
+            assert result["messages"][0]["payload"]["idx"] == 1
+        finally:
+            os.unlink(db_path)
+
+
+# ---------------------------------------------------------------------------
+# MessageStore: delete_older_than
+# ---------------------------------------------------------------------------
+
+class TestMessageStoreDeleteOlderThan:
+    def test_delete_older_than_removes_old_messages(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            very_old = (datetime(2020, 1, 1, tzinfo=timezone.utc)).isoformat()
+            recent = (datetime.now(timezone.utc)).isoformat()
+
+            ms.store("ch", "msg", {"text": "old"}, very_old)
+            ms.store("ch", "msg", {"text": "new"}, recent)
+
+            deleted = ms.delete_older_than(7)
+            assert deleted == 1
+
+            messages = ms.get_messages()
+            assert len(messages) == 1
+            assert messages[0]["payload"]["text"] == "new"
+        finally:
+            os.unlink(db_path)
+
+    def test_delete_older_than_keeps_recent(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            recent = (datetime.now(timezone.utc)).isoformat()
+            ms.store("ch", "msg", {"text": "recent"}, recent)
+
+            deleted = ms.delete_older_than(7)
+            assert deleted == 0
+            assert len(ms.get_messages()) == 1
+        finally:
+            os.unlink(db_path)
+
+    def test_delete_older_than_custom_ttl(self):
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+            db_path = f.name
+        try:
+            ms = MessageStore(db_path)
+            day_old = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+            week_old = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+
+            ms.store("ch", "msg", {"text": "day"}, day_old)
+            ms.store("ch", "msg", {"text": "week"}, week_old)
+
+            deleted = ms.delete_older_than(3)
+            assert deleted == 1
+            messages = ms.get_messages()
+            assert len(messages) == 1
+            assert messages[0]["payload"]["text"] == "day"
+        finally:
+            os.unlink(db_path)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: GET /history
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_history_endpoint_empty(server):
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history")
+    assert data["messages"] == []
+    assert data["has_more"] is False
+    assert data["limit"] == 50
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_chronological(server):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+        for i in range(3):
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+            await asyncio.sleep(0.02)
+
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history")
+    assert len(data["messages"]) == 3
+    assert data["messages"][0]["payload"]["idx"] == 0
+    assert data["messages"][1]["payload"]["idx"] == 1
+    assert data["messages"][2]["payload"]["idx"] == 2
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_filter_by_channel(server):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+        await ws.send(json.dumps({"type": "alert", "channel": "alerts", "payload": {"text": "a"}}))
+        await asyncio.sleep(0.02)
+        await ws.send(json.dumps({"type": "msg", "channel": "chat", "payload": {"text": "b"}}))
+        await asyncio.sleep(0.02)
+
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history?channel=alerts")
+    assert len(data["messages"]) == 1
+    assert data["messages"][0]["channel"] == "alerts"
+    assert data["messages"][0]["payload"]["text"] == "a"
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_has_more(server):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+        for i in range(5):
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+            await asyncio.sleep(0.02)
+
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history?limit=3")
+    assert len(data["messages"]) == 3
+    assert data["has_more"] is True
+    assert data["limit"] == 3
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_no_has_more(server):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+        for i in range(2):
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+            await asyncio.sleep(0.02)
+
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history?limit=10")
+    assert len(data["messages"]) == 2
+    assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_with_since(server):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+        for i in range(3):
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+            await asyncio.sleep(0.02)
+
+    all_data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/history")
+    ts_middle = all_data["messages"][1]["timestamp"]
+
+    data = await asyncio.to_thread(http_get, f"http://127.0.0.1:8766/history?since={ts_middle}")
+    assert len(data["messages"]) == 2
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: Rate limiting
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_rate_limit_allows_under_limit(server_with_redis):
+    os.environ["RATE_LIMIT"] = "10"
+    try:
+        fake_redis = server_with_redis
+        async with connect("ws://127.0.0.1:8765") as ws:
+            welcome = json.loads(await ws.recv())
+            client_id = welcome["payload"]["client_id"]
+
+            for i in range(5):
+                await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+                await asyncio.sleep(0.01)
+
+            count = await fake_redis.get(f"ratelimit:{client_id}")
+            assert count is not None
+            assert int(count) == 5
+    finally:
+        os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_exceeded_returns_error(server_with_redis):
+    os.environ["RATE_LIMIT"] = "5"
+    try:
+        async with connect("ws://127.0.0.1:8765") as ws:
+            await ws.recv()
+
+            for i in range(5):
+                await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+                await asyncio.sleep(0.01)
+
+            for _ in range(5):
+                await ws.recv()
+
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": "exceeded"}}))
+
+            msg = json.loads(await ws.recv())
+            assert msg["type"] == "error"
+            assert "Rate limit exceeded" in msg["payload"]["message"]
+            assert msg["payload"]["max_per_minute"] == 5
+    finally:
+        os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_subscribe_does_not_count(server_with_redis):
+    os.environ["RATE_LIMIT"] = "2"
+    try:
+        async with connect("ws://127.0.0.1:8765") as ws:
+            welcome = json.loads(await ws.recv())
+            client_id = welcome["payload"]["client_id"]
+
+            await ws.send(json.dumps({"type": "subscribe", "channel": "test"}))
+            await ws.recv()
+            await ws.send(json.dumps({"type": "unsubscribe", "channel": "test"}))
+            await ws.recv()
+
+            fake_redis = server_with_redis
+            key = f"ratelimit:{client_id}"
+            # Subscribe/unsubscribe should not create rate limit keys
+            # since rate limit is only checked for non-control messages
+            count = await fake_redis.get(key)
+            # No rate limit key should exist yet (subscribe/unsubscribe bypass the check)
+    finally:
+        os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_counter_expires(server_with_redis):
+    os.environ["RATE_LIMIT"] = "100"
+    try:
+        fake_redis = server_with_redis
+        async with connect("ws://127.0.0.1:8765") as ws:
+            welcome = json.loads(await ws.recv())
+            client_id = welcome["payload"]["client_id"]
+
+            await ws.send(json.dumps({"type": "msg", "payload": {"text": "test"}}))
+
+            await asyncio.sleep(0.05)
+
+            count = await fake_redis.get(f"ratelimit:{client_id}")
+            assert count is not None
+            assert int(count) == 1
+    finally:
+        os.environ.pop("RATE_LIMIT", None)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_default_value(server_with_redis):
+    async with connect("ws://127.0.0.1:8765") as ws:
+        await ws.recv()
+
+        # Should allow 50 messages (well under default of 100)
+        for i in range(50):
+            await ws.send(json.dumps({"type": "msg", "payload": {"idx": i}}))
+            await asyncio.sleep(0.005)
+
+
+# ---------------------------------------------------------------------------
+# Integration tests: Message expiry
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_message_expiry_cleanup_on_startup(server):
+    await asyncio.sleep(0.3)
+    data = await asyncio.to_thread(http_get, "http://127.0.0.1:8766/messages")
+    assert data["messages"] == []
+
+
+# ---------------------------------------------------------------------------

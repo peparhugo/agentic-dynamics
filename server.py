@@ -5,13 +5,15 @@ import sqlite3
 import threading
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 from websockets.asyncio.server import serve
 
 REDIS_URL = os.environ.get("REDIS_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
 
 _server_id = str(uuid.uuid4())
 
@@ -62,6 +64,52 @@ class MessageStore:
                 msg["channel"] = msg["channel"] or None
                 messages.append(msg)
             return messages
+
+    def delete_older_than(self, days: int) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        with self._lock:
+            with sqlite3.connect(self._db_path) as conn:
+                cursor = conn.execute(
+                    "DELETE FROM messages WHERE timestamp < ?",
+                    (cutoff,),
+                )
+                conn.commit()
+                return cursor.rowcount
+
+    def get_history(self, channel: str | None = None, since: str | None = None, limit: int = 50) -> dict:
+        with sqlite3.connect(self._db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE 1=1"
+            params: list = []
+
+            if channel is not None:
+                query += " AND channel = ?"
+                params.append(channel)
+
+            if since is not None:
+                query += " AND timestamp >= ?"
+                params.append(since)
+
+            query += " ORDER BY id ASC LIMIT ?"
+            params.append(limit + 1)
+
+            rows = conn.execute(query, params).fetchall()
+
+            has_more = len(rows) > limit
+            if has_more:
+                rows = rows[:limit]
+
+            messages = []
+            for row in rows:
+                msg = dict(row)
+                try:
+                    msg["payload"] = json.loads(msg["payload"])
+                except (json.JSONDecodeError, TypeError):
+                    pass
+                msg["channel"] = msg["channel"] or None
+                messages.append(msg)
+
+            return {"messages": messages, "has_more": has_more, "limit": limit}
 
     def clear(self) -> None:
         with self._lock:
@@ -133,6 +181,16 @@ class RedisMessageBroker:
         else:
             await self._redis.delete(key)
             await self._redis.srem("connected_clients", client_id)
+
+    async def is_rate_limited(self, client_id: str) -> bool:
+        if not self._redis:
+            return False
+        rate_limit = int(os.environ.get("RATE_LIMIT", "100"))
+        key = f"ratelimit:{client_id}"
+        count = await self._redis.incr(key)
+        if count == 1:
+            await self._redis.expire(key, 60)
+        return count > rate_limit
 
     async def _listen(self) -> None:
         async for msg in self._pubsub.listen():
@@ -362,6 +420,14 @@ async def ws_handler(websocket):
                     })
                     await websocket.send(ack)
             else:
+                if await redis_broker.is_rate_limited(client_id):
+                    error = make_message("error", {
+                        "message": "Rate limit exceeded",
+                        "max_per_minute": int(os.environ.get("RATE_LIMIT", "100")),
+                    })
+                    await websocket.send(error)
+                    continue
+
                 payload = data.get("payload", {})
                 channel = data.get("channel")
                 timestamp = datetime.now(timezone.utc).isoformat()
@@ -400,8 +466,23 @@ async def messages_list(request):
     return web.json_response({"messages": messages, "limit": limit, "offset": offset})
 
 
+async def history_handler(request):
+    channel = request.query.get("channel")
+    since = request.query.get("since")
+    limit = int(request.query.get("limit", "50"))
+    result = message_store.get_history(channel=channel, since=since, limit=limit)
+    return web.json_response(result)
+
+
+async def cleanup_expired_messages():
+    ttl_days = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+    await asyncio.to_thread(message_store.delete_older_than, ttl_days)
+
+
 async def main():
     await redis_broker.start()
+
+    asyncio.create_task(cleanup_expired_messages())
 
     ws_server = await serve(
         ws_handler,
@@ -414,6 +495,7 @@ async def main():
     app.router.add_get("/channels", channels_list)
     app.router.add_get("/channels/{name}/subscribers", channel_subscribers)
     app.router.add_get("/messages", messages_list)
+    app.router.add_get("/history", history_handler)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "127.0.0.1", 8766)
