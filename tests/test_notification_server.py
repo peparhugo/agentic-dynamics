@@ -205,6 +205,63 @@ async def test_channel_subscriptions_route_messages_and_are_listed(server):
     await second.close()
 
 
+@pytest.mark.asyncio
+async def test_rate_limit_returns_an_error(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    server = NotificationServer(websocket_port=0, http_port=0)
+    await server.start()
+    try:
+        client = await websockets.connect(websocket_url(server))
+        await client.recv()
+        for value in (1, 2):
+            await client.send(json.dumps({"type": "broadcast", "payload": {"n": value}}))
+            assert json.loads(await client.recv())["payload"] == {"n": value}
+        await client.send(json.dumps({"type": "broadcast", "payload": {"n": 3}}))
+        error = json.loads(await client.recv())
+        assert error["type"] == "system"
+        assert error["payload"]["error"] == "rate limit exceeded"
+        await client.close()
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_since_and_paginates_chronologically(tmp_path):
+    server = NotificationServer(
+        websocket_port=0, http_port=0,
+        database_url=f"sqlite:///{tmp_path / 'history.sqlite'}",
+    )
+    await server.start()
+    try:
+        for index, timestamp in enumerate((
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-02T00:00:00+00:00",
+            "2026-01-03T00:00:00+00:00",
+        )):
+            await server._save_message({
+                "type": "broadcast", "channel": "alerts", "payload": {"n": index},
+                "timestamp": timestamp,
+            })
+        await server._save_message({
+            "type": "broadcast", "channel": "other", "payload": {},
+            "timestamp": "2026-01-02T00:00:00+00:00",
+        })
+
+        status, result = await http_get_with_status(
+            server, "/history?channel=alerts&since=2026-01-02T00:00:00%2B00:00&limit=1"
+        )
+        assert status == 200
+        assert [message["payload"]["n"] for message in result["messages"]] == [1]
+        assert result["has_more"] is True
+
+        status, result = await http_get_with_status(server, "/history?channel=alerts&limit=5")
+        assert status == 200
+        assert [message["payload"]["n"] for message in result["messages"]] == [0, 1, 2]
+        assert result["has_more"] is False
+    finally:
+        await server.stop()
+
+
 def test_make_message_rejects_invalid_type():
     with pytest.raises(ValueError):
         make_message("unknown", {})
