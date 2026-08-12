@@ -13,9 +13,10 @@ import time
 import binascii
 
 from flask import Flask, g, jsonify, request
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 from tasks import send_notification_email
+from repositories import DuplicateUserError, TaskRepository, UserRepository, initialize_database
 
 
 app = Flask(__name__)
@@ -30,64 +31,9 @@ def get_db():
     return connection
 
 
-def _legacy_username(connection):
-    username = "legacy"
-    suffix = 0
-    while connection.execute(
-        "SELECT 1 FROM users WHERE username = ?", (username,)
-    ).fetchone():
-        suffix += 1
-        username = f"legacy_{suffix}"
-    return username
-
-
 def init_db():
     """Create the schema and migrate databases made by older API versions."""
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
-        columns = {
-            row["name"]
-            for row in connection.execute("PRAGMA table_info(tasks)").fetchall()
-        }
-        if "owner_id" not in columns:
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
-
-        if connection.execute("SELECT 1 FROM tasks WHERE owner_id IS NULL").fetchone():
-            legacy = connection.execute(
-                "SELECT id FROM users WHERE username LIKE 'legacy%' ORDER BY id LIMIT 1"
-            ).fetchone()
-            if legacy is None:
-                cursor = connection.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (_legacy_username(connection), generate_password_hash(secrets.token_urlsafe(32))),
-                )
-                legacy_id = cursor.lastrowid
-            else:
-                legacy_id = legacy["id"]
-            connection.execute(
-                "UPDATE tasks SET owner_id = ? WHERE owner_id IS NULL", (legacy_id,)
-            )
+    initialize_database(DATABASE)
 
 
 def _encode(value):
@@ -141,8 +87,7 @@ def require_auth(view):
         user_id = verify_token(token) if scheme.lower() == "bearer" and token else None
         if user_id is None:
             return jsonify({"error": "authentication required"}), 401
-        with get_db() as connection:
-            user = connection.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+        user = UserRepository(DATABASE).get(user_id)
         if user is None:
             return jsonify({"error": "authentication required"}), 401
         g.current_user = user
@@ -167,13 +112,8 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user_id = UserRepository(DATABASE).create(username, password)
+    except DuplicateUserError:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user_id, "username": username}), 201
 
@@ -181,11 +121,7 @@ def register():
 @app.route("/auth/login", methods=["POST"])
 def login():
     data = json_body()
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, username, password_hash FROM users WHERE username = ?",
-            (data.get("username"),),
-        ).fetchone()
+    user = UserRepository(DATABASE).get_by_username(data.get("username"))
     if user is None or not isinstance(data.get("password"), str) or not check_password_hash(user["password_hash"], data["password"]):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
@@ -198,35 +134,19 @@ def create_task():
     if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, ?, ?, ?)",
-            (title.strip(), "pending", created_at, g.current_user["id"]),
-        )
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (cursor.lastrowid, g.current_user["id"]),
-        ).fetchone()
+    row = TaskRepository(DATABASE).create(title.strip(), "pending", created_at, g.current_user["id"])
     return jsonify(serialize_task(row)), 201
 
 
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (g.current_user["id"],),
-        ).fetchall()
+    rows = TaskRepository(DATABASE).list_for_owner(g.current_user["id"])
     return jsonify([serialize_task(row) for row in rows])
 
 
 def find_task(task_id):
-    with get_db() as connection:
-        return connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.current_user["id"]),
-        ).fetchone()
+    return TaskRepository(DATABASE).get_for_owner(task_id, g.current_user["id"])
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
@@ -255,15 +175,9 @@ def update_task(task_id):
     status_changed_to_completed = (
         row["status"] != "completed" and status.strip() == "completed"
     )
-    with get_db() as connection:
-        connection.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
-            (title.strip(), status.strip(), task_id, g.current_user["id"]),
-        )
-        updated = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.current_user["id"]),
-        ).fetchone()
+    updated = TaskRepository(DATABASE).update_for_owner(
+        task_id, g.current_user["id"], title=title.strip(), status=status.strip()
+    )
     if status_changed_to_completed:
         try:
             # The current auth model uses username as the owner's contact address.
