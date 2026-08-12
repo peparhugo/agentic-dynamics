@@ -349,6 +349,7 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     current_depth = 0
     retry_count = 0
     last_was_error = False
+    _step_costs: list[float] = []
 
     for line in stdout.splitlines():
         line = line.strip()
@@ -431,10 +432,10 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
                     result.prompt_tokens + result.completion_tokens + result.reasoning_tokens
                 )
                 result.context_tokens = result.total_tokens + result.cache_read_tokens
-            # Cost is per-step — accumulate across steps
+            # Collect cost — format depends on provider
             cost_val = part.get("cost", 0)
-            if isinstance(cost_val, (int, float)):
-                result.estimated_cost_usd += float(cost_val)
+            if isinstance(cost_val, (int, float)) and cost_val > 0:
+                _step_costs.append(float(cost_val))
 
         # Parse test output from bash tool results
         if etype == "tool_use" and part.get("tool") == "bash":
@@ -462,6 +463,17 @@ def _parse_session_output(stdout: str, result: AgenticResult) -> None:
     result.retry_loops = retry_count
     result.iteration_depth = iteration_depth
     result.final_response = "\n".join(final_texts[-3:]) if final_texts else ""
+
+    # Provider cost format detection:
+    # - DeepSeek: cost is cumulative per step (always increasing)
+    # - OpenAI/Anthropic: cost is a per-step delta (may decrease)
+    # If costs never decrease → cumulative, use last value.
+    # If any cost is lower than a prior cost → per-step, sum all.
+    if _step_costs:
+        if all(_step_costs[i] >= _step_costs[i - 1] for i in range(1, len(_step_costs))):
+            result.estimated_cost_usd = _step_costs[-1]  # cumulative
+        else:
+            result.estimated_cost_usd = sum(_step_costs)  # per-step delta
 
     # Estimate correctness from test results if not directly parsed
     if result.tests_total == 0:
