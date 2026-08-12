@@ -58,6 +58,41 @@ def test_update_task_fields(client, auth_headers):
     assert response.get_json()["status"] == "done"
 
 
+def test_completing_task_dispatches_notification(client, auth_headers, monkeypatch):
+    task = client.post("/tasks", json={"title": "Ship feature"}, headers=auth_headers).get_json()
+    dispatched = []
+
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: dispatched.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task['id']}",
+        json={"status": "completed"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    assert dispatched == [("alice", "Ship feature")]
+
+
+def test_completed_task_is_not_notified_again(client, auth_headers, monkeypatch):
+    task = client.post("/tasks", json={"title": "Already done"}, headers=auth_headers).get_json()
+    dispatched = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: dispatched.append(args),
+    )
+
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers)
+
+    assert dispatched == [("alice", "Already done")]
+
+
 def test_missing_task_returns_json_404(client, auth_headers):
     assert client.get("/tasks/999", headers=auth_headers).get_json() == {"error": "task not found"}
     assert client.get("/tasks/999", headers=auth_headers).status_code == 404

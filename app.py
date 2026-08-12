@@ -17,6 +17,7 @@ import json
 import time
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from tasks import send_notification_email
 
 app = Flask(__name__)
 
@@ -71,6 +72,12 @@ def create_user(username: str, password: str) -> dict:
 def find_user(username: str) -> sqlite3.Row | None:
     with get_db() as conn:
         return conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+
+
+def get_user_email(user_id: int) -> str | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT username FROM users WHERE id = ?", (user_id,)).fetchone()
+        return row["username"] if row else None
 
 
 def create_token(user_id: int) -> str:
@@ -205,7 +212,8 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
 def edit_task(task_id: int):
-    if get_task(task_id, g.user_id) is None:
+    existing_task = get_task(task_id, g.user_id)
+    if existing_task is None:
         return jsonify({"error": "task not found"}), 404
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
@@ -221,6 +229,10 @@ def edit_task(task_id: int):
         title=data.get("title", None).strip() if "title" in data else None,
         status=data.get("status"),
     )
+    if existing_task["status"] != "completed" and task["status"] == "completed":
+        user_email = get_user_email(g.user_id)
+        if user_email is not None:
+            send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 
