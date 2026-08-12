@@ -3,7 +3,7 @@ import { buildSite, BuildOptions } from './index';
 import { ServeOptions, startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n'
+  return 'Usage: ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>]\n'
     + '       ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
 }
 
@@ -11,7 +11,9 @@ export function parseArgs(args: string[]): BuildOptions {
   const options: BuildOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates') {
+    if (argument === '--incremental') options.incremental = true;
+    else if (argument === '--clean') options.clean = true;
+    else if (argument === '--content' || argument === '--output' || argument === '--templates') {
       const value = args[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`${argument} requires a directory`);
       if (argument === '--content') options.contentDir = value;
@@ -57,7 +59,13 @@ export function parseServeArgs(args: string[]): ServeOptions {
 
 export function main(args: string[] = process.argv.slice(2)): void | Promise<void> {
   const [command, ...rest] = args;
-  if (command === 'build') buildSite(parseArgs(rest));
+  if (command === 'build') {
+    const options = parseArgs(rest);
+    options.onStats = (stats) => process.stdout.write(
+      `Built ${stats.pagesBuilt} page(s), skipped ${stats.pagesSkipped}; saved ${stats.timeSavedMs.toFixed(1)}ms\n`,
+    );
+    buildSite(options);
+  }
   else if (command === 'serve') return startDevServer(parseServeArgs(rest)).then(() => undefined);
   else throw new Error(usage());
 }
