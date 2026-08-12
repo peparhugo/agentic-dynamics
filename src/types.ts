@@ -18,3 +18,17 @@ export interface BuildOptions {
   outputDir: string;
   templatesDir?: string;
 }
+
+export interface IncrementalBuildOptions {
+  incremental?: boolean;
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  total: number;
+  built: number;
+  skipped: number;
+  timeMs: number;
+  timeSavedMs: number;
+  usedCache: boolean;
+}

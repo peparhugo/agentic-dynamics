@@ -12,6 +12,8 @@ export interface CliArgs {
   host: string;
   showHelp: boolean;
   command: string | undefined;
+  incremental: boolean;
+  clean: boolean;
 }
 
 const DEFAULT_PORT = 3000;
@@ -29,6 +31,8 @@ Options:
   --templates <dir>  Templates directory with .hbs templates, layouts and partials (default: ./templates)
   --port <number>    Port for the dev server (default: 3000)
   --host <host>      Host for the dev server (default: localhost)
+  --incremental      Only rebuild pages whose source or template changed
+  --clean            Force a full clean rebuild (ignores the cache)
   -h, --help         Show this help message
 `;
 
@@ -41,6 +45,8 @@ export function parseArgs(argv: string[]): CliArgs {
     host: DEFAULT_HOST,
     showHelp: false,
     command: undefined,
+    incremental: false,
+    clean: false,
   };
 
   let i = 0;
@@ -56,6 +62,12 @@ export function parseArgs(argv: string[]): CliArgs {
         break;
       case 'serve':
         args.command = 'serve';
+        break;
+      case '--incremental':
+        args.incremental = true;
+        break;
+      case '--clean':
+        args.clean = true;
         break;
       case '--content':
       case '--output':
@@ -134,8 +146,14 @@ export function run(argv: string[]): number | undefined {
       plugins: config.plugins,
     });
     engine.start();
-    const pages = engine.build();
+    const pages = engine.build({ incremental: args.incremental, clean: args.clean });
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${outputDir}`);
+    if (engine.lastBuildStats) {
+      const s = engine.lastBuildStats;
+      console.log(
+        `Build stats: ${s.built} built, ${s.skipped} skipped, ${s.timeSavedMs}ms time saved`
+      );
+    }
     return 0;
   } catch (err) {
     console.error(`Error: ${(err as Error).message}`);

@@ -1,12 +1,8 @@
 import fs from 'fs';
-import path from 'path';
 import { Plugin } from '../plugin';
 import { createTemplateEngine, TemplateEngine } from '../templates';
 import { renderIndex, renderPage } from '../render';
-
-function resolveTemplatesDir(contentDir: string, templatesDir?: string): string {
-  return templatesDir ?? path.join(path.dirname(contentDir), 'templates');
-}
+import { resolveTemplatesDir } from '../cache';
 
 export function createTemplatePlugin(): Plugin {
   let engine: TemplateEngine | null = null;
