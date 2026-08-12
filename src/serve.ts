@@ -4,15 +4,14 @@ import path from 'path';
 import chokidar from 'chokidar';
 import { WebSocket, WebSocketServer } from 'ws';
 import { build } from './ssg';
+import { DevServerPlugin, WS_PATH } from './plugins/dev-server';
+
+export { LIVE_RELOAD_SCRIPT_ID, WS_PATH, liveReloadScript, injectLiveReload } from './plugins/dev-server';
 
 /** Default port for the development server. */
 export const DEFAULT_PORT = 3000;
 
-/** Id attribute on the injected live-reload script tag. */
-export const LIVE_RELOAD_SCRIPT_ID = 'ssg-live-reload';
-
-/** WebSocket endpoint that served pages connect to. */
-export const WS_PATH = '/live-reload';
+const devServerPlugin = new DevServerPlugin();
 
 export interface ServeOptions {
   content: string;
@@ -60,39 +59,6 @@ const MIME_TYPES: Record<string, string> = {
   '.xml': 'text/xml; charset=utf-8',
   '.map': 'application/json; charset=utf-8',
 };
-
-/**
- * The client-side script injected into served HTML pages. It opens a
- * WebSocket connection to the dev server and reloads the page whenever a
- * rebuild has finished.
- */
-export function liveReloadScript(port: number): string {
-  return `<script id="${LIVE_RELOAD_SCRIPT_ID}">
-(function () {
-  var port = ${port};
-  function connect() {
-    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    var ws = new WebSocket(proto + '//' + location.hostname + ':' + port + '${WS_PATH}');
-    ws.onmessage = function () { location.reload(); };
-    ws.onclose = function () { setTimeout(connect, 1000); };
-    ws.onerror = function () { ws.close(); };
-  }
-  connect();
-})();
-</script>`;
-}
-
-/**
- * Inject the live-reload script into an HTML document, just before the closing
- * `</body>` tag when present, otherwise appended at the end.
- */
-export function injectLiveReload(html: string, port: number): string {
-  const script = liveReloadScript(port);
-  if (/<\/body>/i.test(html)) {
-    return html.replace(/<\/body>/i, `${script}\n</body>`);
-  }
-  return `${html}\n${script}`;
-}
 
 /** Send a message to every connected client, returning how many got it. */
 export function broadcast(wss: WebSocketServer, message: string): number {
@@ -145,7 +111,7 @@ function serveFile(req: http.IncomingMessage, res: http.ServerResponse, options:
 
   if (ext === '.html' || ext === '.htm') {
     const html = fs.readFileSync(filePath, 'utf8');
-    res.end(injectLiveReload(html, port));
+    res.end(devServerPlugin.injectLiveReload(html, port));
   } else {
     fs.createReadStream(filePath).pipe(res);
   }
