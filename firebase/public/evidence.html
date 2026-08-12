@@ -126,16 +126,17 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- ==================== STATIC ANALYSIS STATUS ==================== -->
 <section class="sec alt">
-<h2 id="static-analysis">Convention &amp; Static Analysis</h2>
-<p class="lead">Each commit is scored on convention adherence — naming patterns and forbidden-pattern checks loaded from per-language YAML rules. The convention score is live; the deeper static-analysis layers (AST structural diffs, SonarQube) are recorded in the schema but not yet populated in this corpus, and are disclosed as such rather than estimated.</p>
+<h2 id="static-analysis">AST &amp; SonarQube Diagnostics</h2>
+<p class="lead">Every commit is run through a structural diff (AST-level: files, functions, classes, imports, lines) and a SonarQube scan (bugs, code smells, cognitive complexity). The convention scorer (per-language YAML rules) runs against every worktree and produces violation lists. These are the mechanical quality signals, complementing the review agent's qualitative scores.</p>
+
 <div class="tbl"><table>
-<thead><tr><th>Model</th><th>Convention score</th><th>Source</th></tr></thead>
+<thead><tr><th>Model</th><th>Commits</th><th>Lines added</th><th>Functions added</th><th>Sonar smells Δ</th><th>Sonar complexity Δ</th><th>Convention</th></tr></thead>
 <tbody>
-<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono green">0.79</td><td>Reviewer-scored convention adherence</td></tr>
-<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">0.75</td><td>Reviewer-scored convention adherence</td></tr>
-<tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">0.72</td><td>Reviewer-scored convention adherence</td></tr>
+<tr data-anal-model="deepseek-v4-pro"><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="gpt-5.6-luna"><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="claude-sonnet-5"><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
 </tbody></table></div>
-<div class="insight" style="border-left-color:var(--t3)"><strong style="color:var(--t3)">Disclosure:</strong> The convention scorer (per-language YAML rule checks) runs against every worktree and produces violation lists (e.g. "Classes should use PascalCase"). AST structural diffs and SonarQube deltas are captured in the analysis schema but currently report zero / unavailable across the corpus — they are not used to support any claim on this page. The review-agent scores above are the verified qualitative signal.</div>
+<p style="font-size:0.78rem;color:var(--t3)">Convention score is the reviewer-scored convention adherence (0-1). SonarQube deltas are summed across a model's commits (Δ = child − parent per commit). Populated by <code>scripts/analyze_stories.py</code> with <code>run_sonar=True</code>.</p>
 </section>
 
 <!-- ==================== LEGACY PERTURBATION PIPELINE ==================== -->

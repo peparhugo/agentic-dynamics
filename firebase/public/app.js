@@ -84,6 +84,28 @@
       var ffn = statMap[fkey];
       if (ffn) fel.textContent = ffn();
     }
+
+    // data-anal: populate analysis-metric cells from D.analysis.models
+    var analysisModels = (D.analysis && D.analysis.models) || [];
+    var analRows = document.querySelectorAll('tr[data-anal-model]');
+    for (var r = 0; r < analRows.length; r++) {
+      var row = analRows[r];
+      var modelId = row.getAttribute('data-anal-model');
+      var model = null;
+      for (var mi = 0; mi < analysisModels.length; mi++) {
+        if (analysisModels[mi].model === modelId) { model = analysisModels[mi]; break; }
+      }
+      if (!model) continue;
+      var cells = row.querySelectorAll('[data-anal]');
+      for (var c = 0; c < cells.length; c++) {
+        var cell = cells[c];
+        var field = cell.getAttribute('data-anal');
+        var v = model[field];
+        if (v !== undefined && v !== null) {
+          cell.textContent = (typeof v === 'number') ? v.toLocaleString() : v;
+        }
+      }
+    }
   });
 })();
 

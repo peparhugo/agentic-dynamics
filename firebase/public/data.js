@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 15:42:13 UTC by build_data.py */
+/* Generated 2026-08-12 16:05:05 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T15:42:13.140632+00:00",
+    "generated_at": "2026-08-12T16:05:05.162826+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -3263,7 +3263,7 @@ window.DYNAMICS_DATA = {
       "successful": 347,
       "failed": 0
     },
-    "generated_at": "2026-08-12T15:42:13.169292+00:00"
+    "generated_at": "2026-08-12T16:05:05.198472+00:00"
   },
   "reviews": {
     "models": [
@@ -3370,5 +3370,57 @@ window.DYNAMICS_DATA = {
     "commit_reviews": 332,
     "story_reviews": 71,
     "reviewer": "deepseek/deepseek-v4-flash"
+  },
+  "analysis": {
+    "models": [
+      {
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek v4 Pro",
+        "commits": 166,
+        "lines_added": 0,
+        "lines_removed": 0,
+        "functions_added": 0,
+        "classes_added": 0,
+        "imports_added": 0,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.695
+      },
+      {
+        "model": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "commits": 170,
+        "lines_added": 0,
+        "lines_removed": 0,
+        "functions_added": 0,
+        "classes_added": 0,
+        "imports_added": 0,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.675
+      },
+      {
+        "model": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "commits": 10,
+        "lines_added": 0,
+        "lines_removed": 0,
+        "functions_added": 0,
+        "classes_added": 0,
+        "imports_added": 0,
+        "sonar_available": 0,
+        "sonar_bugs_delta": 0,
+        "sonar_smells_delta": 0,
+        "sonar_complexity_delta": 0,
+        "avg_convention": 0.667
+      }
+    ],
+    "stories_analyzed": 71,
+    "commits_analyzed": 346,
+    "sonar_commits_available": 0
   }
 };

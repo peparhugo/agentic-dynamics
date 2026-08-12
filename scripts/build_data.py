@@ -556,8 +556,99 @@ def _classify_issue(text: str) -> str:
     return "other"
 
 
+def _load_analysis_data() -> dict:
+    """Aggregate AST + SonarQube + convention data from analysis files."""
+    from collections import Counter
+
+    analysis_dir = ROOT / "experiments" / "results" / "analysis"
+    stories_dir = ROOT / "experiments" / "results" / "stories"
+
+    sid_to_model = {}
+    for f in stories_dir.glob("*.json"):
+        if "dvs" in f.name or "log" in f.name:
+            continue
+        try:
+            d = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        sid = f.stem.split("_")[-1]
+        if len(sid) >= 8:
+            sid_to_model[sid] = d.get("model", "?")
+
+    by_model = {}
+    n_analysis = 0
+    n_sonar_available = 0
+    n_commits = 0
+
+    for f in analysis_dir.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        n_analysis += 1
+        sid = d.get("story_id", "")
+        reviewed = sid_to_model.get(sid, "?").split("/")[-1]
+        m = by_model.setdefault(reviewed, {
+            "model": reviewed, "commits": 0,
+            "lines_added": 0, "lines_removed": 0,
+            "functions_added": 0, "functions_removed": 0,
+            "classes_added": 0, "imports_added": 0,
+            "sonar_available": 0,
+            "sonar_bugs_delta": 0, "sonar_smells_delta": 0,
+            "sonar_complexity_delta": 0,
+            "convention_scores": [],
+        })
+        summary = d.get("summary", {})
+        conv = summary.get("average_convention_score")
+        if conv is not None:
+            m["convention_scores"].append(conv)
+        for c in d.get("commits", []):
+            m["commits"] += 1
+            n_commits += 1
+            ast = c.get("ast", {})
+            m["lines_added"] += ast.get("lines_added", 0)
+            m["lines_removed"] += ast.get("lines_removed", 0)
+            m["functions_added"] += ast.get("functions_added", 0)
+            m["functions_removed"] += ast.get("functions_removed", 0)
+            m["classes_added"] += ast.get("classes_added", 0)
+            m["imports_added"] += ast.get("imports_added", 0)
+            sonar = c.get("sonar", {})
+            if sonar.get("available"):
+                m["sonar_available"] += 1
+                n_sonar_available += 1
+                m["sonar_bugs_delta"] += sonar.get("bugs_delta", 0)
+                m["sonar_smells_delta"] += sonar.get("smells_delta", 0)
+                m["sonar_complexity_delta"] += sonar.get("complexity_delta", 0)
+
+    models = []
+    for reviewed, m in by_model.items():
+        n = len(m["convention_scores"])
+        models.append({
+            "model": reviewed,
+            "label": _short_model_label(reviewed),
+            "commits": m["commits"],
+            "lines_added": m["lines_added"],
+            "lines_removed": m["lines_removed"],
+            "functions_added": m["functions_added"],
+            "classes_added": m["classes_added"],
+            "imports_added": m["imports_added"],
+            "sonar_available": m["sonar_available"],
+            "sonar_bugs_delta": m["sonar_bugs_delta"],
+            "sonar_smells_delta": m["sonar_smells_delta"],
+            "sonar_complexity_delta": m["sonar_complexity_delta"],
+            "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
+        })
+    models.sort(key=lambda x: -(x["lines_added"]))
+
+    return {
+        "models": models,
+        "stories_analyzed": n_analysis,
+        "commits_analyzed": n_commits,
+        "sonar_commits_available": n_sonar_available,
+    }
+
+
 def _short_model_label(model_id: str) -> str:
-    """Map a bare model id suffix to a human-readable label."""
     mapping = {
         "deepseek-v4-pro": "DeepSeek v4 Pro",
         "gpt-5.6-luna": "GPT-5.6 Luna",
@@ -908,6 +999,7 @@ def build():
         },
         "stories": _load_story_data(),
         "reviews": _load_review_data(),
+        "analysis": _load_analysis_data(),
     }
 
     import math
