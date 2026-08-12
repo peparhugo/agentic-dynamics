@@ -1,0 +1,29 @@
+{
+  "name": "ssg",
+  "version": "1.0.0",
+  "description": "A static site generator CLI written in TypeScript",
+  "license": "MIT",
+  "bin": {
+    "ssg": "dist/cli.js"
+  },
+  "main": "dist/generator.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "pretest": "tsc",
+    "test": "jest"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^20.14.0",
+    "ts-jest": "^29.1.5",
+    "typescript": "^5.5.4"
+  }
+}
