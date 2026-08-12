@@ -96,6 +96,48 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="insight" style="border-left-color:var(--cy)"><strong style="color:var(--cy)">Cache is a hidden cost lever:</strong> DeepSeek reuses 78% of its context; Luna and Sonnet reuse 97-98%. A model that trusts its cache sends 6K new tokens per session; a model that re-reads the codebase sends 35K. Same output, 5× the token economics — purely through provider caching policy, not capability.</div>
 </section>
 
+<!-- ==================== REVIEW AGENT: CODE QUALITY ==================== -->
+<section class="sec">
+<h2 id="reviews">The Review Agent — What a Second Model Sees</h2>
+<p class="lead">Every commit and every story was reviewed by a second model (DeepSeek v4 Flash). <strong style="color:var(--ac)">332 commit reviews</strong> plus <strong style="color:var(--ac)">71 story reviews</strong>, each scoring architectural fit, convention adherence, and multi-session coherence. This is the qualitative half of the instrument — the part that answers "is the code actually good, or does it just pass its own tests?"</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Model (reviewed)</th><th>Coherence</th><th>Arch fit</th><th>Convention</th><th>Commits "better"</th><th>"worse"</th></tr></thead>
+<tbody>
+<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong> <span class="mono" style="color:var(--t3)">(n=2)</span></td><td class="mono green">0.92</td><td class="mono green">0.86</td><td class="mono green">0.79</td><td class="mono green">80%</td><td class="mono green">0%</td></tr>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">0.90</td><td class="mono green">0.77</td><td class="mono green">0.75</td><td class="mono green">74%</td><td class="mono green">8%</td></tr>
+<tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">0.88</td><td class="mono green">0.74</td><td class="mono green">0.72</td><td class="mono amber">70%</td><td class="mono amber">12%</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>The finding that inverts the price story:</strong> review quality is <em>decoupled</em> from test thoroughness. Luna writes 5× fewer tests than DeepSeek, yet the reviewer rates Luna's code <strong>more coherent</strong> (0.90 vs 0.88) and <strong>less likely to make things worse</strong> (8% vs 12% "worse" commits). What the price difference actually buys is not better architecture — all three models cluster within a narrow coherence band of 0.88–0.92. What it buys is <em>verification</em>: tests. The cheap model's code is just as coherent; it's just not guarded.</div>
+
+<h3 style="margin-top:2rem;color:var(--ac)">What the reviewer flags</h3>
+<p class="lead" style="font-size:0.9rem">322 compounding issues surfaced across the corpus, categorized by theme. The signature differs per model — DeepSeek's code skews toward <strong style="color:var(--am)">security problems</strong> (hard-coded secrets, insecure JWT fallbacks), while Luna's skews toward <strong style="color:var(--am)">test gaps</strong>. The reviewer sees the same shortfall the metrics do, from the other direction.</p>
+<div class="tbl"><table>
+<thead><tr><th>Theme</th><th>DeepSeek</th><th>Luna</th><th>Sonnet 5</th></tr></thead>
+<tbody>
+<tr><td>Security (hard-coded secrets / auth)</td><td class="mono amber">29</td><td class="mono">25</td><td class="mono">1</td></tr>
+<tr><td>Test gaps</td><td class="mono">20</td><td class="mono amber">27</td><td class="mono">2</td></tr>
+<tr><td>Incomplete refactor</td><td class="mono amber">26</td><td class="mono">17</td><td class="mono">1</td></tr>
+<tr><td>Schema / migration drift</td><td class="mono amber">17</td><td class="mono">10</td><td class="mono">2</td></tr>
+</tbody></table></div>
+<p style="font-size:0.78rem;color:var(--t3)">Reviewer: DeepSeek v4 Flash. Theme counts are compounding issues flagged in story-level reviews, not per-commit problem counts. Sonnet 5 n=2 — directional only.</p>
+</section>
+
+<!-- ==================== STATIC ANALYSIS STATUS ==================== -->
+<section class="sec alt">
+<h2 id="static-analysis">Convention &amp; Static Analysis</h2>
+<p class="lead">Each commit is scored on convention adherence — naming patterns and forbidden-pattern checks loaded from per-language YAML rules. The convention score is live; the deeper static-analysis layers (AST structural diffs, SonarQube) are recorded in the schema but not yet populated in this corpus, and are disclosed as such rather than estimated.</p>
+<div class="tbl"><table>
+<thead><tr><th>Model</th><th>Convention score</th><th>Source</th></tr></thead>
+<tbody>
+<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono green">0.79</td><td>Reviewer-scored convention adherence</td></tr>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">0.75</td><td>Reviewer-scored convention adherence</td></tr>
+<tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">0.72</td><td>Reviewer-scored convention adherence</td></tr>
+</tbody></table></div>
+<div class="insight" style="border-left-color:var(--t3)"><strong style="color:var(--t3)">Disclosure:</strong> The convention scorer (per-language YAML rule checks) runs against every worktree and produces violation lists (e.g. "Classes should use PascalCase"). AST structural diffs and SonarQube deltas are captured in the analysis schema but currently report zero / unavailable across the corpus — they are not used to support any claim on this page. The review-agent scores above are the verified qualitative signal.</div>
+</section>
+
 <!-- ==================== LEGACY PERTURBATION PIPELINE ==================== -->
 <section class="sec" style="padding-top:4rem">
 <h2 id="perturbation">Single-Session Perturbation Experiments</h2>

@@ -1,8 +1,8 @@
-/* Generated 2026-08-12 15:30:16 UTC by build_data.py */
+/* Generated 2026-08-12 15:42:13 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T15:30:15.954491+00:00",
+    "generated_at": "2026-08-12T15:42:13.140632+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -3263,6 +3263,112 @@ window.DYNAMICS_DATA = {
       "successful": 347,
       "failed": 0
     },
-    "generated_at": "2026-08-12T15:30:15.987096+00:00"
+    "generated_at": "2026-08-12T15:42:13.169292+00:00"
+  },
+  "reviews": {
+    "models": [
+      {
+        "model": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "stories": 2,
+        "overall_coherence": 0.92,
+        "architectural_fit": 0.862,
+        "convention_adherence": 0.787,
+        "better_pct": 80.0,
+        "worse_pct": 0.0,
+        "neutral_pct": 20.0,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 2
+          },
+          {
+            "theme": "schema drift",
+            "count": 2
+          },
+          {
+            "theme": "test gaps",
+            "count": 2
+          },
+          {
+            "theme": "security",
+            "count": 1
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "model": "gpt-5.6-luna",
+        "label": "GPT-5.6 Luna",
+        "stories": 34,
+        "overall_coherence": 0.9,
+        "architectural_fit": 0.773,
+        "convention_adherence": 0.754,
+        "better_pct": 73.9,
+        "worse_pct": 7.6,
+        "neutral_pct": 17.2,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 61
+          },
+          {
+            "theme": "test gaps",
+            "count": 27
+          },
+          {
+            "theme": "security",
+            "count": 25
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 17
+          },
+          {
+            "theme": "coupling",
+            "count": 9
+          }
+        ]
+      },
+      {
+        "model": "deepseek-v4-pro",
+        "label": "DeepSeek v4 Pro",
+        "stories": 35,
+        "overall_coherence": 0.877,
+        "architectural_fit": 0.74,
+        "convention_adherence": 0.716,
+        "better_pct": 70.3,
+        "worse_pct": 12.1,
+        "neutral_pct": 17.0,
+        "top_issues": [
+          {
+            "theme": "other",
+            "count": 49
+          },
+          {
+            "theme": "security",
+            "count": 29
+          },
+          {
+            "theme": "incomplete refactor",
+            "count": 26
+          },
+          {
+            "theme": "test gaps",
+            "count": 20
+          },
+          {
+            "theme": "schema drift",
+            "count": 17
+          }
+        ]
+      }
+    ],
+    "commit_reviews": 332,
+    "story_reviews": 71,
+    "reviewer": "deepseek/deepseek-v4-flash"
   }
 };

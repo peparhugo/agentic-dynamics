@@ -450,6 +450,129 @@ def compute_derived(models, inventory, report_count):
     }
 
 
+def _load_review_data() -> dict:
+    """Aggregate the review-agent corpus into per-model quality metrics.
+
+    The review agent (DeepSeek Flash) reviews every commit and every story.
+    Returns per-reviewed-model: coherence, architectural_fit, convention
+    adherence, better/worse distribution, and top compounding-issue themes.
+    """
+    import statistics
+    from collections import Counter
+
+    reviews_dir = ROOT / "experiments" / "results" / "reviews"
+    stories_dir = ROOT / "experiments" / "results" / "stories"
+
+    sid_to_model = {}
+    for f in stories_dir.glob("*.json"):
+        if "dvs" in f.name or "log" in f.name:
+            continue
+        try:
+            d = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        sid = f.stem.split("_")[-1]
+        if len(sid) >= 8:
+            sid_to_model[sid] = d.get("model", "?")
+
+    by_model = {}
+    total_commit_reviews = 0
+    total_story_reviews = 0
+
+    for f in reviews_dir.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        sid = d.get("story_id", "")
+        reviewed = sid_to_model.get(sid, "?").split("/")[-1]
+        m = by_model.setdefault(reviewed, {
+            "model": reviewed, "stories": 0, "coherence": [],
+            "arch_fit": [], "convention": [], "bow": Counter(),
+            "issue_themes": Counter(),
+        })
+        sr = d.get("story_review")
+        if sr:
+            m["stories"] += 1
+            total_story_reviews += 1
+            coh = sr.get("overall_coherence")
+            if coh is not None:
+                m["coherence"].append(coh)
+            for issue in sr.get("compounding_issues", []):
+                m["issue_themes"][_classify_issue(issue)] += 1
+        for cr in d.get("commit_reviews", []):
+            total_commit_reviews += 1
+            af = cr.get("architectural_fit")
+            ca = cr.get("convention_adherence")
+            if af is not None:
+                m["arch_fit"].append(af)
+            if ca is not None:
+                m["convention"].append(ca)
+            m["bow"][cr.get("better_or_worse", "?")] += 1
+
+    models = []
+    for reviewed, m in by_model.items():
+        total_bow = sum(m["bow"].values()) or 1
+        label = _short_model_label(reviewed)
+        models.append({
+            "model": reviewed,
+            "label": label,
+            "stories": m["stories"],
+            "overall_coherence": round(statistics.mean(m["coherence"]), 3) if m["coherence"] else None,
+            "architectural_fit": round(statistics.mean(m["arch_fit"]), 3) if m["arch_fit"] else None,
+            "convention_adherence": round(statistics.mean(m["convention"]), 3) if m["convention"] else None,
+            "better_pct": round(m["bow"].get("better", 0) / total_bow * 100, 1),
+            "worse_pct": round(m["bow"].get("worse", 0) / total_bow * 100, 1),
+            "neutral_pct": round(m["bow"].get("neutral", 0) / total_bow * 100, 1),
+            "top_issues": [
+                {"theme": t, "count": c}
+                for t, c in m["issue_themes"].most_common(5)
+            ],
+        })
+    models.sort(key=lambda x: x.get("overall_coherence") or 0, reverse=True)
+
+    return {
+        "models": models,
+        "commit_reviews": total_commit_reviews,
+        "story_reviews": total_story_reviews,
+        "reviewer": "deepseek/deepseek-v4-flash",
+    }
+
+
+def _classify_issue(text: str) -> str:
+    low = text.lower()
+    if any(k in low for k in ("secret", "hard-coded", "hardcoded", "auth", "jwt", "password")):
+        return "security"
+    if "test" in low:
+        return "test gaps"
+    if any(k in low for k in ("migration", "schema", "alter table")):
+        return "schema drift"
+    if any(k in low for k in ("coupl", "orchestrat")):
+        return "coupling"
+    if any(k in low for k in ("refactor", "repository", "layer")):
+        return "incomplete refactor"
+    if any(k in low for k in ("pagination", "delete", "missing", "rate limit")):
+        return "missing surface"
+    return "other"
+
+
+def _short_model_label(model_id: str) -> str:
+    """Map a bare model id suffix to a human-readable label."""
+    mapping = {
+        "deepseek-v4-pro": "DeepSeek v4 Pro",
+        "gpt-5.6-luna": "GPT-5.6 Luna",
+        "claude-sonnet-5": "Claude Sonnet 5",
+        "deepseek-v4-flash": "DeepSeek v4 Flash",
+        "claude-fable-5": "Claude Fable 5",
+    }
+    if model_id in mapping:
+        return mapping[model_id]
+    for full, label in MODEL_LABELS.items():
+        if model_id in full:
+            return label
+    return model_id
+
+
 def _load_story_data() -> dict:
     """Load story pipeline data from parquet for the website."""
     sessions_path = DATA_DIR / "sessions.parquet"
@@ -784,6 +907,7 @@ def build():
             "deepseek_active_params": {"value": "37B", "provenance": "X", "note": "MoE, ~3% active at inference"},
         },
         "stories": _load_story_data(),
+        "reviews": _load_review_data(),
     }
 
     import math
