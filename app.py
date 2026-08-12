@@ -5,11 +5,13 @@ Features:
 - Accept WebSocket connections and assign each client a unique ID.
 - Broadcast messages to all connected clients.
 - Send direct and system messages to specific clients.
+- Channel-based subscriptions: clients subscribe/unsubscribe to named
+  channels and channel-tagged messages are routed only to subscribers.
 - Clean removal of clients on disconnect.
-- REST endpoint GET /health returning the connected client count.
+- REST endpoints: GET /health, GET /channels, GET /channels/{name}/subscribers.
 
 Message format (JSON): {type: str, payload: dict, timestamp: str}
-Supported types: 'broadcast', 'direct', 'system'.
+Supported types: 'broadcast', 'direct', 'system', 'subscribe', 'unsubscribe'.
 """
 
 import asyncio
@@ -26,7 +28,7 @@ DEFAULT_WS_PORT = 8765
 DEFAULT_HTTP_HOST = "0.0.0.0"
 DEFAULT_HTTP_PORT = 8080
 
-VALID_TYPES = ("broadcast", "direct", "system")
+VALID_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
 
 def utcnow_iso() -> str:
@@ -67,12 +69,61 @@ class ClientRegistry:
             return len(self._clients)
 
 
+class ChannelRegistry:
+    """Thread-safe registry of channel memberships.
+
+    Maps a channel name to the set of client IDs subscribed to it. Guarded by a
+    threading.Lock so it can be used from the asyncio loop and HTTP handlers.
+    """
+
+    def __init__(self) -> None:
+        self._channels: dict[str, set[str]] = {}
+        self._lock = threading.Lock()
+
+    def subscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            members = self._channels.get(channel)
+            if members is None:
+                return
+            members.discard(client_id)
+            if not members:
+                del self._channels[channel]
+
+    def unsubscribe_all(self, client_id: str) -> None:
+        """Remove a client from every channel it is subscribed to."""
+        with self._lock:
+            for channel in list(self._channels):
+                members = self._channels[channel]
+                members.discard(client_id)
+                if not members:
+                    del self._channels[channel]
+
+    def members(self, channel: str) -> set[str]:
+        with self._lock:
+            return set(self._channels.get(channel, ()))
+
+    def count(self, channel: str) -> int:
+        with self._lock:
+            return len(self._channels.get(channel, ()))
+
+    def snapshot(self) -> dict[str, int]:
+        """Return a mapping of channel name to subscriber count."""
+        with self._lock:
+            return {name: len(members) for name, members in self._channels.items()}
+
+
 class NotificationServer:
     """Async notification server exposing a WebSocket endpoint and a
     REST health check, both running on the same asyncio event loop."""
 
-    def __init__(self, registry: ClientRegistry | None = None) -> None:
+    def __init__(self, registry: ClientRegistry | None = None,
+                 channels: ChannelRegistry | None = None) -> None:
         self.registry = registry or ClientRegistry()
+        self.channels = channels or ChannelRegistry()
         self._ws_server = None
         self._http_runner = None
         self._http_site = None
@@ -93,12 +144,17 @@ class NotificationServer:
     def encode(message: dict) -> str:
         return json.dumps(message)
 
-    async def broadcast(self, payload: dict) -> int:
-        """Send a 'broadcast' message to every connected client.
+    async def broadcast(self, payload: dict, channel: str | None = None) -> int:
+        """Send a 'broadcast' message to connected clients.
 
-        Returns the number of currently connected clients.
+        When ``channel`` is given, the message is delivered only to clients
+        subscribed to that channel. Otherwise it goes to every connected
+        client. Returns the number of recipients.
         """
         message = self.make_message("broadcast", payload)
+        if channel is not None:
+            await self._send_to_channel(str(channel), message)
+            return self.channels.count(str(channel))
         await self._send_to_all(message)
         return self.registry.count()
 
@@ -134,6 +190,19 @@ class NotificationServer:
             except Exception:
                 self.registry.remove(client_id)
 
+    async def _send_to_channel(self, channel: str, message: dict) -> None:
+        data = self.encode(message)
+        for client_id in self.channels.members(channel):
+            websocket = self.registry.get(client_id)
+            if websocket is None:
+                self.channels.unsubscribe(channel, client_id)
+                continue
+            try:
+                await websocket.send(data)
+            except Exception:
+                self.registry.remove(client_id)
+                self.channels.unsubscribe(channel, client_id)
+
     async def handler(self, websocket, path: str | None = None) -> None:
         """Per-connection handler: registers the client, then relays messages."""
         client_id = str(uuid.uuid4())
@@ -146,6 +215,7 @@ class NotificationServer:
             pass
         finally:
             self.registry.remove(client_id)
+            self.channels.unsubscribe_all(client_id)
 
     async def _dispatch(self, client_id: str, raw: str) -> None:
         """Route an incoming client message based on its type."""
@@ -158,13 +228,25 @@ class NotificationServer:
         if not isinstance(payload, dict):
             payload = {"data": payload}
         if msg_type == "broadcast":
-            await self.broadcast(payload)
+            channel = message.get("channel") or payload.get("channel")
+            if channel is not None:
+                await self.broadcast(payload, str(channel))
+            else:
+                await self.broadcast(payload)
         elif msg_type == "direct":
             target = payload.get("to")
             if target is not None:
                 await self.send_direct(str(target), payload)
         elif msg_type == "system":
             await self.send_system(client_id, {"ack": msg_type})
+        elif msg_type == "subscribe":
+            channel = message.get("channel") or payload.get("channel")
+            if channel is not None:
+                self.channels.subscribe(str(channel), client_id)
+        elif msg_type == "unsubscribe":
+            channel = message.get("channel") or payload.get("channel")
+            if channel is not None:
+                self.channels.unsubscribe(str(channel), client_id)
 
     async def start(self, ws_host: str = DEFAULT_WS_HOST, ws_port: int = DEFAULT_WS_PORT,
                     http_host: str = DEFAULT_HTTP_HOST, http_port: int = DEFAULT_HTTP_PORT) -> None:
@@ -174,6 +256,8 @@ class NotificationServer:
 
         http_app = web.Application()
         http_app.router.add_get("/health", self._health_handler)
+        http_app.router.add_get("/channels", self._channels_handler)
+        http_app.router.add_get("/channels/{name}/subscribers", self._channel_subscribers_handler)
         self._http_runner = web.AppRunner(http_app)
         await self._http_runner.setup()
         self._http_site = web.TCPSite(self._http_runner, http_host, http_port)
@@ -189,6 +273,23 @@ class NotificationServer:
 
     async def _health_handler(self, request):
         return web.json_response({"clients": self.registry.count()})
+
+    async def _channels_handler(self, request):
+        snapshot = self.channels.snapshot()
+        return web.json_response({
+            "channels": [
+                {"name": name, "subscribers": count}
+                for name, count in snapshot.items()
+            ],
+        })
+
+    async def _channel_subscribers_handler(self, request):
+        name = request.match_info["name"]
+        subscribers = sorted(self.channels.members(name))
+        return web.json_response({
+            "name": name,
+            "subscribers": subscribers,
+        })
 
     async def serve_forever(self) -> None:
         """Block forever, serving both endpoints."""
