@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from notification_tasks import send_notification_email
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -31,7 +32,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT NOT NULL
             )
             """
         )
@@ -56,6 +58,12 @@ def init_db():
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)"
         )
+        user_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            connection.execute("UPDATE users SET email = username WHERE email IS NULL")
 
 
 def _base64url_encode(value):
@@ -162,11 +170,16 @@ def register():
     if credentials is None:
         return jsonify({"error": "username and password are required"}), 400
     username, password = credentials
+    data = request.get_json()
+    email = data.get("email", username)
+    if not isinstance(email, str) or not email.strip():
+        return jsonify({"error": "email must be a non-empty string"}), 400
+    email = email.strip()
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, generate_password_hash(password), email),
             )
     except sqlite3.IntegrityError:
         return jsonify({"error": "username already exists"}), 409
@@ -263,7 +276,11 @@ def update_task(task_id):
 
     with get_db() as connection:
         existing = connection.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
+            """
+            SELECT tasks.id, tasks.status, users.email
+            FROM tasks JOIN users ON users.id = tasks.owner_id
+            WHERE tasks.id = ? AND tasks.owner_id = ?
+            """,
             (task_id, g.user_id),
         ).fetchone()
         if existing is None:
@@ -276,6 +293,9 @@ def update_task(task_id):
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, g.user_id),
         ).fetchone()
+
+    if existing["status"] != "completed" and row["status"] == "completed":
+        send_notification_email.delay(existing["email"], row["title"])
 
     return jsonify(task_to_dict(row))
 

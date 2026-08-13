@@ -17,14 +17,15 @@ def client(tmp_path, monkeypatch):
     return task_app.app.test_client()
 
 
-def register(client, username="alice", password="secret"):
-    return client.post(
-        "/auth/register", json={"username": username, "password": password}
-    )
+def register(client, username="alice", password="secret", email=None):
+    body = {"username": username, "password": password}
+    if email is not None:
+        body["email"] = email
+    return client.post("/auth/register", json=body)
 
 
-def auth_headers(client, username="alice", password="secret"):
-    if register(client, username, password).status_code not in (201, 409):
+def auth_headers(client, username="alice", password="secret", email=None):
+    if register(client, username, password, email).status_code not in (201, 409):
         raise AssertionError("could not create test user")
     response = client.post(
         "/auth/login", json={"username": username, "password": password}
@@ -118,7 +119,8 @@ def test_list_tasks_newest_first(client):
     assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
 
 
-def test_update_task(client):
+def test_update_task(client, monkeypatch):
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: None)
     headers = auth_headers(client)
     task_id = client.post("/tasks", json={"title": "Old"}, headers=headers).get_json()["id"]
 
@@ -131,6 +133,58 @@ def test_update_task(client):
     assert response.status_code == 200
     assert response.get_json()["title"] == "New"
     assert response.get_json()["status"] == "completed"
+
+
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email, "delay", lambda *args: calls.append(args)
+    )
+    headers = auth_headers(client, email="alice@example.com")
+    task_id = client.post(
+        "/tasks", json={"title": "Send report"}, headers=headers
+    ).get_json()["id"]
+
+    response = client.put(
+        f"/tasks/{task_id}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert calls == [("alice@example.com", "Send report")]
+
+
+def test_completed_task_is_not_notified_again(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email, "delay", lambda *args: calls.append(args)
+    )
+    headers = auth_headers(client)
+    task_id = client.post(
+        "/tasks", json={"title": "One notification"}, headers=headers
+    ).get_json()["id"]
+
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+    assert calls == [("alice", "One notification")]
+
+
+def test_non_completed_update_does_not_queue_notification(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email, "delay", lambda *args: calls.append(args)
+    )
+    headers = auth_headers(client)
+    task_id = client.post(
+        "/tasks", json={"title": "Still working"}, headers=headers
+    ).get_json()["id"]
+
+    response = client.put(
+        f"/tasks/{task_id}", json={"status": "in-progress"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert calls == []
 
 
 def test_users_only_see_and_modify_their_own_tasks(client):
