@@ -6,7 +6,7 @@ import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import NotificationServer
+from app import MemoryBroker, MessageStore, NotificationServer
 
 
 @pytest.fixture
@@ -34,6 +34,17 @@ def fetch_health(port):
 def fetch_json(port, path):
     with urlopen(f"http://127.0.0.1:{port}{path}") as response:
         return json.loads(response.read())
+
+
+async def start_application(application):
+    await application.start()
+    server = await serve(
+        application.handler,
+        "127.0.0.1",
+        0,
+        process_request=application.process_request,
+    )
+    return server, f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
 
 
 async def test_clients_receive_unique_ids_and_health_count(notification_server):
@@ -111,3 +122,45 @@ async def test_channel_subscriptions_route_messages_and_are_listed(notification_
             "channel": "alerts",
             "subscribers": [],
         }
+
+
+async def test_shared_broker_delivers_channel_messages_between_server_instances(tmp_path):
+    broker = MemoryBroker()
+    first = NotificationServer(broker=broker, store=MessageStore(str(tmp_path / "first.db")))
+    second = NotificationServer(broker=broker, store=MessageStore(str(tmp_path / "second.db")))
+    first_server, first_url = await start_application(first)
+    second_server, second_url = await start_application(second)
+    try:
+        async with connect(first_url) as sender, connect(second_url) as recipient:
+            await asyncio.gather(receive_json(sender), receive_json(recipient))
+            await recipient.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+            await asyncio.sleep(0.01)
+            await sender.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "shared"}}))
+            assert (await receive_json(recipient))["payload"] == {"text": "shared"}
+    finally:
+        first_server.close()
+        second_server.close()
+        await first_server.wait_closed()
+        await second_server.wait_closed()
+        await first.close()
+        await second.close()
+
+
+async def test_messages_endpoint_returns_persisted_notifications(notification_server):
+    _, url, port = notification_server
+    async with connect(url) as sender:
+        await receive_json(sender)
+        await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+        await receive_json(sender)
+        await sender.send(json.dumps({"type": "subscribe", "channel": "ops"}))
+        await sender.send(json.dumps({"type": "system", "payload": {"event": "notice"}, "channel": "ops"}))
+        await receive_json(sender)
+
+        history = await asyncio.to_thread(fetch_json, port, "/messages?limit=1&offset=0")
+        assert len(history["messages"]) == 1
+        assert history["messages"][0]["channel"] == "ops"
+        assert history["messages"][0]["payload"] == {"event": "notice"}
+
+        previous = await asyncio.to_thread(fetch_json, port, "/messages?limit=1&offset=1")
+        assert previous["messages"][0]["channel"] is None
+        assert previous["messages"][0]["payload"] == {"text": "first"}
