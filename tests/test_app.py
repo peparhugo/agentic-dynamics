@@ -1,0 +1,98 @@
+import asyncio
+import json
+from xml.etree import ElementTree as ET
+
+import pytest
+import pytest_asyncio
+import websockets
+
+from app import NotificationServer, SOAP_NS
+
+
+@pytest_asyncio.fixture
+async def notification_server():
+    app = NotificationServer()
+    websocket_server = await websockets.serve(app.websocket_handler, "127.0.0.1", 0)
+    soap_server = await asyncio.start_server(app.soap_handler, "127.0.0.1", 0)
+    websocket_port = websocket_server.sockets[0].getsockname()[1]
+    soap_port = soap_server.sockets[0].getsockname()[1]
+    yield app, websocket_port, soap_port
+    websocket_server.close()
+    await websocket_server.wait_closed()
+    soap_server.close()
+    await soap_server.wait_closed()
+
+
+async def connect(port):
+    socket = await websockets.connect(f"ws://127.0.0.1:{port}")
+    welcome = json.loads(await socket.recv())
+    return socket, welcome["payload"]["client_id"]
+
+
+@pytest.mark.asyncio
+async def test_connect_assigns_unique_client_ids(notification_server):
+    app, websocket_port, _ = notification_server
+    first, first_id = await connect(websocket_port)
+    second, second_id = await connect(websocket_port)
+    assert first_id != second_id
+    assert await app.client_count() == 2
+    await first.close()
+    await second.close()
+
+
+@pytest.mark.asyncio
+async def test_broadcast_reaches_all_clients(notification_server):
+    _, websocket_port, _ = notification_server
+    sender, _ = await connect(websocket_port)
+    recipient, _ = await connect(websocket_port)
+    await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "hello"}}))
+    messages = [json.loads(await sender.recv()), json.loads(await recipient.recv())]
+    assert all(message["type"] == "broadcast" for message in messages)
+    assert all(message["payload"] == {"text": "hello"} for message in messages)
+    assert all("timestamp" in message for message in messages)
+    await sender.close()
+    await recipient.close()
+
+
+@pytest.mark.asyncio
+async def test_direct_message_reaches_only_recipient(notification_server):
+    _, websocket_port, _ = notification_server
+    sender, _ = await connect(websocket_port)
+    recipient, recipient_id = await connect(websocket_port)
+    await sender.send(json.dumps({"type": "direct", "payload": {"client_id": recipient_id, "message": {"text": "private"}}}))
+    message = json.loads(await recipient.recv())
+    assert message["type"] == "direct"
+    assert message["payload"] == {"text": "private"}
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(sender.recv(), timeout=0.05)
+    await sender.close()
+    await recipient.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_removes_client(notification_server):
+    app, websocket_port, _ = notification_server
+    socket, _ = await connect(websocket_port)
+    await socket.close()
+    for _ in range(20):
+        if await app.client_count() == 0:
+            break
+        await asyncio.sleep(0.01)
+    assert await app.client_count() == 0
+
+
+@pytest.mark.asyncio
+async def test_soap_health_returns_client_count(notification_server):
+    _, websocket_port, soap_port = notification_server
+    socket, _ = await connect(websocket_port)
+    reader, writer = await asyncio.open_connection("127.0.0.1", soap_port)
+    body = f'<soap:Envelope xmlns:soap="{SOAP_NS}"><soap:Body><Health /></soap:Body></soap:Envelope>'.encode()
+    writer.write(b"POST / HTTP/1.1\r\nHost: localhost\r\nContent-Type: text/xml\r\nContent-Length: " + str(len(body)).encode() + b"\r\n\r\n" + body)
+    await writer.drain()
+    response = await reader.read()
+    response_body = response.split(b"\r\n\r\n", 1)[1]
+    root = ET.fromstring(response_body)
+    assert root.find(".//{*}connectedClientCount").text == "1"
+    writer.close()
+    await writer.wait_closed()
+    await socket.close()

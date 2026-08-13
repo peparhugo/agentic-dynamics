@@ -1,128 +1,154 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Async WebSocket notification service with a SOAP health operation."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+import asyncio
+import json
+import uuid
+from datetime import datetime, timezone
+from typing import Any
+from xml.etree import ElementTree as ET
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
-
-app = Flask(__name__)
-
-DATABASE = os.environ.get("DATABASE", "todos.db")
+from websockets.server import WebSocketServerProtocol, serve
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
+SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
+SERVICE_NS = "urn:notification-service"
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
+class NotificationServer:
+    """Coordinates connected clients and validates notification messages."""
+
+    def __init__(self) -> None:
+        self.clients: dict[str, WebSocketServerProtocol] = {}
+        self._clients_lock = asyncio.Lock()
+
+    async def register(self, websocket: WebSocketServerProtocol) -> str:
+        client_id = str(uuid.uuid4())
+        async with self._clients_lock:
+            self.clients[client_id] = websocket
+        await self.send(client_id, "system", {"event": "connected", "client_id": client_id})
+        return client_id
+
+    async def unregister(self, client_id: str) -> None:
+        async with self._clients_lock:
+            self.clients.pop(client_id, None)
+
+    async def client_count(self) -> int:
+        async with self._clients_lock:
+            return len(self.clients)
+
+    @staticmethod
+    def message(message_type: str, payload: dict[str, Any]) -> str:
+        return json.dumps(
+            {
+                "type": message_type,
+                "payload": payload,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
         )
 
+    async def send(self, client_id: str, message_type: str, payload: dict[str, Any]) -> bool:
+        async with self._clients_lock:
+            websocket = self.clients.get(client_id)
+        if websocket is None:
+            return False
+        try:
+            await websocket.send(self.message(message_type, payload))
+        except Exception:
+            await self.unregister(client_id)
+            return False
+        return True
 
-# ── Models ────────────────────────────────────────────────────
+    async def broadcast(self, message_type: str, payload: dict[str, Any]) -> None:
+        async with self._clients_lock:
+            client_ids = tuple(self.clients)
+        await asyncio.gather(*(self.send(client_id, message_type, payload) for client_id in client_ids))
 
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
-            (title, now),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
+    async def websocket_handler(self, websocket: WebSocketServerProtocol) -> None:
+        client_id = await self.register(websocket)
+        try:
+            async for raw_message in websocket:
+                await self.handle_message(client_id, raw_message)
+        finally:
+            await self.unregister(client_id)
 
+    async def handle_message(self, sender_id: str, raw_message: str) -> None:
+        try:
+            message = json.loads(raw_message)
+            message_type = message["type"]
+            payload = message["payload"]
+            if message_type not in SUPPORTED_MESSAGE_TYPES or not isinstance(payload, dict):
+                raise ValueError
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            await self.send(sender_id, "system", {"event": "error", "message": "invalid message"})
+            return
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+        if message_type == "broadcast":
+            await self.broadcast("broadcast", payload)
+        elif message_type == "direct":
+            recipient_id = payload.get("client_id")
+            content = payload.get("message")
+            if not isinstance(recipient_id, str) or not isinstance(content, dict):
+                await self.send(sender_id, "system", {"event": "error", "message": "invalid direct message"})
+                return
+            await self.send(recipient_id, "direct", content)
+        else:
+            await self.broadcast("system", payload)
 
-
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
+    async def soap_handler(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        try:
+            request = await reader.readuntil(b"\r\n\r\n")
+            headers = request.decode("iso-8859-1")
+            content_length = next(
+                int(line.split(":", 1)[1].strip())
+                for line in headers.split("\r\n")
+                if line.lower().startswith("content-length:")
             )
-            conn.commit()
-    return get_task(task_id)
+            body = await reader.readexactly(content_length)
+            root = ET.fromstring(body)
+            operation = next(iter(root)).find(".//{*}Health")
+            if operation is None:
+                raise ValueError("unsupported SOAP operation")
+            response_body = self.soap_health_response(await self.client_count())
+            response = self.http_response("200 OK", response_body)
+        except (ValueError, ET.ParseError, asyncio.IncompleteReadError, UnicodeDecodeError):
+            response = self.http_response("400 Bad Request", self.soap_fault("Invalid SOAP request"))
+        writer.write(response)
+        await writer.drain()
+        writer.close()
+        await writer.wait_closed()
+
+    @staticmethod
+    def soap_health_response(client_count: int) -> bytes:
+        return (
+            f'<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="{SOAP_NS}" '
+            f'xmlns:ns="{SERVICE_NS}"><soap:Body><ns:HealthResponse><ns:connectedClientCount>'
+            f"{client_count}</ns:connectedClientCount></ns:HealthResponse></soap:Body></soap:Envelope>"
+        ).encode()
+
+    @staticmethod
+    def soap_fault(message: str) -> bytes:
+        return (
+            f'<?xml version="1.0" encoding="utf-8"?><soap:Envelope xmlns:soap="{SOAP_NS}"><soap:Body>'
+            f"<soap:Fault><faultcode>soap:Client</faultcode><faultstring>{message}</faultstring>"
+            f"</soap:Fault></soap:Body></soap:Envelope>"
+        ).encode()
+
+    @staticmethod
+    def http_response(status: str, body: bytes) -> bytes:
+        return (
+            f"HTTP/1.1 {status}\r\nContent-Type: text/xml; charset=utf-8\r\n"
+            f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n"
+        ).encode() + body
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
-def list_tasks():
-    return jsonify(get_tasks())
-
-
-@app.route("/tasks", methods=["POST"])
-def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
-
-
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+async def main() -> None:
+    server = NotificationServer()
+    async with serve(server.websocket_handler, "localhost", 8765), await asyncio.start_server(
+        server.soap_handler, "localhost", 8766
+    ):
+        await asyncio.Future()
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    asyncio.run(main())
