@@ -14,6 +14,11 @@ The command reads `./content` and writes the generated site to `./dist`. Use cus
 npx ssg build --content posts --output public
 ```
 
+Use `--incremental` to rebuild only pages whose Markdown source or templates
+changed. Build metadata is stored in `output/.ssg-cache.json`; if it is missing,
+the build is clean. Pass `--clean` to discard the cache and rebuild every page.
+Incremental builds report pages built, pages skipped, and estimated time saved.
+
 Templates are loaded from `./templates` by default. Pass `--templates <dir>` to use
 a different directory. Pages may select a Handlebars template and layout in their
 frontmatter:

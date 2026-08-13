@@ -48,4 +48,22 @@ describe('CLI', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+  it('reports incremental build statistics', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'post.md'), '# Post');
+    const stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      await run(['build', '--content', content, '--output', output, '--incremental']);
+      await run(['build', '--content', content, '--output', output, '--incremental']);
+      expect(stdout).toHaveBeenLastCalledWith(expect.stringMatching(/^Built 0 pages, skipped 1, time saved \d+ms\.\n$/));
+    } finally {
+      stdout.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });

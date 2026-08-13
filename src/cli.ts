@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { buildSite } from './index.js';
+import { buildSiteWithStats } from './index.js';
 import { startDevServer } from './server.js';
 
 interface CliOptions {
@@ -8,10 +8,12 @@ interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>] [--incremental] [--clean]';
 }
 
 function parseOptions(args: string[]): CliOptions {
@@ -41,6 +43,10 @@ function parseOptions(args: string[]): CliOptions {
       }
       options.port = port;
       index += 1;
+    } else if (option === '--incremental') {
+      options.incremental = true;
+    } else if (option === '--clean') {
+      options.clean = true;
     } else {
       throw new Error(`Unknown option: ${option}`);
     }
@@ -55,8 +61,12 @@ export async function run(args: string[]): Promise<void> {
   const options = parseOptions(args.slice(1));
   if (args[0] === 'build') {
     if (options.port !== undefined) throw new Error('--port is only available for serve');
-    const pages = await buildSite(options);
-    process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+    const { pages, stats } = await buildSiteWithStats(options);
+    if (options.incremental) {
+      process.stdout.write(`Built ${stats.pagesBuilt} page${stats.pagesBuilt === 1 ? '' : 's'}, skipped ${stats.pagesSkipped}, time saved ${stats.timeSavedMs}ms.\n`);
+    } else {
+      process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+    }
     return;
   }
 

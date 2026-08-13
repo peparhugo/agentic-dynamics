@@ -22,9 +22,14 @@ function templateName(value: unknown): string | undefined {
 
 export class MarkdownPlugin implements Plugin {
   readonly name = 'markdown';
+  private readonly cache = new Map<string, ReturnType<typeof matter>>();
 
   async onFile(page: BuildPage): Promise<void> {
-    const parsed = matter(page.source);
+    let parsed = this.cache.get(page.source);
+    if (!parsed) {
+      parsed = matter(page.source);
+      this.cache.set(page.source, parsed);
+    }
     page.data = parsed.data;
     page.title = typeof parsed.data.title === 'string' && parsed.data.title.trim()
       ? parsed.data.title.trim()

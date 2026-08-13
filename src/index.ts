@@ -2,9 +2,9 @@ import { loadPlugins } from './config.js';
 import { SsgEngine } from './engine.js';
 import { MarkdownPlugin } from './plugins/markdown.js';
 import { TemplatePlugin } from './plugins/template.js';
-import type { BuildOptions, Page, Plugin } from './plugin.js';
+import type { BuildOptions, BuildStats, Page, Plugin } from './plugin.js';
 
-export type { BuildContext, BuildOptions, BuildPage, Page, Plugin, SsgConfig } from './plugin.js';
+export type { BuildContext, BuildOptions, BuildPage, BuildStats, Page, Plugin, SsgConfig } from './plugin.js';
 export { defineConfig } from './plugin.js';
 export { SsgEngine } from './engine.js';
 export { MarkdownPlugin } from './plugins/markdown.js';
@@ -16,9 +16,14 @@ export function createBuildPlugins(options: BuildOptions = {}): Plugin[] {
 }
 
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
+  return (await buildSiteWithStats(options)).pages;
+}
+
+export async function buildSiteWithStats(options: BuildOptions = {}): Promise<{ pages: Page[]; stats: BuildStats }> {
   const engine = new SsgEngine(options, createBuildPlugins(options));
   try {
-    return await engine.build();
+    const pages = await engine.build();
+    return { pages, stats: engine.getBuildStats() };
   } finally {
     await engine.end();
   }
