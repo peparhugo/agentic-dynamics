@@ -8,10 +8,11 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Awaitable, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -243,6 +244,10 @@ class MessageStore:
                 )
                 """
             )
+            self.connection.execute(
+                "CREATE INDEX IF NOT EXISTS messages_channel_timestamp "
+                "ON messages (channel, timestamp)"
+            )
 
     async def save(self, data: dict[str, Any]) -> int:
         def insert() -> int:
@@ -282,6 +287,43 @@ class MessageStore:
 
         return await asyncio.to_thread(select)
 
+    async def history(
+        self, channel: str, since: str, limit: int, offset: int = 0
+    ) -> tuple[list[dict[str, Any]], bool]:
+        def select() -> tuple[list[dict[str, Any]], bool]:
+            with self._lock:
+                rows = self.connection.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "WHERE channel = ? AND julianday(timestamp) > julianday(?) "
+                    "ORDER BY julianday(timestamp) ASC, id ASC LIMIT ? OFFSET ?",
+                    (channel, since, limit + 1, offset),
+                ).fetchall()
+            messages = [
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                }
+                for row in rows[:limit]
+            ]
+            return messages, len(rows) > limit
+
+        return await asyncio.to_thread(select)
+
+    async def delete_older_than(self, cutoff: str) -> int:
+        def delete() -> int:
+            with self._lock, self.connection:
+                cursor = self.connection.execute(
+                    "DELETE FROM messages "
+                    "WHERE julianday(timestamp) < julianday(?)",
+                    (cutoff,),
+                )
+                return cursor.rowcount
+
+        return await asyncio.to_thread(delete)
+
 
 class RedisBackbone:
     """Redis pub/sub and shared client connection state."""
@@ -315,6 +357,15 @@ class RedisBackbone:
         await self.client.publish(
             REDIS_MESSAGE_CHANNEL, json.dumps(data, separators=(",", ":"))
         )
+
+    async def allow_message(self, client_id: str, limit: int) -> bool:
+        minute = int(time.time() // 60)
+        key = f"notifications:rate_limit:{client_id}:{minute}"
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.incr(key)
+            pipe.expire(key, 60)
+            count, _ = await pipe.execute()
+        return int(count) <= limit
 
     async def register(self, client_id: str, server_id: str) -> None:
         await self.client.hset(
@@ -377,6 +428,8 @@ class NotificationServer:
         backbone: RedisBackbone | None = None,
         store: MessageStore | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         if transport is None:
             self.registry = registry or ClientRegistry()
@@ -390,10 +443,36 @@ class NotificationServer:
         self.backbone = backbone
         self.store = store or MessageStore(os.getenv("DATABASE_URL", ":memory:"))
         self.server_id = str(uuid.uuid4())
+        self.rate_limit = (
+            int(os.getenv("RATE_LIMIT", "100"))
+            if rate_limit is None
+            else rate_limit
+        )
+        self.message_ttl_days = (
+            int(os.getenv("MESSAGE_TTL_DAYS", "7"))
+            if message_ttl_days is None
+            else message_ttl_days
+        )
+        if self.rate_limit < 1:
+            raise ValueError("RATE_LIMIT must be positive")
+        if self.message_ttl_days < 1:
+            raise ValueError("MESSAGE_TTL_DAYS must be positive")
+        self._start_lock = asyncio.Lock()
+        self._started = False
+        self._cleanup_task: asyncio.Task[int] | None = None
 
     async def start(self) -> None:
-        if self.backbone is not None:
-            await self.backbone.start(self._deliver)
+        async with self._start_lock:
+            if self._started:
+                return
+            self._started = True
+            cutoff = datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)
+            cutoff_text = cutoff.isoformat().replace("+00:00", "Z")
+            self._cleanup_task = asyncio.create_task(
+                self.store.delete_older_than(cutoff_text)
+            )
+            if self.backbone is not None:
+                await self.backbone.start(self._deliver)
 
     async def send_to(self, client_id: str, data: dict[str, Any]) -> bool:
         return await self.transport.send_message(client_id, data)
@@ -419,6 +498,11 @@ class NotificationServer:
         await self.send_to(client_id, message("system", {"error": detail}))
 
     async def handle_message(self, client_id: str, raw_message: str | bytes) -> None:
+        if self.backbone is not None and not await self.backbone.allow_message(
+            client_id, self.rate_limit
+        ):
+            await self._error(client_id, "rate limit exceeded")
+            return
         try:
             data = json.loads(raw_message)
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -544,6 +628,40 @@ class NotificationServer:
                 )
             return self._json_response(
                 HTTPStatus.OK, {"messages": await self.store.list(limit, offset)}
+            )
+        if path == "/history":
+            query = parse_qs(urlsplit(request.path).query)
+            channel = query.get("channel", [""])[0]
+            since = query.get("since", [""])[0]
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+                offset = int(query.get("offset", ["0"])[0])
+                since_datetime = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                if (
+                    not channel
+                    or since_datetime.tzinfo is None
+                    or not 1 <= limit <= 1000
+                    or offset < 0
+                ):
+                    raise ValueError
+            except (TypeError, ValueError):
+                return self._json_response(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "error": "channel and timezone-aware since are required; "
+                        "limit must be 1-1000 and offset must be non-negative"
+                    },
+                )
+            normalized_since = (
+                since_datetime.astimezone(timezone.utc)
+                .isoformat()
+                .replace("+00:00", "Z")
+            )
+            messages, has_more = await self.store.history(
+                channel, normalized_since, limit, offset
+            )
+            return self._json_response(
+                HTTPStatus.OK, {"messages": messages, "has_more": has_more}
             )
         if path not in {"/", "/ws"}:
             return self._json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})

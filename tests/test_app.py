@@ -1,5 +1,7 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 from urllib.request import urlopen
 
 import pytest
@@ -322,3 +324,121 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
 
     reopened = MessageStore(f"sqlite:///{tmp_path / 'history.db'}")
     assert len(await reopened.list(50, 0)) == 2
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_is_enforced_per_client_with_redis(tmp_path):
+    backbone = RedisBackbone(fakeredis.aioredis.FakeRedis(decode_responses=True))
+    notification_server = NotificationServer(
+        ClientRegistry(),
+        backbone=backbone,
+        store=MessageStore(str(tmp_path / "rate-limit.db")),
+        rate_limit=2,
+    )
+    await notification_server.start()
+    try:
+        async with serve(
+            notification_server.websocket_handler,
+            "127.0.0.1",
+            0,
+            process_request=notification_server.process_request,
+        ) as websocket_server:
+            port = websocket_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{port}/ws") as websocket:
+                await receive(websocket)
+                await websocket.send("invalid")
+                assert (await receive(websocket))["payload"]["error"] == (
+                    "message must be valid JSON"
+                )
+                await websocket.send("invalid")
+                assert (await receive(websocket))["payload"]["error"] == (
+                    "message must be valid JSON"
+                )
+                await websocket.send("invalid")
+                assert (await receive(websocket))["payload"]["error"] == (
+                    "rate limit exceeded"
+                )
+    finally:
+        await backbone.close()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_and_paginates_chronologically(tmp_path):
+    store = MessageStore(str(tmp_path / "filtered-history.db"))
+    for channel, text, sent_at in (
+        ("alerts", "before", "2099-01-01T00:00:00Z"),
+        ("alerts", "first", "2099-01-02T00:00:00Z"),
+        ("chat", "other channel", "2099-01-03T00:00:00Z"),
+        ("alerts", "second", "2099-01-04T00:00:00Z"),
+        ("alerts", "third", "2099-01-05T00:00:00Z"),
+    ):
+        await store.save(
+            {
+                "type": "broadcast",
+                "channel": channel,
+                "payload": {"text": text},
+                "timestamp": sent_at,
+            }
+        )
+
+    notification_server = NotificationServer(ClientRegistry(), store=store)
+    async with serve(
+        notification_server.websocket_handler,
+        "127.0.0.1",
+        0,
+        process_request=notification_server.process_request,
+    ) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        query = urlencode(
+            {
+                "channel": "alerts",
+                "since": "2099-01-01T00:00:00Z",
+                "limit": 2,
+            }
+        )
+        status, first_page = await get_json(
+            f"http://127.0.0.1:{port}/history?{query}"
+        )
+        assert status == 200
+        assert [item["payload"]["text"] for item in first_page["messages"]] == [
+            "first",
+            "second",
+        ]
+        assert first_page["has_more"] is True
+
+        status, second_page = await get_json(
+            f"http://127.0.0.1:{port}/history?{query}&offset=2"
+        )
+        assert status == 200
+        assert [item["payload"]["text"] for item in second_page["messages"]] == [
+            "third"
+        ]
+        assert second_page["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_startup_cleanup_removes_expired_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "expiry.db"))
+    now = datetime.now(timezone.utc)
+    for text, sent_at in (
+        ("expired", now - timedelta(days=8)),
+        ("current", now - timedelta(days=1)),
+    ):
+        await store.save(
+            {
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"text": text},
+                "timestamp": sent_at.isoformat().replace("+00:00", "Z"),
+            }
+        )
+
+    notification_server = NotificationServer(
+        ClientRegistry(), store=store, message_ttl_days=7
+    )
+    await notification_server.start()
+    assert notification_server._cleanup_task is not None
+    await notification_server._cleanup_task
+
+    remaining = await store.list(50, 0)
+    assert [item["payload"]["text"] for item in remaining] == ["current"]
