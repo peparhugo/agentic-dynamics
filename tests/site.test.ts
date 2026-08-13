@@ -21,6 +21,12 @@ describe('buildSite', () => {
     const output = join(workspace, 'public');
     mkdirSync(content);
     writeFileSync(join(content, 'welcome.md'), `---
+title: Welcome <Home>
+date: 2025-01-02
+tags:
+  - news
+---
+# Hello`);
 
     const pages = buildSite({ contentDir: content, outputDir: output });
 
