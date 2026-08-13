@@ -3,18 +3,22 @@ import json
 import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 import websockets
 
+import notification_server as ns
 from notification_server import (
     BROADCAST_CHANNEL,
     Broker,
     ConnectionStore,
     MessageStore,
     NotificationServer,
+    RateLimiter,
     make_message,
 )
 
@@ -642,3 +646,274 @@ def test_database_url_env_is_respected(tmp_path, monkeypatch):
     store.save(make_message("broadcast", {"env": True}), None)
     assert store.count() == 1
     store.close()
+
+
+# ── Rate limiting ────────────────────────────────────────────────────
+
+async def test_rate_limiter_redis_counters(fake_redis):
+    limiter = RateLimiter(redis_client=fake_redis, limit=100)
+    for _ in range(100):
+        assert await limiter.allow("client-1") is True
+    assert await limiter.allow("client-1") is False
+    assert await limiter.allow("client-2") is True
+
+
+async def test_rate_limit_shared_across_redis_instances(fake_redis):
+    limiter_a = RateLimiter(redis_client=fake_redis, limit=3)
+    limiter_b = RateLimiter(redis_client=fake_redis, limit=3)
+    for _ in range(3):
+        assert await limiter_a.allow("c1") is True
+    assert await limiter_b.allow("c1") is False
+
+
+async def test_rate_limiter_in_memory_fallback():
+    limiter = RateLimiter(limit=3)
+    for _ in range(3):
+        assert await limiter.allow("client-x") is True
+    assert await limiter.allow("client-x") is False
+    assert await limiter.allow("client-y") is True
+
+
+async def test_rate_limiter_window_rolls_over(fake_redis, monkeypatch):
+    limiter = RateLimiter(redis_client=fake_redis, limit=2, window_seconds=60)
+    clock = [1000.0]
+    monkeypatch.setattr(ns.time, "time", lambda: clock[0])
+    assert await limiter.allow("c1") is True
+    assert await limiter.allow("c1") is True
+    assert await limiter.allow("c1") is False
+    clock[0] += 60
+    assert await limiter.allow("c1") is True
+
+
+def test_rate_limit_env_is_respected(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "3")
+    limiter = RateLimiter()
+    assert limiter.limit == 3
+
+
+async def test_rate_limit_rejects_excess_messages(server):
+    addr, srv = server
+    srv.rate_limiter = RateLimiter(limit=5)
+    ws, _, _ = await connect_client(addr)
+
+    for i in range(5):
+        await ws.send(json.dumps(make_message("broadcast", {"n": i})))
+        got = json.loads(await asyncio.wait_for(ws.recv(), 2.0))
+        assert got["type"] == "broadcast"
+        assert got["payload"]["n"] == i
+
+    await ws.send(json.dumps(make_message("broadcast", {"n": 5})))
+    got = json.loads(await asyncio.wait_for(ws.recv(), 2.0))
+    assert got["type"] == "system"
+    assert got["payload"]["message"] == "error"
+    assert "rate limit" in got["payload"]["error"].lower()
+
+    await ws.close()
+
+
+async def test_rate_limit_prevents_delivery_of_excess_messages(server):
+    addr, srv = server
+    srv.rate_limiter = RateLimiter(limit=5)
+    ws1, _, _ = await connect_client(addr)
+    ws2, _, _ = await connect_client(addr)
+
+    for i in range(5):
+        await ws1.send(json.dumps(make_message("broadcast", {"n": i})))
+        await asyncio.wait_for(ws1.recv(), 2.0)
+        await asyncio.wait_for(ws2.recv(), 2.0)
+
+    await ws1.send(json.dumps(make_message("broadcast", {"n": 6})))
+    got = json.loads(await asyncio.wait_for(ws1.recv(), 2.0))
+    assert got["payload"]["message"] == "error"
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws2.recv(), 0.2)
+
+    await ws1.close()
+    await ws2.close()
+
+
+# ── Message history (GET /history) ───────────────────────────────────
+
+async def test_history_endpoint_filters_by_channel(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        await server.broadcast(
+            "broadcast", {"n": 1}, "2026-01-01T00:00:00+00:00", "alerts"
+        )
+        await server.broadcast(
+            "broadcast", {"n": 2}, "2026-01-02T00:00:00+00:00", "alerts"
+        )
+        await server.broadcast(
+            "broadcast", {"n": 3}, "2026-01-03T00:00:00+00:00", "chat"
+        )
+
+        status, body = await http_get(addr, "/history?channel=alerts")
+        assert status == 200
+        assert body["channel"] == "alerts"
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        assert body["has_more"] is False
+        assert [m["payload"]["n"] for m in body["messages"]] == [1, 2]
+    server.close()
+
+
+async def test_history_without_channel_returns_all_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        await server.broadcast(
+            "broadcast", {"n": 1}, "2026-01-01T00:00:00+00:00", "alerts"
+        )
+        await server.broadcast(
+            "broadcast", {"n": 2}, "2026-01-02T00:00:00+00:00", "chat"
+        )
+        status, body = await http_get(addr, "/history")
+        assert [m["payload"]["n"] for m in body["messages"]] == [1, 2]
+    server.close()
+
+
+async def test_history_returns_chronological_order(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        await server.broadcast(
+            "broadcast", {"n": "later"}, "2026-03-01T00:00:00+00:00", "alerts"
+        )
+        await server.broadcast(
+            "broadcast", {"n": "earlier"}, "2026-01-01T00:00:00+00:00", "alerts"
+        )
+        status, body = await http_get(addr, "/history?channel=alerts")
+        assert [m["payload"]["n"] for m in body["messages"]] == ["earlier", "later"]
+    server.close()
+
+
+async def test_history_since_filters_by_time(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        for i in range(1, 4):
+            await server.broadcast(
+                "broadcast",
+                {"n": i},
+                f"2026-01-0{i}T00:00:00+00:00",
+                "alerts",
+            )
+
+        qs = urlencode({"channel": "alerts", "since": "2026-01-02T00:00:00+00:00"})
+        status, body = await http_get(addr, f"/history?{qs}")
+        assert status == 200
+        assert body["since"] == "2026-01-02T00:00:00+00:00"
+        assert [m["payload"]["n"] for m in body["messages"]] == [2, 3]
+
+        qs = urlencode({"channel": "alerts", "since": "2026-12-31T00:00:00+00:00"})
+        status, body = await http_get(addr, f"/history?{qs}")
+        assert body["messages"] == []
+        assert body["has_more"] is False
+    server.close()
+
+
+async def test_history_pagination_and_has_more(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        for i in range(5):
+            await server.broadcast(
+                "broadcast",
+                {"n": i},
+                f"2026-01-0{i + 1}T00:00:00+00:00",
+                "alerts",
+            )
+
+        status, body = await http_get(addr, "/history?channel=alerts&limit=2")
+        assert [m["payload"]["n"] for m in body["messages"]] == [0, 1]
+        assert body["has_more"] is True
+
+        status, body = await http_get(addr, "/history?channel=alerts&limit=2&offset=2")
+        assert [m["payload"]["n"] for m in body["messages"]] == [2, 3]
+        assert body["has_more"] is True
+
+        status, body = await http_get(addr, "/history?channel=alerts&limit=2&offset=4")
+        assert [m["payload"]["n"] for m in body["messages"]] == [4]
+        assert body["has_more"] is False
+    server.close()
+
+
+async def test_history_ignores_other_channels_in_pagination(tmp_path):
+    store = MessageStore(str(tmp_path / "history.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        await server.broadcast(
+            "broadcast", {"n": "alerts-1"}, "2026-01-01T00:00:00+00:00", "alerts"
+        )
+        await server.broadcast(
+            "broadcast", {"n": "chat-1"}, "2026-01-02T00:00:00+00:00", "chat"
+        )
+        await server.broadcast(
+            "broadcast", {"n": "alerts-2"}, "2026-01-03T00:00:00+00:00", "alerts"
+        )
+        status, body = await http_get(addr, "/history?channel=alerts&limit=1")
+        assert [m["payload"]["n"] for m in body["messages"]] == ["alerts-1"]
+        assert body["has_more"] is True
+    server.close()
+
+
+# ── Message expiry / TTL ─────────────────────────────────────────────
+
+def test_purge_older_than_removes_stale_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "ttl.db"))
+    old = make_message("broadcast", {"a": 1}, "2020-01-01T00:00:00+00:00")
+    fresh = make_message("broadcast", {"a": 2})
+    store.save(old, "alerts")
+    store.save(fresh, "alerts")
+    assert store.count() == 2
+
+    deleted = store.purge_older_than(7)
+    assert deleted == 1
+    remaining = store.list()
+    assert len(remaining) == 1
+    assert remaining[0]["payload"] == {"a": 2}
+    store.close()
+
+
+def test_purge_keeps_recently_timed_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "ttl.db"))
+    near_now = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    store.save(make_message("broadcast", {"a": 1}, near_now), "alerts")
+    assert store.purge_older_than(7) == 0
+    assert store.count() == 1
+    store.close()
+
+
+def test_purge_disabled_for_non_positive_ttl(tmp_path):
+    store = MessageStore(str(tmp_path / "ttl.db"))
+    store.save(
+        make_message("broadcast", {"a": 1}, "2020-01-01T00:00:00+00:00"), "alerts"
+    )
+    assert store.purge_older_than(0) == 0
+    assert store.purge_older_than(-1) == 0
+    assert store.count() == 1
+    store.close()
+
+
+async def test_background_cleanup_purges_expired_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "ttl.db"))
+    store.save(
+        make_message("broadcast", {"a": 1}, "2020-01-01T00:00:00+00:00"), "alerts"
+    )
+    store.save(make_message("broadcast", {"a": 2}), "alerts")
+    server = NotificationServer(message_store=store)
+    server.message_ttl_days = 7
+    server.start_background_tasks()
+    await asyncio.sleep(0.05)
+    assert store.count() == 1
+    assert store.list()[0]["payload"] == {"a": 2}
+    server.close()
+
+
+def test_message_ttl_days_env_is_respected(monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "30")
+    server = NotificationServer()
+    assert server.message_ttl_days == 30
+    server.close()
