@@ -1,126 +1,89 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Flask API for managing tasks in memory."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+from datetime import datetime, timezone
+from threading import Lock
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
+from flask import Flask, jsonify, request
+
 
 app = Flask(__name__)
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
+_store: dict[str, object] = {}
+_store_lock = Lock()
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
-
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+def init_db() -> None:
+    """Initialize the in-memory equivalent of the task schema."""
+    global _store
+    with _store_lock:
+        _store = {"tasks": [], "next_id": 1}
 
 
 def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
+    with _store_lock:
+        task = {
+            "id": _store["next_id"],
             "title": title,
             "status": "pending",
-            "created_at": now,
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        _store["next_id"] += 1
+        _store["tasks"].append(task)
+        return task.copy()
 
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+def get_tasks() -> list[dict]:
+    with _store_lock:
+        tasks = sorted(
+            _store["tasks"],
+            key=lambda task: (task["created_at"], task["id"]),
+            reverse=True,
+        )
+        return [task.copy() for task in tasks]
 
 
 def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
-
+    with _store_lock:
+        for task in _store["tasks"]:
+            if task["id"] == task_id:
+                return task.copy()
+    return None
 
 
 def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
     return get_task(task_id)
 
 
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
+def update_task(
+    task_id: int, title: str | None = None, status: str | None = None
+) -> dict | None:
+    with _store_lock:
+        for task in _store["tasks"]:
+            if task["id"] != task_id:
+                continue
+            if title is not None:
+                task["title"] = title
+            if status is not None:
+                task["status"] = status
+            return task.copy()
+    return None
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
+@app.get("/tasks")
 def list_tasks():
     return jsonify(get_tasks())
 
 
-@app.route("/tasks", methods=["POST"])
+@app.post("/tasks")
 def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    data = request.get_json(silent=True)
+    title = data.get("title") if isinstance(data, dict) else None
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
+    return jsonify(create_task(title.strip())), 201
 
 
-@app.route("/tasks/<int:task_id>", methods=["GET"])
+@app.get("/tasks/<int:task_id>")
 def show_task(task_id: int):
     task = get_task(task_id)
     if task is None:
@@ -128,19 +91,19 @@ def show_task(task_id: int):
     return jsonify(task)
 
 
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
+@app.put("/tasks/<int:task_id>")
 def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    task = update_task(task_id, title=data.get("title"), status=data.get("status"))
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
 
 
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
