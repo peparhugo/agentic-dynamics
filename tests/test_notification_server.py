@@ -178,6 +178,47 @@ async def test_messages_endpoint_returns_persisted_messages(tmp_path):
     await server.close()
 
 
+async def test_history_returns_channel_messages_since_timestamp_in_order(tmp_path):
+    store = SQLiteMessageStore(f"sqlite:///{tmp_path / 'messages.db'}")
+    await store.save({"type": "broadcast", "channel": "alerts", "payload": {"text": "old"}, "timestamp": "2026-01-01T00:00:00+00:00"})
+    await store.save({"type": "broadcast", "channel": "other", "payload": {"text": "other"}, "timestamp": "2026-01-02T00:00:00+00:00"})
+    await store.save({"type": "broadcast", "channel": "alerts", "payload": {"text": "first"}, "timestamp": "2026-01-02T00:00:00+00:00"})
+    await store.save({"type": "broadcast", "channel": "alerts", "payload": {"text": "second"}, "timestamp": "2026-01-03T00:00:00+00:00"})
+    server = NotificationServer(message_store=store)
+    async with serve(server.handler, "127.0.0.1", 0, process_request=create_process_request(server)) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        status, history = await get_json(
+            f"127.0.0.1:{port}", "/history?channel=alerts&since=2026-01-02T00%3A00%3A00%2B00%3A00&limit=1"
+        )
+
+    assert "200 OK" in status
+    assert history["has_more"] is True
+    assert [message["payload"] for message in history["messages"]] == [{"text": "first"}]
+    assert [message["timestamp"] for message in history["messages"]] == ["2026-01-02T00:00:00+00:00"]
+    await server.close()
+
+
+async def test_rate_limit_returns_error_without_dropping_message():
+    import fakeredis.aioredis
+
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    server = NotificationServer(broker=RedisBroker(redis))
+    server._rate_limit = 2
+    async with serve(server.handler, "127.0.0.1", 0) as websocket_server:
+        uri = f"ws://127.0.0.1:{websocket_server.sockets[0].getsockname()[1]}"
+        client, _ = await connected_client(uri)
+        message = json.dumps({"type": "broadcast", "payload": {"text": "allowed"}, "timestamp": "client-time"})
+        await client.send(message)
+        assert json.loads(await client.recv())["payload"] == {"text": "allowed"}
+        await client.send(message)
+        assert json.loads(await client.recv())["payload"] == {"text": "allowed"}
+        await client.send(message)
+        error = json.loads(await client.recv())
+        assert error["payload"] == {"event": "error", "detail": "rate limit exceeded"}
+        await client.close()
+    await server.close()
+
+
 async def test_redis_pubsub_delivers_channel_messages_between_server_instances():
     import fakeredis.aioredis
 

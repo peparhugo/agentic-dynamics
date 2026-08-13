@@ -1,5 +1,7 @@
 """Async WebSocket notification server with a small HTTP health endpoint."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import os
@@ -113,6 +115,32 @@ class SQLiteMessageStore:
             for row in rows
         ]
 
+    async def history(
+        self, channel: str, since: str | None, limit: int
+    ) -> tuple[list[dict[str, object]], bool]:
+        query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE channel = ?"
+        parameters: list[object] = [channel]
+        if since is not None:
+            query += " AND timestamp >= ?"
+            parameters.append(since)
+        query += " ORDER BY timestamp ASC, rowid ASC LIMIT ?"
+        parameters.append(limit + 1)
+        async with self._lock:
+            rows = self._connection.execute(query, parameters).fetchall()
+        has_more = len(rows) > limit
+        return (
+            [
+                {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+                for row in rows[:limit]
+            ],
+            has_more,
+        )
+
+    async def delete_older_than(self, timestamp: str) -> None:
+        async with self._lock:
+            self._connection.execute("DELETE FROM messages WHERE timestamp < ?", (timestamp,))
+            self._connection.commit()
+
     def close(self) -> None:
         self._connection.close()
 
@@ -169,6 +197,13 @@ class RedisBroker:
     async def channel_subscribers(self, channel: str) -> list[str]:
         return sorted(await self._redis.smembers(f"notifications:channel:{channel}"))
 
+    async def allow_message(self, client_id: str, limit: int) -> bool:
+        key = f"notifications:rate-limit:{client_id}"
+        count = await self._redis.incr(key)
+        if count == 1:
+            await self._redis.expire(key, 60)
+        return count <= limit
+
     async def close(self) -> None:
         await self._redis.aclose()
 
@@ -190,6 +225,13 @@ class NotificationServer:
         self._transport = transport or self._transport_from_environment()
         self._instance_id = uuid.uuid4().hex
         self._listener_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._rate_limit = int(os.environ.get("RATE_LIMIT", "100"))
+        self._message_ttl_days = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        if self._rate_limit < 1:
+            raise ValueError("RATE_LIMIT must be at least 1")
+        if self._message_ttl_days < 0:
+            raise ValueError("MESSAGE_TTL_DAYS must be non-negative")
 
     @property
     def client_count(self) -> int:
@@ -228,6 +270,8 @@ class NotificationServer:
             await self._broker.remove_client(client_id)
 
     async def start(self) -> None:
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
         if self._broker and self._listener_task is None:
             self._listener_task = asyncio.create_task(self._listen_for_messages())
 
@@ -238,6 +282,8 @@ class NotificationServer:
                 await self._listener_task
             except asyncio.CancelledError:
                 pass
+        if self._cleanup_task:
+            await self._cleanup_task
         self._message_store.close()
         if self._broker:
             await self._broker.close()
@@ -254,7 +300,14 @@ class NotificationServer:
             else:
                 await self._broadcast_to_all_local(event)
 
+    async def _cleanup_expired_messages(self) -> None:
+        cutoff = datetime.now(timezone.utc).timestamp() - self._message_ttl_days * 86400
+        await self._message_store.delete_older_than(datetime.fromtimestamp(cutoff, timezone.utc).isoformat())
+
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
+        if self._broker and not await self._broker.allow_message(sender_id, self._rate_limit):
+            await self._send_error(sender_id, "rate limit exceeded")
+            return
         if isinstance(raw_message, bytes):
             await self._send_error(sender_id, "messages must be JSON text")
             return
@@ -424,6 +477,24 @@ def create_process_request(server: NotificationServer) -> Callable[..., Awaitabl
             if limit < 0 or offset < 0:
                 return Response(400, "Bad Request", Headers({"Content-Type": "application/json"}), b'{"detail": "limit and offset must be non-negative"}')
             body = json.dumps(await server._message_store.list(limit, offset)).encode()
+        elif path == "/history":
+            channel = query.get("channel", [""])[0]
+            since = query.get("since", [None])[0]
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except ValueError:
+                return Response(400, "Bad Request", Headers({"Content-Type": "application/json"}), b'{"detail": "limit must be an integer"}')
+            if not channel:
+                return Response(400, "Bad Request", Headers({"Content-Type": "application/json"}), b'{"detail": "channel is required"}')
+            if limit < 1 or limit > 50:
+                return Response(400, "Bad Request", Headers({"Content-Type": "application/json"}), b'{"detail": "limit must be between 1 and 50"}')
+            if since is not None:
+                try:
+                    datetime.fromisoformat(since.replace("Z", "+00:00"))
+                except ValueError:
+                    return Response(400, "Bad Request", Headers({"Content-Type": "application/json"}), b'{"detail": "since must be an ISO timestamp"}')
+            messages, has_more = await server._message_store.history(channel, since, limit)
+            body = json.dumps({"messages": messages, "has_more": has_more}).encode()
         elif path == "/channels":
             body = json.dumps(await server.channels()).encode()
         elif path.startswith("/channels/") and path.endswith("/subscribers"):
@@ -440,6 +511,7 @@ def create_process_request(server: NotificationServer) -> Callable[..., Awaitabl
 
 async def run_server(host: str = "127.0.0.1", port: int = 8765) -> None:
     server = NotificationServer()
+    await server.start()
     async with serve(server.handler, host, port, process_request=create_process_request(server)):
         await asyncio.Future()
 
