@@ -12,11 +12,25 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import sqlite3
 import os
+from celery_config import celery_app
+from tasks import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+# Initialize Celery with Flask app context
+def make_celery(app):
+    celery = celery_app
+    class ContextTask(celery.Task):
+        def __call__(self, *args, **kwargs):
+            with app.app_context():
+                return self.run(*args, **kwargs)
+    celery.Task = ContextTask
+    return celery
+
+celery = make_celery(app)
 
 
 def get_db():
@@ -31,7 +45,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT UNIQUE NOT NULL,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -79,18 +94,19 @@ def token_required(f):
 
 # User management
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     password_hash = generate_password_hash(password)
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             return {
                 "id": cursor.lastrowid,
                 "username": username,
+                "email": email,
             }
     except sqlite3.IntegrityError:
         return None
@@ -99,6 +115,12 @@ def create_user(username: str, password: str) -> dict | None:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -183,11 +205,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() or None
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = create_user(username, password)
+    user = create_user(username, password, email=email)
     if user is None:
         return jsonify({"error": "username already exists"}), 400
 
@@ -208,7 +231,12 @@ def login():
         return jsonify({"error": "invalid credentials"}), 401
 
     token = generate_token(user["id"])
-    return jsonify({"token": token, "user_id": user["id"], "username": user["username"]}), 200
+    return jsonify({
+        "token": token,
+        "user_id": user["id"],
+        "username": user["username"],
+        "email": user.get("email"),
+    }), 200
 
 
 # Task endpoints (protected)
@@ -243,14 +271,29 @@ def show_task(current_user_id, task_id: int):
 @token_required
 def edit_task(current_user_id, task_id: int):
     data = request.get_json(silent=True) or {}
+    new_status = data.get("status")
+
+    # Get current task to check if status is changing to 'completed'
+    current_task = get_task(task_id, current_user_id)
+    if current_task is None:
+        return jsonify({"error": "task not found"}), 404
+
+    # Update the task
     task = update_task(
         task_id,
         current_user_id,
         title=data.get("title"),
-        status=data.get("status"),
+        status=new_status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+
+    # Trigger email notification if status changed to 'completed'
+    if new_status == "completed" and current_task.get("status") != "completed":
+        user = get_user_by_id(current_user_id)
+        if user and user.get("email"):
+            send_notification_email.delay(user["email"], task["title"])
+
     return jsonify(task)
 
 

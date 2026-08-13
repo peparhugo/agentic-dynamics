@@ -6,6 +6,7 @@ import pytest
 import os
 import json
 from app import app, init_db, DATABASE
+from unittest.mock import patch, MagicMock
 import tempfile
 
 
@@ -836,3 +837,342 @@ class TestEdgeCases:
         assert password_hash != registered_user["password"]
         # werkzeug hash format includes algorithm prefix and $ separators
         assert "$" in password_hash  # werkzeug hashes contain $ delimiters
+
+
+class TestEmailRegistration:
+    def test_register_with_email(self, client):
+        """Test registering a user with email."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "emailuser", "password": "pass123", "email": "user@example.com"},
+            content_type="application/json"
+        )
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["username"] == "emailuser"
+        assert data["email"] == "user@example.com"
+
+    def test_register_without_email(self, client):
+        """Test registering a user without email (optional field)."""
+        response = client.post(
+            "/auth/register",
+            json={"username": "noemailuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["username"] == "noemailuser"
+        assert data["email"] is None
+
+    def test_login_returns_email(self, client):
+        """Test that login response includes email."""
+        # Register with email
+        client.post(
+            "/auth/register",
+            json={"username": "testuser", "password": "pass123", "email": "test@example.com"},
+            content_type="application/json"
+        )
+
+        # Login and check email is returned
+        response = client.post(
+            "/auth/login",
+            json={"username": "testuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["email"] == "test@example.com"
+
+    def test_login_returns_none_email_when_not_set(self, client):
+        """Test that login returns None for email when not set."""
+        # Register without email
+        client.post(
+            "/auth/register",
+            json={"username": "noemailuser", "password": "pass123"},
+            content_type="application/json"
+        )
+
+        # Login and check email is None
+        response = client.post(
+            "/auth/login",
+            json={"username": "noemailuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["email"] is None
+
+
+class TestEmailNotifications:
+    @patch("app.send_notification_email.delay")
+    def test_notification_triggered_on_status_completed(self, mock_delay, client):
+        """Test that notification email task is triggered when task status changes to 'completed'."""
+        # Register user with email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "notifyuser", "password": "pass123", "email": "notify@example.com"},
+            content_type="application/json"
+        )
+        user_id = reg_response.get_json()["id"]
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "notifyuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Important Task"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+        task_title = create_response.get_json()["title"]
+
+        # Update task status to 'completed'
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        assert response.status_code == 200
+        # Verify the task was updated to completed
+        data = response.get_json()
+        assert data["status"] == "completed"
+
+        # Verify the notification task was triggered
+        mock_delay.assert_called_once_with("notify@example.com", task_title)
+
+    @patch("app.send_notification_email.delay")
+    def test_notification_not_triggered_for_non_completed_status(self, mock_delay, client):
+        """Test that notification is not triggered when status changes to something other than 'completed'."""
+        # Register user with email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "notifyuser2", "password": "pass123", "email": "notify2@example.com"},
+            content_type="application/json"
+        )
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "notifyuser2", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Update task status to 'in_progress' (not 'completed')
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "in_progress"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "in_progress"
+
+        # Verify the notification task was NOT triggered
+        mock_delay.assert_not_called()
+
+    @patch("app.send_notification_email.delay")
+    def test_notification_not_triggered_when_already_completed(self, mock_delay, client):
+        """Test that notification is not triggered when task is already completed and status is set again."""
+        # Register user with email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "notifyuser3", "password": "pass123", "email": "notify3@example.com"},
+            content_type="application/json"
+        )
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "notifyuser3", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Update task status to 'completed' (first time)
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        # Verify the notification task was triggered once
+        assert mock_delay.call_count == 1
+
+        # Update task status to 'completed' again (shouldn't trigger notification)
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        assert response.status_code == 200
+        # Verify the notification task was still called only once
+        assert mock_delay.call_count == 1
+
+    @patch("app.send_notification_email.delay")
+    def test_notification_not_triggered_when_no_email(self, mock_delay, client):
+        """Test that notification is not triggered when user has no email."""
+        # Register user WITHOUT email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "noemailnotify", "password": "pass123"},
+            content_type="application/json"
+        )
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "noemailnotify", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Update task status to 'completed'
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        assert response.status_code == 200
+        # Verify the notification task was NOT triggered
+        mock_delay.assert_not_called()
+
+    @patch("app.send_notification_email.delay")
+    def test_notification_uses_correct_task_title(self, mock_delay, client):
+        """Test that the notification uses the updated task title if changed along with status."""
+        # Register user with email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "titleuser", "password": "pass123", "email": "title@example.com"},
+            content_type="application/json"
+        )
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "titleuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Original Title"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Update both title and status to 'completed'
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"title": "Updated Title", "status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["title"] == "Updated Title"
+        assert data["status"] == "completed"
+
+        # Verify the notification was called with the updated title
+        mock_delay.assert_called_once_with("title@example.com", "Updated Title")
+
+    @patch("app.send_notification_email.delay")
+    def test_notification_only_on_transition_to_completed(self, mock_delay, client):
+        """Test that notification only triggers on transition from non-completed to completed."""
+        # Register user with email
+        reg_response = client.post(
+            "/auth/register",
+            json={"username": "transuser", "password": "pass123", "email": "trans@example.com"},
+            content_type="application/json"
+        )
+
+        # Login to get token
+        login_response = client.post(
+            "/auth/login",
+            json={"username": "transuser", "password": "pass123"},
+            content_type="application/json"
+        )
+        token = login_response.get_json()["token"]
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            json={"title": "Task"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        task_id = create_response.get_json()["id"]
+
+        # First transition: pending -> in_progress (no notification)
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "in_progress"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        assert mock_delay.call_count == 0
+
+        # Second transition: in_progress -> completed (notification should trigger)
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        assert mock_delay.call_count == 1
+
+        # Third transition: completed -> in_progress (no notification)
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "in_progress"},
+            headers={"Authorization": f"Bearer {token}"},
+            content_type="application/json"
+        )
+        assert mock_delay.call_count == 1
