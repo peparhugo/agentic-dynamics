@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 class Message:
     """Represents a notification message."""
 
-    SUPPORTED_TYPES = {'broadcast', 'direct', 'system'}
+    SUPPORTED_TYPES = {'broadcast', 'direct', 'system', 'subscribe', 'unsubscribe'}
 
     def __init__(self, message_type: str, payload: Dict[str, Any], timestamp: Optional[str] = None):
         self.type = message_type
@@ -37,7 +37,7 @@ class Message:
 class MessageHandler:
     """Validates and handles notification messages."""
 
-    SUPPORTED_TYPES = {'broadcast', 'direct', 'system'}
+    SUPPORTED_TYPES = {'broadcast', 'direct', 'system', 'subscribe', 'unsubscribe'}
 
     @staticmethod
     def validate_message(data: str) -> bool:

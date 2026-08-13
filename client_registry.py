@@ -10,6 +10,7 @@ class ClientRegistry:
 
     def __init__(self):
         self._clients: Dict[str, Any] = {}
+        self._channels: Dict[str, set] = {}
         self._lock = threading.RLock()
 
     def register(self, websocket: Any) -> str:
@@ -38,3 +39,34 @@ class ClientRegistry:
         """Get count of connected clients."""
         with self._lock:
             return len(self._clients)
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a channel."""
+        with self._lock:
+            if channel not in self._channels:
+                self._channels[channel] = set()
+            self._channels[channel].add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a channel."""
+        with self._lock:
+            if channel in self._channels:
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    def get_channel_subscribers(self, channel: str) -> list:
+        """Get list of client IDs subscribed to a channel."""
+        with self._lock:
+            return list(self._channels.get(channel, set()))
+
+    def get_active_channels(self) -> Dict[str, int]:
+        """Get all active channels and their subscriber counts."""
+        with self._lock:
+            return {channel: len(clients) for channel, clients in self._channels.items()}
+
+    def get_clients_in_channel(self, channel: str) -> Dict[str, Any]:
+        """Get all websocket objects for clients in a channel."""
+        with self._lock:
+            subscriber_ids = self._channels.get(channel, set())
+            return {cid: self._clients[cid] for cid in subscriber_ids if cid in self._clients}

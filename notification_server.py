@@ -36,6 +36,8 @@ class NotificationServer:
     def _setup_rest_routes(self):
         """Setup REST API routes."""
         self.rest_app.router.add_get('/health', self._health_handler)
+        self.rest_app.router.add_get('/channels', self._channels_handler)
+        self.rest_app.router.add_get('/channels/{name}/subscribers', self._channel_subscribers_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Handle health check endpoint."""
@@ -43,6 +45,24 @@ class NotificationServer:
         return web.json_response({
             'connected_clients': count,
             'status': 'ok'
+        })
+
+    async def _channels_handler(self, request: web.Request) -> web.Response:
+        """Handle GET /channels endpoint."""
+        channels = self.client_registry.get_active_channels()
+        return web.json_response({
+            'channels': channels,
+            'count': len(channels)
+        })
+
+    async def _channel_subscribers_handler(self, request: web.Request) -> web.Response:
+        """Handle GET /channels/{name}/subscribers endpoint."""
+        channel_name = request.match_info['name']
+        subscribers = self.client_registry.get_channel_subscribers(channel_name)
+        return web.json_response({
+            'channel': channel_name,
+            'subscribers': subscribers,
+            'count': len(subscribers)
         })
 
     async def handle_client(
@@ -80,12 +100,40 @@ class NotificationServer:
             await self._broadcast_message(message)
         elif message.type == 'direct':
             await self._direct_message(message)
+        elif message.type == 'subscribe':
+            await self._handle_subscribe(sender_id, message)
+        elif message.type == 'unsubscribe':
+            await self._handle_unsubscribe(sender_id, message)
         elif message.type == 'system':
             logger.info(f"System message from {sender_id}: {message.payload}")
 
+    async def _handle_subscribe(self, sender_id: str, message: Message) -> None:
+        """Handle client subscribing to a channel."""
+        channel = message.payload.get('channel')
+        if not channel:
+            logger.warning(f"Subscribe message from {sender_id} without channel")
+            return
+        self.client_registry.subscribe(sender_id, channel)
+        logger.info(f"Client {sender_id} subscribed to channel '{channel}'")
+
+    async def _handle_unsubscribe(self, sender_id: str, message: Message) -> None:
+        """Handle client unsubscribing from a channel."""
+        channel = message.payload.get('channel')
+        if not channel:
+            logger.warning(f"Unsubscribe message from {sender_id} without channel")
+            return
+        self.client_registry.unsubscribe(sender_id, channel)
+        logger.info(f"Client {sender_id} unsubscribed from channel '{channel}'")
+
     async def _broadcast_message(self, message: Message) -> None:
-        """Broadcast message to all connected clients."""
-        clients = self.client_registry.get_all_clients()
+        """Broadcast message to all connected clients or to channel subscribers."""
+        channel = message.payload.get('channel')
+
+        if channel:
+            clients = self.client_registry.get_clients_in_channel(channel)
+        else:
+            clients = self.client_registry.get_all_clients()
+
         if not clients:
             return
 
