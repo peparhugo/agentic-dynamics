@@ -1,20 +1,26 @@
 #!/usr/bin/env node
-import { buildSite, BuildOptions } from './generator';
+import { buildSite } from './generator';
+import { ServeOptions, startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
 }
 
-export function parseArguments(args: string[]): BuildOptions {
-  const options: BuildOptions = {};
+export function parseArguments(args: string[], allowPort = false): ServeOptions {
+  const options: ServeOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates') {
+    if (argument === '--content' || argument === '--output' || argument === '--templates' || (allowPort && argument === '--port')) {
       const value = args[++index];
-      if (!value || value.startsWith('--')) throw new Error(`${argument} requires a directory`);
+      if (!value || value.startsWith('--')) throw new Error(`${argument} requires a ${argument === '--port' ? 'number' : 'directory'}`);
       if (argument === '--content') options.contentDir = value;
       else if (argument === '--output') options.outputDir = value;
-      else options.templatesDir = value;
+      else if (argument === '--templates') options.templatesDir = value;
+      else {
+        const port = Number(value);
+        if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('--port requires a number between 1 and 65535');
+        options.port = port;
+      }
     } else {
       throw new Error(`Unknown option: ${argument}`);
     }
@@ -23,9 +29,17 @@ export function parseArguments(args: string[]): BuildOptions {
 }
 
 export async function run(args: string[]): Promise<void> {
-  if (args[0] !== 'build') throw new Error(usage());
-  const pages = await buildSite(parseArguments(args.slice(1)));
-  process.stdout.write(`Generated ${pages.length} page(s).\n`);
+  if (args[0] === 'build') {
+    const pages = await buildSite(parseArguments(args.slice(1)));
+    process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    return;
+  }
+  if (args[0] === 'serve') {
+    const server = await startDevServer(parseArguments(args.slice(1), true));
+    process.stdout.write(`Serving on http://localhost:${server.port}\n`);
+    return;
+  }
+  throw new Error(usage());
 }
 
 if (require.main === module) {

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSite } from '../src/generator';
 import { parseArguments } from '../src/cli';
+import { startDevServer } from '../src/server';
 
 describe('buildSite', () => {
   it('renders frontmatter, Markdown pages, and an index', async () => {
@@ -65,5 +66,28 @@ describe('parseArguments', () => {
 
   it('rejects invalid options', () => {
     expect(() => parseArguments(['--nope'])).toThrow('Unknown option: --nope');
+  });
+
+  it('accepts a port for the serve command', () => {
+    expect(parseArguments(['--port', '4000'], true)).toEqual({ port: 4000 });
+    expect(() => parseArguments(['--port', 'invalid'], true)).toThrow('--port requires a number');
+  });
+});
+
+describe('startDevServer', () => {
+  it('serves generated pages with the live reload client', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'page.md'), '# Page');
+    const server = await startDevServer({ contentDir: content, outputDir: output, templatesDir: join(root, 'templates'), port: 0 });
+
+    try {
+      const response = await fetch(`http://localhost:${server.port}/page.html`);
+      await expect(response.text()).resolves.toContain('/__ssg_live_reload');
+    } finally {
+      await server.close();
+    }
   });
 });
