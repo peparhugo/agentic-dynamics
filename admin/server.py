@@ -36,7 +36,7 @@ from instrument.live import (
 from instrument.routing import compute_routing
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
-REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6379"))
+REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 RESULTS_KEY = "story_results"

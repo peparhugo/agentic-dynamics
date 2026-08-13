@@ -12,7 +12,7 @@ export default tool({
       // Check if Redis is available
       const redisCheck = await Bun.$`python3 -c "
 import redis, os
-r = redis.Redis(host=os.environ.get('FINOPS_REDIS_HOST', '127.0.0.1'), port=int(os.environ.get('FINOPS_REDIS_PORT', 6379)), socket_connect_timeout=2)
+r = redis.Redis(host=os.environ.get('FINOPS_REDIS_HOST', '127.0.0.1'), port=int(os.environ.get('FINOPS_REDIS_PORT', 6380)), socket_connect_timeout=2)
 print('connected' if r.ping() else 'no_ping')
 "`.cwd(ctx.directory).nothrow().quiet()
 
@@ -21,7 +21,7 @@ print('connected' if r.ping() else 'no_ping')
         return "Redis is not running. Start it with: docker compose -f infrastructure/docker-compose.experiment.yml up -d redis"
       }
 
-      return "Worker started in background. Uses Redis at 127.0.0.1:6379. Auto-exits after 2 minutes of idle queue. Check progress with: monitor(action: 'status')"
+      return "Worker started in background. Uses Redis at 127.0.0.1:6380. Auto-exits after 2 minutes of idle queue. Check progress with: monitor(action: 'status')"
     }
 
     if (args.action === "stop") {

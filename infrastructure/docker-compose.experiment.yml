@@ -3,6 +3,8 @@
 # status tracking, and progress monitoring.
 
 services:
+  # redis (6379) is the STORY AGENT sandbox — agents build Flask/Celery apps against
+  # it and run flushdb() while testing. Never put framework state here.
   redis:
     image: redis:7-alpine
     container_name: finops-redis
@@ -12,5 +14,17 @@ services:
     volumes:
       - redis_data:/data
 
+  # queue (6380) is the FRAMEWORK queue — story_jobs/story_status live here, isolated
+  # from the agents so their flushdb()/flushall() can never wipe the experiment queue.
+  queue:
+    image: redis:7-alpine
+    container_name: finops-queue
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - queue_data:/data
+
 volumes:
   redis_data:
+  queue_data:

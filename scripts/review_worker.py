@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 from instrument.review import review_commit, review_story
 
 REDIS_HOST = "127.0.0.1"
-REDIS_PORT = 6379
+REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "review_jobs"
 STATUS_KEY = "review_status"

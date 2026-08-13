@@ -31,7 +31,7 @@ firebase deploy --only hosting       # deploy = inventory -> sync -> build -> de
 
 ## Operational notes
 
-- **Redis isolation:** the queue lives in Redis db **1** (`FINOPS_REDIS_DB`, default 1). Story agents build Flask apps against db **0** and call `flushdb()` while testing — they must never share the queue's db.
+- **Redis isolation (two instances):** the framework queue lives in `finops-queue` on port **6380** (`FINOPS_REDIS_PORT` default 6380). Story agents build Flask/Celery apps against `finops-redis` on **6379** and call `flushdb()`/`flushall()` while testing — since they hardcode 6379, they can never reach the framework queue. Never run the queue on 6379.
 - **Models in use:** `deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`, `anthropic/claude-haiku-4-5`, `anthropic/claude-sonnet-5`, `openai/gpt-5.6-luna`, `openai/gpt-5.6-sol`, `openai/gpt-5.6-terra`.
 
 ## Key files (read on demand, not preemptively)
