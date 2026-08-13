@@ -6,6 +6,8 @@ from xml.etree import ElementTree as ET
 
 import jwt
 from flask import Flask, Response, current_app, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -16,6 +18,22 @@ SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TASK_NS = "urn:task-management"
 ET.register_namespace("soap", SOAP_NS)
 ET.register_namespace("task", TASK_NS)
+
+
+def rate_limit_key():
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and separator and token.strip():
+        try:
+            payload = jwt.decode(
+                token.strip(),
+                current_app.config["JWT_SECRET_KEY"],
+                algorithms=["HS256"],
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{get_remote_address()}"
 
 
 def get_user_repository():
@@ -198,9 +216,21 @@ def create_app(test_config=None):
         DATABASE=os.environ.get("DATABASE", os.path.join(app.instance_path, "tasks.db")),
         JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "development-only-secret"),
         JWT_EXPIRATION_SECONDS=3600,
+        RATELIMIT_STORAGE_URI=os.environ.get(
+            "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+        ),
+        RATELIMIT_HEADERS_ENABLED=True,
     )
     if test_config:
         app.config.update(test_config)
+    if app.testing and not (test_config or {}).get("RATELIMIT_STORAGE_URI"):
+        app.config["RATELIMIT_STORAGE_URI"] = "memory://"
+
+    Limiter(
+        key_func=rate_limit_key,
+        app=app,
+        default_limits=["100 per minute"],
+    )
 
     os.makedirs(os.path.dirname(os.path.abspath(app.config["DATABASE"])), exist_ok=True)
 
@@ -290,6 +320,29 @@ def create_app(test_config=None):
         if existing["status"] != "completed" and task["status"] == "completed":
             queue_completion_notification(existing["owner_email"], task["title"])
         return jsonify({key: task[key] for key in ("id", "title", "status", "created_at")})
+
+    @app.get("/tasks")
+    @token_required
+    def get_tasks_rest():
+        cursor_value = request.args.get("cursor")
+        limit_value = request.args.get("limit", "20")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(limit_value)
+            if (cursor is not None and cursor < 1) or limit < 1:
+                raise ValueError
+        except ValueError:
+            return jsonify(error="cursor and limit must be positive integers"), 400
+
+        limit = min(limit, 100)
+        page, next_cursor, total = get_task_repository().paginate_for_owner(
+            g.user_id, cursor, limit
+        )
+        data = [
+            {key: task[key] for key in ("id", "title", "status", "created_at")}
+            for task in page
+        ]
+        return jsonify(data=data, next_cursor=next_cursor, total=total)
 
     with app.app_context():
         init_db()

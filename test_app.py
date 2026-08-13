@@ -14,6 +14,7 @@ def client(tmp_path):
             "TESTING": True,
             "DATABASE": str(tmp_path / "tasks.db"),
             "JWT_SECRET_KEY": "test-secret",
+            "RATELIMIT_STORAGE_URI": "memory://",
         }
     )
     return app.test_client()
@@ -231,6 +232,74 @@ def test_users_only_see_and_update_their_own_tasks(client):
         == 404
     )
     assert tasks(call(client, "GetTask", alice_token, id=task_id))[0]["status"] == "pending"
+
+
+def test_get_tasks_uses_cursor_pagination(client, token):
+    for number in range(5):
+        call(client, "CreateTask", token, title=f"Task {number}")
+
+    first = client.get(
+        "/tasks?limit=2", headers={"Authorization": f"Bearer {token}"}
+    )
+    second = client.get(
+        f"/tasks?limit=2&cursor={first.json['next_cursor']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    third = client.get(
+        f"/tasks?limit=2&cursor={second.json['next_cursor']}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert [task["title"] for task in first.json["data"]] == ["Task 4", "Task 3"]
+    assert [task["title"] for task in second.json["data"]] == ["Task 2", "Task 1"]
+    assert [task["title"] for task in third.json["data"]] == ["Task 0"]
+    assert first.json["total"] == second.json["total"] == third.json["total"] == 5
+    assert first.json["next_cursor"] == str(first.json["data"][-1]["id"])
+    assert third.json["next_cursor"] is None
+
+
+def test_get_tasks_defaults_limit_and_caps_it_at_100(client, token):
+    for number in range(105):
+        with client.application.app_context():
+            from app import get_task_repository
+
+            get_task_repository().create_for_owner(
+                f"Task {number}", f"2026-01-01T00:00:{number:02d}+00:00", 1
+            )
+
+    headers = {"Authorization": f"Bearer {token}"}
+    assert len(client.get("/tasks", headers=headers).json["data"]) == 20
+    assert len(client.get("/tasks?limit=200", headers=headers).json["data"]) == 100
+
+
+@pytest.mark.parametrize("query", ["cursor=abc", "cursor=0", "limit=abc", "limit=0"])
+def test_get_tasks_rejects_invalid_pagination(client, token, query):
+    response = client.get(
+        f"/tasks?{query}", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 400
+
+
+def test_rate_limit_applies_to_authenticated_user(client, token):
+    headers = {"Authorization": f"Bearer {token}"}
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 401
+
+    response = client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
 
 
 def test_existing_tasks_are_preserved_during_migration(tmp_path):

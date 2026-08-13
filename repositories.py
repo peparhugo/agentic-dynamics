@@ -168,6 +168,29 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [self._as_dict(row) for row in rows]
 
+    def paginate_for_owner(self, owner_id, cursor, limit):
+        parameters = [owner_id]
+        cursor_clause = ""
+        if cursor is not None:
+            cursor_clause = "AND id < ?"
+            parameters.append(cursor)
+        parameters.append(limit + 1)
+
+        with self.connection() as connection:
+            rows = connection.execute(
+                f"""SELECT * FROM tasks
+                    WHERE owner_id = ? {cursor_clause}
+                    ORDER BY id DESC LIMIT ?""",
+                parameters,
+            ).fetchall()
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+        has_more = len(rows) > limit
+        page = rows[:limit]
+        next_cursor = str(page[-1]["id"]) if has_more else None
+        return [self._as_dict(row) for row in page], next_cursor, total
+
     def get_for_owner(self, task_id, owner_id):
         with self.connection() as connection:
             row = connection.execute(
