@@ -1,9 +1,31 @@
 """
-WebSocket-based notification server.
+WebSocket-based notification server with a Redis pub/sub message backbone.
 
 Accepts WebSocket connections, assigns each client a unique ID, broadcasts
-messages to all connected clients, handles clean disconnects, and exposes a
-REST endpoint ``GET /health`` returning the connected client count.
+messages to all connected clients, handles clean disconnects, and exposes REST
+endpoints for health, channels, and message history.
+
+Message backbone
+----------------
+Messages are distributed over Redis pub/sub channels. A server publishes every
+broadcast to a Redis channel and every server instance runs a subscriber that
+delivers the message to its own connected clients. This lets multiple server
+instances share a single Redis backbone. When Redis is unavailable the server
+delivers locally, so it keeps working without a broker.
+
+Client connection state (client IDs and their channel subscriptions) is
+mirrored into Redis when a broker is available, so the state survives a server
+restart.
+
+Persistence
+-----------
+Every broadcast and direct message is stored in SQLite so a history can be
+served back through ``GET /messages``.
+
+Configuration
+-------------
+``REDIS_URL``    optional Redis connection URL for the pub/sub backbone.
+``DATABASE_URL`` optional SQLite path (or ``sqlite:///...`` URL) for history.
 
 Clients can subscribe to named channels (e.g. ``"alerts"``, ``"system"``,
 ``"chat"``). Messages that carry a ``channel`` field are delivered only to the
@@ -22,14 +44,18 @@ REST endpoints::
     GET /health                          connected client count
     GET /channels                        active channels and subscriber counts
     GET /channels/{name}/subscribers     subscriber IDs for a channel
+    GET /messages?limit=50&offset=0      persisted message history
 """
 
 import asyncio
 import json
 import os
+import sqlite3
 import threading
 import uuid
+import weakref
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 
 import websockets
 from websockets.datastructures import Headers
@@ -40,7 +66,18 @@ MESSAGE_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
 HEALTH_PATH = "/health"
 CHANNELS_PATH = "/channels"
+MESSAGES_PATH = "/messages"
 WEBSOCKET_PATHS = ("/", "/ws")
+
+BROADCAST_CHANNEL = "broadcast"
+
+
+def _redis_url() -> str | None:
+    return os.environ.get("REDIS_URL")
+
+
+def _database_url() -> str | None:
+    return os.environ.get("DATABASE_URL")
 
 
 def now_iso() -> str:
@@ -60,6 +97,315 @@ def make_message(msg_type: str, payload: dict, timestamp: str | None = None) -> 
         "timestamp": timestamp or now_iso(),
     }
 
+
+def _decode(value) -> str:
+    if isinstance(value, bytes):
+        return value.decode("utf-8")
+    return value
+
+
+# ── Pub/Sub backbone ────────────────────────────────────────────────
+
+class Broker:
+    """
+    Pub/sub message backbone.
+
+    When a ``redis_client`` is supplied (or ``REDIS_URL`` is set) messages are
+    published to Redis channels and each server runs a subscriber task that
+    delivers them to its local clients, letting multiple server instances share
+    a single backbone. Without Redis the server falls back to a no-op broker and
+    delivers locally, so it keeps working with no broker running.
+    """
+
+    def __init__(self, redis_client=None) -> None:
+        self.redis_client = redis_client
+        self._pubsub = None
+        self._subscribed: set[str] = set()
+        self._lock = threading.RLock()
+        self._connected = False
+
+    @property
+    def redis_enabled(self) -> bool:
+        return self.redis_client is not None
+
+    async def connect(self) -> None:
+        """Prepare the broker for use, degrading gracefully to in-memory."""
+        if self._connected:
+            return
+        if self.redis_client is not None:
+            try:
+                await self.redis_client.ping()
+            except Exception:
+                self.redis_client = None
+        self._connected = True
+        if self.redis_client is not None:
+            self._pubsub = self.redis_client.pubsub()
+
+    async def subscribe(self, channel: str) -> None:
+        await self.connect()
+        if self.redis_client is None:
+            return
+        with self._lock:
+            if channel in self._subscribed:
+                return
+            self._subscribed.add(channel)
+        await self._pubsub.subscribe(channel)
+
+    async def unsubscribe(self, channel: str) -> None:
+        await self.connect()
+        if self.redis_client is None:
+            return
+        with self._lock:
+            if channel not in self._subscribed:
+                return
+            self._subscribed.discard(channel)
+        await self._pubsub.unsubscribe(channel)
+
+    def channels_subscribed(self) -> set[str]:
+        with self._lock:
+            return set(self._subscribed)
+
+    async def publish(self, channel: str, payload: dict) -> None:
+        """Publish a message dict to a channel."""
+        await self.connect()
+        if self.redis_client is None:
+            return
+        await self.redis_client.publish(channel, json.dumps(payload))
+
+    async def next_message(self):
+        """
+        Return the next ``(channel, data)`` from Redis, or ``None`` when nothing
+        is pending. Polls so cancellation during event loop shutdown is clean.
+        """
+        await self.connect()
+        if self.redis_client is None:
+            await asyncio.sleep(0.01)
+            return None
+        msg = await self._pubsub.get_message(ignore_subscribe_messages=True)
+        if msg is None:
+            await asyncio.sleep(0.01)
+            return None
+        channel = _decode(msg.get("channel"))
+        data = _decode(msg.get("data"))
+        if channel is None or data is None:
+            return None
+        return channel, data
+
+
+def _make_default_broker() -> Broker:
+    """Build the process-wide default broker from the environment."""
+    redis_url = _redis_url()
+    if not redis_url:
+        return Broker()
+    try:
+        import redis.asyncio as aioredis
+    except ImportError:
+        return Broker()
+    try:
+        client = aioredis.from_url(redis_url)
+    except Exception:
+        return Broker()
+    return Broker(redis_client=client)
+
+
+# ── Persistence ─────────────────────────────────────────────────────
+
+class MessageStore:
+    """
+    SQLite-backed history for messages.
+
+    The ``messages`` table holds ``id``, ``channel``, ``type``, ``payload``
+    (JSON-encoded) and ``timestamp``. A single connection guarded by a lock is
+    reused so in-memory databases (``:memory:``) work correctly.
+    """
+
+    def __init__(self, database: str | None = None) -> None:
+        self.database = database or _database_url()
+        self._path = self._resolve_path(self.database)
+        self._conn = sqlite3.connect(self._path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        self._lock = threading.RLock()
+        self._init_schema()
+        weakref.finalize(self, self._close_connection, self._conn)
+
+    @staticmethod
+    def _close_connection(conn) -> None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    @staticmethod
+    def _resolve_path(database: str | None) -> str:
+        if not database:
+            return ":memory:"
+        if database.startswith("sqlite:///"):
+            return database[len("sqlite:///"):]
+        if database.startswith("sqlite://"):
+            return database[len("sqlite://"):] or ":memory:"
+        return database
+
+    def _init_schema(self) -> None:
+        with self._lock:
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel TEXT,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+            self._conn.commit()
+
+    def save(self, message: dict, channel: str | None = None) -> int:
+        """Persist a message dict. Returns the new row id."""
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO messages (channel, type, payload, timestamp) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    channel,
+                    message["type"],
+                    json.dumps(message["payload"]),
+                    message["timestamp"],
+                ),
+            )
+            self._conn.commit()
+            return cur.lastrowid
+
+    def list(self, limit: int = 50, offset: int = 0) -> list[dict]:
+        """Return stored messages ordered by id (oldest first)."""
+        limit = max(0, int(limit))
+        offset = max(0, int(offset))
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, channel, type, payload, timestamp "
+                "FROM messages ORDER BY id ASC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+        out = []
+        for row in rows:
+            entry = dict(row)
+            try:
+                entry["payload"] = json.loads(entry["payload"])
+            except (json.JSONDecodeError, TypeError):
+                pass
+            out.append(entry)
+        return out
+
+    def count(self) -> int:
+        with self._lock:
+            row = self._conn.execute("SELECT COUNT(*) FROM messages").fetchone()
+            return int(row[0])
+
+    def close(self) -> None:
+        with self._lock:
+            self._conn.close()
+
+
+# ── Redis-backed client connection state ───────────────────────────
+
+class ConnectionStore:
+    """
+    Client connection state, mirrored to Redis when available.
+
+    Client IDs and their channel subscriptions are recorded here so the state
+    survives a server restart. Falls back to an in-memory map when no Redis
+    connection is available.
+    """
+
+    CLIENTS_KEY = "ntf:clients"
+
+    def __init__(self, redis_client=None) -> None:
+        self.redis_client = redis_client
+        self._memory: dict[str, dict] = {}
+        self._lock = threading.RLock()
+
+    @property
+    def redis_enabled(self) -> bool:
+        return self.redis_client is not None
+
+    @staticmethod
+    def _client_key(client_id: str) -> str:
+        return f"ntf:client:{client_id}"
+
+    async def register(self, client_id: str) -> None:
+        if self.redis_client is not None:
+            await self.redis_client.sadd(self.CLIENTS_KEY, client_id)
+            await self.redis_client.hset(
+                self._client_key(client_id), "channels", "[]"
+            )
+        else:
+            with self._lock:
+                self._memory[client_id] = {"channels": set()}
+
+    async def unregister(self, client_id: str) -> None:
+        if self.redis_client is not None:
+            await self.redis_client.srem(self.CLIENTS_KEY, client_id)
+            await self.redis_client.delete(self._client_key(client_id))
+        else:
+            with self._lock:
+                self._memory.pop(client_id, None)
+
+    async def add_channel(self, client_id: str, channel: str) -> None:
+        if self.redis_client is not None:
+            channels = await self.channels_for(client_id)
+            if channel not in channels:
+                channels.append(channel)
+                await self.redis_client.hset(
+                    self._client_key(client_id),
+                    "channels",
+                    json.dumps(channels),
+                )
+        else:
+            with self._lock:
+                entry = self._memory.get(client_id)
+                if entry is not None:
+                    entry["channels"].add(channel)
+
+    async def remove_channel(self, client_id: str, channel: str) -> None:
+        if self.redis_client is not None:
+            channels = await self.channels_for(client_id)
+            if channel in channels:
+                channels.remove(channel)
+                await self.redis_client.hset(
+                    self._client_key(client_id),
+                    "channels",
+                    json.dumps(channels),
+                )
+        else:
+            with self._lock:
+                entry = self._memory.get(client_id)
+                if entry is not None:
+                    entry["channels"].discard(channel)
+
+    async def channels_for(self, client_id: str) -> list[str]:
+        if self.redis_client is not None:
+            raw = await self.redis_client.hget(
+                self._client_key(client_id), "channels"
+            )
+            if raw is None:
+                return []
+            try:
+                return json.loads(_decode(raw))
+            except (json.JSONDecodeError, TypeError):
+                return []
+        with self._lock:
+            entry = self._memory.get(client_id)
+            return sorted(entry["channels"]) if entry else []
+
+    async def clients(self) -> list[str]:
+        if self.redis_client is not None:
+            raw = await self.redis_client.smembers(self.CLIENTS_KEY)
+            return sorted(_decode(c) for c in raw)
+        with self._lock:
+            return sorted(self._memory)
+
+
+# ── Connection and channel registries ──────────────────────────────
 
 class ClientRegistry:
     """
@@ -137,6 +483,8 @@ class ChannelRegistry:
             return {name: len(members) for name, members in self._channels.items()}
 
 
+# ── Server ──────────────────────────────────────────────────────────
+
 class NotificationServer:
     """WebSocket notification server built on the ``websockets`` library."""
 
@@ -144,14 +492,70 @@ class NotificationServer:
         self,
         registry: ClientRegistry | None = None,
         channels: ChannelRegistry | None = None,
+        broker: Broker | None = None,
+        message_store: MessageStore | None = None,
+        connection_store: ConnectionStore | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
         self.channels = channels or ChannelRegistry()
+        self.broker = broker or _make_default_broker()
+        self.message_store = message_store or MessageStore()
+        self.connection_store = connection_store or ConnectionStore()
+        self._listener_task: asyncio.Task | None = None
+        self._listener_started = False
+
+    async def _ensure_listener(self) -> None:
+        """
+        Start the broker subscriber task (once). Only needed in Redis mode;
+        without a broker messages are delivered inline during publishing.
+        """
+        if self._listener_started or not self.broker.redis_enabled:
+            return
+        self._listener_started = True
+        await self.broker.subscribe(BROADCAST_CHANNEL)
+        self._listener_task = asyncio.get_running_loop().create_task(
+            self._run_listener()
+        )
+
+    async def _run_listener(self) -> None:
+        """Consume messages from the backbone and deliver them locally."""
+        while True:
+            item = await self.broker.next_message()
+            if item is None:
+                continue
+            channel, data = item
+            try:
+                json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if channel == BROADCAST_CHANNEL:
+                client_ids = [cid for cid, _ in self.registry.all()]
+            else:
+                client_ids = self.channels.subscribers(channel)
+            await self._deliver(data, client_ids)
+
+    async def _sync_channel_subscriptions(self) -> None:
+        """Subscribe the backbone to channels with local subscribers."""
+        await self._ensure_listener()
+        desired = {BROADCAST_CHANNEL, *self.channels.channels().keys()}
+        current = self.broker.channels_subscribed()
+        for channel in desired - current:
+            await self.broker.subscribe(channel)
+        for channel in current - desired:
+            await self.broker.unsubscribe(channel)
+
+    def close(self) -> None:
+        """Cancel the broker subscriber task (used during shutdown)."""
+        if self._listener_task is not None and not self._listener_task.done():
+            self._listener_task.cancel()
+        self._listener_task = None
 
     async def handler(self, websocket) -> None:
         """Handle a single WebSocket connection lifecycle."""
+        await self._ensure_listener()
         client_id = self._new_client_id()
         self.registry.add(client_id, websocket)
+        await self.connection_store.register(client_id)
         welcome = make_message(
             "system",
             {"client_id": client_id, "message": "connected"},
@@ -165,6 +569,8 @@ class NotificationServer:
         finally:
             self.registry.remove(client_id)
             self.channels.remove_client(client_id)
+            await self._sync_channel_subscriptions()
+            await self.connection_store.unregister(client_id)
 
     def _new_client_id(self) -> str:
         while True:
@@ -220,6 +626,8 @@ class NotificationServer:
             await self._send_error(websocket, "subscribe requires payload.channel")
             return
         self.channels.subscribe(channel, sender_id)
+        await self.connection_store.add_channel(sender_id, channel)
+        await self._sync_channel_subscriptions()
         await websocket.send(
             json.dumps(
                 make_message(
@@ -235,6 +643,8 @@ class NotificationServer:
             await self._send_error(websocket, "unsubscribe requires payload.channel")
             return
         self.channels.unsubscribe(channel, sender_id)
+        await self.connection_store.remove_channel(sender_id, channel)
+        await self._sync_channel_subscriptions()
         await websocket.send(
             json.dumps(
                 make_message(
@@ -255,11 +665,8 @@ class NotificationServer:
         if not target:
             await self._send_error(sender_ws, "direct message requires payload.to")
             return
-        target_ws = self.registry.get(target)
-        if target_ws is None:
+        if not await self.direct(target, payload, timestamp):
             await self._send_error(sender_ws, f"unknown target client: {target}")
-            return
-        await target_ws.send(json.dumps(make_message("direct", payload, timestamp)))
 
     async def _send_error(self, websocket, message: str) -> None:
         await websocket.send(
@@ -289,29 +696,30 @@ class NotificationServer:
         timestamp: str | None = None,
         channel: str | None = None,
     ) -> None:
-        """Send a message to every connected client (or channel subscribers)."""
-        msg = json.dumps(make_message(msg_type, payload or {}, timestamp))
-        if channel:
-            await self._deliver(msg, self.channels.subscribers(channel))
-            return
-        dead: list[str] = []
-        for client_id, ws in self.registry.all():
-            try:
-                await ws.send(msg)
-            except ConnectionClosed:
-                dead.append(client_id)
-        for client_id in dead:
-            self.registry.remove(client_id)
-            self.channels.remove_client(client_id)
+        """
+        Publish a message to the backbone. With Redis every server instance's
+        subscriber (including this one) receives it and delivers to its local
+        clients; without Redis the message is delivered to local clients inline.
+        """
+        message = make_message(msg_type, payload or {}, timestamp)
+        self.message_store.save(message, channel)
+        await self._ensure_listener()
+        await self.broker.publish(channel or BROADCAST_CHANNEL, message)
+        if not self.broker.redis_enabled:
+            data = json.dumps(message)
+            if channel:
+                await self._deliver(data, self.channels.subscribers(channel))
+            else:
+                await self._deliver(data, [cid for cid, _ in self.registry.all()])
 
     async def direct(self, target_id: str, payload: dict, timestamp: str | None = None) -> bool:
         """Send a message to a single client. Returns True if delivered."""
         target_ws = self.registry.get(target_id)
         if target_ws is None:
             return False
-        await target_ws.send(
-            json.dumps(make_message("direct", payload, timestamp))
-        )
+        message = make_message("direct", payload, timestamp)
+        self.message_store.save(message, None)
+        await target_ws.send(json.dumps(message))
         return True
 
     async def process_request(
@@ -333,9 +741,34 @@ class NotificationServer:
             return self._json_response(200, {"channels": channels})
         if request.path.startswith(CHANNELS_PATH + "/"):
             return self._handle_channel_detail(request.path)
+        if request.path == MESSAGES_PATH or request.path.startswith(MESSAGES_PATH + "?"):
+            return self._handle_messages(request)
         if request.path in WEBSOCKET_PATHS:
             return None
         return self._json_response(404, {"error": "not found"})
+
+    def _handle_messages(self, request: Request) -> Response:
+        parsed = urlparse(request.path)
+        if parsed.path != MESSAGES_PATH:
+            return self._json_response(404, {"error": "not found"})
+        query = parse_qs(parsed.query)
+        limit = self._query_int(query, "limit", 50)
+        offset = self._query_int(query, "offset", 0)
+        return self._json_response(
+            200,
+            {
+                "messages": self.message_store.list(limit, offset),
+                "limit": limit,
+                "offset": offset,
+            },
+        )
+
+    @staticmethod
+    def _query_int(query: dict, key: str, default: int) -> int:
+        try:
+            return int(query.get(key, [str(default)])[0])
+        except (TypeError, ValueError):
+            return default
 
     def _handle_channel_detail(self, path: str) -> Response:
         parts = path[len(CHANNELS_PATH) + 1:].split("/")

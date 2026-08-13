@@ -4,11 +4,19 @@ import urllib.error
 import urllib.request
 from contextlib import asynccontextmanager
 
+import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 import websockets
 
-from notification_server import NotificationServer, make_message
+from notification_server import (
+    BROADCAST_CHANNEL,
+    Broker,
+    ConnectionStore,
+    MessageStore,
+    NotificationServer,
+    make_message,
+)
 
 
 @asynccontextmanager
@@ -411,3 +419,226 @@ async def test_channels_endpoint_after_disconnect(server):
     status, body = await http_get(addr, "/channels")
     assert status == 200
     assert body["channels"] == []
+
+
+# ── Redis pub/sub integration ───────────────────────────────────────
+
+@asynccontextmanager
+async def serve_server(server):
+    async with websockets.serve(
+        server.handler,
+        "127.0.0.1",
+        0,
+        process_request=server.process_request,
+    ) as ws_server:
+        port = ws_server.sockets[0].getsockname()[1]
+        yield f"127.0.0.1:{port}", server
+
+
+@pytest.fixture
+def fake_redis():
+    redis_server = fakeredis.aioredis.FakeServer()
+    return fakeredis.aioredis.FakeRedis(server=redis_server)
+
+
+async def wait_for_pubsub(ps, timeout: float = 2.0):
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while loop.time() < deadline:
+        msg = await ps.get_message(ignore_subscribe_messages=True)
+        if msg is not None:
+            return msg
+        await asyncio.sleep(0.01)
+    raise AssertionError("timed out waiting for a pub/sub message")
+
+
+async def test_server_publishes_to_redis_channel(fake_redis):
+    server = NotificationServer(broker=Broker(redis_client=fake_redis))
+    async with serve_server(server) as (addr, _):
+        ws, _, _ = await connect_client(addr)
+
+        raw = fake_redis.pubsub()
+        await raw.subscribe(BROADCAST_CHANNEL)
+
+        payload = {"text": "watch this"}
+        await ws.send(json.dumps(make_message("broadcast", payload)))
+
+        msg = await wait_for_pubsub(raw)
+        body = json.loads(msg["data"].decode())
+        assert body["type"] == "broadcast"
+        assert body["payload"] == payload
+
+        await ws.close()
+    server.close()
+
+
+async def test_redis_pubsub_delivers_across_servers(fake_redis):
+    server_a = NotificationServer(broker=Broker(redis_client=fake_redis))
+    server_b = NotificationServer(broker=Broker(redis_client=fake_redis))
+    async with serve_server(server_a) as (addr_a, _):
+        async with serve_server(server_b) as (addr_b, _):
+            ws_a, _, _ = await connect_client(addr_a)
+            ws_b, _, _ = await connect_client(addr_b)
+
+            payload = {"text": "cross server broadcast"}
+            await ws_a.send(json.dumps(make_message("broadcast", payload)))
+
+            got = json.loads(await asyncio.wait_for(ws_b.recv(), 2.0))
+            assert got["type"] == "broadcast"
+            assert got["payload"] == payload
+
+            await ws_a.close()
+            await ws_b.close()
+    server_a.close()
+    server_b.close()
+
+
+async def test_redis_channel_subscription_across_servers(fake_redis):
+    server_a = NotificationServer(broker=Broker(redis_client=fake_redis))
+    server_b = NotificationServer(broker=Broker(redis_client=fake_redis))
+    async with serve_server(server_a) as (addr_a, _):
+        async with serve_server(server_b) as (addr_b, _):
+            ws_a, _, _ = await connect_client(addr_a)
+            ws_b, _, _ = await connect_client(addr_b)
+
+            await subscribe(ws_a, "alerts")
+
+            payload = {"text": "intruder alert"}
+            await ws_b.send(
+                json.dumps(make_message("broadcast", payload) | {"channel": "alerts"})
+            )
+
+            got = json.loads(await asyncio.wait_for(ws_a.recv(), 2.0))
+            assert got["payload"] == payload
+
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(ws_b.recv(), 0.2)
+
+            await ws_a.close()
+            await ws_b.close()
+    server_a.close()
+    server_b.close()
+
+
+async def test_client_connection_state_stored_in_redis(fake_redis):
+    store = ConnectionStore(redis_client=fake_redis)
+    server = NotificationServer(
+        broker=Broker(redis_client=fake_redis),
+        connection_store=store,
+    )
+    async with serve_server(server) as (addr, _):
+        ws, cid, _ = await connect_client(addr)
+        await subscribe(ws, "alerts")
+        await subscribe(ws, "chat")
+
+        assert cid in await store.clients()
+        assert set(await store.channels_for(cid)) == {"alerts", "chat"}
+
+        revived = ConnectionStore(redis_client=fake_redis)
+        assert cid in await revived.clients()
+        assert set(await revived.channels_for(cid)) == {"alerts", "chat"}
+
+        await ws.close()
+        await wait_count(server.registry, 0)
+
+        assert cid not in await revived.clients()
+        assert await revived.channels_for(cid) == []
+    server.close()
+
+
+# ── Message persistence ─────────────────────────────────────────────
+
+async def test_messages_endpoint_persists_history(tmp_path):
+    store = MessageStore(str(tmp_path / "messages.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        ws1, _, _ = await connect_client(addr)
+        ws2, _, _ = await connect_client(addr)
+
+        payload = {"text": "hello history"}
+        await ws2.send(json.dumps(make_message("broadcast", payload)))
+        got = json.loads(await asyncio.wait_for(ws1.recv(), 2.0))
+        assert got["payload"] == payload
+
+        status, body = await http_get(addr, "/messages")
+        assert status == 200
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        assert len(body["messages"]) == 1
+        msg = body["messages"][0]
+        assert msg["type"] == "broadcast"
+        assert msg["payload"] == payload
+        assert msg["channel"] is None
+        assert isinstance(msg["id"], int)
+        assert isinstance(msg["timestamp"], str)
+
+        await ws1.close()
+        await ws2.close()
+    server.close()
+
+
+async def test_messages_endpoint_limit_and_offset(tmp_path):
+    store = MessageStore(str(tmp_path / "messages.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        ws, _, _ = await connect_client(addr)
+        for i in range(5):
+            await ws.send(json.dumps(make_message("broadcast", {"n": i})))
+            await asyncio.wait_for(ws.recv(), 2.0)
+
+        status, body = await http_get(addr, "/messages?limit=2&offset=1")
+        assert status == 200
+        assert body["limit"] == 2
+        assert body["offset"] == 1
+        assert [m["payload"]["n"] for m in body["messages"]] == [1, 2]
+
+        status, body = await http_get(addr, "/messages?limit=10&offset=3")
+        assert [m["payload"]["n"] for m in body["messages"]] == [3, 4]
+
+        status, body = await http_get(addr, "/messages")
+        assert len(body["messages"]) == 5
+
+        await ws.close()
+    server.close()
+
+
+async def test_direct_messages_are_persisted(tmp_path):
+    store = MessageStore(str(tmp_path / "messages.db"))
+    server = NotificationServer(message_store=store)
+    async with serve_server(server) as (addr, _):
+        ws1, id1, _ = await connect_client(addr)
+        ws2, id2, _ = await connect_client(addr)
+
+        payload = {"to": id2, "text": "private"}
+        await ws1.send(json.dumps(make_message("direct", payload)))
+        await asyncio.wait_for(ws2.recv(), 2.0)
+
+        status, body = await http_get(addr, "/messages")
+        msgs = body["messages"]
+        assert len(msgs) == 1
+        assert msgs[0]["type"] == "direct"
+        assert msgs[0]["payload"] == payload
+
+        await ws1.close()
+        await ws2.close()
+    server.close()
+
+
+async def test_message_store_accepts_sqlite_url(tmp_path):
+    db = tmp_path / "url.db"
+    store = MessageStore(f"sqlite:///{db}")
+    assert store._path == str(db)
+    store.save(make_message("broadcast", {"a": 1}), "alerts")
+    assert store.count() == 1
+    assert store.list()[0]["channel"] == "alerts"
+    store.close()
+
+
+def test_database_url_env_is_respected(tmp_path, monkeypatch):
+    db = tmp_path / "env_messages.db"
+    monkeypatch.setenv("DATABASE_URL", str(db))
+    store = MessageStore()
+    assert store._path == str(db)
+    store.save(make_message("broadcast", {"env": True}), None)
+    assert store.count() == 1
+    store.close()
