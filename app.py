@@ -12,6 +12,7 @@ import os
 import jwt
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery_tasks import send_notification_email
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -33,7 +34,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -51,18 +53,19 @@ def init_db():
 
 # ── Auth ──────────────────────────────────────────────────────
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     password_hash = generate_password_hash(password)
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             return {
                 "id": cursor.lastrowid,
                 "username": username,
+                "email": email,
             }
         except sqlite3.IntegrityError:
             return None
@@ -71,6 +74,12 @@ def create_user(username: str, password: str) -> dict | None:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user_by_id(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -186,11 +195,12 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip()
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = create_user(username, password)
+    user = create_user(username, password, email if email else None)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
 
@@ -244,14 +254,22 @@ def show_task(user_id, task_id: int):
 @token_required
 def edit_task(user_id, task_id: int):
     data = request.get_json(silent=True) or {}
+    old_task = get_task(task_id, user_id)
+    if old_task is None:
+        return jsonify({"error": "task not found"}), 404
+
     task = update_task(
         task_id,
         user_id,
         title=data.get("title"),
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+
+    if task and data.get("status") == "completed" and old_task.get("status") != "completed":
+        user = get_user_by_id(user_id)
+        if user and user.get("email"):
+            send_notification_email.delay(user["email"], task["title"])
+
     return jsonify(task)
 
 

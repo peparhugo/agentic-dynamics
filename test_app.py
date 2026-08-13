@@ -7,6 +7,7 @@ import json
 import os
 import sqlite3
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 from app import app, init_db, get_db
 
 # Use a test database
@@ -645,3 +646,169 @@ class TestTaskInitialization:
         # Verify schema by checking we can query the table
         response = client.get("/tasks", headers=auth_headers)
         assert response.status_code == 200
+
+
+class TestEmailNotifications:
+    """Tests for async email notification system."""
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_without_email(self, mock_task, client):
+        """Test that notification is not sent when task status changes to completed but user has no email."""
+        token = create_user(client, "notifuser", "pass123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Complete this task"}),
+            content_type="application/json",
+            headers=headers
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        assert response.status_code == 200
+        mock_task.assert_not_called()
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_sent_with_email(self, mock_task, client):
+        """Test that notification task is triggered with user email."""
+        client.post(
+            "/auth/register",
+            data=json.dumps({"username": "emailuser", "password": "pass123", "email": "user@example.com"}),
+            content_type="application/json"
+        )
+
+        response = client.post(
+            "/auth/login",
+            data=json.dumps({"username": "emailuser", "password": "pass123"}),
+            content_type="application/json"
+        )
+        token = json.loads(response.data)["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Important task"}),
+            content_type="application/json",
+            headers=headers
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        assert response.status_code == 200
+        mock_task.assert_called_once_with("user@example.com", "Important task")
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_if_no_email(self, mock_task, client):
+        """Test that notification is not sent if user has no email."""
+        token = create_user(client, "noemailuser", "pass123")
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task without email"}),
+            content_type="application/json",
+            headers=headers
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        assert response.status_code == 200
+        mock_task.assert_not_called()
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_on_status_change_to_other(self, mock_task, client):
+        """Test that notification is not sent when status changes to non-completed status."""
+        client.post(
+            "/auth/register",
+            data=json.dumps({"username": "statususer", "password": "pass123", "email": "status@example.com"}),
+            content_type="application/json"
+        )
+
+        response = client.post(
+            "/auth/login",
+            data=json.dumps({"username": "statususer", "password": "pass123"}),
+            content_type="application/json"
+        )
+        token = json.loads(response.data)["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Work in progress"}),
+            content_type="application/json",
+            headers=headers
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "in_progress"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        assert response.status_code == 200
+        mock_task.assert_not_called()
+
+    @patch('app.send_notification_email.delay')
+    def test_notification_not_sent_on_second_completion_update(self, mock_task, client):
+        """Test that notification is only sent once, not on subsequent updates."""
+        client.post(
+            "/auth/register",
+            data=json.dumps({"username": "onceonlyuser", "password": "pass123", "email": "once@example.com"}),
+            content_type="application/json"
+        )
+
+        response = client.post(
+            "/auth/login",
+            data=json.dumps({"username": "onceonlyuser", "password": "pass123"}),
+            content_type="application/json"
+        )
+        token = json.loads(response.data)["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Already done"}),
+            content_type="application/json",
+            headers=headers
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        mock_task.reset_mock()
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"title": "Already done - updated"}),
+            content_type="application/json",
+            headers=headers
+        )
+
+        assert response.status_code == 200
+        mock_task.assert_not_called()
