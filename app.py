@@ -13,11 +13,16 @@ import jwt
 import functools
 from werkzeug.security import generate_password_hash, check_password_hash
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+# Initialize repositories
+task_repo = TaskRepository()
+user_repo = UserRepository()
 
 
 def get_db():
@@ -100,54 +105,28 @@ def _notify_admin(task_id, action):
 
 
 def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    now = datetime.utcnow().isoformat()
+    task_id = task_repo.create(title, "pending", now, owner_id)
+    return {
+        "id": task_id,
+        "title": title,
+        "status": "pending",
+        "created_at": now,
+        "owner_id": owner_id,
+    }
 
 
 def get_tasks(owner_id: int | None = None):
-    with get_db() as conn:
-        if owner_id is not None:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,)
-            ).fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+    return task_repo.get_all(owner_id)
 
 
 def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
-    with get_db() as conn:
-        if owner_id is not None:
-            row = conn.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, owner_id)
-            ).fetchone()
-        else:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+    return task_repo.get_by_id(task_id, owner_id)
 
 
 def get_user_email(user_id: int) -> str | None:
     """Get user email by user_id."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT email FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-        return row["email"] if row else None
-
+    return user_repo.get_email_by_id(user_id)
 
 
 def fetch_task(task_id: int) -> dict | None:
@@ -155,27 +134,10 @@ def fetch_task(task_id: int) -> dict | None:
     return get_task(task_id)
 
 
-
 def update_task(task_id: int, title: str | None = None, status: str | None = None, owner_id: int | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
+    if not task_repo.update(task_id, owner_id, title=title, status=status):
         return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return task_repo.get_by_id(task_id, owner_id)
 
 
 # ── Auth Routes ────────────────────────────────────────────────
@@ -193,17 +155,12 @@ def register():
     if not password:
         return jsonify({"error": "password is required"}), 400
 
-    with get_db() as conn:
-        try:
-            password_hash = generate_password_hash(password)
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, password_hash, email),
-            )
-            conn.commit()
-            return jsonify({"id": cursor.lastrowid, "username": username, "email": email}), 201
-        except sqlite3.IntegrityError:
-            return jsonify({"error": "username already exists"}), 409
+    try:
+        password_hash = generate_password_hash(password)
+        user_id = user_repo.create(username, password_hash, email)
+        return jsonify({"id": user_id, "username": username, "email": email}), 201
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "username already exists"}), 409
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -215,10 +172,7 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    with get_db() as conn:
-        user = conn.execute(
-            "SELECT id, password_hash FROM users WHERE username = ?", (username,)
-        ).fetchone()
+    user = user_repo.get_by_username(username)
 
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid username or password"}), 401
