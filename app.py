@@ -14,6 +14,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -34,7 +36,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -50,6 +53,9 @@ def init_db():
         if "owner_id" not in columns:
             # Keep legacy tasks accessible in the database while leaving them unowned.
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)")
 
 
@@ -89,6 +95,16 @@ def get_task(task_id: int, owner_id: int) -> dict | None:
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
         ).fetchone()
         return serialize_task(row) if row else None
+
+
+def get_user_email(user_id: int) -> str | None:
+    with get_db() as conn:
+        user = conn.execute(
+            "SELECT email, username FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    if user is None:
+        return None
+    return user["email"] or user["username"]
 
 
 def update_task(
@@ -156,17 +172,21 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
     password = data.get("password")
+    email = data.get("email")
     if not isinstance(username, str) or not username.strip():
         return jsonify({"error": "username is required"}), 400
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a non-empty string"}), 400
 
     username = username.strip()
+    email = email.strip() if email is not None else None
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, generate_password_hash(password), email),
             )
             conn.commit()
     except sqlite3.IntegrityError:
@@ -228,14 +248,19 @@ def edit_task(task_id: int):
         return jsonify({"error": "title is required"}), 400
     if status is not None and not isinstance(status, str):
         return jsonify({"error": "status must be a string"}), 400
+    previous_task = get_task(task_id, g.user_id)
+    if previous_task is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         g.user_id,
         title=title.strip() if title is not None else None,
         status=status,
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        user_email = get_user_email(g.user_id)
+        if user_email:
+            send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 

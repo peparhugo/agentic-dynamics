@@ -58,6 +58,39 @@ def test_update_task(client, auth_headers):
     assert response.get_json()["status"] == "complete"
 
 
+def test_completing_a_task_queues_notification(client, monkeypatch):
+    headers = register_and_login(client, username="alice", password="secret")
+    task = client.post("/tasks", json={"title": "Draft"}, headers=headers).get_json()
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda email, title: queued.append((email, title)),
+    )
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Draft")]
+
+
+def test_notification_is_only_queued_on_transition_to_completed(client, auth_headers, monkeypatch):
+    task = client.post("/tasks", json={"title": "Draft"}, headers=auth_headers).get_json()
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda email, title: queued.append((email, title)),
+    )
+
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers)
+
+    assert len(queued) == 1
+
+
 @pytest.mark.parametrize("payload", [{}, {"title": ""}, {"title": 42}])
 def test_create_requires_a_title(client, auth_headers, payload):
     response = client.post("/tasks", json=payload, headers=auth_headers)
