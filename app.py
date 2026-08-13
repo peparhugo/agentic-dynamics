@@ -26,6 +26,7 @@ from websockets import ConnectionClosed
 
 from database import MessageDatabase
 from redis_pubsub import RedisPublisher, RedisSubscriber, ClientConnectionState
+from transport import BaseTransport, WebSocketTransport
 
 
 class ClientRegistry:
@@ -97,7 +98,8 @@ class NotificationServer:
     """WebSocket notification server."""
 
     def __init__(self, host: str = "localhost", ws_port: int = 8765, http_port: int = 8080,
-                 redis_url: str | None = None, database_url: str | None = None):
+                 redis_url: str | None = None, database_url: str | None = None,
+                 transport: BaseTransport | None = None):
         self.host = host
         self.ws_port = ws_port
         self.http_port = http_port
@@ -112,6 +114,15 @@ class NotificationServer:
         self.publisher = RedisPublisher(self.redis_url)
         self.subscriber = RedisSubscriber(self.redis_url)
         self.connection_state = ClientConnectionState(self.redis_url)
+
+        # Initialize transport
+        if transport is None:
+            transport_type = os.getenv("TRANSPORT", "websocket").lower()
+            if transport_type == "websocket":
+                transport = WebSocketTransport(self.registry)
+            else:
+                transport = WebSocketTransport(self.registry)
+        self.transport = transport
 
         self._setup_http_routes()
 
@@ -296,31 +307,8 @@ class NotificationServer:
         except Exception:
             pass
 
-        if channel:
-            # Send only to subscribers of the channel
-            subscribers = self.registry.get_channel_subscribers(channel)
-            target_clients = {
-                client_id: self.registry.get_client(client_id)
-                for client_id in subscribers
-                if self.registry.get_client(client_id) is not None
-            }
-        else:
-            # Broadcast to all clients
-            target_clients = self.registry.get_all_clients()
-
-        if not target_clients:
-            return
-
-        message_json = json.dumps(message)
-        tasks = []
-
-        for client_id, websocket in target_clients.items():
-            if exclude and client_id == exclude:
-                continue
-            tasks.append(self._send_safe(websocket, message_json))
-
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        # Use transport to broadcast
+        await self.transport.broadcast(message, exclude=exclude, channel=channel)
 
     async def send_direct(self, client_id: str, message: dict) -> None:
         """Send a direct message to a specific client."""
@@ -341,9 +329,8 @@ class NotificationServer:
         except Exception:
             pass
 
-        client = self.registry.get_client(client_id)
-        if client:
-            await self._send_safe(client, json.dumps(message))
+        # Use transport to send
+        await self.transport.send_message(client_id, message)
 
     async def _send_safe(self, websocket: Any, message: str) -> None:
         """Safely send a message, handling closed connections."""
