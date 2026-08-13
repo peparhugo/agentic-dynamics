@@ -7,13 +7,25 @@ export interface Page {
   template?: string;
   layout?: string | false;
   data: Record<string, unknown>;
+  sourcePath?: string;
+  sourceHash?: string;
 }
 
 export interface BuildOptions {
   content?: string;
   output?: string;
   templates?: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+}
+
+export type BuildPages = Page[] & { buildStats: BuildStats };
 
 export interface PluginContext {
   options: BuildOptions;

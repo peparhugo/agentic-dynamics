@@ -1,10 +1,12 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { basename, extname, join, relative, sep } from 'node:path';
 import matter from 'gray-matter';
 import MarkdownIt from 'markdown-it';
 import type { Page, Plugin, PluginContext } from '../plugin.js';
 
 const markdown = new MarkdownIt();
+const parsedPageCache = new Map<string, Page>();
 
 function toStringValue(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
@@ -32,9 +34,13 @@ export class MarkdownPlugin implements Plugin {
   async beforeBuild({ contentDirectory, pages }: PluginContext): Promise<void> {
     const files = await markdownFiles(contentDirectory);
     const parsedPages = await Promise.all(files.map(async (filePath): Promise<Page> => {
-      const parsed = matter(await readFile(filePath, 'utf8'));
+      const source = await readFile(filePath, 'utf8');
+      const sourceHash = createHash('sha256').update(source).digest('hex');
+      const cached = parsedPageCache.get(filePath);
+      if (cached?.sourceHash === sourceHash) return { ...cached };
+      const parsed = matter(source);
       const slug = relative(contentDirectory, filePath).split(sep).join('/').replace(/\.md$/i, '');
-      return {
+      const page = {
         slug,
         title: toStringValue(parsed.data.title) ?? basename(slug),
         date: toStringValue(parsed.data.date),
@@ -43,7 +49,11 @@ export class MarkdownPlugin implements Plugin {
         template: toStringValue(parsed.data.template),
         layout: parsed.data.layout === false ? false : toStringValue(parsed.data.layout),
         data: parsed.data,
+        sourcePath: filePath,
+        sourceHash,
       };
+      parsedPageCache.set(filePath, page);
+      return { ...page };
     }));
     pages.push(...parsedPages.sort((a, b) => a.title.localeCompare(b.title)));
   }

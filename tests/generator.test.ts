@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -39,8 +39,46 @@ describe('static site generator', () => {
   it('parses build directory options', () => {
     expect(parseArguments(['--content', 'posts', '--output', 'site', '--templates', 'views'])).toEqual({ content: 'posts', output: 'site', templates: 'views' });
     expect(parseArguments(['--port', '4000'])).toEqual({ port: 4000 });
+    expect(parseArguments(['--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
     expect(() => parseArguments(['--content'])).toThrow('--content requires a directory');
     expect(() => parseArguments(['--port', 'invalid'])).toThrow('--port must be an integer between 1 and 65535');
+  });
+
+  it('incrementally rebuilds only changed pages and invalidates all pages when templates change', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'public');
+    await mkdir(content, { recursive: true });
+    await mkdir(templates, { recursive: true });
+    await writeFile(join(content, 'first.md'), '# First\n');
+    await writeFile(join(content, 'second.md'), '# Second\n');
+    await writeFile(join(templates, 'default.hbs'), '<article>{{{html}}}</article>');
+
+    const initial = await buildSite({ content, output, templates, incremental: true });
+    expect(initial.buildStats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(readFile(join(output, '.ssg-cache.json'), 'utf8')).resolves.toContain('first');
+
+    await rm(join(output, '.ssg-cache.json'));
+    const missingCache = await buildSite({ content, output, templates, incremental: true });
+    expect(missingCache.buildStats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+
+    const unchanged = await buildSite({ content, output, templates, incremental: true });
+    expect(unchanged.buildStats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await writeFile(join(content, 'first.md'), '# Updated\n');
+    const changed = await buildSite({ content, output, templates, incremental: true });
+    expect(changed.buildStats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(readFile(join(output, 'first.html'), 'utf8')).resolves.toContain('Updated');
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('Second');
+
+    await writeFile(join(templates, 'default.hbs'), '<main>{{{html}}}</main>');
+    const templateChanged = await buildSite({ content, output, templates, incremental: true });
+    expect(templateChanged.buildStats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('<main>');
+
+    const cleaned = await buildSite({ content, output, templates, incremental: true, clean: true });
+    expect(cleaned.buildStats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
   });
 
   it('renders frontmatter templates inside layouts with partials', async () => {
