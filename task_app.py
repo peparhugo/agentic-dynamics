@@ -2,7 +2,7 @@
 Flask Task Management API with JWT Authentication
 
 Endpoints:
-- POST /auth/register — create user (JSON: {username, password})
+- POST /auth/register — create user (JSON: {username, password, email})
 - POST /auth/login — return JWT token (JSON: {username, password})
 - POST /tasks — create a task (requires auth)
 - GET /tasks — list authenticated user's tasks (requires auth)
@@ -17,6 +17,16 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 import secrets
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Try to import Celery task (optional - may not be available in test environment)
+try:
+    from tasks_celery import send_notification_email
+except Exception as e:
+    logger.debug(f"Celery not available: {e}")
+    send_notification_email = None
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -41,6 +51,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
                 password_hash TEXT NOT NULL,
+                email TEXT,
                 created_at TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS tokens (
@@ -107,6 +118,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip()
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
     if len(password) < 8:
@@ -120,8 +132,8 @@ def register():
         now = datetime.utcnow().isoformat()
         password_hash = generate_password_hash(password)
         conn.execute(
-            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-            (username, password_hash, now),
+            "INSERT INTO users (username, password_hash, email, created_at) VALUES (?, ?, ?, ?)",
+            (username, password_hash, email if email else None, now),
         )
         conn.commit()
     return jsonify({"message": "user registered", "username": username}), 201
@@ -229,6 +241,7 @@ def update_task(user: dict, task_id):
         if row is None:
             return jsonify({"error": "task not found"}), 404
 
+        old_status = row["status"]
         title = data.get("title")
         status = data.get("status")
 
@@ -261,6 +274,17 @@ def update_task(user: dict, task_id):
             "SELECT * FROM tasks WHERE id = ?",
             (task_id,),
         ).fetchone()
+
+    new_status = row["status"]
+    task_title = row["title"]
+
+    # Trigger email notification if task status changed to 'completed'
+    if status is not None and old_status != "completed" and new_status == "completed":
+        if user.get("email") and send_notification_email:
+            try:
+                send_notification_email.delay(user["email"], task_title)
+            except Exception as e:
+                logger.warning(f"Failed to queue email notification: {e}")
 
     return jsonify(task_to_dict(row))
 

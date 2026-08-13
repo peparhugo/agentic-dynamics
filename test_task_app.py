@@ -6,6 +6,7 @@ import pytest
 import sqlite3
 import os
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 from task_app import app, init_db
 
 
@@ -77,6 +78,25 @@ def another_user(client):
     assert login_response.status_code == 200
     token = login_response.get_json()["token"]
     return {"token": token, "username": "otheruser"}
+
+
+@pytest.fixture
+def email_user(client):
+    """Create a test user with email and return their token"""
+    response = client.post("/auth/register", json={
+        "username": "emailuser",
+        "password": "password789",
+        "email": "emailuser@example.com"
+    })
+    assert response.status_code == 201
+
+    login_response = client.post("/auth/login", json={
+        "username": "emailuser",
+        "password": "password789"
+    })
+    assert login_response.status_code == 200
+    token = login_response.get_json()["token"]
+    return {"token": token, "username": "emailuser", "email": "emailuser@example.com"}
 
 
 def get_auth_headers(token):
@@ -700,6 +720,137 @@ class TestErrorHandling:
         assert response.status_code == 201
         data = response.get_json()
         assert data["title"] == "123"
+
+
+class TestEmailNotification:
+    @patch("task_app.send_notification_email")
+    def test_notification_sent_when_task_completed(self, mock_send, client, email_user):
+        """Test that notification task is queued when status changes to 'completed'"""
+        # Create a task
+        response = client.post(
+            "/tasks",
+            json={"title": "Important Task"},
+            headers=get_auth_headers(email_user["token"])
+        )
+        task_id = response.get_json()["id"]
+
+        # Update task to completed
+        with patch("task_app.send_notification_email") as mock_task:
+            mock_task.delay = MagicMock()
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=get_auth_headers(email_user["token"])
+            )
+
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["status"] == "completed"
+
+    @patch("task_app.send_notification_email")
+    def test_notification_not_sent_without_email(self, mock_send, client, auth_user):
+        """Test that notification is not sent when user has no email"""
+        # Create a task
+        response = client.post(
+            "/tasks",
+            json={"title": "Task without email"},
+            headers=get_auth_headers(auth_user["token"])
+        )
+        task_id = response.get_json()["id"]
+
+        # Update task to completed - should not crash even without email
+        with patch("task_app.send_notification_email") as mock_task:
+            mock_task.delay = MagicMock()
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=get_auth_headers(auth_user["token"])
+            )
+
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["status"] == "completed"
+
+    def test_notification_not_sent_when_status_not_completed(self, client, email_user):
+        """Test that notification is not sent when status changes to non-completed value"""
+        # Create a task
+        response = client.post(
+            "/tasks",
+            json={"title": "Task in progress"},
+            headers=get_auth_headers(email_user["token"])
+        )
+        task_id = response.get_json()["id"]
+
+        # Update task to in_progress (not completed)
+        with patch("task_app.send_notification_email") as mock_task:
+            mock_task.delay = MagicMock()
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "in_progress"},
+                headers=get_auth_headers(email_user["token"])
+            )
+
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["status"] == "in_progress"
+
+    def test_notification_not_sent_when_already_completed(self, client, email_user):
+        """Test that notification is not sent when status was already completed"""
+        # Create and complete a task
+        response = client.post(
+            "/tasks",
+            json={"title": "Already done"},
+            headers=get_auth_headers(email_user["token"])
+        )
+        task_id = response.get_json()["id"]
+
+        # First update to completed
+        with patch("task_app.send_notification_email") as mock_task:
+            mock_task.delay = MagicMock()
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=get_auth_headers(email_user["token"])
+            )
+            assert response.status_code == 200
+
+            # Second update (e.g., update title while already completed)
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"title": "Updated title"},
+                headers=get_auth_headers(email_user["token"])
+            )
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["status"] == "completed"
+
+    def test_register_with_email(self, client):
+        """Test user registration with email"""
+        response = client.post("/auth/register", json={
+            "username": "newemail",
+            "password": "password123",
+            "email": "newemail@example.com"
+        })
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["username"] == "newemail"
+
+        # Verify email was stored by logging in and checking
+        login_response = client.post("/auth/login", json={
+            "username": "newemail",
+            "password": "password123"
+        })
+        assert login_response.status_code == 200
+
+    def test_register_without_email(self, client):
+        """Test that email is optional during registration"""
+        response = client.post("/auth/register", json={
+            "username": "noemail",
+            "password": "password123"
+        })
+        assert response.status_code == 201
+        data = response.get_json()
+        assert data["username"] == "noemail"
 
 
 class TestHealth:
