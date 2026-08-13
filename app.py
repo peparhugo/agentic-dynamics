@@ -10,6 +10,7 @@ from functools import wraps
 from pathlib import Path
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash
 
 from celery_config import send_notification_email
@@ -17,6 +18,25 @@ from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
+
+
+def _rate_limit_key() -> str:
+    """Use authenticated user identity, falling back to the client address for auth routes."""
+    user = getattr(g, "current_user", None)
+    if user is None:
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, token = authorization.partition(" ")
+        user = _user_from_token(token) if scheme.lower() == "bearer" and token else None
+    return f"user:{user['id']}" if user is not None else f"ip:{request.remote_addr}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"),
+    headers_enabled=True,
+)
 
 # Tests or deployments may override this path. User data lives alongside task data.
 DATA_FILE = os.environ.get("TASKS_FILE", "tasks.json")
@@ -102,6 +122,19 @@ def require_auth(view):
     return wrapped
 
 
+def _pagination_from_request() -> tuple[int | None, int] | None:
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", "20")
+    try:
+        cursor_id = int(cursor) if cursor is not None else None
+        page_size = int(limit)
+    except ValueError:
+        return None
+    if (cursor_id is not None and cursor_id < 1) or not 1 <= page_size <= 100:
+        return None
+    return cursor_id, page_size
+
+
 def _credentials_from(data: dict) -> tuple[str, str] | None:
     username = data.get("username")
     password = data.get("password")
@@ -142,7 +175,11 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repository.list_for_owner(g.current_user["id"]))
+    pagination = _pagination_from_request()
+    if pagination is None:
+        return jsonify({"error": "cursor and limit must be positive integers; limit cannot exceed 100"}), 400
+    tasks, next_cursor, total = task_repository.list_page_for_owner(g.current_user["id"], *pagination)
+    return jsonify({"data": tasks, "next_cursor": str(next_cursor) if next_cursor is not None else None, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])

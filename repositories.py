@@ -100,6 +100,18 @@ class TaskRepository(BaseRepository):
         tasks = (task for task in self.list_all() if task.get("owner_id") == owner_id)
         return sorted(tasks, key=lambda task: task["created_at"], reverse=True)
 
+    def list_page_for_owner(self, owner_id: int, cursor: int | None, limit: int) -> tuple[list[dict], int | None, int]:
+        tasks = self.list_for_owner(owner_id)
+        total = len(tasks)
+        if cursor is not None:
+            cursor_index = next((index for index, task in enumerate(tasks) if task["id"] == cursor), None)
+            if cursor_index is None:
+                return [], None, total
+            tasks = tasks[cursor_index + 1 :]
+        page = tasks[:limit]
+        next_cursor = page[-1]["id"] if len(tasks) > limit else None
+        return page, next_cursor, total
+
     def get_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         task = self.get_by_id(task_id)
         return task if task is not None and task.get("owner_id") == owner_id else None

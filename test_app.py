@@ -2,12 +2,17 @@ import json
 
 import app
 import pytest
+from limits.storage import storage_from_string
+from limits.strategies import FixedWindowRateLimiter
 
 
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "DATA_FILE", str(tmp_path / "tasks.json"))
     monkeypatch.setattr(app, "JWT_SECRET", "test-secret")
+    storage = storage_from_string("memory://")
+    monkeypatch.setattr(app.limiter, "_storage", storage)
+    monkeypatch.setattr(app.limiter, "_limiter", FixedWindowRateLimiter(storage))
     app.init_db()
     return app.app.test_client()
 
@@ -88,7 +93,32 @@ def test_list_tasks_orders_newest_first(client):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["title"] for task in response.get_json()] == ["Second", "First"]
+    assert [task["title"] for task in response.get_json()["data"]] == ["Second", "First"]
+    assert response.get_json()["next_cursor"] is None
+    assert response.get_json()["total"] == 2
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_headers(client)
+    for title in ("First", "Second", "Third"):
+        client.post("/tasks", json={"title": title}, headers=headers)
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+    second_page = client.get(f"/tasks?cursor={first_page.get_json()['next_cursor']}&limit=2", headers=headers)
+
+    assert [task["title"] for task in first_page.get_json()["data"]] == ["Third", "Second"]
+    assert first_page.get_json()["next_cursor"] == "2"
+    assert first_page.get_json()["total"] == 3
+    assert [task["title"] for task in second_page.get_json()["data"]] == ["First"]
+    assert second_page.get_json()["next_cursor"] is None
+    assert second_page.get_json()["total"] == 3
+
+
+@pytest.mark.parametrize("query", ("?limit=0", "?limit=101", "?limit=bad", "?cursor=0", "?cursor=bad"))
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks{query}", headers=auth_headers(client))
+
+    assert response.status_code == 400
 
 
 def test_users_can_only_access_their_own_tasks(client):
@@ -96,7 +126,7 @@ def test_users_can_only_access_their_own_tasks(client):
     bob_headers = auth_headers(client, "bob")
     task = client.post("/tasks", json={"title": "Alice private task"}, headers=alice_headers).get_json()
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob_headers).status_code == 404
 
@@ -169,3 +199,19 @@ def test_tasks_are_persisted_to_flat_file(client, tmp_path):
         "created_at": persisted["created_at"],
         "owner_id": 1,
     }
+
+
+def test_rate_limit_returns_retry_after_for_authenticated_user(client):
+    headers = auth_headers(client)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+
+    assert responses[-1].status_code == 429
+    assert responses[-1].headers["Retry-After"]
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    responses = [client.post("/auth/register", json={}) for _ in range(101)]
+
+    assert responses[-1].status_code == 429
+    assert responses[-1].headers["Retry-After"]
