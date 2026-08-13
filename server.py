@@ -17,7 +17,8 @@ Features
 * Supports named channels: clients subscribe/unsubscribe dynamically and
   channel messages are delivered only to that channel's subscribers.
 * Exposes REST endpoints ``GET /health``, ``GET /channels``,
-  ``GET /channels/{name}/subscribers`` and ``GET /messages``.
+  ``GET /channels/{name}/subscribers``, ``GET /messages`` and
+  ``GET /history``.
 
 Redis integration
 -----------------
@@ -39,6 +40,23 @@ Persistence
   ``DATABASE_URL`` environment variable (``sqlite:///...`` or a plain path);
   when unset an in-memory database is used.
 * ``GET /messages?limit=50&offset=0`` returns stored messages newest-first.
+* ``GET /history?channel=X&since=ISO&limit=50&offset=0`` returns stored
+  messages for a channel/time range in chronological order, paginated with a
+  ``has_more`` flag.
+
+Rate limiting
+-------------
+* Every client is limited to ``RATE_LIMIT`` inbound messages per minute
+  (``100`` by default). Limits are enforced per client ID with Redis counters
+  when a Redis backend is available, and with an in-process sliding window
+  otherwise. A client that exceeds the limit receives a ``system`` error
+  message instead of having its message processed.
+
+Message expiry
+--------------
+* Messages older than ``MESSAGE_TTL_DAYS`` days (``7`` by default) are
+  automatically deleted by a background task that runs on server startup and
+  then periodically.
 
 Message format
 --------------
@@ -61,8 +79,10 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from collections import deque
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
@@ -278,6 +298,84 @@ class MessageStore:
             row = self._conn.execute("SELECT COUNT(*) AS n FROM messages").fetchone()
             return int(row["n"])
 
+    @staticmethod
+    def _parse_utc(ts: str) -> datetime | None:
+        """Parse an ISO-8601 timestamp, assuming UTC when naive."""
+        try:
+            parsed = datetime.fromisoformat(ts)
+        except (TypeError, ValueError):
+            return None
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed
+
+    def history(
+        self,
+        channel: str | None = None,
+        since: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict], bool]:
+        """Return messages for a channel / time range in chronological order.
+
+        ``channel`` narrows the query to one channel (or all channels when
+        ``None``); ``since`` is an ISO-8601 timestamp that keeps only messages
+        at or after that instant. Returns ``(page, has_more)`` where ``page``
+        is bounded by ``limit``/``offset`` and ``has_more`` tells the caller
+        whether additional pages exist.
+        """
+        with self._lock:
+            if channel:
+                rows = self._conn.execute(
+                    "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC",
+                    (channel,),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT * FROM messages ORDER BY id ASC"
+                ).fetchall()
+        messages: list[dict] = []
+        for row in rows:
+            record = dict(row)
+            try:
+                record["payload"] = json.loads(record["payload"])
+            except (TypeError, json.JSONDecodeError):
+                record["payload"] = {}
+            messages.append(record)
+
+        since_dt = self._parse_utc(since) if since else None
+        if since_dt is not None:
+            messages = [
+                record
+                for record in messages
+                if (parsed := self._parse_utc(record.get("timestamp", ""))) is not None
+                and parsed >= since_dt
+            ]
+
+        page = messages[offset : offset + limit]
+        has_more = (offset + len(page)) < len(messages)
+        return page, has_more
+
+    def cleanup(self, ttl_days: int = 7) -> int:
+        """Delete messages older than ``ttl_days``; return the count removed."""
+        ttl_days = max(0, int(ttl_days))
+        cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+        with self._lock:
+            rows = self._conn.execute("SELECT id, timestamp FROM messages").fetchall()
+            stale_ids = [
+                row["id"]
+                for row in rows
+                if (parsed := self._parse_utc(row["timestamp"])) is not None
+                and parsed < cutoff
+            ]
+            if stale_ids:
+                placeholders = ",".join("?" for _ in stale_ids)
+                self._conn.execute(
+                    f"DELETE FROM messages WHERE id IN ({placeholders})", stale_ids
+                )
+                self._conn.commit()
+            return len(stale_ids)
+
     def close(self) -> None:
         with self._lock:
             self._conn.close()
@@ -309,6 +407,11 @@ class RedisBroker:
         self._pubsub = self._client.pubsub()
         await self._pubsub.subscribe(BUS_CHANNEL)
         self.ready.set()
+
+    @property
+    def client(self):
+        """The underlying Redis client (may be ``None`` before connect)."""
+        return self._client
 
     async def listen(self):
         """Yield raw pub/sub messages received on the bus channel."""
@@ -371,6 +474,76 @@ def _clamp_int(
     if maximum is not None:
         parsed = min(parsed, maximum)
     return parsed
+
+
+class RateLimiter:
+    """Per-client message rate limiter.
+
+    Limits are enforced per client ID. When a Redis client is available a
+    fixed one-minute window is tracked with Redis counters (``notify:rate:``
+    keys); otherwise an in-process sliding window keeps the server functional
+    without a Redis backend. The ``RATE_LIMIT`` environment variable sets the
+    maximum number of inbound messages a client may send per minute.
+    """
+
+    def __init__(
+        self,
+        limit: int = 100,
+        window_seconds: int = 60,
+        redis_client=None,
+    ) -> None:
+        self.limit = max(1, limit)
+        self.window = window_seconds
+        self._redis = redis_client
+        self._local: dict[str, deque] = {}
+        self._lock = threading.Lock()
+
+    def attach_redis(self, redis_client) -> None:
+        """Point the limiter at a Redis client (idempotent)."""
+        if redis_client is not None:
+            self._redis = redis_client
+
+    @staticmethod
+    def _redis_key(client_id: str) -> str:
+        return f"notify:rate:{client_id}"
+
+    async def allow(self, client_id: str) -> bool:
+        """Record one inbound message from ``client_id``.
+
+        Returns ``True`` while the client is within its per-minute quota and
+        ``False`` once the quota is exceeded.
+        """
+        if self._redis is not None:
+            key = self._redis_key(client_id)
+            count = await self._redis.incr(key)
+            await self._redis.expire(key, self.window)
+            return count <= self.limit
+        return self._allow_local(client_id)
+
+    def _allow_local(self, client_id: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            history = self._local.setdefault(client_id, deque())
+            while history and now - history[0] >= self.window:
+                history.popleft()
+            if len(history) >= self.limit:
+                if not history:
+                    del self._local[client_id]
+                return False
+            history.append(now)
+            if len(self._local) > 4096:
+                self._prune(now)
+            return True
+
+    def _prune(self, now: float) -> None:
+        """Drop bookkeeping for clients whose window has fully expired."""
+        cutoff = now - self.window
+        for client_id in list(self._local):
+            history = self._local[client_id]
+            while history and history[0] < cutoff:
+                history.popleft()
+            if not history:
+                del self._local[client_id]
 
 
 class BaseTransport(ABC):
@@ -614,6 +787,21 @@ class NotificationServer:
         self.store = MessageStore(database_url)
         self.transport = transport or create_transport(self, host, port)
         self._listener_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
+        self._cleanup_interval = _clamp_int(
+            os.environ.get("CLEANUP_INTERVAL_SECONDS", "3600"),
+            default=3600,
+            minimum=10,
+        )
+        self.rate_limit = _clamp_int(
+            os.environ.get("RATE_LIMIT", "100"),
+            default=100,
+            minimum=1,
+            maximum=1_000_000,
+        )
+        self.rate_limiter = RateLimiter(
+            limit=self.rate_limit, redis_client=redis_client
+        )
         if redis_client is not None or os.environ.get("REDIS_URL"):
             self.broker = RedisBroker(
                 redis_client=redis_client, url=os.environ.get("REDIS_URL")
@@ -629,12 +817,21 @@ class NotificationServer:
             return
         if self.broker is not None:
             await self.broker.connect()
+            self.rate_limiter.attach_redis(self.broker.client)
         await self.transport.start()
         if self.broker is not None:
             self._listener_task = asyncio.create_task(self._redis_listener())
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
         """Close the listening socket and stop accepting connections."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._cleanup_task = None
         if self._listener_task is not None:
             self._listener_task.cancel()
             try:
@@ -646,6 +843,27 @@ class NotificationServer:
             await self.broker.close()
         await self.transport.stop()
         self.store.close()
+
+    async def _cleanup_loop(self) -> None:
+        """Periodically purge messages older than ``MESSAGE_TTL_DAYS`` days.
+
+        Runs on server startup (first iteration deletes immediately) and then
+        every ``CLEANUP_INTERVAL_SECONDS`` seconds.
+        """
+        ttl_days = _clamp_int(
+            os.environ.get("MESSAGE_TTL_DAYS", "7"), default=7, minimum=0
+        )
+        while True:
+            try:
+                removed = self.store.cleanup(ttl_days)
+                if removed:
+                    logger.info("cleaned up %d expired messages", removed)
+            except Exception:
+                logger.exception("message cleanup task failed")
+            try:
+                await asyncio.sleep(self._cleanup_interval)
+            except asyncio.CancelledError:
+                raise
 
     @property
     def sockets(self):
@@ -811,6 +1029,16 @@ class NotificationServer:
     # ── message handling ───────────────────────────────────────
 
     async def _handle_message(self, client_id: str, raw: str) -> None:
+        if not await self.rate_limiter.allow(client_id):
+            await self._send(
+                client_id,
+                "system",
+                {
+                    "client_id": client_id,
+                    "error": "rate limit exceeded: too many messages",
+                },
+            )
+            return
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
@@ -960,6 +1188,8 @@ class NotificationServer:
             return await self._channels_response()
         if path == "/messages":
             return await self._messages_response(request)
+        if path == "/history":
+            return await self._history_response(request)
         if path.startswith("/channels/") and path.endswith("/subscribers"):
             name = unquote(path[len("/channels/") : -len("/subscribers")])
             return await self._subscribers_response(name)
@@ -1023,6 +1253,26 @@ class NotificationServer:
             {
                 "messages": self.store.query(limit, offset),
                 "total": self.store.count(),
+                "limit": limit,
+                "offset": offset,
+            },
+        )
+
+    async def _history_response(self, request) -> Response:
+        """Serve ``GET /history?channel=X&since=ISO&limit=N&offset=M``."""
+        query = parse_qs(urlsplit(request.path).query)
+        channel = query.get("channel", [None])[0]
+        since = query.get("since", [None])[0]
+        limit = _clamp_int(
+            query.get("limit", ["50"])[0], default=50, minimum=0, maximum=500
+        )
+        offset = _clamp_int(query.get("offset", ["0"])[0], default=0, minimum=0)
+        messages, has_more = self.store.history(channel, since, limit, offset)
+        return self._json_response(
+            200,
+            {
+                "messages": messages,
+                "has_more": has_more,
                 "limit": limit,
                 "offset": offset,
             },
