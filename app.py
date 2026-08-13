@@ -10,6 +10,8 @@ import os
 import sqlite3
 
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -20,6 +22,7 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_EXPIRATION_HOURS = 24
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/2")
 
 
 def get_db() -> sqlite3.Connection:
@@ -62,6 +65,23 @@ def decode_token(token: str) -> int | None:
         return payload["sub"] if isinstance(payload["sub"], int) else None
     except (KeyError, TypeError, ValueError, json.JSONDecodeError):
         return None
+
+
+def rate_limit_key() -> str:
+    """Rate-limit authenticated requests by user and auth requests by client."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    user_id = decode_token(token) if scheme == "Bearer" and token else None
+    return f"user:{user_id}" if user_id is not None else f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=REDIS_URL,
+    headers_enabled=True,
+)
 
 
 def require_auth(view):
@@ -141,8 +161,30 @@ def create_task(owner_id: int):
 @app.get("/tasks")
 @require_auth
 def list_tasks(owner_id: int):
-    rows = TaskRepository(get_db).list_for_owner(owner_id)
-    return jsonify([task_dict(row) for row in rows])
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", default=20, type=int)
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+        except ValueError:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+        if cursor_id < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+    else:
+        cursor_id = None
+    if limit is None or not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    rows, total = TaskRepository(get_db).list_page_for_owner(owner_id, cursor_id, limit)
+    has_next_page = len(rows) > limit
+    page = rows[:limit]
+    return jsonify(
+        {
+            "data": [task_dict(row) for row in page],
+            "next_cursor": str(page[-1]["id"]) if has_next_page else None,
+            "total": total,
+        }
+    )
 
 
 @app.get("/tasks/<int:task_id>")

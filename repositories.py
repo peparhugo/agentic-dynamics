@@ -94,6 +94,28 @@ class TaskRepository(BaseRepository):
                 (owner_id,),
             ).fetchall()
 
+    def list_page_for_owner(
+        self, owner_id: int, cursor_id: int | None, limit: int
+    ) -> tuple[Sequence[sqlite3.Row], int]:
+        """Return a task page plus the owner's complete task count."""
+        with self.connection_factory() as connection:
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            if cursor_id is None:
+                rows = connection.execute(
+                    f"SELECT {self.select_columns} FROM tasks WHERE owner_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    f"SELECT {self.select_columns} FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor_id, limit + 1),
+                ).fetchall()
+        return rows, total
+
     def update_for_owner(self, task_id: int, owner_id: int, title: str, status: str) -> None:
         with self.connection_factory() as connection:
             connection.execute(
