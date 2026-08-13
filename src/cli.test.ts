@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { parseArgs, run } from './cli';
+import { ServeHandle } from './serve';
 
 describe('parseArgs', () => {
   it('defaults to the build command with default directories', () => {
@@ -40,6 +41,23 @@ describe('parseArgs', () => {
   it('throws when --templates is missing its value', () => {
     expect(() => parseArgs(['build', '--templates'])).toThrow(/--templates requires/);
   });
+
+  it('parses a --port override for the serve command', () => {
+    expect(parseArgs(['serve', '--port', '4000'])).toEqual({
+      command: 'serve',
+      contentDir: './content',
+      outputDir: './dist',
+      port: 4000,
+    });
+  });
+
+  it('throws when --port is missing its value', () => {
+    expect(() => parseArgs(['serve', '--port'])).toThrow(/--port requires/);
+  });
+
+  it('throws when --port is not a number', () => {
+    expect(() => parseArgs(['serve', '--port', 'abc'])).toThrow(/--port requires/);
+  });
 });
 
 describe('run', () => {
@@ -65,5 +83,15 @@ describe('run', () => {
 
   it('rejects an unknown command', () => {
     expect(() => run(['deploy'])).toThrow(/Unknown command/);
+  });
+
+  it('starts a live-reload dev server via the serve command', async () => {
+    const handle = run(['serve', '--content', contentDir, '--output', outputDir, '--port', '0']) as ServeHandle;
+    try {
+      expect(handle.port).toBeGreaterThan(0);
+      expect(fs.existsSync(path.join(outputDir, 'index.html'))).toBe(true);
+    } finally {
+      await handle.close();
+    }
   });
 });
