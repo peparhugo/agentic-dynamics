@@ -98,6 +98,30 @@ class TaskRepository(BaseRepository):
                 "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ?", (owner_id,)
             ).fetchall()
 
+    def list_page_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[sqlite3.Row], int]:
+        """Return one newest-first task page and the owner's total task count."""
+        with self.connection_factory() as conn:
+            total = conn.execute("SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)).fetchone()[0]
+            if cursor is None:
+                rows = conn.execute(
+                    """
+                    SELECT id, title, status, created_at FROM tasks
+                    WHERE owner_id = ? ORDER BY id DESC LIMIT ?
+                    """,
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    """
+                    SELECT id, title, status, created_at FROM tasks
+                    WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?
+                    """,
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            return rows, total
+
     def find_for_owner(self, task_id: int, owner_id: int) -> sqlite3.Row | None:
         with self.connection_factory() as conn:
             return conn.execute(

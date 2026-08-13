@@ -10,6 +10,8 @@ import os
 import sqlite3
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from repositories import BaseRepository, TaskRepository, UserRepository
@@ -20,6 +22,7 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-only-secret")
 JWT_EXPIRATION_HOURS = 24
+RATE_LIMIT_STORAGE_URI = os.environ.get("RATE_LIMIT_REDIS_URL", "redis://localhost:6379/2")
 
 
 def get_db() -> sqlite3.Connection:
@@ -67,6 +70,25 @@ def decode_token(token: str) -> int | None:
         return claims["sub"]
     except (ValueError, TypeError, json.JSONDecodeError):
         return None
+
+
+def rate_limit_key() -> str:
+    """Use a user-specific key when a request has a valid bearer token."""
+    scheme, _, token = request.headers.get("Authorization", "").partition(" ")
+    user_id = decode_token(token) if scheme == "Bearer" and token else None
+    return f"user:{user_id}" if user_id is not None else f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+    headers_enabled=True,
+    # Redis remains the primary shared store; this keeps development and tests usable without Redis.
+    in_memory_fallback_enabled=True,
+    in_memory_fallback=["100 per minute"],
+)
 
 
 def authentication_required(view):
@@ -145,11 +167,26 @@ def create_task():
 @app.get("/tasks")
 @authentication_required
 def list_tasks():
-    rows = TaskRepository(get_db).list_for_owner(g.user_id)
-    # SQLite retrieval is intentionally unsorted; sort the loaded task rows here.
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", default=20, type=int)
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+        except ValueError:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+        if cursor_id < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+    else:
+        cursor_id = None
+    if limit is None or not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    rows, total = TaskRepository(get_db).list_page_for_owner(g.user_id, cursor_id, limit)
+    has_more = len(rows) > limit
+    rows = rows[:limit]
     tasks = [dict(row) for row in rows]
-    tasks.sort(key=lambda task: task["created_at"], reverse=True)
-    return jsonify(tasks)
+    next_cursor = str(tasks[-1]["id"]) if has_more else None
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.get("/tasks/<int:task_id>")

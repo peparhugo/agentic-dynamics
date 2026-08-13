@@ -5,6 +5,7 @@ def configure_database(monkeypatch, tmp_path):
     database = tmp_path / "tasks.db"
     monkeypatch.setattr(task_app, "DATABASE", str(database))
     task_app.init_db()
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -36,7 +37,7 @@ def test_create_task_requires_title(monkeypatch, tmp_path):
     assert response.get_json() == {"error": "title is required"}
 
 
-def test_list_tasks_is_sorted_in_python_by_newest_first(monkeypatch, tmp_path):
+def test_list_tasks_returns_first_cursor_page_newest_first(monkeypatch, tmp_path):
     client = configure_database(monkeypatch, tmp_path)
     headers = auth_header(client)
     client.post("/tasks", json={"title": "Older"}, headers=headers)
@@ -45,7 +46,10 @@ def test_list_tasks_is_sorted_in_python_by_newest_first(monkeypatch, tmp_path):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["title"] for task in response.get_json()] == ["Newer", "Older"]
+    page = response.get_json()
+    assert [task["title"] for task in page["data"]] == ["Newer", "Older"]
+    assert page["next_cursor"] is None
+    assert page["total"] == 2
 
 
 def test_get_and_update_task(monkeypatch, tmp_path):
@@ -128,6 +132,55 @@ def test_users_can_only_access_their_own_tasks(monkeypatch, tmp_path):
     bob_headers = auth_header(client, "bob")
     task_id = client.post("/tasks", json={"title": "Private"}, headers=alice_headers).get_json()["id"]
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task_id}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{task_id}", json={"status": "done"}, headers=bob_headers).status_code == 404
+
+
+def test_list_tasks_cursor_pagination(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+    headers = auth_header(client)
+    for title in ("First", "Second", "Third"):
+        assert client.post("/tasks", json={"title": title}, headers=headers).status_code == 201
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+    second_page = client.get("/tasks?limit=2&cursor=2", headers=headers)
+
+    assert first_page.get_json()["total"] == 3
+    assert [task["title"] for task in first_page.get_json()["data"]] == ["Third", "Second"]
+    assert first_page.get_json()["next_cursor"] == "2"
+    assert [task["title"] for task in second_page.get_json()["data"]] == ["First"]
+    assert second_page.get_json()["next_cursor"] is None
+
+
+def test_list_tasks_rejects_invalid_pagination_parameters(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+    headers = auth_header(client)
+
+    assert client.get("/tasks?cursor=zero", headers=headers).status_code == 400
+    assert client.get("/tasks?limit=101", headers=headers).status_code == 400
+
+
+def test_authenticated_user_is_limited_to_100_requests_per_minute(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+    headers = auth_header(client)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+
+    assert all(response.status_code == 200 for response in responses[:100])
+    assert responses[100].status_code == 429
+    assert responses[100].headers["Retry-After"]
+
+
+def test_auth_endpoints_are_rate_limited(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+
+    responses = [client.post("/auth/login", json={}) for _ in range(101)]
+
+    assert all(response.status_code == 401 for response in responses[:100])
+    assert responses[100].status_code == 429
+    assert responses[100].headers["Retry-After"]
