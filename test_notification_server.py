@@ -1,11 +1,19 @@
+import asyncio
 import json
+import urllib.request
 
 import pytest
 import websockets
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from notification_server import MESSAGE_TYPES, ClientRegistry, NotificationServer, make_message
+from notification_server import (
+    MESSAGE_TYPES,
+    ChannelRegistry,
+    ClientRegistry,
+    NotificationServer,
+    make_message,
+)
 
 
 # ── unit tests: message helpers & registry ──────────────────────────────
@@ -24,7 +32,7 @@ def test_make_message_rejects_unsupported_type():
 
 
 def test_supported_types_contains_expected():
-    assert MESSAGE_TYPES == {"broadcast", "direct", "system"}
+    assert MESSAGE_TYPES == {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 class FakeConnection:
@@ -89,6 +97,64 @@ async def test_send_direct_to_unknown_client_returns_false():
     app = NotificationServer()
     delivered = await app.send_direct("unknown-id", {"text": "hi"})
     assert delivered is False
+
+
+# ── unit tests: channel registry ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_channel_registry_subscribe_and_counts():
+    channels = ChannelRegistry()
+    await channels.subscribe("client-a", "alerts")
+    await channels.subscribe("client-b", "alerts")
+    await channels.subscribe("client-a", "chat")
+    assert await channels.channel_counts() == {"alerts": 2, "chat": 1}
+    assert await channels.subscribers("alerts") == ["client-a", "client-b"]
+
+
+@pytest.mark.asyncio
+async def test_channel_registry_unsubscribe_removes_empty_channel():
+    channels = ChannelRegistry()
+    await channels.subscribe("client-a", "alerts")
+    await channels.unsubscribe("client-a", "alerts")
+    assert await channels.channel_counts() == {}
+    assert await channels.subscribers("alerts") == []
+
+
+@pytest.mark.asyncio
+async def test_channel_registry_unsubscribe_unknown_is_noop():
+    channels = ChannelRegistry()
+    await channels.unsubscribe("client-a", "does-not-exist")
+    assert await channels.channel_counts() == {}
+
+
+@pytest.mark.asyncio
+async def test_channel_registry_remove_client_prunes_all_channels():
+    channels = ChannelRegistry()
+    await channels.subscribe("client-a", "alerts")
+    await channels.subscribe("client-a", "chat")
+    await channels.subscribe("client-b", "chat")
+    await channels.remove_client("client-a")
+    assert await channels.channel_counts() == {"chat": 1}
+    assert await channels.subscribers("chat") == ["client-b"]
+
+
+@pytest.mark.asyncio
+async def test_broadcast_with_channel_only_reaches_subscribers():
+    app = NotificationServer()
+    conn_a = FakeConnection()
+    conn_b = FakeConnection()
+    id_a = await app.registry.add(conn_a)
+    await app.registry.add(conn_b)
+    await app.channels.subscribe(id_a, "alerts")
+
+    sent = await app.broadcast({"text": "fire"}, channel="alerts")
+
+    assert sent == 1
+    assert len(conn_a.sent) == 1
+    assert len(conn_b.sent) == 0
+    body = json.loads(conn_a.sent[0])
+    assert body["channel"] == "alerts"
 
 
 # ── integration tests: real server over a real socket ───────────────────
@@ -222,3 +288,181 @@ async def test_health_endpoint_reports_connected_count(running_server):
         status, data = await asyncio.to_thread(fetch)
         assert status == 200
         assert data["connected_clients"] == 1
+
+
+# ── integration tests: channel subscriptions ─────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_subscribe_yields_ack_and_registers_client(running_server):
+    app, uri = running_server
+    async with connect(uri) as ws:
+        await _recv_json(ws)  # welcome
+
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        ack = await _recv_json(ws)
+        assert ack["type"] == "system"
+        assert ack["payload"]["event"] == "subscribed"
+        assert ack["payload"]["channel"] == "alerts"
+        assert await app.channels.channel_counts() == {"alerts": 1}
+
+
+@pytest.mark.asyncio
+async def test_subscribe_without_channel_yields_error(running_server):
+    app, uri = running_server
+    async with connect(uri) as ws:
+        await _recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+        err = await _recv_json(ws)
+        assert err["type"] == "system"
+        assert err["payload"]["event"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_removes_client_from_channel(running_server):
+    app, uri = running_server
+    async with connect(uri) as ws:
+        await _recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws)  # subscribed ack
+
+        await ws.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        ack = await _recv_json(ws)
+        assert ack["payload"]["event"] == "unsubscribed"
+        assert await app.channels.channel_counts() == {}
+
+
+@pytest.mark.asyncio
+async def test_channel_message_delivered_only_to_subscribers(running_server):
+    app, uri = running_server
+    async with connect(uri) as ws1, connect(uri) as ws2, connect(uri) as ws3:
+        await _recv_json(ws1)  # welcome
+        await _recv_json(ws2)  # welcome
+        await _recv_json(ws3)  # welcome
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws1)  # ack
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws2)  # ack
+        # ws3 stays unsubscribed
+
+        await ws1.send(
+            json.dumps(
+                {"type": "broadcast", "channel": "alerts", "payload": {"text": "fire"}}
+            )
+        )
+
+        msg1 = await _recv_json(ws1)
+        msg2 = await _recv_json(ws2)
+        assert msg1["payload"] == {"text": "fire"}
+        assert msg1["channel"] == "alerts"
+        assert msg2 == msg1
+
+        # ws3 should receive nothing on the channel — confirm by sending a
+        # plain, channel-less broadcast that ws3 *should* receive instead.
+        await ws1.send(json.dumps({"type": "broadcast", "payload": {"text": "everyone"}}))
+        everyone1 = await _recv_json(ws1)
+        everyone2 = await _recv_json(ws2)
+        everyone3 = await _recv_json(ws3)
+        assert everyone1["payload"] == {"text": "everyone"}
+        assert everyone2 == everyone1
+        assert everyone3 == everyone1
+
+
+@pytest.mark.asyncio
+async def test_multiple_channel_subscriptions_per_client(running_server):
+    app, uri = running_server
+    async with connect(uri) as ws:
+        client_id = (await _recv_json(ws))["payload"]["client_id"]
+        await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws)
+        await ws.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await _recv_json(ws)
+
+        counts = await app.channels.channel_counts()
+        assert counts == {"alerts": 1, "chat": 1}
+        assert await app.channels.subscribers("alerts") == [client_id]
+        assert await app.channels.subscribers("chat") == [client_id]
+
+
+@pytest.mark.asyncio
+async def test_disconnect_prunes_channel_subscriptions(running_server):
+    app, uri = running_server
+    ws = await connect(uri)
+    await _recv_json(ws)
+    await ws.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+    await _recv_json(ws)
+    assert await app.channels.channel_counts() == {"alerts": 1}
+
+    await ws.close()
+
+    for _ in range(50):
+        if await app.channels.channel_counts() == {}:
+            break
+        await asyncio.sleep(0.02)
+
+    assert await app.channels.channel_counts() == {}
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_lists_active_channels_and_counts(running_server):
+    app, uri = running_server
+    http_uri = uri.replace("ws://", "http://") + "/channels"
+
+    def fetch():
+        with urllib.request.urlopen(http_uri) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with connect(uri) as ws1, connect(uri) as ws2:
+        await _recv_json(ws1)
+        await _recv_json(ws2)
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws1)
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws2)
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await _recv_json(ws1)
+
+        status, data = await asyncio.to_thread(fetch)
+        assert status == 200
+        assert data["channels"] == {"alerts": 2, "chat": 1}
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_lists_subscriber_ids(running_server):
+    app, uri = running_server
+
+    async with connect(uri) as ws1, connect(uri) as ws2:
+        w1 = await _recv_json(ws1)
+        await _recv_json(ws2)
+        client_id = w1["payload"]["client_id"]
+
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await _recv_json(ws1)
+
+        http_uri = uri.replace("ws://", "http://") + "/channels/alerts/subscribers"
+
+        def fetch():
+            with urllib.request.urlopen(http_uri) as resp:
+                return resp.status, json.loads(resp.read())
+
+        status, data = await asyncio.to_thread(fetch)
+        assert status == 200
+        assert data["channel"] == "alerts"
+        assert data["subscribers"] == [client_id]
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_empty_for_unknown_channel(running_server):
+    app, uri = running_server
+    http_uri = uri.replace("ws://", "http://") + "/channels/does-not-exist/subscribers"
+
+    def fetch():
+        with urllib.request.urlopen(http_uri) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with connect(uri):
+        status, data = await asyncio.to_thread(fetch)
+        assert status == 200
+        assert data["channel"] == "does-not-exist"
+        assert data["subscribers"] == []
