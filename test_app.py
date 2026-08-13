@@ -21,7 +21,10 @@ async def server():
 
 async def receive_json(websocket):
     result = json.loads(await asyncio.wait_for(websocket.recv(), timeout=1))
-    assert set(result) == {"type", "payload", "timestamp"}
+    assert set(result) in (
+        {"type", "payload", "timestamp"},
+        {"type", "payload", "timestamp", "channel"},
+    )
     datetime.fromisoformat(result["timestamp"].replace("Z", "+00:00"))
     return result
 
@@ -42,6 +45,18 @@ async def soap_request(server, body, method="POST", path="/health"):
     await writer.wait_closed()
     headers, response_body = response.split(b"\r\n\r\n", 1)
     return headers, response_body
+
+
+async def rest_get(server, path):
+    return await soap_request(server, "", method="GET", path=path)
+
+
+async def wait_until(predicate):
+    deadline = asyncio.get_running_loop().time() + 1
+    while not predicate():
+        if asyncio.get_running_loop().time() >= deadline:
+            raise asyncio.TimeoutError
+        await asyncio.sleep(0.001)
 
 
 def health_envelope():
@@ -111,6 +126,103 @@ async def test_direct_reaches_only_target(server):
         assert direct["payload"]["text"] == "private"
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(sender.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_reaches_only_subscribers(server):
+    uri = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(uri) as sender, connect(uri) as subscribed, connect(uri) as other:
+        await receive_json(sender)
+        subscribed_id = (await receive_json(subscribed))["payload"]["client_id"]
+        await receive_json(other)
+        await subscribed.send(json.dumps({
+            "type": "subscribe", "channel": "alerts", "payload": {}
+        }))
+        await sender.send(json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"text": "maintenance"},
+        }))
+
+        received = await receive_json(subscribed)
+        assert received["channel"] == "alerts"
+        assert received["payload"]["text"] == "maintenance"
+        assert server.clients.subscriber_ids("alerts") == [subscribed_id]
+        for websocket in (sender, other):
+            with pytest.raises(asyncio.TimeoutError):
+                await asyncio.wait_for(websocket.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_channel_direct_requires_target_subscription(server):
+    uri = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(uri) as sender, connect(uri) as target:
+        await receive_json(sender)
+        target_id = (await receive_json(target))["payload"]["client_id"]
+        direct = {
+            "type": "direct",
+            "channel": "alerts",
+            "payload": {"client_id": target_id, "text": "private"},
+        }
+        await sender.send(json.dumps(direct))
+        error = await receive_json(sender)
+        assert "not subscribed" in error["payload"]["detail"]
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(target.recv(), timeout=0.05)
+
+        await target.send(json.dumps({
+            "type": "subscribe", "channel": "alerts", "payload": {}
+        }))
+        await wait_until(lambda: server.clients.is_subscribed(target_id, "alerts"))
+        await sender.send(json.dumps(direct))
+        received = await receive_json(target)
+        assert received["channel"] == "alerts"
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_and_disconnect_remove_active_channels(server):
+    uri = f"ws://{server.host}:{server.websocket_port}"
+    websocket = await connect(uri)
+    await receive_json(websocket)
+    await websocket.send(json.dumps({
+        "type": "subscribe", "channel": "chat", "payload": {}
+    }))
+    await wait_until(lambda: bool(server.clients.channels()))
+    assert server.clients.channels() == [{"name": "chat", "subscriber_count": 1}]
+
+    await websocket.send(json.dumps({
+        "type": "unsubscribe", "channel": "chat", "payload": {}
+    }))
+    await wait_until(lambda: not server.clients.channels())
+    assert server.clients.channels() == []
+    await websocket.send(json.dumps({
+        "type": "subscribe", "channel": "chat", "payload": {}
+    }))
+    await websocket.close()
+    await wait_until(lambda: not server.clients.channels())
+    assert server.clients.channels() == []
+
+
+@pytest.mark.asyncio
+async def test_channel_rest_endpoints(server):
+    uri = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(uri) as websocket:
+        client_id = (await receive_json(websocket))["payload"]["client_id"]
+        await websocket.send(json.dumps({
+            "type": "subscribe", "channel": "system", "payload": {}
+        }))
+
+        headers, body = await rest_get(server, "/channels")
+        assert headers.startswith(b"HTTP/1.1 200 OK")
+        assert b"application/json" in headers
+        assert json.loads(body) == {
+            "channels": [{"name": "system", "subscriber_count": 1}]
+        }
+
+        _, body = await rest_get(server, "/channels/system/subscribers")
+        assert json.loads(body) == {
+            "channel": "system", "subscribers": [client_id]
+        }
 
 
 @pytest.mark.asyncio
