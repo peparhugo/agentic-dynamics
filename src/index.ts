@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 export interface Page {
@@ -54,6 +56,59 @@ async function markdownFiles(directory: string): Promise<string[]> {
     return /\.md$/i.test(entry.name) ? [entryPath] : [];
   }));
   return files.flat().sort();
+}
+
+async function exists(file: string): Promise<boolean> {
+  try {
+    await fs.access(file);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function templateFiles(directory: string): Promise<string[]> {
+  if (!await exists(directory)) {
+    return [];
+  }
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return templateFiles(entryPath);
+    }
+    return /\.hbs$/i.test(entry.name) ? [entryPath] : [];
+  }));
+  return files.flat().sort();
+}
+
+function namedTemplate(directory: string, value: unknown, field: string): string | undefined {
+  if (typeof value !== 'string' || value.trim() === '') {
+    return undefined;
+  }
+  const name = value.trim().replace(/\.hbs$/i, '') + '.hbs';
+  const file = path.resolve(directory, name);
+  const relative = path.relative(directory, file);
+  if (relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) {
+    throw new Error(`${field} must be inside ${directory}`);
+  }
+  return file;
+}
+
+async function renderTemplate(file: string, context: Record<string, unknown>, engine: typeof Handlebars): Promise<string> {
+  if (!await exists(file)) {
+    throw new Error(`Template not found: ${file}`);
+  }
+  return engine.compile(await fs.readFile(file, 'utf8'))(context);
+}
+
+async function createTemplateEngine(partialsDir: string): Promise<typeof Handlebars> {
+  const engine = Handlebars.create() as typeof Handlebars;
+  for (const file of await templateFiles(partialsDir)) {
+    const name = path.relative(partialsDir, file).replace(/\.hbs$/i, '').split(path.sep).join('/');
+    engine.registerPartial(name, await fs.readFile(file, 'utf8'));
+  }
+  return engine;
 }
 
 function document(title: string, body: string): string {
@@ -106,7 +161,11 @@ function indexDocument(pages: Page[]): string {
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const files = await markdownFiles(contentDir);
+  const engine = await createTemplateEngine(path.join(templatesDir, 'partials'));
+  const defaultTemplate = path.join(templatesDir, 'default.hbs');
+  const defaultLayout = path.join(templatesDir, 'layouts', 'default.hbs');
 
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -123,8 +182,31 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
     };
     const destination = path.join(outputDir, relativePath);
 
+    const content = await marked.parse(parsed.content);
+    const context: Record<string, unknown> = {
+      ...parsed.data,
+      ...page,
+      content,
+      body: content
+    };
+    const selectedTemplate = namedTemplate(templatesDir, parsed.data.template, 'template');
+    let html: string;
+    if (selectedTemplate) {
+      html = await renderTemplate(selectedTemplate, context, engine);
+    } else if (await exists(defaultTemplate)) {
+      html = await renderTemplate(defaultTemplate, context, engine);
+    } else {
+      html = pageDocument(page, content);
+    }
+
+    const selectedLayout = namedTemplate(path.join(templatesDir, 'layouts'), parsed.data.layout, 'layout');
+    const layout = selectedLayout ?? (await exists(defaultLayout) ? defaultLayout : undefined);
+    if (layout) {
+      html = await renderTemplate(layout, { ...context, body: html }, engine);
+    }
+
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, pageDocument(page, await marked.parse(parsed.content)), 'utf8');
+    await fs.writeFile(destination, html, 'utf8');
     return page;
   }));
 

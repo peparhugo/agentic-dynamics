@@ -94,4 +94,81 @@ This is **important**.
     expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(html).not.toContain('<script>');
   });
+
+  test('renders a frontmatter-selected Handlebars template and layout', async () => {
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'dist');
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), `---
+title: Template Post
+author: Sam
+template: post
+layout: main
+---
+This is **rendered**.
+`);
+    await fs.writeFile(
+      path.join(templatesDir, 'post.hbs'),
+      '<article><h1>{{title}}</h1><p>{{author}}</p>{{{content}}}</article>'
+    );
+    await fs.writeFile(
+      path.join(templatesDir, 'layouts', 'main.hbs'),
+      '<!doctype html><html><head><title>{{title}}</title></head><body>{{{body}}}</body></html>'
+    );
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const html = await fs.readFile(path.join(outputDir, 'post.html'), 'utf8');
+
+    expect(html).toContain('<title>Template Post</title>');
+    expect(html).toContain('<article><h1>Template Post</h1><p>Sam</p>');
+    expect(html).toContain('<p>This is <strong>rendered</strong>.</p>');
+    expect(html).not.toContain('&lt;article&gt;');
+  });
+
+  test('uses default templates and renders partials', async () => {
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'dist');
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'partials'), { recursive: true });
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\nOur story');
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '{{> nav}}<main>{{{body}}}</main>');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'default.hbs'), '<html><body>{{{body}}}{{> footer}}</body></html>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'nav.hbs'), '<nav>{{title}}</nav>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>Site footer</footer>');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const html = await fs.readFile(path.join(outputDir, 'about.html'), 'utf8');
+
+    expect(html).toBe('<html><body><nav>About</nav><main><p>Our story</p>\n</main><footer>Site footer</footer></body></html>');
+  });
+
+  test('escapes template values unless triple braces are used', async () => {
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'dist');
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'safe.md'), '---\ntitle: "<b>Safe</b>"\n---\nText');
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<h1>{{title}}</h1>{{{content}}}');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const html = await fs.readFile(path.join(outputDir, 'safe.html'), 'utf8');
+
+    expect(html).toContain('<h1>&lt;b&gt;Safe&lt;/b&gt;</h1>');
+    expect(html).toContain('<p>Text</p>');
+  });
+
+  test('reports a missing selected template', async () => {
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'dist');
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'bad.md'), '---\ntemplate: missing\n---\nText');
+
+    await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template not found');
+  });
 });

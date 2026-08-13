@@ -28,3 +28,29 @@ test('CLI accepts custom content and output directories', async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('CLI accepts a custom template directory', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+  const contentDir = path.join(root, 'content');
+  const outputDir = path.join(root, 'public');
+  const templatesDir = path.join(root, 'views');
+
+  try {
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntitle: CLI template\n---\nContent');
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<main data-title="{{title}}">{{{content}}}</main>');
+
+    await execFileAsync(process.execPath, [
+      path.resolve('lib/cli.js'),
+      'build',
+      '--content', contentDir,
+      '--output', outputDir,
+      '--templates', templatesDir
+    ]);
+
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8')).resolves.toContain('<main data-title="CLI template">');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
