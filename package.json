@@ -1,0 +1,33 @@
+{
+  "name": "ssg",
+  "version": "1.0.0",
+  "description": "A small Markdown static site generator",
+  "license": "MIT",
+  "type": "commonjs",
+  "bin": {
+    "ssg": "lib/cli.js"
+  },
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "files": [
+    "lib"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --runInBand",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3",
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.6",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
