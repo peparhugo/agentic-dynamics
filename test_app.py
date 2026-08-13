@@ -1,5 +1,7 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import pytest
 import pytest_asyncio
@@ -167,3 +169,59 @@ async def test_messages_endpoint_returns_persisted_history(tmp_path):
         _, history = await get_json(address, "/messages?limit=1&offset=1")
         assert history["messages"][0]["channel"] == "alerts"
         assert history["messages"][0]["payload"] == {"text": "first"}
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_connection(tmp_path):
+    application = NotificationServer(database_url=str(tmp_path / "messages.db"), rate_limit=2)
+    async with application.create_server(port=0) as server:
+        address = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        async with connect(address) as client:
+            await receive_json(client)
+            for number in range(2):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"number": number}}))
+                assert (await receive_json(client))["payload"] == {"number": number}
+
+            await client.send(json.dumps({"type": "broadcast", "payload": {"number": 3}}))
+            assert (await receive_json(client))["payload"] == {"error": "rate limit exceeded"}
+
+            await client.send("not json")
+            assert (await receive_json(client))["payload"] == {"error": "message must be valid JSON"}
+
+
+@pytest.mark.asyncio
+async def test_history_returns_chronological_channel_messages_with_pagination(tmp_path):
+    application = NotificationServer(database_url=str(tmp_path / "messages.db"))
+    async with application.create_server(port=0) as server:
+        address = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        since = datetime.now(timezone.utc).isoformat()
+        async with connect(address) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+            for text in ("first", "second", "third"):
+                await client.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": text}}))
+                await receive_json(client)
+            await client.send(json.dumps({"type": "broadcast", "channel": "other", "payload": {"text": "ignored"}}))
+
+        query = urlencode({"channel": "alerts", "since": since, "limit": 2})
+        response, history = await get_json(address, f"/history?{query}")
+        assert b"200 OK" in response
+        assert [message["payload"]["text"] for message in history["messages"]] == ["first", "second"]
+        assert history["has_more"] is True
+
+        response, history = await get_json(address, f"/history?{query}&offset=2")
+        assert b"200 OK" in response
+        assert [message["payload"]["text"] for message in history["messages"]] == ["third"]
+        assert history["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_startup_removes_messages_older_than_configured_ttl(tmp_path):
+    database_url = str(tmp_path / "messages.db")
+    application = NotificationServer(database_url=database_url, message_ttl_days=7)
+    old_message = application.message("broadcast", {"text": "old"})
+    old_message["timestamp"] = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    await application.messages.add(old_message)
+    await application.start()
+    assert await application.messages.list(10, 0) == []
+    await application.close()
