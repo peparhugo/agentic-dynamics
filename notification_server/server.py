@@ -23,14 +23,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from websockets.asyncio.server import serve
 
 from .broker import RedisBroker
-from .config import database_path
+from .config import database_path, message_ttl_days as default_message_ttl_days, rate_limit as default_rate_limit
 from .messages import Message, MessageValidationError, utc_now_iso
 from .persistence import MessageStore
+from .rate_limiter import RateLimiter
 from .registry import ClientRegistry, ChannelRegistry
 from .state import RedisClientState
 from .transport import BaseTransport, build_transport
@@ -42,6 +44,8 @@ BROADCAST_CHANNEL = f"{NS_PREFIX}:broadcast"
 CHANNEL_PREFIX = f"{NS_PREFIX}:channel:"
 DIRECT_PREFIX = f"{NS_PREFIX}:direct:"
 SUBSCRIBE_PATTERN = f"{NS_PREFIX}:*"
+
+DEFAULT_CLEANUP_INTERVAL_SECONDS = 3600.0
 
 
 def _redis_channel_for(channel: str | None) -> str:
@@ -61,6 +65,10 @@ class NotificationServer:
         broker: RedisBroker | None = None,
         store: MessageStore | None = None,
         state: RedisClientState | None = None,
+        rate_limiter: RateLimiter | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
+        cleanup_interval_seconds: float | None = None,
     ) -> None:
         self.registry = ClientRegistry()
         self.channel_registry = ChannelRegistry()
@@ -69,13 +77,32 @@ class NotificationServer:
         self.state = state if state is not None else RedisClientState(self.broker.client)
         self.transport = transport if transport is not None else build_transport()
         self.transport.bind(self)
+        self.rate_limiter = rate_limiter if rate_limiter is not None else RateLimiter(
+            self.broker.client, rate_limit if rate_limit is not None else default_rate_limit()
+        )
+        self.message_ttl_days = (
+            message_ttl_days if message_ttl_days is not None else default_message_ttl_days()
+        )
+        self.cleanup_interval_seconds = (
+            cleanup_interval_seconds if cleanup_interval_seconds is not None else DEFAULT_CLEANUP_INTERVAL_SECONDS
+        )
+        self._cleanup_task: asyncio.Task | None = None
 
     async def start(self) -> None:
-        """Start the Redis delivery worker. Must be awaited before the
-        server accepts connections, so no early publish is missed."""
+        """Start the Redis delivery worker and the expired-message cleanup
+        task. Must be awaited before the server accepts connections, so no
+        early publish is missed."""
         await self.broker.start(SUBSCRIBE_PATTERN, self._on_redis_message)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def close(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         await self.broker.stop()
         self.store.close()
 
@@ -84,6 +111,26 @@ class NotificationServer:
 
     async def channels_payload(self) -> dict[str, int]:
         return await self.state.all_channels()
+
+    def history_payload(
+        self, channel: str | None = None, since: str | None = None, limit: int = 50
+    ) -> dict[str, Any]:
+        return self.store.history(channel=channel, since=since, limit=limit)
+
+    def _cleanup_expired_messages(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        return self.store.delete_expired(cutoff)
+
+    async def _cleanup_loop(self) -> None:
+        """Background task (started from `start()`) that deletes messages
+        older than `message_ttl_days` immediately, then again on every
+        `cleanup_interval_seconds` tick for as long as the server runs."""
+        while True:
+            try:
+                self._cleanup_expired_messages()
+            except Exception:
+                logger.exception("expired-message cleanup failed")
+            await asyncio.sleep(self.cleanup_interval_seconds)
 
     async def handler(self, connection: Any) -> None:
         """Entry point for the transport's connection lifecycle (e.g. passed
@@ -156,6 +203,12 @@ class NotificationServer:
         )
 
     async def route(self, sender_id: str, message: Message) -> None:
+        if not await self.rate_limiter.allow(sender_id):
+            await self.send_error(
+                sender_id, f"rate limit exceeded: max {self.rate_limiter.limit} messages per minute"
+            )
+            return
+
         if message.type in ("broadcast", "system"):
             await self._fan_out(sender_id, message)
 

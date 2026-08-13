@@ -29,6 +29,7 @@ logger = logging.getLogger("notification_server")
 HEALTH_PATH = "/health"
 CHANNELS_PATH = "/channels"
 MESSAGES_PATH = "/messages"
+HISTORY_PATH = "/history"
 CHANNEL_SUBSCRIBERS_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 DEFAULT_MESSAGES_LIMIT = 50
@@ -111,6 +112,14 @@ class WebSocketTransport(BaseTransport):
             )
             offset = self._parse_int(query.get("offset", [None])[0], 0, minimum=0)
             return self._json_response(server.store.fetch(limit=limit, offset=offset))
+        if path == HISTORY_PATH:
+            query = parse_qs(query_string)
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            limit = self._parse_int(
+                query.get("limit", [None])[0], DEFAULT_MESSAGES_LIMIT, minimum=1, maximum=MAX_MESSAGES_LIMIT
+            )
+            return self._json_response(server.history_payload(channel=channel, since=since, limit=limit))
         return None
 
     # -- WebSocket connection lifecycle -----------------------------------

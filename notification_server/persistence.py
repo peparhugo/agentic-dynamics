@@ -66,16 +66,54 @@ class MessageStore:
                 "ORDER BY id DESC LIMIT ? OFFSET ?",
                 (limit, offset),
             ).fetchall()
-        return [
-            {
-                "id": row["id"],
-                "channel": row["channel"],
-                "type": row["type"],
-                "payload": json.loads(row["payload"]),
-                "timestamp": row["timestamp"],
-            }
-            for row in rows
-        ]
+        return [self._row_to_dict(row) for row in rows]
+
+    def history(
+        self, channel: str | None = None, since: str | None = None, limit: int = 50
+    ) -> dict[str, Any]:
+        """Chronological (oldest-first) message history, optionally filtered
+        to a `channel` and/or messages timestamped at or after `since` (an
+        ISO-8601 string). Fetches one extra row to derive `has_more` without
+        a separate COUNT query."""
+        clauses = []
+        params: list[Any] = []
+        if channel is not None:
+            clauses.append("channel = ?")
+            params.append(channel)
+        if since is not None:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        params.append(limit + 1)
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT id, channel, type, payload, timestamp FROM messages "
+                f"{where} ORDER BY id ASC LIMIT ?",
+                params,
+            ).fetchall()
+        has_more = len(rows) > limit
+        return {
+            "messages": [self._row_to_dict(row) for row in rows[:limit]],
+            "has_more": has_more,
+        }
+
+    def delete_expired(self, cutoff: str) -> int:
+        """Delete messages timestamped (ISO-8601 string) before `cutoff`.
+        Returns the number of rows removed."""
+        with self._lock:
+            cursor = self._conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+            self._conn.commit()
+            return cursor.rowcount
+
+    @staticmethod
+    def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        }
 
     def close(self) -> None:
         with self._lock:

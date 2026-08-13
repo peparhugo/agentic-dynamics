@@ -6,10 +6,25 @@ import os
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 DEFAULT_DATABASE_URL = "notifications.db"
 DEFAULT_TRANSPORT = "websocket"
+DEFAULT_RATE_LIMIT = 100
+DEFAULT_MESSAGE_TTL_DAYS = 7
 
 
 def redis_url() -> str:
     return os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
+
+
+def rate_limit() -> int:
+    """Max messages a single client may send per 60-second window, selected
+    via the RATE_LIMIT env var. Defaults to 100."""
+    return int(os.environ.get("RATE_LIMIT", DEFAULT_RATE_LIMIT))
+
+
+def message_ttl_days() -> int:
+    """How many days of message history to retain before the background
+    cleanup task deletes it, selected via the MESSAGE_TTL_DAYS env var.
+    Defaults to 7."""
+    return int(os.environ.get("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS))
 
 
 def transport_name() -> str:
