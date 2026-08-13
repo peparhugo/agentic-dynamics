@@ -1,18 +1,24 @@
 #!/usr/bin/env node
 
 import { build } from './generator';
+import { DevServer } from './dev-server';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
-  if (args.length === 0 || args[0] !== 'build') {
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  if (args.length === 0) {
+    console.error('Usage: ssg <command> [options]');
+    console.error('Commands:');
+    console.error('  build    Build the site');
+    console.error('  serve    Start development server with live reload');
     process.exit(1);
   }
 
+  const command = args[0];
   let contentDir = './content';
   let outputDir = './dist';
   let templatesDir = './templates';
+  let port = 3000;
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--content' && args[i + 1]) {
@@ -24,12 +30,29 @@ async function main(): Promise<void> {
     } else if (args[i] === '--templates' && args[i + 1]) {
       templatesDir = args[i + 1];
       i++;
+    } else if (args[i] === '--port' && args[i + 1]) {
+      port = parseInt(args[i + 1], 10);
+      i++;
     }
   }
 
   try {
-    await build(contentDir, outputDir, templatesDir);
-    console.log(`✓ Site built successfully to ${outputDir}`);
+    if (command === 'build') {
+      await build(contentDir, outputDir, templatesDir);
+      console.log(`✓ Site built successfully to ${outputDir}`);
+    } else if (command === 'serve') {
+      await build(contentDir, outputDir, templatesDir);
+      console.log(`✓ Initial build complete`);
+      const devServer = new DevServer({ contentDir, outputDir, templatesDir, port });
+      devServer.start();
+    } else {
+      console.error(`✗ Unknown command: ${command}`);
+      console.error('Usage: ssg <command> [options]');
+      console.error('Commands:');
+      console.error('  build    Build the site');
+      console.error('  serve    Start development server with live reload');
+      process.exit(1);
+    }
   } catch (error) {
     if (error instanceof Error) {
       console.error(`✗ Error: ${error.message}`);
