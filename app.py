@@ -1,5 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import jwt
@@ -8,14 +10,19 @@ from functools import wraps
 from celery_config import celery_app
 from tasks import send_notification_email
 from repositories import UserRepository, TaskRepository
+import redis
 
 app = Flask(__name__)
 db_path = os.path.join(os.path.dirname(__file__), 'tasks.db')
 app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['RATELIMIT_ENABLED'] = os.environ.get('RATELIMIT_ENABLED', 'true').lower() != 'false'
 
 db = SQLAlchemy(app)
+
+redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
+redis_client = redis.from_url(redis_url)
 
 
 class User(db.Model):
@@ -63,6 +70,41 @@ user_repo = UserRepository(User, db)
 task_repo = TaskRepository(Task, db)
 
 
+def get_rate_limit_key():
+    token = None
+    if 'Authorization' in request.headers:
+        auth_header = request.headers['Authorization']
+        try:
+            token = auth_header.split(' ')[1]
+        except IndexError:
+            return get_remote_address()
+
+    if not token:
+        return get_remote_address()
+
+    try:
+        payload = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+        return f"user_{payload['user_id']}"
+    except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
+        return get_remote_address()
+
+
+class NoOpLimiter:
+    def limit(self, *args, **kwargs):
+        return lambda f: f
+
+try:
+    redis_client.ping()
+    limiter = Limiter(
+        app=app,
+        key_func=get_rate_limit_key,
+        storage_uri=redis_url,
+        default_limits=["100 per minute"]
+    )
+except Exception:
+    limiter = NoOpLimiter()
+
+
 @app.before_request
 def init_db():
     if not hasattr(app, 'db_initialized'):
@@ -103,6 +145,7 @@ def token_required(f):
 
 
 @app.route('/auth/register', methods=['POST'])
+@limiter.limit("100 per minute")
 def register():
     data = request.get_json(silent=True)
 
@@ -126,6 +169,7 @@ def register():
 
 
 @app.route('/auth/login', methods=['POST'])
+@limiter.limit("100 per minute")
 def login():
     data = request.get_json(silent=True)
 
@@ -143,6 +187,7 @@ def login():
 
 @app.route('/tasks', methods=['POST'])
 @token_required
+@limiter.limit("100 per minute")
 def create_task(user_id):
     data = request.get_json(silent=True)
 
@@ -156,13 +201,26 @@ def create_task(user_id):
 
 @app.route('/tasks', methods=['GET'])
 @token_required
+@limiter.limit("100 per minute")
 def list_tasks(user_id):
-    tasks = task_repo.get_tasks_by_owner(user_id)
-    return jsonify([task.to_dict() for task in tasks]), 200
+    cursor = request.args.get('cursor', type=int)
+    limit = request.args.get('limit', default=20, type=int)
+
+    if limit < 1 or limit > 100:
+        limit = 20
+
+    tasks, next_cursor, total = task_repo.get_tasks_paginated(user_id, cursor=cursor, limit=limit)
+
+    return jsonify({
+        'data': [task.to_dict() for task in tasks],
+        'next_cursor': next_cursor,
+        'total': total
+    }), 200
 
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 @token_required
+@limiter.limit("100 per minute")
 def get_task(task_id, user_id):
     task = task_repo.get_by_id(task_id)
 
@@ -174,6 +232,7 @@ def get_task(task_id, user_id):
 
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 @token_required
+@limiter.limit("100 per minute")
 def update_task(task_id, user_id):
     task = task_repo.get_by_id(task_id)
 

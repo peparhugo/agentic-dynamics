@@ -60,6 +60,23 @@ class TaskRepository(BaseRepository):
     def get_tasks_by_owner(self, owner_id):
         return self.model.query.filter_by(owner_id=owner_id).order_by(self.model.created_at.desc()).all()
 
+    def get_tasks_paginated(self, owner_id, cursor=None, limit=20):
+        query = self.model.query.filter_by(owner_id=owner_id).order_by(self.model.id.desc())
+
+        total = query.count()
+
+        if cursor is not None:
+            query = query.filter(self.model.id < cursor)
+
+        tasks = query.limit(limit + 1).all()
+
+        next_cursor = None
+        if len(tasks) > limit:
+            tasks = tasks[:limit]
+            next_cursor = tasks[-1].id
+
+        return tasks, next_cursor, total
+
     def create_task(self, title, owner_id):
         task = self.model(title=title, owner_id=owner_id)
         self.db.session.add(task)

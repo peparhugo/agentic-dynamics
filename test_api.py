@@ -4,6 +4,7 @@ import os
 from datetime import datetime
 from unittest import mock
 from app import app, db, Task, User
+import redis
 
 
 @pytest.fixture
@@ -11,11 +12,25 @@ def client():
     app.config['TESTING'] = True
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
 
+    # Flush Redis to reset rate limiting between tests
+    try:
+        r = redis.from_url('redis://localhost:6379/1')
+        r.flushdb()
+    except:
+        pass
+
     with app.app_context():
         db.create_all()
         yield app.test_client()
         db.session.remove()
         db.drop_all()
+
+    # Flush Redis after test
+    try:
+        r = redis.from_url('redis://localhost:6379/1')
+        r.flushdb()
+    except:
+        pass
 
 
 def register_user(client, username, password):
@@ -243,7 +258,9 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert data == []
+        assert data['data'] == []
+        assert data['next_cursor'] is None
+        assert data['total'] == 0
 
     def test_list_tasks_ordered_by_created_at_desc(self, client):
         token = login_user(client, *self._register_and_login(client))
@@ -266,9 +283,9 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = response.get_json()
-        assert len(data) == 2
-        assert data[0]['title'] == 'Second task'
-        assert data[1]['title'] == 'First task'
+        assert len(data['data']) == 2
+        assert data['data'][0]['title'] == 'Second task'
+        assert data['data'][1]['title'] == 'First task'
 
     def test_list_includes_all_fields(self, client):
         token = login_user(client, *self._register_and_login(client))
@@ -284,11 +301,11 @@ class TestListTasks:
             headers={'Authorization': f'Bearer {token}'}
         )
         data = response.get_json()
-        assert 'id' in data[0]
-        assert 'title' in data[0]
-        assert 'status' in data[0]
-        assert 'created_at' in data[0]
-        assert 'owner_id' in data[0]
+        assert 'id' in data['data'][0]
+        assert 'title' in data['data'][0]
+        assert 'status' in data['data'][0]
+        assert 'created_at' in data['data'][0]
+        assert 'owner_id' in data['data'][0]
 
     def test_list_tasks_without_token(self, client):
         response = client.get('/tasks')
@@ -328,10 +345,10 @@ class TestListTasks:
 
         data1 = response1.get_json()
         data2 = response2.get_json()
-        assert len(data1) == 1
-        assert len(data2) == 1
-        assert data1[0]['title'] == 'User1 task'
-        assert data2[0]['title'] == 'User2 task'
+        assert len(data1['data']) == 1
+        assert len(data2['data']) == 1
+        assert data1['data'][0]['title'] == 'User1 task'
+        assert data2['data'][0]['title'] == 'User2 task'
 
     def _register_and_login(self, client):
         register_user(client, 'testuser', 'password123')
@@ -709,3 +726,218 @@ class TestNotificationTrigger:
     def _register_and_login(self, client):
         register_user(client, 'testuser', 'password123')
         return 'testuser', 'password123'
+
+
+class TestPaginationListTasks:
+    def test_list_tasks_pagination_default_limit(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        for i in range(5):
+            client.post(
+                '/tasks',
+                data=json.dumps({'title': f'Task {i}'}),
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+
+        response = client.get(
+            '/tasks',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert 'data' in data
+        assert 'next_cursor' in data
+        assert 'total' in data
+        assert len(data['data']) == 5
+        assert data['total'] == 5
+        assert data['next_cursor'] is None
+
+    def test_list_tasks_pagination_with_cursor(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        for i in range(25):
+            client.post(
+                '/tasks',
+                data=json.dumps({'title': f'Task {i}'}),
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+
+        response = client.get(
+            '/tasks?limit=10',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data['data']) == 10
+        assert data['total'] == 25
+        assert data['next_cursor'] is not None
+
+        cursor = data['next_cursor']
+        response2 = client.get(
+            f'/tasks?cursor={cursor}&limit=10',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response2.status_code == 200
+        data2 = response2.get_json()
+        assert len(data2['data']) == 10
+        assert data2['total'] == 25
+        assert data2['next_cursor'] is not None
+
+        cursor2 = data2['next_cursor']
+        response3 = client.get(
+            f'/tasks?cursor={cursor2}&limit=10',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response3.status_code == 200
+        data3 = response3.get_json()
+        assert len(data3['data']) == 5
+        assert data3['total'] == 25
+        assert data3['next_cursor'] is None
+
+    def test_list_tasks_pagination_custom_limit(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        for i in range(15):
+            client.post(
+                '/tasks',
+                data=json.dumps({'title': f'Task {i}'}),
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+
+        response = client.get(
+            '/tasks?limit=5',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data['data']) == 5
+        assert data['total'] == 15
+        assert data['next_cursor'] is not None
+
+    def test_list_tasks_pagination_invalid_limit_too_high(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        for i in range(50):
+            client.post(
+                '/tasks',
+                data=json.dumps({'title': f'Task {i}'}),
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+
+        response = client.get(
+            '/tasks?limit=150',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data['data']) == 20
+        assert data['total'] == 50
+
+    def test_list_tasks_pagination_invalid_limit_zero(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        for i in range(5):
+            client.post(
+                '/tasks',
+                data=json.dumps({'title': f'Task {i}'}),
+                content_type='application/json',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+
+        response = client.get(
+            '/tasks?limit=0',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data['data']) == 5
+
+    def test_list_tasks_pagination_empty_result(self, client):
+        token = login_user(client, *self._register_and_login(client))
+        response = client.get(
+            '/tasks',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['data'] == []
+        assert data['next_cursor'] is None
+        assert data['total'] == 0
+
+    def _register_and_login(self, client):
+        register_user(client, 'testuser', 'password123')
+        return 'testuser', 'password123'
+
+
+class TestRateLimiting:
+    @pytest.fixture
+    def redis_conn(self):
+        try:
+            conn = redis.from_url('redis://localhost:6379/1')
+            conn.ping()
+            return conn
+        except:
+            pytest.skip("Redis not available")
+
+    def test_rate_limiting_register_endpoint(self, client, redis_conn):
+        redis_conn.flushdb()
+
+        for i in range(101):
+            response = client.post(
+                '/auth/register',
+                data=json.dumps({'username': f'user{i}', 'password': 'password123'}),
+                content_type='application/json'
+            )
+            if i < 100:
+                assert response.status_code == 201
+            else:
+                assert response.status_code == 429
+
+    def test_rate_limiting_authenticated_user(self, client, redis_conn):
+        redis_conn.flushdb()
+
+        register_user(client, 'testuser', 'password123')
+        token = login_user(client, 'testuser', 'password123')
+
+        for i in range(101):
+            response = client.get(
+                '/tasks',
+                headers={'Authorization': f'Bearer {token}'}
+            )
+            if i < 100:
+                assert response.status_code == 200
+            else:
+                assert response.status_code == 429
+
+    def test_rate_limiting_per_user_isolation(self, client, redis_conn):
+        redis_conn.flushdb()
+
+        username1, password1 = 'user1', 'password1'
+        username2, password2 = 'user2', 'password2'
+        register_user(client, username1, password1)
+        register_user(client, username2, password2)
+        token1 = login_user(client, username1, password1)
+        token2 = login_user(client, username2, password2)
+
+        for i in range(50):
+            response1 = client.get(
+                '/tasks',
+                headers={'Authorization': f'Bearer {token1}'}
+            )
+            assert response1.status_code == 200
+
+        for i in range(50):
+            response2 = client.get(
+                '/tasks',
+                headers={'Authorization': f'Bearer {token2}'}
+            )
+            assert response2.status_code == 200
+
+        for i in range(51):
+            response1 = client.get(
+                '/tasks',
+                headers={'Authorization': f'Bearer {token1}'}
+            )
+            if i < 50:
+                assert response1.status_code == 200
+            else:
+                assert response1.status_code == 429
