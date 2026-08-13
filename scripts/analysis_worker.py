@@ -21,7 +21,7 @@ import redis
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from instrument.commit_analysis import analyze_story_worktree
+from instrument.commit_analysis import analyze_story_worktree, compute_deep_metrics, agentic_token_dicts
 from instrument.story import load_story_result
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
@@ -118,9 +118,19 @@ def main() -> None:
             analysis.story_name = story_result.story_name
             analysis.story_id = story_result.story_id
 
+            analysis_dict = analysis.to_dict()
+            analysis_dict["deep"] = compute_deep_metrics(
+                worktree,
+                story_name=story_result.story_name,
+                model=story_result.model,
+                test_passed=story_result.all_successful,
+                total_cost_usd=story_result.total_cost,
+                session_token_data=agentic_token_dicts(story_result.sessions),
+            )
+
             out_path = ANALYSIS_DIR / f"analysis_{story_id}.json"
             out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(json.dumps(analysis.to_dict(), indent=2))
+            out_path.write_text(json.dumps(analysis_dict, indent=2))
 
             _safe_hset(r, STATUS_KEY, story_id, "done")
             completed += 1

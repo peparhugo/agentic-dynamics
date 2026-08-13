@@ -12,7 +12,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from instrument.commit_analysis import analyze_story_worktree, StoryAnalysis, CommitAnalysis
+from instrument.commit_analysis import (
+    analyze_story_worktree,
+    StoryAnalysis,
+    CommitAnalysis,
+    compute_deep_metrics,
+    agentic_token_dicts,
+)
 from instrument.story import load_story_result, StoryResult
 
 
@@ -132,9 +138,18 @@ def _analyze_from_result(
 
     _print_analysis(analysis)
 
-    # Save analysis
+    # Save analysis (with deep LSP + solution + basin + strategy metrics)
+    analysis_dict = analysis.to_dict()
+    analysis_dict["deep"] = compute_deep_metrics(
+        worktree_path,
+        story_name=story_result.story_name,
+        model=story_result.model,
+        test_passed=story_result.all_successful,
+        total_cost_usd=story_result.total_cost,
+        session_token_data=agentic_token_dicts(story_result.sessions),
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(json.dumps(analysis.to_dict(), indent=2))
+    out_path.write_text(json.dumps(analysis_dict, indent=2))
     print(f"  Saved: {out_path}")
 
     return analysis

@@ -10,7 +10,7 @@ v0.6: Multi-language analysis via tree-sitter. Flash V4 mutation compiler.
 """
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
-from .perturb import build_operators, perturb_prompt
+from .perturb import build_operators, perturb_prompt, PERTURBATION_CLASSES, perturbation_class_for
 # Deprecated: ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance — not used by current scripts
 from .basin import BasinMetrics, measure_basin_escape
 # Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
@@ -77,6 +77,7 @@ from .commit_analysis import (
     analyze_commit,
     analyze_story_worktree,
     compute_ast_diff,
+    compute_deep_metrics,
     score_conventions,
 )
 from .review import (
@@ -111,7 +112,7 @@ from .lsp_diagnostics import (
 )
 
 __all__ = [
-    "build_operators", "perturb_prompt",
+    "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for",
     "BasinMetrics", "measure_basin_escape",
     "SolutionMetrics", "evaluate_solution",
     "EfficiencyMetrics", "compute_efficiency", "compute_cost_estimate",
@@ -141,6 +142,7 @@ __all__ = [
     "PerturbationCondition", "condition_to_mutations",
     "CommitAnalysis", "StoryAnalysis", "analyze_commit",
     "analyze_story_worktree", "compute_ast_diff", "score_conventions",
+    "compute_deep_metrics",
     "CommitReview", "StoryReview", "review_commit", "review_story",
     "generate_tests", "compare_implementations",
     "EntropyProfile", "compute_entropy", "entropy_delta", "entropy_delta_detailed",

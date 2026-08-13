@@ -614,6 +614,172 @@ def analyze_story_worktree(worktree: Path, run_sonar: bool = False) -> StoryAnal
     return story
 
 
+# ── Deep Quality Metrics ───────────────────────────────────────
+
+STORY_CONSTRAINTS: dict[str, list[str]] = {
+    "task_manager_api": [
+        "All endpoints return JSON",
+        "Use SQLite for persistence",
+        "Include error handling for all endpoints",
+    ],
+    "static_site_gen": [
+        "All output goes to ./dist by default",
+        "CLI interface via commander or yargs",
+        "TypeScript with strict mode enabled",
+    ],
+    "notification_service": [
+        "All communication via WebSocket",
+        "Use Redis for pub/sub and rate limiting",
+        "SQLite for message persistence",
+    ],
+}
+
+
+def _read_source_files(directory: Path, profile) -> dict[str, str]:
+    """Read all source files under ``directory`` for the given language profile."""
+    files: dict[str, str] = {}
+    exts = set(profile.extensions) if profile else {".py", ".ts"}
+    skip_parts = {".git", "node_modules", "__pycache__", "venv", ".venv", "dist", "build"}
+    for ext in exts:
+        if not ext.startswith("."):
+            ext = "." + ext
+        for f in directory.rglob(f"*{ext}"):
+            if any(part in skip_parts for part in f.parts):
+                continue
+            try:
+                files[str(f.relative_to(directory))] = f.read_text(errors="ignore")
+            except OSError:
+                continue
+    return files
+
+
+def _build_efficiency(session_token_data: list[dict], total_cost_usd: float):
+    """Construct an EfficiencyMetrics from per-session token data + total cost."""
+    from .efficiency import EfficiencyMetrics
+
+    eff = EfficiencyMetrics()
+    eff.total_cost_usd = total_cost_usd
+    eff.cost_is_estimated = True
+    for s in session_token_data:
+        eff.prompt_tokens += int(s.get("prompt_tokens", 0) or 0)
+        eff.completion_tokens += int(s.get("completion_tokens", 0) or 0)
+        eff.reasoning_tokens += int(s.get("reasoning_tokens", 0) or 0)
+        eff.total_tokens += int(s.get("total_tokens", 0) or 0)
+        eff.cache_read_tokens += int(s.get("cache_read_tokens", 0) or 0)
+        eff.cache_write_tokens += int(s.get("cache_write_tokens", 0) or 0)
+    if eff.total_tokens:
+        eff.thinking_ratio = eff.reasoning_tokens / eff.total_tokens
+        eff.output_efficiency = eff.completion_tokens / eff.total_tokens
+    return eff
+
+
+def compute_deep_metrics(
+    worktree: Path,
+    *,
+    story_name: str,
+    model: str,
+    test_passed: bool | None = None,
+    total_cost_usd: float = 0.0,
+    session_token_data: list[dict] | None = None,
+) -> dict[str, Any]:
+    """Compute LSP + solution + basin + strategy metrics for a story's final state.
+
+    LSP diagnostics run on the final worktree state; the solution evaluator
+    scores correctness / constraints / quality / novelty against the seed
+    baseline; basin escape measures seed-vs-final structural divergence; and
+    the strategy classifier combines those with efficiency into an archetype.
+    """
+    from .language import detect_language
+    from .lsp_diagnostics import run_diagnostics
+    from .solution import evaluate_solution
+    from .basin import measure_basin_escape
+    from .strategy import classify_strategy
+
+    deep: dict[str, Any] = {}
+    profile = detect_language(worktree)
+
+    # 1. LSP diagnostics on the final state
+    try:
+        lsp = run_diagnostics(worktree, profile)
+        deep["lsp"] = {
+            "available": lsp.available,
+            "tool": lsp.tool,
+            "errors": lsp.errors,
+            "warnings": lsp.warnings,
+        }
+    except Exception:
+        deep["lsp"] = {"available": False, "errors": 0, "warnings": 0}
+
+    # 2. Baseline (seed) + final code
+    final_files = _read_source_files(worktree, profile)
+    final_code = "\n\n".join(final_files.values())
+    baseline_code = ""
+    log = _run_git(worktree, "log", "--reverse", "--format=%H")
+    hashes = [h for h in log.splitlines() if h]
+    if hashes:
+        seed_hash = hashes[0]
+        with tempfile.TemporaryDirectory(prefix="deep_", dir="/tmp") as tmp:
+            seed_dir = Path(tmp) / "seed"
+            _run_git(worktree, "worktree", "add", "--detach", str(seed_dir), seed_hash)
+            try:
+                baseline_files = _read_source_files(seed_dir, profile)
+                baseline_code = "\n\n".join(baseline_files.values())
+            finally:
+                _run_git(worktree, "worktree", "remove", "--force", str(seed_dir))
+
+    # 3. Solution metrics
+    constraints = STORY_CONSTRAINTS.get(story_name, [])
+    test_results = {"story": bool(test_passed)} if test_passed is not None else None
+    solution = evaluate_solution(
+        final_code,
+        constraints,
+        test_results=test_results,
+        baseline_code=baseline_code,
+        code_files=final_files,
+    )
+    deep["solution"] = solution.to_dict()
+
+    # 4. Basin escape (seed vs final)
+    basin = measure_basin_escape(
+        baseline_code,
+        final_code,
+        baseline_correctness=1.0,
+        perturbed_correctness=solution.correctness_score,
+        baseline_constraints_met=len(constraints),
+        perturbed_constraints_met=solution.constraints_met,
+        baseline_loc=len(baseline_code.splitlines()),
+        perturbed_loc=len(final_code.splitlines()),
+        model=model,
+        task=story_name,
+    )
+    deep["basin"] = basin.to_dict()
+
+    # 5. Efficiency + strategy
+    efficiency = _build_efficiency(session_token_data or [], total_cost_usd)
+    strategy = classify_strategy(basin, solution, efficiency)
+    deep["strategy"] = strategy.to_dict()
+
+    return deep
+
+
+def agentic_token_dicts(sessions) -> list[dict]:
+    """Extract per-session token breakdowns from SessionResult objects."""
+    out: list[dict] = []
+    for s in sessions:
+        a = getattr(s, "agentic", None)
+        if a is None:
+            out.append({})
+            continue
+        out.append({
+            k: (getattr(a, k, 0) or 0)
+            for k in (
+                "prompt_tokens", "completion_tokens", "reasoning_tokens",
+                "total_tokens", "cache_read_tokens", "cache_write_tokens",
+            )
+        })
+    return out
+
+
 # ── Git Helpers ────────────────────────────────────────────────
 
 def _run_git(worktree: Path, *args: str) -> str:
