@@ -10,6 +10,7 @@ def client(tmp_path):
     task_app.app.config.update(
         TESTING=True, DATABASE=str(database), JWT_SECRET_KEY="test-secret"
     )
+    task_app.limiter.reset()
     task_app.init_db()
     return task_app.app.test_client()
 
@@ -91,7 +92,64 @@ def test_list_tasks_is_newest_first(client):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    assert response.get_json() == {
+        "data": [second, first],
+        "next_cursor": None,
+        "total": 2,
+    }
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_headers(client)
+    tasks = [
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=headers).get_json()
+        for number in range(3)
+    ]
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+
+    assert first_page.status_code == 200
+    assert first_page.get_json() == {
+        "data": [tasks[2], tasks[1]],
+        "next_cursor": str(tasks[1]["id"]),
+        "total": 3,
+    }
+    second_page = client.get(
+        f"/tasks?cursor={tasks[1]['id']}&limit=2", headers=headers
+    )
+    assert second_page.get_json() == {
+        "data": [tasks[0]],
+        "next_cursor": None,
+        "total": 3,
+    }
+
+
+@pytest.mark.parametrize("query", ("?limit=0", "?limit=101", "?limit=no", "?cursor=no"))
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks{query}", headers=auth_headers(client))
+
+    assert response.status_code == 400
+
+
+def test_authenticated_user_is_rate_limited(client):
+    headers = auth_headers(client)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+
+
+def test_auth_endpoints_are_rate_limited(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 401
+
+    response = client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
 
 
 def test_users_only_see_and_change_their_own_tasks(client):
@@ -99,7 +157,11 @@ def test_users_only_see_and_change_their_own_tasks(client):
     bob_headers = auth_headers(client, "bob")
     task = client.post("/tasks", json={"title": "Private"}, headers=alice_headers).get_json()
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob_headers).status_code == 404
     assert client.get(f"/tasks/{task['id']}", headers=alice_headers).get_json() == task

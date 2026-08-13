@@ -1,0 +1,5 @@
+Flask==2.3.3
+Flask-Limiter==3.12
+PyJWT
+redis
+celery

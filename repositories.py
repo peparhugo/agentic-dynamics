@@ -121,13 +121,25 @@ class TaskRepository(BaseRepository):
                 (task_id, owner_id),
             ).fetchone()
 
-    def list_for_owner(self, owner_id):
+    def list_page_for_owner(self, owner_id, cursor, limit):
         with self.connection_factory() as connection:
-            return connection.execute(
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            query = (
                 "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? "
-                "ORDER BY created_at DESC, id DESC",
-                (owner_id,),
+            )
+            parameters = [owner_id]
+            if cursor is not None:
+                query += "AND id < ? "
+                parameters.append(cursor)
+            rows = connection.execute(
+                query + "ORDER BY id DESC LIMIT ?", parameters + [limit + 1]
             ).fetchall()
+        has_next_page = len(rows) > limit
+        tasks = rows[:limit]
+        next_cursor = tasks[-1]["id"] if has_next_page else None
+        return tasks, next_cursor, total
 
     def update_for_owner(self, task_id, owner_id, values):
         """Update a task and return its former status, owner email, and new row."""

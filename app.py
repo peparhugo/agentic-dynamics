@@ -7,6 +7,8 @@ from functools import wraps
 
 import jwt
 from flask import Flask, jsonify, g, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -17,6 +19,44 @@ app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
 app.config["JWT_SECRET_KEY"] = os.environ.get("JWT_SECRET_KEY", "development-secret")
 app.config["JWT_EXPIRATION_HOURS"] = 24
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+)
+
+
+def rate_limit_key():
+    """Rate limit authenticated requests by JWT subject and auth requests by IP."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(
+                token, app.config["JWT_SECRET_KEY"], algorithms=["HS256"]
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+    # Keeps local development and isolated tests usable when Redis is unavailable.
+    in_memory_fallback=["100 per minute"],
+    in_memory_fallback_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = "60"
+    return response
 
 
 def get_db():
@@ -127,8 +167,28 @@ def create_task():
 @app.get("/tasks")
 @token_required
 def list_tasks():
-    tasks = TaskRepository(get_db).list_for_owner(g.user_id)
-    return jsonify([task_response(task) for task in tasks])
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor) if cursor is not None else None
+        limit = int(limit)
+    except ValueError:
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if cursor is not None and cursor < 1:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    if not 1 <= limit <= 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    tasks, next_cursor, total = TaskRepository(get_db).list_page_for_owner(
+        g.user_id, cursor, limit
+    )
+    return jsonify(
+        {
+            "data": [task_response(task) for task in tasks],
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.get("/tasks/<int:task_id>")
