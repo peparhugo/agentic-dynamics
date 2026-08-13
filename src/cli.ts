@@ -12,6 +12,8 @@ export interface CliOptions {
   outputDir: string;
   templatesDir: string;
   port: number;
+  incremental: boolean;
+  clean: boolean;
 }
 
 const HELP = `ssg — a tiny static site generator
@@ -29,6 +31,8 @@ Options:
   --output <dir>     Directory where the site is written (default: ./dist)
   --templates <dir>  Directory containing Handlebars templates (default: ./templates)
   --port <number>    Port for the dev server (default: 3000, serve only)
+  --incremental      Only rebuild pages whose source or template changed
+  --clean            Ignore the build cache and rebuild every page
   --help             Show this help message
   --version          Show the version number
 `;
@@ -41,6 +45,8 @@ export function parseArgs(argv: string[]): CliOptions {
   let outputDir = 'dist';
   let templatesDir = 'templates';
   let port = 3000;
+  let incremental = false;
+  let clean = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -60,6 +66,10 @@ export function parseArgs(argv: string[]): CliOptions {
       port = Number(argv[++i]);
     } else if (arg.startsWith('--port=')) {
       port = Number(arg.slice('--port='.length));
+    } else if (arg === '--incremental') {
+      incremental = true;
+    } else if (arg === '--clean') {
+      clean = true;
     } else if (arg === '--help' || arg === '-h') {
       command = 'help';
     } else if (arg === '--version' || arg === '-v') {
@@ -73,7 +83,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command = 'build';
   }
 
-  return { command, contentDir, outputDir, templatesDir, port };
+  return { command, contentDir, outputDir, templatesDir, port, incremental, clean };
 }
 
 export function runCli(argv: string[]): number {
@@ -102,8 +112,17 @@ export function runCli(argv: string[]): number {
   }
 
   try {
-    const result = buildSite(options.contentDir, options.outputDir, options.templatesDir);
+    const result = buildSite(options.contentDir, options.outputDir, options.templatesDir, {
+      incremental: options.incremental,
+      clean: options.clean,
+    });
     process.stdout.write(`Generated ${result.pages.length} page(s) in ${result.outputDir}\n`);
+    if (options.incremental) {
+      process.stdout.write(
+        `Incremental build: ${result.stats.builtPages} built, ` +
+          `${result.stats.skippedPages} skipped, ~${result.stats.timeSavedMs}ms saved\n`,
+      );
+    }
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

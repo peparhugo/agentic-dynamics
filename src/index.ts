@@ -10,6 +10,15 @@ export {
 export type { TemplateMeta, SiteContext, SitePageRef } from './engine';
 export { buildSite, slugify } from './build';
 export type { SiteBuildResult, BuildSiteOptions } from './build';
+export {
+  CACHE_FILE,
+  CACHE_VERSION,
+  computeTemplateHash,
+  hashContent,
+  loadCache,
+  saveCache,
+} from './cache';
+export type { BuildCache, BuildStats, CacheEntry } from './cache';
 export { parseArgs, runCli } from './cli';
 export type { CliOptions } from './cli';
 export {

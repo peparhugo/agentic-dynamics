@@ -42,7 +42,7 @@ export function startDevServer(options: DevServerOptions = {}): DevServer {
     devServerPlugin,
   ];
 
-  const engine = new SSGEngine({ contentDir, outputDir, templatesDir, plugins });
+  const engine = new SSGEngine({ contentDir, outputDir, templatesDir, plugins, incremental: true });
   engine.ctx.port = port;
   engine.ctx.onBuild = (result) => {
     if (options.onBuild) {
