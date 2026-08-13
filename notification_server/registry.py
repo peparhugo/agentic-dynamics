@@ -51,3 +51,46 @@ class ClientRegistry:
     def __contains__(self, client_id: str) -> bool:
         with self._lock:
             return client_id in self._clients
+
+
+class ChannelRegistry:
+    """Thread-safe registry of channel -> subscribed client ID sets."""
+
+    def __init__(self) -> None:
+        self._channels: dict[str, set[str]] = {}
+        self._lock = threading.Lock()
+
+    def subscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def unsubscribe_all(self, client_id: str) -> None:
+        with self._lock:
+            emptied = []
+            for channel, subscribers in self._channels.items():
+                subscribers.discard(client_id)
+                if not subscribers:
+                    emptied.append(channel)
+            for channel in emptied:
+                del self._channels[channel]
+
+    def subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
+
+    def is_subscribed(self, channel: str, client_id: str) -> bool:
+        with self._lock:
+            return client_id in self._channels.get(channel, set())
+
+    def all_channels(self) -> dict[str, int]:
+        with self._lock:
+            return {name: len(subscribers) for name, subscribers in self._channels.items()}

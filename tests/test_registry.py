@@ -1,6 +1,6 @@
 import threading
 
-from notification_server.registry import ClientRegistry
+from notification_server.registry import ClientRegistry, ChannelRegistry
 
 
 def test_add_assigns_unique_id():
@@ -72,3 +72,84 @@ def test_concurrent_add_is_thread_safe():
 
     assert registry.count() == 50
     assert len(set(added_ids)) == 50
+
+
+def test_channel_subscribe_adds_subscriber():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    assert channels.subscribers("alerts") == ["client-1"]
+    assert channels.is_subscribed("alerts", "client-1")
+
+
+def test_channel_subscribers_returns_sorted_list():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-2")
+    channels.subscribe("alerts", "client-1")
+    assert channels.subscribers("alerts") == ["client-1", "client-2"]
+
+
+def test_channel_subscribers_unknown_channel_is_empty():
+    channels = ChannelRegistry()
+    assert channels.subscribers("does-not-exist") == []
+
+
+def test_channel_unsubscribe_removes_subscriber():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    channels.unsubscribe("alerts", "client-1")
+    assert channels.subscribers("alerts") == []
+    assert not channels.is_subscribed("alerts", "client-1")
+
+
+def test_channel_unsubscribe_unknown_channel_is_a_no_op():
+    channels = ChannelRegistry()
+    channels.unsubscribe("does-not-exist", "client-1")
+    assert channels.all_channels() == {}
+
+
+def test_channel_unsubscribe_all_removes_client_from_every_channel():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    channels.subscribe("chat", "client-1")
+    channels.subscribe("chat", "client-2")
+    channels.unsubscribe_all("client-1")
+    assert channels.subscribers("alerts") == []
+    assert channels.subscribers("chat") == ["client-2"]
+
+
+def test_client_can_be_subscribed_to_multiple_channels():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    channels.subscribe("chat", "client-1")
+    assert channels.is_subscribed("alerts", "client-1")
+    assert channels.is_subscribed("chat", "client-1")
+
+
+def test_all_channels_reports_subscriber_counts():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    channels.subscribe("alerts", "client-2")
+    channels.subscribe("chat", "client-1")
+    assert channels.all_channels() == {"alerts": 2, "chat": 1}
+
+
+def test_empty_channel_is_removed_from_all_channels():
+    channels = ChannelRegistry()
+    channels.subscribe("alerts", "client-1")
+    channels.unsubscribe("alerts", "client-1")
+    assert channels.all_channels() == {}
+
+
+def test_channel_concurrent_subscribe_is_thread_safe():
+    channels = ChannelRegistry()
+
+    def worker(i):
+        channels.subscribe("alerts", f"client-{i}")
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(50)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert channels.all_channels() == {"alerts": 50}

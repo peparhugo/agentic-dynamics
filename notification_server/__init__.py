@@ -1,4 +1,4 @@
-from .registry import ClientRegistry
+from .registry import ClientRegistry, ChannelRegistry
 from .messages import Message, MessageValidationError
 
-__all__ = ["ClientRegistry", "Message", "MessageValidationError"]
+__all__ = ["ClientRegistry", "ChannelRegistry", "Message", "MessageValidationError"]

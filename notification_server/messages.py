@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
-VALID_TYPES = {"broadcast", "direct", "system"}
+VALID_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 class MessageValidationError(ValueError):
@@ -22,6 +22,7 @@ class Message:
     type: str
     payload: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=utc_now_iso)
+    channel: str | None = None
 
     @classmethod
     def from_json(cls, raw: str) -> "Message":
@@ -50,10 +51,17 @@ class Message:
         if not isinstance(timestamp, str):
             raise MessageValidationError("'timestamp' must be a string")
 
-        return cls(type=msg_type, payload=payload, timestamp=timestamp)
+        channel = data.get("channel")
+        if channel is not None and not isinstance(channel, str):
+            raise MessageValidationError("'channel' must be a string")
+
+        return cls(type=msg_type, payload=payload, timestamp=timestamp, channel=channel)
 
     def to_dict(self) -> dict[str, Any]:
-        return {"type": self.type, "payload": self.payload, "timestamp": self.timestamp}
+        data: dict[str, Any] = {"type": self.type, "payload": self.payload, "timestamp": self.timestamp}
+        if self.channel is not None:
+            data["channel"] = self.channel
+        return data
 
     def to_json(self) -> str:
         return json.dumps(self.to_dict())

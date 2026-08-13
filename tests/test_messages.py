@@ -62,3 +62,30 @@ def test_to_dict_and_to_json_round_trip():
     assert as_dict == {"type": "broadcast", "payload": {"a": 1}, "timestamp": "2026-01-01T00:00:00+00:00"}
     round_tripped = Message.from_json(message.to_json())
     assert round_tripped == message
+
+
+@pytest.mark.parametrize("msg_type", ["subscribe", "unsubscribe"])
+def test_subscribe_and_unsubscribe_are_valid_types(msg_type):
+    message = Message.from_dict({"type": msg_type, "payload": {"channel": "alerts"}})
+    assert message.type == msg_type
+    assert message.payload["channel"] == "alerts"
+
+
+def test_channel_field_defaults_to_none():
+    message = Message.from_dict({"type": "broadcast", "payload": {}})
+    assert message.channel is None
+    assert "channel" not in message.to_dict()
+
+
+def test_channel_field_round_trips():
+    message = Message.from_dict({"type": "broadcast", "payload": {"text": "hi"}, "channel": "alerts"})
+    assert message.channel == "alerts"
+    as_dict = message.to_dict()
+    assert as_dict["channel"] == "alerts"
+    round_tripped = Message.from_json(message.to_json())
+    assert round_tripped == message
+
+
+def test_non_string_channel_raises():
+    with pytest.raises(MessageValidationError):
+        Message.from_dict({"type": "broadcast", "payload": {}, "channel": 123})
