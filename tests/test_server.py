@@ -187,6 +187,181 @@ async def test_malformed_json_gets_system_error(ws_url):
         await ws.close()
 
 
+# ── Channel subscriptions ──────────────────────────────────────────
+
+
+async def test_subscribe_and_channel_routing(ws_url):
+    ws1, _ = await connect_client(ws_url)
+    ws2, _ = await connect_client(ws_url)
+    ws3, _ = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await ws3.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await asyncio.sleep(0.1)
+
+        await ws1.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "boom"}})
+        )
+        received = [
+            json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            for ws in (ws1, ws2)
+        ]
+        for msg in received:
+            assert msg["type"] == "broadcast"
+            assert msg["payload"] == {"text": "boom"}
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws3.recv(), timeout=0.3)
+    finally:
+        await ws1.close()
+        await ws2.close()
+        await ws3.close()
+
+
+async def test_unsubscribe_stops_delivery(ws_url):
+    ws1, _ = await connect_client(ws_url)
+    ws2, _ = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        for n in (1, 1):
+            await ws1.send(
+                json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"n": n}})
+            )
+            msg = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+            assert msg["payload"] == {"n": n}
+            msg = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+            assert msg["payload"] == {"n": n}
+
+        await ws2.send(json.dumps({"type": "unsubscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws1.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"n": 2}})
+        )
+        msg = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+        assert msg["payload"] == {"n": 2}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.3)
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(ws_url):
+    ws1, _ = await connect_client(ws_url)
+    ws2, _ = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        await ws1.send(
+            json.dumps({"type": "broadcast", "channel": "chat", "payload": {"text": "hi"}})
+        )
+        msg = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+        assert msg["payload"] == {"text": "hi"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.3)
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_channel_message_without_subscribers_is_safe(ws_url, server):
+    ws, _ = await connect_client(ws_url)
+    try:
+        await ws.send(
+            json.dumps({"type": "broadcast", "channel": "empty", "payload": {"x": 1}})
+        )
+        await asyncio.sleep(0.1)
+        assert await server.channel_counts() == {}
+    finally:
+        await ws.close()
+
+
+async def test_subscribe_requires_channel(ws_url):
+    ws, _ = await connect_client(ws_url)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert msg["type"] == "system"
+        assert "error" in msg["payload"]
+    finally:
+        await ws.close()
+
+
+# ── REST channel endpoints ─────────────────────────────────────────
+
+
+async def test_channels_endpoint(ws_url, server):
+    ws1, _ = await connect_client(ws_url)
+    ws2, _ = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        await asyncio.sleep(0.1)
+
+        status, body = await http_get(
+            f"http://127.0.0.1:{server.bound_port}/channels"
+        )
+        assert status == 200
+        assert body["channels"]["alerts"] == 2
+        assert body["channels"]["chat"] == 1
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_channel_subscribers_endpoint(ws_url, server):
+    ws1, id1 = await connect_client(ws_url)
+    ws2, id2 = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+
+        status, body = await http_get(
+            f"http://127.0.0.1:{server.bound_port}/channels/alerts/subscribers"
+        )
+        assert status == 200
+        assert body["channel"] == "alerts"
+        assert set(body["subscribers"]) == {id1, id2}
+
+        status, body = await http_get(
+            f"http://127.0.0.1:{server.bound_port}/channels/missing/subscribers"
+        )
+        assert status == 404
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_disconnect_clears_subscriptions(ws_url, server):
+    ws1, _ = await connect_client(ws_url)
+    ws2, _ = await connect_client(ws_url)
+    try:
+        await ws1.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await ws2.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.1)
+        await ws1.close()
+        for _ in range(50):
+            counts = await server.channel_counts()
+            if counts.get("alerts", 0) == 1:
+                break
+            await asyncio.sleep(0.02)
+        assert await server.channel_counts() == {"alerts": 1}
+    finally:
+        await ws2.close()
+        await asyncio.sleep(0.2)
+    assert await server.channel_counts() == {}
+
+
 # ── Server API helpers ────────────────────────────────────────────
 
 

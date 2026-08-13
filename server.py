@@ -8,11 +8,16 @@ Features:
 - Sends system messages (e.g. the assigned client id) to clients.
 - Handles client disconnect with clean registry removal.
 - Exposes a REST endpoint GET /health reporting the connected client count.
+- Supports channel-based subscriptions: clients subscribe/unsubscribe to
+  named channels and messages carrying a 'channel' field are delivered only
+  to that channel's subscribers. Messages without a channel broadcast to all.
+- Exposes REST endpoints GET /channels and GET /channels/{name}/subscribers.
 
 All messages use the JSON envelope:
     {"type": str, "payload": dict, "timestamp": str}
 
-Supported message types: 'broadcast', 'direct', 'system'.
+Supported message types: 'broadcast', 'direct', 'system', 'subscribe',
+'unsubscribe'.
 
 Tech: websockets library, asyncio, thread-safe client registry.
 """
@@ -25,6 +30,7 @@ import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import unquote
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.datastructures import Headers
@@ -95,6 +101,8 @@ class NotificationServer:
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
+        self._channels: dict[str, set[str]] = {}
+        self._channels_lock = asyncio.Lock()
         self._server: Optional[Server] = None
         self._id_counter = 0
         self._id_lock = asyncio.Lock()
@@ -105,6 +113,52 @@ class NotificationServer:
         async with self._id_lock:
             self._id_counter += 1
             return f"client-{self._id_counter}"
+
+    # ── Channel subscriptions ─────────────────────────────────────
+
+    async def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a named channel."""
+        if not isinstance(channel, str) or not channel:
+            return
+        async with self._channels_lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    async def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a named channel."""
+        if not isinstance(channel, str) or not channel:
+            return
+        async with self._channels_lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    async def channel_subscribers(self, channel: str) -> set[str]:
+        """Return the set of client ids subscribed to a channel (may be empty)."""
+        async with self._channels_lock:
+            subscribers = self._channels.get(channel)
+            return set(subscribers) if subscribers else set()
+
+    async def channel_counts(self) -> dict[str, int]:
+        """Return a mapping of active channel name to subscriber count."""
+        async with self._channels_lock:
+            return {name: len(subs) for name, subs in self._channels.items()}
+
+    async def _remove_client_channels(self, client_id: str) -> None:
+        """Remove a client from every channel, dropping channels left empty."""
+        async with self._channels_lock:
+            empty = [
+                name
+                for name, subscribers in self._channels.items()
+                if client_id in subscribers
+            ]
+            for name in empty:
+                subscribers = self._channels[name]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[name]
 
     # ── Sending helpers ───────────────────────────────────────────
 
@@ -139,6 +193,23 @@ class NotificationServer:
             await self.registry.remove(client_id)
         return delivered
 
+    async def send_to_channel(self, channel: str, message: dict) -> int:
+        """Deliver a message envelope to every subscriber of a channel.
+
+        Returns the number of clients the message was sent to.
+        """
+        snapshot = await self.registry.snapshot()
+        delivered = 0
+        for client_id in await self.channel_subscribers(channel):
+            websocket = snapshot.get(client_id)
+            if websocket is None:
+                continue
+            if await self._send(websocket, message):
+                delivered += 1
+            else:
+                await self.registry.remove(client_id)
+        return delivered
+
     @property
     async def client_count(self) -> int:
         return await self.registry.count()
@@ -156,14 +227,49 @@ class NotificationServer:
 
         msg_type = data.get("type")
         payload = data.get("payload")
-        if not isinstance(msg_type, str) or not isinstance(payload, dict):
+        if not isinstance(msg_type, str):
             await self.send_direct(
                 client_id, build_message("system", {"error": "malformed message"})
             )
             return
+        if not isinstance(payload, dict):
+            if msg_type in ("subscribe", "unsubscribe"):
+                payload = {}
+            else:
+                await self.send_direct(
+                    client_id,
+                    build_message("system", {"error": "malformed message"}),
+                )
+                return
 
-        if msg_type == "broadcast":
-            await self.broadcast(build_message("broadcast", payload))
+        if msg_type == "subscribe":
+            channel = self._resolve_channel(data, payload)
+            if channel is None:
+                await self.send_direct(
+                    client_id,
+                    build_message(
+                        "system", {"error": "subscribe requires a 'channel'"}
+                    ),
+                )
+                return
+            await self.subscribe(client_id, channel)
+        elif msg_type == "unsubscribe":
+            channel = self._resolve_channel(data, payload)
+            if channel is None:
+                await self.send_direct(
+                    client_id,
+                    build_message(
+                        "system", {"error": "unsubscribe requires a 'channel'"}
+                    ),
+                )
+                return
+            await self.unsubscribe(client_id, channel)
+        elif msg_type == "broadcast":
+            channel = self._resolve_channel(data, payload)
+            if channel is not None:
+                await self.send_to_channel(channel, build_message("broadcast", payload))
+            else:
+                await self.broadcast(build_message("broadcast", payload))
         elif msg_type == "direct":
             target = payload.get("target")
             if not isinstance(target, str) or not target:
@@ -184,6 +290,17 @@ class NotificationServer:
                 build_message("system", {"error": f"unknown type: {msg_type}"}),
             )
 
+    @staticmethod
+    def _resolve_channel(data: dict, payload: dict) -> Optional[str]:
+        """Extract a channel name from a message, top-level or payload."""
+        channel = data.get("channel")
+        if isinstance(channel, str) and channel:
+            return channel
+        channel = payload.get("channel")
+        if isinstance(channel, str) and channel:
+            return channel
+        return None
+
     # ── Per-connection handler ────────────────────────────────────
 
     async def handler(self, websocket: ServerConnection) -> None:
@@ -202,24 +319,43 @@ class NotificationServer:
             pass
         finally:
             await self.registry.remove(client_id)
+            await self._remove_client_channels(client_id)
             logger.info("client %s disconnected", client_id)
 
     # ── REST /health endpoint ─────────────────────────────────────
 
+    def _json_response(
+        self, body: dict, status: int = 200, reason: str = "OK"
+    ) -> Response:
+        encoded = json.dumps(body).encode("utf-8")
+        headers = Headers(
+            {
+                "Content-Type": "application/json",
+                "Content-Length": str(len(encoded)),
+            }
+        )
+        return Response(status, reason, headers, encoded)
+
     async def _process_request(
         self, connection: ServerConnection, request: Request
     ) -> Optional[Response]:
-        if request.path == "/health":
-            body = json.dumps(
+        path = request.path
+        if path == "/health":
+            return self._json_response(
                 {"status": "ok", "clients": await self.registry.count()}
-            ).encode("utf-8")
-            headers = Headers(
-                {
-                    "Content-Type": "application/json",
-                    "Content-Length": str(len(body)),
-                }
             )
-            return Response(200, "OK", headers, body)
+        if path == "/channels":
+            return self._json_response({"channels": await self.channel_counts()})
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")])
+            if name not in await self.channel_counts():
+                return self._json_response(
+                    {"error": "channel not found"}, status=404, reason="Not Found"
+                )
+            subscribers = sorted(await self.channel_subscribers(name))
+            return self._json_response(
+                {"channel": name, "subscribers": subscribers}
+            )
         return None
 
     # ── Lifecycle ─────────────────────────────────────────────────
