@@ -1,8 +1,13 @@
 """WebSocket-based notification server.
 
 Accepts WebSocket connections, assigns each client a unique ID, and
-supports broadcast / direct / system JSON messages between clients.
-Also exposes a plain HTTP GET /health endpoint on the same port.
+supports broadcast / direct / system / subscribe / unsubscribe JSON
+messages between clients. Clients can subscribe to named channels;
+broadcast messages carrying a 'channel' field in their payload are
+routed only to that channel's subscribers, while channel-less
+broadcasts still reach everyone. Also exposes plain HTTP endpoints
+(GET /health, GET /channels, GET /channels/{name}/subscribers) on the
+same port.
 """
 
 from __future__ import annotations
@@ -11,7 +16,9 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 from datetime import datetime, timezone
+from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
 from websockets.asyncio.server import Server, ServerConnection, serve
@@ -23,7 +30,9 @@ from notification_server.registry import ClientRegistry
 
 logger = logging.getLogger("notification_server")
 
-MESSAGE_TYPES = {"broadcast", "direct", "system"}
+MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+
+CHANNEL_SUBSCRIBERS_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 
 def now_iso() -> str:
@@ -70,15 +79,30 @@ class NotificationServer:
 
     def _process_request(self, connection: ServerConnection, request: Request):
         """Intercept plain HTTP requests before the WebSocket handshake."""
-        if request.path == "/health":
-            body = json.dumps(
-                {"connected_clients": self.registry.count()}
-            ).encode("utf-8")
-            headers = Headers()
-            headers["Content-Type"] = "application/json"
-            headers["Content-Length"] = str(len(body))
-            return Response(200, "OK", headers, body)
+        path = urlsplit(request.path).path
+
+        if path == "/health":
+            return self._json_response({"connected_clients": self.registry.count()})
+
+        if path == "/channels":
+            return self._json_response({"channels": self.registry.channels()})
+
+        match = CHANNEL_SUBSCRIBERS_RE.match(path)
+        if match:
+            channel = unquote(match.group(1))
+            return self._json_response(
+                {"channel": channel, "subscribers": self.registry.subscribers(channel)}
+            )
+
         return None
+
+    @staticmethod
+    def _json_response(data: dict) -> Response:
+        body = json.dumps(data).encode("utf-8")
+        headers = Headers()
+        headers["Content-Type"] = "application/json"
+        headers["Content-Length"] = str(len(body))
+        return Response(200, "OK", headers, body)
 
     # -- WebSocket handling ------------------------------------------
 
@@ -127,6 +151,35 @@ class NotificationServer:
             await self._handle_direct(client_id, websocket, payload)
         elif msg_type == "system":
             await self._send_error(websocket, "'system' messages are reserved for server use")
+        elif msg_type == "subscribe":
+            await self._handle_subscribe(client_id, websocket, payload)
+        elif msg_type == "unsubscribe":
+            await self._handle_unsubscribe(client_id, websocket, payload)
+
+    @staticmethod
+    def _extract_channel(payload: dict) -> str | None:
+        channel = payload.get("channel")
+        return channel if isinstance(channel, str) and channel else None
+
+    async def _handle_subscribe(self, client_id: str, websocket: ServerConnection, payload: dict) -> None:
+        channel = self._extract_channel(payload)
+        if channel is None:
+            await self._send_error(websocket, "'channel' is required to subscribe")
+            return
+        self.registry.subscribe(client_id, channel)
+        await self._send(
+            websocket, make_message("system", {"event": "subscribed", "channel": channel})
+        )
+
+    async def _handle_unsubscribe(self, client_id: str, websocket: ServerConnection, payload: dict) -> None:
+        channel = self._extract_channel(payload)
+        if channel is None:
+            await self._send_error(websocket, "'channel' is required to unsubscribe")
+            return
+        self.registry.unsubscribe(client_id, channel)
+        await self._send(
+            websocket, make_message("system", {"event": "unsubscribed", "channel": channel})
+        )
 
     async def _handle_direct(self, client_id: str, websocket: ServerConnection, payload: dict) -> None:
         target_id = payload.get("target_id")
@@ -137,8 +190,10 @@ class NotificationServer:
         await self._send(target, make_message("direct", payload, sender_id=client_id))
 
     async def broadcast(self, payload: dict, sender_id: str | None = None) -> None:
+        channel = self._extract_channel(payload)
         message = make_message("broadcast", payload, sender_id=sender_id)
-        for connection in self.registry.all():
+        connections = self.registry.connections_for_channel(channel) if channel else self.registry.all()
+        for connection in connections:
             await self._send(connection, message)
 
     @staticmethod
