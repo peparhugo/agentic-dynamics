@@ -8,16 +8,23 @@ interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <number>]';
 }
 
 function parseOptions(args: string[], allowPort: boolean): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
+    if (!allowPort && (option === '--incremental' || option === '--clean')) {
+      if (option === '--incremental') options.incremental = true;
+      else options.clean = true;
+      continue;
+    }
     if (option !== '--content' && option !== '--output' && option !== '--templates' && (option !== '--port' || !allowPort)) {
       throw new Error(`Unknown option: ${option}`);
     }
@@ -41,6 +48,7 @@ export async function run(args: string[]): Promise<void> {
   if (command === 'build') {
     const pages = await buildSite(parseOptions(optionArgs, false));
     process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+    process.stdout.write(`Build stats: ${pages.stats.pagesBuilt} built, ${pages.stats.pagesSkipped} skipped, ${pages.stats.timeSavedMs.toFixed(1)}ms saved.\n`);
     return;
   }
   if (command === 'serve') {

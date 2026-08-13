@@ -17,6 +17,13 @@ The default input directory is `./content` and the default output directory is `
 npx ssg build --content ./posts --output ./public
 ```
 
+Use `--incremental` to rebuild only pages whose Markdown, selected template/layout, partials, or plugins changed. Build hashes and rendered output are stored in `.ssg-cache.json`; a missing cache triggers a clean build. Use `--clean` to force a clean build and refresh the cache.
+
+```sh
+npx ssg build --incremental
+npx ssg build --clean
+```
+
 Templates are Handlebars files under `./templates`. Use `default.hbs` as the default page template, `layouts/default.hbs` as the default layout, and reusable partials from `partials/*.hbs`. The rendered Markdown is available as `{{{content}}}` in page templates, and rendered page output is available as `{{{body}}}` in layouts.
 
 ```yaml

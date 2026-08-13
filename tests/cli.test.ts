@@ -50,4 +50,23 @@ describe('CLI', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+  test('accepts incremental and clean build flags and reports stats', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const content = path.join(root, 'posts');
+    const output = path.join(root, 'web');
+    const stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'post.md'), 'Cached');
+
+    try {
+      await run(['build', '--content', content, '--output', output, '--incremental']);
+      await run(['build', '--content', content, '--output', output, '--incremental']);
+      expect(stdout).toHaveBeenCalledWith(expect.stringMatching(/Build stats: 0 built, 1 skipped, .*ms saved/));
+      await run(['build', '--content', content, '--output', output, '--clean']);
+    } finally {
+      stdout.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });

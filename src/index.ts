@@ -11,6 +11,15 @@ import {
 } from './plugin';
 import { MarkdownPlugin } from './plugins/markdown';
 import { escapeHtml, renderDocument, TemplatePlugin } from './plugins/template';
+import {
+  CACHE_VERSION,
+  hash,
+  pageRenderHash,
+  readManifest,
+  writeManifest,
+  type CacheManifest,
+  type CachedPage,
+} from './cache';
 
 export type { Plugin, PluginContext, PluginPage, SsgConfig } from './plugin';
 export { defineConfig, MarkdownPlugin, TemplatePlugin };
@@ -22,6 +31,8 @@ export interface BuildOptions {
   templatesDir?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export interface GeneratedPage {
@@ -31,6 +42,14 @@ export interface GeneratedPage {
   outputPath: string;
   url: string;
 }
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+}
+
+export type BuildResult = GeneratedPage[] & { stats: BuildStats };
 
 async function markdownFiles(directory: string): Promise<string[]> {
   const entries = await fs.readdir(directory, { withFileTypes: true });
@@ -62,7 +81,7 @@ function configuredPlugins(options: BuildOptions): Plugin[] {
 }
 
 /** Build all Markdown documents and return metadata for the generated pages. */
-export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPage[]> {
+export async function buildSite(options: BuildOptions = {}): Promise<BuildResult> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
   const templatesDir = path.resolve(options.templatesDir ?? './templates');
@@ -72,30 +91,72 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
 
   const pages: PluginPage[] = [];
   const context: PluginContext = { contentDir, outputDir, templatesDir, pages };
+  const customPlugins = configuredPlugins(options);
+  const markdown = new MarkdownPlugin();
+  const templates = new TemplatePlugin(templatesDir);
   const pipeline = new PluginPipeline([
-    new MarkdownPlugin(),
-    new TemplatePlugin(templatesDir),
-    ...configuredPlugins(options),
+    markdown,
+    templates,
+    ...customPlugins,
   ]);
+  const customPipeline = new PluginPipeline(customPlugins);
+  const cacheFile = path.join(path.dirname(outputDir), '.ssg-cache.json');
+  const cached = options.incremental && !options.clean ? await readManifest(cacheFile) : undefined;
+  const usableCache = cached?.contentDir === contentDir && cached.outputDir === outputDir ? cached : undefined;
+  const cleanBuild = !options.incremental || options.clean || !usableCache;
+  const manifest: CacheManifest = { version: CACHE_VERSION, contentDir, outputDir, pages: {} };
+  const stats: BuildStats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
+  const skippedPages = new Set<string>();
 
   try {
     await pipeline.run('onStart', context);
     await pipeline.run('beforeBuild', context);
     for (const file of await markdownFiles(contentDir)) {
       const relativePath = path.relative(contentDir, file).replace(/\.md$/i, '.html');
+      const source = await fs.readFile(file, 'utf8');
+      const sourceHash = hash(source);
+      const previous = usableCache?.pages[relativePath];
       const page: PluginPage = {
         sourcePath: file,
         relativePath,
         outputPath: path.join(outputDir, relativePath),
         url: relativePath.split(path.sep).map(encodeURIComponent).join('/'),
-        source: await fs.readFile(file, 'utf8'),
+        source,
         data: {},
         title: path.basename(file, path.extname(file)),
         tags: [],
         content: '',
         html: '',
       };
-      await pipeline.onFile(page);
+      if (previous && previous.sourceHash === sourceHash) {
+        Object.assign(page, previous, {
+          sourcePath: file,
+          relativePath,
+          outputPath: path.join(outputDir, relativePath),
+          url: relativePath.split(path.sep).map(encodeURIComponent).join('/'),
+          source,
+        });
+      } else {
+        await markdown.onFile(page);
+      }
+      const renderHash = await pageRenderHash(page, templatesDir, customPlugins);
+      const outputExists = await fs.stat(page.outputPath).then((value) => value.isFile(), (error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return false;
+        throw error;
+      });
+      if (!cleanBuild && previous?.sourceHash === sourceHash && previous.renderHash === renderHash && outputExists) {
+        stats.pagesSkipped += 1;
+        stats.timeSavedMs += previous.buildTimeMs;
+        skippedPages.add(relativePath);
+        manifest.pages[relativePath] = { ...previous, sourcePath: file, outputPath: page.outputPath, source };
+      } else {
+        const started = process.hrtime.bigint();
+        await templates.onFile(page);
+        await customPipeline.onFile(page);
+        const buildTimeMs = Number(process.hrtime.bigint() - started) / 1_000_000;
+        stats.pagesBuilt += 1;
+        manifest.pages[relativePath] = { ...page, sourceHash, renderHash, buildTimeMs };
+      }
       pages.push(page);
     }
 
@@ -111,16 +172,25 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
       outputPaths.add(normalizedPath);
     }
 
-    await fs.rm(outputDir, { recursive: true, force: true });
+    if (cleanBuild) await fs.rm(outputDir, { recursive: true, force: true });
+    if (!cleanBuild && usableCache) {
+      for (const [relativePath, previous] of Object.entries(usableCache.pages)) {
+        if (!manifest.pages[relativePath]) await fs.rm(path.join(outputDir, relativePath), { force: true });
+      }
+    }
     for (const page of pages) {
+      if (skippedPages.has(page.relativePath)) continue;
       await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
       await fs.writeFile(page.outputPath, page.html, 'utf8');
     }
     await fs.mkdir(outputDir, { recursive: true });
     await fs.writeFile(path.join(outputDir, 'index.html'), renderDocument('Pages', indexBody(pages)), 'utf8');
     await pipeline.run('afterBuild', context);
+    await writeManifest(cacheFile, manifest);
 
-    return pages.map(({ title, date, tags, outputPath, url }) => ({ title, date, tags, outputPath, url }));
+    const result = pages.map(({ title, date, tags, outputPath, url }) => ({ title, date, tags, outputPath, url })) as BuildResult;
+    Object.defineProperty(result, 'stats', { value: stats, enumerable: false });
+    return result;
   } finally {
     await pipeline.run('onEnd', context);
   }
