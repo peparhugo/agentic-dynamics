@@ -27,7 +27,7 @@ def test_encode_round_trips_through_json():
     assert json.loads(encode(message)) == message
 
 
-@pytest.mark.parametrize("msg_type", ["broadcast", "direct", "system"])
+@pytest.mark.parametrize("msg_type", ["broadcast", "direct", "system", "subscribe", "unsubscribe"])
 def test_parse_client_message_accepts_supported_types(msg_type):
     raw = '{"type": "%s", "payload": {"a": 1}}' % msg_type
     parsed = parse_client_message(raw)

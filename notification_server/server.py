@@ -14,6 +14,7 @@ import argparse
 import asyncio
 import json
 import logging
+import re
 from pathlib import Path
 
 import websockets
@@ -21,12 +22,14 @@ from websockets.datastructures import Headers
 from websockets.http11 import Response
 
 from .messages import MessageError, encode, make_message, now_iso, parse_client_message
-from .registry import ClientRegistry
+from .registry import ChannelRegistry, ClientRegistry
 from .storage import FlatFileStorage
 
 logger = logging.getLogger("notification_server")
 
 DEFAULT_DATA_PATH = Path(__file__).parent / "data" / "events.jsonl"
+
+CHANNEL_SUBSCRIBERS_PATH_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 
 class NotificationServer:
@@ -34,6 +37,7 @@ class NotificationServer:
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
+        self.channels = ChannelRegistry()
         self.storage = FlatFileStorage(storage_path)
         self._server = None
 
@@ -53,6 +57,7 @@ class NotificationServer:
             pass
         finally:
             self.registry.remove(client_id)
+            self.channels.unsubscribe_all(client_id)
             self.storage.append_event(
                 {"event": "disconnect", "client_id": client_id, "timestamp": now_iso()}
             )
@@ -91,6 +96,30 @@ class NotificationServer:
         elif msg_type == "system":
             ack = make_message("system", {"event": "ack"})
             await self._safe_send(websocket, encode(ack))
+        elif msg_type == "subscribe":
+            await self._handle_subscribe(client_id, websocket, payload)
+        elif msg_type == "unsubscribe":
+            await self._handle_unsubscribe(client_id, websocket, payload)
+
+    async def _handle_subscribe(self, client_id, websocket, payload):
+        channel = payload.get("channel")
+        if not channel:
+            error = make_message("system", {"event": "error", "detail": "channel is required"})
+            await self._safe_send(websocket, encode(error))
+            return
+        self.channels.subscribe(channel, client_id)
+        ack = make_message("system", {"event": "subscribed", "channel": channel})
+        await self._safe_send(websocket, encode(ack))
+
+    async def _handle_unsubscribe(self, client_id, websocket, payload):
+        channel = payload.get("channel")
+        if not channel:
+            error = make_message("system", {"event": "error", "detail": "channel is required"})
+            await self._safe_send(websocket, encode(error))
+            return
+        self.channels.unsubscribe(channel, client_id)
+        ack = make_message("system", {"event": "unsubscribed", "channel": channel})
+        await self._safe_send(websocket, encode(ack))
 
     # ── message delivery ────────────────────────────────────────
 
@@ -100,7 +129,13 @@ class NotificationServer:
             body.setdefault("sender_id", sender_id)
         message = make_message("broadcast", body)
         data = encode(message)
-        clients = self.registry.all()
+        channel = payload.get("channel")
+        if channel is not None:
+            subscriber_ids = self.channels.subscribers(channel)
+            all_clients = self.registry.all()
+            clients = {cid: ws for cid, ws in all_clients.items() if cid in subscriber_ids}
+        else:
+            clients = self.registry.all()
         if clients:
             await asyncio.gather(*(self._safe_send(ws, data) for ws in clients.values()))
         return message
@@ -130,19 +165,36 @@ class NotificationServer:
         except websockets.exceptions.ConnectionClosed:
             pass
 
-    # ── REST: GET /health ───────────────────────────────────────
+    # ── REST: GET /health, /channels, /channels/{name}/subscribers ─
 
     def process_request(self, connection, request):
-        if request.path == "/health":
-            body = json.dumps({"connected_clients": self.registry.count()}).encode()
-            headers = Headers(
-                [
-                    ("Content-Type", "application/json"),
-                    ("Content-Length", str(len(body))),
-                ]
-            )
-            return Response(200, "OK", headers, body)
+        path = request.path
+        if path == "/health":
+            return self._json_response({"connected_clients": self.registry.count()})
+        if path == "/channels":
+            channels = self.channels.channels()
+            data = [
+                {"name": name, "subscriber_count": len(subs)}
+                for name, subs in sorted(channels.items())
+            ]
+            return self._json_response({"channels": data})
+        match = CHANNEL_SUBSCRIBERS_PATH_RE.match(path)
+        if match:
+            channel = match.group(1)
+            subscribers = sorted(self.channels.subscribers(channel))
+            return self._json_response({"channel": channel, "subscribers": subscribers})
         return None
+
+    @staticmethod
+    def _json_response(payload):
+        body = json.dumps(payload).encode()
+        headers = Headers(
+            [
+                ("Content-Type", "application/json"),
+                ("Content-Length", str(len(body))),
+            ]
+        )
+        return Response(200, "OK", headers, body)
 
     # ── run/serve ────────────────────────────────────────────────
 

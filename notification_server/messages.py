@@ -6,7 +6,7 @@ Every message is: {"type": str, "payload": dict, "timestamp": str}
 import json
 from datetime import datetime, timezone
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def now_iso() -> str:
