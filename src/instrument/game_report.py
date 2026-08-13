@@ -157,7 +157,7 @@ class GameReport:
             lines += [
                 f"| Metric | Value |",
                 f"|--------|-------|",
-                f"| Correctness | {sol.correctness_score:.0%} ({sol.tests_passed}/{sol.tests_total} tests) {'[M]' if sol.tests_total > 0 else '[H]'} |",
+                f"| Correctness | {sol.correctness_score:.0%} ({sol.tests_passed}/{sol.tests_total} tests) {'[M]' if sol.evaluator_independent else '[H]'} |",
                 f"| Constraint satisfaction [H] | {sol.constraint_score:.0%} ({sol.constraints_met}/{sol.constraints_total} constraints) |",
                 f"| Lines of code [M] | {sol.lines_of_code} |",
                 f"| Cyclomatic complexity [C] | {sol.cyclomatic_complexity:.1f} |",

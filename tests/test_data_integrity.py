@@ -39,3 +39,18 @@ def test_no_resurrected_arch_constants_in_build_data():
     src = _read("scripts/build_data.py")
     assert '"claude_active_params"' not in src
     assert '"37B"' not in src
+
+
+def test_correctness_tag_uses_independent_evaluator():
+    # P0-11: game_report.py must tag correctness [M] only when the evaluator is
+    # independent, not merely when tests were run (agent-authored tests ≠ [M]).
+    src = _read("src/instrument/game_report.py")
+    assert "evaluator_independent" in src
+    assert "'[M]' if sol.tests_total > 0" not in src
+
+
+def test_pytest_errors_included_in_total():
+    # P0-12: analyze_worktrees.py must count errors in the denominator so an
+    # errored run can never report 100%.
+    src = _read("scripts/analyze_worktrees.py")
+    assert "total = passed + failed + errors" in src

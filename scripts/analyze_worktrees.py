@@ -99,7 +99,7 @@ def run_pytest(worktree_path: str, timeout_sec: int = 120) -> dict:
         passed = int(re.search(r'(\d+)\s+passed', out).group(1)) if re.search(r'(\d+)\s+passed', out) else 0
         failed = int(re.search(r'(\d+)\s+failed', out).group(1)) if re.search(r'(\d+)\s+failed', out) else 0
         errors = int(re.search(r'(\d+)\s+error', out).group(1)) if re.search(r'(\d+)\s+error', out) else 0
-        total = passed + failed
+        total = passed + failed + errors
 
         return {
             "ok": r.returncode == 0 and total > 0,

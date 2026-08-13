@@ -33,3 +33,11 @@ Tracks the P0 fixes from `2026-08-13_architecture-hardening-review.md` (Phase 1:
 
 - `tests/test_strategy.py` — locks in: expected archetypes, price-rescale invariance, and "cheap model can be wasteful / expensive model can be efficient".
 - **Deferred:** existing `analysis/*.json` store the pre-fix strategy labels; re-running `analyze_stories.py` will propagate the corrected classification into `data.js`.
+
+## Phase 3 (partial) — P0-11 + P0-12 (done 2026-08-13)
+
+- **P0-11 provenance `[M]` overclaim** — `game_report.py` correctness tag now uses `sol.evaluator_independent` (`[M]` only when independent, else `[H]`), not `tests_total > 0`. Agent-authored tests are no longer tagged "measured".
+- **P0-12 pytest errors dropped from denominator** — `analyze_worktrees.py` `run_pytest` now sets `total = passed + failed + errors`, so an errored run can no longer report 100%.
+- Regression guards added to `tests/test_data_integrity.py`.
+
+Remaining in Phase 3: P0-8 (baseline contamination), P0-9 (convention rubric), P0-10 (regex "AST" diff).
