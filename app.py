@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
@@ -16,6 +17,69 @@ from websockets.asyncio.server import ServerConnection, serve
 
 SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system", "subscribe", "unsubscribe"})
 BROKER_CHANNEL = "notifications:messages"
+
+
+class BaseTransport(ABC):
+    """Connection adapter used by ``NotificationServer`` to deliver messages."""
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> str:
+        """Initialize a connection and return its transport-specific client ID."""
+
+    @abstractmethod
+    async def on_disconnect(self, connection: Any) -> None:
+        """Release resources associated with a connection."""
+
+    @abstractmethod
+    async def send_message(self, connection: Any, message: dict[str, Any]) -> None:
+        """Send one notification to a connection."""
+
+    @abstractmethod
+    async def broadcast(self, connections: list[Any], message: dict[str, Any]) -> list[BaseException | None]:
+        """Send one notification to a collection of connections."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        return str(connection.id)
+
+    async def on_disconnect(self, connection: ServerConnection) -> None:
+        # websockets owns the underlying connection lifecycle.
+        return None
+
+    async def send_message(self, connection: ServerConnection, message: dict[str, Any]) -> None:
+        await connection.send(json.dumps(message))
+
+    async def broadcast(
+        self, connections: list[ServerConnection], message: dict[str, Any]
+    ) -> list[BaseException | None]:
+        payload = json.dumps(message)
+        return list(await asyncio.gather(*(connection.send(payload) for connection in connections), return_exceptions=True))
+
+    async def handle_connection(self, server: "NotificationServer", websocket: ServerConnection) -> None:
+        client_id = await server.register(websocket)
+        await server.send_to_client(client_id, system_message({"client_id": client_id, "event": "connected"}))
+        try:
+            async for raw_message in websocket:
+                try:
+                    message = server._validate_message(json.loads(raw_message))
+                except (json.JSONDecodeError, ValueError) as error:
+                    await server.send_to_client(client_id, system_message({"error": str(error)}))
+                    continue
+                await server.handle_message(client_id, message)
+        finally:
+            await server.unregister(websocket)
+
+
+def configured_transport() -> BaseTransport:
+    """Create the transport selected by TRANSPORT, defaulting to WebSockets."""
+
+    transport_name = os.environ.get("TRANSPORT", "websocket").lower()
+    if transport_name == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"unsupported transport: {transport_name}")
 
 
 class InMemoryBroker:
@@ -177,14 +241,21 @@ class MessageStore:
 
 
 class NotificationServer:
-    """Manages WebSocket clients while Redis distributes messages between workers."""
+    """Coordinates notifications independently of the connection transport."""
 
-    def __init__(self, broker: Any | None = None, database_url: str | None = None) -> None:
+    def __init__(
+        self,
+        broker: Any | None = None,
+        database_url: str | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         redis_url = os.environ.get("REDIS_URL")
         self.broker = broker or (RedisBroker(redis_url) if redis_url else InMemoryBroker())
         self.store = MessageStore(database_url or os.environ.get("DATABASE_URL", "sqlite:///notifications.db"))
         self.instance_id = str(uuid.uuid4())
-        self.clients: dict[str, ServerConnection] = {}
+        self.transport = transport or configured_transport()
+        self.clients: dict[str, Any] = {}
+        self._connection_ids: dict[int, str] = {}
         self._clients_lock = asyncio.Lock()
         self._worker: asyncio.Task[None] | None = None
 
@@ -206,21 +277,25 @@ class NotificationServer:
                 if event["type"] == "message":
                     await self._deliver(json.loads(event["data"]))
 
-    async def register(self, websocket: ServerConnection) -> str:
+    async def register(self, connection: Any) -> str:
         await self._start_worker()
-        client_id = str(websocket.id)
+        client_id = await self.transport.on_connect(connection)
         async with self._clients_lock:
-            self.clients[client_id] = websocket
+            self.clients[client_id] = connection
+            self._connection_ids[id(connection)] = client_id
         await self.broker.set_client(client_id, self.instance_id)
         return client_id
 
-    async def unregister(self, websocket: ServerConnection) -> None:
-        client_id = str(websocket.id)
+    async def unregister(self, connection: Any) -> None:
         async with self._clients_lock:
+            client_id = self._connection_ids.pop(id(connection), None)
+            if client_id is None:
+                return
             self.clients.pop(client_id, None)
         await self.broker.remove_client(client_id)
+        await self.transport.on_disconnect(connection)
 
-    async def _local_clients(self, client_ids: set[str] | None = None) -> list[ServerConnection]:
+    async def _local_clients(self, client_ids: set[str] | None = None) -> list[Any]:
         async with self._clients_lock:
             if client_ids is None:
                 return list(self.clients.values())
@@ -244,22 +319,30 @@ class NotificationServer:
                 raise ValueError("subscription channel must be a non-empty string")
         return message
 
-    async def _send(self, clients: list[ServerConnection], message: dict[str, Any]) -> None:
-        payload = json.dumps(message)
-        results = await asyncio.gather(*(client.send(payload) for client in clients), return_exceptions=True)
+    async def _send(self, clients: list[Any], message: dict[str, Any]) -> None:
+        results = list(
+            await asyncio.gather(*(self.transport.send_message(client, message) for client in clients), return_exceptions=True)
+        )
+        await self._remove_failed_clients(clients, results)
+
+    async def _remove_failed_clients(self, clients: list[Any], results: list[BaseException | None]) -> None:
         for client, result in zip(clients, results):
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 await self.unregister(client)
+
+    async def send_to_client(self, client_id: str, message: dict[str, Any]) -> None:
+        await self._send(await self._local_clients({client_id}), message)
 
     async def _deliver(self, message: dict[str, Any]) -> None:
         if message["type"] == "broadcast":
             channel = message.get("channel")
             clients = await self._local_clients(await self.broker.subscribers(channel) if channel else None)
-            await self._send(clients, message)
+            results = await self.transport.broadcast(clients, message)
+            await self._remove_failed_clients(clients, results)
         elif message["type"] == "direct":
             client_id = str(message["payload"].get("client_id"))
             if await self.broker.client_owner(client_id) == self.instance_id:
-                await self._send(await self._local_clients({client_id}), message)
+                await self.send_to_client(client_id, message)
 
     async def update_subscription(self, client_id: str, message: dict[str, Any]) -> None:
         channel = message["payload"].get("channel", message.get("channel"))
@@ -268,23 +351,17 @@ class NotificationServer:
         else:
             await self.broker.unsubscribe_client(channel, client_id)
 
+    async def handle_message(self, client_id: str, message: dict[str, Any]) -> None:
+        await self.store.save(message)
+        if message["type"] in {"subscribe", "unsubscribe"}:
+            await self.update_subscription(client_id, message)
+        elif message["type"] in {"broadcast", "direct"}:
+            await self.broker.publish(message)
+
     async def handle_connection(self, websocket: ServerConnection) -> None:
-        client_id = await self.register(websocket)
-        await websocket.send(json.dumps(system_message({"client_id": client_id, "event": "connected"})))
-        try:
-            async for raw_message in websocket:
-                try:
-                    message = self._validate_message(json.loads(raw_message))
-                except (json.JSONDecodeError, ValueError) as error:
-                    await websocket.send(json.dumps(system_message({"error": str(error)})))
-                    continue
-                await self.store.save(message)
-                if message["type"] in {"subscribe", "unsubscribe"}:
-                    await self.update_subscription(client_id, message)
-                elif message["type"] in {"broadcast", "direct"}:
-                    await self.broker.publish(message)
-        finally:
-            await self.unregister(websocket)
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("handle_connection is only available with the websocket transport")
+        await self.transport.handle_connection(self, websocket)
 
     async def health_response(self, connection: ServerConnection, request: Any) -> Any:
         parsed = urlsplit(request.path)
