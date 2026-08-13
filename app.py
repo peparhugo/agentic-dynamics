@@ -6,12 +6,12 @@ A simple task management API with SQLite persistence and JWT authentication.
 
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
-import sqlite3
 import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from tasks_celery import celery_app, send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 app.config["CELERY_BROKER_URL"] = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
@@ -29,34 +29,15 @@ celery_app.Task = ContextTask
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
+user_repo = UserRepository()
+task_repo = TaskRepository()
+
 
 # ── Database ────────────────────────────────────────────────────
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def init_db():
-    with get_db() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                email TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER NOT NULL,
-                FOREIGN KEY (owner_id) REFERENCES users (id)
-            );
-        """)
+    user_repo.init_db()
+    task_repo.init_db()
 
 
 # ── Authentication Helpers ─────────────────────────────────────
@@ -98,16 +79,6 @@ def require_auth(f):
 
 # ── Helper Functions ────────────────────────────────────────────
 
-def get_user_email(user_id):
-    """Get the email address for a user, return None if not found."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT email FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-    return row["email"] if row else None
-
-
 def task_to_dict(row):
     """Convert a database row to a dictionary."""
     return {
@@ -137,14 +108,8 @@ def register():
     password_hash = generate_password_hash(password)
 
     try:
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, password_hash, email),
-            )
-            conn.commit()
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user_id = user_repo.create_user(username, password_hash, email)
+    except Exception:
         return jsonify({"error": "username already exists"}), 400
 
     token = get_jwt_token(user_id)
@@ -161,11 +126,7 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    with get_db() as conn:
-        user = conn.execute(
-            "SELECT id, password_hash FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
+    user = user_repo.get_user_by_username(username)
 
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
@@ -187,13 +148,7 @@ def create_task(user_id):
         return jsonify({"error": "title is required"}), 400
 
     now = datetime.utcnow().isoformat()
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, ?, ?, ?)",
-            (title, "pending", now, user_id),
-        )
-        conn.commit()
-        task_id = cursor.lastrowid
+    task_id = task_repo.create_task(title, "pending", now, user_id)
 
     return jsonify({
         "id": task_id,
@@ -207,12 +162,7 @@ def create_task(user_id):
 @require_auth
 def list_tasks(user_id):
     """List all tasks for the authenticated user ordered by created_at descending."""
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (user_id,)
-        ).fetchall()
-
+    rows = task_repo.get_tasks_by_owner(user_id)
     return jsonify([task_to_dict(row) for row in rows])
 
 
@@ -220,11 +170,7 @@ def list_tasks(user_id):
 @require_auth
 def get_task(user_id, task_id):
     """Get a single task by ID."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
+    row = task_repo.get_task_by_id_and_owner(task_id, user_id)
 
     if row is None:
         return jsonify({"error": "task not found"}), 404
@@ -238,30 +184,22 @@ def update_task(user_id, task_id):
     """Update a task's title and/or status."""
     data = request.get_json(silent=True) or {}
 
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
+    row = task_repo.get_task_by_id_and_owner(task_id, user_id)
 
-        if row is None:
-            return jsonify({"error": "task not found"}), 404
+    if row is None:
+        return jsonify({"error": "task not found"}), 404
 
-        title = data.get("title", row["title"]).strip() if "title" in data else row["title"]
-        status = data.get("status", row["status"]) if "status" in data else row["status"]
+    title = data.get("title", row["title"]).strip() if "title" in data else row["title"]
+    status = data.get("status", row["status"]) if "status" in data else row["status"]
 
-        if "title" in data and not title:
-            return jsonify({"error": "title cannot be empty"}), 400
+    if "title" in data and not title:
+        return jsonify({"error": "title cannot be empty"}), 400
 
-        old_status = row["status"]
-        conn.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
-            (title, status, task_id),
-        )
-        conn.commit()
+    old_status = row["status"]
+    task_repo.update_task(task_id, title, status)
 
     if status == "completed" and old_status != "completed":
-        user_email = get_user_email(user_id)
+        user_email = user_repo.get_user_email(user_id)
         if user_email:
             send_notification_email.delay(user_email, title)
 
