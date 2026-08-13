@@ -79,6 +79,53 @@ def test_update_task(auth_client):
     assert response.get_json()["created_at"] == created["created_at"]
 
 
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    client.post(
+        "/auth/register",
+        json={
+            "username": "alice",
+            "email": "alice@example.com",
+            "password": "secret",
+        },
+    )
+    token = client.post(
+        "/auth/login", json={"username": "alice", "password": "secret"}
+    ).get_json()["token"]
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    created = client.post("/tasks", json={"title": "Ship release"}).get_json()
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{created['id']}",
+        json={"title": "Ship final release", "status": "completed"},
+    )
+
+    assert response.status_code == 200
+    assert queued == [("alice@example.com", "Ship final release")]
+
+
+def test_notification_only_queued_on_transition_to_completed(auth_client, monkeypatch):
+    created = auth_client.post("/tasks", json={"title": "One email"}).get_json()
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "active"})
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+    auth_client.put(f"/tasks/{created['id']}", json={"title": "Renamed"})
+
+    assert queued == [("alice", "One email")]
+
+
 def test_update_single_field(auth_client):
     created = auth_client.post("/tasks", json={"title": "Task"}).get_json()
 

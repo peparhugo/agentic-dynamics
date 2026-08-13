@@ -12,6 +12,9 @@ from flask import Flask, g, jsonify, request
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import celery_app
+from notifications import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -34,10 +37,18 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                email TEXT NOT NULL,
                 password_hash TEXT NOT NULL
             )
             """
         )
+        user_columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(users)").fetchall()
+        }
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            connection.execute("UPDATE users SET email = username WHERE email IS NULL")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS tasks (
@@ -165,12 +176,17 @@ def register():
     if credentials is None:
         return jsonify({"error": "username and password are required"}), 400
     username, password = credentials
+    data = request.get_json()
+    email = data.get("email", username)
+    if not isinstance(email, str) or not email.strip():
+        return jsonify({"error": "email must be a non-empty string"}), 400
+    email = email.strip()
 
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username, email, generate_password_hash(password)),
             )
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -278,7 +294,9 @@ def update_task(task_id):
 
     with get_db() as connection:
         exists = connection.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
+            "SELECT tasks.id, tasks.status, users.email, users.username "
+            "FROM tasks JOIN users ON users.id = tasks.owner_id "
+            "WHERE tasks.id = ? AND tasks.owner_id = ?",
             (task_id, g.current_user_id),
         ).fetchone()
         if exists is None:
@@ -293,6 +311,16 @@ def update_task(task_id):
             "WHERE id = ? AND owner_id = ?",
             (task_id, g.current_user_id),
         ).fetchone()
+
+    status_changed_to_completed = (
+        "status" in data
+        and data["status"].strip() == "completed"
+        and exists["status"] != "completed"
+    )
+    if status_changed_to_completed:
+        if app.config["TESTING"]:
+            celery_app.conf.task_always_eager = True
+        send_notification_email.delay(exists["email"] or exists["username"], row["title"])
 
     return jsonify(task_response(row))
 
