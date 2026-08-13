@@ -14,6 +14,7 @@ import os
 import jwt
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -27,6 +28,13 @@ def get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# Repositories receive `get_db` itself (not a connection), so they always
+# resolve the current DATABASE at call time — important since callers (and
+# tests) may repoint DATABASE after the app module has already loaded.
+user_repository = UserRepository(get_db)
+task_repository = TaskRepository(get_db)
 
 
 def init_db():
@@ -72,90 +80,39 @@ def _migrate_add_email(conn):
 
 
 def create_user(username: str, password: str, email: str | None = None) -> dict:
-    with get_db() as conn:
-        password_hash = generate_password_hash(password)
-        email = email or f"{username}@example.com"
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username, "email": email}
+    password_hash = generate_password_hash(password)
+    email = email or f"{username}@example.com"
+    return user_repository.create(username, password_hash, email)
 
 
 def get_user_by_username(username: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        return dict(row) if row else None
+    return user_repository.get_by_username(username)
 
 
 def get_user_by_id(user_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(row) if row else None
+    return user_repository.get_by_id(user_id)
 
 
 # ── Models: tasks ─────────────────────────────────────────────────
 
 
 def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    now = datetime.utcnow().isoformat()
+    return task_repository.create(title, owner_id, now)
 
 
 def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    return task_repository.list_for_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-        return dict(row) if row else None
+    return task_repository.get_for_owner(task_id, owner_id)
 
 
 def update_task(
     task_id: int, owner_id: int, title: str | None = None, status: str | None = None
 ) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return task_repository.update_for_owner(task_id, owner_id, title=title, status=status)
 
 
 # ── Auth helpers ──────────────────────────────────────────────────
