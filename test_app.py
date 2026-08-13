@@ -136,3 +136,170 @@ def test_http_health_endpoint_returns_client_count(ws_server):
         assert resp.status == 200
         body = json.loads(resp.read())
         assert body == {"client_count": 0}
+
+
+async def test_subscribe_acknowledges_subscription(ws_server, client):
+    ws, _ = client
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    ack = await recv_message(ws)
+    assert ack["type"] == "system"
+    assert ack["payload"]["action"] == "subscribed"
+    assert ack["payload"]["channel"] == "alerts"
+
+
+async def test_subscribe_without_channel_reports_error(ws_server, client):
+    ws, _ = client
+    await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+    err = await recv_message(ws)
+    assert err["type"] == "system"
+    assert err["payload"]["action"] == "error"
+
+
+async def test_channel_message_delivered_only_to_subscribers(ws_server):
+    ws1 = await connect(ws_server["ws_url"])
+    ws2 = await connect(ws_server["ws_url"])
+    ws3 = await connect(ws_server["ws_url"])
+    await recv_message(ws1)
+    await recv_message(ws2)
+    await recv_message(ws3)
+
+    await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await ws1.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "hi"}}))
+    m1 = await recv_message(ws1)
+    m2 = await recv_message(ws2)
+    assert m1["type"] == "broadcast"
+    assert m1["payload"] == {"channel": "alerts", "text": "hi"}
+    assert m2["type"] == "broadcast"
+    assert m2["payload"] == {"channel": "alerts", "text": "hi"}
+    await ws1.close()
+    await ws2.close()
+    await ws3.close()
+
+
+async def test_unsubscribed_client_does_not_receive_channel_message(ws_server):
+    ws_sub = await connect(ws_server["ws_url"])
+    ws_not = await connect(ws_server["ws_url"])
+    await recv_message(ws_sub)
+    await recv_message(ws_not)
+
+    await ws_sub.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws_sub)
+
+    await ws_sub.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "hi"}}))
+    m = await recv_message(ws_sub)
+    assert m["payload"]["text"] == "hi"
+    assert not await _poll_no_message(ws_not)
+    await ws_sub.close()
+    await ws_not.close()
+
+
+async def test_unsubscribe_stops_channel_delivery(ws_server):
+    ws1 = await connect(ws_server["ws_url"])
+    ws2 = await connect(ws_server["ws_url"])
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws1)
+    await recv_message(ws2)
+
+    await ws2.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+    ack = await recv_message(ws2)
+    assert ack["payload"]["action"] == "unsubscribed"
+
+    await ws1.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "hi"}}))
+    m1 = await recv_message(ws1)
+    assert m1["payload"]["text"] == "hi"
+    assert not await _poll_no_message(ws2)
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(ws_server):
+    ws = await connect(ws_server["ws_url"])
+    await recv_message(ws)
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws)
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+    await recv_message(ws)
+
+    await ws.send(json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "a"}}))
+    await ws.send(json.dumps({"type": "broadcast", "payload": {"channel": "chat", "text": "c"}}))
+    assert (await recv_message(ws))["payload"]["text"] == "a"
+    assert (await recv_message(ws))["payload"]["text"] == "c"
+    await ws.close()
+
+
+async def test_broadcast_without_channel_reaches_everyone(ws_server):
+    ws_sub = await connect(ws_server["ws_url"])
+    ws_not = await connect(ws_server["ws_url"])
+    await recv_message(ws_sub)
+    await recv_message(ws_not)
+
+    await ws_sub.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws_sub)
+
+    await ws_sub.send(json.dumps({"type": "broadcast", "payload": {"text": "all"}}))
+    m1 = await recv_message(ws_sub)
+    m2 = await recv_message(ws_not)
+    assert m1["payload"] == {"text": "all"}
+    assert m2["payload"] == {"text": "all"}
+    await ws_sub.close()
+    await ws_not.close()
+
+
+async def _poll_no_message(ws):
+    import asyncio
+
+    for _ in range(10):
+        try:
+            await asyncio.wait_for(ws.recv(), timeout=0.05)
+            return True
+        except asyncio.TimeoutError:
+            continue
+    return False
+
+
+def test_http_channels_endpoint_empty(ws_server):
+    import urllib.request
+
+    with urllib.request.urlopen(ws_server["health_url"] + "/channels") as resp:
+        assert resp.status == 200
+        body = json.loads(resp.read())
+        assert body == {"channels": {}}
+
+
+async def test_http_channels_lists_subscriber_counts(ws_server):
+    import urllib.request
+
+    ws = await connect(ws_server["ws_url"])
+    await recv_message(ws)
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws)
+
+    with urllib.request.urlopen(ws_server["health_url"] + "/channels") as resp:
+        body = json.loads(resp.read())
+    assert body["channels"]["alerts"] == 1
+    await ws.close()
+
+
+async def test_http_channels_subscribers_endpoint(ws_server):
+    import urllib.request
+
+    ws = await connect(ws_server["ws_url"])
+    greeting = await recv_message(ws)
+    client_id = greeting["payload"]["client_id"]
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws)
+
+    with urllib.request.urlopen(ws_server["health_url"] + "/channels/alerts/subscribers") as resp:
+        assert resp.status == 200
+        body = json.loads(resp.read())
+    assert body["channel"] == "alerts"
+    assert body["subscribers"] == [client_id]
+    await ws.close()
