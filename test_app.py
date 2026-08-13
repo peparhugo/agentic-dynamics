@@ -1187,3 +1187,354 @@ async def test_transport_custom_env():
             os.environ["TRANSPORT"] = original_transport
         elif "TRANSPORT" in os.environ:
             del os.environ["TRANSPORT"]
+
+
+@pytest.mark.asyncio
+async def test_rate_limiter_no_redis():
+    """Test that rate limiter allows all requests when redis is unavailable."""
+    from app import RateLimiter
+
+    limiter = RateLimiter(redis_client=None, limit=2)
+    allowed, error = await limiter.is_allowed("client-1")
+    assert allowed is True
+    assert error is None
+
+
+@pytest.mark.asyncio
+async def test_history_handler_requires_channel():
+    """Test that history endpoint requires channel parameter."""
+    from app import history_handler
+
+    class MockRequest:
+        def __init__(self, params):
+            self.query = params
+
+    request = MockRequest({})
+    response = await history_handler(request)
+    data = json.loads(response.text)
+
+    assert response.status == 400
+    assert "error" in data
+    assert "channel" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_history_handler_basic():
+    """Test basic history retrieval."""
+    import tempfile
+    import os
+    from app import store_message, init_database, history_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_history.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp_1 = "2025-08-13T10:00:00"
+            msg_timestamp_2 = "2025-08-13T10:01:00"
+            msg_timestamp_3 = "2025-08-13T10:02:00"
+
+            await store_message("alerts", "broadcast", {"text": "msg1"}, msg_timestamp_1)
+            await store_message("alerts", "broadcast", {"text": "msg2"}, msg_timestamp_2)
+            await store_message("system", "broadcast", {"text": "msg3"}, msg_timestamp_3)
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"channel": "alerts"})
+            response = await history_handler(request)
+            data = json.loads(response.text)
+
+            assert data["channel"] == "alerts"
+            assert len(data["messages"]) == 2
+            assert data["messages"][0]["payload"]["text"] == "msg1"
+            assert data["messages"][1]["payload"]["text"] == "msg2"
+            assert data["has_more"] is False
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_history_handler_with_since():
+    """Test history retrieval with since filter."""
+    import tempfile
+    import os
+    from app import store_message, init_database, history_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_history_since.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp_1 = "2025-08-13T10:00:00"
+            msg_timestamp_2 = "2025-08-13T10:01:00"
+            msg_timestamp_3 = "2025-08-13T10:02:00"
+
+            await store_message("alerts", "broadcast", {"text": "msg1"}, msg_timestamp_1)
+            await store_message("alerts", "broadcast", {"text": "msg2"}, msg_timestamp_2)
+            await store_message("alerts", "broadcast", {"text": "msg3"}, msg_timestamp_3)
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"channel": "alerts", "since": "2025-08-13T10:00:30"})
+            response = await history_handler(request)
+            data = json.loads(response.text)
+
+            assert data["channel"] == "alerts"
+            assert len(data["messages"]) == 2
+            assert data["messages"][0]["payload"]["text"] == "msg2"
+            assert data["messages"][1]["payload"]["text"] == "msg3"
+            assert data["has_more"] is False
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_history_handler_pagination():
+    """Test history pagination with has_more flag."""
+    import tempfile
+    import os
+    from app import store_message, init_database, history_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_history_pagination.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            base_time = "2025-08-13T10:00:00"
+            for i in range(10):
+                timestamp = f"2025-08-13T10:{i:02d}:00"
+                await store_message("alerts", "broadcast", {"index": i}, timestamp)
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"channel": "alerts", "limit": "5"})
+            response = await history_handler(request)
+            data = json.loads(response.text)
+
+            assert len(data["messages"]) == 5
+            assert data["has_more"] is True
+            assert data["messages"][0]["payload"]["index"] == 0
+            assert data["messages"][4]["payload"]["index"] == 4
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_cleanup_old_messages():
+    """Test cleanup of old messages."""
+    import tempfile
+    import os
+    from datetime import datetime, timedelta
+    from app import store_message, init_database, cleanup_old_messages, get_messages
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_cleanup.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            old_timestamp = (datetime.utcnow() - timedelta(days=8)).isoformat()
+            recent_timestamp = datetime.utcnow().isoformat()
+
+            await store_message("alerts", "broadcast", {"old": True}, old_timestamp)
+            await store_message("alerts", "broadcast", {"recent": True}, recent_timestamp)
+
+            messages = await get_messages(limit=50, offset=0)
+            assert len(messages) == 2
+
+            await cleanup_old_messages(ttl_days=7)
+
+            messages = await get_messages(limit=50, offset=0)
+            assert len(messages) == 1
+            assert messages[0]["payload"]["recent"] is True
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_env_var():
+    """Test RATE_LIMIT env var configuration."""
+    import os
+    from app import get_rate_limit
+
+    original_rate_limit = os.environ.get("RATE_LIMIT")
+    try:
+        os.environ["RATE_LIMIT"] = "200"
+        assert get_rate_limit() == 200
+
+        os.environ["RATE_LIMIT"] = "invalid"
+        assert get_rate_limit() == 100
+
+        del os.environ["RATE_LIMIT"]
+        assert get_rate_limit() == 100
+    finally:
+        if original_rate_limit:
+            os.environ["RATE_LIMIT"] = original_rate_limit
+        elif "RATE_LIMIT" in os.environ:
+            del os.environ["RATE_LIMIT"]
+
+
+@pytest.mark.asyncio
+async def test_message_ttl_env_var():
+    """Test MESSAGE_TTL_DAYS env var configuration."""
+    import os
+    from app import get_message_ttl_days
+
+    original_ttl = os.environ.get("MESSAGE_TTL_DAYS")
+    try:
+        os.environ["MESSAGE_TTL_DAYS"] = "14"
+        assert get_message_ttl_days() == 14
+
+        os.environ["MESSAGE_TTL_DAYS"] = "invalid"
+        assert get_message_ttl_days() == 7
+
+        del os.environ["MESSAGE_TTL_DAYS"]
+        assert get_message_ttl_days() == 7
+    finally:
+        if original_ttl:
+            os.environ["MESSAGE_TTL_DAYS"] = original_ttl
+        elif "MESSAGE_TTL_DAYS" in os.environ:
+            del os.environ["MESSAGE_TTL_DAYS"]
+
+
+@pytest.mark.asyncio
+async def test_history_empty_channel():
+    """Test history for channel with no messages."""
+    import tempfile
+    import os
+    from app import init_database, history_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_empty_history.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"channel": "empty"})
+            response = await history_handler(request)
+            data = json.loads(response.text)
+
+            assert data["channel"] == "empty"
+            assert len(data["messages"]) == 0
+            assert data["has_more"] is False
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_history_invalid_limit():
+    """Test history with invalid limit parameter."""
+    import tempfile
+    import os
+    from app import store_message, init_database, history_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_invalid_limit.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            await store_message("alerts", "broadcast", {"text": "msg"}, "2025-08-13T10:00:00")
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"channel": "alerts", "limit": "invalid"})
+            response = await history_handler(request)
+            data = json.loads(response.text)
+
+            assert data["limit"] == 50
+            assert len(data["messages"]) == 1
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_websocket_handler_rate_limited():
+    """Test websocket rate limiting on broadcast."""
+    from app import registry
+
+    registry.clients.clear()
+
+    class TestWebSocket:
+        def __init__(self):
+            self.messages = []
+            self.message_queue = [
+                json.dumps({"type": "broadcast", "payload": {"test": "data"}}),
+                json.dumps({"type": "broadcast", "payload": {"test": "data2"}}),
+            ]
+            self.index = 0
+
+        async def send(self, msg):
+            self.messages.append(msg)
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            if self.index >= len(self.message_queue):
+                raise StopAsyncIteration
+            msg = self.message_queue[self.index]
+            self.index += 1
+            return msg
+
+    ws = TestWebSocket()
+
+    task = asyncio.create_task(websocket_handler(ws))
+
+    await asyncio.sleep(0.1)
+
+    try:
+        await asyncio.wait_for(task, timeout=0.2)
+    except asyncio.TimeoutError:
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    registry.clients.clear()

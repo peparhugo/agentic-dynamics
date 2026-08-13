@@ -7,8 +7,8 @@ import json
 import uuid
 import os
 from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Dict, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Optional, Tuple
 import websockets
 from websockets.exceptions import ConnectionClosed
 from aiohttp import web
@@ -145,6 +145,35 @@ class BaseTransport(ABC):
         pass
 
 
+class RateLimiter:
+    """Rate limiter using Redis for distributed tracking."""
+
+    def __init__(self, redis_client: Optional[redis.Redis] = None, limit: int = 100):
+        self.redis_client = redis_client
+        self.limit = limit
+        self.window_seconds = 60
+
+    async def is_allowed(self, client_id: str) -> Tuple[bool, Optional[str]]:
+        """Check if client is allowed to send message.
+
+        Returns (allowed, error_message)
+        """
+        if not self.redis_client:
+            return True, None
+
+        try:
+            key = f"rate_limit:{client_id}"
+            current = await self.redis_client.incr(key)
+            if current == 1:
+                await self.redis_client.expire(key, self.window_seconds)
+
+            if current > self.limit:
+                return False, f"Rate limit exceeded: {self.limit} messages per minute"
+            return True, None
+        except Exception:
+            return True, None
+
+
 class WebSocketTransport(BaseTransport):
     """WebSocket transport implementation."""
 
@@ -177,6 +206,7 @@ registry = ClientRegistry()
 
 # Global Redis and database instances
 redis_client: Optional[redis.Redis] = None
+rate_limiter: Optional[RateLimiter] = None
 
 
 def get_db_path() -> str:
@@ -187,6 +217,22 @@ def get_db_path() -> str:
 def get_redis_url() -> str:
     """Get the Redis URL from environment or use default."""
     return os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+
+def get_rate_limit() -> int:
+    """Get the rate limit from environment or use default."""
+    try:
+        return int(os.environ.get("RATE_LIMIT", "100"))
+    except ValueError:
+        return 100
+
+
+def get_message_ttl_days() -> int:
+    """Get the message TTL in days from environment or use default."""
+    try:
+        return int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+    except ValueError:
+        return 7
 
 
 def get_transport() -> BaseTransport:
@@ -210,6 +256,10 @@ async def init_database():
                 payload TEXT NOT NULL,
                 timestamp TEXT NOT NULL
             )
+        """)
+        await db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_messages_channel_timestamp
+            ON messages (channel, timestamp)
         """)
         await db.commit()
 
@@ -257,6 +307,67 @@ async def get_messages(limit: int = 50, offset: int = 0) -> list:
         ]
 
 
+async def get_history(channel: str, since: Optional[str] = None, limit: int = 50) -> Tuple[list, bool]:
+    """Retrieve message history for a channel.
+
+    Returns (messages, has_more) tuple.
+    Messages are returned in chronological order (oldest first).
+    """
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        if since:
+            cursor = await db.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ? AND timestamp > ?
+                ORDER BY timestamp ASC
+                LIMIT ?
+                """,
+                (channel, since, limit + 1)
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ?
+                ORDER BY timestamp ASC
+                LIMIT ?
+                """,
+                (channel, limit + 1)
+            )
+        rows = await cursor.fetchall()
+
+        has_more = len(rows) > limit
+        messages = [
+            {
+                "id": row[0],
+                "channel": row[1],
+                "type": row[2],
+                "payload": json.loads(row[3]),
+                "timestamp": row[4]
+            }
+            for row in rows[:limit]
+        ]
+        return messages, has_more
+
+
+async def cleanup_old_messages(ttl_days: int = 7):
+    """Delete messages older than ttl_days."""
+    try:
+        db_path = get_db_path()
+        cutoff_date = (datetime.utcnow() - timedelta(days=ttl_days)).isoformat()
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                "DELETE FROM messages WHERE timestamp < ?",
+                (cutoff_date,)
+            )
+            await db.commit()
+    except Exception:
+        pass
+
+
 def create_message(msg_type: str, payload: dict) -> dict:
     """Create a properly formatted message."""
     return {
@@ -299,6 +410,19 @@ async def redis_subscriber():
         await pubsub.close()
 
 
+async def cleanup_task():
+    """Background task to cleanup old messages periodically."""
+    ttl_days = get_message_ttl_days()
+    while True:
+        try:
+            await asyncio.sleep(3600)
+            await cleanup_old_messages(ttl_days)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
+
+
 async def websocket_handler(websocket):
     """Handle WebSocket connection."""
     client_id = str(uuid.uuid4())
@@ -317,6 +441,15 @@ async def websocket_handler(websocket):
                 msg_type = message.get("type")
 
                 if msg_type == "broadcast":
+                    if rate_limiter:
+                        allowed, error_msg = await rate_limiter.is_allowed(client_id)
+                        if not allowed:
+                            await websocket.send(
+                                json.dumps(
+                                    create_message("system", {"error": error_msg})
+                                )
+                            )
+                            continue
                     channel = message.get("channel")
                     msg = create_message("broadcast", message.get("payload", {}))
                     await registry.broadcast(msg, channel=channel)
@@ -404,6 +537,29 @@ async def channel_subscribers_handler(request):
     return web.json_response({"channel": channel_name, "subscribers": subscribers})
 
 
+async def history_handler(request):
+    """Get message history for a specific channel with time range filtering."""
+    channel = request.query.get("channel")
+    since = request.query.get("since")
+    try:
+        limit = int(request.query.get("limit", 50))
+        limit = min(limit, 1000)
+        limit = max(limit, 1)
+    except (ValueError, TypeError):
+        limit = 50
+
+    if not channel:
+        return web.json_response({"error": "channel parameter required"}, status=400)
+
+    messages, has_more = await get_history(channel, since=since, limit=limit)
+    return web.json_response({
+        "messages": messages,
+        "channel": channel,
+        "limit": limit,
+        "has_more": has_more
+    })
+
+
 async def messages_handler(request):
     """Get message history with pagination."""
     try:
@@ -421,16 +577,18 @@ async def messages_handler(request):
 
 async def start_servers():
     """Start both WebSocket and REST servers."""
-    global redis_client
+    global redis_client, rate_limiter
 
     await init_database()
 
     try:
         redis_client = await redis.from_url(get_redis_url())
         await redis_client.ping()
+        rate_limiter = RateLimiter(redis_client, limit=get_rate_limit())
     except Exception:
-        print("Warning: Redis connection failed, running without pub/sub")
+        print("Warning: Redis connection failed, running without pub/sub and rate limiting")
         redis_client = None
+        rate_limiter = None
 
     async with websockets.serve(websocket_handler, "localhost", 8765):
         app = web.Application()
@@ -438,6 +596,7 @@ async def start_servers():
         app.router.add_get("/channels", channels_handler)
         app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
         app.router.add_get("/messages", messages_handler)
+        app.router.add_get("/history", history_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, "localhost", 8766)
@@ -450,11 +609,18 @@ async def start_servers():
         if redis_client:
             redis_task = asyncio.create_task(redis_subscriber())
 
+        cleanup_bg_task = asyncio.create_task(cleanup_task())
+
         try:
             await asyncio.Event().wait()
         except KeyboardInterrupt:
             pass
         finally:
+            cleanup_bg_task.cancel()
+            try:
+                await cleanup_bg_task
+            except asyncio.CancelledError:
+                pass
             if redis_task:
                 redis_task.cancel()
                 try:
