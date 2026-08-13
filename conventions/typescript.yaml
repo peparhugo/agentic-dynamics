@@ -68,7 +68,5 @@ conventions:
       - '\.catch\('
 
 scoring:
-  naming_weight: 0.30
-  structure_weight: 0.25
-  type_safety_weight: 0.25
-  error_handling_weight: 0.20
+  naming_weight: 0.5
+  violations_weight: 0.5

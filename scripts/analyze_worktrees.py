@@ -945,11 +945,12 @@ def build_baseline_index(worktrees: list[dict]) -> dict:
 def find_baseline_code(worktree_title: str, session: dict,
                        baseline_index: dict, worktree_path: str = "") -> str:
     """Find matching baseline code, preferring instruction-level fingerprint matches.
-    
+
     Priority:
-      1. Fingerprint match (same instructions → same code structure)
+      1. Fingerprint match (same instructions → same code structure, ≥50%)
       2. Experiment+model exact match
-      3. Same-model fallback
+      3. Same-experiment fuzzy model match
+    Deliberately no cross-experiment fallback — see P0-8.
     """
     info = parse_session_title_info(worktree_title)
     if info["operator"] == "baseline":
@@ -972,7 +973,7 @@ def find_baseline_code(worktree_title: str, session: dict,
                 # Boost score for same-model matches
                 if prov and mid and entry.get("prov") == prov and entry.get("mid") == mid:
                     s = min(s + 0.1, 1.0)
-                if s > best_score and s > 0.25:
+                if s > best_score and s > 0.5:
                     best_score = s
                     best_code = entry["code"]
             if best_code:
@@ -996,17 +997,11 @@ def find_baseline_code(worktree_title: str, session: dict,
                 if ms_words & kw or ms.lower() in key_ms.lower() or key_ms.lower() in ms.lower():
                     return entry["code"]
 
-    # ── Priority 4: any baseline for same model ──
-    if prov and mid:
-        target = f"{prov}/{mid}"
-        for bk, entry in baseline_index.items():
-            if target in bk:
-                return entry["code"]
-    if prov:
-        for bk, entry in baseline_index.items():
-            if prov in bk:
-                return entry["code"]
-
+    # ── No cross-experiment fallback ──
+    # Deliberately removed (P0-8): the old "any baseline for the same model"
+    # fallback could match a perturbed url_shortener run against a task_manager
+    # baseline, recording bogus basin-escape numbers. A perturbed run with no
+    # same-experiment baseline is reported as unmatched, not cross-matched.
     return ""
 
 

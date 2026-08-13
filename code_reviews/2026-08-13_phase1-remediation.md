@@ -41,3 +41,12 @@ Tracks the P0 fixes from `2026-08-13_architecture-hardening-review.md` (Phase 1:
 - Regression guards added to `tests/test_data_integrity.py`.
 
 Remaining in Phase 3: P0-8 (baseline contamination), P0-9 (convention rubric), P0-10 (regex "AST" diff).
+
+## Phase 3 (complete) — P0-8, P0-9, P0-10 (done 2026-08-13)
+
+- **P0-8 baseline cross-contamination** — removed the "any baseline for same model" cross-experiment fallback in `analyze_worktrees.py`; raised the fingerprint threshold 0.25 → 0.5.
+- **P0-9 convention rubric** — `score_conventions` now uses a `violations_weight` key (forbidden patterns were mis-keyed to `structure_weight`); removed the unimplemented `structure/documentation/type_safety/error_handling` weights from `conventions/*.yaml` so the rubric matches reality (naming + violations only).
+- **P0-10 regex "AST" diff** — added Go (`func`/`type`/`import`) and Rust (`fn`/`struct|enum|impl|trait`/`use`) patterns so Go/Rust are no longer miscounted as zero; docstring now says it's a diff-stat heuristic, not a tree-sitter AST.
+- Tests: `tests/test_commit_analysis.py` (Go + Rust counting), `tests/test_data_integrity.py` (baseline fallback + Go/Rust pattern guards).
+
+Phase 3 complete. Phase 4 (robustness P1-1…P1-5) and Phase 5 (cleanup P2-1…P2-6) remain.

@@ -216,10 +216,12 @@ def compute_ast_diff(
     child_commit: str,
     profile: LanguageProfile | None = None,
 ) -> CommitAnalysis:
-    """Compute AST-level diff between two commits using git diff stats.
+    """Compute diff-level structural changes between two commits.
 
-    Uses `git diff` (instant) instead of temporary worktrees.
-    No git worktree creation — all metrics from the diff output.
+    Uses `git diff` (instant) instead of temporary worktrees. The structural
+    counts (functions/classes/imports) are a regex diff-stat *heuristic*, not a
+    tree-sitter AST — kept under this name for API compatibility. Language-aware
+    patterns cover Python, TypeScript, Go, and Rust.
 
     Args:
         worktree: Path to the git worktree.
@@ -228,7 +230,7 @@ def compute_ast_diff(
         profile: Language profile. Auto-detected if None.
 
     Returns:
-        CommitAnalysis with AST diff fields populated.
+        CommitAnalysis with diff fields populated.
     """
     if profile is None:
         profile = detect_language(worktree)
@@ -270,9 +272,10 @@ def compute_ast_diff(
         elif line.startswith("D"):
             files_deleted += 1
 
-    # Functions/classes/imports: count + and - lines in the diff
-    # For Python: +def , +class , +import , +from
-    # For TypeScript: +function , +class , +import
+    # Functions/classes/imports: count + and - lines in the diff.
+    # This is a diff-stat *heuristic* (regex on git diff hunks), not a
+    # tree-sitter AST — the function name is retained for API compatibility.
+    # Patterns per language so Go/Rust are not miscounted as zero.
     if profile.name == "python":
         func_pattern = r"\n\+def "
         async_func = r"\n\+async def "
@@ -282,7 +285,35 @@ def compute_ast_diff(
         async_rem = r"\n\-async def "
         class_rem_pattern = r"\n\-class "
         import_rem_patterns = (r"\n\-import ", r"\n\-from ")
+    elif profile.name == "typescript":
+        func_pattern = r"\n\+function "
+        async_func = r"\n\+async function "
+        class_pattern = r"\n\+class "
+        import_patterns = (r"\n\+import ",)
+        func_rem_pattern = r"\n\-function "
+        async_rem = r"\n\-async function "
+        class_rem_pattern = r"\n\-class "
+        import_rem_patterns = (r"\n\-import ",)
+    elif profile.name == "go":
+        func_pattern = r"\n\+func "
+        async_func = r"(?!)"  # Go has no async functions
+        class_pattern = r"\n\+type "
+        import_patterns = (r"\n\+import ",)
+        func_rem_pattern = r"\n\-func "
+        async_rem = r"(?!)"
+        class_rem_pattern = r"\n\-type "
+        import_rem_patterns = (r"\n\-import ",)
+    elif profile.name == "rust":
+        func_pattern = r"\n\+fn "
+        async_func = r"\n\+async fn "
+        class_pattern = r"\n\+(struct|enum|impl|trait) "
+        import_patterns = (r"\n\+use ",)
+        func_rem_pattern = r"\n\-fn "
+        async_rem = r"\n\-async fn "
+        class_rem_pattern = r"\n\-(struct|enum|impl|trait) "
+        import_rem_patterns = (r"\n\-use ",)
     else:
+        # Unknown language — best-effort TypeScript-style heuristics.
         func_pattern = r"\n\+function "
         async_func = r"\n\+async function "
         class_pattern = r"\n\+class "
@@ -347,10 +378,14 @@ def score_conventions(
     rules = get_convention_rules(profile.name)
     violations: list[str] = []
 
-    # Category scores: naming and forbidden. Weights from YAML.
+    # Category scores: naming (should-match) and violations (should-not-match).
+    # Only these two categories are computed. The structural conventions
+    # (import_order, docstring, type_hints) declared in the YAML `conventions:`
+    # list are aspirational — not yet evaluated — so their weights are omitted
+    # from the rubric rather than silently un-scored (P0-9).
     naming_weight = rules.scoring.get("naming_weight", 0.5)
-    forbidden_weight = rules.scoring.get("structure_weight", 0.5)
-    total_weight = naming_weight + forbidden_weight or 1.0
+    violations_weight = rules.scoring.get("violations_weight", 0.5)
+    total_weight = naming_weight + violations_weight or 1.0
 
     naming_passed = 0
     naming_total = 0
@@ -393,7 +428,7 @@ def score_conventions(
     forbidden_score = forbidden_passed / forbidden_total if forbidden_total > 0 else 1.0
 
     score = (
-        naming_score * naming_weight + forbidden_score * forbidden_weight
+        naming_score * naming_weight + forbidden_score * violations_weight
     ) / total_weight
 
     return round(score, 3), violations

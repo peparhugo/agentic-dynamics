@@ -138,6 +138,40 @@ class TestASTDiff:
             assert diff.functions_added >= 1
             assert diff.imports_added >= 1
 
+    def test_counts_go_functions(self):
+        with tempfile.TemporaryDirectory() as d:
+            dp = Path(d)
+            _run_git(dp, "init")
+            (dp / "main.go").write_text("package main\n\nfunc Foo() {}\n")
+            _run_git(dp, "add", "-A")
+            _run_git(dp, "commit", "-m", "initial")
+            c1 = _run_git(dp, "rev-parse", "HEAD").strip()
+
+            (dp / "main.go").write_text("package main\n\nfunc Foo() {}\n\nfunc Bar() {}\n")
+            _run_git(dp, "add", "-A")
+            _run_git(dp, "commit", "-m", "add Bar")
+            c2 = _run_git(dp, "rev-parse", "HEAD").strip()
+
+            diff = compute_ast_diff(dp, c1, c2)
+            assert diff.functions_added >= 1
+
+    def test_counts_rust_functions(self):
+        with tempfile.TemporaryDirectory() as d:
+            dp = Path(d)
+            _run_git(dp, "init")
+            (dp / "main.rs").write_text("fn foo() {}\n")
+            _run_git(dp, "add", "-A")
+            _run_git(dp, "commit", "-m", "initial")
+            c1 = _run_git(dp, "rev-parse", "HEAD").strip()
+
+            (dp / "main.rs").write_text("fn foo() {}\n\nfn bar() {}\n")
+            _run_git(dp, "add", "-A")
+            _run_git(dp, "commit", "-m", "add bar")
+            c2 = _run_git(dp, "rev-parse", "HEAD").strip()
+
+            diff = compute_ast_diff(dp, c1, c2)
+            assert diff.functions_added >= 1
+
 
 class TestAnalyzeStoryWorktree:
     def test_empty_worktree(self):

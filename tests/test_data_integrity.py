@@ -54,3 +54,19 @@ def test_pytest_errors_included_in_total():
     # errored run can never report 100%.
     src = _read("scripts/analyze_worktrees.py")
     assert "total = passed + failed + errors" in src
+
+
+def test_no_cross_experiment_baseline_fallback():
+    # P0-8: analyze_worktrees.py must not fall back to "any baseline for the
+    # same model" across experiments.
+    src = _read("scripts/analyze_worktrees.py")
+    assert "any baseline for same model" not in src
+    assert "for bk, entry in baseline_index.items():\n            if target in bk" not in src
+
+
+def test_go_rust_patterns_in_ast_diff():
+    # P0-10: commit_analysis.py diff stats must cover Go (func) and Rust (fn).
+    src = _read("src/instrument/commit_analysis.py")
+    assert r"\n\+func " in src
+    assert r"\n\+fn " in src
+    assert r"\n\+use " in src
