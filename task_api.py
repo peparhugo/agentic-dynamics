@@ -33,6 +33,7 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_app import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -190,8 +191,8 @@ def create_app(database_path=None):
             return jsonify(error=f"password must be at least {MIN_PASSWORD_LENGTH} characters"), 400
 
         username = username.strip()
-        db = get_db()
-        existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        user_repo = UserRepository(get_db())
+        existing = user_repo.get_by_username(username)
         if existing is not None:
             return jsonify(error="username already taken"), 409
 
@@ -202,12 +203,8 @@ def create_app(database_path=None):
             email = email.strip()
 
         password_hash = generate_password_hash(password)
-        cur = db.execute(
-            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-            (username, password_hash, email),
-        )
-        db.commit()
-        return jsonify(id=cur.lastrowid, username=username), 201
+        user_id = user_repo.create_user(username, password_hash, email)
+        return jsonify(id=user_id, username=username), 201
 
     @app.route("/auth/login", methods=["POST"])
     def login():
@@ -220,8 +217,8 @@ def create_app(database_path=None):
         if not isinstance(username, str) or not isinstance(password, str):
             return jsonify(error="username and password are required"), 400
 
-        db = get_db()
-        row = db.execute("SELECT * FROM users WHERE username = ?", (username.strip(),)).fetchone()
+        user_repo = UserRepository(get_db())
+        row = user_repo.get_by_username(username.strip())
         if row is None or not check_password_hash(row["password_hash"], password):
             return jsonify(error="Invalid username or password"), 401
 
@@ -245,32 +242,23 @@ def create_app(database_path=None):
             return jsonify(error=f"status must be one of {sorted(VALID_STATUSES)}"), 400
 
         created_at = datetime.now(timezone.utc).isoformat()
-        db = get_db()
-        cur = db.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, ?, ?, ?)",
-            (title.strip(), status, created_at, g.current_user_id),
-        )
-        db.commit()
-        row = db.execute("SELECT * FROM tasks WHERE id = ?", (cur.lastrowid,)).fetchone()
+        task_repo = TaskRepository(get_db())
+        task_id = task_repo.create_task(title.strip(), status, created_at, g.current_user_id)
+        row = task_repo.get_by_id(task_id)
         return jsonify(task_to_dict(row)), 201
 
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks():
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (g.current_user_id,),
-        ).fetchall()
+        task_repo = TaskRepository(get_db())
+        rows = task_repo.list_by_owner(g.current_user_id)
         return jsonify([task_to_dict(row) for row in rows]), 200
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth
     def get_task(task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, g.current_user_id)
-        ).fetchone()
+        task_repo = TaskRepository(get_db())
+        row = task_repo.get_by_id_and_owner(task_id, g.current_user_id)
         if row is None:
             return jsonify(error="Task not found"), 404
         return jsonify(task_to_dict(row)), 200
@@ -278,10 +266,8 @@ def create_app(database_path=None):
     @app.route("/tasks/<int:task_id>", methods=["PUT"])
     @require_auth
     def update_task(task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, g.current_user_id)
-        ).fetchone()
+        task_repo = TaskRepository(get_db())
+        row = task_repo.get_by_id_and_owner(task_id, g.current_user_id)
         if row is None:
             return jsonify(error="Task not found"), 404
 
@@ -306,17 +292,12 @@ def create_app(database_path=None):
 
         status_became_completed = status == "completed" and row["status"] != "completed"
 
-        db.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
-            (title, status, task_id),
-        )
-        db.commit()
-        updated = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        task_repo.update_task(task_id, title, status)
+        updated = task_repo.get_by_id(task_id)
 
         if status_became_completed:
-            owner = db.execute(
-                "SELECT email, username FROM users WHERE id = ?", (g.current_user_id,)
-            ).fetchone()
+            user_repo = UserRepository(get_db())
+            owner = user_repo.get_by_id(g.current_user_id)
             if owner is not None:
                 owner_email = owner["email"] or owner["username"]
                 try:
