@@ -6,14 +6,16 @@ import argparse
 import asyncio
 import json
 import os
+import sqlite3
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from http import HTTPStatus
-from typing import Any
-from urllib.parse import unquote
+from typing import Any, Awaitable, Callable
+from urllib.parse import parse_qs, unquote, urlsplit
 
+import redis.asyncio as redis
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosed
@@ -21,6 +23,18 @@ from websockets.http11 import Request, Response
 
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+REDIS_MESSAGE_CHANNEL = "notifications:messages"
+
+
+def sqlite_path(database_url: str) -> str:
+    """Convert a SQLite URL (or plain path) to a sqlite3 path."""
+    if database_url == "sqlite:///:memory:":
+        return ":memory:"
+    if database_url.startswith("sqlite:////"):
+        return "/" + database_url[len("sqlite:////") :]
+    if database_url.startswith("sqlite:///"):
+        return database_url[len("sqlite:///") :]
+    return database_url
 
 
 def timestamp() -> str:
@@ -114,9 +128,169 @@ class ClientRegistry:
             return len(self._clients)
 
 
+class MessageStore:
+    """SQLite-backed message history."""
+
+    def __init__(self, database_url: str) -> None:
+        self.connection = sqlite3.connect(
+            sqlite_path(database_url), check_same_thread=False
+        )
+        self.connection.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
+        with self.connection:
+            self.connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel TEXT,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+
+    async def save(self, data: dict[str, Any]) -> int:
+        def insert() -> int:
+            with self._lock, self.connection:
+                cursor = self.connection.execute(
+                    "INSERT INTO messages (channel, type, payload, timestamp) "
+                    "VALUES (?, ?, ?, ?)",
+                    (
+                        data.get("channel"),
+                        data["type"],
+                        json.dumps(data["payload"], separators=(",", ":")),
+                        data["timestamp"],
+                    ),
+                )
+                return int(cursor.lastrowid)
+
+        return await asyncio.to_thread(insert)
+
+    async def list(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        def select() -> list[dict[str, Any]]:
+            with self._lock:
+                rows = self.connection.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "ORDER BY id DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
+                ).fetchall()
+            return [
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                }
+                for row in rows
+            ]
+
+        return await asyncio.to_thread(select)
+
+
+class RedisBackbone:
+    """Redis pub/sub and shared client connection state."""
+
+    def __init__(self, client: redis.Redis) -> None:
+        self.client = client
+        self.pubsub: Any | None = None
+        self._listener: asyncio.Task[None] | None = None
+
+    @classmethod
+    def from_url(cls, url: str) -> "RedisBackbone":
+        return cls(redis.from_url(url, decode_responses=True))
+
+    async def start(
+        self, callback: Callable[[dict[str, Any]], Awaitable[None]]
+    ) -> None:
+        if self._listener is not None:
+            return
+        self.pubsub = self.client.pubsub()
+        await self.pubsub.subscribe(REDIS_MESSAGE_CHANNEL)
+
+        async def listen() -> None:
+            assert self.pubsub is not None
+            async for event in self.pubsub.listen():
+                if event["type"] == "message":
+                    await callback(json.loads(event["data"]))
+
+        self._listener = asyncio.create_task(listen())
+
+    async def publish(self, data: dict[str, Any]) -> None:
+        await self.client.publish(
+            REDIS_MESSAGE_CHANNEL, json.dumps(data, separators=(",", ":"))
+        )
+
+    async def register(self, client_id: str, server_id: str) -> None:
+        await self.client.hset(
+            f"notifications:client:{client_id}",
+            mapping={"server_id": server_id, "connected_at": timestamp()},
+        )
+        await self.client.sadd("notifications:clients", client_id)
+
+    async def unregister(self, client_id: str) -> None:
+        channels = await self.client.smembers(
+            f"notifications:client:{client_id}:channels"
+        )
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.srem("notifications:clients", client_id)
+            for channel in channels:
+                pipe.srem(f"notifications:channel:{channel}", client_id)
+            pipe.delete(
+                f"notifications:client:{client_id}",
+                f"notifications:client:{client_id}:channels",
+            )
+            await pipe.execute()
+
+    async def subscribe_client(self, client_id: str, channel: str) -> None:
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.sadd(f"notifications:client:{client_id}:channels", channel)
+            pipe.sadd(f"notifications:channel:{channel}", client_id)
+            await pipe.execute()
+
+    async def unsubscribe_client(self, client_id: str, channel: str) -> None:
+        async with self.client.pipeline(transaction=True) as pipe:
+            pipe.srem(f"notifications:client:{client_id}:channels", channel)
+            pipe.srem(f"notifications:channel:{channel}", client_id)
+            await pipe.execute()
+
+    async def is_connected(self, client_id: str) -> bool:
+        return bool(await self.client.sismember("notifications:clients", client_id))
+
+    async def is_subscribed(self, client_id: str, channel: str) -> bool:
+        return bool(
+            await self.client.sismember(
+                f"notifications:channel:{channel}", client_id
+            )
+        )
+
+    async def close(self) -> None:
+        if self._listener is not None:
+            self._listener.cancel()
+            await asyncio.gather(self._listener, return_exceptions=True)
+            self._listener = None
+        if self.pubsub is not None:
+            await self.pubsub.aclose()
+            self.pubsub = None
+        await self.client.aclose()
+
+
 class NotificationServer:
-    def __init__(self, registry: ClientRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: ClientRegistry | None = None,
+        backbone: RedisBackbone | None = None,
+        store: MessageStore | None = None,
+    ) -> None:
         self.registry = registry or ClientRegistry()
+        self.backbone = backbone
+        self.store = store or MessageStore(os.getenv("DATABASE_URL", ":memory:"))
+        self.server_id = str(uuid.uuid4())
+
+    async def start(self) -> None:
+        if self.backbone is not None:
+            await self.backbone.start(self._deliver)
 
     async def _send(self, client: Client, data: dict[str, Any]) -> bool:
         try:
@@ -150,6 +324,20 @@ class NotificationServer:
             if result is not True:
                 self.registry.remove(client_id)
 
+    async def _deliver(self, data: dict[str, Any]) -> None:
+        if data["type"] in {"broadcast", "system"}:
+            await self.broadcast(data)
+        else:
+            await self.send_to(data["payload"]["target_id"], data)
+
+    async def _distribute(self, data: dict[str, Any]) -> None:
+        await self.store.save(data)
+        if self.backbone is not None:
+            await self.start()
+            await self.backbone.publish(data)
+        else:
+            await self._deliver(data)
+
     async def _error(self, client_id: str, detail: str) -> None:
         await self.send_to(client_id, message("system", {"error": detail}))
 
@@ -180,8 +368,12 @@ class NotificationServer:
                 return
             if message_type == "subscribe":
                 self.registry.subscribe(client_id, channel)
+                if self.backbone is not None:
+                    await self.backbone.subscribe_client(client_id, channel)
             else:
                 self.registry.unsubscribe(client_id, channel)
+                if self.backbone is not None:
+                    await self.backbone.unsubscribe_client(client_id, channel)
             return
 
         if not isinstance(payload, dict):
@@ -199,23 +391,37 @@ class NotificationServer:
         if channel is not None:
             outgoing["channel"] = channel
         if message_type in {"broadcast", "system"}:
-            await self.broadcast(outgoing)
+            await self._distribute(outgoing)
             return
 
         target_id = payload.get("target_id")
         if not isinstance(target_id, str) or not target_id:
             await self._error(client_id, "direct messages require payload.target_id")
             return
-        if channel is not None and target_id not in {
-            subscriber_id for subscriber_id, _ in self.registry.channel_snapshot(channel)
-        }:
+        if self.backbone is not None:
+            target_connected = await self.backbone.is_connected(target_id)
+            target_subscribed = channel is None or await self.backbone.is_subscribed(
+                target_id, channel
+            )
+        else:
+            target_connected = self.registry.get(target_id) is not None
+            target_subscribed = channel is None or target_id in {
+                subscriber_id
+                for subscriber_id, _ in self.registry.channel_snapshot(channel)
+            }
+        if not target_subscribed:
             await self._error(client_id, "target client is not subscribed to channel")
             return
-        if not await self.send_to(target_id, outgoing):
+        if not target_connected:
             await self._error(client_id, "target client is not connected")
+            return
+        await self._distribute(outgoing)
 
     async def websocket_handler(self, websocket: ServerConnection) -> None:
+        await self.start()
         client_id = self.registry.add(websocket)
+        if self.backbone is not None:
+            await self.backbone.register(client_id, self.server_id)
         try:
             await self.send_to(
                 client_id,
@@ -227,6 +433,8 @@ class NotificationServer:
             pass
         finally:
             self.registry.remove(client_id)
+            if self.backbone is not None:
+                await self.backbone.unregister(client_id)
 
     async def process_request(
         self, _connection: ServerConnection, request: Request
@@ -251,6 +459,21 @@ class NotificationServer:
                         "subscribers": self.registry.subscribers(channel),
                     },
                 )
+        if path == "/messages":
+            query = parse_qs(urlsplit(request.path).query)
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+                offset = int(query.get("offset", ["0"])[0])
+                if not 1 <= limit <= 1000 or offset < 0:
+                    raise ValueError
+            except ValueError:
+                return self._json_response(
+                    HTTPStatus.BAD_REQUEST,
+                    {"error": "limit must be 1-1000 and offset must be non-negative"},
+                )
+            return self._json_response(
+                HTTPStatus.OK, {"messages": await self.store.list(limit, offset)}
+            )
         if path not in {"/", "/ws"}:
             return self._json_response(HTTPStatus.NOT_FOUND, {"error": "not found"})
         return None
@@ -272,14 +495,24 @@ class NotificationServer:
 
 
 async def run(host: str = "127.0.0.1", port: int = 8765) -> None:
-    notification_server = NotificationServer()
-    async with serve(
-        notification_server.websocket_handler,
-        host,
-        port,
-        process_request=notification_server.process_request,
-    ):
-        await asyncio.get_running_loop().create_future()
+    backbone = RedisBackbone.from_url(
+        os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    )
+    notification_server = NotificationServer(
+        backbone=backbone,
+        store=MessageStore(os.getenv("DATABASE_URL", "messages.db")),
+    )
+    await notification_server.start()
+    try:
+        async with serve(
+            notification_server.websocket_handler,
+            host,
+            port,
+            process_request=notification_server.process_request,
+        ):
+            await asyncio.get_running_loop().create_future()
+    finally:
+        await backbone.close()
 
 
 def main() -> None:

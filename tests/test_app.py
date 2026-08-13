@@ -3,10 +3,11 @@ import json
 from urllib.request import urlopen
 
 import pytest
+import fakeredis.aioredis
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import ClientRegistry, NotificationServer
+from app import ClientRegistry, MessageStore, NotificationServer, RedisBackbone
 
 
 @pytest.fixture
@@ -217,3 +218,107 @@ async def test_disconnect_removes_inactive_channels(running_server):
             break
         await asyncio.sleep(0.01)
     assert (await get_json(f"http://127.0.0.1:{port}/channels"))[1] == {"channels": []}
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    fake_server = fakeredis.FakeServer()
+    backbones = [
+        RedisBackbone(
+            fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True)
+        )
+        for _ in range(2)
+    ]
+    servers = [
+        NotificationServer(
+            ClientRegistry(),
+            backbone,
+            MessageStore(str(tmp_path / f"messages-{index}.db")),
+        )
+        for index, backbone in enumerate(backbones)
+    ]
+    await asyncio.gather(*(server.start() for server in servers))
+    try:
+        async with serve(
+            servers[0].websocket_handler,
+            "127.0.0.1",
+            0,
+            process_request=servers[0].process_request,
+        ) as first_listener, serve(
+            servers[1].websocket_handler,
+            "127.0.0.1",
+            0,
+            process_request=servers[1].process_request,
+        ) as second_listener:
+            first_port = first_listener.sockets[0].getsockname()[1]
+            second_port = second_listener.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{first_port}/ws") as sender, connect(
+                f"ws://127.0.0.1:{second_port}/ws"
+            ) as recipient:
+                sender_id = (await receive(sender))["payload"]["client_id"]
+                recipient_id = (await receive(recipient))["payload"]["client_id"]
+                assert await backbones[0].client.smembers("notifications:clients") == {
+                    sender_id,
+                    recipient_id,
+                }
+
+                outgoing = {
+                    "type": "direct",
+                    "payload": {"target_id": recipient_id, "text": "cross-instance"},
+                    "timestamp": "2026-01-01T00:00:00Z",
+                }
+                await sender.send(json.dumps(outgoing))
+                assert await receive(recipient) == outgoing
+                with pytest.raises(asyncio.TimeoutError):
+                    await asyncio.wait_for(sender.recv(), timeout=0.05)
+    finally:
+        await asyncio.gather(*(backbone.close() for backbone in backbones))
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    store = MessageStore(f"sqlite:///{tmp_path / 'history.db'}")
+    notification_server = NotificationServer(ClientRegistry(), store=store)
+    async with serve(
+        notification_server.websocket_handler,
+        "127.0.0.1",
+        0,
+        process_request=notification_server.process_request,
+    ) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}/ws") as websocket:
+            await receive(websocket)
+            await websocket.send(
+                json.dumps({"type": "subscribe", "channel": "history"})
+            )
+            for text in ("first", "second"):
+                await websocket.send(
+                    json.dumps(
+                        {
+                            "type": "broadcast",
+                            "channel": "history",
+                            "payload": {"text": text},
+                            "timestamp": f"2026-01-0{1 if text == 'first' else 2}T00:00:00Z",
+                        }
+                    )
+                )
+                await receive(websocket)
+
+        status, body = await get_json(
+            f"http://127.0.0.1:{port}/messages?limit=1&offset=1"
+        )
+        assert status == 200
+        assert body == {
+            "messages": [
+                {
+                    "id": 1,
+                    "channel": "history",
+                    "type": "broadcast",
+                    "payload": {"text": "first"},
+                    "timestamp": "2026-01-01T00:00:00Z",
+                }
+            ]
+        }
+
+    reopened = MessageStore(f"sqlite:///{tmp_path / 'history.db'}")
+    assert len(await reopened.list(50, 0)) == 2
