@@ -7,6 +7,8 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from notification_tasks import send_notification_email
 from repositories import (
     DuplicateRecordError,
@@ -20,7 +22,29 @@ from werkzeug.security import check_password_hash, generate_password_hash
 app = Flask(__name__)
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_SECONDS"] = 3600
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
+
+
+def rate_limit_key():
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and separator and token:
+        user_id = decode_token(token)
+        if user_id is not None:
+            return f"user:{user_id}"
+    return f"address:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+)
 
 
 def get_db():
@@ -184,8 +208,28 @@ def create_task():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    rows = TaskRepository(get_db).list_for_owner(g.user_id)
-    return jsonify([task_to_dict(row) for row in rows])
+    cursor = request.args.get("cursor")
+    limit = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor) if cursor is not None else None
+        limit = int(limit)
+    except ValueError:
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if cursor is not None and cursor <= 0:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    if limit <= 0 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    rows, total, has_more = TaskRepository(get_db).list_for_owner(
+        g.user_id, cursor=cursor, limit=limit
+    )
+    return jsonify(
+        {
+            "data": [task_to_dict(row) for row in rows],
+            "next_cursor": str(rows[-1]["id"]) if has_more else None,
+            "total": total,
+        }
+    )
 
 
 @app.get("/tasks/<int:task_id>")

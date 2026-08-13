@@ -153,16 +153,21 @@ class TaskRepository(BaseRepository):
                 (task_id, owner_id),
             ).fetchone()
 
-    def list_for_owner(self, owner_id):
+    def list_for_owner(self, owner_id, cursor=None, limit=20):
         with self.connection_factory() as connection:
-            return connection.execute(
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            rows = connection.execute(
                 """
                 SELECT * FROM tasks
-                WHERE owner_id = ?
-                ORDER BY created_at DESC, id DESC
+                WHERE owner_id = ? AND (? IS NULL OR id < ?)
+                ORDER BY id DESC
+                LIMIT ?
                 """,
-                (owner_id,),
+                (owner_id, cursor, cursor, limit + 1),
             ).fetchall()
+            return rows[:limit], total, len(rows) > limit
 
     def update_for_owner(self, task_id, owner_id, values):
         fields = self._validated_fields(values)

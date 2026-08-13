@@ -2,12 +2,17 @@ import sqlite3
 
 import app as task_app
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import FixedWindowRateLimiter
 from werkzeug.security import check_password_hash
 
 
 @pytest.fixture
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "test.db"))
+    storage = MemoryStorage()
+    monkeypatch.setattr(task_app.limiter, "_storage", storage)
+    monkeypatch.setattr(task_app.limiter, "_limiter", FixedWindowRateLimiter(storage))
     task_app.app.config.update(
         TESTING=True,
         JWT_SECRET="test-secret",
@@ -116,7 +121,42 @@ def test_list_tasks_newest_first(client):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    body = response.get_json()
+    assert [task["id"] for task in body["data"]] == [second["id"], first["id"]]
+    assert body["next_cursor"] is None
+    assert body["total"] == 2
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_headers(client)
+    tasks = [
+        client.post("/tasks", json={"title": str(index)}, headers=headers).get_json()
+        for index in range(5)
+    ]
+
+    first_page = client.get("/tasks?limit=2", headers=headers).get_json()
+    second_page = client.get(
+        f"/tasks?limit=2&cursor={first_page['next_cursor']}", headers=headers
+    ).get_json()
+    final_page = client.get(
+        f"/tasks?limit=2&cursor={second_page['next_cursor']}", headers=headers
+    ).get_json()
+
+    assert [task["id"] for task in first_page["data"]] == [tasks[4]["id"], tasks[3]["id"]]
+    assert [task["id"] for task in second_page["data"]] == [tasks[2]["id"], tasks[1]["id"]]
+    assert [task["id"] for task in final_page["data"]] == [tasks[0]["id"]]
+    assert first_page["total"] == second_page["total"] == final_page["total"] == 5
+    assert final_page["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["cursor=invalid", "cursor=0", "limit=invalid", "limit=0", "limit=101"],
+)
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks?{query}", headers=auth_headers(client))
+
+    assert response.status_code == 400
 
 
 def test_update_task(client, monkeypatch):
@@ -194,7 +234,11 @@ def test_users_only_see_and_modify_their_own_tasks(client):
         "/tasks", json={"title": "Alice only"}, headers=alice_headers
     ).get_json()
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task['id']}", headers=bob_headers).status_code == 404
     assert client.put(
         f"/tasks/{task['id']}", json={"status": "stolen"}, headers=bob_headers
@@ -230,6 +274,27 @@ def test_update_requires_valid_fields(client):
     assert client.put(
         f"/tasks/{task_id}", json={"status": None}, headers=headers
     ).status_code == 400
+
+
+def test_rate_limit_applies_to_authenticated_user(client):
+    headers = auth_headers(client)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 400
+
+    response = client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
 
 
 def test_init_db_migrates_existing_tasks_without_data_loss(tmp_path, monkeypatch):
