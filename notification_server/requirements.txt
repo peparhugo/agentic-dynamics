@@ -1,3 +1,5 @@
 websockets>=13.0
+redis>=5.0
 pytest>=7.0
 pytest-asyncio>=0.23
+fakeredis>=2.20

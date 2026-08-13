@@ -3,19 +3,9 @@ import json
 import urllib.request
 
 import pytest
-import pytest_asyncio
 import websockets
 
 from notification_server.server import NotificationServer
-
-
-@pytest_asyncio.fixture
-async def server():
-    srv = NotificationServer(host="localhost", port=0)
-    await srv.start()
-    yield srv
-    srv.stop()
-    await srv.wait_closed()
 
 
 def ws_uri(srv: NotificationServer) -> str:
