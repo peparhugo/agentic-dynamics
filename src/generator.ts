@@ -4,6 +4,7 @@ import { parseFrontmatter, Frontmatter } from './frontmatter';
 import { markdownToHtml } from './markdown';
 import { TemplateEngine } from './templates';
 import { PluginManager, PluginContext } from './plugin';
+import { BuildCache, BuildStats } from './cache';
 
 export interface PageData {
   slug: string;
@@ -11,6 +12,12 @@ export interface PageData {
   frontmatter: Frontmatter;
   content: string;
   html: string;
+}
+
+export interface BuildOptions {
+  incremental?: boolean;
+  clean?: boolean;
+  cache?: BuildCache;
 }
 
 export async function readMarkdownFiles(contentDir: string): Promise<string[]> {
@@ -44,7 +51,8 @@ export async function generatePages(
   contentDir: string,
   outputDir: string,
   templateEngine?: TemplateEngine,
-  pluginManager?: PluginManager
+  pluginManager?: PluginManager,
+  options?: BuildOptions
 ): Promise<PageData[]> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -53,6 +61,7 @@ export async function generatePages(
   const files = await readMarkdownFiles(contentDir);
   const pages: PageData[] = [];
   const context: PluginContext = { contentDir, outputDir, templatesDir: '' };
+  const cache = options?.cache;
 
   for (const file of files) {
     const filePath = path.join(contentDir, file);
@@ -69,7 +78,25 @@ export async function generatePages(
     const html = templateEngine
       ? generatePageHtmlWithTemplate(pageData, templateEngine)
       : generatePageHtml(pageData);
-    fs.writeFileSync(outputPath, html, 'utf-8');
+
+    let shouldWrite = true;
+    if (options?.incremental && cache) {
+      const fileHash = cache.getFileHash(filePath);
+      const templateHash = templateEngine ? cache.getFileHash(templateEngine.getTemplatesDir()) : '';
+      const frontmatterStr = JSON.stringify(pageData.frontmatter);
+
+      if (fileHash && cache.isCached(filePath, null, fileHash, templateHash || '')) {
+        shouldWrite = false;
+      }
+
+      if (shouldWrite && fileHash) {
+        cache.setCacheEntry(filePath, fileHash, templateHash || '', html, frontmatterStr);
+      }
+    }
+
+    if (shouldWrite) {
+      fs.writeFileSync(outputPath, html, 'utf-8');
+    }
   }
 
   return pages;
@@ -183,7 +210,8 @@ export async function build(
   contentDir: string = './content',
   outputDir: string = './dist',
   templatesDir: string = './templates',
-  pluginManager?: PluginManager
+  pluginManager?: PluginManager,
+  options?: BuildOptions
 ): Promise<void> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -210,7 +238,7 @@ export async function build(
     });
   }
 
-  const pages = await generatePages(contentDir, outputDir, templateEngine, pluginManager);
+  const pages = await generatePages(contentDir, outputDir, templateEngine, pluginManager, options);
   const indexHtml = generateIndexHtml(pages);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf-8');
 
@@ -218,6 +246,50 @@ export async function build(
     await pluginManager.executeHook('afterBuild', context, pages);
     await pluginManager.executeHook('onEnd', context);
   }
+}
+
+export async function buildWithStats(
+  contentDir: string = './content',
+  outputDir: string = './dist',
+  templatesDir: string = './templates',
+  pluginManager?: PluginManager,
+  options?: BuildOptions
+): Promise<BuildStats> {
+  const cache = options?.cache;
+  if (!cache) {
+    throw new Error('Cache is required for buildWithStats');
+  }
+
+  if (options?.clean) {
+    cache.clear();
+  }
+
+  cache.startBuild();
+
+  const files = await readMarkdownFiles(contentDir);
+  let pagesBuilt = 0;
+  let pagesSkipped = 0;
+
+  for (const file of files) {
+    const filePath = path.join(contentDir, file);
+    const fileHash = cache.getFileHash(filePath);
+
+    if (!fileHash) {
+      pagesBuilt++;
+      continue;
+    }
+
+    if (cache.isCached(filePath, null, fileHash, '')) {
+      pagesSkipped++;
+    } else {
+      pagesBuilt++;
+    }
+  }
+
+  await build(contentDir, outputDir, templatesDir, pluginManager, options);
+  cache.save();
+
+  return cache.getStats(pagesBuilt, pagesSkipped);
 }
 
 function escapeHtml(text: string): string {

@@ -134,6 +134,10 @@ export class TemplateEngine {
   registerHelper(name: string, fn: (...args: unknown[]) => unknown): void {
     Handlebars.registerHelper(name, fn);
   }
+
+  getTemplatesDir(): string {
+    return this.config.templatesDir;
+  }
 }
 
 export function createTemplateEngine(config: Partial<TemplateConfig> = {}): TemplateEngine {

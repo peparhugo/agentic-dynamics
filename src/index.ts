@@ -1,13 +1,15 @@
-export { build, generatePages, generatePageHtml, generatePageHtmlWithTemplate, generateIndexHtml, parseMarkdownFile, readMarkdownFiles } from './generator';
+export { build, buildWithStats, generatePages, generatePageHtml, generatePageHtmlWithTemplate, generateIndexHtml, parseMarkdownFile, readMarkdownFiles } from './generator';
 export { parseFrontmatter } from './frontmatter';
 export { markdownToHtml } from './markdown';
 export { TemplateEngine, createTemplateEngine } from './templates';
 export { PluginManager } from './plugin';
 export { createPluginManager, loadPluginsFromConfig } from './plugin-loader';
 export { MarkdownPlugin, TemplatePlugin, DevServerPlugin } from './plugins';
+export { BuildCache, createBuildCache } from './cache';
 export type { Frontmatter, ParsedMarkdown } from './frontmatter';
-export type { PageData } from './generator';
+export type { PageData, BuildOptions } from './generator';
 export type { TemplateConfig } from './templates';
 export type { Plugin, PluginContext } from './plugin';
 export type { TemplatePluginOptions } from './plugins/template-plugin';
 export type { DevServerPluginOptions } from './plugins/dev-server-plugin';
+export type { CacheEntry, CacheManifest, BuildStats } from './cache';
