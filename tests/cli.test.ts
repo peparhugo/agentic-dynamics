@@ -29,6 +29,20 @@ describe('CLI', () => {
     expect(writeSpy).toHaveBeenCalledWith('Generated 1 page.\n');
   });
 
+  it('builds using a custom templates directory', async () => {
+    const content = path.join(root, 'posts');
+    const output = path.join(root, 'site');
+    const templates = path.join(root, 'views');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'post.md'), '# Post');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{body}}}</main>');
+
+    await run(['build', '--content', content, '--output', output, '--templates', templates]);
+
+    await expect(fs.readFile(path.join(output, 'post.html'), 'utf8')).resolves.toBe('<main><h1>Post</h1>\n</main>');
+  });
+
   it.each([
     [[], 'Usage: ssg build'],
     [['serve'], 'Usage: ssg build'],

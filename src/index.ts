@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface PageMetadata {
@@ -18,6 +19,7 @@ export interface GeneratedPage extends PageMetadata {
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 function escapeHtml(value: string): string {
@@ -66,6 +68,50 @@ async function markdownFiles(directory: string): Promise<string[]> {
     return entry.isFile() && /\.md$/i.test(entry.name) ? [entryPath] : [];
   }));
   return files.flat().sort();
+}
+
+async function fileExists(filePath: string): Promise<boolean> {
+  try {
+    return (await fs.stat(filePath)).isFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function loadPartials(directory: string): Promise<Record<string, string>> {
+  const partials: Record<string, string> = {};
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return partials;
+    throw error;
+  }
+
+  await Promise.all(entries.map(async (entry) => {
+    const filePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      const nested = await loadPartials(filePath);
+      for (const [name, contents] of Object.entries(nested)) partials[`${entry.name}/${name}`] = contents;
+    } else if (entry.isFile() && entry.name.endsWith('.hbs')) {
+      const contents = await fs.readFile(filePath, 'utf8');
+      partials[entry.name] = contents;
+      partials[entry.name.replace(/\.hbs$/i, '')] = contents;
+    }
+  }));
+  return partials;
+}
+
+function templatePath(directory: string, name: unknown, kind: 'template' | 'layout'): string | undefined {
+  if (typeof name !== 'string' || !name.trim()) return undefined;
+  const baseDirectory = kind === 'layout' ? path.join(directory, 'layouts') : directory;
+  const relativeName = name.trim().endsWith('.hbs') ? name.trim() : `${name.trim()}.hbs`;
+  const resolved = path.resolve(baseDirectory, relativeName);
+  if (resolved !== baseDirectory && !resolved.startsWith(`${baseDirectory}${path.sep}`)) {
+    throw new Error(`Invalid ${kind} path: ${name}`);
+  }
+  return resolved;
 }
 
 function pageTemplate(metadata: PageMetadata, body: string): string {
@@ -125,7 +171,12 @@ function indexTemplate(pages: GeneratedPage[]): string {
 export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPage[]> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const files = await markdownFiles(contentDir);
+  const partials = await loadPartials(path.join(templatesDir, 'partials'));
+  const handlebars = Handlebars.create();
+  handlebars.registerPartial(partials);
+  const defaultTemplatePath = path.join(templatesDir, 'default.hbs');
 
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
@@ -146,9 +197,31 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
       tags: normalizeTags(parsed.data.tags),
     };
     const body = marked.parse(parsed.content, { async: false }) as string;
+    const context = { ...parsed.data, ...metadata, body };
+    const selectedTemplatePath = templatePath(templatesDir, parsed.data.template, 'template');
+    let html: string;
+
+    if (selectedTemplatePath) {
+      if (!await fileExists(selectedTemplatePath)) {
+        throw new Error(`Template does not exist: ${selectedTemplatePath}`);
+      }
+      html = handlebars.compile(await fs.readFile(selectedTemplatePath, 'utf8'))(context);
+    } else if (await fileExists(defaultTemplatePath)) {
+      html = handlebars.compile(await fs.readFile(defaultTemplatePath, 'utf8'))(context);
+    } else {
+      html = pageTemplate(metadata, body);
+    }
+
+    const selectedLayoutPath = templatePath(templatesDir, parsed.data.layout, 'layout');
+    if (selectedLayoutPath) {
+      if (!await fileExists(selectedLayoutPath)) {
+        throw new Error(`Layout does not exist: ${selectedLayoutPath}`);
+      }
+      html = handlebars.compile(await fs.readFile(selectedLayoutPath, 'utf8'))({ ...context, body: html });
+    }
 
     await fs.mkdir(path.dirname(outputPath), { recursive: true });
-    await fs.writeFile(outputPath, pageTemplate(metadata, body), 'utf8');
+    await fs.writeFile(outputPath, html, 'utf8');
     pages.push({
       ...metadata,
       sourcePath,

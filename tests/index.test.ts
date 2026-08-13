@@ -7,11 +7,13 @@ describe('buildSite', () => {
   let root: string;
   let contentDir: string;
   let outputDir: string;
+  let templatesDir: string;
 
   beforeEach(async () => {
     root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-test-'));
     contentDir = path.join(root, 'content');
     outputDir = path.join(root, 'public');
+    templatesDir = path.join(root, 'templates');
     await fs.mkdir(contentDir);
   });
 
@@ -92,5 +94,49 @@ Body`);
       contentDir: path.join(root, 'missing'),
       outputDir,
     })).rejects.toThrow('Content directory does not exist');
+  });
+
+  it('uses a default template and escapes frontmatter values', async () => {
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<h1>{{title}}</h1><main>{{{body}}}</main>');
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntitle: A <Post>\n---\n**Body**');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'post.html'), 'utf8');
+
+    expect(page).toBe('<h1>A &lt;Post&gt;</h1><main><p><strong>Body</strong></p>\n</main>');
+  });
+
+  it('selects page templates, wraps layouts, and renders partials', async () => {
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'partials'));
+    await fs.writeFile(path.join(templatesDir, 'post.hbs'), '{{> header}}<article>{{{body}}}</article>{{> footer}}');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'site.hbs'), '<html><body>{{> nav}}{{{body}}}</body></html>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>End</footer>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'nav.hbs'), '<nav>Home</nav>');
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntitle: Custom\ntemplate: post\nlayout: site\n---\nContent');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'post.html'), 'utf8');
+
+    expect(page).toBe('<html><body><nav>Home</nav><header>Custom</header><article><p>Content</p>\n</article><footer>End</footer></body></html>');
+  });
+
+  it('supports conditionals and loops in templates', async () => {
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '{{#if date}}<time>{{date}}</time>{{/if}}<ul>{{#each tags}}<li>{{this}}</li>{{/each}}</ul>');
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ndate: 2026-08-13\ntags: [one, two]\n---\nContent');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'post.html'), 'utf8');
+
+    expect(page).toBe('<time>2026-08-13</time><ul><li>one</li><li>two</li></ul>');
+  });
+
+  it('reports missing selected templates', async () => {
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntemplate: missing\n---\nContent');
+
+    await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template does not exist');
   });
 });

@@ -3,7 +3,7 @@
 import { buildSite, BuildOptions } from './index';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
 export async function run(argv: string[]): Promise<void> {
@@ -14,7 +14,7 @@ export async function run(argv: string[]): Promise<void> {
   const options: BuildOptions = {};
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument !== '--content' && argument !== '--output') {
+    if (argument !== '--content' && argument !== '--output' && argument !== '--templates') {
       throw new Error(`Unknown option: ${argument}\n${usage()}`);
     }
     const value = argv[index + 1];
@@ -23,6 +23,7 @@ export async function run(argv: string[]): Promise<void> {
     }
     if (argument === '--content') options.contentDir = value;
     if (argument === '--output') options.outputDir = value;
+    if (argument === '--templates') options.templatesDir = value;
     index += 1;
   }
 
