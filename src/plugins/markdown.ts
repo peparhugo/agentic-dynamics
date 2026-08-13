@@ -6,6 +6,7 @@ import type { Frontmatter, Page } from '../index.js';
 import type { Plugin } from '../plugin.js';
 
 const markdown = new MarkdownIt({ html: false });
+const pageCache = new Map<string, { source: string; page: Page }>();
 
 function renderMarkdown(source: string): string {
   const embeddedHtml: string[] = [];
@@ -52,10 +53,14 @@ function parseFrontmatter(source: string): { content: string; data: Frontmatter 
 }
 
 export function parseMarkdownPage(source: string, sourcePath: string): Page {
+  const cached = pageCache.get(sourcePath);
+  if (cached?.source === source) {
+    return { ...cached.page, tags: [...cached.page.tags], data: cached.page.data ? { ...cached.page.data } : undefined };
+  }
   const { content, data } = parseFrontmatter(source);
   const baseName = path.basename(sourcePath, path.extname(sourcePath));
   const title = data.title ?? baseName;
-  return {
+  const page: Page = {
     title,
     date: data.date,
     tags: data.tags ?? [],
@@ -66,6 +71,8 @@ export function parseMarkdownPage(source: string, sourcePath: string): Page {
     layout: data.layout,
     data: { ...data, title },
   };
+  pageCache.set(sourcePath, { source, page });
+  return { ...page, tags: [...page.tags], data: page.data ? { ...page.data } : undefined };
 }
 
 export class MarkdownPlugin implements Plugin {

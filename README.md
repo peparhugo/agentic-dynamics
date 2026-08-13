@@ -16,6 +16,12 @@ Override them with:
 npx ssg build --content posts --output public --templates theme
 ```
 
+Use `npx ssg build --incremental` to reuse unchanged rendered pages. Source and
+template hashes, parsed page data, rendered HTML, and timing data are stored in
+`.ssg-cache.json` beside the content directory. `--clean` discards output and performs
+a full build. Incremental builds report pages built, pages skipped, and estimated time
+saved.
+
 ## Development server
 
 Build and serve the site with live reload at `http://localhost:3000`:

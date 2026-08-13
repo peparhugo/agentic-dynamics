@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './index.js';
+import { buildSite, type BuildStats } from './index.js';
 import { startDevServer } from './server.js';
 
 export interface CliOptions {
@@ -8,16 +8,23 @@ export interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>] [--incremental] [--clean]';
 }
 
 export function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = { command: args[0] };
   for (let index = 1; index < args.length; index += 1) {
     const argument = args[index];
+    if (argument === '--incremental' || argument === '--clean') {
+      if (argument === '--incremental') options.incremental = true;
+      else options.clean = true;
+      continue;
+    }
     if (argument !== '--content' && argument !== '--output' && argument !== '--templates' && argument !== '--port') {
       throw new Error(`Unknown option: ${argument}`);
     }
@@ -44,8 +51,12 @@ export async function run(args: string[]): Promise<void> {
   const options = parseArgs(args);
   if (options.command === 'build') {
     if (options.port !== undefined) throw new Error('--port is only valid with the serve command');
-    const pages = await buildSite(options);
+    let stats: BuildStats | undefined;
+    const pages = await buildSite({ ...options, onBuildStats: (value) => { stats = value; } });
     process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+    if (stats && (options.incremental || options.clean)) {
+      process.stdout.write(`Build stats: ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${Math.round(stats.timeSavedMs)}ms saved.\n`);
+    }
     return;
   }
   if (options.command === 'serve') {
