@@ -8,13 +8,14 @@ import uuid
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from http import HTTPStatus
+from urllib.parse import unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Response
 from websockets.datastructures import Headers
 
-MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
+MESSAGE_TYPES = frozenset({"broadcast", "direct", "system", "subscribe", "unsubscribe"})
 
 
 class ClientRegistry:
@@ -22,6 +23,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
 
     async def add(self, connection: ServerConnection) -> str:
@@ -33,6 +35,11 @@ class ClientRegistry:
     async def remove(self, client_id: str) -> None:
         async with self._lock:
             self._clients.pop(client_id, None)
+            for channel in tuple(self._channels):
+                subscribers = self._channels[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[channel]
 
     async def count(self) -> int:
         async with self._lock:
@@ -45,6 +52,36 @@ class ClientRegistry:
     async def connections(self) -> tuple[ServerConnection, ...]:
         async with self._lock:
             return tuple(self._clients.values())
+
+    async def subscribe(self, client_id: str, channel: str) -> None:
+        async with self._lock:
+            if client_id in self._clients:
+                self._channels.setdefault(channel, set()).add(client_id)
+
+    async def unsubscribe(self, client_id: str, channel: str) -> None:
+        async with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    async def channel_connections(self, channel: str) -> tuple[ServerConnection, ...]:
+        async with self._lock:
+            return tuple(
+                self._clients[client_id]
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            )
+
+    async def channels(self) -> dict[str, int]:
+        async with self._lock:
+            return {channel: len(subscribers) for channel, subscribers in self._channels.items()}
+
+    async def subscribers(self, channel: str) -> tuple[str, ...]:
+        async with self._lock:
+            return tuple(sorted(self._channels.get(channel, set())))
 
 
 class NotificationServer:
@@ -76,6 +113,12 @@ class NotificationServer:
             raise ValueError("payload must be a JSON object")
         if "timestamp" in message and not isinstance(message["timestamp"], str):
             raise ValueError("timestamp must be a string")
+        if "channel" in message and (
+            not isinstance(message["channel"], str) or not message["channel"]
+        ):
+            raise ValueError("channel must be a non-empty string")
+        if message["type"] in {"subscribe", "unsubscribe"} and "channel" not in message:
+            raise ValueError(f"{message['type']} messages require channel")
         return message
 
     async def send(self, connection: ServerConnection, message: dict[str, object]) -> None:
@@ -89,6 +132,11 @@ class NotificationServer:
             *(self.send(connection, message) for connection in await self.clients.connections())
         )
 
+    async def broadcast_channel(self, channel: str, message: dict[str, object]) -> None:
+        await asyncio.gather(
+            *(self.send(connection, message) for connection in await self.clients.channel_connections(channel))
+        )
+
     async def handle_message(self, client_id: str, raw_message: str) -> None:
         try:
             message = self.validate_message(raw_message)
@@ -99,6 +147,12 @@ class NotificationServer:
             return
 
         message["timestamp"] = datetime.now(timezone.utc).isoformat()
+        if message["type"] == "subscribe":
+            await self.clients.subscribe(client_id, message["channel"])
+            return
+        if message["type"] == "unsubscribe":
+            await self.clients.unsubscribe(client_id, message["channel"])
+            return
         if message["type"] == "direct":
             target_id = message["payload"].get("client_id")
             if not isinstance(target_id, str):
@@ -111,7 +165,11 @@ class NotificationServer:
                 await self.send(target, message)
             return
 
-        await self.broadcast(message)
+        channel = message.get("channel")
+        if isinstance(channel, str):
+            await self.broadcast_channel(channel, message)
+        else:
+            await self.broadcast(message)
 
     async def websocket_handler(self, connection: ServerConnection) -> None:
         client_id = await self.clients.add(connection)
@@ -123,12 +181,36 @@ class NotificationServer:
             await self.clients.remove(client_id)
 
     async def process_request(self, connection: ServerConnection, request: object) -> Response | None:
-        if getattr(request, "path", None) != "/health":
+        path = urlsplit(getattr(request, "path", "")).path
+        if path == "/health":
+            return self.json_response({"connected_clients": await self.clients.count()})
+        if path == "/channels":
+            channels = await self.clients.channels()
+            return self.json_response(
+                {
+                    "channels": [
+                        {"name": name, "subscriber_count": count}
+                        for name, count in sorted(channels.items())
+                    ]
+                }
+            )
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")].rstrip("/"))
+            if name:
+                return self.json_response(
+                    {"channel": name, "subscribers": list(await self.clients.subscribers(name))}
+                )
+        if path.startswith("/channels/"):
+            return self.json_response({"error": "not found"}, HTTPStatus.NOT_FOUND)
+        if path != "/health":
             return None
-        body = json.dumps({"connected_clients": await self.clients.count()}).encode()
+
+    @staticmethod
+    def json_response(payload: Mapping[str, object], status: HTTPStatus = HTTPStatus.OK) -> Response:
+        body = json.dumps(payload).encode()
         return Response(
-            HTTPStatus.OK,
-            "OK",
+            status,
+            status.phrase,
             Headers({"Content-Type": "application/json", "Content-Length": str(len(body))}),
             body,
         )

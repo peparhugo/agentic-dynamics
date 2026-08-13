@@ -20,6 +20,16 @@ async def receive_json(connection):
     return json.loads(await connection.recv())
 
 
+async def get_json(address, path):
+    reader, writer = await asyncio.open_connection("127.0.0.1", int(address.rsplit(":", 1)[1]))
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    return response, json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 @pytest.mark.asyncio
 async def test_connect_assigns_unique_client_ids_and_health_reports_count(notification_server):
     _, address = notification_server
@@ -81,3 +91,42 @@ async def test_invalid_message_returns_system_error(notification_server):
         error = await receive_json(client)
         assert error["type"] == "system"
         assert error["payload"] == {"error": "message must be valid JSON"}
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_only_reach_subscribers_and_unsubscribe(notification_server):
+    _, address = notification_server
+    async with connect(address) as sender, connect(address) as subscriber, connect(address) as other:
+        await asyncio.gather(receive_json(sender), receive_json(subscriber), receive_json(other))
+        await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+        await sender.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}}))
+        received = await receive_json(subscriber)
+        assert received["channel"] == "alerts"
+        assert received["payload"] == {"text": "warning"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other.recv(), timeout=0.05)
+
+        await subscriber.send(json.dumps({"type": "unsubscribe", "channel": "alerts", "payload": {}}))
+        await sender.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {}}))
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(subscriber.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_channel_endpoints_report_active_subscriptions(notification_server):
+    _, address = notification_server
+    async with connect(address) as first, connect(address) as second:
+        first_welcome, second_welcome = await asyncio.gather(receive_json(first), receive_json(second))
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+
+        response, channels = await get_json(address, "/channels")
+        assert b"200 OK" in response
+        assert channels == {"channels": [{"name": "alerts", "subscriber_count": 2}]}
+
+        response, subscribers = await get_json(address, "/channels/alerts/subscribers")
+        assert b"200 OK" in response
+        assert set(subscribers["subscribers"]) == {
+            first_welcome["payload"]["client_id"],
+            second_welcome["payload"]["client_id"],
+        }
