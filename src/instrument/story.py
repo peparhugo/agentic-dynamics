@@ -212,6 +212,9 @@ class SessionResult:
     exit_code: int = 0
     error: str = ""
     continuation_used: bool = False
+    continuation_cost_usd: float = 0.0
+    subagent_cost_usd: float = 0.0
+    subagent_sessions: int = 0
     test_count: int = 0
     test_lines: int = 0
     code_lines: int = 0
@@ -230,6 +233,9 @@ class SessionResult:
             "exit_code": self.exit_code,
             "error": self.error,
             "continuation_used": self.continuation_used,
+            "continuation_cost_usd": self.continuation_cost_usd,
+            "subagent_cost_usd": self.subagent_cost_usd,
+            "subagent_sessions": self.subagent_sessions,
             "test_count": self.test_count,
             "test_lines": self.test_lines,
             "code_lines": self.code_lines,
@@ -275,6 +281,18 @@ class StoryResult:
     @property
     def total_cost(self) -> float:
         return sum(s.cost_usd for s in self.sessions)
+
+    @property
+    def total_continuation_cost(self) -> float:
+        return sum(s.continuation_cost_usd for s in self.sessions)
+
+    @property
+    def total_subagent_cost(self) -> float:
+        return sum(s.subagent_cost_usd for s in self.sessions)
+
+    @property
+    def total_subagent_sessions(self) -> int:
+        return sum(s.subagent_sessions for s in self.sessions)
 
     @property
     def total_tokens(self) -> int:
@@ -368,6 +386,9 @@ class StoryResult:
             "error": self.error,
             "summary": {
                 "total_cost": self.total_cost,
+                "total_continuation_cost": self.total_continuation_cost,
+                "total_subagent_cost": self.total_subagent_cost,
+                "total_subagent_sessions": self.total_subagent_sessions,
                 "total_tokens": self.total_tokens,
                 "total_cache_reads": self.total_cache_reads,
                 "total_cache_writes": self.total_cache_writes,
@@ -622,6 +643,16 @@ def _run_session(
     continuation_cost = 0.0
     continuation_tokens = 0
 
+    # Primary session id — needed for subagent cost capture and fork continuation.
+    jsonl_path = worktree / ".instrument" / "session.jsonl"
+    primary_session_id = _read_session_id(jsonl_path)
+    if not primary_session_id and transcript_path.exists():
+        primary_session_id = _read_session_id(transcript_path)
+
+    # Capture @explore (and other) subagent sessions spawned via the task tool.
+    # These live in opencode.db with parent_id = primary session id.
+    subagent_cost, subagent_sessions = _estimate_subagent_cost(primary_session_id)
+
     # If timed out, automatically continue the session. This continuation uses
     # opencode's --session --fork mechanism, so it only applies to the opencode
     # backend (Claude CLI has no equivalent forkable session id).
@@ -630,60 +661,52 @@ def _run_session(
         and agentic.error
         and "timeout" in agentic.error.lower()
         and (backend or "").lower() not in ("claude_cli", "claude")
+        and primary_session_id
     ):
-        jsonl_path = worktree / ".instrument" / "session.jsonl"
-        session_id = ""
-        if jsonl_path.exists():
-            try:
-                with open(jsonl_path) as f:
-                    first = json.loads(f.readline())
-                    session_id = first.get("sessionID", "")
-            except (json.JSONDecodeError, OSError):
-                pass
+        opencode_bin = Path.home() / ".opencode/bin/opencode"
+        try:
+            cont_result = subprocess.run(
+                [
+                    str(opencode_bin),
+                    "run",
+                    "--session",
+                    primary_session_id,
+                    "--fork",
+                    "--dir",
+                    str(worktree),
+                    "--model",
+                    model,
+                    "--format",
+                    "json",
+                    "--auto",
+                    "Continue. Complete the task. Run tests and finish.",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=timeout * 2,
+            )
+        except subprocess.TimeoutExpired:
+            cont_result = None
+            print(
+                f"[story] continuation failed: subprocess timed out (session {primary_session_id})",
+                file=sys.stderr,
+            )
 
-        if session_id:
-            opencode_bin = Path.home() / ".opencode/bin/opencode"
-            try:
-                cont_result = subprocess.run(
-                    [
-                        str(opencode_bin),
-                        "run",
-                        "--session",
-                        session_id,
-                        "--fork",
-                        "--dir",
-                        str(worktree),
-                        "--model",
-                        model,
-                        "--auto",
-                        "Continue. Complete the task. Run tests and finish.",
-                    ],
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout * 2,
-                )
-            except subprocess.TimeoutExpired:
-                cont_result = None
-                print(
-                    f"[story] continuation failed: subprocess timed out (session {session_id})",
-                    file=sys.stderr,
-                )
+        if cont_result is not None:
+            continuation_used = True
 
-            if cont_result is not None:
-                continuation_used = True
+            # The fork creates a NEW session. Bill the fork's own id, not the
+            # primary's — querying the primary again double-counted its cost.
+            fork_session_id = _extract_session_id_from_stdout(cont_result.stdout)
+            cont_cost = _estimate_session_cost(fork_session_id or primary_session_id)
+            continuation_cost += cont_cost
 
-                cont_cost = _estimate_session_cost(session_id)
-                continuation_cost += cont_cost
+            cont_tokens = _sum_billed_tokens_from_jsonl(cont_result.stdout)
+            continuation_tokens += cont_tokens
 
-                import re as _re
-
-                cont_tokens = _re.findall(r'"total_tokens"\s*:\s*(\d+)', cont_result.stdout)
-                if cont_tokens:
-                    continuation_tokens += sum(int(t) for t in cont_tokens)
-
-                if cont_result.returncode == 0:
-                    agentic.error = ""
-                    agentic.exit_code = 0
+            if cont_result.returncode == 0:
+                agentic.error = ""
+                agentic.exit_code = 0
 
     duration = time.monotonic() - t0
 
@@ -709,25 +732,95 @@ def _run_session(
         commit_hash=commit_hash,
         commit_message=commit_msg,
         agentic=agentic,
-        cost_usd=round(total_cost + continuation_cost, 8),
+        cost_usd=round(total_cost + continuation_cost + subagent_cost, 8),
         total_tokens=total_tokens + continuation_tokens,
         duration_s=duration,
         files_changed=files_changed,
         exit_code=agentic.exit_code if agentic else -1,
         error=agentic.error if agentic else "",
         continuation_used=continuation_used,
+        continuation_cost_usd=round(continuation_cost, 8),
+        subagent_cost_usd=round(subagent_cost, 8),
+        subagent_sessions=subagent_sessions,
         test_count=test_count,
         test_lines=test_lines,
         code_lines=code_lines,
     )
 
 
+def _opencode_db() -> Path:
+    """Path to opencode's SQLite database (session cost/token ground truth)."""
+    return Path.home() / ".local/share/opencode/opencode.db"
+
+
+def _read_session_id(transcript_path: Path) -> str:
+    """Extract the sessionID from the first JSONL line of a transcript."""
+    if not transcript_path.exists():
+        return ""
+    try:
+        with open(transcript_path) as f:
+            first = json.loads(f.readline())
+            return first.get("sessionID", "")
+    except (json.JSONDecodeError, OSError):
+        return ""
+
+
+def _extract_session_id_from_stdout(stdout: str) -> str:
+    """Extract the sessionID from the first JSONL event in a subprocess stdout."""
+    if not stdout:
+        return ""
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        sid = obj.get("sessionID", "")
+        if sid:
+            return sid
+    return ""
+
+
+def _sum_billed_tokens_from_jsonl(stdout: str) -> int:
+    """Sum billed tokens from step_finish events in a JSONL stdout.
+
+    Billed tokens = prompt + completion + reasoning (cache reads excluded),
+    matching the primary-run accounting in opencode.py.
+    """
+    total = 0
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if obj.get("type") != "step_finish":
+            continue
+        part = obj.get("part", {})
+        tokens = part.get("tokens", {}) if isinstance(part, dict) else {}
+        if isinstance(tokens, dict):
+            total += (
+                (tokens.get("input", 0) or 0)
+                + (tokens.get("output", 0) or 0)
+                + (tokens.get("reasoning", 0) or 0)
+            )
+    return total
+
+
 def _estimate_session_cost(session_id: str) -> float:
-    """Estimate the cost of a continuation session from opencode's database."""
+    """Estimate the cost of a session from opencode's database (exact id match).
+
+    The session id must be the exact id of the session whose cost we want.
+    No LIKE fallback — that matched the wrong session and double-counted.
+    """
     import sqlite3 as _sql
 
-    db_path = Path.home() / ".local/share/opencode/opencode.db"
-    if not db_path.exists():
+    db_path = _opencode_db()
+    if not session_id or not db_path.exists():
         return 0.0
     try:
         conn = _sql.connect(str(db_path))
@@ -735,17 +828,37 @@ def _estimate_session_cost(session_id: str) -> float:
             "SELECT cost FROM session WHERE id = ?",
             (session_id,),
         ).fetchall()
-        if not rows:
-            rows = conn.execute(
-                "SELECT cost FROM session WHERE id LIKE ? ORDER BY updated_at DESC LIMIT 1",
-                (f"%{session_id}%",),
-            ).fetchall()
         conn.close()
         if rows and rows[0][0] is not None:
             return float(rows[0][0])
     except Exception:
-        conn.close()
+        pass
     return 0.0
+
+
+def _estimate_subagent_cost(parent_session_id: str) -> tuple[float, int]:
+    """Sum cost and count of subagent sessions spawned by a parent session.
+
+    Subagent sessions (e.g. @explore) have parent_id set in the DB, unlike
+    fork continuations which have parent_id = NULL.
+    """
+    import sqlite3 as _sql
+
+    db_path = _opencode_db()
+    if not parent_session_id or not db_path.exists():
+        return 0.0, 0
+    try:
+        conn = _sql.connect(str(db_path))
+        rows = conn.execute(
+            "SELECT COALESCE(SUM(cost), 0), COUNT(*) FROM session WHERE parent_id = ?",
+            (parent_session_id,),
+        ).fetchall()
+        conn.close()
+        if rows:
+            return float(rows[0][0] or 0.0), int(rows[0][1] or 0)
+    except Exception:
+        pass
+    return 0.0, 0
 
 
 # ── Git Helpers ────────────────────────────────────────────────
@@ -828,6 +941,10 @@ def load_story_result(path: Path) -> StoryResult:
                 files_changed=s.get("files_changed", 0),
                 exit_code=s.get("exit_code", 0),
                 error=s.get("error", ""),
+                continuation_used=s.get("continuation_used", False),
+                continuation_cost_usd=s.get("continuation_cost_usd", 0.0),
+                subagent_cost_usd=s.get("subagent_cost_usd", 0.0),
+                subagent_sessions=s.get("subagent_sessions", 0),
                 agentic=agentic,
             )
         )
