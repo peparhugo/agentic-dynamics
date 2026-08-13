@@ -9,6 +9,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -126,6 +127,99 @@ class ClientRegistry:
     def count(self) -> int:
         with self._lock:
             return len(self._clients)
+
+
+class BaseTransport(ABC):
+    """Interface between notification delivery and connected clients."""
+
+    def __init__(self, registry: ClientRegistry | None = None) -> None:
+        self.registry = registry or ClientRegistry()
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> str:
+        """Register a connection and return its client ID."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Remove a disconnected client."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, data: dict[str, Any]) -> bool:
+        """Send a message to one client, returning whether it was delivered."""
+
+    @abstractmethod
+    async def broadcast(self, data: dict[str, Any]) -> None:
+        """Send a message to all matching clients."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        return self.registry.add(connection)
+
+    async def on_disconnect(self, client_id: str) -> None:
+        self.registry.remove(client_id)
+
+    async def _send(self, client: Client, data: dict[str, Any]) -> bool:
+        try:
+            async with client.send_lock:
+                await client.websocket.send(json.dumps(data))
+            return True
+        except ConnectionClosed:
+            return False
+
+    async def send_message(self, client_id: str, data: dict[str, Any]) -> bool:
+        client = self.registry.get(client_id)
+        if client is None:
+            return False
+        if await self._send(client, data):
+            return True
+        await self.on_disconnect(client_id)
+        return False
+
+    async def broadcast(self, data: dict[str, Any]) -> None:
+        channel = data.get("channel")
+        clients = (
+            self.registry.channel_snapshot(channel)
+            if isinstance(channel, str)
+            else self.registry.snapshot()
+        )
+        results = await asyncio.gather(
+            *(self._send(client, data) for _, client in clients),
+            return_exceptions=True,
+        )
+        for (client_id, _), result in zip(clients, results, strict=True):
+            if result is not True:
+                await self.on_disconnect(client_id)
+
+    async def handle_connection(
+        self, websocket: ServerConnection, server: "NotificationServer"
+    ) -> None:
+        await server.start()
+        client_id = await self.on_connect(websocket)
+        await server.client_connected(client_id)
+        try:
+            await self.send_message(
+                client_id,
+                message("system", {"event": "connected", "client_id": client_id}),
+            )
+            async for raw_message in websocket:
+                await server.handle_message(client_id, raw_message)
+        except ConnectionClosed:
+            pass
+        finally:
+            await self.on_disconnect(client_id)
+            await server.client_disconnected(client_id)
+
+
+def create_transport(
+    name: str, registry: ClientRegistry | None = None
+) -> BaseTransport:
+    """Create the configured transport."""
+    if name.lower() == "websocket":
+        return WebSocketTransport(registry)
+    raise ValueError(f"unsupported transport: {name}")
 
 
 class MessageStore:
@@ -282,8 +376,17 @@ class NotificationServer:
         registry: ClientRegistry | None = None,
         backbone: RedisBackbone | None = None,
         store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
-        self.registry = registry or ClientRegistry()
+        if transport is None:
+            self.registry = registry or ClientRegistry()
+            self.transport = create_transport(
+                os.getenv("TRANSPORT", "websocket"), self.registry
+            )
+        else:
+            self.registry = registry or transport.registry
+            transport.registry = self.registry
+            self.transport = transport
         self.backbone = backbone
         self.store = store or MessageStore(os.getenv("DATABASE_URL", ":memory:"))
         self.server_id = str(uuid.uuid4())
@@ -292,37 +395,11 @@ class NotificationServer:
         if self.backbone is not None:
             await self.backbone.start(self._deliver)
 
-    async def _send(self, client: Client, data: dict[str, Any]) -> bool:
-        try:
-            async with client.send_lock:
-                await client.websocket.send(json.dumps(data))
-            return True
-        except ConnectionClosed:
-            return False
-
     async def send_to(self, client_id: str, data: dict[str, Any]) -> bool:
-        client = self.registry.get(client_id)
-        if client is None:
-            return False
-        if await self._send(client, data):
-            return True
-        self.registry.remove(client_id)
-        return False
+        return await self.transport.send_message(client_id, data)
 
     async def broadcast(self, data: dict[str, Any]) -> None:
-        channel = data.get("channel")
-        clients = (
-            self.registry.channel_snapshot(channel)
-            if isinstance(channel, str)
-            else self.registry.snapshot()
-        )
-        results = await asyncio.gather(
-            *(self._send(client, data) for _, client in clients),
-            return_exceptions=True,
-        )
-        for (client_id, _), result in zip(clients, results, strict=True):
-            if result is not True:
-                self.registry.remove(client_id)
+        await self.transport.broadcast(data)
 
     async def _deliver(self, data: dict[str, Any]) -> None:
         if data["type"] in {"broadcast", "system"}:
@@ -417,24 +494,18 @@ class NotificationServer:
             return
         await self._distribute(outgoing)
 
-    async def websocket_handler(self, websocket: ServerConnection) -> None:
-        await self.start()
-        client_id = self.registry.add(websocket)
+    async def client_connected(self, client_id: str) -> None:
         if self.backbone is not None:
             await self.backbone.register(client_id, self.server_id)
-        try:
-            await self.send_to(
-                client_id,
-                message("system", {"event": "connected", "client_id": client_id}),
-            )
-            async for raw_message in websocket:
-                await self.handle_message(client_id, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
-            if self.backbone is not None:
-                await self.backbone.unregister(client_id)
+
+    async def client_disconnected(self, client_id: str) -> None:
+        if self.backbone is not None:
+            await self.backbone.unregister(client_id)
+
+    async def websocket_handler(self, websocket: ServerConnection) -> None:
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("websocket handler requires the websocket transport")
+        await self.transport.handle_connection(websocket, self)
 
     async def process_request(
         self, _connection: ServerConnection, request: Request
