@@ -3,6 +3,7 @@ import http.client
 import json
 import socket
 
+import fakeredis
 import pytest
 import websockets
 
@@ -15,9 +16,18 @@ def free_port() -> int:
         return s.getsockname()[1]
 
 
+def make_server(**kwargs) -> NotificationServer:
+    """Build a NotificationServer wired to an isolated in-memory fake Redis
+    and an in-memory SQLite database, so tests never touch a real Redis
+    instance or leave files behind."""
+    kwargs.setdefault("redis_client", fakeredis.aioredis.FakeRedis(decode_responses=True))
+    kwargs.setdefault("database_url", ":memory:")
+    return NotificationServer(host="localhost", port=free_port(), **kwargs)
+
+
 @pytest.fixture
 async def server():
-    srv = NotificationServer(host="localhost", port=free_port())
+    srv = make_server()
     await srv.start()
     yield srv
     await srv.stop()
@@ -458,3 +468,333 @@ def test_make_message_shape():
     assert msg["type"] == "broadcast"
     assert msg["payload"] == {"a": 1}
     assert "timestamp" in msg and isinstance(msg["timestamp"], str)
+
+
+# ── Redis-backed configuration ─────────────────────────────────────
+
+
+async def test_config_defaults_pulled_from_env_vars(monkeypatch, tmp_path):
+    db_path = str(tmp_path / "env-configured.db")
+    monkeypatch.setenv("REDIS_URL", "redis://example-broker:6399/2")
+    monkeypatch.setenv("DATABASE_URL", db_path)
+
+    srv = NotificationServer(host="localhost", port=free_port())
+    try:
+        assert srv.redis_url == "redis://example-broker:6399/2"
+        assert srv.database_url == db_path
+    finally:
+        await srv.redis.close()
+        srv.messages.close()
+
+
+# ── Client connection state stored in Redis ──────────────────────────
+
+
+async def test_client_registration_recorded_in_redis(server):
+    ws = await connect(server)
+    try:
+        welcome = await recv_json(ws)
+        client_id = welcome["payload"]["client_id"]
+
+        owner = await server.redis.hget("notify:clients", client_id)
+        assert owner == server.server_id
+    finally:
+        await ws.close()
+
+
+async def test_client_disconnect_clears_redis_state(server):
+    ws = await connect(server)
+    welcome = await recv_json(ws)
+    client_id = welcome["payload"]["client_id"]
+
+    await ws.close()
+    await asyncio.sleep(0.2)
+
+    owner = await server.redis.hget("notify:clients", client_id)
+    assert owner is None
+
+
+async def test_channel_subscription_recorded_in_redis(server):
+    ws = await connect(server)
+    try:
+        welcome = await recv_json(ws)
+        client_id = welcome["payload"]["client_id"]
+
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+
+        channels = await server.state.channels_of(client_id)
+        assert channels == {"alerts"}
+
+        await ws.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+
+        channels = await server.state.channels_of(client_id)
+        assert channels == set()
+    finally:
+        await ws.close()
+
+
+# ── Message persistence (SQLite) ───────────────────────────────────────
+
+
+async def test_broadcast_message_is_persisted_and_listed(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"text": "history me"}}))
+        await recv_json(ws)  # delivered back via the redis worker
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/messages"
+        )
+        assert status == 200
+        assert body["limit"] == 50
+        assert body["offset"] == 0
+        assert len(body["messages"]) == 1
+        entry = body["messages"][0]
+        assert entry["type"] == "broadcast"
+        assert entry["channel"] is None
+        assert entry["payload"] == {"text": "history me"}
+        assert "timestamp" in entry and "id" in entry
+    finally:
+        await ws.close()
+
+
+async def test_channel_broadcast_is_persisted_with_channel_name(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)  # subscribed confirmation
+
+        await ws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "fire"}})
+        )
+        await recv_json(ws)  # delivered back
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/messages"
+        )
+        assert status == 200
+        assert body["messages"][0]["channel"] == "alerts"
+    finally:
+        await ws.close()
+
+
+async def test_direct_message_is_persisted(server):
+    ws1 = await connect(server)
+    ws2 = await connect(server)
+    try:
+        welcome1 = await recv_json(ws1)
+        welcome2 = await recv_json(ws2)
+        await recv_json(ws1)  # join notice
+
+        target_id = welcome2["payload"]["client_id"]
+        await ws1.send(
+            json.dumps({"type": "direct", "payload": {"target": target_id, "data": {"x": 1}}})
+        )
+        await recv_json(ws2)  # the direct message itself
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/messages"
+        )
+        assert status == 200
+        entry = body["messages"][0]
+        assert entry["type"] == "direct"
+        assert entry["payload"]["data"] == {"x": 1}
+        assert entry["payload"]["from"] == welcome1["payload"]["client_id"]
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_messages_endpoint_respects_limit_and_offset(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        for i in range(5):
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await recv_json(ws)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/messages?limit=2&offset=1"
+        )
+        assert status == 200
+        assert body["limit"] == 2
+        assert body["offset"] == 1
+        assert len(body["messages"]) == 2
+        # newest-first ordering: skipping the very newest (n=4), next two are n=3, n=2
+        assert [m["payload"]["n"] for m in body["messages"]] == [3, 2]
+    finally:
+        await ws.close()
+
+
+async def test_messages_endpoint_defaults_when_params_missing_or_invalid(server):
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/messages?limit=not-a-number"
+    )
+    assert status == 200
+    assert body["limit"] == 50
+    assert body["offset"] == 0
+    assert body["messages"] == []
+
+
+# ── Multi-instance Redis backbone ───────────────────────────────────────
+
+
+async def make_shared_instances(shared_database_url=None):
+    """Two NotificationServer instances wired to the same fake Redis backend,
+    simulating multiple server processes sharing one Redis broker."""
+    fake_server = fakeredis.FakeServer()
+
+    def redis_client():
+        return fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True)
+
+    srv1 = NotificationServer(
+        host="localhost",
+        port=free_port(),
+        redis_client=redis_client(),
+        database_url=shared_database_url or ":memory:",
+    )
+    srv2 = NotificationServer(
+        host="localhost",
+        port=free_port(),
+        redis_client=redis_client(),
+        database_url=shared_database_url or ":memory:",
+    )
+    await srv1.start()
+    await srv2.start()
+    return srv1, srv2
+
+
+async def test_broadcast_reaches_clients_on_a_different_server_instance():
+    srv1, srv2 = await make_shared_instances()
+    try:
+        ws1 = await connect(srv1)
+        ws2 = await connect(srv2)
+        try:
+            await recv_json(ws1)  # welcome on srv1
+            await recv_json(ws2)  # welcome on srv2
+
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"text": "cluster-wide"}}))
+
+            got1 = await recv_json(ws1)
+            got2 = await recv_json(ws2)
+            assert got1["payload"] == {"text": "cluster-wide"}
+            assert got2["payload"] == {"text": "cluster-wide"}
+        finally:
+            await ws1.close()
+            await ws2.close()
+    finally:
+        await srv1.stop()
+        await srv2.stop()
+
+
+async def test_channel_broadcast_reaches_only_subscribers_across_instances():
+    srv1, srv2 = await make_shared_instances()
+    try:
+        ws1 = await connect(srv1)  # subscriber, on instance 1
+        ws2 = await connect(srv2)  # subscriber, on instance 2
+        ws3 = await connect(srv2)  # not subscribed, on instance 2
+        try:
+            await recv_json(ws1)  # welcome
+            await recv_json(ws2)  # welcome
+            await recv_json(ws3)  # welcome
+            await recv_json(ws2)  # join notice for ws3 (local to srv2)
+
+            await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+            await recv_json(ws1)
+            await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+            await recv_json(ws2)
+            await asyncio.sleep(0.2)  # let both workers finish subscribing in Redis
+
+            await ws1.send(
+                json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "fire"}})
+            )
+
+            got1 = await recv_json(ws1)
+            got2 = await recv_json(ws2)
+            assert got1["payload"]["text"] == "fire"
+            assert got2["payload"]["text"] == "fire"
+
+            with pytest.raises(asyncio.TimeoutError):
+                await recv_json(ws3, timeout=0.3)
+        finally:
+            await ws1.close()
+            await ws2.close()
+            await ws3.close()
+    finally:
+        await srv1.stop()
+        await srv2.stop()
+
+
+async def test_direct_message_routes_to_client_on_another_instance():
+    srv1, srv2 = await make_shared_instances()
+    try:
+        ws1 = await connect(srv1)
+        ws2 = await connect(srv2)
+        try:
+            welcome1 = await recv_json(ws1)
+            welcome2 = await recv_json(ws2)
+            target_id = welcome2["payload"]["client_id"]
+
+            await ws1.send(
+                json.dumps(
+                    {"type": "direct", "payload": {"target": target_id, "data": {"hi": True}}}
+                )
+            )
+
+            got = await recv_json(ws2)
+            assert got["type"] == "direct"
+            assert got["payload"]["data"] == {"hi": True}
+            assert got["payload"]["from"] == welcome1["payload"]["client_id"]
+
+            # ws1 should not see its own direct message
+            with pytest.raises(asyncio.TimeoutError):
+                await recv_json(ws1, timeout=0.3)
+        finally:
+            await ws1.close()
+            await ws2.close()
+    finally:
+        await srv1.stop()
+        await srv2.stop()
+
+
+async def test_message_history_shared_across_instances_via_sqlite(tmp_path):
+    shared_db = str(tmp_path / "shared-history.db")
+    srv1, srv2 = await make_shared_instances(shared_database_url=shared_db)
+    try:
+        ws1 = await connect(srv1)
+        ws2 = await connect(srv2)
+        try:
+            await recv_json(ws1)  # welcome
+            await recv_json(ws2)  # welcome
+
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"from": "srv1"}}))
+            await recv_json(ws1)
+            await recv_json(ws2)
+
+            await ws2.send(json.dumps({"type": "broadcast", "payload": {"from": "srv2"}}))
+            await recv_json(ws1)
+            await recv_json(ws2)
+
+            loop = asyncio.get_running_loop()
+            status, body = await loop.run_in_executor(
+                None, http_get, srv2.host, srv2.port, "/messages"
+            )
+            assert status == 200
+            payloads = [m["payload"] for m in body["messages"]]
+            assert {"from": "srv1"} in payloads
+            assert {"from": "srv2"} in payloads
+        finally:
+            await ws1.close()
+            await ws2.close()
+    finally:
+        await srv1.stop()
+        await srv2.stop()
