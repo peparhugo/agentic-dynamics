@@ -31,6 +31,19 @@ PROVIDER_PRICING = {
         "input": 1.25, "output": 10.00, "reasoning": 10.00,
         "cache_read": 0.625, "cache_write": 2.50,
     },
+    # v0.9 models — added Aug 2026
+    "openai-luna": {
+        "input": 0.20, "output": 1.20, "reasoning": 1.20,
+        "cache_read": 0.02, "cache_write": 0.25,
+    },
+    "openai-sol": {
+        "input": 5.00, "output": 30.00, "reasoning": 30.00,
+        "cache_read": 0.50, "cache_write": 6.25,
+    },
+    "openai-terra": {
+        "input": 2.50, "output": 15.00, "reasoning": 15.00,
+        "cache_read": 0.25, "cache_write": 3.125,
+    },
 }
 
 EXPERIMENT_SESSION_PATTERNS = [

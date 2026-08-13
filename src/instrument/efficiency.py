@@ -72,6 +72,32 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
         "input": 0.20, "output": 1.20, "reasoning": 1.20,
         "cache_read": 0.02, "cache_write": 0.25,
     },
+    "openai-sol": {
+        "input": 5.00, "output": 30.00, "reasoning": 30.00,
+        "cache_read": 0.50, "cache_write": 6.25,
+        "source": "models.dev — GPT-5.6 Sol pricing (Aug 2026)",
+    },
+    "openai-terra": {
+        "input": 2.50, "output": 15.00, "reasoning": 15.00,
+        "cache_read": 0.25, "cache_write": 3.125,
+        "source": "models.dev — GPT-5.6 Terra pricing (Aug 2026)",
+    },
+}
+
+# OpenAI long-context tier (context > 200k tokens) — applies to input/output/cache
+# rates once a session exceeds 200k context tokens. Source: models.dev per-model
+# "context_over_200k" cost block (Aug 2026). Keys mirror PROVIDER_PRICING.
+# Note: gpt-5.6-luna is intentionally absent — recovered API billing shows Luna
+# bills flat (no long-context surcharge), while Sol/Terra apply the ~2x tier.
+CONTEXT_OVER_200K_PRICING: dict[str, dict[str, float]] = {
+    "openai-sol": {
+        "input": 10.00, "output": 45.00, "reasoning": 45.00,
+        "cache_read": 1.00, "cache_write": 12.50,
+    },
+    "openai-terra": {
+        "input": 5.00, "output": 22.50, "reasoning": 22.50,
+        "cache_read": 0.50, "cache_write": 6.25,
+    },
 }
 
 # Current reference pricing (2026-08-11) — for comparison only. Experiment billing
@@ -111,7 +137,42 @@ CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
         "cache_read": 0.02, "cache_write": 0.25,
         "note_snapshot": "2026-08-11. GPT-5.6 Luna standard pricing.",
     },
+    "openai-sol": {
+        "input": 5.00, "output": 30.00, "reasoning": 30.00,
+        "cache_read": 0.50, "cache_write": 6.25,
+        "note_snapshot": "2026-08-11. GPT-5.6 Sol standard pricing.",
+    },
+    "openai-terra": {
+        "input": 2.50, "output": 15.00, "reasoning": 15.00,
+        "cache_read": 0.25, "cache_write": 3.125,
+        "note_snapshot": "2026-08-11. GPT-5.6 Terra standard pricing.",
+    },
 }
+
+
+def _resolve_pricing_key(provider_id: str, model_id: str = "") -> str:
+    """Resolve a provider/model pair to a PROVIDER_PRICING key."""
+    combined = f"{provider_id} {model_id}".lower()
+    if "flash" in combined:
+        return "deepseek-flash"
+    if "deepseek" in combined:
+        return "deepseek"
+    if "sonnet" in combined:
+        return "anthropic-sonnet5"
+    if "haiku" in combined:
+        return "anthropic-haiku"
+    if "luna" in combined:
+        return "openai-luna"
+    if "sol" in combined:
+        return "openai-sol"
+    if "terra" in combined:
+        return "openai-terra"
+    if any(k in combined for k in ("anthropic", "claude")):
+        return "anthropic"
+    if any(k in combined for k in ("openai", "gpt")):
+        return "openai"
+    raise ValueError(f"Unknown provider: provider={provider_id!r}, model={model_id!r}")
+
 
 def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     """Get approximate pricing for a provider/model.
@@ -120,23 +181,59 @@ def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     if model-specific pricing is unavailable. Returns historical billing
     rates for pre-v0.9 models, current rates for v0.9+ models.
     """
-    combined = f"{provider_id} {model_id}".lower()
-    if "flash" in combined:
-        return PROVIDER_PRICING["deepseek-flash"]
-    if "deepseek" in combined:
-        return PROVIDER_PRICING["deepseek"]
-    if "sonnet" in combined:
-        return PROVIDER_PRICING["anthropic-sonnet5"]
-    if "haiku" in combined:
-        return PROVIDER_PRICING["anthropic-haiku"]
-    if "luna" in combined:
-        return PROVIDER_PRICING["openai-luna"]
-    if any(k in combined for k in ("anthropic", "claude")):
-        return PROVIDER_PRICING["anthropic"]
-    if any(k in combined for k in ("openai", "gpt")):
-        return PROVIDER_PRICING["openai"]
-    raise ValueError(f"Unknown provider: provider={provider_id!r}, model={model_id!r}")
+    return PROVIDER_PRICING[_resolve_pricing_key(provider_id, model_id)]
 
+
+def compute_cost_estimate(
+    *,
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    reasoning_tokens: int = 0,
+    cache_read_tokens: int = 0,
+    cache_write_tokens: int = 0,
+    context_tokens: int | None = None,
+    provider: str = "",
+    model: str = "",
+) -> dict[str, float]:
+    """Estimate session cost (USD) from token counts at provider pricing.
+
+    Applies the OpenAI long-context tier (>200k context tokens) when the
+    session exceeds the 200k threshold: the portion of input/cache tokens
+    beyond 200k is billed at the elevated per-model rates.
+
+    Returns a dict with per-component costs and a total.
+    """
+    key = _resolve_pricing_key(provider, model)
+    base = PROVIDER_PRICING[key]
+    tier = CONTEXT_OVER_200K_PRICING.get(key)
+
+    context = context_tokens if context_tokens is not None else (
+        prompt_tokens + cache_read_tokens + cache_write_tokens
+    )
+
+    def _rate(field: str) -> float:
+        if not tier or context <= 200_000:
+            return base[field]
+        over = max(0, context - 200_000) / context
+        return base[field] * (1 - over) + tier[field] * over
+
+    cost_input = prompt_tokens * _rate("input") / 1_000_000
+    cost_output = completion_tokens * _rate("output") / 1_000_000
+    cost_reasoning = reasoning_tokens * _rate("reasoning") / 1_000_000
+    cost_cache_read = cache_read_tokens * _rate("cache_read") / 1_000_000
+    cost_cache_write = cache_write_tokens * _rate("cache_write") / 1_000_000
+
+    total = cost_input + cost_output + cost_reasoning + cost_cache_read + cost_cache_write
+    return {
+        "cost_input_usd": round(cost_input, 8),
+        "cost_output_usd": round(cost_output, 8),
+        "cost_reasoning_usd": round(cost_reasoning, 8),
+        "cost_cache_read_usd": round(cost_cache_read, 8),
+        "cost_cache_write_usd": round(cost_cache_write, 8),
+        "total_cost_usd": round(total, 8),
+        "pricing_key": key,
+        "long_context_tier": bool(tier and context > 200_000),
+    }
 
 @dataclass
 class EfficiencyMetrics:

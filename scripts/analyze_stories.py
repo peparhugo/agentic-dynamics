@@ -44,6 +44,11 @@ def main():
         default=1,
         help="Number of parallel story analyses (default 1; 4-8 for sonar)",
     )
+    parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip stories whose analysis output already exists",
+    )
 
     args = parser.parse_args()
 
@@ -62,7 +67,7 @@ def main():
                 print(f"\nAnalyzing: {result_file.name}")
                 try:
                     story_result = load_story_result(result_file)
-                    _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar)
+                    _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar, args.skip_existing)
                 except Exception as e:
                     print(f"  ERROR: {e}")
             return
@@ -73,7 +78,7 @@ def main():
         def _run(result_file: Path) -> tuple[str, str]:
             try:
                 story_result = load_story_result(result_file)
-                _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar)
+                _analyze_from_result(story_result, Path(args.output_dir), args.no_sonar, args.skip_existing)
                 return (result_file.name, "")
             except Exception as e:
                 return (result_file.name, str(e))
@@ -104,8 +109,14 @@ def _analyze_from_result(
     story_result: StoryResult,
     output_dir: Path,
     no_sonar: bool,
+    skip_existing: bool = False,
 ) -> StoryAnalysis:
     """Analyze a story worktree from a StoryResult and save the analysis."""
+    out_path = output_dir / f"analysis_{story_result.story_id}.json"
+    if skip_existing and out_path.exists():
+        print(f"  Skip (already analyzed): {story_result.story_id}")
+        return StoryAnalysis(story_name=story_result.story_name)
+
     worktree_path = Path(story_result.worktree)
     if not worktree_path.exists():
         print(f"  Worktree no longer exists: {worktree_path}")
@@ -123,7 +134,6 @@ def _analyze_from_result(
 
     # Save analysis
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"analysis_{story_result.story_id}.json"
     out_path.write_text(json.dumps(analysis.to_dict(), indent=2))
     print(f"  Saved: {out_path}")
 

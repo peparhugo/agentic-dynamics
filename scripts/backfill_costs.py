@@ -24,6 +24,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from instrument.opencode import AgenticResult, _parse_session_output
 from instrument.story import _count_tests
+from instrument.efficiency import compute_cost_estimate
 
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 BACKUP_DIR = RESULTS_DIR / ".backfill_backup"
@@ -119,12 +120,32 @@ def backfill(dry_run: bool = False) -> dict:
             continue
 
         # Update each session from DB data
+        model = d.get("model", "")
+        provider, _, model_id = model.partition("/")
+
         for ses in story_sessions:
             sn = ses.get("session_number", 0)
             db_match = _match_db_to_session(db_sessions, sn)
             
             if db_match:
-                ses["cost_usd"] = round(db_match["cost"], 8)
+                db_cost = float(db_match["cost"] or 0)
+                if db_cost > 0:
+                    ses["cost_usd"] = round(db_cost, 8)
+                else:
+                    # DB recorded zero cost (e.g. gpt-5.6-sol/terra unpriced at
+                    # run time) — estimate from token counts at provider rates.
+                    est = compute_cost_estimate(
+                        prompt_tokens=db_match["tokens_input"],
+                        completion_tokens=db_match["tokens_output"],
+                        reasoning_tokens=db_match["tokens_reasoning"],
+                        cache_read_tokens=db_match["tokens_cache_read"],
+                        cache_write_tokens=db_match["tokens_cache_write"],
+                        context_tokens=(db_match["tokens_input"]
+                                        + db_match["tokens_cache_read"]
+                                        + db_match["tokens_cache_write"]),
+                        provider=provider, model=model_id,
+                    )
+                    ses["cost_usd"] = est["total_cost_usd"]
 
                 # If this is the last session AND we parsed its JSONL, use detail
                 if sn == story_sessions[-1].get("session_number") and last_agentic:

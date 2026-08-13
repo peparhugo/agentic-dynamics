@@ -15,7 +15,7 @@ from .perturb import build_operators, perturb_prompt
 from .basin import BasinMetrics, measure_basin_escape
 # Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
 from .solution import SolutionMetrics, evaluate_solution
-from .efficiency import EfficiencyMetrics, compute_efficiency
+from .efficiency import EfficiencyMetrics, compute_efficiency, compute_cost_estimate
 # Deprecated: StrategyType — not used by current scripts
 from .strategy import StrategyReport, classify_strategy
 from .game_report import GameReport
@@ -114,7 +114,7 @@ __all__ = [
     "build_operators", "perturb_prompt",
     "BasinMetrics", "measure_basin_escape",
     "SolutionMetrics", "evaluate_solution",
-    "EfficiencyMetrics", "compute_efficiency",
+    "EfficiencyMetrics", "compute_efficiency", "compute_cost_estimate",
     "StrategyReport", "classify_strategy",
     "GameReport",
     "SonarMetrics", "run_sonar_analysis", "compute_sonar_diff", "sonar_quality_score",
