@@ -46,4 +46,48 @@ describe('buildSite', () => {
   it('fails with a clear error for a missing content directory', () => {
     expect(() => buildSite({ contentDir: join(workspace, 'missing') })).toThrow('Content directory does not exist');
   });
+
+  it('renders the default template inside the default layout with partials', () => {
+    const content = join(workspace, 'content');
+    const output = join(workspace, 'public');
+    const templates = join(workspace, 'templates');
+    mkdirSync(join(templates, 'layouts'), { recursive: true });
+    mkdirSync(join(templates, 'partials'), { recursive: true });
+    mkdirSync(content);
+    writeFileSync(join(content, 'welcome.md'), '---\ntitle: Welcome\n---\nHello **world**');
+    writeFileSync(join(templates, 'default.hbs'), '<article><h1>{{title}}</h1>{{{content}}}</article>');
+    writeFileSync(join(templates, 'layouts', 'default.hbs'), '<!doctype html><body>{{> header}}<main>{{{body}}}</main>{{> footer}}</body>');
+    writeFileSync(join(templates, 'partials', 'header.hbs'), '<header>Site header</header>');
+    writeFileSync(join(templates, 'partials', 'footer.hbs'), '<footer>Site footer</footer>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    const html = readFileSync(join(output, 'welcome.html'), 'utf8');
+    expect(html).toContain('<header>Site header</header>');
+    expect(html).toContain('<article><h1>Welcome</h1><p>Hello <strong>world</strong></p>');
+    expect(html).toContain('<footer>Site footer</footer>');
+  });
+
+  it('uses the template and layout selected in frontmatter', () => {
+    const content = join(workspace, 'content');
+    const output = join(workspace, 'public');
+    const templates = join(workspace, 'templates');
+    mkdirSync(join(templates, 'layouts'), { recursive: true });
+    mkdirSync(content);
+    writeFileSync(join(content, 'product.md'), '---\ntitle: Product\ntemplate: product\nlayout: store\n---\nDetails');
+    writeFileSync(join(templates, 'product.hbs'), '<section class="product">{{title}}: {{{content}}}</section>');
+    writeFileSync(join(templates, 'layouts', 'store.hbs'), '<html><body class="store">{{{body}}}</body></html>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    expect(readFileSync(join(output, 'product.html'), 'utf8')).toBe('<html><body class="store"><section class="product">Product: <p>Details</p>\n</section></body></html>');
+  });
+
+  it('fails clearly when a selected template does not exist', () => {
+    const content = join(workspace, 'content');
+    mkdirSync(content);
+    writeFileSync(join(content, 'missing.md'), '---\ntemplate: missing\n---\nContent');
+
+    expect(() => buildSite({ contentDir: content, outputDir: join(workspace, 'public') })).toThrow('Template does not exist: missing');
+  });
 });
