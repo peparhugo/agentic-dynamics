@@ -2,6 +2,7 @@ import json
 
 import pytest
 import pytest_asyncio
+import fakeredis.aioredis
 from websockets.asyncio.client import connect
 
 import app
@@ -303,3 +304,180 @@ async def test_http_channels_subscribers_endpoint(ws_server):
     assert body["channel"] == "alerts"
     assert body["subscribers"] == [client_id]
     await ws.close()
+
+
+@pytest_asyncio.fixture
+async def two_instances(tmp_path):
+    fake_server = fakeredis.FakeServer()
+    db = str(tmp_path / "history.db")
+
+    def make_server():
+        return app.NotificationServer(
+            redis_client=fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True),
+            database_url=db,
+        )
+
+    server1 = make_server()
+    server2 = make_server()
+    await server1.start_backend()
+    await server2.start_backend()
+    ws1 = await app.start_ws_server(server1)
+    ws2 = await app.start_ws_server(server2)
+    httpd1 = app.start_health_server(server1)
+    httpd2 = app.start_health_server(server2)
+    yield {
+        "fake_server": fake_server,
+        "server1": server1,
+        "server2": server2,
+        "redis": server1.redis,
+        "url1": f"ws://127.0.0.1:{ws1.sockets[0].getsockname()[1]}",
+        "url2": f"ws://127.0.0.1:{ws2.sockets[0].getsockname()[1]}",
+    }
+    await server1.stop_backend()
+    await server2.stop_backend()
+    ws1.close()
+    ws2.close()
+    app.stop_health_server(httpd1)
+    app.stop_health_server(httpd2)
+
+
+async def test_redis_pubsub_channel_broadcast_across_instances(two_instances):
+    ws_a = await connect(two_instances["url1"])
+    ws_b = await connect(two_instances["url2"])
+    await recv_message(ws_a)
+    await recv_message(ws_b)
+
+    await ws_a.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await ws_b.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws_a)
+    await recv_message(ws_b)
+
+    await ws_a.send(
+        json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "multi"}})
+    )
+    m_a = await recv_message(ws_a)
+    m_b = await recv_message(ws_b)
+    assert m_a["type"] == "broadcast"
+    assert m_a["payload"] == {"channel": "alerts", "text": "multi"}
+    assert m_b["type"] == "broadcast"
+    assert m_b["payload"] == {"channel": "alerts", "text": "multi"}
+
+    persisted = two_instances["server1"].store.list(50, 0)
+    assert len(persisted) == 1
+    assert persisted[0]["type"] == "broadcast"
+    assert persisted[0]["channel"] == "alerts"
+    assert persisted[0]["payload"] == {"channel": "alerts", "text": "multi"}
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_redis_pubsub_global_broadcast_across_instances(two_instances):
+    ws_a = await connect(two_instances["url1"])
+    ws_b = await connect(two_instances["url2"])
+    await recv_message(ws_a)
+    await recv_message(ws_b)
+
+    await ws_a.send(json.dumps({"type": "broadcast", "payload": {"text": "all"}}))
+    m_a = await recv_message(ws_a)
+    m_b = await recv_message(ws_b)
+    assert m_a["type"] == "broadcast"
+    assert m_a["payload"] == {"text": "all"}
+    assert m_b["type"] == "broadcast"
+    assert m_b["payload"] == {"text": "all"}
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_redis_pubsub_direct_across_instances(two_instances):
+    ws_a = await connect(two_instances["url1"])
+    ws_b = await connect(two_instances["url2"])
+    await recv_message(ws_a)
+    g_b = await recv_message(ws_b)
+    id_b = g_b["payload"]["client_id"]
+
+    await ws_a.send(
+        json.dumps({"type": "direct", "payload": {"client_id": id_b, "text": "psst"}})
+    )
+    m_b = await recv_message(ws_b)
+    assert m_b["type"] == "direct"
+    assert m_b["payload"] == {"client_id": id_b, "text": "psst"}
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_redis_client_state_persists_across_restart(two_instances):
+    ws = await connect(two_instances["url1"])
+    greeting = await recv_message(ws)
+    client_id = greeting["payload"]["client_id"]
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws)
+
+    state = await two_instances["redis"].hgetall(f"notifications:client:{client_id}")
+    assert state["status"] == "connected"
+    assert json.loads(state["channels"]) == ["alerts"]
+
+    await ws.close()
+    await asyncio_gather_till_count(two_instances["server1"].registry, 0)
+    state = await two_instances["redis"].hgetall(f"notifications:client:{client_id}")
+    assert state["status"] == "disconnected"
+
+    reader = fakeredis.aioredis.FakeRedis(server=two_instances["fake_server"], decode_responses=True)
+    state = await reader.hgetall(f"notifications:client:{client_id}")
+    assert state["status"] == "disconnected"
+    assert json.loads(state["channels"]) == ["alerts"]
+    await reader.close()
+
+
+async def test_messages_persistence_and_rest_endpoint(tmp_path):
+    import urllib.request
+
+    db = str(tmp_path / "history.db")
+    server = app.NotificationServer(database_url=db)
+    await server.start_backend()
+    ws = await app.start_ws_server(server)
+    httpd = app.start_health_server(server)
+    health_url = f"http://127.0.0.1:{httpd.server_address[1]}"
+    ws_url = f"ws://127.0.0.1:{ws.sockets[0].getsockname()[1]}"
+
+    cws = await connect(ws_url)
+    await recv_message(cws)
+    await cws.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+    await recv_message(cws)
+    await cws.send(json.dumps({"type": "subscribe", "payload": {"channel": "news"}}))
+    await recv_message(cws)
+    await cws.send(
+        json.dumps({"type": "broadcast", "payload": {"channel": "news", "text": "second"}})
+    )
+    await recv_message(cws)
+
+    with urllib.request.urlopen(health_url + "/messages") as resp:
+        body = json.loads(resp.read())
+    messages = body["messages"]
+    assert len(messages) == 2
+    assert {"id", "channel", "type", "payload", "timestamp"}.issubset(messages[0])
+    assert messages[0]["type"] == "broadcast"
+    assert messages[0]["channel"] is None
+    assert messages[0]["payload"] == {"text": "first"}
+    assert messages[1]["channel"] == "news"
+    assert messages[1]["payload"] == {"channel": "news", "text": "second"}
+
+    with urllib.request.urlopen(health_url + "/messages?limit=1&offset=1") as resp:
+        body = json.loads(resp.read())
+    assert len(body["messages"]) == 1
+    assert body["messages"][0]["payload"] == {"channel": "news", "text": "second"}
+
+    with urllib.request.urlopen(health_url + "/messages?limit=0&offset=0") as resp:
+        body = json.loads(resp.read())
+    assert body["messages"] == []
+
+    await cws.close()
+    ws.close()
+    app.stop_health_server(httpd)
+    await server.stop_backend()
+
+
+async def test_redis_client_state_saved_without_backend_is_noop(ws_server, client):
+    ws, client_id = client
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+    await recv_message(ws)
+    assert ws_server["server"].store.list(50, 0) == []
