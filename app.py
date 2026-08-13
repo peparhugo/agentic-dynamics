@@ -12,6 +12,8 @@ import sqlite3
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from tasks import send_notification_email
@@ -23,6 +25,36 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION = timedelta(hours=1)
+RATE_LIMIT_STORAGE_URI = os.environ.get("RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/2")
+
+
+def rate_limit_key() -> str:
+    """Use the token subject when present; auth requests fall back to the client IP."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            return f"user:{payload['sub']}"
+        except (jwt.PyJWTError, KeyError, TypeError):
+            pass
+    return f"ip:{request.remote_addr}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=RATE_LIMIT_STORAGE_URI,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(max(1, int(error.retry_after or 60)))
+    return response
 
 
 def get_db():
@@ -112,7 +144,20 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repository().list_for_owner(g.user_id))
+    cursor = request.args.get("cursor")
+    limit_value = request.args.get("limit")
+    try:
+        limit = int(limit_value) if limit_value is not None else 20
+    except ValueError:
+        limit = None
+    if limit is None or limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+    if cursor is not None and (not cursor.isdigit() or int(cursor) < 1):
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    page = task_repository().list_page_for_owner(
+        g.user_id, int(cursor) if cursor is not None else None, limit
+    )
+    return jsonify(page)
 
 
 @app.route("/tasks", methods=["POST"])

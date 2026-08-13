@@ -6,6 +6,7 @@ import pytest
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
+    task_app.limiter.reset()
     task_app.init_db()
     task_app.app.config.update(TESTING=True)
     return task_app.app.test_client()
@@ -42,8 +43,10 @@ def test_list_orders_newest_task_first(client, auth_headers):
     first = client.post("/tasks", json={"title": "First"}, headers=auth_headers).get_json()
     second = client.post("/tasks", json={"title": "Second"}, headers=auth_headers).get_json()
 
-    tasks = client.get("/tasks", headers=auth_headers).get_json()
-    assert [task["id"] for task in tasks] == [second["id"], first["id"]]
+    page = client.get("/tasks", headers=auth_headers).get_json()
+    assert [task["id"] for task in page["data"]] == [second["id"], first["id"]]
+    assert page["next_cursor"] is None
+    assert page["total"] == 2
 
 
 def test_update_task(client, auth_headers):
@@ -130,7 +133,7 @@ def test_users_cannot_access_each_others_tasks(client, auth_headers):
     task = client.post("/tasks", json={"title": "Private"}, headers=auth_headers).get_json()
     other_headers = register_and_login(client, username="bob")
 
-    assert client.get("/tasks", headers=other_headers).get_json() == []
+    assert client.get("/tasks", headers=other_headers).get_json()["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=other_headers).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "complete"}, headers=other_headers).status_code == 404
 
@@ -149,3 +152,37 @@ def test_init_db_migrates_existing_tasks(tmp_path, monkeypatch):
     with task_app.get_db() as conn:
         task = conn.execute("SELECT title, owner_id FROM tasks WHERE id = 1").fetchone()
     assert dict(task) == {"title": "Legacy", "owner_id": None}
+
+
+def test_tasks_are_cursor_paginated(client, auth_headers):
+    tasks = [
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=auth_headers).get_json()
+        for number in range(3)
+    ]
+
+    first_page = client.get("/tasks?limit=2", headers=auth_headers)
+    assert first_page.status_code == 200
+    assert first_page.get_json() == {
+        "data": [tasks[2], tasks[1]],
+        "next_cursor": str(tasks[1]["id"]),
+        "total": 3,
+    }
+
+    second_page = client.get(
+        f"/tasks?cursor={tasks[1]['id']}&limit=2", headers=auth_headers
+    )
+    assert second_page.get_json() == {"data": [tasks[0]], "next_cursor": None, "total": 3}
+
+
+@pytest.mark.parametrize("query", ["?limit=0", "?limit=101", "?limit=invalid", "?cursor=0", "?cursor=x"])
+def test_list_tasks_rejects_invalid_pagination(client, auth_headers, query):
+    assert client.get(f"/tasks{query}", headers=auth_headers).status_code == 400
+
+
+def test_rate_limit_returns_retry_after(client, auth_headers):
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth_headers).status_code == 200
+
+    response = client.get("/tasks", headers=auth_headers)
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]

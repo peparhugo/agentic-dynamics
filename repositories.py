@@ -100,6 +100,29 @@ class TaskRepository(BaseRepository):
         )
         return [self._serialize(row) for row in rows]
 
+    def list_page_for_owner(self, owner_id: int, cursor: int | None, limit: int) -> dict:
+        where = "owner_id = ?"
+        parameters: list[int] = [owner_id]
+        if cursor is not None:
+            # IDs are unique and returned in descending order, so they are a stable cursor.
+            where += " AND id < ?"
+            parameters.append(cursor)
+        with self.connection_factory() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            rows = conn.execute(
+                f"SELECT * FROM tasks WHERE {where} ORDER BY id DESC LIMIT ?",
+                tuple(parameters + [limit + 1]),
+            ).fetchall()
+        has_next_page = len(rows) > limit
+        tasks = [self._serialize(row) for row in rows[:limit]]
+        return {
+            "data": tasks,
+            "next_cursor": str(tasks[-1]["id"]) if has_next_page else None,
+            "total": total,
+        }
+
     def update_for_owner(self, task_id: int, owner_id: int, values: dict) -> dict | None:
         task = self.find_for_owner(task_id, owner_id)
         if task is None:

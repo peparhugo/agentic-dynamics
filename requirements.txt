@@ -1,0 +1,5 @@
+Flask
+Flask-Limiter[redis]
+PyJWT
+celery
+pytest
