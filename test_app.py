@@ -15,6 +15,15 @@ def auth_headers(client, username="alice", password="secret"):
     return {"Authorization": f"Bearer {response.get_json()['token']}"}
 
 
+def auth_headers_with_email(client, username="alice", password="secret"):
+    client.post(
+        "/auth/register",
+        json={"username": username, "email": f"{username}@example.com", "password": password},
+    )
+    response = client.post("/auth/login", json={"username": username, "password": password})
+    return {"Authorization": f"Bearer {response.get_json()['token']}"}
+
+
 def test_create_task_uses_pending_status_and_returns_task(tmp_path, monkeypatch):
     client = configure_database(tmp_path, monkeypatch)
 
@@ -64,6 +73,21 @@ def test_get_and_update_task(tmp_path, monkeypatch):
     assert update.get_json()["status"] == "complete"
     assert fetched.status_code == 200
     assert fetched.get_json() == update.get_json()
+
+
+def test_completing_task_queues_notification_once(tmp_path, monkeypatch):
+    client = configure_database(tmp_path, monkeypatch)
+    headers = auth_headers_with_email(client)
+    task_id = client.post("/tasks", json={"title": "Send report"}, headers=headers).get_json()["id"]
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    completed = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+    unchanged = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+    assert completed.status_code == 200
+    assert unchanged.status_code == 200
+    assert queued == [("alice@example.com", "Send report")]
 
 
 def test_missing_task_returns_json_404(tmp_path, monkeypatch):

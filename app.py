@@ -12,6 +12,8 @@ import sqlite3
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -34,6 +36,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                email TEXT,
                 password_hash TEXT NOT NULL
             )
             """
@@ -54,6 +57,11 @@ def init_db() -> None:
         }
         if "owner_id" not in columns:
             connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        user_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def encode_token(user_id: int) -> str:
@@ -115,17 +123,20 @@ def get_task(task_id: int, owner_id: int) -> sqlite3.Row | None:
 def register():
     data = request.get_json(silent=True)
     username = data.get("username") if isinstance(data, dict) else None
+    email = data.get("email") if isinstance(data, dict) else None
     password = data.get("password") if isinstance(data, dict) else None
     if not isinstance(username, str) or not username.strip():
         return jsonify({"error": "username is required"}), 400
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a non-empty string"}), 400
 
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username.strip(), generate_password_hash(password)),
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username.strip(), email.strip() if isinstance(email, str) else None, generate_password_hash(password)),
             )
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -216,6 +227,11 @@ def update_task(owner_id: int, task_id: int):
             "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
             (title, status, task_id, owner_id),
         )
+        owner = connection.execute(
+            "SELECT email FROM users WHERE id = ?", (owner_id,)
+        ).fetchone()
+    if task["status"] != "completed" and status == "completed" and owner["email"]:
+        send_notification_email.delay(owner["email"], title)
     return jsonify(task_dict(get_task(task_id, owner_id)))
 
 
