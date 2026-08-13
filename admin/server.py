@@ -37,6 +37,7 @@ from instrument.routing import compute_routing
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6379"))
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 RESULTS_KEY = "story_results"
 HEARTBEAT_SECONDS = 15
@@ -47,7 +48,7 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 def _redis():
     import redis
 
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 
 def _sse(generator):

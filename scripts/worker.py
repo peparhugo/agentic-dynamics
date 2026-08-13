@@ -21,6 +21,7 @@ import redis
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6379"))
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 STATUS_KEY = "story_status"
 WORKER_PREFIX = "worker"
@@ -48,7 +49,7 @@ def _connect_redis() -> redis.Redis:
     while True:
         try:
             r = redis.Redis(
-                host=REDIS_HOST, port=REDIS_PORT,
+                host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
                 decode_responses=True, socket_connect_timeout=10,
                 socket_keepalive=True, health_check_interval=30,
             )

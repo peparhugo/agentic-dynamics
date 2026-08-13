@@ -55,3 +55,18 @@ def test_get_pricing_luna():
 def test_get_pricing_openai_via_gpt():
     pricing = get_pricing("", "gpt-5-mini")
     assert pricing["output"] == 10.00
+
+
+def test_get_pricing_deepseek_flash():
+    pricing = get_pricing("deepseek", "deepseek-v4-flash")
+    assert pricing["input"] == 0.14
+    assert pricing["output"] == 0.28
+    assert pricing["cache_read"] == 0.0028
+
+
+def test_get_pricing_haiku():
+    pricing = get_pricing("anthropic", "claude-haiku-4-5")
+    assert pricing["input"] == 1.00
+    assert pricing["output"] == 5.00
+    assert pricing["cache_read"] == 0.10
+    assert pricing["cache_write"] == 1.25

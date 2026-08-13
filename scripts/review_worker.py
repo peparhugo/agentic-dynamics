@@ -30,6 +30,7 @@ from instrument.review import review_commit, review_story
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = 6379
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "review_jobs"
 STATUS_KEY = "review_status"
 REVIEWS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "reviews"
@@ -50,7 +51,7 @@ def _connect_redis() -> redis.Redis:
     while True:
         try:
             r = redis.Redis(
-                host=REDIS_HOST, port=REDIS_PORT,
+                host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB,
                 decode_responses=True, socket_connect_timeout=10,
                 socket_keepalive=True, health_check_interval=30,
             )

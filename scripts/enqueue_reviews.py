@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -23,6 +24,7 @@ from instrument.story import load_story_result
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = 6379
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "review_jobs"
 STATUS_KEY = "review_status"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "experiments" / "results" / "stories"
@@ -58,7 +60,7 @@ def _get_worktree_commits(worktree: Path) -> list[tuple[str, str, int]]:
 def main() -> None:
     dry_run = "--dry-run" in sys.argv
 
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
     r.ping()
 
     if not dry_run:

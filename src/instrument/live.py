@@ -17,6 +17,7 @@ from typing import Any
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6379"))
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 STATUS_KEY = "story_status"
 STATUS_CHANNEL = "status"
 EVENT_CHANNEL_PREFIX = "events:"
@@ -32,6 +33,7 @@ def _connect() -> Any:
         r = redis.Redis(
             host=REDIS_HOST,
             port=REDIS_PORT,
+            db=REDIS_DB,
             decode_responses=True,
             socket_connect_timeout=2,
             socket_keepalive=False,

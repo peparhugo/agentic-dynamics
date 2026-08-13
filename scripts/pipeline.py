@@ -57,6 +57,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6379"))
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 
 STORY_QUEUE = "story_jobs"
 STORY_STATUS = "story_status"
@@ -261,7 +262,7 @@ _PLAN_PREFIX = "pipeline"
 
 def _r():
     import redis
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 
 def _phase_key(plan_name: str, phase_id: str) -> str:

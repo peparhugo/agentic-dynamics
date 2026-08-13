@@ -44,6 +44,11 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
         "cache_read": 0.003625, "cache_write": 0.435,
         "source": "api-docs.deepseek.com — DeepSeek V4 Pro pricing (Aug 2026)",
     },
+    "deepseek-flash": {
+        "input": 0.14, "output": 0.28, "reasoning": 0.28,
+        "cache_read": 0.0028, "cache_write": 0.14,
+        "source": "api-docs.deepseek.com — DeepSeek V4 Flash pricing (Aug 2026)",
+    },
     "anthropic": {
         "input": 3.00, "output": 15.00, "reasoning": 15.00,
         "cache_read": 0.30, "cache_write": 3.75,
@@ -57,6 +62,11 @@ PROVIDER_PRICING: dict[str, dict[str, float]] = {
         "input": 2.00, "output": 10.00, "reasoning": 10.00,
         "cache_read": 0.20, "cache_write": 2.50,
         "note": "Claude Sonnet 5 intro pricing through Aug 31, 2026. Sep 1: $3/$15.",
+    },
+    "anthropic-haiku": {
+        "input": 1.00, "output": 5.00, "reasoning": 5.00,
+        "cache_read": 0.10, "cache_write": 1.25,
+        "source": "docs.anthropic.com — Claude Haiku 4.5 pricing (Aug 2026)",
     },
     "openai-luna": {
         "input": 0.20, "output": 1.20, "reasoning": 1.20,
@@ -73,6 +83,10 @@ CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
         "input": 0.435, "output": 0.87, "reasoning": 0.87,
         "cache_read": 0.003625, "cache_write": 0.435,
     },
+    "deepseek-flash": {
+        "input": 0.14, "output": 0.28, "reasoning": 0.28,
+        "cache_read": 0.0028, "cache_write": 0.14,
+    },
     "anthropic": {
         "input": 10.00, "output": 50.00, "reasoning": 50.00,
         "cache_read": 1.00, "cache_write": 12.50,
@@ -86,6 +100,11 @@ CURRENT_REFERENCE_PRICING: dict[str, dict[str, float]] = {
         "input": 2.00, "output": 10.00, "reasoning": 10.00,
         "cache_read": 0.20, "cache_write": 2.50,
         "note_snapshot": "2026-08-11. Intro $2/$10 through Aug 31. Sep 1: $3/$15.",
+    },
+    "anthropic-haiku": {
+        "input": 1.00, "output": 5.00, "reasoning": 5.00,
+        "cache_read": 0.10, "cache_write": 1.25,
+        "note_snapshot": "2026-08-11. Claude Haiku 4.5 standard pricing.",
     },
     "openai-luna": {
         "input": 0.20, "output": 1.20, "reasoning": 1.20,
@@ -102,10 +121,14 @@ def get_pricing(provider_id: str, model_id: str = "") -> dict[str, float]:
     rates for pre-v0.9 models, current rates for v0.9+ models.
     """
     combined = f"{provider_id} {model_id}".lower()
+    if "flash" in combined:
+        return PROVIDER_PRICING["deepseek-flash"]
     if "deepseek" in combined:
         return PROVIDER_PRICING["deepseek"]
     if "sonnet" in combined:
         return PROVIDER_PRICING["anthropic-sonnet5"]
+    if "haiku" in combined:
+        return PROVIDER_PRICING["anthropic-haiku"]
     if "luna" in combined:
         return PROVIDER_PRICING["openai-luna"]
     if any(k in combined for k in ("anthropic", "claude")):

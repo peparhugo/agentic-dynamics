@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import abc
 import json
+import os
 import subprocess
 import sys
 import time
@@ -30,6 +31,7 @@ sys.path.insert(0, str(ROOT / "src"))
 
 REDIS_HOST = "127.0.0.1"
 REDIS_PORT = 6379
+REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 
 PLAN_PHASE_KEY = "plan:current_phase"
 PLAN_STATE_PREFIX = "plan:phase"
@@ -44,7 +46,7 @@ LOG_DIR = ROOT / "experiments" / "results" / "stories" / "logs"
 
 
 def _r() -> redis.Redis:
-    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+    return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
 
 
 # ── Matrix helpers ─────────────────────────────────────────────────
