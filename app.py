@@ -9,6 +9,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -192,18 +193,18 @@ class RedisBackbone:
 @dataclass(frozen=True)
 class Client:
     id: str
-    connection: ServerConnection
+    connection: Any
 
 
 class ClientRegistry:
-    """A thread-safe registry of connected WebSocket clients."""
+    """A thread-safe registry of connected transport clients."""
 
     def __init__(self) -> None:
         self._clients: dict[str, Client] = {}
         self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
-    def add(self, connection: ServerConnection) -> Client:
+    def add(self, connection: Any) -> Client:
         client = Client(str(uuid.uuid4()), connection)
         with self._lock:
             self._clients[client.id] = client
@@ -264,13 +265,168 @@ class ClientRegistry:
             return len(self._clients)
 
 
+class BaseTransport(ABC):
+    """Interface between notification handling and a client transport."""
+
+    def __init__(self) -> None:
+        self.server: NotificationServer | None = None
+
+    def attach(self, server: NotificationServer) -> None:
+        self.server = server
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> Client:
+        """Register a newly connected transport client."""
+
+    @abstractmethod
+    async def on_disconnect(self, client: Client) -> None:
+        """Release transport resources for a disconnected client."""
+
+    @abstractmethod
+    async def send_message(self, client: Client, outgoing: dict[str, Any]) -> bool:
+        """Send one notification envelope to a client."""
+
+    @abstractmethod
+    async def broadcast(
+        self, outgoing: dict[str, Any], channel: str | None = None
+    ) -> None:
+        """Send one notification envelope to all matching local clients."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    @property
+    def notification_server(self) -> NotificationServer:
+        if self.server is None:
+            raise RuntimeError("transport is not attached to a notification server")
+        return self.server
+
+    async def on_connect(self, connection: ServerConnection) -> Client:
+        return self.notification_server.clients.add(connection)
+
+    async def on_disconnect(self, client: Client) -> None:
+        self.notification_server.clients.remove(client.id)
+
+    async def send_message(self, client: Client, outgoing: dict[str, Any]) -> bool:
+        try:
+            await client.connection.send(json.dumps(outgoing))
+            return True
+        except ConnectionClosed:
+            await self.on_disconnect(client)
+            return False
+
+    async def broadcast(
+        self, outgoing: dict[str, Any], channel: str | None = None
+    ) -> None:
+        clients = (
+            self.notification_server.clients.snapshot()
+            if channel is None
+            else self.notification_server.clients.channel_snapshot(channel)
+        )
+        if clients:
+            await asyncio.gather(
+                *(self.send_message(client, outgoing) for client in clients)
+            )
+
+    async def handle_connection(self, connection: ServerConnection) -> None:
+        server = self.notification_server
+        client = await server._connect(connection)
+        try:
+            async for raw_message in connection:
+                await server._handle_message(client, raw_message)
+        except ConnectionClosed:
+            pass
+        finally:
+            await server._disconnect(client)
+
+    def process_request(
+        self, connection: ServerConnection, request: Request
+    ) -> Response | None:
+        server = self.notification_server
+        parsed = urlsplit(request.path)
+        path = parsed.path
+        if path == "/health":
+            return self._json_response(
+                connection, {"connected_clients": len(server.clients)}
+            )
+        if path == "/channels":
+            channels = [
+                {"name": name, "subscriber_count": count}
+                for name, count in server.clients.channels().items()
+            ]
+            return self._json_response(connection, {"channels": channels})
+        if path == "/messages":
+            if server.messages is None:
+                return self._json_response(connection, {"messages": []})
+            parameters = parse_qs(parsed.query)
+            try:
+                limit = int(parameters.get("limit", ["50"])[0])
+                offset = int(parameters.get("offset", ["0"])[0])
+                if not 1 <= limit <= 1000 or offset < 0:
+                    raise ValueError
+            except ValueError:
+                return self._json_response(
+                    connection,
+                    {"error": "limit must be 1-1000 and offset must be non-negative"},
+                    HTTPStatus.BAD_REQUEST,
+                )
+            return self._json_response(
+                connection, {"messages": server.messages.list(limit, offset)}
+            )
+        prefix, separator, encoded_name = path.partition("/channels/")
+        if not prefix and separator and encoded_name.endswith("/subscribers"):
+            encoded_name = encoded_name[: -len("/subscribers")]
+            if encoded_name:
+                name = unquote(encoded_name)
+                return self._json_response(
+                    connection,
+                    {
+                        "channel": name,
+                        "subscribers": list(server.clients.subscriber_ids(name)),
+                    },
+                )
+        if request.headers.get("Upgrade", "").lower() != "websocket":
+            return connection.respond(HTTPStatus.NOT_FOUND, "Not Found\n")
+        return None
+
+    @staticmethod
+    def _json_response(
+        connection: ServerConnection,
+        body: dict[str, Any],
+        status: HTTPStatus = HTTPStatus.OK,
+    ) -> Response:
+        response = connection.respond(status, json.dumps(body) + "\n")
+        del response.headers["Content-Type"]
+        response.headers["Content-Type"] = "application/json"
+        return response
+
+    def start(self, host: str = "127.0.0.1", port: int = 8765) -> Server:
+        return serve(
+            self.handle_connection,
+            host,
+            port,
+            process_request=self.process_request,
+        )
+
+
+def configured_transport() -> BaseTransport:
+    transport_name = os.getenv("TRANSPORT", "websocket").lower()
+    if transport_name == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"unsupported transport: {transport_name}")
+
+
 class NotificationServer:
     def __init__(
         self,
         backbone: RedisBackbone | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.clients = ClientRegistry()
+        self.transport = transport or configured_transport()
+        self.transport.attach(self)
         configured_redis = os.getenv("REDIS_URL")
         self.backbone = backbone or (
             RedisBackbone(configured_redis) if configured_redis else None
@@ -289,24 +445,25 @@ class NotificationServer:
                 self._backbone_started = True
 
     async def handle_connection(self, connection: ServerConnection) -> None:
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("handle_connection is only available for WebSocket transport")
+        await self.transport.handle_connection(connection)
+
+    async def _connect(self, connection: Any) -> Client:
         await self._ensure_backbone()
-        client = self.clients.add(connection)
+        client = await self.transport.on_connect(connection)
         if self.backbone is not None:
             await self.backbone.add_client(client.id)
         await self._send(
             client,
             message("system", {"event": "connected", "client_id": client.id}),
         )
+        return client
 
-        try:
-            async for raw_message in connection:
-                await self._handle_message(client, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.clients.remove(client.id)
-            if self.backbone is not None:
-                await self.backbone.remove_client(client.id)
+    async def _disconnect(self, client: Client) -> None:
+        await self.transport.on_disconnect(client)
+        if self.backbone is not None:
+            await self.backbone.remove_client(client.id)
 
     async def _handle_message(self, sender: Client, raw_message: str | bytes) -> None:
         if isinstance(raw_message, bytes):
@@ -426,73 +583,20 @@ class NotificationServer:
         outgoing: dict[str, Any],
         channel: str | None = None,
     ) -> None:
-        clients = (
-            self.clients.snapshot()
-            if channel is None
-            else self.clients.channel_snapshot(channel)
-        )
-        if clients:
-            await asyncio.gather(*(self._send(client, outgoing) for client in clients))
+        await self.transport.broadcast(outgoing, channel)
 
     async def _error(self, client: Client, detail: str) -> None:
         await self._send(client, message("system", {"event": "error", "detail": detail}))
 
     async def _send(self, client: Client, outgoing: dict[str, Any]) -> bool:
-        try:
-            await client.connection.send(json.dumps(outgoing))
-            return True
-        except ConnectionClosed:
-            self.clients.remove(client.id)
-            return False
+        return await self.transport.send_message(client, outgoing)
 
     def process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        parsed = urlsplit(request.path)
-        path = parsed.path
-        if path == "/health":
-            return self._json_response(
-                connection, {"connected_clients": len(self.clients)}
-            )
-        if path == "/channels":
-            channels = [
-                {"name": name, "subscriber_count": count}
-                for name, count in self.clients.channels().items()
-            ]
-            return self._json_response(connection, {"channels": channels})
-        if path == "/messages":
-            if self.messages is None:
-                return self._json_response(connection, {"messages": []})
-            parameters = parse_qs(parsed.query)
-            try:
-                limit = int(parameters.get("limit", ["50"])[0])
-                offset = int(parameters.get("offset", ["0"])[0])
-                if not 1 <= limit <= 1000 or offset < 0:
-                    raise ValueError
-            except ValueError:
-                return self._json_response(
-                    connection,
-                    {"error": "limit must be 1-1000 and offset must be non-negative"},
-                    HTTPStatus.BAD_REQUEST,
-                )
-            return self._json_response(
-                connection, {"messages": self.messages.list(limit, offset)}
-            )
-        prefix, separator, encoded_name = path.partition("/channels/")
-        if not prefix and separator and encoded_name.endswith("/subscribers"):
-            encoded_name = encoded_name[: -len("/subscribers")]
-            if encoded_name:
-                name = unquote(encoded_name)
-                return self._json_response(
-                    connection,
-                    {
-                        "channel": name,
-                        "subscribers": list(self.clients.subscriber_ids(name)),
-                    },
-                )
-        if request.headers.get("Upgrade", "").lower() != "websocket":
-            return connection.respond(HTTPStatus.NOT_FOUND, "Not Found\n")
-        return None
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("process_request is only available for WebSocket transport")
+        return self.transport.process_request(connection, request)
 
     @staticmethod
     def _json_response(
@@ -500,19 +604,14 @@ class NotificationServer:
         body: dict[str, Any],
         status: HTTPStatus = HTTPStatus.OK,
     ) -> Response:
-        response = connection.respond(status, json.dumps(body) + "\n")
-        del response.headers["Content-Type"]
-        response.headers["Content-Type"] = "application/json"
-        return response
+        return WebSocketTransport._json_response(connection, body, status)
 
     def start(self, host: str = "127.0.0.1", port: int = 8765) -> Server:
         """Create a server context manager for use with ``async with``."""
-        return serve(
-            self.handle_connection,
-            host,
-            port,
-            process_request=self.process_request,
-        )
+        start = getattr(self.transport, "start", None)
+        if start is None:
+            raise RuntimeError("configured transport cannot start a network server")
+        return start(host, port)
 
 
 async def run(host: str, port: int) -> None:
