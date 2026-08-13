@@ -6,13 +6,16 @@ import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Response
 
 
-SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
+SUPPORTED_MESSAGE_TYPES = frozenset(
+    {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+)
 
 
 class NotificationServer:
@@ -20,6 +23,7 @@ class NotificationServer:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = asyncio.Lock()
 
     @property
@@ -35,6 +39,20 @@ class NotificationServer:
     async def unregister(self, client_id: str) -> None:
         async with self._lock:
             self._clients.pop(client_id, None)
+            self._remove_client_from_channels(client_id)
+
+    async def subscribe(self, client_id: str, channel: str) -> None:
+        async with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    async def unsubscribe(self, client_id: str, channel: str) -> None:
+        async with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                self._channels.pop(channel, None)
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         serialized = json.dumps(message)
@@ -52,6 +70,29 @@ class NotificationServer:
             async with self._lock:
                 for client_id in failed_clients:
                     self._clients.pop(client_id, None)
+                    self._remove_client_from_channels(client_id)
+
+    async def send_channel(self, channel: str, message: dict[str, Any]) -> None:
+        serialized = json.dumps(message)
+        async with self._lock:
+            clients = [
+                (client_id, self._clients[client_id])
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+
+        failed_clients: list[str] = []
+        for client_id, websocket in clients:
+            try:
+                await websocket.send(serialized)
+            except Exception:
+                failed_clients.append(client_id)
+
+        if failed_clients:
+            async with self._lock:
+                for client_id in failed_clients:
+                    self._clients.pop(client_id, None)
+                    self._remove_client_from_channels(client_id)
 
     async def send_direct(self, client_id: str, message: dict[str, Any]) -> bool:
         async with self._lock:
@@ -72,8 +113,12 @@ class NotificationServer:
         try:
             async for raw_message in websocket:
                 message = self._parse_message(raw_message)
-                if message["type"] == "broadcast":
-                    await self.broadcast(message)
+                if message["type"] == "subscribe":
+                    await self.subscribe(client_id, message["channel"])
+                elif message["type"] == "unsubscribe":
+                    await self.unsubscribe(client_id, message["channel"])
+                elif "channel" in message:
+                    await self.send_channel(message["channel"], message)
                 elif message["type"] == "direct":
                     target_id = message["payload"].get("client_id")
                     if not isinstance(target_id, str) or not await self.send_direct(target_id, message):
@@ -88,15 +133,40 @@ class NotificationServer:
             await self.unregister(client_id)
 
     def health_response(self, connection: ServerConnection, request: Any) -> Response | None:
-        if request.path != "/health":
-            return None
-        body = json.dumps({"connected_clients": self.client_count}).encode()
+        path = urlsplit(request.path).path
+        if path == "/health":
+            return self._json_response({"connected_clients": self.client_count})
+        if path == "/channels":
+            return self._json_response(
+                {
+                    "channels": [
+                        {"name": name, "subscriber_count": len(subscribers)}
+                        for name, subscribers in sorted(self._channels.items())
+                    ]
+                }
+            )
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/") : -len("/subscribers")]).rstrip("/")
+            subscribers = self._channels.get(name)
+            if subscribers is None:
+                return self._json_response({"error": "channel not found"}, HTTPStatus.NOT_FOUND)
+            return self._json_response({"subscribers": sorted(subscribers)})
+        return None
+
+    @staticmethod
+    def _json_response(body: dict[str, Any], status: HTTPStatus = HTTPStatus.OK) -> Response:
         return Response(
-            HTTPStatus.OK,
-            "OK",
+            status,
+            status.phrase,
             headers=Headers({"Content-Type": "application/json"}),
-            body=body,
+            body=json.dumps(body).encode(),
         )
+
+    def _remove_client_from_channels(self, client_id: str) -> None:
+        for channel, subscribers in list(self._channels.items()):
+            subscribers.discard(client_id)
+            if not subscribers:
+                self._channels.pop(channel, None)
 
     @staticmethod
     def _message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -123,6 +193,12 @@ class NotificationServer:
             raise ValueError("payload must be an object")
         if not isinstance(message.get("timestamp"), str):
             raise ValueError("timestamp must be a string")
+        if "channel" in message and (
+            not isinstance(message["channel"], str) or not message["channel"]
+        ):
+            raise ValueError("channel must be a non-empty string")
+        if message["type"] in {"subscribe", "unsubscribe"} and "channel" not in message:
+            raise ValueError("channel is required")
         return message
 
 
