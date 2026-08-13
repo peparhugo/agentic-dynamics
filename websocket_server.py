@@ -7,7 +7,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Set
 from threading import Lock
 
 import websockets
@@ -15,21 +15,28 @@ from aiohttp import web
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients."""
+    """Thread-safe registry of connected WebSocket clients with channel subscriptions."""
 
     def __init__(self):
         self._clients: Dict[str, Any] = {}
+        self._subscriptions: Dict[str, Set[str]] = {}
+        self._client_channels: Dict[str, Set[str]] = {}
         self._lock = Lock()
 
     def add(self, client_id: str, websocket: Any) -> None:
         """Add a client to the registry."""
         with self._lock:
             self._clients[client_id] = websocket
+            self._client_channels[client_id] = set()
 
     def remove(self, client_id: str) -> None:
         """Remove a client from the registry."""
         with self._lock:
             self._clients.pop(client_id, None)
+            channels = self._client_channels.pop(client_id, set())
+            for channel in channels:
+                if channel in self._subscriptions:
+                    self._subscriptions[channel].discard(client_id)
 
     def get(self, client_id: str) -> Any | None:
         """Get a specific client."""
@@ -45,6 +52,48 @@ class ClientRegistry:
         """Get count of connected clients."""
         with self._lock:
             return len(self._clients)
+
+    def subscribe(self, client_id: str, channel: str) -> bool:
+        """Subscribe a client to a channel. Returns True if subscription succeeded."""
+        with self._lock:
+            if client_id not in self._clients:
+                return False
+            if channel not in self._subscriptions:
+                self._subscriptions[channel] = set()
+            self._subscriptions[channel].add(client_id)
+            self._client_channels[client_id].add(channel)
+            return True
+
+    def unsubscribe(self, client_id: str, channel: str) -> bool:
+        """Unsubscribe a client from a channel. Returns True if unsubscription succeeded."""
+        with self._lock:
+            if client_id not in self._client_channels:
+                return False
+            if channel not in self._client_channels[client_id]:
+                return False
+            self._client_channels[client_id].discard(channel)
+            if channel in self._subscriptions:
+                self._subscriptions[channel].discard(client_id)
+            return True
+
+    def get_channel_subscribers(self, channel: str) -> Set[str]:
+        """Get all client IDs subscribed to a channel."""
+        with self._lock:
+            return set(self._subscriptions.get(channel, set()))
+
+    def get_channels(self) -> Dict[str, int]:
+        """Get all active channels and their subscriber counts."""
+        with self._lock:
+            return {
+                channel: len(subscribers)
+                for channel, subscribers in self._subscriptions.items()
+                if subscribers
+            }
+
+    def get_client_channels(self, client_id: str) -> Set[str]:
+        """Get all channels a client is subscribed to."""
+        with self._lock:
+            return set(self._client_channels.get(client_id, set()))
 
 
 class NotificationServer:
@@ -99,25 +148,80 @@ class NotificationServer:
             target_id = payload.get("target_id")
             if target_id:
                 await self.send_direct(target_id, payload)
+        elif msg_type == "subscribe":
+            channel = payload.get("channel")
+            if channel:
+                await self._handle_subscribe(sender_id, channel)
+        elif msg_type == "unsubscribe":
+            channel = payload.get("channel")
+            if channel:
+                await self._handle_unsubscribe(sender_id, channel)
         elif msg_type == "system":
             pass
 
+    async def _handle_subscribe(self, client_id: str, channel: str) -> None:
+        """Handle client subscription to a channel."""
+        success = self.registry.subscribe(client_id, channel)
+        websocket = self.registry.get(client_id)
+        if websocket:
+            message = json.dumps({
+                "type": "system",
+                "payload": {
+                    "action": "subscribed" if success else "subscription_failed",
+                    "channel": channel,
+                    "success": success
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            try:
+                await websocket.send(message)
+            except websockets.exceptions.ConnectionClosed:
+                self.registry.remove(client_id)
+
+    async def _handle_unsubscribe(self, client_id: str, channel: str) -> None:
+        """Handle client unsubscription from a channel."""
+        success = self.registry.unsubscribe(client_id, channel)
+        websocket = self.registry.get(client_id)
+        if websocket:
+            message = json.dumps({
+                "type": "system",
+                "payload": {
+                    "action": "unsubscribed" if success else "unsubscription_failed",
+                    "channel": channel,
+                    "success": success
+                },
+                "timestamp": datetime.utcnow().isoformat()
+            })
+            try:
+                await websocket.send(message)
+            except websockets.exceptions.ConnectionClosed:
+                self.registry.remove(client_id)
+
     async def broadcast(self, payload: dict, sender_id: str | None = None) -> None:
-        """Broadcast a message to all connected clients."""
+        """Broadcast a message to clients. Routes to channel subscribers if channel specified."""
+        channel = payload.get("channel")
+
         message = json.dumps({
             "type": "broadcast",
             "payload": payload,
             "timestamp": datetime.utcnow().isoformat()
         })
 
-        clients = self.registry.get_all()
         disconnected = []
 
-        for client_id, websocket in clients.items():
-            try:
-                await websocket.send(message)
-            except websockets.exceptions.ConnectionClosed:
-                disconnected.append(client_id)
+        if channel:
+            target_clients = self.registry.get_channel_subscribers(channel)
+        else:
+            target_clients = set(self.registry.get_all().keys())
+
+        clients = self.registry.get_all()
+        for client_id in target_clients:
+            websocket = clients.get(client_id)
+            if websocket:
+                try:
+                    await websocket.send(message)
+                except websockets.exceptions.ConnectionClosed:
+                    disconnected.append(client_id)
 
         for client_id in disconnected:
             self.registry.remove(client_id)
@@ -143,6 +247,27 @@ class NotificationServer:
             "connected_clients": self.registry.get_count()
         })
 
+    async def channels_handler(self, request: web.Request) -> web.Response:
+        """List all active channels and their subscriber counts."""
+        channels = self.registry.get_channels()
+        return web.json_response({
+            "channels": channels,
+            "total_channels": len(channels)
+        })
+
+    async def channel_subscribers_handler(self, request: web.Request) -> web.Response:
+        """List subscriber IDs for a specific channel."""
+        channel_name = request.match_info.get("channel")
+        if not channel_name:
+            return web.json_response({"error": "channel name required"}, status=400)
+
+        subscribers = self.registry.get_channel_subscribers(channel_name)
+        return web.json_response({
+            "channel": channel_name,
+            "subscribers": sorted(list(subscribers)),
+            "subscriber_count": len(subscribers)
+        })
+
     async def start(self) -> None:
         """Start both WebSocket and HTTP servers."""
         self.server = await websockets.serve(
@@ -153,6 +278,8 @@ class NotificationServer:
 
         app = web.Application()
         app.router.add_get("/health", self.health_handler)
+        app.router.add_get("/channels", self.channels_handler)
+        app.router.add_get("/channels/{channel}", self.channel_subscribers_handler)
 
         self.http_runner = web.AppRunner(app)
         await self.http_runner.setup()

@@ -384,3 +384,323 @@ class TestWebSocketServer:
             assert valid, f"Timestamp {timestamp} is not valid ISO format"
 
         await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channel_subscription(self):
+        """Test that a client can subscribe to a channel."""
+        server = NotificationServer(host="127.0.0.1", port=8780)
+        await server.start()
+
+        async with websockets.connect("ws://127.0.0.1:8780") as ws:
+            greeting = await ws.recv()
+            json.loads(greeting)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"}
+            }))
+
+            response = await ws.recv()
+            data = json.loads(response)
+
+            assert data["type"] == "system"
+            assert data["payload"]["action"] == "subscribed"
+            assert data["payload"]["channel"] == "alerts"
+            assert data["payload"]["success"] is True
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channel_unsubscription(self):
+        """Test that a client can unsubscribe from a channel."""
+        server = NotificationServer(host="127.0.0.1", port=8781)
+        await server.start()
+
+        async with websockets.connect("ws://127.0.0.1:8781") as ws:
+            greeting = await ws.recv()
+            json.loads(greeting)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"}
+            }))
+            subscribe_response = await ws.recv()
+            json.loads(subscribe_response)
+
+            await ws.send(json.dumps({
+                "type": "unsubscribe",
+                "payload": {"channel": "alerts"}
+            }))
+
+            response = await ws.recv()
+            data = json.loads(response)
+
+            assert data["type"] == "system"
+            assert data["payload"]["action"] == "unsubscribed"
+            assert data["payload"]["channel"] == "alerts"
+            assert data["payload"]["success"] is True
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channel_message_routing(self):
+        """Test that messages are routed only to channel subscribers."""
+        server = NotificationServer(host="127.0.0.1", port=8782)
+        await server.start()
+
+        received_messages = []
+
+        async def subscriber():
+            async with websockets.connect("ws://127.0.0.1:8782") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                await ws.send(json.dumps({
+                    "type": "subscribe",
+                    "payload": {"channel": "alerts"}
+                }))
+                sub_response = await ws.recv()
+                json.loads(sub_response)
+
+                message = await ws.recv()
+                received_messages.append(json.loads(message))
+
+        async def non_subscriber():
+            async with websockets.connect("ws://127.0.0.1:8782") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                await asyncio.sleep(0.3)
+
+        async def broadcaster():
+            await asyncio.sleep(0.1)
+            async with websockets.connect("ws://127.0.0.1:8782") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {
+                        "channel": "alerts",
+                        "text": "Alert message"
+                    }
+                }))
+
+        sub_task = asyncio.create_task(subscriber())
+        non_sub_task = asyncio.create_task(non_subscriber())
+        bcast_task = asyncio.create_task(broadcaster())
+
+        await asyncio.sleep(0.5)
+        await asyncio.gather(sub_task, non_sub_task, bcast_task)
+
+        assert len(received_messages) == 1
+        assert received_messages[0]["payload"]["text"] == "Alert message"
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_broadcast_without_channel(self):
+        """Test that broadcast without channel goes to all clients."""
+        server = NotificationServer(host="127.0.0.1", port=8783)
+        await server.start()
+
+        received_messages = []
+
+        async def receiver():
+            async with websockets.connect("ws://127.0.0.1:8783") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                message = await ws.recv()
+                received_messages.append(json.loads(message))
+
+        async def broadcaster():
+            await asyncio.sleep(0.1)
+            async with websockets.connect("ws://127.0.0.1:8783") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                await ws.send(json.dumps({
+                    "type": "broadcast",
+                    "payload": {"text": "Broadcast to all"}
+                }))
+
+        tasks = [
+            asyncio.create_task(receiver()),
+            asyncio.create_task(receiver()),
+            asyncio.create_task(broadcaster())
+        ]
+
+        await asyncio.sleep(0.5)
+        await asyncio.gather(*tasks)
+
+        assert len(received_messages) == 2
+        for msg in received_messages:
+            assert msg["payload"]["text"] == "Broadcast to all"
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_multiple_channel_subscriptions(self):
+        """Test that a client can subscribe to multiple channels."""
+        server = NotificationServer(host="127.0.0.1", port=8784)
+        await server.start()
+
+        received_messages = []
+
+        async with websockets.connect("ws://127.0.0.1:8784") as ws:
+            greeting = await ws.recv()
+            data = json.loads(greeting)
+            client_id = data["payload"]["client_id"]
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"}
+            }))
+            await ws.recv()
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "system"}
+            }))
+            await ws.recv()
+
+            await asyncio.sleep(0.2)
+
+        async def send_channel_messages():
+            await asyncio.sleep(0.1)
+            await server.broadcast({"channel": "alerts", "text": "Alert"})
+            await server.broadcast({"channel": "system", "text": "System"})
+
+        task = asyncio.create_task(send_channel_messages())
+        await asyncio.sleep(0.4)
+
+        channels = server.registry.get_client_channels(client_id)
+        assert "alerts" in channels
+        assert "system" in channels
+
+        await task
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channels_rest_endpoint(self):
+        """Test GET /channels REST endpoint."""
+        server = NotificationServer(host="127.0.0.1", port=8785)
+        await server.start()
+
+        async def subscribe_to_channels():
+            async with websockets.connect("ws://127.0.0.1:8785") as ws:
+                greeting = await ws.recv()
+                json.loads(greeting)
+
+                for channel in ["alerts", "system", "chat"]:
+                    await ws.send(json.dumps({
+                        "type": "subscribe",
+                        "payload": {"channel": channel}
+                    }))
+                    await ws.recv()
+
+                await asyncio.sleep(0.5)
+
+        task = asyncio.create_task(subscribe_to_channels())
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get("http://127.0.0.1:9785/channels") as response:
+                assert response.status == 200
+                data = await response.json()
+
+                assert "channels" in data
+                assert "total_channels" in data
+                assert data["total_channels"] >= 3
+                assert "alerts" in data["channels"]
+                assert "system" in data["channels"]
+                assert "chat" in data["channels"]
+
+        await task
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channel_subscribers_rest_endpoint(self):
+        """Test GET /channels/{name}/subscribers REST endpoint."""
+        server = NotificationServer(host="127.0.0.1", port=8786)
+        await server.start()
+
+        async def subscribe_to_channel():
+            async with websockets.connect("ws://127.0.0.1:8786") as ws:
+                greeting = await ws.recv()
+                data = json.loads(greeting)
+                client_id = data["payload"]["client_id"]
+
+                await ws.send(json.dumps({
+                    "type": "subscribe",
+                    "payload": {"channel": "alerts"}
+                }))
+                await ws.recv()
+
+                await asyncio.sleep(0.5)
+
+                return client_id
+
+        client_id = await subscribe_to_channel()
+
+        async with ClientSession() as session:
+            async with session.get("http://127.0.0.1:9786/channels/alerts") as response:
+                assert response.status == 200
+                data = await response.json()
+
+                assert data["channel"] == "alerts"
+                assert "subscribers" in data
+                assert "subscriber_count" in data
+                assert client_id in data["subscribers"]
+                assert data["subscriber_count"] >= 1
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_channel_cleanup_on_disconnect(self):
+        """Test that channel subscriptions are cleaned up when client disconnects."""
+        server = NotificationServer(host="127.0.0.1", port=8787)
+        await server.start()
+
+        async with websockets.connect("ws://127.0.0.1:8787") as ws:
+            greeting = await ws.recv()
+            json.loads(greeting)
+
+            await ws.send(json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"}
+            }))
+            await ws.recv()
+
+        await asyncio.sleep(0.2)
+
+        channels = server.registry.get_channels()
+        assert "alerts" not in channels or channels.get("alerts", 0) == 0
+
+        await server.stop()
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_nonexistent_channel(self):
+        """Test unsubscribing from a channel not subscribed to."""
+        server = NotificationServer(host="127.0.0.1", port=8788)
+        await server.start()
+
+        async with websockets.connect("ws://127.0.0.1:8788") as ws:
+            greeting = await ws.recv()
+            json.loads(greeting)
+
+            await ws.send(json.dumps({
+                "type": "unsubscribe",
+                "payload": {"channel": "alerts"}
+            }))
+
+            response = await ws.recv()
+            data = json.loads(response)
+
+            assert data["type"] == "system"
+            assert data["payload"]["action"] == "unsubscription_failed"
+            assert data["payload"]["success"] is False
+
+        await server.stop()
