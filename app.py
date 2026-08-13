@@ -10,13 +10,15 @@ import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote, urlsplit
 
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+CONTROL_TYPES = {"subscribe", "unsubscribe"}
 
 
 def timestamp() -> str:
@@ -24,11 +26,13 @@ def timestamp() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def message(message_type: str, payload: dict[str, Any]) -> str:
-    return json.dumps(
-        {"type": message_type, "payload": payload, "timestamp": timestamp()},
-        separators=(",", ":"),
-    )
+def message(
+    message_type: str, payload: dict[str, Any], channel: str | None = None
+) -> str:
+    data = {"type": message_type, "payload": payload, "timestamp": timestamp()}
+    if channel is not None:
+        data["channel"] = channel
+    return json.dumps(data, separators=(",", ":"))
 
 
 class ClientRegistry:
@@ -36,6 +40,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._subscriptions: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     def add(self, websocket: ServerConnection) -> str:
@@ -47,14 +52,54 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in list(self._subscriptions):
+                subscribers = self._subscriptions[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._subscriptions[channel]
 
     def get(self, client_id: str) -> ServerConnection | None:
         with self._lock:
             return self._clients.get(client_id)
 
-    def snapshot(self) -> list[ServerConnection]:
+    def snapshot(self, channel: str | None = None) -> list[ServerConnection]:
         with self._lock:
+            if channel is not None:
+                return [
+                    self._clients[client_id]
+                    for client_id in self._subscriptions.get(channel, set())
+                    if client_id in self._clients
+                ]
             return list(self._clients.values())
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            if client_id in self._clients:
+                self._subscriptions.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subscribers = self._subscriptions.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._subscriptions[channel]
+
+    def is_subscribed(self, client_id: str, channel: str) -> bool:
+        with self._lock:
+            return client_id in self._subscriptions.get(channel, set())
+
+    def channels(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {"name": name, "subscriber_count": len(subscribers)}
+                for name, subscribers in sorted(self._subscriptions.items())
+            ]
+
+    def subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return sorted(self._subscriptions.get(channel, set()))
 
     @property
     def count(self) -> int:
@@ -76,12 +121,14 @@ class NotificationServer:
             # The connection handler owns registry cleanup.
             return
 
-    async def broadcast(self, data: str) -> None:
-        recipients = self.clients.snapshot()
+    async def broadcast(self, data: str, channel: str | None = None) -> None:
+        recipients = self.clients.snapshot(channel)
         if recipients:
             await asyncio.gather(*(self._send(client, data) for client in recipients))
 
-    async def process_message(self, websocket: ServerConnection, raw: str | bytes) -> None:
+    async def process_message(
+        self, client_id: str, websocket: ServerConnection, raw: str | bytes
+    ) -> None:
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, UnicodeDecodeError):
@@ -94,29 +141,56 @@ class NotificationServer:
 
         message_type = data.get("type")
         payload = data.get("payload")
-        if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict):
+        if message_type not in SUPPORTED_TYPES:
             await websocket.send(
                 message("system", {"error": "type must be supported and payload must be an object"})
             )
             return
 
-        outgoing = message(message_type, payload)
+        channel = data.get("channel")
+        if channel is None and message_type in CONTROL_TYPES and isinstance(payload, dict):
+            channel = payload.get("channel")
+        if channel is not None and (not isinstance(channel, str) or not channel.strip()):
+            await websocket.send(message("system", {"error": "channel must be a non-empty string"}))
+            return
+
+        if message_type in CONTROL_TYPES:
+            if channel is None:
+                await websocket.send(
+                    message("system", {"error": "channel must be a non-empty string"})
+                )
+                return
+            if message_type == "subscribe":
+                self.clients.subscribe(client_id, channel)
+            else:
+                self.clients.unsubscribe(client_id, channel)
+            return
+
+        if not isinstance(payload, dict):
+            await websocket.send(
+                message("system", {"error": "type must be supported and payload must be an object"})
+            )
+            return
+
+        outgoing = message(message_type, payload, channel)
         if message_type == "direct":
             target_id = payload.get("target_id")
             target = self.clients.get(target_id) if isinstance(target_id, str) else None
             if target is None:
                 await websocket.send(message("system", {"error": "target client not found"}))
                 return
+            if channel is not None and not self.clients.is_subscribed(target_id, channel):
+                return
             await self._send(target, outgoing)
         else:
-            await self.broadcast(outgoing)
+            await self.broadcast(outgoing, channel)
 
     async def handler(self, websocket: ServerConnection) -> None:
         client_id = self.clients.add(websocket)
         try:
             await websocket.send(message("system", {"event": "connected", "client_id": client_id}))
             async for raw in websocket:
-                await self.process_message(websocket, raw)
+                await self.process_message(client_id, websocket, raw)
         finally:
             self.clients.remove(client_id)
 
@@ -124,10 +198,24 @@ class NotificationServer:
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
         del connection
-        if request.path != "/health":
+        path = urlsplit(request.path).path
+        if path == "/health":
+            response_data: dict[str, Any] = {"connected_clients": self.clients.count}
+        elif path == "/channels":
+            response_data = {"channels": self.clients.channels()}
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            encoded_name = path[len("/channels/") : -len("/subscribers")].rstrip("/")
+            if not encoded_name or "/" in encoded_name:
+                return None
+            channel = unquote(encoded_name)
+            response_data = {
+                "channel": channel,
+                "subscribers": self.clients.subscribers(channel),
+            }
+        else:
             return None
 
-        body = json.dumps({"connected_clients": self.clients.count}).encode("utf-8")
+        body = json.dumps(response_data).encode("utf-8")
         headers = Headers(
             [
                 ("Content-Type", "application/json"),
