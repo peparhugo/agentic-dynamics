@@ -1,7 +1,9 @@
 import asyncio
 import json
+import os
 
 import pytest
+from redis import asyncio as redis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -17,6 +19,7 @@ async def running_server():
     finally:
         server.close()
         await server.wait_closed()
+        await notification_server.stop()
 
 
 async def receive_json(connection):
@@ -150,3 +153,55 @@ async def test_unsubscribe_and_channel_endpoints(running_server):
                 break
             await asyncio.sleep(0.01)
         assert subscribers["subscribers"] == [second_id]
+
+
+async def test_messages_endpoint_persists_notifications(running_server):
+    _, url = running_server
+    async with connect(url) as connection:
+        await receive_json(connection)
+        await connection.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+        await receive_json(connection)
+        await connection.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "second"}})
+        )
+
+        messages = await get_json(url, "/messages?limit=1&offset=0")
+        assert len(messages["messages"]) == 1
+        assert messages["messages"][0]["channel"] == "alerts"
+        assert messages["messages"][0]["payload"] == {"text": "second"}
+        assert isinstance(messages["messages"][0]["id"], int)
+
+        messages = await get_json(url, "/messages?limit=1&offset=1")
+        assert messages["messages"][0]["channel"] is None
+        assert messages["messages"][0]["payload"] == {"text": "first"}
+
+
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/15")
+    client = redis.from_url(redis_url)
+    try:
+        await client.ping()
+    except Exception:
+        pytest.skip("Redis is not available")
+    finally:
+        await client.aclose()
+
+    first = NotificationServer(redis_url=redis_url, database_url=f"sqlite:///{tmp_path / 'first.db'}")
+    second = NotificationServer(redis_url=redis_url, database_url=f"sqlite:///{tmp_path / 'second.db'}")
+    first_server = await first.start(port=0)
+    second_server = await second.start(port=0)
+    first_url = f"ws://127.0.0.1:{first_server.sockets[0].getsockname()[1]}"
+    second_url = f"ws://127.0.0.1:{second_server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(first_url) as sender, connect(second_url) as receiver:
+            await receive_json(sender)
+            await receive_json(receiver)
+            await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "shared"}}))
+            assert (await receive_json(receiver))["payload"] == {"text": "shared"}
+    finally:
+        first_server.close()
+        second_server.close()
+        await first_server.wait_closed()
+        await second_server.wait_closed()
+        await first.stop()
+        await second.stop()
