@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface Page {
@@ -14,9 +15,15 @@ export interface Page {
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 type Metadata = Record<string, unknown>;
+
+interface SourcePage extends Page {
+  metadata: Metadata;
+  template?: string;
+}
 
 function metadataFromFrontmatter(parsed: unknown): Metadata {
   const result = parsed as { data?: unknown; frontmatter?: unknown };
@@ -60,12 +67,46 @@ async function renderMarkdown(source: string): Promise<string> {
   throw new Error('Markdown parser did not return HTML');
 }
 
+async function readTemplate(file: string): Promise<string | undefined> {
+  try {
+    return await fs.readFile(file, 'utf8');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+async function createTemplateRenderer(templatesDir: string): Promise<(page: SourcePage) => Promise<string>> {
+  const handlebars = Handlebars.create();
+  const partialsDir = path.join(templatesDir, 'partials');
+  try {
+    const partials = await fs.readdir(partialsDir, { withFileTypes: true });
+    await Promise.all(partials.filter((entry) => entry.isFile() && /\.hbs$/i.test(entry.name)).map(async (entry) => {
+      handlebars.registerPartial(path.basename(entry.name, '.hbs'), await fs.readFile(path.join(partialsDir, entry.name), 'utf8'));
+    }));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+
+  return async (page: SourcePage): Promise<string> => {
+    const templateName = page.template ?? 'default';
+    const template = await readTemplate(path.join(templatesDir, `${templateName}.hbs`));
+    if (!template) return document(page.title, `<article>\n<h1>${escapeHtml(page.title)}</h1>\n${page.html}</article>`);
+
+    const body = handlebars.compile(template)({ ...page.metadata, ...page, content: page.html });
+    const layout = await readTemplate(path.join(templatesDir, 'layouts', `${templateName}.hbs`))
+      ?? await readTemplate(path.join(templatesDir, 'layouts', 'default.hbs'));
+    return layout ? handlebars.compile(layout)({ ...page.metadata, ...page, content: page.html, body }) : body;
+  };
+}
+
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './site');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
   const entries = await fs.readdir(contentDir, { withFileTypes: true });
   const markdownFiles = entries.filter((entry) => entry.isFile() && /\.md$/i.test(entry.name));
-  const pages = await Promise.all(markdownFiles.map(async (entry): Promise<Page> => {
+  const sourcePages = await Promise.all(markdownFiles.map(async (entry): Promise<SourcePage> => {
     const source = await fs.readFile(path.join(contentDir, entry.name), 'utf8');
     const parsed = matter(source);
     const metadata = metadataFromFrontmatter(parsed);
@@ -76,14 +117,18 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
       tags: asTags(metadata.tags),
       slug,
       html: await renderMarkdown(parsed.content),
+      metadata,
+      template: asString(metadata.template),
     };
   }));
 
-  pages.sort((a, b) => a.slug.localeCompare(b.slug));
+  sourcePages.sort((a, b) => a.slug.localeCompare(b.slug));
+  const pages: Page[] = sourcePages.map(({ metadata: _metadata, template: _template, ...page }) => page);
+  const renderTemplate = await createTemplateRenderer(templatesDir);
   await fs.mkdir(outputDir, { recursive: true });
-  await Promise.all(pages.map((page) => fs.writeFile(
+  await Promise.all(sourcePages.map(async (page) => fs.writeFile(
     path.join(outputDir, `${page.slug}.html`),
-    document(page.title, `<article>\n<h1>${escapeHtml(page.title)}</h1>\n${page.html}</article>`)
+    await renderTemplate(page)
   )));
 
   const links = pages.map((page) => {
