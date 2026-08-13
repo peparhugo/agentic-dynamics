@@ -70,6 +70,10 @@ async def count_is(app, expected):
     return await app.notifier.registry.count() == expected
 
 
+async def channel_members_is(app, channel, expected):
+    return await app.notifier.registry.channel_members(channel) == expected
+
+
 # ── Connect & identity ────────────────────────────────────────────────
 
 
@@ -306,3 +310,200 @@ async def test_client_submitted_system_messages_are_ignored(app):
         await expect_no_message(ws)
     finally:
         await ws.close()
+
+
+# ── Channel subscriptions ─────────────────────────────────────────────
+
+
+async def subscribe(ws, channel):
+    await ws.send(json.dumps({"type": "subscribe", "channel": channel}))
+
+
+async def unsubscribe(ws, channel):
+    await ws.send(json.dumps({"type": "unsubscribe", "channel": channel}))
+
+
+async def test_subscribe_does_not_get_relayed(app):
+    ws, _ = await connect_client(app)
+    try:
+        await subscribe(ws, "alerts")
+        await expect_no_message(ws)
+    finally:
+        await ws.close()
+
+
+async def test_channel_message_only_reaches_subscribers(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await asyncio.sleep(0.1)
+        payload = {"text": "alert!"}
+        await ws_a.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": payload})
+        )
+        msg = json.loads(await asyncio.wait_for(ws_a.recv(), timeout=5))
+        assert msg["type"] == "broadcast"
+        assert msg["payload"] == payload
+        await expect_no_message(ws_b)
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_channel_message_routes_between_channels(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_b, "chat")
+        await asyncio.sleep(0.1)
+        payload = {"text": "chat msg"}
+        await ws_a.send(
+            json.dumps({"type": "broadcast", "channel": "chat", "payload": payload})
+        )
+        msg = json.loads(await asyncio.wait_for(ws_b.recv(), timeout=5))
+        assert msg["payload"] == payload
+        await expect_no_message(ws_a)
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_a, "system")
+        await subscribe(ws_b, "alerts")
+        await asyncio.sleep(0.1)
+        payload = {"text": "sys"}
+        await ws_a.send(
+            json.dumps({"type": "broadcast", "channel": "system", "payload": payload})
+        )
+        msg = json.loads(await asyncio.wait_for(ws_a.recv(), timeout=5))
+        assert msg["payload"] == payload
+        await expect_no_message(ws_b)
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_unsubscribe_stops_channel_delivery(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_b, "alerts")
+        await asyncio.sleep(0.1)
+        await unsubscribe(ws_a, "alerts")
+        await asyncio.sleep(0.1)
+        payload = {"text": "after unsub"}
+        await ws_b.send(
+            json.dumps({"type": "broadcast", "channel": "alerts", "payload": payload})
+        )
+        await expect_no_message(ws_a)
+        msg = json.loads(await asyncio.wait_for(ws_b.recv(), timeout=5))
+        assert msg["payload"] == payload
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_channel_with_no_subscribers_delivers_nowhere(app):
+    ws, _ = await connect_client(app)
+    try:
+        await ws.send(
+            json.dumps({"type": "broadcast", "channel": "ghost", "payload": {"x": 1}})
+        )
+        await expect_no_message(ws)
+    finally:
+        await ws.close()
+
+
+async def test_message_without_channel_still_broadcasts_to_all(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await asyncio.sleep(0.1)
+        payload = {"text": "global"}
+        await ws_b.send(json.dumps({"type": "broadcast", "payload": payload}))
+        for ws in (ws_a, ws_b):
+            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            assert msg["type"] == "broadcast"
+            assert msg["payload"] == payload
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_subscribe_without_channel_errors(app):
+    ws, _ = await connect_client(app)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+        assert msg["type"] == "system"
+        assert msg["payload"]["event"] == "error"
+    finally:
+        await ws.close()
+
+
+async def test_channels_endpoint_lists_channels_and_counts(app):
+    status, body = await http_get(app, "/channels")
+    assert status == 200
+    assert json.loads(body)["channels"] == []
+
+    ws_a, _ = await connect_client(app)
+    ws_b, _ = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_b, "alerts")
+        await subscribe(ws_b, "chat")
+        await asyncio.sleep(0.1)
+        status, body = await http_get(app, "/channels")
+        assert status == 200
+        by_name = {c["name"]: c for c in json.loads(body)["channels"]}
+        assert by_name["alerts"]["subscriber_count"] == 2
+        assert by_name["chat"]["subscriber_count"] == 1
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_channel_subscribers_endpoint(app):
+    ws_a, id_a = await connect_client(app)
+    ws_b, id_b = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_b, "alerts")
+        await asyncio.sleep(0.1)
+        status, body = await http_get(app, "/channels/alerts/subscribers")
+        assert status == 200
+        payload = json.loads(body)
+        assert payload["channel"] == "alerts"
+        assert set(payload["subscribers"]) == {id_a, id_b}
+    finally:
+        await ws_a.close()
+        await ws_b.close()
+
+
+async def test_disconnect_cleans_channel_membership(app):
+    ws_a, _ = await connect_client(app)
+    ws_b, id_b = await connect_client(app)
+    try:
+        await subscribe(ws_a, "alerts")
+        await subscribe(ws_b, "alerts")
+        await asyncio.sleep(0.1)
+        await ws_a.close()
+        ok = await wait_for_condition(
+            lambda: channel_members_is(app, "alerts", {id_b})
+        )
+        assert ok
+        status, body = await http_get(app, "/channels/alerts/subscribers")
+        payload = json.loads(body)
+        assert payload["subscribers"] == [id_b]
+    finally:
+        await ws_a.close()
+        await ws_b.close()
