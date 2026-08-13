@@ -14,8 +14,6 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-<script>window.mermaid&&mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{fontSize:'15px',primaryColor:'#0e1520',primaryBorderColor:'#34d3ee',primaryTextColor:'#e4e4e7',lineColor:'#71717a',clusterBkg:'#0b111a',clusterBorder:'#3f3f46'},flowchart:{nodeSpacing:45,rankSpacing:55,padding:12}});</script>
 <style>
 h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
 h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
@@ -38,10 +36,6 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .cr.head{background:var(--bg4);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
 .cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--t3)}.cr .ck{text-align:center}
 .rules-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:720px;margin:1rem auto}
-.dim{text-align:center;margin:2rem auto 0.7rem;color:var(--ac);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.14em}
-.dim-sub{text-align:center;margin:0 auto 0.8rem;font-size:0.78rem;color:var(--t3);max-width:640px}
-.mermaid{overflow-x:auto;margin:1.4rem 0;padding:0.5rem 0}
-.mermaid svg{max-width:100%;height:auto;display:block}
 .rule{display:flex;align-items:flex-start;gap:1.2rem;padding:0.9rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-radius:10px;font-size:0.85rem;text-align:left}
 .rule .rn{font-size:1.6rem;font-weight:800;min-width:2rem;text-align:center;flex-shrink:0;color:var(--ac)}
 .rule .rn.amber{color:var(--am)}.rule .rn.purple{color:#a78bfa}
@@ -91,67 +85,6 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="pulse">Why — start here</div>
 <h2>AI costs don't grow linearly.<br>They compound.</h2>
   <p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
-</div></section>
-
-<!-- SECTION: ARCHITECTURE -->
-<section class="fsec" id="architecture"><div class="inr wide">
-<div class="pulse">How — The Architecture</div>
-<h2>Where every rule is measured.</h2>
-<p class="lead">The instrument is code, CLIs, and infrastructure — and each rule lives on a specific part of it. Rules ①–⑤ are <strong style="color:var(--ac)">measured</strong> by the measurement core. Rules ⑥–⑨ sit on the Redis queue and its workers — <strong style="color:var(--am)">infrastructure we run but don't measure yet</strong>, the autonomous-workload gap. Rule ⑩ is the capstone over everything measured.</p>
-<pre class="mermaid">flowchart LR
-    LLM["LLM providers"]
-    OPC["opencode CLI"]
-    CLC["Claude CLI"]
-
-    subgraph CORE["MEASUREMENT CORE · src/instrument"]
-        BACK["backends.py"]
-        subgraph R1["① Grit"]
-            PERT["perturb.py"]
-        end
-        subgraph R2["② Explanation Tax"]
-            EFF["efficiency.py"]
-        end
-        subgraph R3["③ Snowball"]
-            STORY["story.py"]
-        end
-        subgraph R4["④ EPM Horizon"]
-            EPM["energy · IEA"]
-        end
-        subgraph R5["⑤ First-Pass"]
-            SOL["solution.py"]
-        end
-        SIG["review · sonar · lsp · trajectory"]
-    end
-
-    subgraph AUTO["⑥⑦⑧⑨ AUTONOMOUS · not measured"]
-        Q["enqueue · worker · monitor"]
-        RQ[("Redis :6380")]
-    end
-
-    subgraph OUT["OUTPUT"]
-        ANL["analyze · build_data"]
-        subgraph R10["⑩ Outcome Multiplier"]
-            WEB["Firebase"]
-        end
-    end
-
-    RUN["run.py · run_story.py"]
-
-    RUN --> BACK
-    BACK --> OPC
-    BACK --> CLC
-    OPC --> LLM
-    CLC --> LLM
-    Q --> RQ --> RUN
-    CORE --> ANL --> WEB
-
-    style AUTO fill:#1a1206,stroke:#fbbf24,stroke-width:2px
-    style R4 fill:#1a1206,stroke:#fbbf24,stroke-width:1px
-    style OUT fill:#0b111a,stroke:#a78bfa
-    style R10 fill:#140f1a,stroke:#a78bfa,stroke-width:1px
-    style CORE fill:#0b111a,stroke:#34d3ee
-</pre>
-<p style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:0.8rem">Solid edges = data flow. The queue (Redis :6380) and its workers are the autonomous-workload substrate — the infrastructure for Rules ⑥–⑨ exists, but we don't instrument it yet.</p>
 </div></section>
 
 <!-- SECTION: The Ten Rules -->
