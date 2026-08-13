@@ -3,12 +3,17 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
 from notification_tasks import send_notification_email
+from repositories import (
+    DuplicateRecordError,
+    TaskRepository,
+    UserRepository,
+    open_database,
+)
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
@@ -19,51 +24,12 @@ DATABASE = os.environ.get("DATABASE", "tasks.db")
 
 
 def get_db():
-    connection = sqlite3.connect(DATABASE)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return open_database(DATABASE)
 
 
 def init_db():
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                email TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)"
-        )
-        user_columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(users)")
-        }
-        if "email" not in user_columns:
-            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
-            connection.execute("UPDATE users SET email = username WHERE email IS NULL")
+    UserRepository(get_db).initialize_schema()
+    TaskRepository(get_db).initialize_schema()
 
 
 def _base64url_encode(value):
@@ -130,11 +96,7 @@ def require_auth(view):
         user_id = decode_token(token)
         if user_id is None:
             return jsonify({"error": "invalid token"}), 401
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT id FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
-        if user is None:
+        if not UserRepository(get_db).exists(user_id):
             return jsonify({"error": "invalid token"}), 401
         g.user_id = user_id
         return view(*args, **kwargs)
@@ -176,14 +138,16 @@ def register():
         return jsonify({"error": "email must be a non-empty string"}), 400
     email = email.strip()
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, generate_password_hash(password), email),
-            )
-    except sqlite3.IntegrityError:
+        user_id = UserRepository(get_db).create(
+            {
+                "username": username,
+                "password_hash": generate_password_hash(password),
+                "email": email,
+            }
+        )
+    except DuplicateRecordError:
         return jsonify({"error": "username already exists"}), 409
-    return jsonify({"id": cursor.lastrowid, "username": username}), 201
+    return jsonify({"id": user_id, "username": username}), 201
 
 
 @app.post("/auth/login")
@@ -192,10 +156,7 @@ def login():
     if credentials is None:
         return jsonify({"error": "username and password are required"}), 400
     username, password = credentials
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, password_hash FROM users WHERE username = ?", (username,)
-        ).fetchone()
+    user = UserRepository(get_db).get_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
@@ -211,15 +172,11 @@ def create_task():
 
     title = title.strip()
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-            (title, created_at, g.user_id),
-        )
-        row = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (cursor.lastrowid, g.user_id),
-        ).fetchone()
+    repository = TaskRepository(get_db)
+    task_id = repository.create(
+        {"title": title, "created_at": created_at, "owner_id": g.user_id}
+    )
+    row = repository.get_for_owner(task_id, g.user_id)
 
     return jsonify(task_to_dict(row)), 201
 
@@ -227,26 +184,14 @@ def create_task():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    with get_db() as connection:
-        rows = connection.execute(
-            """
-            SELECT * FROM tasks
-            WHERE owner_id = ?
-            ORDER BY created_at DESC, id DESC
-            """,
-            (g.user_id,),
-        ).fetchall()
+    rows = TaskRepository(get_db).list_for_owner(g.user_id)
     return jsonify([task_to_dict(row) for row in rows])
 
 
 @app.get("/tasks/<int:task_id>")
 @require_auth
 def get_task(task_id):
-    with get_db() as connection:
-        row = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.user_id),
-        ).fetchone()
+    row = TaskRepository(get_db).get_for_owner(task_id, g.user_id)
     if row is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task_to_dict(row))
@@ -259,40 +204,23 @@ def update_task(task_id):
     if not isinstance(data, dict):
         return jsonify({"error": "JSON object is required"}), 400
 
-    updates = []
-    values = []
+    updates = {}
     if "title" in data:
         if not isinstance(data["title"], str) or not data["title"].strip():
             return jsonify({"error": "title must be a non-empty string"}), 400
-        updates.append("title = ?")
-        values.append(data["title"].strip())
+        updates["title"] = data["title"].strip()
     if "status" in data:
         if not isinstance(data["status"], str) or not data["status"].strip():
             return jsonify({"error": "status must be a non-empty string"}), 400
-        updates.append("status = ?")
-        values.append(data["status"].strip())
+        updates["status"] = data["status"].strip()
     if not updates:
         return jsonify({"error": "title or status is required"}), 400
 
-    with get_db() as connection:
-        existing = connection.execute(
-            """
-            SELECT tasks.id, tasks.status, users.email
-            FROM tasks JOIN users ON users.id = tasks.owner_id
-            WHERE tasks.id = ? AND tasks.owner_id = ?
-            """,
-            (task_id, g.user_id),
-        ).fetchone()
-        if existing is None:
-            return jsonify({"error": "task not found"}), 404
-        connection.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-            (*values, task_id, g.user_id),
-        )
-        row = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.user_id),
-        ).fetchone()
+    existing, row = TaskRepository(get_db).update_for_owner(
+        task_id, g.user_id, updates
+    )
+    if existing is None:
+        return jsonify({"error": "task not found"}), 404
 
     if existing["status"] != "completed" and row["status"] == "completed":
         send_notification_email.delay(existing["email"], row["title"])
