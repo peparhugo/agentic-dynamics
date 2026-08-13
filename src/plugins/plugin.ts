@@ -2,6 +2,7 @@ import type { BuildOptions, Page } from '../generator';
 
 export interface PluginFile extends Page {
   source: string;
+  sourceContent?: string;
   data: Record<string, unknown>;
   output?: string;
 }

@@ -53,4 +53,56 @@ describe('SsgEngine', () => {
       await rm(config, { force: true });
     }
   });
+
+  it('rebuilds only changed sources during an incremental build', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-incremental-'));
+    const content = join(root, 'content');
+    const output = join(root, 'dist');
+    await mkdir(content, { recursive: true });
+    const first = join(content, 'first.md');
+    const second = join(content, 'second.md');
+    await writeFile(first, '# First', 'utf8');
+    await writeFile(second, '# Second', 'utf8');
+    const processed: string[] = [];
+    const plugin: Plugin = { onFile: (page) => { processed.push(page.source); } };
+    const engine = await createEngine([plugin]);
+
+    await engine.build({ contentDir: content, outputDir: output, incremental: true });
+    expect(engine.lastBuildStats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSavedMs: expect.any(Number) });
+    processed.length = 0;
+    await writeFile(first, '# Updated', 'utf8');
+
+    await engine.build({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(processed).toEqual([first]);
+    expect(engine.lastBuildStats).toEqual({ pagesBuilt: 1, pagesSkipped: 1, timeSavedMs: expect.any(Number) });
+    await expect(readFile(join(output, 'first.html'), 'utf8')).resolves.toContain('<h1>Updated</h1>');
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('<h1>Second</h1>');
+  });
+
+  it('invalidates cached pages when templates change and honors clean builds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-incremental-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'dist');
+    await mkdir(content, { recursive: true });
+    await mkdir(templates, { recursive: true });
+    await writeFile(join(content, 'page.md'), '# Page', 'utf8');
+    await writeFile(join(templates, 'default.hbs'), '<article>{{{content}}}</article>', 'utf8');
+    const processed: string[] = [];
+    const engine = await createEngine([{ onFile: (page) => { processed.push(page.source); } }]);
+
+    await engine.build({ contentDir: content, outputDir: output, templateDir: templates, incremental: true });
+    processed.length = 0;
+    await engine.build({ contentDir: content, outputDir: output, templateDir: templates, incremental: true });
+    expect(processed).toEqual([]);
+    await writeFile(join(templates, 'default.hbs'), '<section>{{{content}}}</section>', 'utf8');
+
+    await engine.build({ contentDir: content, outputDir: output, templateDir: templates, incremental: true });
+    expect(processed).toEqual([join(content, 'page.md')]);
+    await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toContain('<section><h1>Page</h1>');
+    processed.length = 0;
+    await engine.build({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, clean: true });
+    expect(processed).toEqual([join(content, 'page.md')]);
+  });
 });

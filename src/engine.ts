@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { dirname, extname, join, resolve } from 'node:path';
-import type { BuildOptions, Page } from './generator';
+import type { BuildOptions, BuildStats, Page } from './generator';
 import { MarkdownPlugin, TemplatePlugin, type Plugin, type PluginContext, type PluginFile } from './plugins';
 
 async function markdownFiles(directory: string): Promise<string[]> {
@@ -12,6 +13,47 @@ async function markdownFiles(directory: string): Promise<string[]> {
     return ['.md', '.markdown'].includes(extname(entry.name).toLowerCase()) ? [path] : [];
   }));
   return files.flat();
+}
+
+const cacheFileName = '.ssg-cache.json';
+
+interface CachedPage extends Page {
+  sourceHash: string;
+  output?: string;
+  data: Record<string, unknown>;
+  renderMs: number;
+}
+
+interface BuildCache {
+  version: 1;
+  templateHash: string;
+  pages: Record<string, CachedPage>;
+}
+
+const hash = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+async function directoryHash(directory: string): Promise<string> {
+  if (!existsSync(directory)) return hash('');
+  const files = await templateFiles(directory);
+  return hash((await Promise.all(files.sort().map(async (file) => `${file}\0${await readFile(file, 'utf8')}`))).join('\0'));
+}
+
+async function templateFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? templateFiles(path) : [path];
+  }));
+  return files.flat();
+}
+
+async function loadCache(path: string): Promise<BuildCache | undefined> {
+  try {
+    const cache = JSON.parse(await readFile(path, 'utf8')) as BuildCache;
+    return cache.version === 1 && typeof cache.templateHash === 'string' && cache.pages !== undefined ? cache : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function loadConfiguredPlugins(): Promise<Plugin[]> {
@@ -39,6 +81,8 @@ async function loadConfiguredPlugins(): Promise<Plugin[]> {
 }
 
 export class SsgEngine {
+  lastBuildStats: BuildStats = { pagesBuilt: 0, pagesSkipped: 0, timeSavedMs: 0 };
+
   constructor(private readonly plugins: Plugin[]) {}
 
   async build(options: BuildOptions = {}): Promise<Page[]> {
@@ -46,6 +90,8 @@ export class SsgEngine {
       contentDir: options.contentDir ?? './content',
       outputDir: options.outputDir ?? './dist',
       templateDir: options.templateDir ?? './templates',
+      incremental: options.incremental ?? false,
+      clean: options.clean ?? false,
     };
     if (!existsSync(resolvedOptions.contentDir)) throw new Error(`Content directory does not exist: ${resolvedOptions.contentDir}`);
     const context: PluginContext = { options: resolvedOptions, pages: [] };
@@ -53,10 +99,34 @@ export class SsgEngine {
     try {
       await this.run('beforeBuild', context);
       const files = await markdownFiles(resolvedOptions.contentDir);
-      await rm(resolvedOptions.outputDir, { recursive: true, force: true });
+      const cachePath = join(resolvedOptions.outputDir, cacheFileName);
+      const previousCache = resolvedOptions.incremental && !resolvedOptions.clean ? await loadCache(cachePath) : undefined;
+      const templateHash = await directoryHash(resolvedOptions.templateDir);
+      const canIncrement = previousCache !== undefined && previousCache.templateHash === templateHash;
+      if (!canIncrement || resolvedOptions.clean || !resolvedOptions.incremental) await rm(resolvedOptions.outputDir, { recursive: true, force: true });
       await mkdir(resolvedOptions.outputDir, { recursive: true });
+      const cache: BuildCache = { version: 1, templateHash, pages: {} };
+      let pagesBuilt = 0;
+      let pagesSkipped = 0;
+      let timeSavedMs = 0;
       for (const source of files) {
-        const file: PluginFile = { source, data: {}, title: '', tags: [], slug: '', html: '' };
+        const sourceContent = await readFile(source, 'utf8');
+        const sourceHash = hash(sourceContent);
+        const cached = canIncrement ? previousCache?.pages[source] : undefined;
+        if (cached?.sourceHash === sourceHash) {
+          const destination = join(resolvedOptions.outputDir, cached.slug);
+          if (cached.output !== undefined && !existsSync(destination)) {
+            await mkdir(dirname(destination), { recursive: true });
+            await writeFile(destination, cached.output, 'utf8');
+          }
+          context.pages.push({ title: cached.title, date: cached.date, tags: cached.tags, slug: cached.slug, html: cached.html });
+          cache.pages[source] = cached;
+          pagesSkipped += 1;
+          timeSavedMs += cached.renderMs;
+          continue;
+        }
+        const startedAt = Date.now();
+        const file: PluginFile = { source, sourceContent, data: {}, title: '', tags: [], slug: '', html: '' };
         context.file = file;
         await this.run('onFile', context, file);
         if (file.output !== undefined) {
@@ -65,10 +135,20 @@ export class SsgEngine {
           await writeFile(destination, file.output, 'utf8');
         }
         context.pages.push({ title: file.title, date: file.date, tags: file.tags, slug: file.slug, html: file.html });
+        cache.pages[source] = { title: file.title, date: file.date, tags: file.tags, slug: file.slug, html: file.html, sourceHash, output: file.output, data: file.data, renderMs: Date.now() - startedAt };
+        pagesBuilt += 1;
       }
       context.file = undefined;
       context.pages.sort((left, right) => left.title.localeCompare(right.title));
       await this.run('afterBuild', context);
+      if (canIncrement) {
+        const currentSources = new Set(files);
+        await Promise.all(Object.entries(previousCache!.pages).filter(([source]) => !currentSources.has(source)).map(async ([, page]) => {
+          await unlink(join(resolvedOptions.outputDir, page.slug)).catch(() => undefined);
+        }));
+      }
+      await writeFile(cachePath, JSON.stringify(cache, null, 2), 'utf8');
+      this.lastBuildStats = { pagesBuilt, pagesSkipped, timeSavedMs };
       return context.pages;
     } finally {
       context.file = undefined;

@@ -5,7 +5,7 @@ import type { Plugin } from './plugin';
 
 export class MarkdownPlugin implements Plugin {
   async onFile(page, context): Promise<void> {
-    const parsed = matter(page.source);
+    const parsed = matter(page.sourceContent ?? await (await import('node:fs/promises')).readFile(page.source, 'utf8'));
     const relativePath = relative(context.options.contentDir, page.source).replace(/\\/g, '/');
     page.slug = relativePath.replace(/\.(md|markdown)$/i, '.html');
     page.title = typeof parsed.data.title === 'string' ? parsed.data.title : basename(page.source, extname(page.source));
