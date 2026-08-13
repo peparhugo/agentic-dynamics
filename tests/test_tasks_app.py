@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -276,6 +277,89 @@ def test_update_task_blank_title_returns_400(client):
     created = create_task(client, "Task", headers=headers).get_json()
     resp = client.put(f"/tasks/{created['id']}", json={"title": "   "}, headers=headers)
     assert resp.status_code == 400
+
+
+# ── Completion notification trigger ───────────────────────────────
+
+
+def test_update_task_to_completed_triggers_notification(client):
+    headers = auth_headers(client)
+    created = create_task(client, "Ship report", headers=headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_task.delay.assert_called_once_with("alice", "Ship report")
+
+
+def test_update_task_to_non_completed_status_does_not_trigger_notification(client):
+    headers = auth_headers(client)
+    created = create_task(client, "Task", headers=headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_task.delay.assert_not_called()
+
+
+def test_update_task_title_only_does_not_trigger_notification(client):
+    headers = auth_headers(client)
+    created = create_task(client, "Task", headers=headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"title": "Renamed"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_task.delay.assert_not_called()
+
+
+def test_update_task_already_completed_does_not_retrigger_notification(client):
+    headers = auth_headers(client)
+    created = create_task(client, "Task", headers=headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        mock_task.delay.reset_mock()
+
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+        mock_task.delay.assert_not_called()
+
+
+def test_update_task_completed_uses_owner_username_as_notification_recipient(client):
+    alice_headers = auth_headers(client, "alice", "hunter2pass")
+    created = create_task(client, "Alice task", headers=alice_headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        client.put(
+            f"/tasks/{created['id']}",
+            json={"status": "completed"},
+            headers=alice_headers,
+        )
+        mock_task.delay.assert_called_once_with("alice", "Alice task")
+
+
+def test_notification_broker_failure_does_not_break_response(client):
+    headers = auth_headers(client)
+    created = create_task(client, "Task", headers=headers).get_json()
+
+    with patch("tasks_app.send_notification_email") as mock_task:
+        mock_task.delay.side_effect = ConnectionError("broker unavailable")
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["status"] == "completed"
 
 
 # ── Migration: pre-auth databases keep their data ────────────────

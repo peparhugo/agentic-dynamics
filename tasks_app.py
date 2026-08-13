@@ -8,6 +8,8 @@ import sqlite3
 import os
 import jwt
 
+from celery_app import send_notification_email
+
 DATABASE = os.environ.get("TASKS_DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
@@ -227,12 +229,24 @@ def create_app(database=None):
                 return jsonify({"error": "status must be a non-empty string"}), 400
             status = new_status.strip()
 
+        just_completed = status == "completed" and row["status"] != "completed"
+
         db.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
             (title, status, task_id),
         )
         db.commit()
         updated = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+        if just_completed:
+            # Fire-and-forget: a broker outage shouldn't fail the API response.
+            try:
+                send_notification_email.delay(user["username"], title)
+            except Exception:
+                app.logger.exception(
+                    "Failed to enqueue notification email for task %s", task_id
+                )
+
         return jsonify(dict(updated))
 
     return app
