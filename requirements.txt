@@ -1,2 +1,4 @@
 Flask==2.3.3
 pytest==7.4.0
+Flask-Limiter==3.5.0
+redis==5.0.0

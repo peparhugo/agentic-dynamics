@@ -11,6 +11,8 @@ import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -49,6 +51,77 @@ def reset_repositories():
     _user_repository = None
 
 
+# ── Authentication ─────────────────────────────────────────────
+
+def generate_token(user_id):
+    """Generate a JWT token for a user."""
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.utcnow() + timedelta(hours=app.config["JWT_EXPIRATION_HOURS"])
+    }
+    return jwt.encode(payload, app.config["SECRET_KEY"], algorithm=app.config["JWT_ALGORITHM"])
+
+
+def verify_token(token):
+    """Verify a JWT token and return the user_id, or None if invalid."""
+    try:
+        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=[app.config["JWT_ALGORITHM"]])
+        return payload.get("user_id")
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+
+def get_rate_limit_key():
+    """Get rate limit key: user_id if authenticated, IP address otherwise."""
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0] == "Bearer":
+            token = parts[1]
+            try:
+                user_id = verify_token(token)
+                if user_id is not None:
+                    return f"user:{user_id}"
+            except Exception:
+                pass
+    return get_remote_address()
+
+
+# Rate limiter setup - now safe to initialize with verify_token defined
+limiter = Limiter(
+    app=app,
+    key_func=get_rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get("REDIS_URL")
+)
+
+
+def token_required(f):
+    """Decorator to require a valid JWT token in Authorization header."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get("Authorization")
+
+        if auth_header:
+            parts = auth_header.split()
+            if len(parts) == 2 and parts[0] == "Bearer":
+                token = parts[1]
+
+        if not token:
+            return jsonify({"error": "missing or invalid authorization header"}), 401
+
+        user_id = verify_token(token)
+        if user_id is None:
+            return jsonify({"error": "invalid or expired token"}), 401
+
+        return f(user_id, *args, **kwargs)
+
+    return decorated
+
+
 # ── Initialization & Migrations ──────────────────────────────────
 
 def migrate_tasks_add_owner():
@@ -76,55 +149,10 @@ def migrate_users_add_email():
     user_repo.migrate_add_emails()
 
 
-# ── Authentication ─────────────────────────────────────────────
-
-def generate_token(user_id):
-    """Generate a JWT token for a user."""
-    payload = {
-        "user_id": user_id,
-        "exp": datetime.utcnow() + timedelta(hours=app.config["JWT_EXPIRATION_HOURS"])
-    }
-    return jwt.encode(payload, app.config["SECRET_KEY"], algorithm=app.config["JWT_ALGORITHM"])
-
-
-def verify_token(token):
-    """Verify a JWT token and return the user_id, or None if invalid."""
-    try:
-        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=[app.config["JWT_ALGORITHM"]])
-        return payload.get("user_id")
-    except jwt.ExpiredSignatureError:
-        return None
-    except jwt.InvalidTokenError:
-        return None
-
-
-def token_required(f):
-    """Decorator to require a valid JWT token in Authorization header."""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        auth_header = request.headers.get("Authorization")
-
-        if auth_header:
-            parts = auth_header.split()
-            if len(parts) == 2 and parts[0] == "Bearer":
-                token = parts[1]
-
-        if not token:
-            return jsonify({"error": "missing or invalid authorization header"}), 401
-
-        user_id = verify_token(token)
-        if user_id is None:
-            return jsonify({"error": "invalid or expired token"}), 401
-
-        return f(user_id, *args, **kwargs)
-
-    return decorated
-
-
 # ── Endpoints ───────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute")
 def register():
     """Register a new user. Requires 'username', 'password', and 'email' in JSON body."""
     data = request.get_json(silent=True) or {}
@@ -147,6 +175,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute")
 def login():
     """Login a user. Requires 'username' and 'password' in JSON body. Returns JWT token."""
     data = request.get_json(silent=True) or {}
@@ -167,6 +196,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100 per minute")
 @token_required
 def create_task(user_id):
     """Create a new task. Requires 'title' in JSON body and valid JWT."""
@@ -183,16 +213,56 @@ def create_task(user_id):
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def list_tasks(user_id):
-    """List all tasks for the current user, ordered by created_at descending."""
+    """List tasks with cursor-based pagination.
+
+    Query params:
+    - cursor: ID of last item from previous page (optional)
+    - limit: Number of items per page (default=20, max=100)
+
+    Returns: {data: [...], next_cursor: str|null, total: int}
+    """
     task_repo = get_task_repository()
     user_tasks = task_repo.get_by_owner_id(user_id)
-    sorted_tasks = sorted(user_tasks, key=lambda t: t["created_at"], reverse=True)
-    return jsonify(sorted_tasks), 200
+    sorted_tasks = sorted(user_tasks, key=lambda t: t["id"], reverse=True)
+
+    # Get pagination params
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", default=20, type=int)
+
+    # Validate limit
+    if limit <= 0:
+        limit = 20
+    if limit > 100:
+        limit = 100
+
+    # Find starting position based on cursor
+    start_idx = 0
+    if cursor is not None:
+        for i, task in enumerate(sorted_tasks):
+            if task["id"] == cursor:
+                start_idx = i + 1
+                break
+
+    # Get the page of tasks
+    page_tasks = sorted_tasks[start_idx : start_idx + limit]
+
+    # Determine next cursor
+    next_cursor = None
+    if start_idx + limit < len(sorted_tasks) and page_tasks:
+        next_cursor = page_tasks[-1]["id"]
+
+    return jsonify({
+        "data": page_tasks,
+        "next_cursor": next_cursor,
+        "total": len(sorted_tasks)
+    }), 200
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def get_task(user_id, task_id):
     """Get a single task by ID. User can only access their own tasks."""
@@ -209,6 +279,7 @@ def get_task(user_id, task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100 per minute")
 @token_required
 def update_task(user_id, task_id):
     """Update a task's title and/or status. User can only update their own tasks."""
@@ -247,9 +318,16 @@ def update_task(user_id, task_id):
 
 
 @app.route("/health", methods=["GET"])
+@limiter.limit("100 per minute")
 def health():
     """Health check endpoint."""
     return jsonify({"status": "ok"}), 200
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    """Handle rate limit exceeded errors."""
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 if __name__ == "__main__":
