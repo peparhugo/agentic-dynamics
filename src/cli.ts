@@ -5,11 +5,13 @@ import path from 'path';
 import { parseMarkdown } from './parser';
 import { generatePageHTML, generateIndexHTML } from './generator';
 import { TemplateEngine } from './template-engine';
+import { serve } from './serve';
 
 interface CliOptions {
   content: string;
   output: string;
   templates?: string;
+  port?: number;
 }
 
 function parseArgs(): CliOptions {
@@ -17,6 +19,7 @@ function parseArgs(): CliOptions {
   const options: CliOptions = {
     content: './content',
     output: './dist',
+    port: 3000,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -28,6 +31,9 @@ function parseArgs(): CliOptions {
       i++;
     } else if (args[i] === '--templates' && args[i + 1]) {
       options.templates = args[i + 1];
+      i++;
+    } else if (args[i] === '--port' && args[i + 1]) {
+      options.port = parseInt(args[i + 1], 10);
       i++;
     }
   }
@@ -95,8 +101,15 @@ if (command === 'build' || !command) {
     console.error('Build failed:', error);
     process.exit(1);
   });
+} else if (command === 'serve') {
+  const options = parseArgs();
+  serve(options).catch(error => {
+    console.error('Serve failed:', error);
+    process.exit(1);
+  });
 } else {
   console.error(`Unknown command: ${command}`);
   console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  console.error('       ssg serve [--content <dir>] [--output <dir>] [--port <port>]');
   process.exit(1);
 }
