@@ -13,6 +13,10 @@ describe('CLI arguments', () => {
     expect(parseArgs(['build'])).toEqual({});
   });
 
+  it('parses incremental and clean build flags', () => {
+    expect(parseArgs(['build', '--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
+  });
+
   it('parses serve options and a custom port', () => {
     expect(parseArgs(['serve', '--port', '4321', '--content', 'pages'])).toEqual({
       port: 4321,

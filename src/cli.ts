@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { buildSite } from './generator';
+import { SsgEngine } from './engine';
 import { serveSite, ServeOptions } from './server';
 
-const usage = 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+const usage = 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <number>]';
 
 export function parseArgs(args: string[]): ServeOptions {
   const command = args[0];
@@ -14,6 +15,11 @@ export function parseArgs(args: string[]): ServeOptions {
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
+    if (command === 'build' && (option === '--incremental' || option === '--clean')) {
+      if (option === '--incremental') options.incremental = true;
+      if (option === '--clean') options.clean = true;
+      continue;
+    }
     if ((option === '--content' || option === '--output' || option === '--templates') && value && !value.startsWith('--')) {
       if (option === '--content') options.contentDir = value;
       if (option === '--output') options.outputDir = value;
@@ -41,8 +47,19 @@ export async function run(args: string[]): Promise<void> {
     await serveSite(options);
     return;
   }
-  const pages = await buildSite(options);
-  process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+  if (!options.incremental && !options.clean) {
+    const pages = await buildSite(options);
+    process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+    return;
+  }
+  const engine = new SsgEngine(options);
+  try {
+    await engine.build();
+    const { pagesBuilt, pagesSkipped, durationMs, timeSavedMs } = engine.stats;
+    process.stdout.write(`Built ${pagesBuilt}, skipped ${pagesSkipped} page${pagesSkipped === 1 ? '' : 's'} in ${Math.round(durationMs)}ms (${Math.round(timeSavedMs)}ms saved).\n`);
+  } finally {
+    await engine.stop();
+  }
 }
 
 if (require.main === module) {

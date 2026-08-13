@@ -3,6 +3,15 @@ export interface BuildOptions {
   outputDir?: string;
   templatesDir?: string;
   configFile?: string;
+  incremental?: boolean;
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  durationMs: number;
+  timeSavedMs: number;
 }
 
 export interface Page {

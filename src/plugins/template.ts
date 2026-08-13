@@ -79,15 +79,35 @@ export class TemplatePlugin implements Plugin {
   readonly name = 'templates';
   private engine = Handlebars.create();
   private templatesDir = '';
+  private partialSignature = '';
+  private compiled = new Map<string, { source: string; template: Handlebars.TemplateDelegate }>();
 
   async beforeBuild(context: PluginContext): Promise<void> {
     this.templatesDir = context.options.templatesDir;
-    this.engine = Handlebars.create();
     const partialsDir = path.join(this.templatesDir, 'partials');
-    for (const file of await templateFiles(partialsDir)) {
+    const partials = await Promise.all((await templateFiles(partialsDir)).map(async (file) => ({
+      file,
+      source: await fs.readFile(file, 'utf8')
+    })));
+    const signature = partials.map(({ file, source }) => `${file}\0${source}`).join('\0');
+    if (signature === this.partialSignature) return;
+    this.partialSignature = signature;
+    this.engine = Handlebars.create();
+    this.compiled.clear();
+    for (const { file, source } of partials) {
       const name = path.relative(partialsDir, file).replace(/\.hbs$/i, '').split(path.sep).join('/');
-      this.engine.registerPartial(name, await fs.readFile(file, 'utf8'));
+      this.engine.registerPartial(name, source);
     }
+  }
+
+  private async render(file: string, context: Record<string, unknown>): Promise<string> {
+    const source = await fs.readFile(file, 'utf8');
+    let cached = this.compiled.get(file);
+    if (!cached || cached.source !== source) {
+      cached = { source, template: this.engine.compile(source) };
+      this.compiled.set(file, cached);
+    }
+    return cached.template(context);
   }
 
   async onFile(page: PluginPage): Promise<void> {
@@ -98,11 +118,11 @@ export class TemplatePlugin implements Plugin {
     const context = { ...page.data, title: page.title, date: page.date, tags: page.tags, content: page.content, body: page.content };
     const pageTemplate = await requestedTemplate(this.templatesDir, page.data.template, 'default');
     const renderedPage = pageTemplate
-      ? this.engine.compile(await fs.readFile(pageTemplate, 'utf8'))(context)
+      ? await this.render(pageTemplate, context)
       : undefined;
     const layoutTemplate = await requestedTemplate(path.join(this.templatesDir, 'layouts'), page.data.layout, 'default');
     page.output = layoutTemplate
-      ? this.engine.compile(await fs.readFile(layoutTemplate, 'utf8'))({ ...context, body: renderedPage ?? page.content })
+      ? await this.render(layoutTemplate, { ...context, body: renderedPage ?? page.content })
       : renderedPage ?? layout(page.title, page.content, metadata);
   }
 
