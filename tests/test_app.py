@@ -20,6 +20,7 @@ async def notification_server(tmp_path):
     ) as server:
         port = server.sockets[0].getsockname()[1]
         yield application, f"ws://127.0.0.1:{port}"
+    await application.close()
 
 
 async def test_connect_assigns_websocket_id_and_health_counts_client(notification_server):
@@ -171,6 +172,66 @@ async def test_messages_endpoint_returns_persisted_messages_with_pagination(noti
         "timestamp": "2026-08-13T00:00:01Z",
     }]
     assert (await asyncio.to_thread(http_get, url, "/messages?limit=1&offset=1"))["messages"][0]["payload"] == {"text": "first"}
+
+
+async def test_history_returns_channel_messages_chronologically_with_has_more(notification_server):
+    _, url = notification_server
+    messages = [
+        {"type": "broadcast", "channel": "alerts", "payload": {"text": "first"}, "timestamp": "2026-08-13T00:00:02Z"},
+        {"type": "broadcast", "channel": "other", "payload": {"text": "ignored"}, "timestamp": "2026-08-13T00:00:01Z"},
+        {"type": "broadcast", "channel": "alerts", "payload": {"text": "second"}, "timestamp": "2026-08-13T00:00:03Z"},
+    ]
+    async with connect(url) as client:
+        await client.recv()
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00Z",
+        }))
+        for message in messages:
+            await client.send(json.dumps(message))
+        for _ in range(2):
+            await client.recv()
+
+    history = await asyncio.to_thread(http_get, url, "/history?channel=alerts&since=2026-08-13T00%3A00%3A00Z&limit=1")
+    assert history == {
+        "messages": [{
+            "id": 2,
+            "channel": "alerts",
+            "type": "broadcast",
+            "payload": {"text": "first"},
+            "timestamp": "2026-08-13T00:00:02Z",
+        }],
+        "has_more": True,
+    }
+
+    all_messages = await asyncio.to_thread(http_get, url, "/history?channel=alerts&since=2026-08-13T00%3A00%3A00Z&limit=2")
+    assert [message["payload"] for message in all_messages["messages"]] == [{"text": "first"}, {"text": "second"}]
+    assert all_messages["has_more"] is False
+
+
+async def test_rate_limit_returns_error_and_does_not_publish_or_persist(tmp_path):
+    application = NotificationServer(database_url=f"sqlite:///{tmp_path / 'messages.db'}", rate_limit=1)
+    async with serve(application.handle_connection, "127.0.0.1", 0, process_request=application.health_response) as server:
+        url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        message = {"type": "broadcast", "payload": {"text": "hello"}, "timestamp": "2026-08-13T00:00:00Z"}
+        async with connect(url) as client:
+            await client.recv()
+            await client.send(json.dumps(message))
+            assert json.loads(await client.recv()) == message
+            await client.send(json.dumps(message))
+            response = json.loads(await client.recv())
+            assert response["type"] == "system"
+            assert response["payload"]["error"] == "rate limit exceeded"
+
+        assert (await asyncio.to_thread(http_get, url, "/messages"))["messages"] == [{
+            "id": 1,
+            "channel": None,
+            "type": "broadcast",
+            "payload": {"text": "hello"},
+            "timestamp": "2026-08-13T00:00:00Z",
+        }]
+    await application.close()
 
 
 def http_get(websocket_url: str, path: str) -> dict[str, int]:
