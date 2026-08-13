@@ -14,6 +14,8 @@
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>window.mermaid&&mermaid.initialize({startOnLoad:true,theme:'dark',themeVariables:{darkMode:true,primaryColor:'#101726',primaryBorderColor:'#34d3ee',primaryTextColor:'#e4e4e7',lineColor:'#52525b',clusterBkg:'#0b111a',clusterBorder:'#3f3f46',edgeLabelBackground:'#0b111a'}});</script>
 <style>
 h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
 h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
@@ -36,6 +38,10 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 .cr.head{background:var(--bg4);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
 .cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--t3)}.cr .ck{text-align:center}
 .rules-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:720px;margin:1rem auto}
+.dim{text-align:center;margin:2rem auto 0.7rem;color:var(--ac);font-size:0.82rem;font-weight:700;text-transform:uppercase;letter-spacing:0.14em}
+.dim-sub{text-align:center;margin:0 auto 0.8rem;font-size:0.78rem;color:var(--t3);max-width:640px}
+.mermaid{display:flex;justify-content:center;margin:1.4rem auto;overflow-x:auto;padding:0.5rem}
+.mermaid svg{max-width:100%;height:auto}
 .rule{display:flex;align-items:flex-start;gap:1.2rem;padding:0.9rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-radius:10px;font-size:0.85rem;text-align:left}
 .rule .rn{font-size:1.6rem;font-weight:800;min-width:2rem;text-align:center;flex-shrink:0;color:var(--ac)}
 .rule .rn.amber{color:var(--am)}.rule .rn.purple{color:#a78bfa}
@@ -84,12 +90,75 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <section class="fsec" id="why"><div class="inr">
 <div class="pulse">Why — start here</div>
 <h2>AI costs don't grow linearly.<br>They compound.</h2>
-<p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
+  <p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
+</div></section>
+
+<!-- SECTION: ARCHITECTURE -->
+<section class="fsec" id="architecture"><div class="inr wide">
+<div class="pulse">How — The Architecture</div>
+<h2>Where every rule is measured.</h2>
+<p class="lead">The instrument is code, CLIs, and infrastructure — and each rule lives on a specific part of it. Rules ①–⑤ are <strong style="color:var(--ac)">measured</strong> by the measurement core. Rules ⑥–⑨ sit on the Redis queue and its workers — <strong style="color:var(--am)">infrastructure we run but don't measure yet</strong>, the autonomous-workload gap. Rule ⑩ is the capstone over everything measured.</p>
+<pre class="mermaid">flowchart TB
+    subgraph EXT["EXTERNAL — LLMs & CLIs"]
+        LLM["LLM providers · deepseek / anthropic / openai"]
+        OPC["opencode CLI"]
+        CLC["Claude CLI"]
+    end
+    subgraph CORE["MEASUREMENT CORE — src/instrument"]
+        BACK["backends.py · model → CLI"]
+        OPA["opencode.py"]
+        CLA["claude_adapter.py"]
+        subgraph R1["① GRIT · measured"]
+            PERT["perturb.py"]
+        end
+        subgraph R2["② EXPLANATION TAX · measured"]
+            EFF["efficiency.py"]
+        end
+        subgraph R3["③ SNOWBALL · measured"]
+            STORY["story.py"]
+        end
+        subgraph R4["④ EPM HORIZON · modeled"]
+            EPM["energy (IEA)"]
+        end
+        subgraph R5["⑤ FIRST-PASS · measured"]
+            SOL["solution.py · WOC"]
+        end
+        SIG["signals · trajectory / basin / recovery / strategy"]
+        VER["verification · review / sonar / lsp / commit_analysis"]
+    end
+    subgraph ORCH["ORCHESTRATION — scripts"]
+        RUN["run.py · run_story.py"]
+        subgraph R69["⑥⑦⑧⑨ AUTONOMOUS WORKLOADS · NOT measured"]
+            Q["enqueue · worker · monitor"]
+        end
+        ANL["analyze_worktrees · sync_data · build_data"]
+    end
+    subgraph INFRA["INFRASTRUCTURE"]
+        RQ[("Redis :6380")]
+        RS[("Redis :6379")]
+        SQ["SonarQube"]
+        DB[("opencode.db")]
+    end
+    subgraph OUT["OUTPUT"]
+        subgraph R10["⑩ OUTCOME MULTIPLIER · derived"]
+            WEB["Firebase"]
+        end
+    end
+    BACK --> OPA --> OPC --> LLM
+    BACK --> CLA --> CLC --> LLM
+    RUN --> BACK
+    Q --> RQ --> RUN
+    VER --> SQ
+    DB --> ANL
+    CORE --> ANL
+    ANL --> WEB
+</pre>
+<p style="font-size:0.7rem;color:var(--t3);text-align:center;margin-top:0.8rem">Solid edges = data flow. The queue (Redis :6380) and its workers are the autonomous-workload substrate — the infrastructure for Rules ⑥–⑨ exists, but we don't instrument it yet.</p>
 </div></section>
 
 <!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr">
-<div class="pulse">What — The Ten Rules</div>
+<div class="pulse">What — The Rules</div>
 <h2>Here is how you govern<br>AI costs — and scale your business.</h2>
 <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
 <div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
