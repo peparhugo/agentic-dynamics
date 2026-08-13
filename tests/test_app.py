@@ -2,10 +2,11 @@ import asyncio
 import json
 
 import pytest
+import fakeredis.aioredis
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import NotificationServer
+from app import CLIENTS_KEY, NotificationServer
 
 
 @pytest.fixture
@@ -178,3 +179,58 @@ async def test_health_endpoint_returns_client_count(notification_server):
     headers, body = response.split(b"\r\n\r\n", 1)
     assert b"200 OK" in headers
     assert json.loads(body) == {"connected_clients": 1}
+
+
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    redis_server = fakeredis.aioredis.FakeServer()
+    first_app = NotificationServer(
+        redis_client=fakeredis.aioredis.FakeRedis(server=redis_server),
+        database_url=str(tmp_path / "first.db"),
+    )
+    second_app = NotificationServer(
+        redis_client=fakeredis.aioredis.FakeRedis(server=redis_server),
+        database_url=str(tmp_path / "second.db"),
+    )
+    await first_app.start()
+    await second_app.start()
+    first_server = await serve(first_app.handler, "127.0.0.1", 0, process_request=first_app.process_request)
+    second_server = await serve(second_app.handler, "127.0.0.1", 0, process_request=second_app.process_request)
+    first_port = first_server.sockets[0].getsockname()[1]
+    second_port = second_server.sockets[0].getsockname()[1]
+    try:
+        async with connect(f"ws://127.0.0.1:{first_port}") as sender, connect(f"ws://127.0.0.1:{second_port}") as recipient:
+            await receive_json(sender)
+            recipient_id = (await receive_json(recipient))["payload"]["client_id"]
+            state = await second_app._broker._redis.hget(CLIENTS_KEY, recipient_id)
+            assert state == second_app._instance_id.encode()
+            message = {"type": "broadcast", "payload": {"text": "shared"}, "timestamp": "2026-01-01T00:00:00Z"}
+            await sender.send(json.dumps(message))
+            assert await receive_json(sender) == message
+            assert await receive_json(recipient) == message
+    finally:
+        first_server.close()
+        second_server.close()
+        await first_server.wait_closed()
+        await second_server.wait_closed()
+        await first_app.close()
+        await second_app.close()
+
+
+async def test_messages_endpoint_returns_persisted_messages(tmp_path):
+    app = NotificationServer(database_url=str(tmp_path / "messages.db"))
+    server = await serve(app.handler, "127.0.0.1", 0, process_request=app.process_request)
+    port = server.sockets[0].getsockname()[1]
+    message = {"type": "broadcast", "payload": {"text": "saved"}, "timestamp": "2026-01-01T00:00:00Z"}
+    try:
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            await websocket.send(json.dumps(message))
+            assert await receive_json(websocket) == message
+        _, body = await get_json(port, "/messages?limit=1&offset=0")
+        assert body == {"messages": [{"id": 1, "channel": None, **message}]}
+        _, body = await get_json(port, "/messages?limit=1&offset=1")
+        assert body == {"messages": []}
+    finally:
+        server.close()
+        await server.wait_closed()
+        await app.close()
