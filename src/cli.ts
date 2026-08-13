@@ -4,13 +4,14 @@ import { buildSite } from './generator.js';
 interface CliOptions {
   content?: string;
   output?: string;
+  templates?: string;
 }
 
 export function parseArguments(args: string[]): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output') {
+    if (argument === '--content' || argument === '--output' || argument === '--templates') {
       const value = args[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`${argument} requires a directory`);
       options[argument.slice(2) as keyof CliOptions] = value;
@@ -23,7 +24,7 @@ export function parseArguments(args: string[]): CliOptions {
 }
 
 export async function run(args: string[]): Promise<void> {
-  if (args[0] !== 'build') throw new Error('Usage: ssg build [--content <dir>] [--output <dir>]');
+  if (args[0] !== 'build') throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
   const pages = await buildSite(parseArguments(args.slice(1)));
   process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
 }

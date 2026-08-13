@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { basename, extname, join, relative, resolve, sep } from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import MarkdownIt from 'markdown-it';
 
 export interface Page {
@@ -9,11 +10,15 @@ export interface Page {
   date?: string;
   tags: string[];
   html: string;
+  template?: string;
+  layout?: string | false;
+  data: Record<string, unknown>;
 }
 
 export interface BuildOptions {
   content?: string;
   output?: string;
+  templates?: string;
 }
 
 const markdown = new MarkdownIt();
@@ -44,6 +49,79 @@ async function markdownFiles(directory: string): Promise<string[]> {
   return files.flat();
 }
 
+async function templateFiles(directory: string): Promise<string[]> {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    const files = await Promise.all(entries.map(async (entry) => {
+      const filePath = join(directory, entry.name);
+      if (entry.isDirectory()) return templateFiles(filePath);
+      return extname(entry.name).toLowerCase() === '.hbs' ? [filePath] : [];
+    }));
+    return files.flat();
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+function templateName(name: string): string {
+  return name.endsWith('.hbs') ? name : `${name}.hbs`;
+}
+
+const defaultPageTemplate = `<article>
+<h1>{{title}}</h1>
+{{#if date}}<time datetime="{{date}}">{{date}}</time>{{/if}}
+{{#if tags.length}}<p class="tags">{{#each tags}}<span>{{this}}</span> {{/each}}</p>{{/if}}
+{{{html}}}
+</article>`;
+
+const defaultLayoutTemplate = `<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>{{title}}</title></head>
+<body>
+<main>
+<nav><a href="/index.html">Home</a></nav>
+{{{body}}}
+</main>
+</body>
+</html>
+`;
+
+async function createRenderer(templatesDirectory: string) {
+  const handlebars = Handlebars.create();
+  const files = await templateFiles(templatesDirectory);
+  const templates = new Map<string, string>();
+  await Promise.all(files.map(async (filePath) => {
+    const name = relative(templatesDirectory, filePath).split(sep).join('/');
+    templates.set(name, await readFile(filePath, 'utf8'));
+  }));
+
+  for (const [name, source] of templates) {
+    if (name.startsWith('partials/')) {
+      const partialName = name.slice('partials/'.length, -'.hbs'.length);
+      handlebars.registerPartial(partialName, source);
+    }
+  }
+
+  const render = (name: string | undefined, fallback: string, context: Record<string, unknown>, directory = ''): string => {
+    const requested = directory + templateName(name ?? 'default');
+    const defaultTemplate = directory + 'default.hbs';
+    const source = templates.get(requested) ?? (name ? undefined : templates.get(defaultTemplate)) ?? fallback;
+    if (!source) throw new Error(`Template not found: ${requested}`);
+    return handlebars.compile(source)(context);
+  };
+
+  return {
+    renderPage(page: Page): string {
+      const context = { ...page.data, ...page };
+      const body = render(page.template, defaultPageTemplate, context);
+      return page.layout === false
+        ? body
+        : render(page.layout, defaultLayoutTemplate, { ...context, body: new handlebars.SafeString(body) }, 'layouts/');
+    },
+  };
+}
+
 export async function readPages(contentDirectory: string): Promise<Page[]> {
   const files = await markdownFiles(contentDirectory);
   const pages = await Promise.all(files.map(async (filePath) => {
@@ -56,31 +134,12 @@ export async function readPages(contentDirectory: string): Promise<Page[]> {
       date: toStringValue(parsed.data.date),
       tags: getTags(parsed.data.tags),
       html: markdown.render(parsed.content),
+      template: toStringValue(parsed.data.template),
+      layout: parsed.data.layout === false ? false : toStringValue(parsed.data.layout),
+      data: parsed.data,
     };
   }));
   return pages.sort((a, b) => a.title.localeCompare(b.title));
-}
-
-function renderPage(page: Page): string {
-  const metadata = [
-    page.date ? `<time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time>` : '',
-    page.tags.length > 0 ? `<p class="tags">${page.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join(' ')}</p>` : '',
-  ].filter(Boolean).join('\n');
-  return `<!doctype html>
-<html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(page.title)}</title></head>
-<body>
-<main>
-<nav><a href="/index.html">Home</a></nav>
-<article>
-<h1>${escapeHtml(page.title)}</h1>
-${metadata}
-${page.html}
-</article>
-</main>
-</body>
-</html>
-`;
 }
 
 function renderIndex(pages: Page[]): string {
@@ -96,13 +155,15 @@ function renderIndex(pages: Page[]): string {
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDirectory = resolve(options.content ?? 'content');
   const outputDirectory = resolve(options.output ?? 'dist');
+  const templatesDirectory = resolve(options.templates ?? 'templates');
   const pages = await readPages(contentDirectory);
+  const renderer = await createRenderer(templatesDirectory);
   await rm(outputDirectory, { recursive: true, force: true });
   await mkdir(outputDirectory, { recursive: true });
   await Promise.all(pages.map(async (page) => {
     const target = join(outputDirectory, `${page.slug}.html`);
     await mkdir(join(target, '..'), { recursive: true });
-    await writeFile(target, renderPage(page), 'utf8');
+    await writeFile(target, renderer.renderPage(page), 'utf8');
   }));
   await writeFile(join(outputDirectory, 'index.html'), renderIndex(pages), 'utf8');
   return pages;
