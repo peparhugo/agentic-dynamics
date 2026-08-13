@@ -1,6 +1,7 @@
 import asyncio
 import json
 import urllib.request
+from datetime import datetime, timedelta, timezone
 
 import fakeredis
 import fakeredis.aioredis
@@ -182,3 +183,123 @@ async def test_sqlite_message_history_persists_and_paginates(
         ]
     finally:
         reopened.close()
+
+
+@pytest.mark.asyncio
+async def test_redis_rate_limit_returns_error_and_does_not_publish(
+    unused_tcp_port, tmp_path
+):
+    redis_client = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    notification_server = NotificationServer(
+        RedisBackbone("redis://unused", redis_client),
+        MessageStore(str(tmp_path / "rate-limit.db")),
+        rate_limit=2,
+    )
+    await notification_server.start()
+    try:
+        async with serve(
+            notification_server.handler,
+            "127.0.0.1",
+            unused_tcp_port,
+            process_request=notification_server.process_request,
+        ):
+            async with connect(f"ws://127.0.0.1:{unused_tcp_port}") as websocket:
+                client_id = (await receive_json(websocket))["payload"]["client_id"]
+                for text in ("first", "second"):
+                    outgoing = valid_message("broadcast", {"text": text})
+                    await websocket.send(json.dumps(outgoing))
+                    assert await receive_json(websocket) == outgoing
+
+                await websocket.send(
+                    json.dumps(valid_message("broadcast", {"text": "blocked"}))
+                )
+                response = await receive_json(websocket)
+                assert response["type"] == "system"
+                assert response["payload"] == {"error": "rate limit exceeded"}
+
+                keys = await redis_client.keys(
+                    f"notifications:rate-limit:{client_id}:*"
+                )
+                assert len(keys) == 1
+                assert await redis_client.get(keys[0]) == "3"
+                assert [
+                    item["payload"]["text"]
+                    for item in notification_server.store.list(50, 0)
+                ] == ["first", "second"]
+    finally:
+        await notification_server.close()
+        await redis_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_channel_and_time_and_reports_has_more(
+    unused_tcp_port, tmp_path
+):
+    notification_server = NotificationServer(
+        store=MessageStore(str(tmp_path / "history.db"))
+    )
+    try:
+        async with serve(
+            notification_server.handler,
+            "127.0.0.1",
+            unused_tcp_port,
+            process_request=notification_server.process_request,
+        ):
+            async with connect(f"ws://127.0.0.1:{unused_tcp_port}") as websocket:
+                await receive_json(websocket)
+                messages = [
+                    valid_message("broadcast", {"text": "old"}, "alerts"),
+                    valid_message("broadcast", {"text": "other"}, "chat"),
+                    valid_message("broadcast", {"text": "third"}, "alerts"),
+                    valid_message("broadcast", {"text": "second"}, "alerts"),
+                ]
+                messages[0]["timestamp"] = "2026-01-01T00:00:00Z"
+                messages[1]["timestamp"] = "2026-01-02T00:00:00Z"
+                messages[2]["timestamp"] = "2026-01-03T00:00:00Z"
+                messages[3]["timestamp"] = "2026-01-02T00:00:00Z"
+                for outgoing in messages:
+                    await websocket.send(json.dumps(outgoing))
+                    if outgoing["channel"] == "alerts":
+                        continue
+
+                status, body = await fetch_json(
+                    unused_tcp_port,
+                    "/history?channel=alerts&since=2026-01-02T00%3A00%3A00Z&limit=1",
+                )
+                assert status == 200
+                assert body["has_more"] is True
+                assert [item["payload"]["text"] for item in body["messages"]] == [
+                    "second"
+                ]
+
+                status, body = await fetch_json(
+                    unused_tcp_port,
+                    "/history?channel=alerts&since=2026-01-02T00%3A00%3A00Z&limit=50",
+                )
+                assert status == 200
+                assert body["has_more"] is False
+                assert [item["payload"]["text"] for item in body["messages"]] == [
+                    "second",
+                    "third",
+                ]
+    finally:
+        await notification_server.close()
+
+
+@pytest.mark.asyncio
+async def test_startup_cleanup_removes_expired_messages(tmp_path):
+    store = MessageStore(str(tmp_path / "expiry.db"))
+    expired = valid_message("broadcast", {"text": "expired"}, "alerts")
+    expired["timestamp"] = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+    current = valid_message("broadcast", {"text": "current"}, "alerts")
+    current["timestamp"] = datetime.now(timezone.utc).isoformat()
+    store.add(expired)
+    store.add(current)
+    notification_server = NotificationServer(store=store, message_ttl_days=7)
+
+    await notification_server.start()
+    try:
+        await asyncio.sleep(0)
+        assert [item["payload"]["text"] for item in store.list(50, 0)] == ["current"]
+    finally:
+        await notification_server.close()

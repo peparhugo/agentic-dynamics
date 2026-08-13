@@ -6,19 +6,22 @@ import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import NotificationServer
+from app import MessageStore, NotificationServer
 
 
 @pytest.fixture
 async def running_server(unused_tcp_port):
-    notification_server = NotificationServer()
-    async with serve(
-        notification_server.handler,
-        "127.0.0.1",
-        unused_tcp_port,
-        process_request=notification_server.process_request,
-    ):
-        yield notification_server, unused_tcp_port
+    notification_server = NotificationServer(store=MessageStore(":memory:"))
+    try:
+        async with serve(
+            notification_server.handler,
+            "127.0.0.1",
+            unused_tcp_port,
+            process_request=notification_server.process_request,
+        ):
+            yield notification_server, unused_tcp_port
+    finally:
+        await notification_server.close()
 
 
 async def receive_json(websocket):
