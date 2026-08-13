@@ -15,6 +15,7 @@ from flask import Flask, Response, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import DuplicateUserError, TaskRepository, UserRepository
 
 
 SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -34,34 +35,8 @@ def get_db():
 
 def init_db():
     """Create current tables and safely upgrade databases from the task-only schema."""
-    with get_db() as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                email TEXT,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
-        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
-        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
-        if "email" not in user_columns:
-            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    UserRepository(get_db).initialize()
+    TaskRepository(get_db).initialize()
 
 
 def encode_jwt(user_id):
@@ -146,15 +121,12 @@ def create_task(operation, owner_id):
     if not title:
         return soap_fault("title is required", 400)
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as conn:
-        cursor = conn.execute("INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)", (title, created_at, owner_id))
-        task = conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone()
+    task = TaskRepository(get_db).create_task(title, created_at, owner_id)
     return soap_response("CreateTask", lambda response: task_element(response, task), 201)
 
 
 def list_tasks(_operation, owner_id):
-    with get_db() as conn:
-        tasks = conn.execute("SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)).fetchall()
+    tasks = TaskRepository(get_db).list_for_owner(owner_id)
     return soap_response("ListTasks", lambda response: [task_element(response, task) for task in tasks])
 
 
@@ -169,8 +141,7 @@ def get_task(operation, owner_id):
     identifier = task_id(operation)
     if identifier is None:
         return soap_fault("valid task id is required", 400)
-    with get_db() as conn:
-        task = conn.execute("SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (identifier, owner_id)).fetchone()
+    task = TaskRepository(get_db).get_for_owner(identifier, owner_id)
     if task is None:
         return soap_fault("task not found", 404)
     return soap_response("GetTask", lambda response: task_element(response, task))
@@ -185,14 +156,11 @@ def update_task(operation, owner_id):
         return soap_fault("title or status is required", 400)
     if title == "":
         return soap_fault("title is required", 400)
-    with get_db() as conn:
-        task = conn.execute("SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (identifier, owner_id)).fetchone()
-        if task is None:
-            return soap_fault("task not found", 404)
-        previous_status = task["status"]
-        conn.execute("UPDATE tasks SET title = ?, status = ? WHERE id = ?", (title if title is not None else task["title"], status if status is not None else task["status"], identifier))
-        task = conn.execute("SELECT * FROM tasks WHERE id = ?", (identifier,)).fetchone()
-        user = conn.execute("SELECT email FROM users WHERE id = ?", (owner_id,)).fetchone()
+    previous_task, task = TaskRepository(get_db).update_for_owner(identifier, owner_id, title, status)
+    if previous_task is None:
+        return soap_fault("task not found", 404)
+    user = UserRepository(get_db).get(owner_id)
+    previous_status = previous_task["status"]
     if status == "completed" and previous_status != "completed" and user["email"]:
         send_notification_email.delay(user["email"], task["title"])
     return soap_response("UpdateTask", lambda response: task_element(response, task))
@@ -210,13 +178,11 @@ def register():
     if email is not None and (not isinstance(email, str) or not email.strip()):
         return jsonify(error="email must be a non-empty string"), 400
     try:
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
-                (username.strip(), email.strip() if email else None, generate_password_hash(password)),
-            )
-        return jsonify(id=cursor.lastrowid, username=username.strip()), 201
-    except sqlite3.IntegrityError:
+        user = UserRepository(get_db).create_user(
+            username.strip(), email.strip() if email else None, generate_password_hash(password)
+        )
+        return jsonify(id=user["id"], username=username.strip()), 201
+    except DuplicateUserError:
         return jsonify(error="username already exists"), 409
 
 
@@ -226,8 +192,7 @@ def login():
     username, password = data.get("username"), data.get("password")
     if not isinstance(username, str) or not isinstance(password, str):
         return jsonify(error="username and password are required"), 400
-    with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    user = UserRepository(get_db).get_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify(error="invalid credentials"), 401
     return jsonify(token=encode_jwt(user["id"]))
