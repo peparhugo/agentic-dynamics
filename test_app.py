@@ -2,6 +2,8 @@ import sqlite3
 from unittest.mock import patch
 
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import FixedWindowRateLimiter
 
 import app
 
@@ -12,6 +14,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "DATABASE", str(database))
     app.init_db()
     app.app.config.update(TESTING=True)
+    monkeypatch.setattr(app.limiter, "enabled", False)
     return app.app.test_client()
 
 
@@ -50,7 +53,54 @@ def test_list_tasks_orders_newest_first(client):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    page = response.get_json()
+    assert [task["id"] for task in page["data"]] == [second["id"], first["id"]]
+    assert page["next_cursor"] is None
+    assert page["total"] == 2
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_header(client)
+    tasks = [client.post("/tasks", json={"title": f"Task {number}"}, headers=headers).get_json() for number in range(25)]
+
+    first_page = client.get("/tasks?limit=20", headers=headers)
+
+    assert first_page.status_code == 200
+    first_data = first_page.get_json()
+    assert [task["id"] for task in first_data["data"]] == [task["id"] for task in reversed(tasks[5:])]
+    assert first_data["next_cursor"] == str(tasks[5]["id"])
+    assert first_data["total"] == 25
+
+    second_page = client.get(f"/tasks?cursor={first_data['next_cursor']}&limit=20", headers=headers)
+
+    assert second_page.status_code == 200
+    second_data = second_page.get_json()
+    assert [task["id"] for task in second_data["data"]] == [task["id"] for task in reversed(tasks[:5])]
+    assert second_data["next_cursor"] is None
+    assert second_data["total"] == 25
+
+
+@pytest.mark.parametrize("query", ["?limit=0", "?limit=101", "?limit=invalid", "?cursor=0", "?cursor=invalid"])
+def test_list_tasks_rejects_invalid_pagination_parameters(client, query):
+    response = client.get(f"/tasks{query}", headers=auth_header(client))
+
+    assert response.status_code == 400
+
+
+def test_rate_limit_returns_retry_after_header(client, monkeypatch):
+    storage = MemoryStorage()
+    monkeypatch.setattr(app.limiter, "_storage", storage)
+    monkeypatch.setattr(app.limiter, "_limiter", FixedWindowRateLimiter(storage))
+    monkeypatch.setattr(app.limiter, "enabled", True)
+    headers = auth_header(client)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
 
 
 def test_get_task_and_missing_task(client):
@@ -138,6 +188,6 @@ def test_users_cannot_access_each_others_tasks(client):
     alice = auth_header(client, "alice")
     bob = auth_header(client, "bob")
     task = client.post("/tasks", json={"title": "Private"}, headers=alice).get_json()
-    assert client.get("/tasks", headers=bob).get_json() == []
+    assert client.get("/tasks", headers=bob).get_json()["data"] == []
     assert client.get(f"/tasks/{task['id']}", headers=bob).status_code == 404
     assert client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob).status_code == 404
