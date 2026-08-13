@@ -13,9 +13,11 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from uuid import uuid4
 
 from redis import asyncio as redis
-from websockets.asyncio.server import Server, ServerConnection, serve
+from websockets.asyncio.server import Server
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
+
+from transports import BaseTransport, WebSocketTransport
 
 
 SUPPORTED_MESSAGE_TYPES = frozenset(
@@ -28,11 +30,11 @@ class ClientRegistry:
     """A thread-safe mapping of assigned client IDs to local connections."""
 
     def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients: dict[str, Any] = {}
         self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
-    def add(self, connection: ServerConnection) -> str:
+    def add(self, connection: Any) -> str:
         client_id = str(uuid4())
         with self._lock:
             self._clients[client_id] = connection
@@ -46,11 +48,11 @@ class ClientRegistry:
                 if not self._channels[channel]:
                     del self._channels[channel]
 
-    def get(self, client_id: str) -> ServerConnection | None:
+    def get(self, client_id: str) -> Any | None:
         with self._lock:
             return self._clients.get(client_id)
 
-    def connections(self) -> list[ServerConnection]:
+    def connections(self) -> list[Any]:
         with self._lock:
             return list(self._clients.values())
 
@@ -67,7 +69,7 @@ class ClientRegistry:
                 if not subscribers:
                     del self._channels[channel]
 
-    def channel_connections(self, channel: str) -> list[ServerConnection]:
+    def channel_connections(self, channel: str) -> list[Any]:
         with self._lock:
             return [
                 self._clients[client_id]
@@ -228,29 +230,46 @@ class RedisClientState:
 class NotificationServer:
     """Routes JSON notifications using a shared pub/sub backbone."""
 
-    def __init__(self, redis_url: str | None = None, database_url: str | None = None) -> None:
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
         self.clients = ClientRegistry()
         self.store = MessageStore(database_url)
         self.state = RedisClientState(redis_url)
         self.broker: RedisBroker | InMemoryBroker = RedisBroker(redis_url) if redis_url else InMemoryBroker()
+        self.transport = transport or self._configured_transport()
         self._subscription: Any = None
         self._listener: asyncio.Task[None] | None = None
+
+    @staticmethod
+    def _configured_transport() -> BaseTransport:
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport_name in {"websocket", "ws"}:
+            return WebSocketTransport()
+        raise ValueError(f"Unsupported transport: {transport_name}")
 
     @staticmethod
     def message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {"type": message_type, "payload": payload, "timestamp": datetime.now(timezone.utc).isoformat()}
 
-    async def handler(self, connection: ServerConnection) -> None:
+    async def handler(self, connection: Any) -> None:
+        await self.transport.on_connect(self, connection)
+
+    async def _register_connection(self, connection: Any) -> str:
         client_id = self.clients.add(connection)
         await self.state.add(client_id)
-        try:
-            await connection.send(json.dumps(self.message("system", {"client_id": client_id})))
-            async for raw_message in connection:
-                await self.handle_message(client_id, raw_message)
-        finally:
-            self.clients.remove(client_id)
-            await self.state.remove(client_id)
+        return client_id
+
+    async def _unregister_connection(self, client_id: str) -> None:
+        self.clients.remove(client_id)
+        await self.state.remove(client_id)
+
+    def welcome_message(self, client_id: str) -> str:
+        return json.dumps(self.message("system", {"client_id": client_id}))
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         if isinstance(raw_message, bytes):
@@ -309,26 +328,21 @@ class NotificationServer:
         if message["type"] == "direct":
             target = self.clients.get(message["payload"]["client_id"])
             if target is not None:
-                await self._send(target, notification)
+                await self.transport.send_message(target, notification)
         elif message.get("channel") is None:
             await self.send_raw(self.clients.connections(), notification)
         else:
             await self.send_raw(self.clients.channel_connections(message["channel"]), notification)
 
-    async def send_raw(self, connections: list[ServerConnection], notification: str) -> None:
-        await asyncio.gather(*(self._send(connection, notification) for connection in connections), return_exceptions=True)
+    async def send_raw(self, connections: list[Any], notification: str) -> None:
+        await self.transport.broadcast(connections, notification)
 
     async def _send_error(self, client_id: str, error: str) -> None:
         connection = self.clients.get(client_id)
         if connection is not None:
-            await self._send(connection, json.dumps(self.message("system", {"error": error})))
+            await self.transport.send_message(connection, json.dumps(self.message("system", {"error": error})))
 
-    @staticmethod
-    async def _send(connection: ServerConnection, notification: str) -> None:
-        with suppress(Exception):
-            await connection.send(notification)
-
-    async def process_request(self, connection: ServerConnection, request: Request) -> Response | None:
+    async def process_request(self, connection: Any, request: Request) -> Response | None:
         if request.headers.get("Upgrade") is not None:
             return None
         if request.path == "/health":
@@ -362,7 +376,7 @@ class NotificationServer:
     async def start(self, host: str = "127.0.0.1", port: int = 8765) -> Server:
         self._subscription = await self.broker.subscribe()
         self._listener = asyncio.create_task(self._listen())
-        return await serve(self.handler, host, port, process_request=self.process_request)
+        return await self.transport.start(self, host, port)
 
     async def stop(self) -> None:
         if self._listener:
