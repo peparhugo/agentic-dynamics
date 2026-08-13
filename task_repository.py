@@ -1,15 +1,15 @@
 """
-Flat-file (JSON) storage for the Task Management API.
+Repository for task records, backed by a flat JSON file.
 
-No database is used — tasks persist to a single JSON file on disk. Writes are
-atomic (write to a temp file, then os.replace) and serialized with a lock so
-concurrent requests within one process don't corrupt the file.
+Writes are atomic (write to a temp file, then os.replace) and serialized
+with a lock so concurrent requests within one process don't corrupt the
+file.
 """
 
-import json
 import os
-import threading
 from datetime import datetime
+
+from base_repository import BaseRepository
 
 
 def _now_iso() -> str:
@@ -18,24 +18,13 @@ def _now_iso() -> str:
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")
 
 
-class TaskStore:
+class TaskRepository(BaseRepository):
     def __init__(self, path: str):
-        self.path = path
-        self._lock = threading.Lock()
-        if not os.path.exists(self.path):
-            self._write({"next_id": 1, "tasks": []})
-        else:
+        super().__init__(path)
+        existed = os.path.exists(path)
+        self._ensure_initialized({"next_id": 1, "tasks": []})
+        if existed:
             self._migrate_add_owner_id()
-
-    def _read(self) -> dict:
-        with open(self.path, "r") as f:
-            return json.load(f)
-
-    def _write(self, data: dict) -> None:
-        tmp_path = f"{self.path}.tmp"
-        with open(tmp_path, "w") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, self.path)
 
     def _migrate_add_owner_id(self) -> None:
         # Tasks written before owner_id existed are left owner-less (None)
@@ -89,51 +78,3 @@ class TaskStore:
                     self._write(data)
                     return task
             return None
-
-
-class UserStore:
-    """Flat-file (JSON) storage for users, mirroring TaskStore's design."""
-
-    def __init__(self, path: str):
-        self.path = path
-        self._lock = threading.Lock()
-        if not os.path.exists(self.path):
-            self._write({"next_id": 1, "users": []})
-
-    def _read(self) -> dict:
-        with open(self.path, "r") as f:
-            return json.load(f)
-
-    def _write(self, data: dict) -> None:
-        tmp_path = f"{self.path}.tmp"
-        with open(tmp_path, "w") as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, self.path)
-
-    def create(self, username: str, password_hash: str, email: str) -> dict:
-        with self._lock:
-            data = self._read()
-            user = {
-                "id": data["next_id"],
-                "username": username,
-                "password_hash": password_hash,
-                "email": email,
-            }
-            data["users"].append(user)
-            data["next_id"] += 1
-            self._write(data)
-            return user
-
-    def get_by_username(self, username: str) -> dict | None:
-        data = self._read()
-        for user in data["users"]:
-            if user["username"] == username:
-                return user
-        return None
-
-    def get_by_id(self, user_id: int) -> dict | None:
-        data = self._read()
-        for user in data["users"]:
-            if user["id"] == user_id:
-                return user
-        return None

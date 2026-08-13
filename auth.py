@@ -54,7 +54,7 @@ def require_auth(app):
             payload = decode_token(token, app.config["SECRET_KEY"])
             if payload is None:
                 return jsonify({"error": "invalid or expired token"}), 401
-            user = app.user_store.get_by_id(payload["sub"])
+            user = app.user_repository.get_by_id(payload["sub"])
             if user is None:
                 return jsonify({"error": "invalid or expired token"}), 401
             return f(user, *args, **kwargs)
