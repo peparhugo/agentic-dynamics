@@ -16,7 +16,7 @@ from typing import Any
 from websockets.asyncio.server import ServerConnection, serve
 
 
-SUPPORTED_TYPES = frozenset({"broadcast", "direct", "system"})
+SUPPORTED_TYPES = frozenset({"broadcast", "direct", "system", "subscribe", "unsubscribe"})
 
 
 class NotificationServer:
@@ -24,6 +24,7 @@ class NotificationServer:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     @property
@@ -53,15 +54,14 @@ class NotificationServer:
             async for raw_message in websocket:
                 await self.handle_message(client_id, raw_message)
         finally:
-            with self._lock:
-                self._clients.pop(client_id, None)
+            self._remove_client(client_id)
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         """Validate an incoming message and route it to its recipients."""
         try:
             message = json.loads(raw_message)
             message_type = message["type"]
-            payload = message["payload"]
+            payload = message.get("payload", {}) if message_type in {"subscribe", "unsubscribe"} else message["payload"]
         except (json.JSONDecodeError, KeyError, TypeError):
             await self._send_error(sender_id, "message must contain type and payload")
             return
@@ -70,12 +70,29 @@ class NotificationServer:
             await self._send_error(sender_id, "unsupported message type or invalid payload")
             return
 
-        notification = {
+        channel = message.get("channel")
+        if channel is not None and (not isinstance(channel, str) or not channel):
+            await self._send_error(sender_id, "channel must be a non-empty string")
+            return
+
+        if message_type in {"subscribe", "unsubscribe"}:
+            if not channel:
+                await self._send_error(sender_id, f"{message_type} messages require channel")
+                return
+            self._update_subscription(sender_id, channel, message_type == "subscribe")
+            return
+
+        notification: dict[str, Any] = {
             "type": message_type,
             "payload": payload,
             "timestamp": message.get("timestamp") or self._timestamp(),
         }
+        if channel:
+            notification["channel"] = channel
         if message_type == "direct":
+            if channel:
+                await self._broadcast_to_channel(channel, notification)
+                return
             target_id = payload.get("client_id")
             if not isinstance(target_id, str):
                 await self._send_error(sender_id, "direct messages require payload.client_id")
@@ -83,7 +100,10 @@ class NotificationServer:
             await self._send_to(target_id, notification)
             return
 
-        await self.broadcast(notification)
+        if channel:
+            await self._broadcast_to_channel(channel, notification)
+        else:
+            await self.broadcast(notification)
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         """Deliver a message to every currently connected client."""
@@ -95,8 +115,22 @@ class NotificationServer:
         )
         for (client_id, _), result in zip(recipients, results):
             if isinstance(result, Exception):
-                with self._lock:
-                    self._clients.pop(client_id, None)
+                self._remove_client(client_id)
+
+    async def _broadcast_to_channel(self, channel: str, message: dict[str, Any]) -> None:
+        with self._lock:
+            recipients = [
+                (client_id, self._clients[client_id])
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+        results = await asyncio.gather(
+            *(connection.send(json.dumps(message)) for _, connection in recipients),
+            return_exceptions=True,
+        )
+        for (client_id, _), result in zip(recipients, results):
+            if isinstance(result, Exception):
+                self._remove_client(client_id)
 
     async def _send_to(self, client_id: str, message: dict[str, Any]) -> None:
         with self._lock:
@@ -106,8 +140,26 @@ class NotificationServer:
         try:
             await connection.send(json.dumps(message))
         except Exception:
-            with self._lock:
-                self._clients.pop(client_id, None)
+            self._remove_client(client_id)
+
+    def _update_subscription(self, client_id: str, channel: str, subscribe: bool) -> None:
+        with self._lock:
+            if subscribe:
+                self._channels.setdefault(channel, set()).add(client_id)
+            else:
+                subscribers = self._channels.get(channel)
+                if subscribers is not None:
+                    subscribers.discard(client_id)
+                    if not subscribers:
+                        self._channels.pop(channel, None)
+
+    def _remove_client(self, client_id: str) -> None:
+        with self._lock:
+            self._clients.pop(client_id, None)
+            for channel, subscribers in list(self._channels.items()):
+                subscribers.discard(client_id)
+                if not subscribers:
+                    self._channels.pop(channel)
 
     async def _send_error(self, client_id: str, error: str) -> None:
         await self._send_to(
@@ -116,10 +168,26 @@ class NotificationServer:
         )
 
     async def process_request(self, connection: ServerConnection, request: Any) -> Any:
-        """Serve the lightweight HTTP health check on the WebSocket port."""
+        """Serve lightweight HTTP status endpoints on the WebSocket port."""
         if request.path == "/health":
             body = json.dumps({"connected_clients": self.client_count})
             return connection.respond(HTTPStatus.OK, body)
+        if request.path == "/channels":
+            with self._lock:
+                channels = [
+                    {"name": name, "subscriber_count": len(subscribers)}
+                    for name, subscribers in sorted(self._channels.items())
+                ]
+            return connection.respond(HTTPStatus.OK, json.dumps({"channels": channels}))
+        if request.path.startswith("/channels/") and request.path.endswith("/subscribers"):
+            name = request.path[len("/channels/") : -len("/subscribers")].rstrip("/")
+            if not name:
+                return connection.respond(HTTPStatus.NOT_FOUND, "not found")
+            with self._lock:
+                subscribers = sorted(self._channels.get(name, set()))
+            return connection.respond(
+                HTTPStatus.OK, json.dumps({"channel": name, "subscribers": subscribers})
+            )
         return None
 
 

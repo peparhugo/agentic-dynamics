@@ -31,6 +31,11 @@ def fetch_health(port):
         return json.loads(response.read())
 
 
+def fetch_json(port, path):
+    with urlopen(f"http://127.0.0.1:{port}{path}") as response:
+        return json.loads(response.read())
+
+
 async def test_clients_receive_unique_ids_and_health_count(notification_server):
     application, url, port = notification_server
     async with connect(url) as first, connect(url) as second:
@@ -73,3 +78,36 @@ async def test_direct_message_and_disconnect_removal(notification_server):
             break
         await asyncio.sleep(0.01)
     assert application.client_count == 0
+
+
+async def test_channel_subscriptions_route_messages_and_are_listed(notification_server):
+    _, url, port = notification_server
+    async with connect(url) as sender, connect(url) as alerts_recipient, connect(url) as chat_recipient:
+        await asyncio.gather(
+            receive_json(sender), receive_json(alerts_recipient), receive_json(chat_recipient)
+        )
+        await alerts_recipient.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await chat_recipient.send(json.dumps({"type": "subscribe", "payload": {}, "channel": "chat"}))
+
+        channels = await asyncio.to_thread(fetch_json, port, "/channels")
+        assert channels == {
+            "channels": [
+                {"name": "alerts", "subscriber_count": 1},
+                {"name": "chat", "subscriber_count": 1},
+            ]
+        }
+
+        await sender.send(
+            json.dumps({"type": "broadcast", "payload": {"text": "warning"}, "channel": "alerts"})
+        )
+        delivered = await receive_json(alerts_recipient)
+        assert delivered["channel"] == "alerts"
+        assert delivered["payload"] == {"text": "warning"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(chat_recipient.recv(), timeout=0.05)
+
+        await alerts_recipient.send(json.dumps({"type": "unsubscribe", "payload": {}, "channel": "alerts"}))
+        assert await asyncio.to_thread(fetch_json, port, "/channels/alerts/subscribers") == {
+            "channel": "alerts",
+            "subscribers": [],
+        }
