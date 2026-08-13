@@ -156,6 +156,34 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [self._to_dict(row) for row in rows]
 
+    def read_paginated(self, user_id: int, cursor: int = None, limit: int = 20) -> dict:
+        limit = min(max(1, limit), 100)
+        with self.get_db() as conn:
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE user_id = ? ORDER BY id DESC LIMIT ?",
+                    (user_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE user_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (user_id, cursor, limit + 1),
+                ).fetchall()
+
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()[0]
+
+        items = [self._to_dict(row) for row in rows[:limit]]
+        next_cursor = rows[limit]["id"] if len(rows) > limit else None
+
+        return {
+            "data": items,
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+
     def update(self, task_id: int, user_id: int, title: str = None, status: str = None) -> dict | None:
         with self.get_db() as conn:
             row = conn.execute(

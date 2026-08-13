@@ -11,6 +11,8 @@ Endpoints:
 """
 
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from functools import wraps
 import sqlite3
 import os
@@ -32,9 +34,27 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
 
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
+limiter = Limiter(
+    app=app,
+    key_func=lambda: _get_user_id(),
+    default_limits=["100 per minute"],
+    storage_uri=REDIS_URL,
+)
+
 user_repo = UserRepository()
 token_repo = TokenRepository(TOKEN_TTL)
 task_repo = TaskRepository()
+
+
+def _get_user_id():
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1]
+        user = get_user_from_token(token)
+        if user:
+            return f"user_{user['id']}"
+    return get_remote_address()
 
 
 def init_db():
@@ -96,6 +116,7 @@ def require_auth(f):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -112,6 +133,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -129,6 +151,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100 per minute")
 @require_auth
 def create_task(user: dict):
     data = request.get_json(silent=True) or {}
@@ -146,13 +169,17 @@ def create_task(user: dict):
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100 per minute")
 @require_auth
 def list_tasks(user: dict):
-    tasks = task_repo.read_all(user["id"])
-    return jsonify(tasks)
+    cursor = request.args.get("cursor", type=int, default=None)
+    limit = request.args.get("limit", type=int, default=20)
+    result = task_repo.read_paginated(user["id"], cursor=cursor, limit=limit)
+    return jsonify(result)
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100 per minute")
 @require_auth
 def get_task(user: dict, task_id):
     task = task_repo.read(task_id, user["id"])
@@ -162,6 +189,7 @@ def get_task(user: dict, task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100 per minute")
 @require_auth
 def update_task(user: dict, task_id):
     data = request.get_json(silent=True) or {}
@@ -201,8 +229,14 @@ def update_task(user: dict, task_id):
 
 
 @app.route("/health", methods=["GET"])
+@limiter.limit("100 per minute")
 def health():
     return jsonify({"status": "ok"})
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 if __name__ == "__main__":
