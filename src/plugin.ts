@@ -16,6 +16,8 @@ export interface BuildOptions {
   templatesDir?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export interface ResolvedBuildOptions {
@@ -23,6 +25,15 @@ export interface ResolvedBuildOptions {
   outputDir: string;
   templatesDir: string;
   configFile: string;
+  incremental: boolean;
+  clean: boolean;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  durationMs: number;
+  timeSavedMs: number;
 }
 
 export interface Page extends GeneratedPage {
@@ -36,6 +47,7 @@ export interface Page extends GeneratedPage {
 export interface BuildContext {
   options: ResolvedBuildOptions;
   pages: Page[];
+  stats: BuildStats;
 }
 
 export interface Plugin {

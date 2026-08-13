@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
-import { buildSite, BuildOptions } from './index';
+import { createEngine, BuildOptions } from './index';
 import { startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <number>]';
 }
 
 export async function run(argv: string[]): Promise<void> {
@@ -17,6 +17,12 @@ export async function run(argv: string[]): Promise<void> {
   let port = 3000;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
+    if (argument === '--incremental' || argument === '--clean') {
+      if (command !== 'build') throw new Error(`Unknown option: ${argument}\n${usage()}`);
+      if (argument === '--incremental') options.incremental = true;
+      if (argument === '--clean') options.clean = true;
+      continue;
+    }
     if (argument !== '--content' && argument !== '--output' && argument !== '--templates' && argument !== '--port') {
       throw new Error(`Unknown option: ${argument}\n${usage()}`);
     }
@@ -43,8 +49,11 @@ export async function run(argv: string[]): Promise<void> {
     return;
   }
 
-  const pages = await buildSite(options);
+  const engine = await createEngine(options);
+  const pages = await engine.build();
   process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+  const stats = engine.lastBuildStats;
+  process.stdout.write(`Build stats: ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${Math.round(stats.timeSavedMs)}ms saved (${Math.round(stats.durationMs)}ms total).\n`);
 }
 
 if (require.main === module) {

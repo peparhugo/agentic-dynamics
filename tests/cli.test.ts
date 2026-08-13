@@ -43,6 +43,19 @@ describe('CLI', () => {
     await expect(fs.readFile(path.join(output, 'post.html'), 'utf8')).resolves.toBe('<main><h1>Post</h1>\n</main>');
   });
 
+  it('reports incremental build statistics', async () => {
+    const content = path.join(root, 'posts');
+    const output = path.join(root, 'site');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'post.md'), '# Post');
+
+    await run(['build', '--content', content, '--output', output, '--incremental']);
+    writeSpy.mockClear();
+    await run(['build', '--content', content, '--output', output, '--incremental']);
+
+    expect(writeSpy).toHaveBeenCalledWith(expect.stringContaining('Build stats: 0 built, 1 skipped,'));
+  });
+
   it.each([
     [[], 'Usage: ssg <build|serve>'],
     [['build', '--unknown'], 'Unknown option: --unknown'],

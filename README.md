@@ -14,6 +14,19 @@ Markdown is read from `./content` and HTML is written to `./dist`. Override thos
 npx ssg build --content posts --output public
 ```
 
+Use incremental builds to skip pages whose Markdown source and templates have not
+changed. The output directory stores rendered HTML and a `.ssg-cache.json`
+manifest containing source hashes and cached frontmatter. A missing manifest or
+`--clean` starts with a clean build:
+
+```sh
+npx ssg build --incremental
+npx ssg build --incremental --clean
+```
+
+Each build reports pages built, pages skipped, elapsed time, and estimated time
+saved by cached pages.
+
 Start a development server on `http://localhost:3000` with automatic rebuilds and
 browser reloads when files in `content/` or `templates/` change:
 
