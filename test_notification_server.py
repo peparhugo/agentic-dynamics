@@ -12,8 +12,10 @@ import notification_server as ns
 @pytest_asyncio.fixture(autouse=True)
 async def clean_registry():
     ns.registry = ns.ClientRegistry()
+    ns.channels = ns.ChannelRegistry()
     yield
     ns.registry = ns.ClientRegistry()
+    ns.channels = ns.ChannelRegistry()
 
 
 @pytest_asyncio.fixture
@@ -29,6 +31,18 @@ async def recv_json(ws, msg_type=None):
         data = json.loads(raw)
         if msg_type is None or data["type"] == msg_type:
             return data
+
+
+async def http_get(server, path):
+    host_port = server.split("://", 1)[1]
+    reader, writer = await asyncio.open_connection(*host_port.split(":"))
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    raw = await reader.read()
+    writer.close()
+    header_blob, _, body = raw.partition(b"\r\n\r\n")
+    status_line = header_blob.splitlines()[0].decode()
+    return status_line, json.loads(body.decode())
 
 
 @pytest.mark.asyncio
@@ -171,3 +185,157 @@ async def test_registry_add_remove_and_snapshot():
     assert registry.count() == 1
     assert registry.get(id1) is None
     assert registry.get(id2) is c2
+
+
+@pytest.mark.asyncio
+async def test_subscribe_gets_ack(server):
+    async with connect(server) as ws1:
+        await recv_json(ws1, "system")
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        ack = await recv_json(ws1, "system")
+        assert ack["payload"] == {"event": "subscribed", "channel": "alerts"}
+
+
+@pytest.mark.asyncio
+async def test_subscribe_without_channel_gets_error(server):
+    async with connect(server) as ws1:
+        await recv_json(ws1, "system")
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {}}))
+        err = await recv_json(ws1, "system")
+        assert "requires 'channel'" in err["payload"]["error"]
+
+
+@pytest.mark.asyncio
+async def test_channel_message_reaches_only_subscribers(server):
+    async with connect(server) as ws1, connect(server) as ws2, connect(server) as ws3:
+        await recv_json(ws1, "system")
+        await recv_json(ws2, "system")
+        await recv_json(ws3, "system")
+
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1, "system")
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws2, "system")
+        # ws3 does not subscribe to "alerts"
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "alerts", "text": "fire!"},
+        }))
+
+        msg1 = await recv_json(ws1, "broadcast")
+        msg2 = await recv_json(ws2, "broadcast")
+        assert msg1["payload"]["text"] == "fire!"
+        assert msg2["payload"]["text"] == "fire!"
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws3.recv(), timeout=0.3)
+
+
+@pytest.mark.asyncio
+async def test_broadcast_without_channel_still_reaches_all(server):
+    async with connect(server) as ws1, connect(server) as ws2:
+        await recv_json(ws1, "system")
+        await recv_json(ws2, "system")
+
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1, "system")
+        # ws2 is subscribed to nothing
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "no channel here"},
+        }))
+
+        msg1 = await recv_json(ws1, "broadcast")
+        msg2 = await recv_json(ws2, "broadcast")
+        assert msg1["payload"]["text"] == "no channel here"
+        assert msg2["payload"]["text"] == "no channel here"
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_stops_delivery(server):
+    async with connect(server) as ws1, connect(server) as ws2:
+        await recv_json(ws1, "system")
+        await recv_json(ws2, "system")
+
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws1, "system")
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws2, "system")
+
+        await ws2.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "chat"}}))
+        unsub_ack = await recv_json(ws2, "system")
+        assert unsub_ack["payload"] == {"event": "unsubscribed", "channel": "chat"}
+
+        await ws1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "chat", "text": "hi"},
+        }))
+        msg1 = await recv_json(ws1, "broadcast")
+        assert msg1["payload"]["text"] == "hi"
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.3)
+
+
+@pytest.mark.asyncio
+async def test_disconnect_removes_client_from_channels(server):
+    async with connect(server) as ws1:
+        await recv_json(ws1, "system")
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1, "system")
+        assert ns.channels.subscribers("alerts") != []
+
+    for _ in range(50):
+        if not ns.channels.subscribers("alerts"):
+            break
+        await asyncio.sleep(0.05)
+    assert ns.channels.subscribers("alerts") == []
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_lists_active_channels_and_counts(server):
+    async with connect(server) as ws1, connect(server) as ws2:
+        await recv_json(ws1, "system")
+        await recv_json(ws2, "system")
+
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1, "system")
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws2, "system")
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws1, "system")
+
+        status_line, data = await http_get(server, "/channels")
+        assert "200" in status_line
+        by_name = {c["name"]: c["subscribers"] for c in data["channels"]}
+        assert by_name == {"alerts": 2, "chat": 1}
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_lists_subscriber_ids(server):
+    async with connect(server) as ws1, connect(server) as ws2:
+        welcome1 = await recv_json(ws1, "system")
+        welcome2 = await recv_json(ws2, "system")
+        id1 = welcome1["payload"]["client_id"]
+        id2 = welcome2["payload"]["client_id"]
+
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1, "system")
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws2, "system")
+
+        status_line, data = await http_get(server, "/channels/alerts/subscribers")
+        assert "200" in status_line
+        assert data["channel"] == "alerts"
+        assert sorted(data["subscribers"]) == sorted([id1, id2])
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_empty_for_unknown_channel(server):
+    async with connect(server) as ws1:
+        await recv_json(ws1, "system")
+        status_line, data = await http_get(server, "/channels/does-not-exist/subscribers")
+        assert "200" in status_line
+        assert data == {"channel": "does-not-exist", "subscribers": []}
