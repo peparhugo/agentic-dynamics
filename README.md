@@ -14,6 +14,15 @@ By default, Markdown is read recursively from `./content` and HTML is written to
 npx ssg build --content ./posts --output ./public
 ```
 
+Reuse unchanged rendered pages and parsed frontmatter with an incremental build:
+
+```sh
+npx ssg build --incremental
+npx ssg build --incremental --clean
+```
+
+Build metadata is stored in `dist/.ssg-cache.json`. Incremental builds compare source and template hashes, remove output for deleted pages, and report built/skipped page counts and estimated time saved. A missing cache or `--clean` performs a clean build.
+
 Supported frontmatter fields are `title`, `date`, `tags`, `template`, and `layout`. Every Markdown file gets a matching `.html` path and the generator creates an `index.html` containing links to all pages.
 
 Handlebars templates can be placed in `./templates`. A page uses `default.hbs` unless its frontmatter selects another template. Templates receive all frontmatter fields plus `title`, `date`, `tags`, `url`, and the rendered Markdown as `content`; use triple braces (`{{{content}}}`) to preserve its HTML.

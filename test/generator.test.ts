@@ -196,4 +196,79 @@ Page body.
     expect(pages[0].title).toBe('Configured');
     expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toContain('<title>Configured</title>');
   });
+
+  it('skips unchanged pages during incremental builds', async () => {
+    await fs.writeFile(path.join(content, 'one.md'), 'First');
+    await fs.writeFile(path.join(content, 'two.md'), 'Second');
+
+    const first = await createEngine({ content, output, incremental: true, config: false });
+    await first.build();
+    await first.end();
+    expect(first.stats.pagesBuilt).toBe(2);
+    expect(first.stats.pagesSkipped).toBe(0);
+
+    const oneOutput = path.join(output, 'one.html');
+    const twoOutput = path.join(output, 'two.html');
+    const oneTime = (await fs.stat(oneOutput)).mtimeMs;
+    const twoTime = (await fs.stat(twoOutput)).mtimeMs;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const second = await createEngine({ content, output, incremental: true, config: false });
+    const pages = await second.build();
+    await second.end();
+
+    expect(second.stats.pagesBuilt).toBe(0);
+    expect(second.stats.pagesSkipped).toBe(2);
+    expect(pages.map((page) => page.title)).toEqual(['one', 'two']);
+    expect((await fs.stat(oneOutput)).mtimeMs).toBe(oneTime);
+    expect((await fs.stat(twoOutput)).mtimeMs).toBe(twoTime);
+    expect(JSON.parse(await fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8'))).toMatchObject({
+      version: 1,
+      pages: { 'one.md': { sourceHash: expect.any(String) }, 'two.md': { sourceHash: expect.any(String) } },
+    });
+  });
+
+  it('rebuilds only a changed source and removes deleted page output', async () => {
+    const oneSource = path.join(content, 'one.md');
+    const twoSource = path.join(content, 'two.md');
+    await fs.writeFile(oneSource, 'First');
+    await fs.writeFile(twoSource, 'Second');
+    await buildSite({ content, output, incremental: true, config: false });
+    const twoOutput = path.join(output, 'two.html');
+    const twoTime = (await fs.stat(twoOutput)).mtimeMs;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await fs.writeFile(oneSource, 'First changed');
+    const changed = await createEngine({ content, output, incremental: true, config: false });
+    await changed.build();
+    await changed.end();
+    expect(changed.stats.pagesBuilt).toBe(1);
+    expect(changed.stats.pagesSkipped).toBe(1);
+    expect(await fs.readFile(path.join(output, 'one.html'), 'utf8')).toContain('First changed');
+    expect((await fs.stat(twoOutput)).mtimeMs).toBe(twoTime);
+
+    await fs.rm(twoSource);
+    await buildSite({ content, output, incremental: true, config: false });
+    await expect(fs.stat(twoOutput)).rejects.toThrow();
+  });
+
+  it('invalidates all pages when templates change and supports clean builds', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{content}}}</article>');
+    await fs.writeFile(path.join(content, 'post.md'), 'Body');
+    await buildSite({ content, output, templates, incremental: true, config: false });
+
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{content}}}</main>');
+    const changed = await createEngine({ content, output, templates, incremental: true, config: false });
+    await changed.build();
+    await changed.end();
+    expect(changed.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+    expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toContain('<main>');
+
+    const clean = await createEngine({ content, output, templates, incremental: true, clean: true, config: false });
+    await clean.build();
+    await clean.end();
+    expect(clean.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+  });
 });

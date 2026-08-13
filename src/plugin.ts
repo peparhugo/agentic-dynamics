@@ -1,11 +1,12 @@
 import path from 'node:path';
 import { promises as fs } from 'node:fs';
 import ts from 'typescript';
-import type { BuildOptions, Page } from './types';
+import type { BuildOptions, BuildStats, Page } from './types';
 
 export interface PluginContext {
   readonly options: Required<Pick<BuildOptions, 'content' | 'output' | 'templates'>> & BuildOptions;
   readonly pages: Page[];
+  readonly stats: BuildStats;
   build(): Promise<Page[]>;
 }
 

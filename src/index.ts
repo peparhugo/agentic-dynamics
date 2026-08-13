@@ -4,7 +4,7 @@ import { MarkdownPlugin } from './plugins/markdown';
 import { TemplatePlugin } from './plugins/template';
 import type { BuildOptions, Page } from './types';
 
-export type { BuildOptions, Frontmatter, Page } from './types';
+export type { BuildOptions, BuildStats, Frontmatter, Page } from './types';
 export type { Plugin, PluginContext, SsgConfig } from './plugin';
 export { SSGEngine } from './engine';
 export { MarkdownPlugin } from './plugins/markdown';

@@ -22,3 +22,23 @@ it('builds with custom content and output options', async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+it('reports incremental build statistics', async () => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-incremental-'));
+  const content = path.join(root, 'content');
+  const output = path.join(root, 'dist');
+  await fs.mkdir(content);
+  await fs.writeFile(path.join(content, 'hello.md'), 'Hello cache');
+
+  try {
+    const cliPath = path.resolve(__dirname, '../lib/cli.js');
+    await execFileAsync(process.execPath, [cliPath, 'build', '--content', content, '--output', output, '--incremental']);
+    const cached = await execFileAsync(process.execPath, [cliPath, 'build', '--content', content, '--output', output, '--incremental']);
+    expect(cached.stdout).toContain('Build stats: 0 built, 1 skipped');
+
+    const clean = await execFileAsync(process.execPath, [cliPath, 'build', '--content', content, '--output', output, '--incremental', '--clean']);
+    expect(clean.stdout).toContain('Build stats: 1 built, 0 skipped');
+  } finally {
+    await fs.rm(root, { recursive: true, force: true });
+  }
+});
