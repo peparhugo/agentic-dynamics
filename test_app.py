@@ -2,6 +2,7 @@ import pytest
 import json
 import os
 import tempfile
+from unittest.mock import patch, MagicMock
 from app import app, init_db
 import sqlite3
 
@@ -542,3 +543,95 @@ class TestIntegration:
         user2_tasks = json.loads(response.data)
         assert len(user2_tasks) == 1
         assert user2_tasks[0]['title'] == 'User2 Task 1'
+
+
+class TestNotificationTrigger:
+    @patch('app.send_notification_email')
+    def test_notification_sent_on_completion(self, mock_send_email, client, token1, sample_task):
+        task_id = sample_task['id']
+        response = client.put(f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers=get_auth_headers(token1))
+
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'completed'
+        mock_send_email.delay.assert_called_once()
+        call_args = mock_send_email.delay.call_args
+        assert call_args[0][0] == 'user1@localhost.local'
+        assert call_args[0][1] == 'Test Task'
+
+    @patch('app.send_notification_email')
+    def test_notification_not_sent_on_other_status_change(self, mock_send_email, client, token1, sample_task):
+        task_id = sample_task['id']
+        response = client.put(f'/tasks/{task_id}',
+            data=json.dumps({'status': 'in_progress'}),
+            content_type='application/json',
+            headers=get_auth_headers(token1))
+
+        assert response.status_code == 200
+        mock_send_email.delay.assert_not_called()
+
+    @patch('app.send_notification_email')
+    def test_notification_not_sent_on_non_status_change(self, mock_send_email, client, token1, sample_task):
+        task_id = sample_task['id']
+        response = client.put(f'/tasks/{task_id}',
+            data=json.dumps({'title': 'Updated Title'}),
+            content_type='application/json',
+            headers=get_auth_headers(token1))
+
+        assert response.status_code == 200
+        mock_send_email.delay.assert_not_called()
+
+    @patch('app.send_notification_email')
+    def test_notification_not_sent_if_already_completed(self, mock_send_email, client, token1, sample_task):
+        task_id = sample_task['id']
+        # First completion
+        client.put(f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers=get_auth_headers(token1))
+        mock_send_email.delay.reset_mock()
+
+        # Try to complete again (should not send notification)
+        response = client.put(f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers=get_auth_headers(token1))
+
+        assert response.status_code == 200
+        mock_send_email.delay.assert_not_called()
+
+    @patch('app.send_notification_email')
+    def test_notification_includes_custom_email(self, mock_send_email, client):
+        # Register user with custom email
+        response = client.post('/auth/register',
+            data=json.dumps({'username': 'custom_user', 'password': 'pass123', 'email': 'custom@example.com'}),
+            content_type='application/json')
+        user = json.loads(response.data)
+
+        # Login and get token
+        response = client.post('/auth/login',
+            data=json.dumps({'username': 'custom_user', 'password': 'pass123'}),
+            content_type='application/json')
+        token = json.loads(response.data)['token']
+
+        # Create and complete task
+        response = client.post('/tasks',
+            data=json.dumps({'title': 'Custom Email Task'}),
+            content_type='application/json',
+            headers=get_auth_headers(token))
+        task = json.loads(response.data)
+        task_id = task['id']
+
+        response = client.put(f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers=get_auth_headers(token))
+
+        assert response.status_code == 200
+        mock_send_email.delay.assert_called_once()
+        call_args = mock_send_email.delay.call_args
+        assert call_args[0][0] == 'custom@example.com'
+        assert call_args[0][1] == 'Custom Email Task'

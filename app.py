@@ -12,6 +12,7 @@ import os
 import jwt
 import functools
 from werkzeug.security import generate_password_hash, check_password_hash
+from tasks import send_notification_email
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
@@ -31,7 +32,8 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
+            "  password_hash TEXT NOT NULL,"
+            "  email TEXT"
             ")"
         )
         conn.execute(
@@ -46,6 +48,11 @@ def init_db():
 
         try:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
         except sqlite3.OperationalError:
             pass
 
@@ -133,6 +140,15 @@ def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
         return dict(row) if row else None
 
 
+def get_user_email(user_id: int) -> str | None:
+    """Get user email by user_id."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+        return row["email"] if row else None
+
+
 
 def fetch_task(task_id: int) -> dict | None:
     """Alias for get_task — used by legacy clients."""
@@ -170,6 +186,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip() or f"{username}@localhost.local"
 
     if not username:
         return jsonify({"error": "username is required"}), 400
@@ -180,11 +197,11 @@ def register():
         try:
             password_hash = generate_password_hash(password)
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
-            return jsonify({"id": cursor.lastrowid, "username": username}), 201
+            return jsonify({"id": cursor.lastrowid, "username": username, "email": email}), 201
         except sqlite3.IntegrityError:
             return jsonify({"error": "username already exists"}), 409
 
@@ -252,14 +269,23 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    old_task = get_task(task_id, request.user_id)
+    if old_task is None:
+        return jsonify({"error": "task not found"}), 404
+
     task = update_task(
         task_id,
         title=data.get("title"),
         status=data.get("status"),
         owner_id=request.user_id,
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+
+    # Trigger notification if status changed to 'completed'
+    if task and data.get("status") == "completed" and old_task.get("status") != "completed":
+        user_email = get_user_email(request.user_id)
+        if user_email:
+            send_notification_email.delay(user_email, task["title"])
+
     return jsonify(task)
 
 
