@@ -1,146 +1,89 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
-
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
-
 from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
-import sqlite3
 import os
 
 app = Flask(__name__)
+db_path = os.path.join(os.path.dirname(__file__), 'tasks.db')
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{db_path}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
-
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+db = SQLAlchemy(app)
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
+class Task(db.Model):
+    __tablename__ = 'tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(255), nullable=False)
+    status = db.Column(db.String(50), default='pending', nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
-        )
-        conn.commit()
+    def to_dict(self):
         return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
+            'id': self.id,
+            'title': self.title,
+            'status': self.status,
+            'created_at': self.created_at.isoformat()
         }
 
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+@app.before_request
+def init_db():
+    if not hasattr(app, 'db_initialized'):
+        with app.app_context():
+            db.create_all()
+        app.db_initialized = True
 
 
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+@app.route('/tasks', methods=['POST'])
+def create_task():
+    data = request.get_json(silent=True)
+
+    if not data or 'title' not in data or not data['title']:
+        return jsonify({'error': 'Missing or empty title'}), 400
+
+    task = Task(title=data['title'])
+    db.session.add(task)
+    db.session.commit()
+
+    return jsonify(task.to_dict()), 201
 
 
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
-
-
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
+@app.route('/tasks', methods=['GET'])
 def list_tasks():
-    return jsonify(get_tasks())
+    tasks = Task.query.order_by(Task.created_at.desc()).all()
+    return jsonify([task.to_dict() for task in tasks]), 200
 
 
-@app.route("/tasks", methods=["POST"])
-def add_task():
+@app.route('/tasks/<int:task_id>', methods=['GET'])
+def get_task(task_id):
+    task = Task.query.get(task_id)
+
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
+    return jsonify(task.to_dict()), 200
+
+
+@app.route('/tasks/<int:task_id>', methods=['PUT'])
+def update_task(task_id):
+    task = Task.query.get(task_id)
+
+    if not task:
+        return jsonify({'error': 'Task not found'}), 404
+
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
+
+    if 'title' in data and data['title']:
+        task.title = data['title']
+
+    if 'status' in data and data['status']:
+        task.status = data['status']
+
+    db.session.commit()
+
+    return jsonify(task.to_dict()), 200
 
 
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-if __name__ == "__main__":
-    init_db()
+if __name__ == '__main__':
     app.run(debug=True)
