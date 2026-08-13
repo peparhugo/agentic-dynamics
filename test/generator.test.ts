@@ -4,8 +4,35 @@ import { join } from 'node:path';
 import { buildSite } from '../src/generator';
 import { parseArguments } from '../src/cli';
 import { startDevServer } from '../src/server';
+import { loadConfiguredPlugins } from '../src/config';
+import { Plugin } from '../src/plugin';
 
 describe('buildSite', () => {
+  it('runs plugin lifecycle hooks in order', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const calls: string[] = [];
+    const plugin = (name: string): Plugin => ({
+      onStart: () => calls.push(`${name}:start`),
+      beforeBuild: () => calls.push(`${name}:before`),
+      onFile: (page) => calls.push(`${name}:file:${page.outputPath}`),
+      afterBuild: () => calls.push(`${name}:after`),
+      onEnd: () => calls.push(`${name}:end`),
+    });
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'page.md'), '# Page');
+
+    await buildSite({ contentDir: content, outputDir: join(root, 'output'), plugins: [plugin('first'), plugin('second')] });
+
+    expect(calls).toEqual([
+      'first:start', 'second:start',
+      'first:before', 'second:before',
+      'first:file:page.html', 'second:file:page.html',
+      'first:after', 'second:after',
+      'first:end', 'second:end',
+    ]);
+  });
+
   it('renders frontmatter, Markdown pages, and an index', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ssg-'));
     const content = join(root, 'content');
@@ -56,6 +83,16 @@ describe('buildSite', () => {
     await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
 
     await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toBe('<html><main>Default Page: <p>Text</p></main></html>');
+  });
+});
+
+describe('loadConfiguredPlugins', () => {
+  it('loads plugins from a TypeScript config module', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const config = join(root, 'ssg.config.ts');
+    await writeFile(config, 'export default { plugins: [{ onStart() {} }] };');
+
+    expect(loadConfiguredPlugins(config)).toHaveLength(1);
   });
 });
 
