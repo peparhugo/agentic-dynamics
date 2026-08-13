@@ -12,9 +12,23 @@ Auth endpoints:
 
 Task endpoints (require "Authorization: Bearer <token>"):
     POST   /tasks       create a task for the current user
-    GET    /tasks       list the current user's tasks, ordered by created_at desc
+    GET    /tasks       cursor-paginated list of the current user's tasks,
+                         ordered by created_at desc (see Pagination below)
     GET    /tasks/<id>  get a single task owned by the current user
     PUT    /tasks/<id>  update task title and/or status (must be owned by the current user)
+
+Pagination (GET /tasks):
+    Query params: ?cursor=<id>&limit=<n>  (limit defaults to 20, max 100)
+    Response: {"data": [...], "next_cursor": <id str>|null, "total": <int>}
+    `cursor` is the id of the last task returned by the previous page; the
+    first page is fetched by omitting it.
+
+Rate limiting:
+    Every endpoint (including /auth/*) is limited to 100 requests per
+    minute per authenticated user (identified by the JWT subject), or per
+    client IP for unauthenticated requests. Exceeding the limit returns
+    429 with a Retry-After header. Backed by Flask-Limiter with Redis as
+    the storage backend.
 
 Notifications:
     When PUT /tasks/<id> transitions a task's status to 'completed', a
@@ -30,6 +44,8 @@ from functools import wraps
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_app import send_notification_email
@@ -41,6 +57,12 @@ DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_SECONDS = int(os.environ.get("JWT_EXP_SECONDS", "3600"))
+
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+DEFAULT_PAGE_SIZE = 20
+MAX_PAGE_SIZE = 100
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
@@ -124,6 +146,25 @@ def decode_token(token):
     return jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
 
 
+def rate_limit_key():
+    """Rate-limit bucket key: per authenticated user if a valid token is
+    present, otherwise per client IP (used for /auth/* and unauthenticated
+    requests to protected endpoints)."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):].strip()
+        if token:
+            try:
+                payload = decode_token(token)
+                return f"user:{payload['sub']}"
+            except jwt.InvalidTokenError:
+                pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(key_func=rate_limit_key, application_limits=[RATE_LIMIT], headers_enabled=True)
+
+
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -145,11 +186,15 @@ def require_auth(view):
     return wrapped
 
 
-def create_app(database_path=None):
+def create_app(database_path=None, storage_uri=None):
     app = Flask(__name__)
     db_path = database_path or DATABASE
     app.config["DATABASE"] = db_path
     init_db(db_path)
+
+    app.config["RATELIMIT_STORAGE_URI"] = storage_uri or RATELIMIT_STORAGE_URI
+    app.config["RATELIMIT_HEADERS_ENABLED"] = True
+    limiter.init_app(app)
 
     @app.before_request
     def _set_db_path():
@@ -172,6 +217,10 @@ def create_app(database_path=None):
     @app.errorhandler(400)
     def bad_request(e):
         return jsonify(error="Bad request"), 400
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(e):
+        return jsonify(error="Rate limit exceeded, please try again later"), 429
 
     # ── Auth ─────────────────────────────────────────────────────
 
@@ -250,9 +299,41 @@ def create_app(database_path=None):
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks():
+        limit_param = request.args.get("limit")
+        if limit_param is None:
+            limit = DEFAULT_PAGE_SIZE
+        else:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify(error="limit must be an integer"), 400
+            if limit < 1:
+                return jsonify(error="limit must be a positive integer"), 400
+            limit = min(limit, MAX_PAGE_SIZE)
+
+        cursor_param = request.args.get("cursor")
+        cursor_id = None
+        if cursor_param is not None:
+            try:
+                cursor_id = int(cursor_param)
+            except ValueError:
+                return jsonify(error="cursor must be an integer id"), 400
+
         task_repo = TaskRepository(get_db())
-        rows = task_repo.list_by_owner(g.current_user_id)
-        return jsonify([task_to_dict(row) for row in rows]), 200
+        rows = task_repo.list_by_owner_page(g.current_user_id, cursor_id, limit + 1)
+        if rows is None:
+            return jsonify(error="Invalid cursor"), 400
+
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        next_cursor = str(rows[-1]["id"]) if has_more and rows else None
+        total = task_repo.count_by_owner(g.current_user_id)
+
+        return jsonify(
+            data=[task_to_dict(row) for row in rows],
+            next_cursor=next_cursor,
+            total=total,
+        ), 200
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth

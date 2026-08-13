@@ -74,6 +74,40 @@ class TaskRepository(BaseRepository):
             (owner_id,),
         ).fetchall()
 
+    def list_by_owner_page(self, owner_id, cursor_id, page_size):
+        """Return up to `page_size` tasks after `cursor_id`, in the same
+        (created_at DESC, id DESC) order as list_by_owner.
+
+        `cursor_id` is the id of the last item of the previous page, or
+        None to fetch the first page.
+        """
+        if cursor_id is None:
+            return self.conn.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                (owner_id, page_size),
+            ).fetchall()
+
+        cursor_row = self.conn.execute(
+            "SELECT created_at, id FROM tasks WHERE id = ? AND owner_id = ?",
+            (cursor_id, owner_id),
+        ).fetchone()
+        if cursor_row is None:
+            return None
+
+        return self.conn.execute(
+            "SELECT * FROM tasks WHERE owner_id = ? "
+            "AND (created_at < ? OR (created_at = ? AND id < ?)) "
+            "ORDER BY created_at DESC, id DESC LIMIT ?",
+            (owner_id, cursor_row["created_at"], cursor_row["created_at"], cursor_row["id"], page_size),
+        ).fetchall()
+
+    def count_by_owner(self, owner_id):
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS count FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()
+        return row["count"]
+
     def create_task(self, title, status, created_at, owner_id):
         return self.create(title=title, status=status, created_at=created_at, owner_id=owner_id)
 
