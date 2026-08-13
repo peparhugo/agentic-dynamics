@@ -1,5 +1,6 @@
 from xml.etree import ElementTree as ET
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
@@ -122,6 +123,42 @@ def test_update_missing_task_returns_not_found(client, token):
 
     assert response.status_code == 404
     assert fault(response) == "task not found"
+
+
+def test_put_completed_task_queues_owner_notification(client, token):
+    created = call(client, "CreateTask", token, title="Ship release")
+    task_id = tasks(created)[0]["id"]
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.json["status"] == "completed"
+    delay.assert_called_once_with("alice", "Ship release")
+
+
+def test_notification_only_queues_on_transition_to_completed(client, token):
+    created = call(client, "CreateTask", token, title="Already done")
+    task_id = tasks(created)[0]["id"]
+
+    with patch("app.send_notification_email.delay") as delay:
+        first = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        second = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    assert first.status_code == second.status_code == 200
+    delay.assert_called_once_with("alice", "Already done")
 
 
 def test_invalid_xml_returns_soap_fault(client, token):

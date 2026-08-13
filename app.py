@@ -9,6 +9,8 @@ import jwt
 from flask import Flask, Response, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TASK_NS = "urn:task-management"
@@ -204,6 +206,13 @@ def parse_task_id(operation):
     return task_id, None
 
 
+def queue_completion_notification(user_email, task_title):
+    try:
+        send_notification_email.delay(user_email, task_title)
+    except Exception:
+        current_app.logger.exception("Could not queue task completion notification")
+
+
 def update_task(operation):
     task_id, error = parse_task_id(operation)
     if error:
@@ -230,7 +239,9 @@ def update_task(operation):
 
     with get_db() as connection:
         existing = connection.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
+            """SELECT tasks.id, tasks.status, users.username AS owner_email
+               FROM tasks JOIN users ON users.id = tasks.owner_id
+               WHERE tasks.id = ? AND tasks.owner_id = ?""",
             (task_id, g.user_id),
         ).fetchone()
         if existing is None:
@@ -244,6 +255,8 @@ def update_task(operation):
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, g.user_id),
         ).fetchone()
+    if existing["status"] != "completed" and task["status"] == "completed":
+        queue_completion_notification(existing["owner_email"], task["title"])
     return soap_response("UpdateTask", task)
 
 
@@ -322,6 +335,49 @@ def create_app(test_config=None):
         if handler is None:
             return soap_fault("unknown operation", 400)
         return handler(operation)
+
+    @app.put("/tasks/<int:task_id>")
+    @token_required
+    def update_task_rest(task_id):
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify(error="JSON body is required"), 400
+
+        updates = []
+        values = []
+        for field in ("title", "status"):
+            if field not in data:
+                continue
+            value = data[field]
+            if not isinstance(value, str) or not value.strip():
+                return jsonify(error=f"{field} cannot be empty"), 400
+            updates.append(f"{field} = ?")
+            values.append(value.strip())
+        if not updates:
+            return jsonify(error="title or status is required"), 400
+
+        with get_db() as connection:
+            existing = connection.execute(
+                """SELECT tasks.status, users.username AS owner_email
+                   FROM tasks JOIN users ON users.id = tasks.owner_id
+                   WHERE tasks.id = ? AND tasks.owner_id = ?""",
+                (task_id, g.user_id),
+            ).fetchone()
+            if existing is None:
+                return jsonify(error="task not found"), 404
+            values.extend((task_id, g.user_id))
+            connection.execute(
+                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
+                values,
+            )
+            task = connection.execute(
+                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
+                (task_id, g.user_id),
+            ).fetchone()
+
+        if existing["status"] != "completed" and task["status"] == "completed":
+            queue_completion_notification(existing["owner_email"], task["title"])
+        return jsonify({key: task[key] for key in ("id", "title", "status", "created_at")})
 
     with app.app_context():
         init_db()
