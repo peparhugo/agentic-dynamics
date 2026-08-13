@@ -10,6 +10,9 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -20,6 +23,8 @@ app = Flask(__name__)
 app.config.update(
     JWT_SECRET=os.environ.get("JWT_SECRET", secrets.token_hex(32)),
     JWT_EXPIRATION_SECONDS=3600,
+    RATELIMIT_STORAGE_URI=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    RATELIMIT_HEADERS_ENABLED=True,
 )
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 
@@ -107,6 +112,28 @@ def decode_token(token):
     return user_repository().get_identity(user_id)
 
 
+def rate_limit_key():
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if separator and scheme.lower() == "bearer" and token:
+        user = decode_token(token)
+        if user is not None:
+            return f"user:{user['id']}"
+    return f"address:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(error):
+    return jsonify(error="rate limit exceeded"), 429
+
+
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -128,8 +155,8 @@ def create_task(title, owner_id):
     return task_repository().create_for_owner(title, created_at, owner_id)
 
 
-def get_tasks(owner_id):
-    return task_repository().get_all_for_owner(owner_id)
+def get_tasks(owner_id, limit, cursor=None):
+    return task_repository().get_page_for_owner(owner_id, limit, cursor)
 
 
 def get_task(task_id, owner_id):
@@ -183,7 +210,22 @@ def login():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.current_user["id"]))
+    limit_value = request.args.get("limit", "20")
+    cursor_value = request.args.get("cursor")
+    try:
+        limit = int(limit_value)
+        cursor = int(cursor_value) if cursor_value is not None else None
+    except ValueError:
+        return jsonify(error="cursor and limit must be integers"), 400
+    if limit < 1:
+        return jsonify(error="limit must be at least 1"), 400
+    if cursor is not None and cursor < 1:
+        return jsonify(error="cursor must be a positive integer"), 400
+
+    page = get_tasks(g.current_user["id"], min(limit, 100), cursor)
+    if page is None:
+        return jsonify(error="invalid cursor"), 400
+    return jsonify(page)
 
 
 @app.post("/tasks")

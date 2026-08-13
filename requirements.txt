@@ -1,3 +1,4 @@
 Flask>=3.0,<4.0
+Flask-Limiter[redis]>=3.8,<4.0
 celery[redis]>=5.4,<6.0
 pytest>=8.0,<9.0

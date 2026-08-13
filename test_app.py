@@ -3,6 +3,8 @@ from unittest.mock import Mock
 
 import app as task_app
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import FixedWindowRateLimiter
 
 
 @pytest.fixture
@@ -12,6 +14,9 @@ def client(tmp_path, monkeypatch):
     task_app.app.config.update(
         TESTING=True, JWT_SECRET="test-secret", JWT_EXPIRATION_SECONDS=3600
     )
+    task_app.limiter._storage = MemoryStorage()
+    task_app.limiter._limiter = FixedWindowRateLimiter(task_app.limiter._storage)
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -161,7 +166,76 @@ def test_list_tasks_newest_first(client, auth_headers):
     response = client.get("/tasks", headers=auth_headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    page = response.get_json()
+    assert [task["id"] for task in page["data"]] == [second["id"], first["id"]]
+    assert page["next_cursor"] is None
+    assert page["total"] == 2
+
+
+def test_list_tasks_uses_cursor_pagination(client, auth_headers):
+    tasks = [
+        client.post("/tasks", json={"title": str(index)}, headers=auth_headers).get_json()
+        for index in range(5)
+    ]
+
+    first_page = client.get("/tasks?limit=2", headers=auth_headers).get_json()
+    second_page = client.get(
+        f"/tasks?limit=2&cursor={first_page['next_cursor']}", headers=auth_headers
+    ).get_json()
+    third_page = client.get(
+        f"/tasks?limit=2&cursor={second_page['next_cursor']}", headers=auth_headers
+    ).get_json()
+
+    assert [task["id"] for task in first_page["data"]] == [tasks[4]["id"], tasks[3]["id"]]
+    assert [task["id"] for task in second_page["data"]] == [tasks[2]["id"], tasks[1]["id"]]
+    assert [task["id"] for task in third_page["data"]] == [tasks[0]["id"]]
+    assert first_page["total"] == second_page["total"] == third_page["total"] == 5
+    assert third_page["next_cursor"] is None
+
+
+def test_list_tasks_defaults_to_20_and_caps_limit_at_100(client, auth_headers):
+    with task_app.get_db() as connection:
+        connection.executemany(
+            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
+            [(str(index), f"2026-01-01T00:00:{index:03d}+00:00", 1) for index in range(105)],
+        )
+
+    default_page = client.get("/tasks", headers=auth_headers).get_json()
+    maximum_page = client.get("/tasks?limit=1000", headers=auth_headers).get_json()
+
+    assert len(default_page["data"]) == 20
+    assert len(maximum_page["data"]) == 100
+    assert default_page["total"] == maximum_page["total"] == 105
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=nope", "cursor=0", "cursor=nope", "cursor=999"])
+def test_list_tasks_rejects_invalid_pagination(client, auth_headers, query):
+    response = client.get(f"/tasks?{query}", headers=auth_headers)
+
+    assert response.status_code == 400
+
+
+def test_rate_limit_applies_to_authenticated_user(client, auth_headers):
+    for _ in range(100):
+        response = client.get("/tasks", headers=auth_headers)
+        assert response.status_code == 200
+
+    response = client.get("/tasks", headers=auth_headers)
+
+    assert response.status_code == 429
+    assert response.get_json() == {"error": "rate limit exceeded"}
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        response = client.post("/auth/login", json={})
+        assert response.status_code == 401
+
+    response = client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
 
 
 def test_update_task(client, auth_headers):
@@ -237,7 +311,11 @@ def test_users_only_see_and_update_their_own_tasks(client):
     ).get_json()
     bob_headers = register_and_login(client, "bob")
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(
         f"/tasks/{alice_task['id']}", headers=bob_headers
     ).status_code == 404

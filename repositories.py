@@ -97,6 +97,10 @@ class BaseRepository(ABC):
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)"
             )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_tasks_owner_created_id "
+                "ON tasks(owner_id, created_at DESC, id DESC)"
+            )
 
 
 class TaskRepository(BaseRepository):
@@ -125,6 +129,37 @@ class TaskRepository(BaseRepository):
                 (owner_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def get_page_for_owner(self, owner_id, limit, cursor=None):
+        parameters = [owner_id]
+        cursor_clause = ""
+        with self.connection_factory() as connection:
+            if cursor is not None:
+                cursor_row = connection.execute(
+                    "SELECT created_at, id FROM tasks WHERE id = ? AND owner_id = ?",
+                    (cursor, owner_id),
+                ).fetchone()
+                if cursor_row is None:
+                    return None
+                cursor_clause = (
+                    "AND (created_at < ? OR (created_at = ? AND id < ?)) "
+                )
+                parameters.extend(
+                    [cursor_row["created_at"], cursor_row["created_at"], cursor_row["id"]]
+                )
+
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            rows = connection.execute(
+                f"SELECT {self.result_fields} FROM tasks WHERE owner_id = ? "
+                f"{cursor_clause}ORDER BY created_at DESC, id DESC LIMIT ?",
+                (*parameters, limit + 1),
+            ).fetchall()
+
+        tasks = [dict(row) for row in rows[:limit]]
+        next_cursor = str(tasks[-1]["id"]) if len(rows) > limit else None
+        return {"data": tasks, "next_cursor": next_cursor, "total": total}
 
     def update_for_owner(self, task_id, owner_id, **values):
         if self.get_for_owner(task_id, owner_id) is None:
