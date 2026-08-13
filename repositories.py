@@ -85,6 +85,32 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_for_user_paginated(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> tuple[list, int | None, int]:
+        """Get paginated tasks for a user. Returns (tasks, next_cursor, total_count).
+        cursor is the id of the last item from the previous page."""
+        with self.get_db() as conn:
+            total_row = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE owner_id = ?",
+                (owner_id,)
+            ).fetchone()
+            total_count = total_row['count'] if total_row else 0
+
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1)
+                ).fetchall()
+
+            tasks = [dict(r) for r in rows[:limit]]
+            next_cursor = rows[limit - 1]['id'] if len(rows) > limit else None
+
+            return tasks, next_cursor, total_count
+
     def get(self, task_id: int, owner_id: int | None = None) -> dict | None:
         """Get a task by ID. Optionally filter by owner_id."""
         with self.get_db() as conn:
