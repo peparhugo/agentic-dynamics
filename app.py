@@ -1,5 +1,4 @@
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from uuid import uuid4
@@ -10,6 +9,7 @@ from flask import Flask, Response, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import DuplicateRecordError, TaskRepository, UserRepository
 
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -18,50 +18,19 @@ ET.register_namespace("soap", SOAP_NS)
 ET.register_namespace("task", TASK_NS)
 
 
-def get_db():
-    connection = sqlite3.connect(current_app.config["DATABASE"])
-    connection.row_factory = sqlite3.Row
-    return connection
+def get_user_repository():
+    return UserRepository(current_app.config["DATABASE"])
+
+
+def get_task_repository():
+    return TaskRepository(current_app.config["DATABASE"])
 
 
 def init_db():
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER NOT NULL REFERENCES users(id)
-            )
-            """
-        )
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
-            legacy_username = f"__legacy__{uuid4().hex}"
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (legacy_username, generate_password_hash(uuid4().hex)),
-            )
-            connection.execute(
-                "UPDATE tasks SET owner_id = ? WHERE owner_id IS NULL",
-                (cursor.lastrowid,),
-            )
+    get_user_repository().initialize()
+    get_task_repository().initialize(
+        f"__legacy__{uuid4().hex}", generate_password_hash(uuid4().hex)
+    )
 
 
 def token_required(view):
@@ -82,10 +51,7 @@ def token_required(view):
         except (jwt.PyJWTError, KeyError, TypeError, ValueError):
             return jsonify(error="valid bearer token required"), 401
 
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT id FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+        user = get_user_repository().get_by_id(user_id)
         if user is None:
             return jsonify(error="valid bearer token required"), 401
 
@@ -116,7 +82,7 @@ def soap_response(operation, tasks, status=200):
     envelope = ET.Element(f"{{{SOAP_NS}}}Envelope")
     body = ET.SubElement(envelope, f"{{{SOAP_NS}}}Body")
     result = ET.SubElement(body, f"{{{TASK_NS}}}{operation}Response")
-    if isinstance(tasks, sqlite3.Row):
+    if isinstance(tasks, dict):
         add_task(result, tasks)
     else:
         for task in tasks:
@@ -159,26 +125,12 @@ def create_task(operation):
         return soap_fault("title is required", 400)
 
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            """INSERT INTO tasks (title, status, created_at, owner_id)
-               VALUES (?, 'pending', ?, ?)""",
-            (title, created_at, g.user_id),
-        )
-        task = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (cursor.lastrowid, g.user_id),
-        ).fetchone()
+    task = get_task_repository().create_for_owner(title, created_at, g.user_id)
     return soap_response("CreateTask", task, 201)
 
 
 def list_tasks():
-    with get_db() as connection:
-        tasks = connection.execute(
-            """SELECT * FROM tasks WHERE owner_id = ?
-               ORDER BY created_at DESC, id DESC""",
-            (g.user_id,),
-        ).fetchall()
+    tasks = get_task_repository().list_for_owner(g.user_id)
     return soap_response("ListTasks", tasks)
 
 
@@ -186,11 +138,7 @@ def get_task(operation):
     task_id, error = parse_task_id(operation)
     if error:
         return error
-    with get_db() as connection:
-        task = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.user_id),
-        ).fetchone()
+    task = get_task_repository().get_for_owner(task_id, g.user_id)
     if task is None:
         return soap_fault("task not found", 404)
     return soap_response("GetTask", task)
@@ -220,41 +168,25 @@ def update_task(operation):
 
     title = child_text(operation, "title")
     status = child_text(operation, "status")
-    updates = []
-    values = []
+    updates = {}
     if title is not None:
         title = title.strip()
         if not title:
             return soap_fault("title cannot be empty", 400)
-        updates.append("title = ?")
-        values.append(title)
+        updates["title"] = title
     if status is not None:
         status = status.strip()
         if not status:
             return soap_fault("status cannot be empty", 400)
-        updates.append("status = ?")
-        values.append(status)
+        updates["status"] = status
     if not updates:
         return soap_fault("title or status is required", 400)
 
-    with get_db() as connection:
-        existing = connection.execute(
-            """SELECT tasks.id, tasks.status, users.username AS owner_email
-               FROM tasks JOIN users ON users.id = tasks.owner_id
-               WHERE tasks.id = ? AND tasks.owner_id = ?""",
-            (task_id, g.user_id),
-        ).fetchone()
-        if existing is None:
-            return soap_fault("task not found", 404)
-        values.extend((task_id, g.user_id))
-        connection.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-            values,
-        )
-        task = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.user_id),
-        ).fetchone()
+    existing, task = get_task_repository().update_for_owner(
+        task_id, g.user_id, updates
+    )
+    if existing is None:
+        return soap_fault("task not found", 404)
     if existing["status"] != "completed" and task["status"] == "completed":
         queue_completion_notification(existing["owner_email"], task["title"])
     return soap_response("UpdateTask", task)
@@ -283,14 +215,12 @@ def create_app(test_config=None):
             return jsonify(error="password is required"), 400
 
         try:
-            with get_db() as connection:
-                cursor = connection.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (username.strip(), generate_password_hash(password)),
-                )
-        except sqlite3.IntegrityError:
+            user = get_user_repository().register(
+                username.strip(), generate_password_hash(password)
+            )
+        except DuplicateRecordError:
             return jsonify(error="username already exists"), 409
-        return jsonify(id=cursor.lastrowid, username=username.strip()), 201
+        return jsonify(id=user["id"], username=username.strip()), 201
 
     @app.post("/auth/login")
     def login():
@@ -300,10 +230,7 @@ def create_app(test_config=None):
         if not isinstance(username, str) or not isinstance(password, str):
             return jsonify(error="invalid username or password"), 401
 
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT * FROM users WHERE username = ?", (username.strip(),)
-            ).fetchone()
+        user = get_user_repository().get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify(error="invalid username or password"), 401
 
@@ -343,37 +270,22 @@ def create_app(test_config=None):
         if not isinstance(data, dict):
             return jsonify(error="JSON body is required"), 400
 
-        updates = []
-        values = []
+        updates = {}
         for field in ("title", "status"):
             if field not in data:
                 continue
             value = data[field]
             if not isinstance(value, str) or not value.strip():
                 return jsonify(error=f"{field} cannot be empty"), 400
-            updates.append(f"{field} = ?")
-            values.append(value.strip())
+            updates[field] = value.strip()
         if not updates:
             return jsonify(error="title or status is required"), 400
 
-        with get_db() as connection:
-            existing = connection.execute(
-                """SELECT tasks.status, users.username AS owner_email
-                   FROM tasks JOIN users ON users.id = tasks.owner_id
-                   WHERE tasks.id = ? AND tasks.owner_id = ?""",
-                (task_id, g.user_id),
-            ).fetchone()
-            if existing is None:
-                return jsonify(error="task not found"), 404
-            values.extend((task_id, g.user_id))
-            connection.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-                values,
-            )
-            task = connection.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, g.user_id),
-            ).fetchone()
+        existing, task = get_task_repository().update_for_owner(
+            task_id, g.user_id, updates
+        )
+        if existing is None:
+            return jsonify(error="task not found"), 404
 
         if existing["status"] != "completed" and task["status"] == "completed":
             queue_completion_notification(existing["owner_email"], task["title"])
