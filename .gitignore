@@ -17,6 +17,9 @@ experiments/results/stories/logs/
 # Backfill backups
 .backfill_backup/
 
+# Mutation compiler cache (runtime artifact, written by compile_mutation)
+experiments/codebases/.mutation_cache/
+
 # Local message/chat databases (runtime artifacts)
 messages.db
 

@@ -235,7 +235,13 @@ def measure_basin_escape(
     if cost_usd is not None:
         m.cost_usd = cost_usd
     else:
-        m.cost_usd = prompt_tokens * 0.27 / 1_000_000 + completion_tokens * 1.10 / 1_000_000 + reasoning_tokens * 0.14 / 1_000_000
+        from .efficiency import get_pricing
+        pricing = get_pricing("deepseek", "deepseek-v4-pro")
+        m.cost_usd = (
+            prompt_tokens * pricing["input"]
+            + completion_tokens * pricing["output"]
+            + reasoning_tokens * pricing.get("reasoning", pricing["output"])
+        ) / 1_000_000
     m.estimated_energy_j = (
         prompt_tokens * 0.08 + completion_tokens * 0.23 + reasoning_tokens * 0.47
     )

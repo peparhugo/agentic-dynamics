@@ -1409,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var totalCost = d.total_cost || m.total;
     var sessions = d.sessions || m.sessions;
     var passRate = (d.pass_rate || m.pass).replace(/[ \[\]H]/g,'');
-    var gritRate = d.narration_rate !== undefined ? d.narration_rate : m.grit;
+    var gritRate = d.narration_rate != null ? d.narration_rate : m.grit;
     var loc = d.avg_loc || m.locPerSes;
     var thinking = d.avg_thinking_ratio || m.thinkingRatio;
     var quality = d.avg_code_quality || m.quality;

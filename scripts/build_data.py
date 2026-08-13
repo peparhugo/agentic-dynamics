@@ -26,7 +26,7 @@ OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
 DATA_DIR = ROOT / "experiments" / "data"
 
-from _constants import WORKTREE_ROOT, MODEL_LABELS, PROVIDER_PRICING, bootstrap_ci
+from _constants import WORKTREE_ROOT, MODEL_LABELS, bootstrap_ci
 
 from instrument.routing import compute_routing  # noqa: E402
 
@@ -182,7 +182,6 @@ def compute_model_data(inventory, summary, db_breakdown):
         inv = model_breakdown[mid]
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
-        pricing = PROVIDER_PRICING[provider]
 
         db_data = db_breakdown.get(mid, {})
         entries = summary.get("entries", summary) if isinstance(summary, dict) else []
@@ -837,14 +836,56 @@ def _load_story_data() -> dict:
     }
 
 
+def _honest_pass_rate(passed: int, run: int) -> str:
+    """Honest pass-rate string. Never fabricates 100% from unmeasured data."""
+    if run <= 0:
+        return "unknown"
+    return f"{passed / run:.0%} ({passed}/{run})"
+
+
+def _merge_story_strategy(story_models: list[dict], analysis_data: dict) -> None:
+    """Attach real strategy-archetype counts to story models.
+
+    compute_story_models cannot source strategy (it lives in the deep-metrics
+    analysis), so merge it here instead of fabricating zeros.
+    """
+    strat_by_model = {
+        m["model"]: m.get("strategies", {})
+        for m in analysis_data.get("models", [])
+    }
+    for sm in story_models:
+        strat = strat_by_model.get(sm["id"].split("/")[-1], {})
+        sm["strategy_cons"] = strat.get("conservative", 0)
+        sm["strategy_expl"] = strat.get("exploratory", 0)
+        sm["strategy_waste"] = strat.get("wasteful", 0)
+        sm["strategy_efficient"] = strat.get("efficient", 0)
+
+
 def compute_story_models() -> list[dict]:
     """Build the model comparison from stories.parquet (source of truth)."""
     stories_path = DATA_DIR / "stories.parquet"
+    sessions_path = DATA_DIR / "sessions.parquet"
     if not stories_path.exists():
         return []
 
     import duckdb
     conn = duckdb.connect()
+
+    # Real test pass/fail + token splits per model, from the session transcripts.
+    test_by_model = {}
+    if sessions_path.exists():
+        for r in conn.execute(f"""
+            SELECT model, sum(tests_passed) as passed, sum(tests_total) as run,
+                   sum(prompt_tokens) as prompt, sum(completion_tokens) as completion,
+                   sum(reasoning_tokens) as reasoning
+            FROM read_parquet('{sessions_path}')
+            GROUP BY model
+        """).fetchall():
+            test_by_model[r[0]] = {
+                "passed": int(r[1] or 0), "run": int(r[2] or 0),
+                "prompt": int(r[3] or 0), "completion": int(r[4] or 0),
+                "reasoning": int(r[5] or 0),
+            }
 
     models = []
     for row in conn.execute(f"""
@@ -861,13 +902,20 @@ def compute_story_models() -> list[dict]:
                round(avg(total_duration), 0) as avg_duration_s,
                round(avg(code_lines), 0) as avg_code_lines,
                sum(test_count) as total_tests
-         FROM read_parquet('{stories_path}')
-         GROUP BY model ORDER BY avg_cost
+          FROM read_parquet('{stories_path}')
+          GROUP BY model ORDER BY avg_cost
     """).fetchall():
         mid = row[0]
         label = MODEL_LABELS.get(mid, mid)
         total_runs = row[1]
         unique_cells = row[2]
+        t = test_by_model.get(mid, {"passed": 0, "run": 0, "prompt": 0, "completion": 0, "reasoning": 0})
+        avg_loc = row[12]
+        # Energy is a [C]omputed estimate from measured tokens (J per token).
+        avg_energy_j = round(
+            (t["prompt"] * 0.08 + t["completion"] * 0.23 + t["reasoning"] * 0.47)
+            / max(total_runs, 1), 1
+        )
         models.append({
             "id": mid,
             "label": label,
@@ -884,17 +932,19 @@ def compute_story_models() -> list[dict]:
             "avg_test_code_ratio": row[9],
             "avg_tok_per_session": row[10],
             "avg_duration_s": row[11],
-            "avg_code_lines": row[12],
+            "avg_code_lines": avg_loc,
             "tests_total": row[13],
-            "tests_passed": row[13],  # all stories passed
+            "tests_passed": t["passed"],
+            "tests_run": t["run"],
+            "pass_rate": _honest_pass_rate(t["passed"], t["run"]),
             # keep legacy keys populated for existing charts
             "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
-            "pass_rate": f"100% ({row[13]}/{row[13]})",
-            "narration_rate": 0,
-            "avg_narration_penalty": 0.0,
-            "avg_loc": row[12],
-            "avg_energy_j": 0.0,
-            "avg_energy_j_per_loc": 0.0,
+            "avg_loc": avg_loc,
+            "avg_energy_j": avg_energy_j,
+            "avg_energy_j_per_loc": round(avg_energy_j / max(avg_loc, 1), 2),
+            # Not measured for the story corpus — do not fabricate zeros.
+            "narration_rate": None,
+            "avg_narration_penalty": None,
             "strategy_cons": 0, "strategy_expl": 0,
             "strategy_waste": 0, "strategy_efficient": 0,
             "reports": total_runs, "reports_valid": total_runs, "reports_narrated": 0,
@@ -921,11 +971,15 @@ def build():
     print(f"  DB query: {len(db_breakdown)} models with token data")
 
     models = compute_model_data(inventory, summary, db_breakdown)
+    perturbation_models = models  # preserve real perturbation metrics (energy/strategy/narration)
     print(f"  Computed: {len(models)} models")
 
     # Story pipeline models are the source of truth for cross-model comparison.
+    # The perturbation models are preserved under a separate key — never discarded.
     story_models = compute_story_models()
+    analysis_data = _load_analysis_data()
     if story_models:
+        _merge_story_strategy(story_models, analysis_data)
         models = story_models
         print(f"  Story models: {len(models)} (from stories.parquet)")
 
@@ -1043,6 +1097,7 @@ def build():
             },
         },
         "models": models,
+        "perturbation_models": perturbation_models,
         "charts": charts,
         "calculator": calculator,
         "derived": derived,
@@ -1073,12 +1128,12 @@ def build():
             "energy_per_token_prompt": {"value": 0.08, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
             "energy_per_token_output": {"value": 0.23, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
             "energy_per_token_reasoning": {"value": 0.47, "unit": "J", "provenance": "X", "source": "TokenPowerBench (Niu et al., AAAI 2026)"},
-            "claude_active_params": {"value": "500B", "provenance": "X", "note": "Conservative estimate"},
-            "deepseek_active_params": {"value": "37B", "provenance": "X", "note": "MoE, ~3% active at inference"},
+            "energy_model_available": {"value": False, "provenance": "X", "note": "Claude/GPT architecture undisclosed — energy model disabled"},
+            "deepseek_active_params": {"value": "49e9", "provenance": "X", "note": "MoE V4 Pro, publicly disclosed (49B active)"},
         },
         "stories": _load_story_data(),
         "reviews": _load_review_data(),
-        "analysis": _load_analysis_data(),
+        "analysis": analysis_data,
         "labs": _load_labs(),
     }
 

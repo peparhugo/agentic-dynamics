@@ -16,35 +16,9 @@ MODEL_LABELS = {
     "openai/gpt-5.6-fast": "GPT-5.6-fast",
 }
 
-# Historical pricing snapshot: 2026-03 (experiment billing date)
-# DB costs were billed at these rates. Don't retroactively change.
-PROVIDER_PRICING = {
-    "deepseek": {
-        "input": 0.27, "output": 1.10, "reasoning": 0.14,
-        "cache_read": 0.14, "cache_write": 0.27,
-    },
-    "anthropic": {
-        "input": 3.00, "output": 15.00, "reasoning": 15.00,
-        "cache_read": 0.30, "cache_write": 3.75,
-    },
-    "openai": {
-        "input": 1.25, "output": 10.00, "reasoning": 10.00,
-        "cache_read": 0.625, "cache_write": 2.50,
-    },
-    # v0.9 models — added Aug 2026
-    "openai-luna": {
-        "input": 0.20, "output": 1.20, "reasoning": 1.20,
-        "cache_read": 0.02, "cache_write": 0.25,
-    },
-    "openai-sol": {
-        "input": 5.00, "output": 30.00, "reasoning": 30.00,
-        "cache_read": 0.50, "cache_write": 6.25,
-    },
-    "openai-terra": {
-        "input": 2.50, "output": 15.00, "reasoning": 15.00,
-        "cache_read": 0.25, "cache_write": 3.125,
-    },
-}
+# Pricing lives in src/instrument/efficiency.py (single source of truth).
+# Do not re-add provider pricing here — import `get_pricing` from
+# instrument.efficiency instead.
 
 EXPERIMENT_SESSION_PATTERNS = [
     "flask", "api", "rest", "task", "url", "probe", "std_", "sweep", "batch", "config",

@@ -103,7 +103,11 @@ class TestCompileMutation:
         with pytest.raises(ValueError, match="codebase_path"):
             compile_mutation("Build API.", "inject_bug", codebase_path=None)
 
-    def test_spec_mutation_returns_artifact(self):
+    def test_spec_mutation_returns_artifact(self, monkeypatch):
+        monkeypatch.setattr(
+            "instrument.mutation._call_opencode",
+            lambda prompt, *, model, timeout: "Mutated spec.",
+        )
         result = compile_mutation(
             "Create a to-do app with user authentication.",
             "remove_constraint",
@@ -112,27 +116,35 @@ class TestCompileMutation:
         assert isinstance(result, MutationArtifact)
         assert result.operator == "remove_constraint"
         assert result.operator_class == "specification"
-        # May be None if opencode not available — mutation relies on CLI
-        # which may not exist in test environment.
+        assert result.mutated_spec == "Mutated spec."
 
-    def test_cache_hit(self):
-        with tempfile.TemporaryDirectory() as d:
-            dp = Path(d)
-            result1 = compile_mutation(
-                "Create a to-do app.",
-                "inject_false_premise",
-                strength=0.3,
-                cache_dir=dp,
-            )
-            result2 = compile_mutation(
-                "Create a to-do app.",
-                "inject_false_premise",
-                strength=0.3,
-                cache_dir=dp,
-            )
-            # Both should return MutationArtifacts
-            assert isinstance(result1, MutationArtifact)
-            assert isinstance(result2, MutationArtifact)
+    def test_cache_writes_and_hits(self, monkeypatch, tmp_path):
+        calls = {"n": 0}
+
+        def fake_call(prompt, *, model, timeout):
+            calls["n"] += 1
+            return "Mutated spec."
+
+        monkeypatch.setattr("instrument.mutation._call_opencode", fake_call)
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+
+        a1 = compile_mutation(
+            "Create a to-do app.", "inject_false_premise", strength=0.3, cache_dir=cache_dir
+        )
+        a2 = compile_mutation(
+            "Create a to-do app.", "inject_false_premise", strength=0.3, cache_dir=cache_dir
+        )
+        assert calls["n"] == 1  # second call hit the cache, no re-compile
+        assert a1.mutated_spec == a2.mutated_spec == "Mutated spec."
+
+    def test_raises_on_compiler_failure(self, monkeypatch):
+        monkeypatch.setattr(
+            "instrument.mutation._call_opencode",
+            lambda prompt, *, model, timeout: None,
+        )
+        with pytest.raises(ValueError, match="compilation failed"):
+            compile_mutation("Create a to-do app.", "inject_false_premise", strength=0.3)
 
 
 class TestApplyMutation:

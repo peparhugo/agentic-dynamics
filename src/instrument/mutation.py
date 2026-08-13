@@ -219,19 +219,25 @@ def compile_mutation(
     ).hexdigest()[:16]
     lookup.mutation_id = f"mut_{lookup.hash}"
 
+    cache_path = None
     if cache_dir:
         cache_path = cache_dir / f"{lookup.mutation_id}.json"
         if cache_path.exists():
             return MutationArtifact.load(cache_path)
 
     if op_class == "codebase":
-        return _compile_codebase_mutation(
+        artifact = _compile_codebase_mutation(
             specification, operator, strength, codebase_path, model, lookup
         )
     else:
-        return _compile_spec_mutation(
+        artifact = _compile_spec_mutation(
             specification, operator, strength, model, lookup, timeout
         )
+
+    if cache_path is not None:
+        artifact.save(cache_path)
+
+    return artifact
 
 
 def _compile_spec_mutation(
@@ -250,8 +256,13 @@ def _compile_spec_mutation(
     )
 
     mutated = _call_opencode(prompt, model=model, timeout=timeout)
+    if not mutated or not mutated.strip():
+        raise ValueError(
+            f"mutation compilation failed for operator {operator!r}: "
+            f"compiler model {model!r} returned no output"
+        )
 
-    artifact.mutated_spec = mutated or specification
+    artifact.mutated_spec = mutated
     artifact.original_spec = specification
     artifact.compiler_timestamp = datetime.now(timezone.utc).isoformat()
     artifact.hash = hashlib.sha256(
@@ -289,8 +300,13 @@ def _compile_codebase_mutation(
     )
 
     patch = _call_opencode(prompt, model=model, timeout=600)
+    if not patch or not patch.strip():
+        raise ValueError(
+            f"codebase mutation compilation failed for operator {operator!r}: "
+            f"compiler model {model!r} returned no output"
+        )
 
-    artifact.codebase_patch = patch or ""
+    artifact.codebase_patch = patch
     artifact.original_spec = specification
     artifact.compiler_timestamp = datetime.now(timezone.utc).isoformat()
     artifact.hash = hashlib.sha256(

@@ -1,0 +1,28 @@
+# Phase-1 Data-Integrity Remediation — Status
+
+Tracks the P0 fixes from `2026-08-13_architecture-hardening-review.md` (Phase 1: data integrity).
+
+| Finding | Status | Fix |
+|---|---|---|
+| P0-1 fabricated 100% pass rate | ✅ Fixed | `compute_story_models` now reads real `tests_passed`/`tests_run` from `sessions.parquet`; `_honest_pass_rate()` returns `"unknown"` when nothing ran. `compute_model_data` output preserved under `perturbation_models` key (never silently discarded). |
+| P0-2 conflicting pricing sources | ✅ Fixed | Deleted `_constants.PROVIDER_PRICING`; `basin.py` cost fallback now uses `efficiency.get_pricing`; `build_data.py`/`lab_claude_audit.py` no longer import the stale dict. `efficiency.py` is the single source of truth (already had `get_pricing` + `test_pricing.py`). |
+| P0-3 resurrected arch constants | ✅ Fixed | Removed `claude_active_params: 500B` and `37B` from `external_sources`; now emits `energy_model_available: false` + `deepseek_active_params: 49e9`. |
+| P0-6 mutation cache never writes | ✅ Fixed | `compile_mutation` now `artifact.save(cache_path)` after compilation (both spec and codebase branches). |
+| P0-7 silent clean-cell on compiler failure | ✅ Fixed | `_compile_spec_mutation`/`_compile_codebase_mutation` raise `ValueError("...compilation failed...")` when `_call_opencode` returns None/empty — no silent fallback to the clean spec. |
+
+## Verification
+
+- `tests/test_mutation.py` — added `test_cache_writes_and_hits` (asserts single compile on repeat) and `test_raises_on_compiler_failure`.
+- `tests/test_data_integrity.py` — new regression guards: no duplicate pricing in `_constants`, no fabricated pass rate in `build_data`, basin uses `get_pricing`, no resurrected arch constants.
+- `tests/test_pricing.py` — unchanged, still green (39 → 110 relevant tests pass).
+
+## Result (data.js)
+
+- `overall_pass_rate` was fabricated `100% (10412/10412)` → now **measured `99.9% (10726/10738) [tests]`**.
+- Claude Haiku's `pass_rate` is `"unknown"` (no in-session test data) instead of a fabricated `100%`.
+- Strategy counts and energy are now real (from analysis + measured tokens), not zeroed.
+
+## Not in this batch (future phases)
+
+- P0-4 (strategy absolute $ thresholds), P0-8…P0-12, P1, P2 — per the review's phases 2–5.
+- Note: story pass rates remain ~100% because the tests are **agent-authored** (the review's "binary correctness" limitation). Honest *independent* pass/fail requires `scripts/validate_session.py` re-runs — deferred.
