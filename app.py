@@ -1,5 +1,7 @@
 """Async WebSocket notification server with a JSON health endpoint."""
 
+from __future__ import annotations
+
 import asyncio
 import inspect
 import json
@@ -7,7 +9,7 @@ import os
 import sqlite3
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Any, Awaitable, Callable
 from urllib.parse import unquote
@@ -223,6 +225,35 @@ class MessageStore:
             for row in rows
         ]
 
+    def history(self, channel: str, since: str | None, limit: int, offset: int) -> list[dict[str, Any]]:
+        clauses = ["channel = ?"]
+        parameters: list[Any] = [channel]
+        if since is not None:
+            clauses.append("timestamp > ?")
+            parameters.append(since)
+        parameters.extend([limit, offset])
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY timestamp ASC, id ASC LIMIT ? OFFSET ?",
+                parameters,
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "channel": row["channel"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]),
+                "timestamp": row["timestamp"],
+            }
+            for row in rows
+        ]
+
+    def delete_older_than(self, cutoff: datetime) -> None:
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff.isoformat(),))
+
     def close(self) -> None:
         self._connection.close()
 
@@ -239,6 +270,13 @@ class RedisBroker:
 
     async def publish(self, message: str) -> None:
         await self.redis.publish(BROKER_CHANNEL, message)
+
+    async def check_rate_limit(self, client_id: str, limit: int) -> bool:
+        key = f"{STATE_PREFIX}:rate-limit:{client_id}"
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, 60)
+        return count <= limit
 
     async def listen(self):
         self.pubsub = self.redis.pubsub()
@@ -306,6 +344,8 @@ class NotificationServer:
         database_url: str | None = None,
         redis_client: Any = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         self.clients = ClientRegistry()
         self.store = MessageStore(database_url or os.environ.get("DATABASE_URL", "sqlite:///messages.db"))
@@ -313,7 +353,27 @@ class NotificationServer:
             redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379/0"), client=redis_client
         )
         self.transport = transport or self._create_transport(os.environ.get("TRANSPORT", "websocket"))
+        self.rate_limit = rate_limit if rate_limit is not None else self._positive_int_env("RATE_LIMIT", 100)
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else self._positive_int_env("MESSAGE_TTL_DAYS", 7)
+        )
         self._listener_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+
+    @staticmethod
+    def _positive_int_env(name: str, default: int) -> int:
+        value = os.environ.get(name)
+        if value is None:
+            return default
+        try:
+            parsed = int(value)
+        except ValueError as error:
+            raise ValueError(f"{name} must be a positive integer") from error
+        if parsed < 1:
+            raise ValueError(f"{name} must be a positive integer")
+        return parsed
 
     @staticmethod
     def _create_transport(name: str) -> BaseTransport:
@@ -360,9 +420,16 @@ class NotificationServer:
         async for message in self.broker.listen():
             await self.deliver(message)
 
+    async def _cleanup_expired_messages(self) -> None:
+        while True:
+            self.store.delete_older_than(datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days))
+            await asyncio.sleep(3600)
+
     async def start(self) -> None:
         if self._listener_task is None:
             self._listener_task = asyncio.create_task(self._listen())
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
 
     async def close(self) -> None:
         if self._listener_task is not None:
@@ -373,6 +440,13 @@ class NotificationServer:
                 if not isinstance(error, asyncio.CancelledError):
                     raise
             self._listener_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         await self.broker.close()
         self.store.close()
 
@@ -383,6 +457,8 @@ class NotificationServer:
 
     async def _on_message(self, connection: Any, raw_message: str) -> None:
         try:
+            if not await self.broker.check_rate_limit(self.clients.client_id(connection), self.rate_limit):
+                raise ValueError("rate limit exceeded")
             message = json.loads(raw_message)
             message_type = message["type"]
             payload = message["payload"]
@@ -446,6 +522,34 @@ class NotificationServer:
                 response.headers["Content-Type"] = "application/json"
                 return response
             response = connection.respond(200, json.dumps({"messages": self.store.list(limit, offset)}))
+            response.headers["Content-Type"] = "application/json"
+            return response
+        if request.path.startswith("/history"):
+            from urllib.parse import parse_qs, urlsplit
+
+            query = parse_qs(urlsplit(request.path).query)
+            channel = query.get("channel", [""])[0]
+            since = query.get("since", [None])[0]
+            try:
+                if not channel:
+                    raise ValueError("channel is required")
+                if since is not None:
+                    parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                    if parsed_since.tzinfo is None:
+                        raise ValueError("since must include a timezone")
+                    since = parsed_since.astimezone(timezone.utc).isoformat()
+                limit = int(query.get("limit", ["50"])[0])
+                offset = int(query.get("offset", ["0"])[0])
+                if not 1 <= limit <= 1000 or offset < 0:
+                    raise ValueError("limit must be 1-1000 and offset non-negative")
+            except ValueError as error:
+                response = connection.respond(400, json.dumps({"error": str(error)}))
+                response.headers["Content-Type"] = "application/json"
+                return response
+            messages = self.store.history(channel, since, limit + 1, offset)
+            response = connection.respond(
+                200, json.dumps({"messages": messages[:limit], "has_more": len(messages) > limit})
+            )
             response.headers["Content-Type"] = "application/json"
             return response
         return None

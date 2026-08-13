@@ -197,3 +197,46 @@ async def test_messages_endpoint_returns_persisted_history(tmp_path):
         assert history["messages"][0]["channel"] is None
     finally:
         await application.close()
+
+
+async def test_rate_limit_returns_error_without_dropping_connection():
+    application = NotificationServer(
+        database_url="sqlite:///:memory:",
+        redis_client=fakeredis.aioredis.FakeRedis(decode_responses=True),
+        rate_limit=1,
+    )
+    await application.start()
+    try:
+        async with application.create_server(port=0) as running_server:
+            port = running_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{port}") as client:
+                await receive_json(client)
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+                assert (await receive_json(client))["payload"] == {"text": "first"}
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": "second"}}))
+                error = await receive_json(client)
+        assert error == {"type": "system", "payload": {"error": "rate limit exceeded"}, "timestamp": error["timestamp"]}
+    finally:
+        await application.close()
+
+
+async def test_history_returns_channel_messages_in_order_with_pagination(server):
+    _, url = server
+    host_and_port = url.removeprefix("ws://")
+    host, port = host_and_port.rsplit(":", 1)
+    async with connect(url) as client:
+        await receive_json(client)
+        await client.send(json.dumps({"type": "subscribe", "payload": {}, "channel": "alerts"}))
+        for text in ("first", "second", "third"):
+            await client.send(json.dumps({"type": "broadcast", "payload": {"text": text}, "channel": "alerts"}))
+            await receive_json(client)
+
+        history = await get_json(host, port, "/history?channel=alerts&since=1970-01-01T00:00:00Z&limit=2")
+        second_page = await get_json(
+            host, port, "/history?channel=alerts&since=1970-01-01T00:00:00Z&limit=2&offset=2"
+        )
+
+    assert [message["payload"]["text"] for message in history["messages"]] == ["first", "second"]
+    assert history["has_more"] is True
+    assert [message["payload"]["text"] for message in second_page["messages"]] == ["third"]
+    assert second_page["has_more"] is False
