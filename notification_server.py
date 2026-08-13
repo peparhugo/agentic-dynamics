@@ -11,7 +11,15 @@ Core features:
 Message format (JSON):
   {"type": str, "payload": dict, "timestamp": str}
 
-Supported message types: "broadcast", "direct", "system".
+Supported message types: "broadcast", "direct", "system",
+"subscribe", "unsubscribe".
+
+Channels:
+  * Clients subscribe to named channels via "subscribe" messages.
+  * Clients can unsubscribe via "unsubscribe" messages.
+  * Messages with a "channel" field route only to that channel's
+    subscribers; messages without a channel broadcast to everyone.
+  * REST endpoints: GET /channels and GET /channels/{name}/subscribers.
 
 All data is persisted in flat files (JSON Lines) - no databases.
 """
@@ -36,9 +44,53 @@ logger = logging.getLogger("notification_server")
 BROADCAST = "broadcast"
 DIRECT = "direct"
 SYSTEM = "system"
-MSG_TYPES = (BROADCAST, DIRECT, SYSTEM)
+SUBSCRIBE = "subscribe"
+UNSUBSCRIBE = "unsubscribe"
+MSG_TYPES = (BROADCAST, DIRECT, SYSTEM, SUBSCRIBE, UNSUBSCRIBE)
 
 HEALTH_PATH = "/health"
+CHANNELS_PATH = "/channels"
+
+
+def extract_channels(message: dict) -> list[str]:
+    """Collect channel names from a subscribe/unsubscribe message.
+
+    Accepts the channel list either at the top level ("channel") or in
+    the payload ("channel" / "channels").
+    """
+    candidates: list[object] = []
+    payload = message.get("payload")
+    if isinstance(payload, dict):
+        if "channels" in payload:
+            candidates.append(payload["channels"])
+        elif "channel" in payload:
+            candidates.append(payload["channel"])
+    if "channel" in message:
+        candidates.append(message["channel"])
+
+    channels: list[str] = []
+    for raw in candidates:
+        if isinstance(raw, str):
+            channels.append(raw)
+        elif isinstance(raw, (list, tuple)):
+            channels.extend(c for c in raw if isinstance(c, str))
+    seen: set[str] = set()
+    result: list[str] = []
+    for channel in channels:
+        if channel and channel not in seen:
+            seen.add(channel)
+            result.append(channel)
+    return result
+
+
+def message_channel(message: dict, payload: dict) -> str | None:
+    """Return the routing channel for an outgoing message, if any."""
+    channel = message.get("channel")
+    if not isinstance(channel, str) or not channel:
+        channel = payload.get("channel")
+    if isinstance(channel, str) and channel:
+        return channel
+    return None
 
 
 def utc_now_iso() -> str:
@@ -117,6 +169,52 @@ class ClientRegistry:
             return dict(self._clients)
 
 
+class ChannelRegistry:
+    """Thread-safe registry mapping channel names to subscriber client IDs."""
+
+    def __init__(self):
+        self._channels: dict[str, set[str]] = {}
+        self._lock = threading.RLock()
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> bool:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return False
+            removed = client_id in subscribers
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+            return removed
+
+    def remove_client(self, client_id: str) -> None:
+        with self._lock:
+            for channel in list(self._channels):
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    def subscribers(self, channel: str) -> set[str]:
+        with self._lock:
+            return set(self._channels.get(channel, ()))
+
+    def count(self, channel: str) -> int:
+        with self._lock:
+            return len(self._channels.get(channel, ()))
+
+    def has(self, channel: str) -> bool:
+        with self._lock:
+            return bool(self._channels.get(channel))
+
+    def snapshot(self) -> dict[str, set[str]]:
+        with self._lock:
+            return {name: set(subs) for name, subs in self._channels.items()}
+
+
 class NotificationServer:
     """Async WebSocket notification server."""
 
@@ -125,6 +223,7 @@ class NotificationServer:
         self.host = host
         self.requested_port = port
         self.registry = ClientRegistry()
+        self.channels = ChannelRegistry()
         self.event_log = EventLog(log_path)
         self._server = None
 
@@ -154,20 +253,39 @@ class NotificationServer:
     # -- HTTP ----------------------------------------------------------
 
     def process_request(self, connection, request):
-        """Serve the /health REST endpoint over plain HTTP."""
+        """Serve REST endpoints over plain HTTP."""
         path = request.path.split("?", 1)[0]
         if path == HEALTH_PATH:
-            body = json.dumps({
+            return self._http_json({
                 "status": "ok",
                 "connected_clients": self.registry.count(),
-            }).encode("utf-8")
-            return Response(
-                status_code=200,
-                reason_phrase="OK",
-                headers=Headers([("Content-Type", "application/json")]),
-                body=body,
-            )
+            })
+        if path == CHANNELS_PATH:
+            channels = [
+                {"name": name, "subscribers": len(subscribers)}
+                for name, subscribers in sorted(self.channels.snapshot().items())
+            ]
+            return self._http_json({
+                "channels": channels,
+                "count": len(channels),
+            })
+        if path.startswith(CHANNELS_PATH + "/"):
+            name = path[len(CHANNELS_PATH) + 1:].split("/", 1)[0]
+            return self._http_json({
+                "channel": name,
+                "subscribers": sorted(self.channels.subscribers(name)),
+            })
         return None
+
+    @staticmethod
+    def _http_json(data: dict) -> Response:
+        body = json.dumps(data).encode("utf-8")
+        return Response(
+            status_code=200,
+            reason_phrase="OK",
+            headers=Headers([("Content-Type", "application/json")]),
+            body=body,
+        )
 
     # -- websocket ------------------------------------------------------
 
@@ -194,6 +312,7 @@ class NotificationServer:
             pass
         finally:
             self.registry.unregister(client_id)
+            self.channels.remove_client(client_id)
             self.event_log.append("disconnected", {"client_id": client_id})
 
     async def _dispatch(self, client_id: str, message: dict) -> None:
@@ -201,10 +320,30 @@ class NotificationServer:
         payload = message.get("payload")
         if not isinstance(payload, dict):
             payload = {}
-        if msg_type == BROADCAST:
+        if msg_type == SUBSCRIBE:
+            channels = extract_channels(message)
+            for channel in channels:
+                self.channels.subscribe(client_id, channel)
+            self.event_log.append("subscribe", {
+                "client_id": client_id,
+                "channels": channels,
+            })
+        elif msg_type == UNSUBSCRIBE:
+            channels = extract_channels(message)
+            for channel in channels:
+                self.channels.unsubscribe(client_id, channel)
+            self.event_log.append("unsubscribe", {
+                "client_id": client_id,
+                "channels": channels,
+            })
+        elif msg_type == BROADCAST:
             data = dict(payload)
             data.setdefault("sender", client_id)
-            await self.broadcast(data)
+            channel = message_channel(message, payload)
+            if channel is not None:
+                await self.send_to_channel(channel, data)
+            else:
+                await self.broadcast(data)
         elif msg_type == DIRECT:
             target = payload.get("target")
             await self.send_direct(target, payload)
@@ -246,6 +385,41 @@ class NotificationServer:
             self.registry.unregister(target_id)
             return False
         return True
+
+    # -- channels -----------------------------------------------------
+
+    def subscribe_client(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a single channel."""
+        self.channels.subscribe(client_id, channel)
+
+    def unsubscribe_client(self, client_id: str, channel: str) -> bool:
+        """Unsubscribe a client from a single channel."""
+        return self.channels.unsubscribe(client_id, channel)
+
+    def channel_subscribers(self, channel: str) -> set[str]:
+        """Return the set of client IDs subscribed to a channel."""
+        return self.channels.subscribers(channel)
+
+    def channel_snapshot(self) -> dict[str, set[str]]:
+        """Return a copy of the channel -> subscriber mapping."""
+        return self.channels.snapshot()
+
+    async def send_to_channel(self, channel: str, payload: dict) -> int:
+        """Send a message only to the clients subscribed to a channel."""
+        message = json.dumps(build_message(BROADCAST, payload))
+        sent = 0
+        for client_id in list(self.channels.subscribers(channel)):
+            conn = self.registry.get(client_id)
+            if conn is None:
+                self.channels.unsubscribe(client_id, channel)
+                continue
+            try:
+                await conn.send(message)
+                sent += 1
+            except ConnectionClosed:
+                self.registry.unregister(client_id)
+                self.channels.remove_client(client_id)
+        return sent
 
 
 def run_server(host: str = "127.0.0.1", port: int = 8765,
