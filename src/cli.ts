@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 
 import { buildSite, BuildOptions } from './index';
+import { startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
 }
 
 export async function run(argv: string[]): Promise<void> {
-  if (argv[0] !== 'build') {
+  const command = argv[0];
+  if (command !== 'build' && command !== 'serve') {
     throw new Error(usage());
   }
 
   const options: BuildOptions = {};
+  let port = 3000;
   for (let index = 1; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument !== '--content' && argument !== '--output' && argument !== '--templates') {
+    if (argument !== '--content' && argument !== '--output' && argument !== '--templates' && argument !== '--port') {
       throw new Error(`Unknown option: ${argument}\n${usage()}`);
     }
     const value = argv[index + 1];
@@ -24,7 +27,20 @@ export async function run(argv: string[]): Promise<void> {
     if (argument === '--content') options.contentDir = value;
     if (argument === '--output') options.outputDir = value;
     if (argument === '--templates') options.templatesDir = value;
+    if (argument === '--port') {
+      if (command !== 'serve') throw new Error(`Unknown option: ${argument}\n${usage()}`);
+      port = Number(value);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid port: ${value}\n${usage()}`);
+      }
+    }
     index += 1;
+  }
+
+  if (command === 'serve') {
+    const server = await startDevServer({ ...options, port });
+    process.stdout.write(`Development server running at http://localhost:${server.port}\n`);
+    return;
   }
 
   const pages = await buildSite(options);

@@ -234,3 +234,5 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
   await fs.writeFile(path.join(outputDir, 'index.html'), indexTemplate(pages), 'utf8');
   return pages;
 }
+
+export { DevServer, ServeOptions, startDevServer } from './server';

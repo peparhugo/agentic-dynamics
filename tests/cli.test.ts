@@ -44,10 +44,11 @@ describe('CLI', () => {
   });
 
   it.each([
-    [[], 'Usage: ssg build'],
-    [['serve'], 'Usage: ssg build'],
+    [[], 'Usage: ssg <build|serve>'],
     [['build', '--unknown'], 'Unknown option: --unknown'],
     [['build', '--content'], 'Missing value for --content'],
+    [['build', '--port', '3001'], 'Unknown option: --port'],
+    [['serve', '--port', 'nope'], 'Invalid port: nope'],
   ])('rejects invalid arguments', async (arguments_, message) => {
     await expect(run(arguments_ as string[])).rejects.toThrow(message as string);
   });

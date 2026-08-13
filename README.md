@@ -14,6 +14,14 @@ Markdown is read from `./content` and HTML is written to `./dist`. Override thos
 npx ssg build --content posts --output public
 ```
 
+Start a development server on `http://localhost:3000` with automatic rebuilds and
+browser reloads when files in `content/` or `templates/` change:
+
+```sh
+npx ssg serve
+npx ssg serve --port 4000
+```
+
 Templates are read from `./templates` (or set with `--templates`). A page can select a
 Handlebars template and layout in its frontmatter:
 
