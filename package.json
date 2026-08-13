@@ -12,13 +12,16 @@
     "test:pytest": "pytest"
   },
   "dependencies": {
+    "chokidar": "^4.0.3",
     "gray-matter": "^4.0.3",
     "handlebars": "^4.7.8",
-    "marked": "^15.0.7"
+    "marked": "^15.0.7",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
     "@types/node": "^22.10.2",
+    "@types/ws": "^8.5.13",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.7.2"
