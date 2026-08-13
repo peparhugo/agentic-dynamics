@@ -198,6 +198,48 @@ def test_update_one_field_preserves_the_other(client):
     assert response.get_json()["status"] == "active"
 
 
+def test_update_to_completed_enqueues_notification(client, monkeypatch):
+    created = client.post("/tasks", json={"title": "Ship release"}).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}
+    )
+
+    assert response.status_code == 200
+    assert calls == [("alice", "Ship release")]
+
+
+@pytest.mark.parametrize(
+    ("initial_status", "updated_status"),
+    [("pending", "active"), ("completed", "completed")],
+)
+def test_update_without_completed_transition_does_not_notify(
+    client, monkeypatch, initial_status, updated_status
+):
+    created = client.post("/tasks", json={"title": "No email"}).get_json()
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+    client.put(f"/tasks/{created['id']}", json={"status": initial_status})
+    calls.clear()
+
+    response = client.put(
+        f"/tasks/{created['id']}", json={"status": updated_status}
+    )
+
+    assert response.status_code == 200
+    assert calls == []
+
+
 def test_update_missing_task(client):
     response = client.put("/tasks/100", json={"status": "done"})
 

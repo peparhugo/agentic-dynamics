@@ -7,6 +7,8 @@ import jwt
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -242,7 +244,9 @@ def update_task(user_id, task_id):
 
     with get_db() as connection:
         existing = connection.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
+            "SELECT tasks.id, tasks.title, tasks.status, users.username AS owner_email "
+            "FROM tasks JOIN users ON users.id = tasks.owner_id "
+            "WHERE tasks.id = ? AND tasks.owner_id = ?",
             (task_id, user_id),
         ).fetchone()
         if existing is None:
@@ -258,6 +262,9 @@ def update_task(user_id, task_id):
             "WHERE id = ? AND owner_id = ?",
             (task_id, user_id),
         ).fetchone()
+
+    if existing["status"] != "completed" and row["status"] == "completed":
+        send_notification_email.delay(existing["owner_email"], row["title"])
 
     return jsonify(task_json(row))
 
