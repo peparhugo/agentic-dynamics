@@ -11,14 +11,17 @@ from app import NotificationServer
 @pytest.fixture
 async def running_server():
     notification_server = NotificationServer()
-    async with serve(notification_server.websocket_handler, "127.0.0.1", 0) as websocket_server:
-        websocket_port = websocket_server.sockets[0].getsockname()[1]
-        health_server = await asyncio.start_server(
-            notification_server.health_handler, "127.0.0.1", 0
-        )
-        health_port = health_server.sockets[0].getsockname()[1]
-        async with health_server:
-            yield notification_server, websocket_port, health_port
+    try:
+        async with serve(notification_server.websocket_handler, "127.0.0.1", 0) as websocket_server:
+            websocket_port = websocket_server.sockets[0].getsockname()[1]
+            health_server = await asyncio.start_server(
+                notification_server.health_handler, "127.0.0.1", 0
+            )
+            health_port = health_server.sockets[0].getsockname()[1]
+            async with health_server:
+                yield notification_server, websocket_port, health_port
+    finally:
+        await notification_server.close()
 
 
 async def receive_json(websocket):

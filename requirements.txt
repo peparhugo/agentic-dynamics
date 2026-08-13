@@ -1,1 +1,2 @@
 websockets>=14,<16
+redis>=5,<7
