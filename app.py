@@ -14,6 +14,7 @@ import hmac
 import json
 import sqlite3
 import os
+from celery import Celery
 from werkzeug.security import check_password_hash, generate_password_hash
 
 app = Flask(__name__)
@@ -21,6 +22,14 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-only-secret")
 JWT_EXPIRATION_HOURS = 24
+celery = Celery("task_notifications")
+celery.config_from_object("celery_config")
+
+
+@celery.task
+def send_notification_email(user_email: str, task_title: str) -> None:
+    """Send the completion notification from a Celery worker."""
+    app.logger.info("Task '%s' completed; notifying %s", task_title, user_email)
 
 
 def get_db():
@@ -35,9 +44,14 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  username TEXT NOT NULL UNIQUE,"
+            "  email TEXT,"
             "  password_hash TEXT NOT NULL"
             ")"
         )
+        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+            conn.execute("UPDATE users SET email = username WHERE email IS NULL")
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -113,12 +127,12 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
     return get_task(task_id, owner_id)
 
 
-def create_user(username: str, password: str) -> dict | None:
+def create_user(username: str, password: str, email: str | None = None) -> dict | None:
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username, email or username, generate_password_hash(password)),
             )
         except sqlite3.IntegrityError:
             return None
@@ -128,6 +142,12 @@ def create_user(username: str, password: str) -> dict | None:
 def get_user_by_username(username: str) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+        return dict(row) if row else None
+
+
+def get_user(user_id: int) -> dict | None:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
 
@@ -187,7 +207,10 @@ def register():
     username, password = data.get("username"), data.get("password")
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify({"error": "username and password are required"}), 400
-    user = create_user(username.strip(), password)
+    email = data.get("email", username)
+    if not isinstance(email, str) or not email.strip():
+        return jsonify({"error": "email must be a non-empty string"}), 400
+    user = create_user(username.strip(), password, email.strip())
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -239,14 +262,19 @@ def edit_task(task_id: int):
     if title is not None and (not isinstance(title, str) or not title.strip()):
         return jsonify({"error": "title must be a non-empty string"}), 400
 
+    previous_task = get_task(task_id, g.user_id)
+    if previous_task is None:
+        return jsonify({"error": "task not found"}), 404
+
     task = update_task(
         task_id,
         g.user_id,
         title=title.strip() if title is not None else None,
         status=data.get("status"),
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
+    if previous_task["status"] != "completed" and task["status"] == "completed":
+        user = get_user(g.user_id)
+        send_notification_email.delay(user["email"], task["title"])
     return jsonify(task)
 
 
