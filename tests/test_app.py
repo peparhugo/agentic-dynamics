@@ -23,6 +23,19 @@ async def receive_json(connection):
     return json.loads(await asyncio.wait_for(connection.recv(), timeout=1))
 
 
+async def get_json(url, path):
+    port = url.rsplit(":", 1)[1]
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(
+        f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode()
+    )
+    await writer.drain()
+    response = await asyncio.wait_for(reader.read(), timeout=1)
+    writer.close()
+    await writer.wait_closed()
+    return json.loads(response.split(b"\r\n\r\n", 1)[1])
+
+
 async def test_connections_receive_unique_ids_and_health_count(running_server):
     _, url = running_server
     async with connect(url) as first, connect(url) as second:
@@ -80,3 +93,60 @@ async def test_disconnected_client_is_removed(running_server):
             break
         await asyncio.sleep(0.01)
     assert len(notification_server.clients) == 0
+
+
+async def test_channel_messages_reach_only_subscribers(running_server):
+    _, url = running_server
+    async with connect(url) as first, connect(url) as second, connect(url) as third:
+        await receive_json(first)
+        await receive_json(second)
+        await receive_json(third)
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await third.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+        for _ in range(20):
+            channels = await get_json(url, "/channels")
+            if {channel["name"]: channel["subscriber_count"] for channel in channels["channels"]} == {
+                "alerts": 2,
+                "chat": 1,
+            }:
+                break
+            await asyncio.sleep(0.01)
+        await first.send(
+            json.dumps(
+                {"type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}}
+            )
+        )
+
+        received = [await receive_json(first), await receive_json(second)]
+        assert all(message["channel"] == "alerts" for message in received)
+        assert all(message["payload"] == {"text": "warning"} for message in received)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(third.recv(), timeout=0.1)
+
+
+async def test_unsubscribe_and_channel_endpoints(running_server):
+    _, url = running_server
+    async with connect(url) as first, connect(url) as second:
+        first_id = (await receive_json(first))["payload"]["client_id"]
+        second_id = (await receive_json(second))["payload"]["client_id"]
+        await first.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        for _ in range(20):
+            channels = await get_json(url, "/channels")
+            if channels == {"channels": [{"name": "system", "subscriber_count": 2}]}:
+                break
+            await asyncio.sleep(0.01)
+        assert channels == {"channels": [{"name": "system", "subscriber_count": 2}]}
+        assert await get_json(url, "/channels/system/subscribers") == {
+            "channel": "system",
+            "subscribers": sorted([first_id, second_id]),
+        }
+
+        await first.send(json.dumps({"type": "unsubscribe", "channel": "system"}))
+        for _ in range(20):
+            subscribers = await get_json(url, "/channels/system/subscribers")
+            if subscribers["subscribers"] == [second_id]:
+                break
+            await asyncio.sleep(0.01)
+        assert subscribers["subscribers"] == [second_id]

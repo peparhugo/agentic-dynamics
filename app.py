@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 import threading
 from typing import Any
+from urllib.parse import unquote
 from uuid import uuid4
 
 from websockets.asyncio.server import Server, ServerConnection, serve
@@ -12,7 +13,9 @@ from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
 
 
-SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
+SUPPORTED_MESSAGE_TYPES = frozenset(
+    {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+)
 
 
 class ClientRegistry:
@@ -20,6 +23,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     def add(self, connection: ServerConnection) -> str:
@@ -31,6 +35,11 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in list(self._channels):
+                subscribers = self._channels[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[channel]
 
     def get(self, client_id: str) -> ServerConnection | None:
         with self._lock:
@@ -39,6 +48,40 @@ class ClientRegistry:
     def connections(self) -> list[ServerConnection]:
         with self._lock:
             return list(self._clients.values())
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            if client_id in self._clients:
+                self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def channel_connections(self, channel: str) -> list[ServerConnection]:
+        with self._lock:
+            return [
+                self._clients[client_id]
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+
+    def channels(self) -> dict[str, int]:
+        with self._lock:
+            return {
+                channel: len(subscribers)
+                for channel, subscribers in self._channels.items()
+                if subscribers
+            }
+
+    def subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
 
     def __len__(self) -> int:
         with self._lock:
@@ -86,11 +129,28 @@ class NotificationServer:
         if message_type not in SUPPORTED_MESSAGE_TYPES:
             await self._send_error(sender_id, "unsupported message type")
             return
+
+        channel = message.get("channel")
+        if channel is not None and (not isinstance(channel, str) or not channel):
+            await self._send_error(sender_id, "channel must be a non-empty string")
+            return
+        if message_type in {"subscribe", "unsubscribe"}:
+            if channel is None:
+                await self._send_error(sender_id, f"{message_type} messages require channel")
+                return
+            if message_type == "subscribe":
+                self.clients.subscribe(sender_id, channel)
+            else:
+                self.clients.unsubscribe(sender_id, channel)
+            return
         if not isinstance(payload, dict):
             await self._send_error(sender_id, "payload must be an object")
             return
 
-        notification = json.dumps(self.message(message_type, payload))
+        notification_message = self.message(message_type, payload)
+        if channel is not None:
+            notification_message["channel"] = channel
+        notification = json.dumps(notification_message)
         if message_type == "direct":
             target_id = payload.get("client_id")
             if not isinstance(target_id, str):
@@ -103,12 +163,21 @@ class NotificationServer:
             await self._send(target, notification)
             return
 
-        await self.broadcast_raw(notification)
+        if channel is None:
+            await self.broadcast_raw(notification)
+        else:
+            await self.send_raw(self.clients.channel_connections(channel), notification)
 
     async def broadcast_raw(self, notification: str) -> None:
         """Send a serialized notification to a stable registry snapshot."""
+        await self.send_raw(self.clients.connections(), notification)
+
+    async def send_raw(
+        self, connections: list[ServerConnection], notification: str
+    ) -> None:
+        """Send a serialized notification to a stable connection snapshot."""
         await asyncio.gather(
-            *(self._send(connection, notification) for connection in self.clients.connections()),
+            *(self._send(connection, notification) for connection in connections),
             return_exceptions=True,
         )
 
@@ -131,6 +200,22 @@ class NotificationServer:
     ) -> Response | None:
         if request.path == "/health" and request.headers.get("Upgrade") is None:
             body = json.dumps({"connected_clients": len(self.clients)}).encode()
+            return Response(200, "OK", Headers({"Content-Type": "application/json"}), body)
+        if request.path == "/channels" and request.headers.get("Upgrade") is None:
+            channels = [
+                {"name": name, "subscriber_count": count}
+                for name, count in sorted(self.clients.channels().items())
+            ]
+            body = json.dumps({"channels": channels}).encode()
+            return Response(200, "OK", Headers({"Content-Type": "application/json"}), body)
+        if request.path.startswith("/channels/") and request.path.endswith("/subscribers") and request.headers.get("Upgrade") is None:
+            encoded_name = request.path[len("/channels/") : -len("/subscribers")].rstrip("/")
+            if not encoded_name:
+                return Response(404, "Not Found", Headers(), b"Not Found")
+            channel = unquote(encoded_name)
+            body = json.dumps(
+                {"channel": channel, "subscribers": self.clients.subscribers(channel)}
+            ).encode()
             return Response(200, "OK", Headers({"Content-Type": "application/json"}), body)
         if request.headers.get("Upgrade") is None:
             return Response(404, "Not Found", Headers(), b"Not Found")
