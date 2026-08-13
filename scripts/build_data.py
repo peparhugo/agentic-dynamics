@@ -604,6 +604,11 @@ def _load_analysis_data() -> dict:
             "sonar_bugs_delta": 0, "sonar_smells_delta": 0,
             "sonar_complexity_delta": 0,
             "convention_scores": [],
+            "deep_cells": 0, "lsp_available": 0, "lsp_errors": 0, "lsp_warnings": 0,
+            "solution_correctness": [], "solution_constraints": [],
+            "solution_quality": [], "solution_novelty": [], "solution_composite": [],
+            "basin_escape": [],
+            "strategies": Counter(),
         })
         summary = d.get("summary", {})
         conv = summary.get("average_convention_score")
@@ -627,9 +632,31 @@ def _load_analysis_data() -> dict:
                 m["sonar_smells_delta"] += sonar.get("smells_delta", 0)
                 m["sonar_complexity_delta"] += sonar.get("complexity_delta", 0)
 
+        deep = d.get("deep", {})
+        if deep:
+            m["deep_cells"] += 1
+            lsp = deep.get("lsp", {})
+            if lsp.get("available"):
+                m["lsp_available"] += 1
+            m["lsp_errors"] += lsp.get("errors", 0) or 0
+            m["lsp_warnings"] += lsp.get("warnings", 0) or 0
+            sol = deep.get("solution", {})
+            m["solution_correctness"].append(sol.get("correctness_score", 0) or 0)
+            m["solution_constraints"].append(sol.get("constraint_score", 0) or 0)
+            m["solution_quality"].append(sol.get("code_quality_score", 0) or 0)
+            m["solution_novelty"].append(sol.get("novelty_score", 0) or 0)
+            m["solution_composite"].append(sol.get("composite_score", 0) or 0)
+            basin = deep.get("basin", {})
+            m["basin_escape"].append(basin.get("escape_score", 0) or 0)
+            m["strategies"][deep.get("strategy", {}).get("strategy", "?")] += 1
+
+    def _avg(lst):
+        return round(sum(lst) / len(lst), 3) if lst else None
+
     models = []
     for reviewed, m in by_model.items():
         n = len(m["convention_scores"])
+        cells = m["deep_cells"] or 1
         models.append({
             "model": reviewed,
             "label": _short_model_label(reviewed),
@@ -644,6 +671,17 @@ def _load_analysis_data() -> dict:
             "sonar_smells_delta": m["sonar_smells_delta"],
             "sonar_complexity_delta": m["sonar_complexity_delta"],
             "avg_convention": round(sum(m["convention_scores"]) / n, 3) if n else None,
+            "deep_cells": m["deep_cells"],
+            "lsp_available": m["lsp_available"],
+            "lsp_errors_per_cell": round(m["lsp_errors"] / cells, 1),
+            "lsp_warnings_per_cell": round(m["lsp_warnings"] / cells, 1),
+            "solution_correctness": _avg(m["solution_correctness"]),
+            "solution_constraints": _avg(m["solution_constraints"]),
+            "solution_quality": _avg(m["solution_quality"]),
+            "solution_novelty": _avg(m["solution_novelty"]),
+            "solution_composite": _avg(m["solution_composite"]),
+            "basin_escape": _avg(m["basin_escape"]),
+            "strategies": dict(m["strategies"]),
         })
     models.sort(key=lambda x: -(x["lines_added"]))
 
@@ -895,7 +933,7 @@ def build():
                 "low_n": (agg.get("n", agg.get("count", 0)) < 5),
             }
 
-    # ── Perturbation class breakdown — manifold vs semantic vs baseline ──
+    # ── Perturbation class breakdown — specification / objective / process vs baseline ──
     pert_class_breakdown = {}
     for e in entries:
         if e.get("narration_failure"):

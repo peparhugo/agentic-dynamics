@@ -1,22 +1,22 @@
-/* Generated 2026-08-12 20:43:07 UTC by build_data.py */
+/* Generated 2026-08-13 18:25:38 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-12T20:43:07.387347+00:00",
+    "generated_at": "2026-08-13T18:25:38.036413+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
-    "worktrees_total": 61,
-    "sessions_total": 352,
+    "worktrees_total": 80,
+    "sessions_total": 1097,
     "game_reports": 224,
-    "total_cost": 15.3238,
+    "total_cost": 288.6909,
     "architectures": 3,
-    "variants": 3,
-    "stories_total": 72,
-    "stories_unique": 62,
-    "stories_re_runs": 10,
-    "story_sessions": 352,
-    "story_total_cost": 15.3238,
+    "variants": 7,
+    "stories_total": 221,
+    "stories_unique": 210,
+    "stories_re_runs": 11,
+    "story_sessions": 1097,
+    "story_total_cost": 288.6909,
     "configs": 35,
     "_provenance": {
       "worktrees_total": "M",
@@ -35,6 +35,39 @@ window.DYNAMICS_DATA = {
   },
   "models": [
     {
+      "id": "deepseek/deepseek-v4-flash",
+      "label": "DeepSeek v4 Flash",
+      "provider": "deepseek",
+      "cells": 30,
+      "unique_cells": 30,
+      "re_runs": 0,
+      "sessions": 150,
+      "total_cost": 2.044974,
+      "avg_cost": 0.068166,
+      "avg_cache_hit": 0.964,
+      "avg_tests": 31.2,
+      "avg_test_code_ratio": 0.658,
+      "avg_tok_per_session": 46576.0,
+      "avg_duration_s": 1386.0,
+      "avg_code_lines": 616.0,
+      "tests_total": 937,
+      "tests_passed": 937,
+      "avg_cost_per_session": 0.013633,
+      "pass_rate": "100% (937/937)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 616.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 30,
+      "reports_valid": 30,
+      "reports_narrated": 0
+    },
+    {
       "id": "openai/gpt-5.6-luna",
       "label": "GPT-5.6 Luna",
       "provider": "openai",
@@ -46,17 +79,17 @@ window.DYNAMICS_DATA = {
       "avg_cost": 0.090736,
       "avg_cache_hit": 0.975,
       "avg_tests": 7.3,
-      "avg_test_code_ratio": 0.281,
+      "avg_test_code_ratio": 0.275,
       "avg_tok_per_session": 6324.0,
       "avg_duration_s": 528.0,
-      "avg_code_lines": 368.0,
+      "avg_code_lines": 380.0,
       "tests_total": 249,
       "tests_passed": 249,
       "avg_cost_per_session": 0.018147,
       "pass_rate": "100% (249/249)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 368.0,
+      "avg_loc": 380.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -101,73 +134,201 @@ window.DYNAMICS_DATA = {
       "reports_narrated": 0
     },
     {
-      "id": "anthropic/claude-sonnet-5",
-      "label": "Claude Sonnet 5",
+      "id": "anthropic/claude-haiku-4-5",
+      "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
-      "cells": 3,
-      "unique_cells": 2,
+      "cells": 31,
+      "unique_cells": 30,
       "re_runs": 1,
-      "sessions": 15,
-      "total_cost": 7.415924,
-      "avg_cost": 2.471975,
-      "avg_cache_hit": 0.983,
-      "avg_tests": 103.7,
-      "avg_test_code_ratio": 1.497,
-      "avg_tok_per_session": 15157.0,
-      "avg_duration_s": 957.0,
-      "avg_code_lines": 992.0,
-      "tests_total": 311,
-      "tests_passed": 311,
-      "avg_cost_per_session": 0.494395,
-      "pass_rate": "100% (311/311)",
+      "sessions": 155,
+      "total_cost": 30.216397,
+      "avg_cost": 0.974722,
+      "avg_cache_hit": 0.606,
+      "avg_tests": 117.4,
+      "avg_test_code_ratio": 1.022,
+      "avg_tok_per_session": 10082.0,
+      "avg_duration_s": 632.0,
+      "avg_code_lines": 1520.0,
+      "tests_total": 3638,
+      "tests_passed": 3638,
+      "avg_cost_per_session": 0.194944,
+      "pass_rate": "100% (3638/3638)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 992.0,
+      "avg_loc": 1520.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
       "strategy_expl": 0,
       "strategy_waste": 0,
       "strategy_efficient": 0,
-      "reports": 3,
-      "reports_valid": 3,
+      "reports": 31,
+      "reports_valid": 31,
+      "reports_narrated": 0
+    },
+    {
+      "id": "openai/gpt-5.6-terra",
+      "label": "openai/gpt-5.6-terra",
+      "provider": "openai",
+      "cells": 30,
+      "unique_cells": 30,
+      "re_runs": 0,
+      "sessions": 150,
+      "total_cost": 30.640397,
+      "avg_cost": 1.021347,
+      "avg_cache_hit": 0.819,
+      "avg_tests": 8.8,
+      "avg_test_code_ratio": 0.331,
+      "avg_tok_per_session": 33004.0,
+      "avg_duration_s": 775.0,
+      "avg_code_lines": 316.0,
+      "tests_total": 265,
+      "tests_passed": 265,
+      "avg_cost_per_session": 0.204269,
+      "pass_rate": "100% (265/265)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 316.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 30,
+      "reports_valid": 30,
+      "reports_narrated": 0
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "cells": 31,
+      "unique_cells": 30,
+      "re_runs": 1,
+      "sessions": 155,
+      "total_cost": 105.418795,
+      "avg_cost": 3.400606,
+      "avg_cache_hit": 0.731,
+      "avg_tests": 122.1,
+      "avg_test_code_ratio": 0.647,
+      "avg_tok_per_session": 14312.0,
+      "avg_duration_s": 844.0,
+      "avg_code_lines": 1794.0,
+      "tests_total": 3786,
+      "tests_passed": 3786,
+      "avg_cost_per_session": 0.680121,
+      "pass_rate": "100% (3786/3786)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 1794.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 31,
+      "reports_valid": 31,
+      "reports_narrated": 0
+    },
+    {
+      "id": "openai/gpt-5.6-sol",
+      "label": "openai/gpt-5.6-sol",
+      "provider": "openai",
+      "cells": 30,
+      "unique_cells": 30,
+      "re_runs": 0,
+      "sessions": 150,
+      "total_cost": 112.46246,
+      "avg_cost": 3.748749,
+      "avg_cache_hit": 0.843,
+      "avg_tests": 12.0,
+      "avg_test_code_ratio": 0.423,
+      "avg_tok_per_session": 46888.0,
+      "avg_duration_s": 1203.0,
+      "avg_code_lines": 426.0,
+      "tests_total": 359,
+      "tests_passed": 359,
+      "avg_cost_per_session": 0.74975,
+      "pass_rate": "100% (359/359)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 426.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 30,
+      "reports_valid": 30,
       "reports_narrated": 0
     }
   ],
   "charts": {
     "labels": [
+      "DeepSeek v4 Flash",
       "GPT-5.6 Luna",
       "DeepSeek v4 Pro",
-      "Claude Sonnet 5"
+      "anthropic/claude-haiku-4-5",
+      "openai/gpt-5.6-terra",
+      "Claude Sonnet 5",
+      "openai/gpt-5.6-sol"
     ],
     "costData": [
+      0.068166,
       0.090736,
       0.137794,
-      2.471975
+      0.974722,
+      1.021347,
+      3.400606,
+      3.748749
     ],
     "narrData": [
+      0,
+      0,
+      0,
+      0,
       0,
       0,
       0
     ],
     "locData": [
-      368.0,
+      616.0,
+      380.0,
       373.0,
-      992.0
+      1520.0,
+      316.0,
+      1794.0,
+      426.0
     ],
     "costY": [
+      0.068166,
       0.090736,
       0.137794,
-      2.471975
+      0.974722,
+      1.021347,
+      3.400606,
+      3.748749
     ],
     "reports": [
+      30,
       34,
       35,
-      3
+      31,
+      30,
+      31,
+      30
     ]
   },
   "calculator": {
     "model_costs": [
+      {
+        "n": "DeepSeek v4 Flash",
+        "c": 0.068166,
+        "p": 1.0
+      },
       {
         "n": "GPT-5.6 Luna",
         "c": 0.090736,
@@ -179,40 +340,71 @@ window.DYNAMICS_DATA = {
         "p": 1.0
       },
       {
+        "n": "anthropic/claude-haiku-4-5",
+        "c": 0.974722,
+        "p": 1.0
+      },
+      {
+        "n": "openai/gpt-5.6-terra",
+        "c": 1.021347,
+        "p": 1.0
+      },
+      {
         "n": "Claude Sonnet 5",
-        "c": 2.471975,
+        "c": 3.400606,
+        "p": 1.0
+      },
+      {
+        "n": "openai/gpt-5.6-sol",
+        "c": 3.748749,
         "p": 1.0
       }
     ],
     "escalation_tiers": [
       {
-        "m": "DS\u2192DeepSeek v4 Pro",
-        "e": 1.5
+        "m": "DS\u2192Luna",
+        "e": 1.3
       },
       {
-        "m": "DS\u2192Claude Sonnet 5",
-        "e": 27.2
+        "m": "DS\u2192Pro",
+        "e": 2.0
+      },
+      {
+        "m": "DS\u2192anthropic/claude-haiku-4-5",
+        "e": 14.3
+      },
+      {
+        "m": "DS\u2192openai/gpt-5.6-terra",
+        "e": 15.0
+      },
+      {
+        "m": "DS\u21925",
+        "e": 49.9
+      },
+      {
+        "m": "DS\u2192openai/gpt-5.6-sol",
+        "e": 55.0
       },
       {
         "m": "\u2192Human ($5/job)",
-        "e": 55.1
+        "e": 73.4
       }
     ],
     "retry_rate_measured": 0.0,
     "woc_ratio": 1.0
   },
   "derived": {
-    "cost_gap": "18\u00d7",
-    "cost_gap_computation": "$2.471975 / $0.137794 = 17.9\u00d7",
-    "overall_pass_rate": "100.0% (1738/1738) [tests]",
-    "total_tests_passed": 1738,
-    "total_tests_run": 1738,
-    "total_cost_all_models": 15.3238,
-    "total_cost_deepseek": 4.8228,
-    "total_cost_claude": 7.4159,
+    "cost_gap": "14\u00d7",
+    "cost_gap_computation": "$0.974722 / $0.068166 = 14.3\u00d7",
+    "overall_pass_rate": "100.0% (10412/10412) [tests]",
+    "total_tests_passed": 10412,
+    "total_tests_run": 10412,
+    "total_cost_all_models": 288.6909,
+    "total_cost_deepseek": 6.8678,
+    "total_cost_claude": 135.6352,
     "total_narrated": 0,
-    "total_valid_reports": 72,
-    "total_reports_analyzed": 72,
+    "total_valid_reports": 221,
+    "total_reports_analyzed": 221,
     "_provenance": {
       "cost_gap": "C",
       "overall_pass_rate": "C",
@@ -3161,6 +3353,15 @@ window.DYNAMICS_DATA = {
     "_provenance": "[M] token counts from session.jsonl; cost from opencode DB verified",
     "models": [
       {
+        "model": "deepseek/deepseek-v4-flash",
+        "cells": 30,
+        "total_cost": 2.044974,
+        "avg_cost": 0.068166,
+        "total_tokens": 6986407,
+        "avg_cache_hit": 0.964,
+        "avg_duration_s": 1386.0
+      },
+      {
         "model": "openai/gpt-5.6-luna",
         "cells": 34,
         "total_cost": 3.085027,
@@ -3179,118 +3380,145 @@ window.DYNAMICS_DATA = {
         "avg_duration_s": 1675.0
       },
       {
+        "model": "anthropic/claude-haiku-4-5",
+        "cells": 31,
+        "total_cost": 30.216397,
+        "avg_cost": 0.974722,
+        "total_tokens": 1562780,
+        "avg_cache_hit": 0.606,
+        "avg_duration_s": 632.0
+      },
+      {
+        "model": "openai/gpt-5.6-terra",
+        "cells": 30,
+        "total_cost": 30.640397,
+        "avg_cost": 1.021347,
+        "total_tokens": 4950585,
+        "avg_cache_hit": 0.819,
+        "avg_duration_s": 775.0
+      },
+      {
         "model": "anthropic/claude-sonnet-5",
-        "cells": 3,
-        "total_cost": 7.415924,
-        "avg_cost": 2.471975,
-        "total_tokens": 227348,
-        "avg_cache_hit": 0.983,
-        "avg_duration_s": 957.0
+        "cells": 31,
+        "total_cost": 105.418795,
+        "avg_cost": 3.400606,
+        "total_tokens": 2218404,
+        "avg_cache_hit": 0.731,
+        "avg_duration_s": 844.0
+      },
+      {
+        "model": "openai/gpt-5.6-sol",
+        "cells": 30,
+        "total_cost": 112.46246,
+        "avg_cost": 3.748749,
+        "total_tokens": 7033139,
+        "avg_cache_hit": 0.843,
+        "avg_duration_s": 1203.0
       }
     ],
     "conditions": [
       {
         "condition": "bad_seed",
-        "cells": 14,
+        "cells": 44,
         "variants": 6,
-        "total_cost": 1.557621,
-        "avg_cost": 0.111259,
-        "success": 14,
-        "fail": 0
+        "total_cost": 59.719593,
+        "avg_cost": 1.357263,
+        "success": 39,
+        "fail": 5
       },
       {
         "condition": "clean",
-        "cells": 30,
+        "cells": 89,
         "variants": 12,
-        "total_cost": 7.6748,
-        "avg_cost": 0.255827,
-        "success": 30,
-        "fail": 0
+        "total_cost": 119.322572,
+        "avg_cost": 1.340703,
+        "success": 80,
+        "fail": 9
       },
       {
         "condition": "early_degrade",
-        "cells": 28,
+        "cells": 88,
         "variants": 12,
-        "total_cost": 6.091334,
-        "avg_cost": 0.217548,
-        "success": 28,
-        "fail": 0
+        "total_cost": 109.648689,
+        "avg_cost": 1.246008,
+        "success": 75,
+        "fail": 13
       }
     ],
     "stories": [
       {
+        "story": "task_manager_api",
+        "cells": 78,
+        "total_cost": 87.807082,
+        "avg_cost": 1.125732,
+        "sessions": 388,
+        "avg_duration_s": 867.0,
+        "avg_tokens_per_session": 22031.0
+      },
+      {
         "story": "static_site_gen",
-        "cells": 20,
-        "total_cost": 2.508622,
-        "avg_cost": 0.125431,
-        "sessions": 96,
-        "avg_duration_s": 1164.0,
-        "avg_tokens_per_session": 23011.0
+        "cells": 70,
+        "total_cost": 95.841249,
+        "avg_cost": 1.369161,
+        "sessions": 346,
+        "avg_duration_s": 1007.0,
+        "avg_tokens_per_session": 30255.0
       },
       {
         "story": "notification_service",
-        "cells": 23,
-        "total_cost": 2.760404,
-        "avg_cost": 0.120018,
-        "sessions": 113,
-        "avg_duration_s": 1184.0,
-        "avg_tokens_per_session": 21991.0
-      },
-      {
-        "story": "task_manager_api",
-        "cells": 29,
-        "total_cost": 10.054729,
-        "avg_cost": 0.346715,
-        "sessions": 143,
-        "avg_duration_s": 998.0,
-        "avg_tokens_per_session": 17553.0
+        "cells": 73,
+        "total_cost": 105.042523,
+        "avg_cost": 1.438939,
+        "sessions": 363,
+        "avg_duration_s": 1166.0,
+        "avg_tokens_per_session": 29364.0
       }
     ],
     "tiers": [
       {
         "tier": "tier1_minimal",
         "quality": "bad",
-        "cells": 14,
-        "avg_cost": 0.11281,
-        "avg_tokens_per_session": 20481.0,
-        "avg_session_duration_s": 242.0
+        "cells": 44,
+        "avg_cost": 1.319078,
+        "avg_tokens_per_session": 27258.0,
+        "avg_session_duration_s": 212.0
       },
       {
         "tier": "tier1_minimal",
         "quality": "good",
-        "cells": 25,
-        "avg_cost": 0.397501,
-        "avg_tokens_per_session": 19521.0,
-        "avg_session_duration_s": 225.0
+        "cells": 69,
+        "avg_cost": 1.466812,
+        "avg_tokens_per_session": 27010.0,
+        "avg_session_duration_s": 219.0
       },
       {
         "tier": "tier2_small",
         "quality": "bad",
-        "cells": 13,
-        "avg_cost": 0.110795,
-        "avg_tokens_per_session": 20768.0,
-        "avg_session_duration_s": 246.0
+        "cells": 43,
+        "avg_cost": 1.058701,
+        "avg_tokens_per_session": 26729.0,
+        "avg_session_duration_s": 200.0
       },
       {
         "tier": "tier2_small",
         "quality": "good",
-        "cells": 20,
-        "avg_cost": 0.118328,
-        "avg_tokens_per_session": 21516.0,
-        "avg_session_duration_s": 219.0
+        "cells": 65,
+        "avg_cost": 1.291035,
+        "avg_tokens_per_session": 27192.0,
+        "avg_session_duration_s": 189.0
       }
     ],
     "sessions": {
-      "total": 352,
-      "total_cost": 15.323754770000004,
-      "total_tokens": 7375280,
-      "total_cache_reads": 163140558,
-      "cache_hit_rate": 0.979,
-      "duration_s": 79460.99198819613,
-      "successful": 352,
-      "failed": 0
+      "total": 1097,
+      "total_cost": 288.69085364000034,
+      "total_tokens": 29899247,
+      "total_cache_reads": 715852100,
+      "cache_hit_rate": 0.977,
+      "duration_s": 223261.00070005076,
+      "successful": 976,
+      "failed": 121
     },
-    "generated_at": "2026-08-12T20:43:07.416366+00:00"
+    "generated_at": "2026-08-13T18:25:38.073009+00:00"
   },
   "reviews": {
     "models": [
@@ -3401,6 +3629,34 @@ window.DYNAMICS_DATA = {
   "analysis": {
     "models": [
       {
+        "model": "deepseek-v4-flash",
+        "label": "DeepSeek v4 Flash",
+        "commits": 150,
+        "lines_added": 111951,
+        "lines_removed": 8474,
+        "functions_added": 1872,
+        "classes_added": 110,
+        "imports_added": 1870,
+        "sonar_available": 150,
+        "sonar_bugs_delta": 27,
+        "sonar_smells_delta": 201,
+        "sonar_complexity_delta": 4881,
+        "avg_convention": 0.673,
+        "deep_cells": 30,
+        "lsp_available": 30,
+        "lsp_errors_per_cell": 13.5,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 1.0,
+        "solution_quality": 0.035,
+        "solution_novelty": 0.877,
+        "solution_composite": 0.789,
+        "basin_escape": 0.738,
+        "strategies": {
+          "exploratory": 30
+        }
+      },
+      {
         "model": "deepseek-v4-pro",
         "label": "DeepSeek v4 Pro",
         "commits": 166,
@@ -3413,7 +3669,108 @@ window.DYNAMICS_DATA = {
         "sonar_bugs_delta": 6,
         "sonar_smells_delta": 78,
         "sonar_complexity_delta": 4111,
-        "avg_convention": 0.713
+        "avg_convention": 0.713,
+        "deep_cells": 35,
+        "lsp_available": 35,
+        "lsp_errors_per_cell": 11.3,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 0.99,
+        "solution_quality": 0.048,
+        "solution_novelty": 0.815,
+        "solution_composite": 0.779,
+        "basin_escape": 0.678,
+        "strategies": {
+          "exploratory": 35
+        }
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "label": "gpt-5.6-sol",
+        "commits": 150,
+        "lines_added": 76959,
+        "lines_removed": 11671,
+        "functions_added": 1085,
+        "classes_added": 108,
+        "imports_added": 1251,
+        "sonar_available": 150,
+        "sonar_bugs_delta": 4,
+        "sonar_smells_delta": 90,
+        "sonar_complexity_delta": 3603,
+        "avg_convention": 0.657,
+        "deep_cells": 30,
+        "lsp_available": 30,
+        "lsp_errors_per_cell": 9.2,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 1.0,
+        "solution_quality": 0.056,
+        "solution_novelty": 0.912,
+        "solution_composite": 0.798,
+        "basin_escape": 0.776,
+        "strategies": {
+          "exploratory": 30
+        }
+      },
+      {
+        "model": "claude-haiku-4-5",
+        "label": "claude-haiku-4-5",
+        "commits": 157,
+        "lines_added": 54775,
+        "lines_removed": 3809,
+        "functions_added": 521,
+        "classes_added": 254,
+        "imports_added": 701,
+        "sonar_available": 147,
+        "sonar_bugs_delta": 2,
+        "sonar_smells_delta": 176,
+        "sonar_complexity_delta": 1795,
+        "avg_convention": 0.745,
+        "deep_cells": 31,
+        "lsp_available": 31,
+        "lsp_errors_per_cell": 9.0,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 0.548,
+        "solution_constraints": 0.839,
+        "solution_quality": 0.167,
+        "solution_novelty": 0.521,
+        "solution_composite": 0.555,
+        "basin_escape": 0.444,
+        "strategies": {
+          "exploratory": 17,
+          "conservative": 12,
+          "wasteful": 2
+        }
+      },
+      {
+        "model": "claude-sonnet-5",
+        "label": "Claude Sonnet 5",
+        "commits": 155,
+        "lines_added": 51447,
+        "lines_removed": 2996,
+        "functions_added": 1876,
+        "classes_added": 122,
+        "imports_added": 1211,
+        "sonar_available": 152,
+        "sonar_bugs_delta": 5,
+        "sonar_smells_delta": 159,
+        "sonar_complexity_delta": 2245,
+        "avg_convention": 0.718,
+        "deep_cells": 31,
+        "lsp_available": 31,
+        "lsp_errors_per_cell": 9.4,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 0.581,
+        "solution_constraints": 0.882,
+        "solution_quality": 0.125,
+        "solution_novelty": 0.59,
+        "solution_composite": 0.581,
+        "basin_escape": 0.484,
+        "strategies": {
+          "conservative": 8,
+          "wasteful": 5,
+          "exploratory": 18
+        }
       },
       {
         "model": "gpt-5.6-luna",
@@ -3428,26 +3785,52 @@ window.DYNAMICS_DATA = {
         "sonar_bugs_delta": 2,
         "sonar_smells_delta": 89,
         "sonar_complexity_delta": 4750,
-        "avg_convention": 0.679
+        "avg_convention": 0.679,
+        "deep_cells": 34,
+        "lsp_available": 34,
+        "lsp_errors_per_cell": 5.1,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 0.971,
+        "solution_quality": 0.086,
+        "solution_novelty": 0.88,
+        "solution_composite": 0.79,
+        "basin_escape": 0.704,
+        "strategies": {
+          "exploratory": 34
+        }
       },
       {
-        "model": "claude-sonnet-5",
-        "label": "Claude Sonnet 5",
-        "commits": 10,
-        "lines_added": 4033,
-        "lines_removed": 439,
-        "functions_added": 259,
-        "classes_added": 6,
-        "imports_added": 88,
-        "sonar_available": 10,
-        "sonar_bugs_delta": 0,
-        "sonar_smells_delta": 4,
-        "sonar_complexity_delta": 301,
-        "avg_convention": 0.667
+        "model": "gpt-5.6-terra",
+        "label": "gpt-5.6-terra",
+        "commits": 150,
+        "lines_added": 25843,
+        "lines_removed": 9946,
+        "functions_added": 825,
+        "classes_added": 97,
+        "imports_added": 1079,
+        "sonar_available": 150,
+        "sonar_bugs_delta": 5,
+        "sonar_smells_delta": 75,
+        "sonar_complexity_delta": 2724,
+        "avg_convention": 0.67,
+        "deep_cells": 30,
+        "lsp_available": 30,
+        "lsp_errors_per_cell": 13.7,
+        "lsp_warnings_per_cell": 0.0,
+        "solution_correctness": 1.0,
+        "solution_constraints": 0.967,
+        "solution_quality": 0.088,
+        "solution_novelty": 0.905,
+        "solution_composite": 0.793,
+        "basin_escape": 0.743,
+        "strategies": {
+          "exploratory": 30
+        }
       }
     ],
-    "stories_analyzed": 71,
-    "commits_analyzed": 346,
-    "sonar_commits_available": 346
+    "stories_analyzed": 221,
+    "commits_analyzed": 1098,
+    "sonar_commits_available": 1085
   }
 };

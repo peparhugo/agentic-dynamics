@@ -255,6 +255,26 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="insight"><strong>Finding:</strong> All 8 models produce maintainable code (SonarQube A rating). 198/198 quality gates pass. GPT-5 has the worst code hygiene at 19.0 smells/kLOC — 4× the industry average for production Python. DeepSeek produces the most code (678 LOC/worktree) with clean quality (0.18 bugs/kLOC). One FastAPI maintenance worktree was excluded from DeepSeek's averages — it contained 97K LOC of framework source, not generated code.</div>
 </section>
 
+<!-- Deep Metrics — Solution, Basin & Strategy -->
+<section class="sec">
+<h2 id="deep-metrics">Solution, Basin &amp; Strategy — The Deep Metrics</h2>
+<p class="lead">All 221 story cells are scored across five axes beyond static analysis: <strong style="color:var(--ac)">solution quality</strong> (correctness, constraint satisfaction, code quality, novelty vs. the seed), <strong style="color:var(--am)">basin escape</strong> (how far the final code diverged from the seed's attractor), and a <strong style="color:var(--cy)">strategy archetype</strong> — plus live LSP diagnostics (pyright / tsc) on every final codebase.</p>
+
+<div class="tbl"><table><thead><tr>
+<th>Model</th><th>Correctness</th><th>Constraints</th><th>Code Quality</th><th>Novelty</th><th>Basin Escape</th><th>LSP Errors / story</th><th>Strategy Archetype</th>
+</tr></thead><tbody>
+<tr data-anal-model="gpt-5.6-sol"><td>GPT-5.6 Sol</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="gpt-5.6-terra"><td>GPT-5.6 Terra</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="deepseek-v4-flash"><td>DeepSeek v4 Flash</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="gpt-5.6-luna"><td>GPT-5.6 Luna</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>34 exploratory</td></tr>
+<tr data-anal-model="deepseek-v4-pro"><td>DeepSeek v4 Pro</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>35 exploratory</td></tr>
+<tr data-anal-model="claude-sonnet-5"><td>Claude Sonnet 5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>8 cons · 18 expl · 5 waste</td></tr>
+<tr data-anal-model="claude-haiku-4-5"><td>Claude Haiku 4.5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>12 cons · 17 expl · 2 waste</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Finding:</strong> Two clean behavioral regimes. DeepSeek and OpenAI are uniformly <strong style="color:var(--ac)">EXPLORATORY</strong> — 100% correctness, ~all constraints met, high novelty (0.82–0.91), and basin escape of 0.68–0.78: they leave the seed and find new solutions. Claude is <strong style="color:var(--am)">MIXED</strong> — conservative, exploratory, or wasteful depending on the story — with lower escape (0.44–0.48) and novelty (0.52–0.59), but ~3× higher code quality (0.13–0.17 vs 0.04–0.09) and the cleanest LSP output. The Claude correctness gap (0.55–0.58) is the subscription CLI's session-timeout limit, not a capability gap. And the <strong style="color:var(--cy)">EFFICIENT</strong> archetype is empty — no model is simultaneously cheap, reliable, clean, and basin-stable.</div>
+</section>
+
 <!-- Constraint Detection — DeepSeek vs Claude -->
 <section class="sec">
 <h2 id="constraint-detection">Constraint Detection — DeepSeek vs Claude</h2>
