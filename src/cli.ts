@@ -4,10 +4,12 @@ import fs from 'fs';
 import path from 'path';
 import { parseMarkdown } from './parser';
 import { generatePageHTML, generateIndexHTML } from './generator';
+import { TemplateEngine } from './template-engine';
 
 interface CliOptions {
   content: string;
   output: string;
+  templates?: string;
 }
 
 function parseArgs(): CliOptions {
@@ -24,6 +26,9 @@ function parseArgs(): CliOptions {
     } else if (args[i] === '--output' && args[i + 1]) {
       options.output = args[i + 1];
       i++;
+    } else if (args[i] === '--templates' && args[i + 1]) {
+      options.templates = args[i + 1];
+      i++;
     }
   }
 
@@ -31,7 +36,7 @@ function parseArgs(): CliOptions {
 }
 
 async function build(options: CliOptions): Promise<void> {
-  const { content: contentDir, output: outputDir } = options;
+  const { content: contentDir, output: outputDir, templates: templatesDir } = options;
 
   if (!fs.existsSync(contentDir)) {
     console.error(`Error: Content directory "${contentDir}" does not exist`);
@@ -40,6 +45,11 @@ async function build(options: CliOptions): Promise<void> {
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  let templateEngine: TemplateEngine | undefined;
+  if (templatesDir && fs.existsSync(templatesDir)) {
+    templateEngine = new TemplateEngine({ templateDir: templatesDir });
   }
 
   const files = fs.readdirSync(contentDir).filter(file => file.endsWith('.md'));
@@ -60,7 +70,7 @@ async function build(options: CliOptions): Promise<void> {
       pages.push(page);
 
       const outputFile = path.join(outputDir, `${slug}.html`);
-      const html = generatePageHTML(page);
+      const html = generatePageHTML(page, templateEngine);
       fs.writeFileSync(outputFile, html, 'utf-8');
       console.log(`✓ Generated ${outputFile}`);
     } catch (error) {

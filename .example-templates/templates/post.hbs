@@ -1,0 +1,21 @@
+<article class="blog-post">
+  <h1>{{title}}</h1>
+  {{#if date}}
+    <div class="post-meta">
+      <time datetime="{{date}}">{{date}}</time>
+      {{#if author}}
+        <span class="author">by {{author}}</span>
+      {{/if}}
+    </div>
+  {{/if}}
+  {{#if tags}}
+    <div class="tags">
+      {{#each tags}}
+        <span class="tag">{{this}}</span>
+      {{/each}}
+    </div>
+  {{/if}}
+  <div class="post-content">
+    {{{body}}}
+  </div>
+</article>

@@ -5,6 +5,8 @@ export interface PageFrontmatter {
   title: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
   [key: string]: any;
 }
 

@@ -1,6 +1,17 @@
 import { ParsedPage, PageFrontmatter } from './parser';
+import { TemplateEngine } from './template-engine';
 
-export function generatePageHTML(page: ParsedPage): string {
+export function generatePageHTML(page: ParsedPage, templateEngine?: TemplateEngine): string {
+  if (templateEngine) {
+    const templateName = page.frontmatter.template;
+    const layoutName = page.frontmatter.layout;
+    return templateEngine.renderPage(page, templateName, layoutName);
+  }
+
+  return generatePageHTMLDefault(page);
+}
+
+function generatePageHTMLDefault(page: ParsedPage): string {
   const { frontmatter, html, slug } = page;
   const date = frontmatter.date ? new Date(frontmatter.date).toLocaleDateString() : '';
   const tagsList = Array.isArray(frontmatter.tags) ? frontmatter.tags.join(', ') : '';
