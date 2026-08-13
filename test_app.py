@@ -1,11 +1,59 @@
+import sqlite3
+
 from app import create_app
 
 
-def test_create_task_uses_pending_status_and_returns_task(tmp_path):
+def make_client(tmp_path):
     app = create_app(str(tmp_path / "tasks.db"))
-    client = app.test_client()
+    app.config["JWT_SECRET"] = "test-secret"
+    return app.test_client()
 
-    response = client.post("/tasks", json={"title": "Write tests"})
+
+def register_and_login(client, username="alice", password="password"):
+    response = client.post("/auth/register", json={"username": username, "password": password})
+    assert response.status_code == 201
+    response = client.post("/auth/login", json={"username": username, "password": password})
+    return {"Authorization": f"Bearer {response.get_json()['token']}"}
+
+
+def test_register_and_login_return_a_token(tmp_path):
+    client = make_client(tmp_path)
+
+    registered = client.post("/auth/register", json={"username": "alice", "password": "password"})
+    logged_in = client.post("/auth/login", json={"username": "alice", "password": "password"})
+
+    assert registered.status_code == 201
+    assert registered.get_json() == {"id": 1, "username": "alice"}
+    assert logged_in.status_code == 200
+    assert logged_in.get_json()["token"]
+
+
+def test_register_rejects_duplicate_username_and_login_rejects_bad_password(tmp_path):
+    client = make_client(tmp_path)
+    register_and_login(client)
+
+    duplicate = client.post("/auth/register", json={"username": "alice", "password": "other"})
+    bad_login = client.post("/auth/login", json={"username": "alice", "password": "wrong"})
+
+    assert duplicate.status_code == 409
+    assert bad_login.status_code == 401
+
+
+def test_tasks_require_a_valid_token(tmp_path):
+    client = make_client(tmp_path)
+
+    missing = client.get("/tasks")
+    invalid = client.post("/tasks", json={"title": "Nope"}, headers={"Authorization": "Bearer invalid"})
+
+    assert missing.status_code == 401
+    assert invalid.status_code == 401
+
+
+def test_create_task_uses_pending_status_and_returns_task(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+
+    response = client.post("/tasks", json={"title": "Write tests"}, headers=headers)
 
     assert response.status_code == 201
     task = response.get_json()
@@ -16,33 +64,36 @@ def test_create_task_uses_pending_status_and_returns_task(tmp_path):
 
 
 def test_create_task_requires_title(tmp_path):
-    client = create_app(str(tmp_path / "tasks.db")).test_client()
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
 
-    response = client.post("/tasks", json={})
+    response = client.post("/tasks", json={}, headers=headers)
 
     assert response.status_code == 400
     assert response.get_json() == {"error": "title is required"}
 
 
 def test_list_tasks_is_newest_first(tmp_path):
-    client = create_app(str(tmp_path / "tasks.db")).test_client()
-    first = client.post("/tasks", json={"title": "First"}).get_json()
-    second = client.post("/tasks", json={"title": "Second"}).get_json()
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+    first = client.post("/tasks", json={"title": "First"}, headers=headers).get_json()
+    second = client.post("/tasks", json={"title": "Second"}, headers=headers).get_json()
 
-    response = client.get("/tasks")
+    response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
     assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
 
 
 def test_get_and_update_task(tmp_path):
-    client = create_app(str(tmp_path / "tasks.db")).test_client()
-    task = client.post("/tasks", json={"title": "Old title"}).get_json()
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+    task = client.post("/tasks", json={"title": "Old title"}, headers=headers).get_json()
 
     update = client.put(
-        f"/tasks/{task['id']}", json={"title": "New title", "status": "done"}
+        f"/tasks/{task['id']}", json={"title": "New title", "status": "done"}, headers=headers
     )
-    retrieved = client.get(f"/tasks/{task['id']}")
+    retrieved = client.get(f"/tasks/{task['id']}", headers=headers)
 
     assert update.status_code == 200
     assert update.get_json()["title"] == "New title"
@@ -50,10 +101,45 @@ def test_get_and_update_task(tmp_path):
     assert retrieved.get_json() == update.get_json()
 
 
-def test_missing_task_returns_json_404(tmp_path):
-    client = create_app(str(tmp_path / "tasks.db")).test_client()
+def test_users_only_see_and_change_their_own_tasks(tmp_path):
+    client = make_client(tmp_path)
+    alice_headers = register_and_login(client, "alice")
+    task = client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers).get_json()
+    bob_headers = register_and_login(client, "bob")
 
-    response = client.get("/tasks/99")
+    listed = client.get("/tasks", headers=bob_headers)
+    fetched = client.get(f"/tasks/{task['id']}", headers=bob_headers)
+    updated = client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob_headers)
+
+    assert listed.get_json() == []
+    assert fetched.status_code == 404
+    assert updated.status_code == 404
+
+
+def test_task_migration_preserves_existing_rows(tmp_path):
+    database = tmp_path / "tasks.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created_at TEXT NOT NULL)"
+        )
+        connection.execute(
+            "INSERT INTO tasks (title, status, created_at) VALUES ('Legacy', 'pending', '2020-01-01')"
+        )
+
+    create_app(str(database))
+
+    with sqlite3.connect(database) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(tasks)")}
+        legacy_task = connection.execute("SELECT title, owner_id FROM tasks WHERE id = 1").fetchone()
+    assert "owner_id" in columns
+    assert legacy_task == ("Legacy", None)
+
+
+def test_missing_task_returns_json_404(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+
+    response = client.get("/tasks/99", headers=headers)
 
     assert response.status_code == 404
     assert response.get_json() == {"error": "task not found"}
