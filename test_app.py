@@ -1,5 +1,6 @@
 import os
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -288,6 +289,107 @@ def test_update_other_users_task_returns_404(client):
     resp = client.put(f"/tasks/{created['id']}", json={"title": "hijacked"}, headers=bob_headers)
     assert resp.status_code == 404
     assert "error" in resp.get_json()
+
+
+# ── Completion notification ──────────────────────────────────
+
+
+def test_completing_task_triggers_notification(client):
+    headers = _auth_headers(client, "alice", "pw1")
+    created = _create(client, "ship feature", headers=headers).get_json()
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    assert resp.status_code == 200
+    mock_delay.assert_called_once_with("alice@example.com", "ship feature")
+
+
+def test_completing_already_completed_task_does_not_retrigger(client):
+    headers = _auth_headers(client, "alice", "pw1")
+    created = _create(client, "ship feature", headers=headers).get_json()
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    mock_delay.assert_not_called()
+
+
+def test_non_completed_status_change_does_not_trigger_notification(client):
+    headers = _auth_headers(client)
+    created = _create(client, "keep working", headers=headers).get_json()
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=headers
+        )
+
+    mock_delay.assert_not_called()
+
+
+def test_updating_title_only_does_not_trigger_notification(client):
+    headers = _auth_headers(client)
+    created = _create(client, "keep working", headers=headers).get_json()
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        client.put(f"/tasks/{created['id']}", json={"title": "renamed"}, headers=headers)
+
+    mock_delay.assert_not_called()
+
+
+def test_completing_nonexistent_task_does_not_trigger_notification(client):
+    headers = _auth_headers(client)
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        resp = client.put(
+            "/tasks/9999", json={"status": "completed"}, headers=headers
+        )
+
+    assert resp.status_code == 404
+    mock_delay.assert_not_called()
+
+
+def test_completing_other_users_task_does_not_trigger_notification(client):
+    alice_headers = _auth_headers(client, "alice", "pw1")
+    bob_headers = _auth_headers(client, "bob", "pw2")
+    created = _create(client, "alice's task", headers=alice_headers).get_json()
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=bob_headers
+        )
+
+    mock_delay.assert_not_called()
+
+
+def test_register_with_custom_email_used_for_notification(client):
+    client.post(
+        "/auth/register",
+        json={"username": "carol", "password": "pw123", "email": "carol@work.com"},
+    )
+    token = _login(client, "carol", "pw123").get_json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    created = _create(client, "custom email task", headers=headers).get_json()
+
+    with patch.object(app_module.send_notification_email, "delay") as mock_delay:
+        client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    mock_delay.assert_called_once_with("carol@work.com", "custom email task")
+
+
+def test_send_notification_email_task_runs_without_broker(capsys):
+    from notifications import send_notification_email
+
+    send_notification_email("bob@example.com", "Write report")
+
+    captured = capsys.readouterr()
+    assert "bob@example.com" in captured.out
+    assert "Write report" in captured.out
 
 
 # ── Migration ─────────────────────────────────────────────────
