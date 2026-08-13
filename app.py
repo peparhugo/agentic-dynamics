@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
@@ -25,6 +27,10 @@ app.config["JWT_SECRET_KEY"] = os.environ.get(
     "JWT_SECRET_KEY", "development-secret-change-in-production"
 )
 app.config["JWT_EXPIRATION_SECONDS"] = 3600
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 
 
@@ -42,6 +48,24 @@ def task_repository():
 
 def user_repository():
     return UserRepository(DATABASE)
+
+
+def rate_limit_key():
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and separator and token:
+        user = decode_token(token)
+        if user is not None:
+            return f"user:{user['id']}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+)
 
 
 def _base64url_encode(value):
@@ -133,8 +157,16 @@ def create_task(title, owner_id):
     return task_repository().create_for_owner(title, created_at, owner_id)
 
 
-def get_tasks(owner_id):
-    return task_repository().list_for_owner(owner_id)
+def get_tasks(owner_id, cursor=None, limit=20):
+    repository = task_repository()
+    tasks = repository.list_for_owner(owner_id, cursor, limit)
+    has_next_page = len(tasks) > limit
+    tasks = tasks[:limit]
+    return {
+        "data": tasks,
+        "next_cursor": str(tasks[-1]["id"]) if has_next_page else None,
+        "total": repository.count_for_owner(owner_id),
+    }
 
 
 def get_task(task_id, owner_id):
@@ -205,7 +237,18 @@ def add_task():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.current_user["id"]))
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+    except ValueError:
+        return jsonify(error="cursor and limit must be integers"), 400
+    if cursor is not None and cursor <= 0:
+        return jsonify(error="cursor must be a positive integer"), 400
+    if not 1 <= limit <= 100:
+        return jsonify(error="limit must be between 1 and 100"), 400
+    return jsonify(get_tasks(g.current_user["id"], cursor, limit))
 
 
 @app.get("/tasks/<int:task_id>")
