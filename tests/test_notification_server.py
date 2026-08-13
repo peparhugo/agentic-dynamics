@@ -5,7 +5,7 @@ import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import NotificationServer, create_process_request
+from app import NotificationServer, RedisBroker, SQLiteMessageStore, create_process_request
 
 
 @pytest.fixture
@@ -154,3 +154,51 @@ async def test_unsubscribe_removes_channel_and_channel_endpoints_report_subscrib
         await asyncio.sleep(0.01)
     assert channels == {}
     await first.close()
+
+
+async def test_messages_endpoint_returns_persisted_messages(tmp_path):
+    store = SQLiteMessageStore(f"sqlite:///{tmp_path / 'messages.db'}")
+    server = NotificationServer(message_store=store)
+    async with serve(server.handler, "127.0.0.1", 0, process_request=create_process_request(server)) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        uri = f"ws://127.0.0.1:{port}"
+        client, _ = await connected_client(uri)
+        await client.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}, "timestamp": "client-time"}))
+        await asyncio.sleep(0.01)
+        await client.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "saved"}, "timestamp": "client-time"}))
+        await client.recv()
+
+        _, messages = await get_json(f"127.0.0.1:{port}", "/messages?limit=50&offset=0")
+        assert len(messages) == 2
+        broadcast = messages[0]
+        assert broadcast["channel"] == "alerts"
+        assert broadcast["type"] == "broadcast"
+        assert broadcast["payload"] == {"text": "saved"}
+        await client.close()
+    await server.close()
+
+
+async def test_redis_pubsub_delivers_channel_messages_between_server_instances():
+    import fakeredis.aioredis
+
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    first_server = NotificationServer(broker=RedisBroker(redis))
+    second_server = NotificationServer(broker=RedisBroker(redis))
+    await first_server.start()
+    await second_server.start()
+    async with serve(first_server.handler, "127.0.0.1", 0) as first_websocket_server:
+        async with serve(second_server.handler, "127.0.0.1", 0) as second_websocket_server:
+            first_uri = f"ws://127.0.0.1:{first_websocket_server.sockets[0].getsockname()[1]}"
+            second_uri = f"ws://127.0.0.1:{second_websocket_server.sockets[0].getsockname()[1]}"
+            publisher, _ = await connected_client(first_uri)
+            subscriber, _ = await connected_client(second_uri)
+            await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}, "timestamp": "client-time"}))
+            await asyncio.sleep(0.01)
+            await publisher.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "shared"}, "timestamp": "client-time"}))
+
+            received = json.loads(await asyncio.wait_for(subscriber.recv(), timeout=1))
+            assert received["payload"] == {"text": "shared"}
+            await publisher.close()
+            await subscriber.close()
+    await first_server.close()
+    await second_server.close()
