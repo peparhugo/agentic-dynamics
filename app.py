@@ -9,9 +9,13 @@ from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import check_password_hash
+import redis
 import sqlite3
 import os
 import jwt
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 from tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
@@ -22,6 +26,55 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_DELTA = timedelta(hours=24)
+
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+
+
+def _storage_options():
+    # Lets the test suite point flask-limiter at an in-process fake Redis
+    # server instead of a real one, without changing any production code path.
+    if os.environ.get("FAKE_REDIS") == "1":
+        import fakeredis
+
+        pool = redis.ConnectionPool(connection_class=fakeredis.FakeRedisConnection)
+        return {"connection_pool": pool}
+    return {}
+
+
+def rate_limit_key():
+    """Key by authenticated user when possible, otherwise by IP (e.g. auth endpoints)."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):].strip()
+        if token:
+            try:
+                payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+                return f"user:{payload.get('user_id')}"
+            except jwt.InvalidTokenError:
+                pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=REDIS_URL,
+    storage_options=_storage_options(),
+    # application_limits (not default_limits) gives one shared budget per key
+    # across every endpoint, rather than a separate 100/minute bucket per route.
+    application_limits=[RATE_LIMIT],
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def handle_rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    return response
 
 
 def get_db():
@@ -126,7 +179,19 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks():
-    return jsonify(task_repository.list_for_owner(request.user_id))
+    raw_cursor = request.args.get("cursor")
+    raw_limit = request.args.get("limit")
+    try:
+        cursor = int(raw_cursor) if raw_cursor is not None else None
+    except ValueError:
+        return jsonify({"error": "cursor must be an integer"}), 400
+    try:
+        limit = int(raw_limit) if raw_limit is not None else DEFAULT_PAGE_LIMIT
+    except ValueError:
+        return jsonify({"error": "limit must be an integer"}), 400
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+    result = task_repository.list_for_owner(request.user_id, cursor=cursor, limit=limit)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])

@@ -4,3 +4,5 @@ PyJWT
 werkzeug
 celery
 redis
+Flask-Limiter
+fakeredis

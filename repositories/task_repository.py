@@ -39,12 +39,24 @@ class TaskRepository(BaseRepository):
             "owner_id": owner_id,
         }
 
-    def list_for_owner(self, owner_id: int):
+    def list_for_owner(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> dict:
         with self.get_db() as conn:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
-            ).fetchall()
-            return [dict(r) for r in rows]
+            total = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()["c"]
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            data = [dict(r) for r in rows[:limit]]
+            next_cursor = data[-1]["id"] if len(rows) > limit else None
+            return {"data": data, "next_cursor": next_cursor, "total": total}
 
     def get(self, task_id: int, owner_id: int) -> dict | None:
         with self.get_db() as conn:
