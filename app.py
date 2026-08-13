@@ -1,4 +1,4 @@
-"""Async WebSocket notification server backed by Redis and SQLite."""
+"""Async notification server backed by Redis and SQLite."""
 
 from __future__ import annotations
 
@@ -8,16 +8,17 @@ import json
 import os
 import sqlite3
 import threading
-import uuid
+from collections.abc import Awaitable
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable
+from typing import Any, Callable
 from urllib.parse import parse_qs, unquote, urlsplit
 
 import redis.asyncio as redis
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
-from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
+
+from transports import BaseTransport, ClientRegistry, WebSocketTransport, create_transport
 
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -238,88 +239,21 @@ class RedisBackbone:
         return sorted(await self.redis.smembers(f"notifications:channel:{channel}"))
 
 
-class ClientRegistry:
-    """Local live sockets; shared metadata is maintained by the backbone."""
-
-    def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
-        self._channels: dict[str, set[str]] = {}
-        self._lock = threading.RLock()
-
-    def add(self, websocket: ServerConnection) -> str:
-        client_id = str(uuid.uuid4())
-        with self._lock:
-            self._clients[client_id] = websocket
-        return client_id
-
-    def remove(self, client_id: str) -> None:
-        with self._lock:
-            self._clients.pop(client_id, None)
-            for channel in list(self._channels):
-                self._channels[channel].discard(client_id)
-                if not self._channels[channel]:
-                    del self._channels[channel]
-
-    def get(self, client_id: str) -> ServerConnection | None:
-        with self._lock:
-            return self._clients.get(client_id)
-
-    def snapshot(self) -> list[ServerConnection]:
-        with self._lock:
-            return list(self._clients.values())
-
-    def subscribe(self, client_id: str, channel: str) -> None:
-        with self._lock:
-            self._channels.setdefault(channel, set()).add(client_id)
-
-    def unsubscribe(self, client_id: str, channel: str) -> None:
-        with self._lock:
-            subscribers = self._channels.get(channel)
-            if subscribers:
-                subscribers.discard(client_id)
-                if not subscribers:
-                    del self._channels[channel]
-
-    def channel_snapshot(self, channel: str) -> list[ServerConnection]:
-        with self._lock:
-            return [
-                self._clients[client_id]
-                for client_id in self._channels.get(channel, set())
-                if client_id in self._clients
-            ]
-
-    def channels(self) -> dict[str, int]:
-        with self._lock:
-            return {
-                channel: len(subscribers)
-                for channel, subscribers in sorted(self._channels.items())
-            }
-
-    def subscribers(self, channel: str) -> list[str]:
-        with self._lock:
-            return sorted(self._channels.get(channel, set()))
-
-    def is_subscribed(self, client_id: str, channel: str) -> bool:
-        with self._lock:
-            return client_id in self._channels.get(channel, set())
-
-    def __len__(self) -> int:
-        with self._lock:
-            return len(self._clients)
-
-
 class NotificationServer:
     def __init__(
         self,
         backbone: InMemoryBackbone | RedisBackbone | None = None,
         store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         redis_url = os.getenv("REDIS_URL")
         self.backbone = backbone or (
             RedisBackbone(redis_url) if redis_url else InMemoryBackbone()
         )
         self.store = store or MessageStore()
-        self.clients = ClientRegistry()
+        self.transport = transport or create_transport(os.getenv("TRANSPORT", "websocket"))
+        self.transport.bind(self)
+        self.clients = self.transport.clients
         self._started = False
         self._start_lock = asyncio.Lock()
 
@@ -387,25 +321,30 @@ class NotificationServer:
         )
 
     async def handler(self, websocket: ServerConnection) -> None:
-        await self.start()
-        client_id = self.clients.add(websocket)
+        handler = getattr(self.transport, "handler", None)
+        if handler is None:
+            raise RuntimeError("configured transport does not provide a WebSocket handler")
+        await handler(websocket)
+
+    async def client_connected(self, client_id: str) -> None:
         await self.backbone.add_client(client_id)
-        await self._send(
-            websocket, message("system", {"event": "connected", "client_id": client_id})
-        )
-        try:
-            async for raw_message in websocket:
-                parsed, error = self._parse_message(raw_message)
-                if error:
-                    await self._send(websocket, message("system", {"error": error}))
-                    continue
-                self.store.add(parsed)
-                await self._route(parsed, websocket, client_id)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.clients.remove(client_id)
-            await self.backbone.remove_client(client_id)
+
+    async def client_disconnected(self, client_id: str) -> None:
+        await self.backbone.remove_client(client_id)
+
+    @staticmethod
+    def connected_message(client_id: str) -> dict[str, Any]:
+        return message("system", {"event": "connected", "client_id": client_id})
+
+    async def handle_message(
+        self, raw_message: str | bytes, sender: Any, sender_id: str
+    ) -> None:
+        parsed, error = self._parse_message(raw_message)
+        if error:
+            await self.transport.send_message(sender, message("system", {"error": error}))
+            return
+        self.store.add(parsed)
+        await self._route(parsed, sender, sender_id)
 
     @staticmethod
     def _parse_message(raw_message: str | bytes) -> tuple[dict[str, Any], str | None]:
@@ -435,7 +374,7 @@ class NotificationServer:
         return parsed, None
 
     async def _route(
-        self, outgoing: dict[str, Any], sender: ServerConnection, sender_id: str
+        self, outgoing: dict[str, Any], sender: Any, sender_id: str
     ) -> None:
         if outgoing["type"] == "subscribe":
             self.clients.subscribe(sender_id, outgoing["channel"])
@@ -450,10 +389,12 @@ class NotificationServer:
             return
         target_id = outgoing["payload"].get("client_id")
         if not isinstance(target_id, str):
-            await self._send(sender, message("system", {"error": "direct payload requires client_id"}))
+            await self.transport.send_message(
+                sender, message("system", {"error": "direct payload requires client_id"})
+            )
             return
         if not await self.backbone.has_client(target_id):
-            await self._send(
+            await self.transport.send_message(
                 sender,
                 message("system", {"error": "client not found", "client_id": target_id}),
             )
@@ -474,19 +415,14 @@ class NotificationServer:
         else:
             recipients = self.clients.snapshot()
         if recipients:
-            await asyncio.gather(
-                *(self._send(client, outgoing) for client in recipients),
-                return_exceptions=True,
-            )
-
-    @staticmethod
-    async def _send(websocket: ServerConnection, outgoing: dict[str, Any]) -> None:
-        await websocket.send(json.dumps(outgoing))
+            await self.transport.broadcast(outgoing, recipients)
 
 
 async def run(host: str = "127.0.0.1", port: int = 8765) -> None:
     redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
     server = NotificationServer(backbone=RedisBackbone(redis_url))
+    if not isinstance(server.transport, WebSocketTransport):
+        raise RuntimeError("the configured transport cannot be served by this entry point")
     await server.start()
     try:
         async with serve(server.handler, host, port, process_request=server.process_request):
