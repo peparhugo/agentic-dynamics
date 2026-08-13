@@ -50,3 +50,34 @@ tags: [news, updates]
 
 # Welcome
 ```
+
+## Plugins
+
+Add TypeScript plugin modules to `plugins/` and list them in `ssg.config.ts`:
+
+```ts
+// plugins/example.ts
+import type { Plugin } from 'ssg';
+
+export const examplePlugin: Plugin = {
+  name: 'example',
+  onFile(page) {
+    page.html += '<footer>Built with ssg</footer>';
+  },
+};
+```
+
+```ts
+// ssg.config.ts
+import { defineConfig } from 'ssg';
+import { examplePlugin } from './plugins/example';
+
+export default defineConfig({
+  plugins: [examplePlugin],
+});
+```
+
+Plugins can implement `onStart`, `beforeBuild`, `onFile`, `afterBuild`, and
+`onEnd`. Each lifecycle stage runs in configured order. Markdown parsing,
+Handlebars templates, and the development server are exposed as the built-in
+`MarkdownPlugin`, `TemplatePlugin`, and `DevServerPlugin` classes.
