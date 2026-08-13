@@ -5,6 +5,8 @@ Features proper connection pooling, error handling, JWT authentication, and asyn
 
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.pool import QueuePool
@@ -19,6 +21,7 @@ app = Flask(__name__)
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-key-change-in-production")
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
@@ -28,6 +31,21 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 }
 
 db = SQLAlchemy(app)
+
+limiter = Limiter(
+    app=app,
+    key_func=lambda: get_current_user_id(),
+    default_limits=["100 per minute"],
+    storage_uri=REDIS_URL,
+)
+
+
+def get_current_user_id():
+    """Get user ID for rate limiting."""
+    user = get_current_user()
+    if user:
+        return str(user.id)
+    return get_remote_address()
 
 
 # ── Models ────────────────────────────────────────────────────
@@ -116,6 +134,11 @@ def require_auth(f):
     return decorated_function
 
 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "rate limit exceeded"}), 429
+
+
 def init_db():
     with app.app_context():
         db.create_all()
@@ -147,6 +170,7 @@ def migrate_existing_tasks():
 # ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute", key_func=get_remote_address)
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip() if data.get("username") else ""
@@ -170,6 +194,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute", key_func=get_remote_address)
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip() if data.get("username") else ""
@@ -187,13 +212,45 @@ def login():
 
 @app.route("/tasks", methods=["GET"])
 @require_auth
+@limiter.limit("100 per minute")
 def list_tasks(user):
-    tasks = task_repository.find_by_owner(user.id)
-    return jsonify([task.to_dict() for task in tasks])
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", 20, type=int)
+
+    if limit < 1 or limit > 100:
+        limit = 20
+
+    all_tasks = task_repository.find_by_owner(user.id)
+    total = len(all_tasks)
+
+    if cursor is None:
+        paginated_tasks = all_tasks[:limit]
+    else:
+        start_idx = None
+        for i, task in enumerate(all_tasks):
+            if task.id == cursor:
+                start_idx = i + 1
+                break
+
+        if start_idx is None:
+            paginated_tasks = []
+        else:
+            paginated_tasks = all_tasks[start_idx:start_idx + limit]
+
+    next_cursor = None
+    if paginated_tasks and len(all_tasks) > (all_tasks.index(paginated_tasks[-1]) + 1):
+        next_cursor = paginated_tasks[-1].id
+
+    return jsonify({
+        "data": [task.to_dict() for task in paginated_tasks],
+        "next_cursor": next_cursor,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
 @require_auth
+@limiter.limit("100 per minute")
 def add_task(user):
     data = request.get_json(silent=True) or {}
     title = data.get("title", "").strip() if data.get("title") else ""
@@ -208,6 +265,7 @@ def add_task(user):
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
+@limiter.limit("100 per minute")
 def show_task(task_id: int, user):
     task = task_repository.get_by_id(task_id)
     if task is None or task.owner_id != user.id:
@@ -217,6 +275,7 @@ def show_task(task_id: int, user):
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
+@limiter.limit("100 per minute")
 def edit_task(task_id: int, user):
     task = task_repository.get_by_id(task_id)
     if task is None or task.owner_id != user.id:
