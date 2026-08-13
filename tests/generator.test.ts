@@ -24,4 +24,43 @@ describe('buildSite', () => {
     expect(index).toContain('href="hello.html"');
     expect(index).toContain('Hello &lt;World&gt;');
   });
+
+  it('renders Handlebars page templates, layouts, and partials', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'site');
+    await mkdir(content);
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await mkdir(join(templates, 'partials'));
+    await writeFile(join(content, 'hello.md'), '---\ntitle: Template page\ntemplate: article\nlayout: site\n---\n\nHello **world**.');
+    await writeFile(join(templates, 'article.hbs'), '<article><h1>{{title}}</h1>{{> header}}{{{content}}}</article>');
+    await writeFile(join(templates, 'layouts', 'site.hbs'), '<!doctype html><body>{{{body}}}{{> footer}}</body>');
+    await writeFile(join(templates, 'partials', 'header.hbs'), '<header>Header</header>');
+    await writeFile(join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+    const page = await readFile(join(output, 'hello.html'), 'utf8');
+
+    expect(page).toContain('<h1>Template page</h1>');
+    expect(page).toContain('<header>Header</header>');
+    expect(page).toContain('<strong>world</strong>');
+    expect(page).toContain('<footer>Footer</footer>');
+  });
+
+  it('uses page and default layout templates when frontmatter omits them', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'site');
+    await mkdir(content);
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await writeFile(join(content, 'hello.md'), '---\ntitle: Default template\n---\n\nContent');
+    await writeFile(join(templates, 'page.hbs'), '<main>{{title}}: {{{content}}}</main>');
+    await writeFile(join(templates, 'layouts', 'default.hbs'), '<html>{{{body}}}</html>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(readFile(join(output, 'hello.html'), 'utf8')).resolves.toBe('<html><main>Default template: <p>Content</p>\n</main></html>');
+  });
 });

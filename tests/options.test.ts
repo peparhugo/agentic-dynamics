@@ -2,9 +2,10 @@ import { parseBuildOptions } from '../src/options.js';
 
 describe('parseBuildOptions', () => {
   it('accepts content and output directories', () => {
-    expect(parseBuildOptions(['--content', 'posts', '--output', 'public'])).toEqual({
+    expect(parseBuildOptions(['--content', 'posts', '--output', 'public', '--templates', 'views'])).toEqual({
       contentDir: 'posts',
       outputDir: 'public',
+      templatesDir: 'views',
     });
   });
 

@@ -3,7 +3,7 @@ import { buildSite } from './generator.js';
 import { parseBuildOptions } from './options.js';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
 async function main(): Promise<void> {
