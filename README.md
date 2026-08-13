@@ -8,7 +8,15 @@ A small static site generator that turns Markdown files into HTML.
 npm install
 npm run build
 npx ssg build
+npx ssg build --incremental
 ```
+
+Incremental builds store source and template hashes in `.ssg-cache.json`. Pages
+whose Markdown and templates are unchanged are not parsed, processed by file
+plugins, or rendered again. Use `--clean` to discard the manifest and output
+before rebuilding, or `--cache <file>` to choose a different manifest path.
+The CLI reports built and skipped page counts and estimated
+time saved after each incremental build.
 
 For development, build and serve the site with live reload. Changes under
 `content` or `templates` trigger a rebuild and refresh connected browsers:

@@ -1,6 +1,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import Handlebars from 'handlebars';
+import { performance } from 'node:perf_hooks';
 import { BuildContext, Page, Plugin } from '../types';
 
 interface TemplateEngine {
@@ -152,9 +153,24 @@ export class TemplatePlugin implements Plugin {
   async afterBuild(context: BuildContext): Promise<void> {
     if (!this.templates) throw new Error('TemplatePlugin has not been initialized');
     const templates = this.templates;
-    await Promise.all(context.pages.map(async page => {
+    const pages = context.incremental
+      ? context.pages.filter(page => context.pagesToBuild.has(page.sourcePath))
+      : context.pages;
+    await Promise.all(pages.map(async page => {
+      const started = performance.now();
       await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
-      await fs.writeFile(page.outputPath, templates.renderPage(page), 'utf8');
+      const html = templates.renderPage(page);
+      context.renderedHtml.set(page.sourcePath, html);
+      await fs.writeFile(page.outputPath, html, 'utf8');
+      if (context.cache) {
+        const key = path.relative(context.contentDir, page.sourcePath);
+        const entry = context.cache.entries[key];
+        if (entry) {
+          entry.page = page;
+          entry.renderedHtml = html;
+          entry.buildTimeMs += Math.max(0.01, performance.now() - started);
+        }
+      }
     }));
     await fs.writeFile(path.join(context.outputDir, 'index.html'), templates.renderIndex(context.pages), 'utf8');
   }

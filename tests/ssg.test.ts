@@ -234,6 +234,103 @@ This is **important**.
     await expect(fs.stat(path.join(outputDir, 'page.html'))).resolves.toBeDefined();
   });
 
+  test('incremental builds skip unchanged pages and persist their output', async () => {
+    const cacheFile = path.join(root, '.ssg-cache.json');
+    await fs.writeFile(path.join(contentDir, 'one.md'), '# One');
+    await fs.writeFile(path.join(contentDir, 'two.md'), '# Two');
+
+    const first = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+    const firstStat = await fs.stat(path.join(outputDir, 'one.html'));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    const second = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+    const secondStat = await fs.stat(path.join(outputDir, 'one.html'));
+
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(second.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+    expect(second.stats.timeSavedMs).toBeGreaterThan(0);
+    expect(secondStat.mtimeMs).toBe(firstStat.mtimeMs);
+    const manifest = JSON.parse(await fs.readFile(cacheFile, 'utf8')) as { pages: Record<string, unknown> };
+    expect(Object.keys(manifest.pages)).toEqual(['one.md', 'two.md']);
+  });
+
+  test('incremental builds rebuild only a changed source', async () => {
+    const cacheFile = path.join(root, '.ssg-cache.json');
+    const unchanged = path.join(outputDir, 'one.html');
+    const changed = path.join(outputDir, 'two.html');
+    await fs.writeFile(path.join(contentDir, 'one.md'), '# One');
+    await fs.writeFile(path.join(contentDir, 'two.md'), '# Two');
+    await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+    const before = await Promise.all([fs.stat(unchanged), fs.stat(changed)]);
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    await fs.writeFile(path.join(contentDir, 'two.md'), '# Two changed');
+    const result = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+    const after = await Promise.all([fs.stat(unchanged), fs.stat(changed)]);
+
+    expect(result.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(after[0].mtimeMs).toBe(before[0].mtimeMs);
+    expect(after[1].mtimeMs).toBeGreaterThan(before[1].mtimeMs);
+    await expect(fs.readFile(changed, 'utf8')).resolves.toContain('Two changed');
+  });
+
+  test('template changes invalidate all incremental pages', async () => {
+    const cacheFile = path.join(root, '.ssg-cache.json');
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<main>{{title}}</main>');
+    await fs.writeFile(path.join(contentDir, 'one.md'), '# One');
+    await fs.writeFile(path.join(contentDir, 'two.md'), '# Two');
+    await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<article>{{title}}</article>');
+    const result = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+
+    expect(result.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(fs.readFile(path.join(outputDir, 'one.html'), 'utf8'))
+      .resolves.toBe('<article>One</article>');
+  });
+
+  test('clean incremental builds ignore existing cache and remove stale output', async () => {
+    const cacheFile = path.join(root, '.ssg-cache.json');
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Page');
+    await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+    await fs.writeFile(path.join(outputDir, 'stale.html'), 'stale');
+
+    const result = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true, clean: true });
+
+    expect(result.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0 });
+    await expect(fs.stat(path.join(outputDir, 'stale.html'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('incremental builds remove output for deleted sources', async () => {
+    const cacheFile = path.join(root, '.ssg-cache.json');
+    const source = path.join(contentDir, 'page.md');
+    const output = path.join(outputDir, 'page.html');
+    await fs.writeFile(source, '# Page');
+    await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+
+    await fs.rm(source);
+    const result = await buildSite({ contentDir, outputDir, templatesDir, cacheFile, incremental: true });
+
+    expect(result).toHaveLength(0);
+    await expect(fs.stat(output)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  test('CLI accepts incremental builds and reports build stats', async () => {
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Page');
+    const stdout = { write: jest.fn(() => true) };
+    const stderr = { write: jest.fn(() => true) };
+
+    const exitCode = await runCli(
+      ['build', '--content', contentDir, '--output', outputDir, '--templates', templatesDir,
+        '--incremental', '--cache', path.join(root, '.ssg-cache.json')],
+      { stdout, stderr }
+    );
+
+    expect(exitCode).toBe(0);
+    expect(stdout.write).toHaveBeenLastCalledWith(expect.stringMatching(/^Build stats: 1 built, 0 skipped, .*ms saved\.\n$/));
+    expect(stderr.write).not.toHaveBeenCalled();
+  });
+
   test('runs build with a custom CLI templates directory', async () => {
     await fs.mkdir(templatesDir);
     await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<section>{{title}}</section>');

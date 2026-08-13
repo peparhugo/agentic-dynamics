@@ -2,6 +2,8 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import { performance } from 'node:perf_hooks';
+import { hash } from '../cache';
 import { BuildContext, Plugin } from '../types';
 
 function titleFromFilename(filename: string): string {
@@ -47,21 +49,54 @@ export class MarkdownPlugin implements Plugin {
 
     context.pages = await Promise.all(files.map(async sourcePath => {
       const relativePath = path.relative(context.contentDir, sourcePath);
-      const parsed = matter(await fs.readFile(sourcePath, 'utf8'));
       const outputRelativePath = relativePath.replace(/\.md$/i, '.html');
+      const outputPath = path.join(context.outputDir, outputRelativePath);
+      const source = await fs.readFile(sourcePath, 'utf8');
+      const sourceHash = hash(source);
+      const cached = context.cache?.previousEntries[relativePath];
+      const outputExists = cached
+        ? await fs.access(outputPath).then(() => true, () => false)
+        : false;
+      if (cached && cached.sourceHash === sourceHash
+        && context.cache?.previousTemplateHash === context.cache?.templateHash
+        && (outputExists || cached.renderedHtml)) {
+        const page = { ...cached.page, sourcePath, outputPath, data: { ...cached.page.data } };
+        if (!outputExists) {
+          await fs.mkdir(path.dirname(outputPath), { recursive: true });
+          await fs.writeFile(outputPath, cached.renderedHtml, 'utf8');
+        }
+        context.cache.entries[relativePath] = { ...cached, page };
+        context.stats.pagesSkipped += 1;
+        context.stats.timeSavedMs += cached.buildTimeMs;
+        return page;
+      }
+
+      const started = performance.now();
+      const parsed = matter(source);
       const title = typeof parsed.data.title === 'string' && parsed.data.title.trim()
         ? parsed.data.title.trim()
         : titleFromFilename(sourcePath);
-      return {
+      const page = {
         title,
         date: parseDate(parsed.data.date),
         tags: parseTags(parsed.data.tags),
         sourcePath,
-        outputPath: path.join(context.outputDir, outputRelativePath),
+        outputPath,
         url: outputRelativePath.split(path.sep).map(encodeURIComponent).join('/'),
         html: await marked.parse(parsed.content),
         data: parsed.data
       };
+      context.pagesToBuild.add(sourcePath);
+      context.stats.pagesBuilt += 1;
+      if (context.cache) {
+        context.cache.entries[relativePath] = {
+          sourceHash,
+          page,
+          renderedHtml: '',
+          buildTimeMs: Math.max(0.01, performance.now() - started)
+        };
+      }
+      return page;
     }));
 
     context.pages.sort((left, right) => {

@@ -9,7 +9,7 @@ export interface CliIO {
 }
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]\n';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--cache <file>] [--port <number>]\n';
 }
 
 function valueAfter(args: string[], index: number, option: string): string {
@@ -51,6 +51,14 @@ export async function runCli(
           throw new Error(`Invalid port: ${value}`);
         }
         index += 1;
+      } else if (argument === '--incremental' && command === 'build') {
+        options.incremental = true;
+      } else if (argument === '--clean' && command === 'build') {
+        options.clean = true;
+        options.incremental = true;
+      } else if (argument === '--cache' && command === 'build') {
+        options.cacheFile = valueAfter(args, index, argument);
+        index += 1;
       } else {
         throw new Error(`Unknown option: ${argument}`);
       }
@@ -62,6 +70,9 @@ export async function runCli(
     } else {
       const pages = await buildSite(options);
       io.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+      if (options.incremental) {
+        io.stdout.write(`Build stats: ${pages.stats.pagesBuilt} built, ${pages.stats.pagesSkipped} skipped, ${pages.stats.timeSavedMs.toFixed(1)}ms saved.\n`);
+      }
     }
     return 0;
   } catch (error) {
