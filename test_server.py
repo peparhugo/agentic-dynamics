@@ -17,7 +17,8 @@ from aiohttp.test_utils import AioHTTPTestCase
 
 from server import (
     NotificationServer, handle_websocket, health_handler, channels_handler,
-    channel_subscribers_handler, messages_handler, init_db, save_message, get_messages
+    channel_subscribers_handler, messages_handler, history_handler, init_db, save_message, get_messages,
+    get_channel_history, cleanup_expired_messages, check_rate_limit
 )
 import server as server_module
 
@@ -1065,3 +1066,322 @@ class TestRedisIntegration:
         # Verify close was called
         mock_redis.close.assert_called()
         mock_redis.wait_closed.assert_called()
+
+
+class TestRateLimiting:
+    """Test rate limiting functionality."""
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_allowed(self):
+        """Test that clients within limit are allowed."""
+        mock_redis = AsyncMock()
+        mock_redis.incr.return_value = 50
+        mock_redis.expire = AsyncMock()
+
+        is_allowed, remaining = await check_rate_limit(mock_redis, "client-1", limit=100)
+        assert is_allowed is True
+        assert remaining == 50
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_exceeded(self):
+        """Test that clients exceeding limit are blocked."""
+        mock_redis = AsyncMock()
+        mock_redis.incr.return_value = 101
+        mock_redis.expire = AsyncMock()
+
+        is_allowed, remaining = await check_rate_limit(mock_redis, "client-1", limit=100)
+        assert is_allowed is False
+        assert remaining == 0
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_no_redis(self):
+        """Test that rate limiting is skipped if no Redis."""
+        is_allowed, remaining = await check_rate_limit(None, "client-1", limit=100)
+        assert is_allowed is True
+        assert remaining == 100
+
+    @pytest.mark.asyncio
+    async def test_check_rate_limit_redis_error(self):
+        """Test that rate limiting fails gracefully."""
+        mock_redis = AsyncMock()
+        mock_redis.incr.side_effect = Exception("Redis error")
+
+        is_allowed, remaining = await check_rate_limit(mock_redis, "client-1", limit=100)
+        assert is_allowed is True
+        assert remaining == 100
+
+    @pytest.mark.asyncio
+    async def test_server_check_client_rate_limit(self):
+        """Test rate limit check on NotificationServer."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        mock_redis.incr.return_value = 50
+        mock_redis.expire = AsyncMock()
+        server.redis_pub = mock_redis
+
+        is_allowed, remaining = await server.check_client_rate_limit("client-1")
+        assert is_allowed is True
+        assert remaining >= 0
+
+    @pytest.mark.asyncio
+    async def test_websocket_rate_limit_exceeded(self):
+        """Test WebSocket connection with rate limit exceeded."""
+        with patch("server.server") as mock_server:
+            mock_server.check_client_rate_limit = AsyncMock(return_value=(False, 0))
+            mock_server.add_client = MagicMock()
+            mock_server.remove_client = MagicMock()
+            mock_server.unsubscribe_from_all = MagicMock()
+
+            mock_ws = AsyncMock()
+            rate_limited_msg = json.dumps({"type": "broadcast", "payload": {"text": "Test"}})
+            mock_ws.__aiter__.return_value = iter([rate_limited_msg])
+
+            await handle_websocket(mock_ws, "/")
+
+            # Should send connection + rate limit error
+            assert mock_ws.send.call_count >= 2
+            # Second call should be rate limit error
+            error_call = mock_ws.send.call_args_list[1][0][0]
+            error_data = json.loads(error_call)
+            assert error_data["payload"]["error"] == "rate limit exceeded"
+
+
+class TestChannelHistory:
+    """Test channel message history retrieval."""
+
+    def test_get_channel_history_empty(self, test_db):
+        """Test retrieving history from empty channel."""
+        messages, has_more = get_channel_history("alerts")
+        assert len(messages) == 0
+        assert has_more is False
+
+    def test_get_channel_history_basic(self, test_db):
+        """Test retrieving basic channel history."""
+        for i in range(5):
+            save_message("alerts", "broadcast", {"text": f"Alert {i}"}, f"2023-01-01T00:00:{i:02d}")
+
+        messages, has_more = get_channel_history("alerts")
+        assert len(messages) == 5
+        assert has_more is False
+        # Should be in chronological order (oldest first)
+        assert messages[0]["payload"]["text"] == "Alert 0"
+        assert messages[4]["payload"]["text"] == "Alert 4"
+
+    def test_get_channel_history_pagination(self, test_db):
+        """Test channel history pagination with has_more."""
+        for i in range(100):
+            save_message("alerts", "broadcast", {"text": f"Alert {i}"}, f"2023-01-01T00:{i//60:02d}:{i%60:02d}")
+
+        # Get first 50
+        messages, has_more = get_channel_history("alerts", limit=50)
+        assert len(messages) == 50
+        assert has_more is True
+
+        # Get all
+        messages, has_more = get_channel_history("alerts", limit=100)
+        assert len(messages) == 100
+        assert has_more is False
+
+    def test_get_channel_history_time_range(self, test_db):
+        """Test channel history with since timestamp."""
+        save_message("alerts", "broadcast", {"text": "Alert 1"}, "2023-01-01T00:00:00")
+        save_message("alerts", "broadcast", {"text": "Alert 2"}, "2023-01-01T00:00:10")
+        save_message("alerts", "broadcast", {"text": "Alert 3"}, "2023-01-01T00:00:20")
+
+        # Get messages after first alert
+        messages, has_more = get_channel_history("alerts", since="2023-01-01T00:00:05")
+        assert len(messages) == 2
+        assert messages[0]["payload"]["text"] == "Alert 2"
+        assert messages[1]["payload"]["text"] == "Alert 3"
+
+    def test_get_channel_history_different_channels(self, test_db):
+        """Test that history only returns messages from specified channel."""
+        save_message("alerts", "broadcast", {"text": "Alert"}, "2023-01-01T00:00:00")
+        save_message("system", "broadcast", {"text": "System"}, "2023-01-01T00:00:00")
+        save_message("alerts", "broadcast", {"text": "Alert 2"}, "2023-01-01T00:00:10")
+
+        messages, has_more = get_channel_history("alerts")
+        assert len(messages) == 2
+        assert all(m["channel"] == "alerts" for m in messages)
+
+    def test_get_channel_history_chronological_order(self, test_db):
+        """Test that history returns messages in chronological order."""
+        save_message("alerts", "broadcast", {"text": "First"}, "2023-01-01T00:00:00")
+        save_message("alerts", "broadcast", {"text": "Second"}, "2023-01-01T00:00:10")
+        save_message("alerts", "broadcast", {"text": "Third"}, "2023-01-01T00:00:20")
+
+        messages, has_more = get_channel_history("alerts")
+        assert messages[0]["payload"]["text"] == "First"
+        assert messages[1]["payload"]["text"] == "Second"
+        assert messages[2]["payload"]["text"] == "Third"
+
+
+class TestMessageExpiry:
+    """Test message expiry and cleanup."""
+
+    def test_cleanup_expired_messages(self, test_db):
+        """Test cleanup of expired messages."""
+        import time
+        # Save an old message (simulate old timestamp)
+        conn = sqlite3.connect(server_module.DATABASE_URL)
+        cursor = conn.cursor()
+        old_time = time.time() - (8 * 24 * 3600)  # 8 days ago
+        cursor.execute(
+            "INSERT INTO messages (channel, type, payload, timestamp, created_at) VALUES (?, ?, ?, ?, ?)",
+            ("alerts", "broadcast", json.dumps({"text": "Old"}), "2023-01-01T00:00:00", old_time)
+        )
+        conn.commit()
+        conn.close()
+
+        # Save a recent message
+        save_message("alerts", "broadcast", {"text": "New"}, "2023-01-10T00:00:00")
+
+        # Cleanup with 7 day TTL
+        deleted = cleanup_expired_messages(ttl_days=7)
+        assert deleted == 1
+
+        # Check that only recent message remains
+        messages = get_messages()
+        assert len(messages) == 1
+        assert messages[0]["payload"]["text"] == "New"
+
+    def test_cleanup_no_expired_messages(self, test_db):
+        """Test cleanup when no messages are expired."""
+        save_message("alerts", "broadcast", {"text": "Message"}, "2023-01-10T00:00:00")
+
+        deleted = cleanup_expired_messages(ttl_days=7)
+        assert deleted == 0
+
+        messages = get_messages()
+        assert len(messages) == 1
+
+    def test_cleanup_multiple_expired(self, test_db):
+        """Test cleanup with multiple expired messages."""
+        import time
+        old_time = time.time() - (8 * 24 * 3600)
+
+        conn = sqlite3.connect(server_module.DATABASE_URL)
+        cursor = conn.cursor()
+        for i in range(5):
+            cursor.execute(
+                "INSERT INTO messages (channel, type, payload, timestamp, created_at) VALUES (?, ?, ?, ?, ?)",
+                ("alerts", "broadcast", json.dumps({"text": f"Old {i}"}), "2023-01-01T00:00:00", old_time)
+            )
+        conn.commit()
+        conn.close()
+
+        deleted = cleanup_expired_messages(ttl_days=7)
+        assert deleted == 5
+
+        messages = get_messages()
+        assert len(messages) == 0
+
+    def test_server_cleanup_method(self):
+        """Test cleanup method on NotificationServer."""
+        server = NotificationServer()
+        # Should not raise error
+        deleted = server.cleanup_old_messages()
+        assert deleted >= 0
+
+
+class TestHistoryRESTEndpoint(AioHTTPTestCase):
+    """Test the REST history endpoint."""
+
+    async def get_application(self):
+        """Create the test application."""
+        app = web.Application()
+        app.router.add_get("/history", history_handler)
+        return app
+
+    async def test_history_endpoint_missing_channel(self):
+        """Test history endpoint without channel parameter."""
+        resp = await self.client.request("GET", "/history")
+        assert resp.status == 400
+        data = await resp.json()
+        assert "error" in data
+        assert "channel" in data["error"]
+
+    async def test_history_endpoint_empty_channel(self):
+        """Test history endpoint for empty channel."""
+        resp = await self.client.request("GET", "/history?channel=alerts")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "alerts"
+        assert data["messages"] == []
+        assert data["count"] == 0
+        assert data["has_more"] is False
+
+    async def test_history_endpoint_with_messages(self):
+        """Test history endpoint with messages."""
+        # Insert messages
+        for i in range(5):
+            save_message("alerts", "broadcast", {"text": f"Alert {i}"}, f"2023-01-01T00:00:{i:02d}")
+
+        resp = await self.client.request("GET", "/history?channel=alerts")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "alerts"
+        assert len(data["messages"]) == 5
+        assert data["count"] == 5
+        assert data["has_more"] is False
+
+    async def test_history_endpoint_pagination(self):
+        """Test history endpoint with limit parameter."""
+        for i in range(50):
+            save_message("alerts", "broadcast", {"text": f"Alert {i}"}, f"2023-01-01T00:{i//60:02d}:{i%60:02d}")
+
+        # Get first 20
+        resp = await self.client.request("GET", "/history?channel=alerts&limit=20")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 20
+        assert data["has_more"] is True
+        assert data["limit"] == 20
+
+        # Get all 50
+        resp = await self.client.request("GET", "/history?channel=alerts&limit=50")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 50
+        assert data["has_more"] is False
+
+    async def test_history_endpoint_time_filter(self):
+        """Test history endpoint with since parameter."""
+        save_message("alerts", "broadcast", {"text": "Alert 1"}, "2023-01-01T00:00:00")
+        save_message("alerts", "broadcast", {"text": "Alert 2"}, "2023-01-01T00:00:10")
+        save_message("alerts", "broadcast", {"text": "Alert 3"}, "2023-01-01T00:00:20")
+
+        resp = await self.client.request("GET", "/history?channel=alerts&since=2023-01-01T00:00:05")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 2
+        assert data["messages"][0]["payload"]["text"] == "Alert 2"
+
+    async def test_history_endpoint_max_limit(self):
+        """Test that history endpoint respects max limit."""
+        for i in range(2000):
+            save_message("alerts", "broadcast", {"text": f"Alert {i}"}, f"2023-01-01T00:{i//60:02d}:{i%60:02d}")
+
+        resp = await self.client.request("GET", "/history?channel=alerts&limit=5000")
+        assert resp.status == 200
+        data = await resp.json()
+        # Should be clamped to 1000
+        assert data["limit"] == 1000
+        assert len(data["messages"]) <= 1000
+        assert data["has_more"] is True
+
+    async def test_history_endpoint_invalid_limit(self):
+        """Test history endpoint with invalid limit."""
+        resp = await self.client.request("GET", "/history?channel=alerts&limit=abc")
+        assert resp.status == 400
+
+    async def test_history_endpoint_channel_isolation(self):
+        """Test that history only returns specified channel."""
+        save_message("alerts", "broadcast", {"text": "Alert"}, "2023-01-01T00:00:00")
+        save_message("system", "broadcast", {"text": "System"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/history?channel=alerts")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 1
+        assert data["messages"][0]["channel"] == "alerts"

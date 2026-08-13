@@ -31,6 +31,8 @@ import aioredis
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
 TRANSPORT = os.environ.get("TRANSPORT", "websocket")
+RATE_LIMIT = int(os.environ.get("RATE_LIMIT", "100"))
+MESSAGE_TTL_DAYS = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
 
 
 def init_db():
@@ -43,7 +45,8 @@ def init_db():
             channel TEXT NOT NULL,
             type TEXT NOT NULL,
             payload TEXT NOT NULL,
-            timestamp TEXT NOT NULL
+            timestamp TEXT NOT NULL,
+            created_at REAL NOT NULL
         )
     """)
     conn.commit()
@@ -54,9 +57,11 @@ def save_message(channel: str, msg_type: str, payload: dict, timestamp: str) -> 
     """Save a message to SQLite."""
     conn = sqlite3.connect(DATABASE_URL)
     cursor = conn.cursor()
+    import time
+    created_at = time.time()
     cursor.execute(
-        "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
-        (channel, msg_type, json.dumps(payload), timestamp)
+        "INSERT INTO messages (channel, type, payload, timestamp, created_at) VALUES (?, ?, ?, ?, ?)",
+        (channel, msg_type, json.dumps(payload), timestamp, created_at)
     )
     conn.commit()
     msg_id = cursor.lastrowid
@@ -86,6 +91,84 @@ def get_messages(limit: int = 50, offset: int = 0) -> list:
             "timestamp": row["timestamp"],
         })
     return messages
+
+
+def get_channel_history(channel: str, since: str = None, limit: int = 50) -> tuple:
+    """Retrieve message history for a specific channel with optional time filter.
+
+    Returns:
+        Tuple of (messages list, has_more boolean)
+    """
+    conn = sqlite3.connect(DATABASE_URL)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    if since:
+        cursor.execute(
+            "SELECT * FROM messages WHERE channel = ? AND timestamp > ? ORDER BY id ASC LIMIT ?",
+            (channel, since, limit + 1)
+        )
+    else:
+        cursor.execute(
+            "SELECT * FROM messages WHERE channel = ? ORDER BY id ASC LIMIT ?",
+            (channel, limit + 1)
+        )
+
+    rows = cursor.fetchall()
+    conn.close()
+
+    has_more = len(rows) > limit
+    rows = rows[:limit]
+
+    messages = []
+    for row in rows:
+        messages.append({
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        })
+
+    return messages, has_more
+
+
+def cleanup_expired_messages(ttl_days: int = MESSAGE_TTL_DAYS) -> int:
+    """Delete messages older than ttl_days. Returns number of deleted messages."""
+    import time
+    conn = sqlite3.connect(DATABASE_URL)
+    cursor = conn.cursor()
+
+    cutoff_time = time.time() - (ttl_days * 24 * 3600)
+    cursor.execute("DELETE FROM messages WHERE created_at < ?", (cutoff_time,))
+    conn.commit()
+    deleted = cursor.rowcount
+    conn.close()
+
+    return deleted
+
+
+async def check_rate_limit(redis_client, client_id: str, limit: int = RATE_LIMIT) -> tuple:
+    """Check if client is within rate limit (messages per minute).
+
+    Returns:
+        Tuple of (is_allowed: bool, remaining: int)
+    """
+    if not redis_client:
+        return True, limit
+
+    try:
+        key = f"rate_limit:{client_id}"
+        current = await redis_client.incr(key)
+        remaining = max(0, limit - current)
+
+        if current == 1:
+            await redis_client.expire(key, 60)
+
+        is_allowed = current <= limit
+        return is_allowed, remaining
+    except Exception:
+        return True, limit
 
 
 class BaseTransport(ABC):
@@ -409,6 +492,14 @@ class NotificationServer:
             self.redis_sub.close()
             await self.redis_sub.wait_closed()
 
+    async def check_client_rate_limit(self, client_id: str) -> tuple:
+        """Check rate limit for client. Returns (is_allowed, remaining)."""
+        return await check_rate_limit(self.redis_pub, client_id, RATE_LIMIT)
+
+    def cleanup_old_messages(self) -> int:
+        """Run message cleanup. Returns number of deleted messages."""
+        return cleanup_expired_messages(MESSAGE_TTL_DAYS)
+
     async def send_direct(self, client_id: str, message: dict) -> bool:
         """Send a direct message to a specific client."""
         if not message.get("timestamp"):
@@ -473,6 +564,17 @@ async def handle_websocket(websocket, path):
     try:
         async for message in websocket:
             try:
+                is_allowed, remaining = await server.check_client_rate_limit(client_id)
+                if not is_allowed:
+                    await websocket.send(
+                        json.dumps({
+                            "type": "system",
+                            "payload": {"error": "rate limit exceeded"},
+                            "timestamp": datetime.utcnow().isoformat(),
+                        })
+                    )
+                    continue
+
                 data = json.loads(message)
                 msg_type = data.get("type")
                 payload = data.get("payload", {})
@@ -574,6 +676,31 @@ async def messages_handler(request):
         return web.json_response({"error": "invalid limit or offset"}, status=400)
 
 
+async def history_handler(request):
+    """REST endpoint to retrieve channel message history with optional time range."""
+    try:
+        channel = request.query.get("channel")
+        if not channel:
+            return web.json_response({"error": "channel parameter required"}, status=400)
+
+        since = request.query.get("since")
+        limit = int(request.query.get("limit", "50"))
+
+        # Clamp limit
+        limit = max(1, min(limit, 1000))
+
+        messages, has_more = get_channel_history(channel, since, limit)
+        return web.json_response({
+            "channel": channel,
+            "messages": messages,
+            "limit": limit,
+            "count": len(messages),
+            "has_more": has_more,
+        })
+    except ValueError:
+        return web.json_response({"error": "invalid parameters"}, status=400)
+
+
 async def start_websocket_server(host: str = "localhost", port: int = 8765):
     """Start the WebSocket server."""
     async with websockets.serve(handle_websocket, host, port):
@@ -588,6 +715,7 @@ async def start_rest_server(host: str = "localhost", port: int = 8080):
     app.router.add_get("/channels", channels_handler)
     app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
     app.router.add_get("/messages", messages_handler)
+    app.router.add_get("/history", history_handler)
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host, port)
@@ -601,6 +729,9 @@ async def main(ws_host: str = "localhost", ws_port: int = 8765,
     """Start both WebSocket and REST servers."""
     # Initialize database
     init_db()
+
+    # Run initial cleanup of expired messages
+    cleanup_expired_messages(MESSAGE_TTL_DAYS)
 
     # Initialize Redis connections
     try:
