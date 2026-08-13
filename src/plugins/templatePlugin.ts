@@ -5,7 +5,7 @@ import { renderIndex, renderPage } from '../templates';
 import { Plugin, PluginContext } from '../plugin';
 import { Page } from '../types';
 
-const DEFAULT_STYLESHEET = `body { font-family: sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
+export const DEFAULT_STYLESHEET = `body { font-family: sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; }
 header { margin-bottom: 2rem; }
 .page-list { list-style: none; padding: 0; }
 .page-list li { margin-bottom: 0.5rem; }
@@ -13,7 +13,7 @@ header { margin-bottom: 2rem; }
 .tags li { background: #eee; border-radius: 0.25rem; padding: 0.1rem 0.5rem; font-size: 0.85rem; }
 `;
 
-function writeFile(filePath: string, contents: string): void {
+export function writeFile(filePath: string, contents: string): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   fs.writeFileSync(filePath, contents, 'utf-8');
 }

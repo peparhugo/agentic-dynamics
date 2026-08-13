@@ -1,4 +1,6 @@
 export { buildSite, loadPages, findMarkdownFiles } from './generator';
+export { buildSiteIncremental, IncrementalBuildOptions, IncrementalBuildResult, BuildStats } from './incremental';
+export { CacheManifest, CacheEntry, CACHE_FILENAME, loadManifest } from './cache';
 export { parseMarkdown } from './parser';
 export { renderPage, renderIndex, renderArticleBody, renderIndexBody } from './templates';
 export { TemplateEngine } from './templateEngine';
