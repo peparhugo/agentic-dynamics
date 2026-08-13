@@ -39,4 +39,36 @@ describe('buildSite', () => {
 
     expect(pages[0].title).toBe('untitled');
   });
+
+  it('renders the selected template inside a layout with partials', async () => {
+    const content = path.join(directory, 'content');
+    const templates = path.join(directory, 'templates');
+    const output = path.join(directory, 'dist');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'));
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'custom.md'), '---\ntitle: Custom\ntemplate: article\n---\nTemplate **content**');
+    await fs.writeFile(path.join(templates, 'article.hbs'), '<article><h1>{{title}}</h1>{{{body}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<!doctype html><body>{{> header}}<main>{{{body}}}</main>{{> footer}}</body>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>Header</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(fs.readFile(path.join(output, 'custom.html'), 'utf8')).resolves.toBe('<!doctype html><body><header>Header</header><main><article><h1>Custom</h1><p>Template <strong>content</strong></p>\n</article></main><footer>Footer</footer></body>');
+  });
+
+  it('uses the default template when frontmatter does not specify one', async () => {
+    const content = path.join(directory, 'content');
+    const templates = path.join(directory, 'templates');
+    const output = path.join(directory, 'dist');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'default.md'), '---\ntitle: Default\n---\nText');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<h1>{{title}}</h1>{{{body}}}');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(fs.readFile(path.join(output, 'default.html'), 'utf8')).resolves.toContain('<h1>Default</h1><p>Text</p>');
+  });
 });
