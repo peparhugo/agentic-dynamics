@@ -1,6 +1,7 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from xml.etree import ElementTree
 
 import pytest
@@ -399,3 +400,116 @@ async def test_message_history_persists_across_restart(tmp_path):
     finally:
         await second.stop()
         await second_broker.aclose()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_and_is_per_client(tmp_path):
+    broker = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    instance = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=broker,
+        database_url=str(tmp_path / "rate-limit.db"),
+        rate_limit=2,
+    )
+    await instance.start()
+    first, _ = await connect(instance)
+    second, _ = await connect(instance)
+    try:
+        await send_message(first, "broadcast", {"sequence": 1})
+        await first.recv()
+        await second.recv()
+        await send_message(first, "broadcast", {"sequence": 2})
+        await first.recv()
+        await second.recv()
+
+        await send_message(first, "broadcast", {"sequence": 3})
+        error = json.loads(await first.recv())
+        assert error["type"] == "system"
+        assert error["payload"] == {
+            "event": "error",
+            "detail": "rate limit exceeded",
+        }
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(second.recv(), timeout=0.05)
+
+        await send_message(second, "broadcast", {"sequence": "independent"})
+        delivered_to_first, delivered_to_second = await asyncio.gather(
+            first.recv(), second.recv()
+        )
+        assert json.loads(delivered_to_first)["payload"]["sequence"] == "independent"
+        assert json.loads(delivered_to_second)["payload"]["sequence"] == "independent"
+    finally:
+        await asyncio.gather(first.close(), second.close())
+        await instance.stop()
+        await broker.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_orders_and_paginates(server):
+    now = datetime.now(timezone.utc)
+    messages = [
+        {
+            "type": "broadcast",
+            "payload": {"sequence": 3},
+            "channel": "alerts",
+            "timestamp": (now + timedelta(seconds=3)).isoformat(),
+        },
+        {
+            "type": "broadcast",
+            "payload": {"sequence": 1},
+            "channel": "alerts",
+            "timestamp": (now + timedelta(seconds=1)).isoformat(),
+        },
+        {
+            "type": "broadcast",
+            "payload": {"sequence": 2},
+            "channel": "alerts",
+            "timestamp": (now + timedelta(seconds=2)).isoformat(),
+        },
+        {
+            "type": "broadcast",
+            "payload": {"sequence": 99},
+            "channel": "other",
+            "timestamp": (now + timedelta(seconds=2)).isoformat(),
+        },
+        {
+            "type": "broadcast",
+            "payload": {"sequence": 0},
+            "channel": "alerts",
+            "timestamp": (now - timedelta(seconds=1)).isoformat(),
+        },
+    ]
+    for stored_message in messages:
+        await server.messages.save(stored_message)
+
+    since = quote(now.isoformat())
+    headers, body = await get_request(
+        server, f"/history?channel=alerts&since={since}&limit=2"
+    )
+    assert headers.startswith("HTTP/1.1 200 OK")
+    assert body["has_more"] is True
+    assert [item["payload"]["sequence"] for item in body["messages"]] == [1, 2]
+
+    _, final_page = await get_request(
+        server,
+        f"/history?channel=alerts&since={quote(body['messages'][-1]['timestamp'])}&limit=2",
+    )
+    assert final_page["has_more"] is False
+    assert [item["payload"]["sequence"] for item in final_page["messages"]] == [2, 3]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "path,detail",
+    [
+        ("/history?since=2026-01-01T00:00:00Z", "channel is required"),
+        ("/history?channel=alerts", "since is required"),
+        ("/history?channel=alerts&since=not-a-date", "since must be an ISO timestamp with timezone"),
+        ("/history?channel=alerts&since=2026-01-01T00:00:00Z&limit=0", "limit must be positive"),
+    ],
+)
+async def test_history_rejects_invalid_queries(server, path, detail):
+    headers, body = await get_request(server, path)
+    assert headers.startswith("HTTP/1.1 400 Bad Request")
+    assert body == {"error": detail}

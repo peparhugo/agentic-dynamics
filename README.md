@@ -35,7 +35,15 @@ channel retain their original behavior.
 
 The HTTP port also exposes `GET /channels` and
 `GET /channels/{name}/subscribers` as JSON endpoints. Message history is
-available from `GET /messages?limit=50&offset=0`, newest first.
+available from `GET /messages?limit=50&offset=0`, newest first. Channel history
+is available chronologically from
+`GET /history?channel=alerts&since=2026-08-13T12:00:00Z&limit=50`; the response
+includes a `has_more` pagination flag.
+
+Each client may send 100 messages per minute by default. Configure this with
+`RATE_LIMIT`. Counters are maintained in Redis per client ID, and excess
+messages receive a `system` error response. Stored messages expire after seven
+days; configure the startup background cleanup with `MESSAGE_TTL_DAYS`.
 
 ## SOAP Health API
 
