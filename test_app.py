@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from websockets.asyncio.client import connect
 
-from app import NotificationServer
+from app import MemoryBroker, NotificationServer
 
 
 @pytest_asyncio.fixture
@@ -130,3 +130,40 @@ async def test_channel_endpoints_report_active_subscriptions(notification_server
             first_welcome["payload"]["client_id"],
             second_welcome["payload"]["client_id"],
         }
+
+
+@pytest.mark.asyncio
+async def test_broker_distributes_messages_between_server_instances(tmp_path):
+    broker = MemoryBroker()
+    first_app = NotificationServer(broker=broker, database_url=str(tmp_path / "first.db"))
+    second_app = NotificationServer(broker=broker, database_url=str(tmp_path / "second.db"))
+    async with first_app.create_server(port=0) as first_server, second_app.create_server(port=0) as second_server:
+        first_address = f"ws://127.0.0.1:{first_server.sockets[0].getsockname()[1]}"
+        second_address = f"ws://127.0.0.1:{second_server.sockets[0].getsockname()[1]}"
+        async with connect(first_address) as sender, connect(second_address) as recipient:
+            await asyncio.gather(receive_json(sender), receive_json(recipient))
+            await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "shared"}}))
+            assert (await receive_json(recipient))["payload"] == {"text": "shared"}
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_returns_persisted_history(tmp_path):
+    application = NotificationServer(database_url=str(tmp_path / "messages.db"))
+    async with application.create_server(port=0) as server:
+        address = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        async with connect(address) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+            await client.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "first"}}))
+            await receive_json(client)
+            await client.send(json.dumps({"type": "broadcast", "payload": {"text": "second"}}))
+            await receive_json(client)
+
+        response, history = await get_json(address, "/messages?limit=1&offset=0")
+        assert b"200 OK" in response
+        assert history["messages"][0]["payload"] == {"text": "second"}
+        assert history["messages"][0]["channel"] is None
+
+        _, history = await get_json(address, "/messages?limit=1&offset=1")
+        assert history["messages"][0]["channel"] == "alerts"
+        assert history["messages"][0]["payload"] == {"text": "first"}
