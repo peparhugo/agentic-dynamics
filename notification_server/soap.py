@@ -74,6 +74,19 @@ def build_fault(message: str, code: str = "soap:Client") -> str:
 
 
 def create_soap_app(registry: ClientRegistry) -> web.Application:
+    async def list_channels(request: web.Request) -> web.Response:
+        channels = [
+            {"name": name, "subscribers": count}
+            for name, count in sorted(registry.channels().items())
+        ]
+        return web.json_response({"channels": channels})
+
+    async def get_channel_subscribers(request: web.Request) -> web.Response:
+        name = request.match_info["name"]
+        return web.json_response(
+            {"channel": name, "subscribers": registry.channel_subscribers(name)}
+        )
+
     async def wsdl_handler(request: web.Request) -> web.Response:
         return web.Response(text=WSDL, content_type="text/xml")
 
@@ -102,4 +115,6 @@ def create_soap_app(registry: ClientRegistry) -> web.Application:
     app = web.Application()
     app.router.add_get("/health", get_health)
     app.router.add_post("/health", post_health)
+    app.router.add_get("/channels", list_channels)
+    app.router.add_get("/channels/{name}/subscribers", get_channel_subscribers)
     return app

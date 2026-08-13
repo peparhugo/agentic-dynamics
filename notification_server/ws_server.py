@@ -47,6 +47,10 @@ class NotificationServer:
             await self._broadcast(sender_id, message)
         elif msg_type == "direct":
             await self._direct(sender_id, message)
+        elif msg_type == "subscribe":
+            await self._subscribe(sender_id, message)
+        elif msg_type == "unsubscribe":
+            await self._unsubscribe(sender_id, message)
         else:  # "system" is server-reserved; clients may not originate it
             sender = self.registry.get(sender_id)
             if sender is not None:
@@ -56,10 +60,41 @@ class NotificationServer:
 
     async def _broadcast(self, sender_id: str, message: dict) -> None:
         outgoing = dict(message, sender_id=sender_id)
-        targets = self.registry.connections()
+        channel = message.get("channel")
+        targets = (
+            self.registry.connections_for_channel(channel)
+            if channel
+            else self.registry.connections()
+        )
         if not targets:
             return
         await asyncio.gather(*(self._send(ws, outgoing) for ws in targets), return_exceptions=True)
+
+    async def _subscribe(self, sender_id: str, message: dict) -> None:
+        channel = message.get("channel")
+        sender = self.registry.get(sender_id)
+        if not channel:
+            if sender is not None:
+                await self._send(sender, error_message("subscribe requires a 'channel' field"))
+            return
+        self.registry.subscribe(sender_id, channel)
+        if sender is not None:
+            await self._send(
+                sender, make_message("system", {"event": "subscribed", "channel": channel})
+            )
+
+    async def _unsubscribe(self, sender_id: str, message: dict) -> None:
+        channel = message.get("channel")
+        sender = self.registry.get(sender_id)
+        if not channel:
+            if sender is not None:
+                await self._send(sender, error_message("unsubscribe requires a 'channel' field"))
+            return
+        self.registry.unsubscribe(sender_id, channel)
+        if sender is not None:
+            await self._send(
+                sender, make_message("system", {"event": "unsubscribed", "channel": channel})
+            )
 
     async def _direct(self, sender_id: str, message: dict) -> None:
         target_id = message["payload"].get("target_id")

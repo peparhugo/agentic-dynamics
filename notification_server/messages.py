@@ -1,7 +1,11 @@
 """JSON notification message parsing and construction.
 
 Every message on the wire is `{type: str, payload: dict, timestamp: str}`
-with `type` restricted to 'broadcast', 'direct', or 'system'.
+with `type` restricted to 'broadcast', 'direct', 'system', 'subscribe', or
+'unsubscribe'. Messages may carry an optional top-level `channel: str`
+field: 'subscribe'/'unsubscribe' use it to name the channel being
+(un)subscribed to, and 'broadcast' uses it to scope delivery to that
+channel's subscribers instead of every connected client.
 """
 from __future__ import annotations
 
@@ -9,7 +13,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-VALID_TYPES = {"broadcast", "direct", "system"}
+VALID_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 class InvalidMessage(ValueError):
@@ -43,7 +47,15 @@ def parse_message(raw: str) -> dict[str, Any]:
     if not isinstance(timestamp, str):
         raise InvalidMessage("timestamp must be a string")
 
-    return {"type": msg_type, "payload": payload, "timestamp": timestamp}
+    result = {"type": msg_type, "payload": payload, "timestamp": timestamp}
+
+    channel = data.get("channel")
+    if channel is not None:
+        if not isinstance(channel, str):
+            raise InvalidMessage("channel must be a string")
+        result["channel"] = channel
+
+    return result
 
 
 def make_message(msg_type: str, payload: dict[str, Any], **extra: Any) -> dict[str, Any]:
