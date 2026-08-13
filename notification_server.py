@@ -25,21 +25,24 @@ logger = logging.getLogger(__name__)
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients."""
+    """Thread-safe registry of connected WebSocket clients with channel support."""
 
     def __init__(self):
         self._clients: Dict[str, ServerConnection] = {}
+        self._subscriptions: Dict[str, Set[str]] = {}
         self._lock = Lock()
 
     def add(self, client_id: str, connection: ServerConnection) -> None:
         """Add a client to the registry."""
         with self._lock:
             self._clients[client_id] = connection
+            self._subscriptions[client_id] = set()
 
     def remove(self, client_id: str) -> None:
         """Remove a client from the registry."""
         with self._lock:
             self._clients.pop(client_id, None)
+            self._subscriptions.pop(client_id, None)
 
     def get(self, client_id: str) -> ServerConnection | None:
         """Get a client connection by ID."""
@@ -55,6 +58,43 @@ class ClientRegistry:
         """Get the number of connected clients."""
         with self._lock:
             return len(self._clients)
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a channel."""
+        with self._lock:
+            if client_id in self._subscriptions:
+                self._subscriptions[client_id].add(channel)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a channel."""
+        with self._lock:
+            if client_id in self._subscriptions:
+                self._subscriptions[client_id].discard(channel)
+
+    def get_subscriptions(self, client_id: str) -> Set[str]:
+        """Get all channels a client is subscribed to."""
+        with self._lock:
+            return set(self._subscriptions.get(client_id, set()))
+
+    def get_channel_subscribers(self, channel: str) -> Set[str]:
+        """Get all client IDs subscribed to a channel."""
+        with self._lock:
+            subscribers = set()
+            for client_id, channels in self._subscriptions.items():
+                if channel in channels:
+                    subscribers.add(client_id)
+            return subscribers
+
+    def get_all_channels(self) -> Dict[str, int]:
+        """Get all active channels and their subscriber counts."""
+        with self._lock:
+            channels: Dict[str, Set[str]] = {}
+            for client_id, subs in self._subscriptions.items():
+                for channel in subs:
+                    if channel not in channels:
+                        channels[channel] = set()
+                    channels[channel].add(client_id)
+            return {channel: len(subscribers) for channel, subscribers in channels.items()}
 
 
 class NotificationMessage:
@@ -112,7 +152,17 @@ class NotificationServer:
                     msg = NotificationMessage.from_json(message)
                     logger.info(f"Received from {client_id}: {msg.type}")
 
-                    if msg.type == "broadcast":
+                    if msg.type == "subscribe":
+                        channel = msg.payload.get("channel")
+                        if channel:
+                            self.clients.subscribe(client_id, channel)
+                            logger.info(f"Client {client_id} subscribed to channel: {channel}")
+                    elif msg.type == "unsubscribe":
+                        channel = msg.payload.get("channel")
+                        if channel:
+                            self.clients.unsubscribe(client_id, channel)
+                            logger.info(f"Client {client_id} unsubscribed from channel: {channel}")
+                    elif msg.type == "broadcast":
                         await self.broadcast(
                             NotificationMessage("broadcast", msg.payload)
                         )
@@ -122,6 +172,12 @@ class NotificationServer:
                             await self.send_direct(target_id, msg)
                     elif msg.type == "system":
                         await self.broadcast(msg)
+                    else:
+                        channel = msg.payload.get("channel")
+                        if channel:
+                            await self.broadcast_to_channel(channel, msg)
+                        else:
+                            await self.broadcast(msg)
 
                 except json.JSONDecodeError as e:
                     logger.error(f"Invalid JSON from {client_id}: {e}")
@@ -153,6 +209,25 @@ class NotificationServer:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def broadcast_to_channel(self, channel: str, message: NotificationMessage) -> None:
+        """Broadcast a message to all clients subscribed to a channel."""
+        subscribers = self.clients.get_channel_subscribers(channel)
+        if not subscribers:
+            logger.debug(f"No subscribers for channel {channel}")
+            return
+
+        message_json = message.to_json()
+        tasks = []
+        clients = self.clients.get_all()
+
+        for client_id in subscribers:
+            connection = clients.get(client_id)
+            if connection:
+                tasks.append(self._send_safe(connection, message_json, client_id))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     async def _send_safe(self, connection: ServerConnection, message: str, client_id: str) -> None:
         """Safely send a message to a connection, handling disconnects."""
         try:
@@ -171,7 +246,7 @@ class NotificationServer:
             logger.warning(f"Target client {target_id} not found")
 
     async def http_health(self, reader, writer) -> None:
-        """Simple HTTP server for /health endpoint."""
+        """HTTP server handler for REST endpoints."""
         request_line = await reader.readline()
         request_line = request_line.decode().strip()
 
@@ -189,6 +264,31 @@ class NotificationServer:
         if method == "GET" and path == "/health":
             client_count = self.clients.count()
             response_body = json.dumps({"connected_clients": client_count})
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json\r\n"
+                f"Content-Length: {len(response_body)}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                f"{response_body}"
+            )
+            writer.write(response.encode())
+        elif method == "GET" and path == "/channels":
+            channels = self.clients.get_all_channels()
+            response_body = json.dumps({"channels": channels})
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json\r\n"
+                f"Content-Length: {len(response_body)}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                f"{response_body}"
+            )
+            writer.write(response.encode())
+        elif method == "GET" and path.startswith("/channels/") and path.endswith("/subscribers"):
+            channel_name = path[len("/channels/"):-len("/subscribers")]
+            subscribers = self.clients.get_channel_subscribers(channel_name)
+            response_body = json.dumps({"channel": channel_name, "subscribers": list(subscribers)})
             response = (
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: application/json\r\n"

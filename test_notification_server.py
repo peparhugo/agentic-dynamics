@@ -216,6 +216,85 @@ class TestClientRegistry:
         assert registry.count() == 0
         assert len(results) == 10
 
+    def test_subscribe_client_to_channel(self):
+        """Test subscribing a client to a channel."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        subs = registry.get_subscriptions("client_1")
+
+        assert "alerts" in subs
+
+    def test_unsubscribe_client_from_channel(self):
+        """Test unsubscribing a client from a channel."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        registry.unsubscribe("client_1", "alerts")
+        subs = registry.get_subscriptions("client_1")
+
+        assert "alerts" not in subs
+
+    def test_get_channel_subscribers(self):
+        """Test getting all subscribers to a channel."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+        registry.add("client_2", Mock())
+        registry.add("client_3", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        registry.subscribe("client_2", "alerts")
+        registry.subscribe("client_3", "system")
+
+        subscribers = registry.get_channel_subscribers("alerts")
+        assert len(subscribers) == 2
+        assert "client_1" in subscribers
+        assert "client_2" in subscribers
+
+    def test_client_multiple_subscriptions(self):
+        """Test a client can subscribe to multiple channels."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        registry.subscribe("client_1", "chat")
+        registry.subscribe("client_1", "system")
+
+        subs = registry.get_subscriptions("client_1")
+        assert len(subs) == 3
+        assert "alerts" in subs
+        assert "chat" in subs
+        assert "system" in subs
+
+    def test_get_all_channels(self):
+        """Test getting all active channels and subscriber counts."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+        registry.add("client_2", Mock())
+        registry.add("client_3", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        registry.subscribe("client_2", "alerts")
+        registry.subscribe("client_2", "chat")
+        registry.subscribe("client_3", "chat")
+
+        channels = registry.get_all_channels()
+        assert channels["alerts"] == 2
+        assert channels["chat"] == 2
+
+    def test_remove_client_cleans_subscriptions(self):
+        """Test that removing a client cleans up subscriptions."""
+        registry = ClientRegistry()
+        registry.add("client_1", Mock())
+
+        registry.subscribe("client_1", "alerts")
+        registry.remove("client_1")
+
+        subscribers = registry.get_channel_subscribers("alerts")
+        assert "client_1" not in subscribers
+
 
 # ── NotificationServer Tests ────────────────────────────
 
@@ -296,6 +375,34 @@ class TestNotificationServer:
         assert srv.ws_port == 9765
         assert srv.http_port == 9080
 
+    @pytest.mark.asyncio
+    async def test_broadcast_to_channel(self, server):
+        """Test broadcasting to a specific channel."""
+        conn1 = AsyncMock()
+        conn2 = AsyncMock()
+        conn3 = AsyncMock()
+
+        server.clients.add("client_1", conn1)
+        server.clients.add("client_2", conn2)
+        server.clients.add("client_3", conn3)
+
+        server.clients.subscribe("client_1", "alerts")
+        server.clients.subscribe("client_2", "alerts")
+        server.clients.subscribe("client_3", "chat")
+
+        msg = NotificationMessage("alert", {"data": "alert message", "channel": "alerts"})
+        await server.broadcast_to_channel("alerts", msg)
+
+        assert conn1.send.called
+        assert conn2.send.called
+        assert not conn3.send.called
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_empty_channel(self, server):
+        """Test broadcasting to a channel with no subscribers."""
+        msg = NotificationMessage("alert", {"data": "test", "channel": "empty"})
+        await server.broadcast_to_channel("empty", msg)  # Should not raise
+
 
 # ── HTTP Health Endpoint Tests ──────────────────────────
 
@@ -359,6 +466,63 @@ async def test_http_empty_request():
     await srv.http_health(reader, writer)
 
     assert writer.close.called
+
+
+@pytest.mark.asyncio
+async def test_http_channels_endpoint():
+    """Test HTTP GET /channels endpoint returns active channels."""
+    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+
+    srv.clients.add("client_1", Mock())
+    srv.clients.add("client_2", Mock())
+    srv.clients.add("client_3", Mock())
+
+    srv.clients.subscribe("client_1", "alerts")
+    srv.clients.subscribe("client_2", "alerts")
+    srv.clients.subscribe("client_3", "chat")
+
+    reader = AsyncMock()
+    writer = Mock()
+    writer.drain = AsyncMock()
+
+    reader.readline = AsyncMock(return_value=b"GET /channels HTTP/1.1\r\n")
+
+    await srv.http_health(reader, writer)
+
+    assert writer.write.called
+    response = writer.write.call_args[0][0].decode()
+    assert "200 OK" in response
+    assert "alerts" in response
+    assert "chat" in response
+
+
+@pytest.mark.asyncio
+async def test_http_channel_subscribers_endpoint():
+    """Test HTTP GET /channels/{name}/subscribers endpoint."""
+    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+
+    srv.clients.add("client_1", Mock())
+    srv.clients.add("client_2", Mock())
+    srv.clients.add("client_3", Mock())
+
+    srv.clients.subscribe("client_1", "alerts")
+    srv.clients.subscribe("client_2", "alerts")
+    srv.clients.subscribe("client_3", "chat")
+
+    reader = AsyncMock()
+    writer = Mock()
+    writer.drain = AsyncMock()
+
+    reader.readline = AsyncMock(return_value=b"GET /channels/alerts/subscribers HTTP/1.1\r\n")
+
+    await srv.http_health(reader, writer)
+
+    assert writer.write.called
+    response = writer.write.call_args[0][0].decode()
+    assert "200 OK" in response
+    assert "alerts" in response
+    assert "client_1" in response
+    assert "client_2" in response
 
 
 # ── Integration Tests ──────────────────────────────────
@@ -553,3 +717,199 @@ async def test_message_timestamp_preserved(running_server):
         assert "timestamp" in data
         # Timestamp should be ISO format
         assert "T" in data["timestamp"]
+
+
+@pytest.mark.asyncio
+async def test_subscribe_message(running_server):
+    """Test client can subscribe to a channel."""
+    async with websockets.connect("ws://127.0.0.1:9765") as ws:
+        await asyncio.wait_for(ws.recv(), timeout=1.0)
+
+        subscribe_msg = json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws.send(subscribe_msg)
+
+        # Server should process subscription (no response expected for subscribe)
+        await asyncio.sleep(0.1)
+
+        # Verify subscription by checking server state
+        assert running_server.clients.get_subscriptions(
+            list(running_server.clients.get_all().keys())[0]
+        ) == {"alerts"}
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_message(running_server):
+    """Test client can unsubscribe from a channel."""
+    async with websockets.connect("ws://127.0.0.1:9765") as ws:
+        await asyncio.wait_for(ws.recv(), timeout=1.0)
+
+        client_id = list(running_server.clients.get_all().keys())[0]
+
+        subscribe_msg = json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws.send(subscribe_msg)
+        await asyncio.sleep(0.1)
+
+        unsubscribe_msg = json.dumps({
+            "type": "unsubscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws.send(unsubscribe_msg)
+        await asyncio.sleep(0.1)
+
+        assert running_server.clients.get_subscriptions(client_id) == set()
+
+
+@pytest.mark.asyncio
+async def test_channel_message_routing(running_server):
+    """Test messages with channel are only delivered to subscribers."""
+    async with websockets.connect("ws://127.0.0.1:9765") as ws1, \
+               websockets.connect("ws://127.0.0.1:9765") as ws2, \
+               websockets.connect("ws://127.0.0.1:9765") as ws3:
+
+        # Get initial connection messages
+        await asyncio.wait_for(ws1.recv(), timeout=1.0)
+        await asyncio.wait_for(ws2.recv(), timeout=1.0)
+        await asyncio.wait_for(ws3.recv(), timeout=1.0)
+
+        # Subscribe clients to channels
+        sub1 = json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        sub2 = json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "chat"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws1.send(sub1)
+        await ws2.send(sub2)
+        await asyncio.sleep(0.1)
+
+        # Send message to alerts channel
+        alert_msg = json.dumps({
+            "type": "alert",
+            "payload": {"data": "urgent alert", "channel": "alerts"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws1.send(alert_msg)
+
+        # Only ws1 should receive it (it's subscribed to alerts)
+        msg1 = await asyncio.wait_for(ws1.recv(), timeout=1.0)
+        data1 = json.loads(msg1)
+        assert data1["payload"]["data"] == "urgent alert"
+
+        # ws2 should NOT receive the alert (subscribed to chat)
+        # We need to ensure ws2 doesn't get the message
+        try:
+            await asyncio.wait_for(ws2.recv(), timeout=0.2)
+            # If we get here, ws2 received something it shouldn't
+            assert False, "ws2 should not receive alert message"
+        except asyncio.TimeoutError:
+            # This is expected - ws2 should not receive the message
+            pass
+
+
+@pytest.mark.asyncio
+async def test_message_without_channel_still_broadcasts(running_server):
+    """Test that messages without channel field are broadcast to all."""
+    async with websockets.connect("ws://127.0.0.1:9765") as ws1, \
+               websockets.connect("ws://127.0.0.1:9765") as ws2:
+
+        await asyncio.wait_for(ws1.recv(), timeout=1.0)
+        await asyncio.wait_for(ws2.recv(), timeout=1.0)
+
+        broadcast_msg = json.dumps({
+            "type": "broadcast",
+            "payload": {"data": "hello all"},
+            "timestamp": "2026-08-13T10:00:00Z"
+        })
+        await ws1.send(broadcast_msg)
+
+        # Both should receive it
+        msg1 = await asyncio.wait_for(ws1.recv(), timeout=1.0)
+        msg2 = await asyncio.wait_for(ws2.recv(), timeout=1.0)
+
+        assert json.loads(msg1)["payload"]["data"] == "hello all"
+        assert json.loads(msg2)["payload"]["data"] == "hello all"
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint_integration(running_server):
+    """Test /channels endpoint with real server."""
+    import httpx
+
+    async with httpx.AsyncClient() as client:
+        # Subscribe some clients
+        async with websockets.connect("ws://127.0.0.1:9765") as ws1, \
+                   websockets.connect("ws://127.0.0.1:9765") as ws2:
+
+            await asyncio.wait_for(ws1.recv(), timeout=1.0)
+            await asyncio.wait_for(ws2.recv(), timeout=1.0)
+
+            sub1 = json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+                "timestamp": "2026-08-13T10:00:00Z"
+            })
+            sub2 = json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+                "timestamp": "2026-08-13T10:00:00Z"
+            })
+            await ws1.send(sub1)
+            await ws2.send(sub2)
+            await asyncio.sleep(0.1)
+
+            response = await client.get("http://127.0.0.1:9080/channels")
+            assert response.status_code == 200
+            data = response.json()
+            assert "channels" in data
+            assert data["channels"]["alerts"] == 2
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_integration(running_server):
+    """Test /channels/{name}/subscribers endpoint with real server."""
+    import httpx
+
+    async with httpx.AsyncClient() as client:
+        async with websockets.connect("ws://127.0.0.1:9765") as ws1, \
+                   websockets.connect("ws://127.0.0.1:9765") as ws2:
+
+            msg1 = await asyncio.wait_for(ws1.recv(), timeout=1.0)
+            msg2 = await asyncio.wait_for(ws2.recv(), timeout=1.0)
+
+            client1_id = json.loads(msg1)["payload"]["client_id"]
+            client2_id = json.loads(msg2)["payload"]["client_id"]
+
+            sub1 = json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+                "timestamp": "2026-08-13T10:00:00Z"
+            })
+            sub2 = json.dumps({
+                "type": "subscribe",
+                "payload": {"channel": "alerts"},
+                "timestamp": "2026-08-13T10:00:00Z"
+            })
+            await ws1.send(sub1)
+            await ws2.send(sub2)
+            await asyncio.sleep(0.1)
+
+            response = await client.get("http://127.0.0.1:9080/channels/alerts/subscribers")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["channel"] == "alerts"
+            assert len(data["subscribers"]) == 2
+            assert client1_id in data["subscribers"]
+            assert client2_id in data["subscribers"]
