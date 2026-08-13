@@ -901,3 +901,234 @@ async def test_rest_channel_subscribers_endpoint():
 
     registry.clients.clear()
     registry.channels.clear()
+
+
+@pytest.mark.asyncio
+async def test_messages_persistence():
+    """Test that messages are persisted to SQLite."""
+    import tempfile
+    import os
+    from app import store_message, get_messages, init_database
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_persist.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp = "2025-08-13T10:00:00"
+            await store_message("alerts", "broadcast", {"text": "alert1"}, msg_timestamp)
+            await store_message("alerts", "broadcast", {"text": "alert2"}, msg_timestamp)
+            await store_message("system", "broadcast", {"text": "system1"}, msg_timestamp)
+
+            messages = await get_messages(limit=50, offset=0)
+
+            assert len(messages) == 3
+            assert messages[0]["channel"] == "system"
+            assert messages[0]["payload"]["text"] == "system1"
+            assert messages[1]["channel"] == "alerts"
+            assert messages[1]["payload"]["text"] == "alert2"
+            assert messages[2]["channel"] == "alerts"
+            assert messages[2]["payload"]["text"] == "alert1"
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_messages_rest_endpoint():
+    """Test GET /messages REST endpoint."""
+    import tempfile
+    import os
+    from app import store_message, init_database, messages_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_rest.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp = "2025-08-13T10:00:00"
+            for i in range(5):
+                await store_message("alerts", "broadcast", {"index": i}, msg_timestamp)
+
+            class MockRequest:
+                def __init__(self, limit=50, offset=0):
+                    self.query = {"limit": str(limit), "offset": str(offset)}
+
+            request = MockRequest(limit=2, offset=0)
+            response = await messages_handler(request)
+            data = json.loads(response.text)
+
+            assert len(data["messages"]) == 2
+            assert data["limit"] == 2
+            assert data["offset"] == 0
+            assert data["messages"][0]["payload"]["index"] == 4
+            assert data["messages"][1]["payload"]["index"] == 3
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_messages_pagination():
+    """Test message pagination."""
+    import tempfile
+    import os
+    from app import store_message, init_database, get_messages
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_pagination.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp = "2025-08-13T10:00:00"
+            for i in range(10):
+                await store_message("alerts", "broadcast", {"index": i}, msg_timestamp)
+
+            page1 = await get_messages(limit=5, offset=0)
+            page2 = await get_messages(limit=5, offset=5)
+
+            assert len(page1) == 5
+            assert len(page2) == 5
+            assert page1[0]["payload"]["index"] == 9
+            assert page2[0]["payload"]["index"] == 4
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_redis_publisher_fallback():
+    """Test that redis_publisher handles missing redis gracefully."""
+    from app import redis_publisher
+
+    msg = create_message("broadcast", {"text": "test"})
+    await redis_publisher(msg, channel="alerts")
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_invalid_params():
+    """Test /messages endpoint with invalid query parameters."""
+    import tempfile
+    import os
+    from app import store_message, init_database, messages_handler
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_invalid.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp = "2025-08-13T10:00:00"
+            await store_message("alerts", "broadcast", {"text": "msg"}, msg_timestamp)
+
+            class MockRequest:
+                def __init__(self, params):
+                    self.query = params
+
+            request = MockRequest({"limit": "invalid", "offset": "also_invalid"})
+            response = await messages_handler(request)
+            data = json.loads(response.text)
+
+            assert data["limit"] == 50
+            assert data["offset"] == 0
+            assert len(data["messages"]) == 1
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_database_initialization():
+    """Test that database is properly initialized."""
+    import tempfile
+    import os
+    import aiosqlite
+    from app import init_database
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_init.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            async with aiosqlite.connect(db_path) as db:
+                cursor = await db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='messages'"
+                )
+                row = await cursor.fetchone()
+                assert row is not None
+                assert row[0] == "messages"
+
+                cursor = await db.execute("PRAGMA table_info(messages)")
+                columns = await cursor.fetchall()
+                column_names = [col[1] for col in columns]
+                assert "id" in column_names
+                assert "channel" in column_names
+                assert "type" in column_names
+                assert "payload" in column_names
+                assert "timestamp" in column_names
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_messages_json_payload():
+    """Test that message payloads are properly JSON serialized."""
+    import tempfile
+    import os
+    from app import store_message, init_database, get_messages
+
+    original_db_url = os.environ.get("DATABASE_URL")
+    try:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test_json.db")
+            os.environ["DATABASE_URL"] = db_path
+
+            await init_database()
+
+            msg_timestamp = "2025-08-13T10:00:00"
+            complex_payload = {
+                "nested": {"key": "value", "number": 42},
+                "array": [1, 2, 3],
+                "string": "text",
+                "bool": True
+            }
+            await store_message("test", "broadcast", complex_payload, msg_timestamp)
+
+            messages = await get_messages(limit=10, offset=0)
+
+            assert len(messages) == 1
+            assert messages[0]["payload"]["nested"]["key"] == "value"
+            assert messages[0]["payload"]["nested"]["number"] == 42
+            assert messages[0]["payload"]["array"] == [1, 2, 3]
+            assert messages[0]["payload"]["string"] == "text"
+            assert messages[0]["payload"]["bool"] is True
+    finally:
+        if original_db_url:
+            os.environ["DATABASE_URL"] = original_db_url
+        elif "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]

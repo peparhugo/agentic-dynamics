@@ -5,11 +5,14 @@ WebSocket-based notification server with REST health endpoint.
 import asyncio
 import json
 import uuid
+import os
 from datetime import datetime
-from typing import Dict
+from typing import Dict, Optional
 import websockets
 from websockets.exceptions import ConnectionClosed
 from aiohttp import web
+import redis.asyncio as redis
+import aiosqlite
 
 
 class ClientRegistry:
@@ -85,6 +88,26 @@ class ClientRegistry:
         for client_id in disconnected:
             await self.unregister(client_id)
 
+    async def broadcast_to_local(self, message: dict, channel: str = None):
+        """Broadcast only to local clients without Redis pub/sub."""
+        async with self.lock:
+            if channel:
+                client_ids = self.channels.get(channel, set()).copy()
+            else:
+                client_ids = set(self.clients.keys())
+
+            disconnected = set()
+            for client_id in client_ids:
+                websocket = self.clients.get(client_id)
+                if websocket:
+                    try:
+                        await websocket.send(json.dumps(message))
+                    except (ConnectionClosed, Exception):
+                        disconnected.add(client_id)
+
+        for client_id in disconnected:
+            await self.unregister(client_id)
+
     async def send_direct(self, client_id: str, message: dict):
         """Send message to specific client."""
         async with self.lock:
@@ -100,6 +123,78 @@ class ClientRegistry:
 # Global registry
 registry = ClientRegistry()
 
+# Global Redis and database instances
+redis_client: Optional[redis.Redis] = None
+
+
+def get_db_path() -> str:
+    """Get the database path from environment or use default."""
+    return os.environ.get("DATABASE_URL", "notifications.db")
+
+
+def get_redis_url() -> str:
+    """Get the Redis URL from environment or use default."""
+    return os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+
+async def init_database():
+    """Initialize SQLite database with messages table."""
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                channel TEXT NOT NULL,
+                type TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+        """)
+        await db.commit()
+
+
+async def store_message(channel: str, msg_type: str, payload: dict, timestamp: str):
+    """Store message in SQLite database."""
+    try:
+        db_path = get_db_path()
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                """
+                INSERT INTO messages (channel, type, payload, timestamp)
+                VALUES (?, ?, ?, ?)
+                """,
+                (channel, msg_type, json.dumps(payload), timestamp)
+            )
+            await db.commit()
+    except Exception:
+        pass
+
+
+async def get_messages(limit: int = 50, offset: int = 0) -> list:
+    """Retrieve messages from SQLite database (newest first)."""
+    db_path = get_db_path()
+    async with aiosqlite.connect(db_path) as db:
+        cursor = await db.execute(
+            """
+            SELECT id, channel, type, payload, timestamp
+            FROM messages
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+            """,
+            (limit, offset)
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": row[0],
+                "channel": row[1],
+                "type": row[2],
+                "payload": json.loads(row[3]),
+                "timestamp": row[4]
+            }
+            for row in rows
+        ]
+
 
 def create_message(msg_type: str, payload: dict) -> dict:
     """Create a properly formatted message."""
@@ -108,6 +203,39 @@ def create_message(msg_type: str, payload: dict) -> dict:
         "payload": payload,
         "timestamp": datetime.utcnow().isoformat(),
     }
+
+
+async def redis_publisher(message: dict, channel: str = None):
+    """Publish message to Redis pub/sub."""
+    if redis_client:
+        channel_name = channel or "broadcast"
+        try:
+            await redis_client.publish(channel_name, json.dumps(message))
+        except Exception:
+            pass
+
+
+async def redis_subscriber():
+    """Subscribe to Redis channels and deliver messages to local clients."""
+    if not redis_client:
+        return
+
+    pubsub = redis_client.pubsub()
+    try:
+        await pubsub.subscribe("broadcast", "alerts", "system", "chat")
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                try:
+                    data = json.loads(message["data"])
+                    channel = message["channel"].decode() if isinstance(message["channel"], bytes) else message["channel"]
+                    await registry.broadcast_to_local(data, channel=channel if channel != "broadcast" else None)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    finally:
+        await pubsub.unsubscribe()
+        await pubsub.close()
 
 
 async def websocket_handler(websocket):
@@ -130,17 +258,16 @@ async def websocket_handler(websocket):
 
                 if msg_type == "broadcast":
                     channel = message.get("channel")
-                    await registry.broadcast(
-                        create_message("broadcast", message.get("payload", {})),
-                        channel=channel
-                    )
+                    msg = create_message("broadcast", message.get("payload", {}))
+                    await registry.broadcast(msg, channel=channel)
+                    await redis_publisher(msg, channel=channel)
+                    await store_message(channel or "broadcast", "broadcast", message.get("payload", {}), msg["timestamp"])
                 elif msg_type == "direct":
                     target_client_id = message.get("target_client_id")
                     if target_client_id:
-                        await registry.send_direct(
-                            target_client_id,
-                            create_message("direct", message.get("payload", {})),
-                        )
+                        msg = create_message("direct", message.get("payload", {}))
+                        await registry.send_direct(target_client_id, msg)
+                        await store_message("direct", "direct", {"target": target_client_id, **message.get("payload", {})}, msg["timestamp"])
                 elif msg_type == "subscribe":
                     channel = message.get("channel")
                     if channel:
@@ -219,13 +346,40 @@ async def channel_subscribers_handler(request):
     return web.json_response({"channel": channel_name, "subscribers": subscribers})
 
 
+async def messages_handler(request):
+    """Get message history with pagination."""
+    try:
+        limit = int(request.query.get("limit", 50))
+        offset = int(request.query.get("offset", 0))
+        limit = min(limit, 1000)
+        offset = max(offset, 0)
+    except (ValueError, TypeError):
+        limit = 50
+        offset = 0
+
+    messages = await get_messages(limit, offset)
+    return web.json_response({"messages": messages, "limit": limit, "offset": offset})
+
+
 async def start_servers():
     """Start both WebSocket and REST servers."""
+    global redis_client
+
+    await init_database()
+
+    try:
+        redis_client = await redis.from_url(get_redis_url())
+        await redis_client.ping()
+    except Exception:
+        print("Warning: Redis connection failed, running without pub/sub")
+        redis_client = None
+
     async with websockets.serve(websocket_handler, "localhost", 8765):
         app = web.Application()
         app.router.add_get("/health", health_handler)
         app.router.add_get("/channels", channels_handler)
         app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
+        app.router.add_get("/messages", messages_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, "localhost", 8766)
@@ -234,11 +388,23 @@ async def start_servers():
         print("WebSocket server running on ws://localhost:8765")
         print("REST API running on http://localhost:8766")
 
+        redis_task = None
+        if redis_client:
+            redis_task = asyncio.create_task(redis_subscriber())
+
         try:
             await asyncio.Event().wait()
         except KeyboardInterrupt:
             pass
         finally:
+            if redis_task:
+                redis_task.cancel()
+                try:
+                    await redis_task
+                except asyncio.CancelledError:
+                    pass
+            if redis_client:
+                await redis_client.close()
             await runner.cleanup()
 
 
