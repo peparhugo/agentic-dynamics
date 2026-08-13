@@ -1,6 +1,8 @@
 import asyncio
 import json
 import urllib.request
+from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 
 import fakeredis.aioredis
 import pytest
@@ -91,3 +93,117 @@ async def test_messages_persist_across_restart_with_pagination(tmp_path):
         assert stored["timestamp"].endswith("Z")
     finally:
         await second_server.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_uses_per_client_redis_counters(tmp_path):
+    redis_client = fakeredis.aioredis.FakeRedis()
+    server = NotificationServer(
+        port=0,
+        redis_client=redis_client,
+        database_url=f"sqlite:///{tmp_path / 'rate-limit.db'}",
+        rate_limit=2,
+    )
+    await server.start()
+    first = second = None
+    try:
+        first, _ = await connect_client(server)
+        second, _ = await connect_client(server)
+        request = json.dumps({"type": "broadcast", "payload": {"text": "hello"}})
+
+        await first.send(request)
+        await receive_json(first)
+        await receive_json(second)
+        await first.send(request)
+        await receive_json(first)
+        await receive_json(second)
+        await first.send(request)
+        error = await receive_json(first)
+
+        assert error["type"] == "system"
+        assert error["payload"] == {"error": "rate limit exceeded"}
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(second.recv(), timeout=0.05)
+
+        await second.send(request)
+        assert (await receive_json(first))["type"] == "broadcast"
+        assert (await receive_json(second))["type"] == "broadcast"
+        assert len(server.messages.list(10, 0)) == 3
+    finally:
+        if first is not None:
+            await first.close()
+        if second is not None:
+            await second.close()
+        await server.stop()
+        await redis_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_and_paginates_chronologically(tmp_path):
+    server = NotificationServer(
+        port=0, database_url=f"sqlite:///{tmp_path / 'channel-history.db'}"
+    )
+    for channel, number, created_at in (
+        ("alerts", 1, "2026-08-13T10:00:00Z"),
+        ("other", 2, "2026-08-13T10:30:00Z"),
+        ("alerts", 3, "2026-08-13T11:00:00Z"),
+        ("alerts", 4, "2026-08-13T12:00:00Z"),
+    ):
+        server.messages.add(
+            {
+                "type": "broadcast",
+                "channel": channel,
+                "payload": {"number": number},
+                "timestamp": created_at,
+            }
+        )
+    await server.start()
+    try:
+        query = urlencode(
+            {"channel": "alerts", "since": "2026-08-13T10:30:00Z", "limit": 1}
+        )
+        status, body = await fetch_json(server, f"/history?{query}")
+
+        assert status == 200
+        assert body["has_more"] is True
+        assert [item["payload"]["number"] for item in body["messages"]] == [3]
+
+        query = urlencode(
+            {"channel": "alerts", "since": "2026-08-13T10:30:00Z", "limit": 50}
+        )
+        _, body = await fetch_json(server, f"/history?{query}")
+        assert body["has_more"] is False
+        assert [item["payload"]["number"] for item in body["messages"]] == [3, 4]
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_startup_cleanup_removes_expired_messages(tmp_path):
+    server = NotificationServer(
+        port=0,
+        database_url=f"sqlite:///{tmp_path / 'expiry.db'}",
+        message_ttl_days=7,
+    )
+    now = datetime.now(timezone.utc)
+    for number, created_at in (
+        (1, now - timedelta(days=8)),
+        (2, now - timedelta(days=6)),
+    ):
+        server.messages.add(
+            {
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"number": number},
+                "timestamp": created_at.isoformat().replace("+00:00", "Z"),
+            }
+        )
+    await server.start()
+    try:
+        for _ in range(20):
+            if len(server.messages.list(10, 0)) == 1:
+                break
+            await asyncio.sleep(0.01)
+        assert [item["payload"]["number"] for item in server.messages.list(10, 0)] == [2]
+    finally:
+        await server.stop()
