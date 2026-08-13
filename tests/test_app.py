@@ -6,12 +6,12 @@ import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
-from app import NotificationServer
+from app import InMemoryBroker, NotificationServer
 
 
 @pytest.fixture
-async def notification_server():
-    application = NotificationServer()
+async def notification_server(tmp_path):
+    application = NotificationServer(database_url=f"sqlite:///{tmp_path / 'messages.db'}")
     async with serve(
         application.handle_connection,
         "127.0.0.1",
@@ -133,6 +133,44 @@ async def test_unsubscribe_stops_channel_delivery(notification_server):
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(client.recv(), timeout=0.05)
         assert await asyncio.to_thread(http_get, url, "/channels") == {"channels": []}
+
+
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    broker = InMemoryBroker()
+    first = NotificationServer(broker=broker, database_url=f"sqlite:///{tmp_path / 'first.db'}")
+    second = NotificationServer(broker=broker, database_url=f"sqlite:///{tmp_path / 'second.db'}")
+    async with serve(first.handle_connection, "127.0.0.1", 0, process_request=first.health_response) as first_server, serve(
+        second.handle_connection, "127.0.0.1", 0, process_request=second.health_response
+    ) as second_server:
+        first_url = f"ws://127.0.0.1:{first_server.sockets[0].getsockname()[1]}"
+        second_url = f"ws://127.0.0.1:{second_server.sockets[0].getsockname()[1]}"
+        message = {"type": "broadcast", "payload": {"text": "shared"}, "timestamp": "2026-08-13T00:00:00Z"}
+        async with connect(first_url) as publisher, connect(second_url) as recipient:
+            await publisher.recv()
+            await recipient.recv()
+            await publisher.send(json.dumps(message))
+            assert json.loads(await recipient.recv()) == message
+
+
+async def test_messages_endpoint_returns_persisted_messages_with_pagination(notification_server):
+    _, url = notification_server
+    first = {"type": "broadcast", "payload": {"text": "first"}, "timestamp": "2026-08-13T00:00:00Z"}
+    second = {"type": "broadcast", "channel": "alerts", "payload": {"text": "second"}, "timestamp": "2026-08-13T00:00:01Z"}
+    async with connect(url) as client:
+        await client.recv()
+        await client.send(json.dumps(first))
+        await client.recv()
+        await client.send(json.dumps(second))
+
+    history = await asyncio.to_thread(http_get, url, "/messages?limit=1&offset=0")
+    assert history["messages"] == [{
+        "id": 2,
+        "channel": "alerts",
+        "type": "broadcast",
+        "payload": {"text": "second"},
+        "timestamp": "2026-08-13T00:00:01Z",
+    }]
+    assert (await asyncio.to_thread(http_get, url, "/messages?limit=1&offset=1"))["messages"][0]["payload"] == {"text": "first"}
 
 
 def http_get(websocket_url: str, path: str) -> dict[str, int]:
