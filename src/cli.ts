@@ -2,18 +2,19 @@
 import { buildSite, BuildOptions } from './generator';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
 export function parseArguments(args: string[]): BuildOptions {
   const options: BuildOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output') {
+    if (argument === '--content' || argument === '--output' || argument === '--templates') {
       const value = args[++index];
       if (!value || value.startsWith('--')) throw new Error(`${argument} requires a directory`);
       if (argument === '--content') options.contentDir = value;
-      else options.outputDir = value;
+      else if (argument === '--output') options.outputDir = value;
+      else options.templatesDir = value;
     } else {
       throw new Error(`Unknown option: ${argument}`);
     }

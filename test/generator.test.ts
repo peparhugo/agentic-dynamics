@@ -21,11 +21,46 @@ describe('buildSite', () => {
     await expect(readFile(join(output, 'guides', 'start.html'), 'utf8')).resolves.toContain('<title>start</title>');
     await expect(readFile(join(output, 'index.html'), 'utf8')).resolves.toContain('href="guides/start.html"');
   });
+
+  it('renders Handlebars templates, layouts, and partials', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await mkdir(join(templates, 'partials'), { recursive: true });
+    await writeFile(join(content, 'post.md'), '---\ntitle: Template Page\ntemplate: post\nlayout: site\nauthor: Ada\n---\n\n# Body');
+    await writeFile(join(templates, 'post.hbs'), '<article><h1>{{title}}</h1><p>{{author}}</p>{{{content}}}</article>');
+    await writeFile(join(templates, 'layouts', 'site.hbs'), '<!doctype html><html><body>{{> header}} {{{body}}} {{> footer}}</body></html>');
+    await writeFile(join(templates, 'partials', 'header.hbs'), '<header>Header</header>');
+    await writeFile(join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+
+    await expect(readFile(join(output, 'post.html'), 'utf8')).resolves.toBe('<!doctype html><html><body><header>Header</header> <article><h1>Template Page</h1><p>Ada</p><h1>Body</h1></article> <footer>Footer</footer></body></html>');
+  });
+
+  it('uses the default template and layout when no frontmatter selection is supplied', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await writeFile(join(content, 'page.md'), '---\ntitle: Default Page\n---\n\nText');
+    await writeFile(join(templates, 'default.hbs'), '<main>{{title}}: {{{content}}}</main>');
+    await writeFile(join(templates, 'layouts', 'default.hbs'), '<html>{{{body}}}</html>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+
+    await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toBe('<html><main>Default Page: <p>Text</p></main></html>');
+  });
 });
 
 describe('parseArguments', () => {
   it('accepts custom content and output directories', () => {
-    expect(parseArguments(['--content', 'posts', '--output', 'public'])).toEqual({ contentDir: 'posts', outputDir: 'public' });
+    expect(parseArguments(['--content', 'posts', '--output', 'public', '--templates', 'views'])).toEqual({ contentDir: 'posts', outputDir: 'public', templatesDir: 'views' });
   });
 
   it('rejects invalid options', () => {
