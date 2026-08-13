@@ -4,13 +4,18 @@ Every message is: {"type": str, "payload": dict, "timestamp": str}
 """
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def cutoff_iso(days: float) -> str:
+    """ISO timestamp `days` days before now, for expiring old records."""
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
 
 def make_message(msg_type: str, payload: dict) -> dict:

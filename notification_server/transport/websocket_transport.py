@@ -3,6 +3,7 @@
 import asyncio
 
 import websockets
+import websockets.asyncio.server
 
 from .base import BaseTransport
 
@@ -13,7 +14,14 @@ class WebSocketTransport(BaseTransport):
         self._server = None
 
     async def start(self, host, port, http_handler=None):
-        self._server = await websockets.serve(
+        # `websockets.serve` resolves to the legacy server implementation
+        # (whose process_request hook takes (path, headers) and returns a
+        # legacy response) on versions of the websockets package before its
+        # asyncio-based server became the default. process_request above
+        # is written for the newer (connection, request) -> Response
+        # interface, so target that implementation explicitly rather than
+        # relying on whichever one the installed version aliases to.
+        self._server = await websockets.asyncio.server.serve(
             self._connection_handler,
             host,
             port,

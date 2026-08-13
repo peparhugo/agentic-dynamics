@@ -1,11 +1,13 @@
 import asyncio
 import json
+import urllib.error
 import urllib.request
 
 import pytest
 import pytest_asyncio
 import websockets
 
+from notification_server.messages import now_iso
 from notification_server.server import NotificationServer
 
 
@@ -16,6 +18,23 @@ async def running_server(tmp_path):
         port=0,
         storage_path=tmp_path / "events.jsonl",
         database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+    )
+    await server.start()
+    port = server._server.sockets[0].getsockname()[1]
+    try:
+        yield server, port
+    finally:
+        await server.stop()
+
+
+@pytest_asyncio.fixture
+async def rate_limited_server(tmp_path):
+    server = NotificationServer(
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+        rate_limit=3,
     )
     await server.start()
     port = server._server.sockets[0].getsockname()[1]
@@ -387,3 +406,296 @@ async def test_channel_subscribers_endpoint_empty_for_unknown_channel(running_se
     )
     assert status == 200
     assert body == {"channel": "does-not-exist", "subscribers": []}
+
+
+# ── rate limiting ────────────────────────────────────────────────
+
+
+async def test_messages_within_rate_limit_are_processed(rate_limited_server):
+    server, port = rate_limited_server
+    ws, _ = await connect(port)
+    try:
+        for i in range(3):
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            reply = json.loads(await ws.recv())
+            assert reply["type"] == "broadcast"
+            assert reply["payload"]["n"] == i
+    finally:
+        await ws.close()
+
+
+async def test_messages_over_rate_limit_get_error_not_dropped(rate_limited_server):
+    server, port = rate_limited_server
+    ws, _ = await connect(port)
+    try:
+        for i in range(3):
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await ws.recv()
+
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 99}}))
+        reply = json.loads(await ws.recv())
+        assert reply["type"] == "system"
+        assert reply["payload"]["event"] == "error"
+        assert reply["payload"]["detail"] == "rate_limit_exceeded"
+    finally:
+        await ws.close()
+
+
+async def test_rate_limit_is_tracked_per_client(rate_limited_server):
+    server, port = rate_limited_server
+    ws1, _ = await connect(port)
+    ws2, _ = await connect(port)
+    try:
+        for i in range(3):
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+            await ws1.recv()
+
+        # ws1 is now at its limit; ws2 (a different client) is unaffected.
+        await ws2.send(json.dumps({"type": "broadcast", "payload": {"n": 0}}))
+        reply = json.loads(await ws2.recv())
+        assert reply["type"] == "broadcast"
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_default_rate_limit_matches_env_var(monkeypatch, tmp_path):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    server = NotificationServer(
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+    )
+    await server.start()
+    port = server._server.sockets[0].getsockname()[1]
+    try:
+        ws, _ = await connect(port)
+        try:
+            for i in range(2):
+                await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+                await ws.recv()
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 99}}))
+            reply = json.loads(await ws.recv())
+            assert reply["payload"]["detail"] == "rate_limit_exceeded"
+        finally:
+            await ws.close()
+    finally:
+        await server.stop()
+
+
+# ── GET /history ─────────────────────────────────────────────────
+
+
+async def test_history_returns_channel_messages_in_chronological_order(running_server):
+    server, port = running_server
+    ws, _ = await connect(port)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await ws.recv()
+
+        for i in range(3):
+            await ws.send(
+                json.dumps(
+                    {"type": "broadcast", "payload": {"channel": "alerts", "n": i}}
+                )
+            )
+            await ws.recv()
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, get_json, port, "/history?channel=alerts"
+        )
+        assert status == 200
+        assert [m["payload"]["n"] for m in body["messages"]] == [0, 1, 2]
+        assert body["has_more"] is False
+    finally:
+        await ws.close()
+
+
+async def test_history_excludes_other_channels(running_server):
+    server, port = running_server
+    ws, _ = await connect(port)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await ws.recv()
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await ws.recv()
+
+        await ws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "a"}})
+        )
+        await ws.recv()
+        await ws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "chat", "text": "b"}})
+        )
+        await ws.recv()
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, get_json, port, "/history?channel=alerts"
+        )
+        assert status == 200
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["payload"]["text"] == "a"
+    finally:
+        await ws.close()
+
+
+async def test_history_respects_limit_and_reports_has_more(running_server):
+    server, port = running_server
+    ws, _ = await connect(port)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await ws.recv()
+
+        for i in range(5):
+            await ws.send(
+                json.dumps(
+                    {"type": "broadcast", "payload": {"channel": "alerts", "n": i}}
+                )
+            )
+            await ws.recv()
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, get_json, port, "/history?channel=alerts&limit=2"
+        )
+        assert status == 200
+        assert [m["payload"]["n"] for m in body["messages"]] == [0, 1]
+        assert body["has_more"] is True
+        assert body["limit"] == 2
+    finally:
+        await ws.close()
+
+
+async def test_history_since_filters_out_earlier_messages(running_server):
+    server, port = running_server
+    ws, _ = await connect(port)
+    try:
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await ws.recv()
+
+        for i in range(3):
+            await ws.send(
+                json.dumps(
+                    {"type": "broadcast", "payload": {"channel": "alerts", "n": i}}
+                )
+            )
+            await ws.recv()
+
+        loop = asyncio.get_running_loop()
+        status, first_page = await loop.run_in_executor(
+            None, get_json, port, "/history?channel=alerts&limit=1"
+        )
+        since = first_page["messages"][0]["timestamp"]
+
+        status, body = await loop.run_in_executor(
+            None, get_json, port, f"/history?channel=alerts&since={since}"
+        )
+        assert status == 200
+        assert [m["payload"]["n"] for m in body["messages"]] == [1, 2]
+    finally:
+        await ws.close()
+
+
+async def test_history_without_channel_returns_400(running_server):
+    server, port = running_server
+    loop = asyncio.get_running_loop()
+
+    def get_error():
+        try:
+            urllib.request.urlopen(f"http://localhost:{port}/history")
+            raise AssertionError("expected HTTPError")
+        except urllib.error.HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    status, body = await loop.run_in_executor(None, get_error)
+    assert status == 400
+    assert "channel" in body["error"]
+
+
+async def test_history_empty_for_unknown_channel(running_server):
+    server, port = running_server
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, get_json, port, "/history?channel=does-not-exist"
+    )
+    assert status == 200
+    assert body == {"messages": [], "has_more": False, "limit": 50}
+
+
+# ── message expiry ──────────────────────────────────────────────
+
+
+async def test_cleanup_expired_messages_purges_only_old_messages(running_server):
+    server, port = running_server
+    server.message_ttl_days = 1
+    server.messages.save_message(
+        "broadcast", {"n": "old"}, "2000-01-01T00:00:00+00:00", channel="alerts"
+    )
+    server.messages.save_message(
+        "broadcast", {"n": "new"}, now_iso(), channel="alerts"
+    )
+
+    removed = await server.cleanup_expired_messages()
+    assert removed == 1
+
+    remaining, _ = server.messages.list_by_channel("alerts")
+    assert [m["payload"]["n"] for m in remaining] == ["new"]
+
+
+async def test_cleanup_task_is_running_after_server_start(running_server):
+    server, port = running_server
+    assert server._cleanup_task is not None
+    assert not server._cleanup_task.done()
+
+
+async def test_cleanup_task_stops_when_server_stops(tmp_path):
+    server = NotificationServer(
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+    )
+    await server.start()
+    task = server._cleanup_task
+    await server.stop()
+    assert task.cancelled() or task.done()
+    assert server._cleanup_task is None
+
+
+async def test_cleanup_worker_loop_purges_expired_messages_on_startup(tmp_path):
+    server = NotificationServer(
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+        message_ttl_days=1,
+        cleanup_interval_seconds=0.05,
+    )
+    server.messages.save_message(
+        "broadcast", {"n": "old"}, "2000-01-01T00:00:00+00:00", channel="alerts"
+    )
+    await server.start()
+    try:
+        for _ in range(50):
+            remaining, _ = server.messages.list_by_channel("alerts")
+            if not remaining:
+                break
+            await asyncio.sleep(0.05)
+        remaining, _ = server.messages.list_by_channel("alerts")
+        assert remaining == []
+    finally:
+        await server.stop()
+
+
+async def test_message_ttl_days_configurable_via_env(monkeypatch, tmp_path):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "30")
+    server = NotificationServer(
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+    )
+    assert server.message_ttl_days == 30

@@ -16,6 +16,14 @@
   clients. This lets multiple server processes share one backbone. Client
   connection presence is also mirrored into Redis so it is visible across
   instances and survives an individual server restart.
+- Rate-limits each client's incoming messages using Redis counters (shared
+  across instances the same way presence is), configurable via RATE_LIMIT.
+  Clients over the limit get a "system"/"error" reply, not a silent drop.
+- Exposes GET /history?channel=X&since=ISO_TIMESTAMP&limit=50 for paginated,
+  chronological per-channel message history (SQLite-backed, has_more flag).
+- Runs a background task that purges messages older than MESSAGE_TTL_DAYS
+  (default 7) from the SQLite store on a fixed interval, starting at server
+  startup.
 """
 
 import argparse
@@ -30,8 +38,16 @@ from urllib.parse import parse_qs, urlsplit
 from websockets.datastructures import Headers
 from websockets.http11 import Response
 
-from .db import DEFAULT_DB_PATH, MessageStore, resolve_database_path
-from .messages import MessageError, encode, make_message, now_iso, parse_client_message
+from .db import DEFAULT_DB_PATH, MessageStore, resolve_database_path, resolve_message_ttl_days
+from .messages import (
+    MessageError,
+    cutoff_iso,
+    encode,
+    make_message,
+    now_iso,
+    parse_client_message,
+)
+from .rate_limit import RateLimiter
 from .redis_backend import RedisBackend, make_redis_client
 from .registry import ChannelRegistry
 from .storage import FlatFileStorage
@@ -40,6 +56,7 @@ from .transport import create_transport
 logger = logging.getLogger("notification_server")
 
 DEFAULT_DATA_PATH = Path(__file__).parent / "data" / "events.jsonl"
+DEFAULT_CLEANUP_INTERVAL_SECONDS = 3600
 
 CHANNEL_SUBSCRIBERS_PATH_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
@@ -54,6 +71,9 @@ class NotificationServer:
         redis_url=None,
         redis_client=None,
         transport=None,
+        rate_limit=None,
+        message_ttl_days=None,
+        cleanup_interval_seconds=DEFAULT_CLEANUP_INTERVAL_SECONDS,
     ):
         self.host = host
         self.port = port
@@ -65,7 +85,11 @@ class NotificationServer:
         self.messages = MessageStore(resolve_database_path(database_url))
         self._owns_redis_client = redis_client is None
         self.redis = RedisBackend(redis_client or make_redis_client(redis_url))
+        self.rate_limiter = RateLimiter(self.redis.client, limit=rate_limit)
+        self.message_ttl_days = resolve_message_ttl_days(message_ttl_days)
+        self.cleanup_interval_seconds = cleanup_interval_seconds
         self._redis_worker_task = None
+        self._cleanup_task = None
         self._server = None
 
     # ── connection lifecycle ────────────────────────────────────
@@ -93,6 +117,13 @@ class NotificationServer:
         await self._dispatch(client_id, raw)
 
     async def _dispatch(self, client_id, raw):
+        if not await self.rate_limiter.allow(client_id):
+            error = make_message(
+                "system", {"event": "error", "detail": "rate_limit_exceeded"}
+            )
+            await self.transport.send_message(client_id, encode(error))
+            return
+
         try:
             data = parse_client_message(raw)
         except MessageError as exc:
@@ -246,6 +277,22 @@ class NotificationServer:
         elif kind == "direct":
             await self.transport.send_message(envelope.get("target_id"), data)
 
+    # ── message expiry: periodically purge messages older than the TTL ──
+
+    async def cleanup_expired_messages(self) -> int:
+        return self.messages.delete_older_than(cutoff_iso(self.message_ttl_days))
+
+    async def _cleanup_worker_loop(self):
+        try:
+            while True:
+                try:
+                    await self.cleanup_expired_messages()
+                except Exception:
+                    logger.exception("message cleanup pass failed")
+                await asyncio.sleep(self.cleanup_interval_seconds)
+        except asyncio.CancelledError:
+            raise
+
     # ── REST: GET /health, /channels, /channels/{name}/subscribers, /messages
 
     def process_request(self, connection, request):
@@ -266,6 +313,17 @@ class NotificationServer:
             offset = int(query.get("offset", ["0"])[0])
             messages = self.messages.list_messages(limit=limit, offset=offset)
             return self._json_response({"messages": messages, "limit": limit, "offset": offset})
+        if path == "/history":
+            query = parse_qs(parsed.query)
+            channel = query.get("channel", [None])[0]
+            if not channel:
+                return self._json_response({"error": "channel is required"}, status=400)
+            since = query.get("since", [None])[0]
+            limit = int(query.get("limit", ["50"])[0])
+            messages, has_more = self.messages.list_by_channel(channel, since=since, limit=limit)
+            return self._json_response(
+                {"messages": messages, "has_more": has_more, "limit": limit}
+            )
         match = CHANNEL_SUBSCRIBERS_PATH_RE.match(path)
         if match:
             channel = match.group(1)
@@ -274,7 +332,7 @@ class NotificationServer:
         return None
 
     @staticmethod
-    def _json_response(payload):
+    def _json_response(payload, status=200):
         body = json.dumps(payload).encode()
         headers = Headers(
             [
@@ -282,7 +340,8 @@ class NotificationServer:
                 ("Content-Length", str(len(body))),
             ]
         )
-        return Response(200, "OK", headers, body)
+        reason = "OK" if status == 200 else "Bad Request"
+        return Response(status, reason, headers, body)
 
     # ── run/serve ────────────────────────────────────────────────
 
@@ -291,6 +350,7 @@ class NotificationServer:
         # be missed by this instance's worker loop.
         await self.redis.subscribe()
         self._redis_worker_task = asyncio.create_task(self._redis_worker_loop())
+        self._cleanup_task = asyncio.create_task(self._cleanup_worker_loop())
         self.transport.on_client_connect = self._on_client_connect
         self.transport.on_client_message = self._on_client_message
         self.transport.on_client_disconnect = self._on_client_disconnect
@@ -311,6 +371,13 @@ class NotificationServer:
             except asyncio.CancelledError:
                 pass
             self._redis_worker_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         await self.redis.close(close_client=self._owns_redis_client)
 
     async def serve_forever(self):
@@ -325,6 +392,15 @@ def main():
     parser.add_argument("--data", default=str(DEFAULT_DATA_PATH))
     parser.add_argument("--database-url", default=None, help="defaults to $DATABASE_URL")
     parser.add_argument("--redis-url", default=None, help="defaults to $REDIS_URL")
+    parser.add_argument(
+        "--rate-limit", type=int, default=None, help="messages/min per client; defaults to $RATE_LIMIT"
+    )
+    parser.add_argument(
+        "--message-ttl-days",
+        type=float,
+        default=None,
+        help="defaults to $MESSAGE_TTL_DAYS",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -334,6 +410,8 @@ def main():
         storage_path=args.data,
         database_url=args.database_url,
         redis_url=args.redis_url,
+        rate_limit=args.rate_limit,
+        message_ttl_days=args.message_ttl_days,
     )
     asyncio.run(server.serve_forever())
 

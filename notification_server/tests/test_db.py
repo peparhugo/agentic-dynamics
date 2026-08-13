@@ -1,4 +1,9 @@
-from notification_server.db import MessageStore, resolve_database_path
+from notification_server.db import (
+    DEFAULT_MESSAGE_TTL_DAYS,
+    MessageStore,
+    resolve_database_path,
+    resolve_message_ttl_days,
+)
 
 
 def test_save_message_returns_stored_record(tmp_path):
@@ -76,3 +81,91 @@ def test_resolve_database_path_falls_back_to_default(monkeypatch):
     from notification_server.db import DEFAULT_DB_PATH
 
     assert resolve_database_path() == DEFAULT_DB_PATH
+
+
+# ── list_by_channel (GET /history) ──────────────────────────────
+
+
+def test_list_by_channel_returns_only_matching_channel_in_chronological_order(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    store.save_message("broadcast", {"n": 1}, "2024-01-01T00:00:01+00:00", channel="alerts")
+    store.save_message("broadcast", {"n": 2}, "2024-01-01T00:00:02+00:00", channel="chat")
+    store.save_message("broadcast", {"n": 3}, "2024-01-01T00:00:03+00:00", channel="alerts")
+
+    messages, has_more = store.list_by_channel("alerts")
+    assert [m["payload"]["n"] for m in messages] == [1, 3]
+    assert has_more is False
+
+
+def test_list_by_channel_filters_by_since_exclusive(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    store.save_message("broadcast", {"n": 1}, "2024-01-01T00:00:01+00:00", channel="alerts")
+    store.save_message("broadcast", {"n": 2}, "2024-01-01T00:00:02+00:00", channel="alerts")
+    store.save_message("broadcast", {"n": 3}, "2024-01-01T00:00:03+00:00", channel="alerts")
+
+    messages, _ = store.list_by_channel("alerts", since="2024-01-01T00:00:01+00:00")
+    assert [m["payload"]["n"] for m in messages] == [2, 3]
+
+
+def test_list_by_channel_sets_has_more_when_extra_rows_exist(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    for i in range(5):
+        store.save_message(
+            "broadcast", {"n": i}, f"2024-01-01T00:00:0{i}+00:00", channel="alerts"
+        )
+
+    page, has_more = store.list_by_channel("alerts", limit=3)
+    assert [m["payload"]["n"] for m in page] == [0, 1, 2]
+    assert has_more is True
+
+    next_page, has_more = store.list_by_channel(
+        "alerts", since=page[-1]["timestamp"], limit=3
+    )
+    assert [m["payload"]["n"] for m in next_page] == [3, 4]
+    assert has_more is False
+
+
+def test_list_by_channel_empty_for_unknown_channel(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    store.save_message("broadcast", {"n": 1}, "2024-01-01T00:00:01+00:00", channel="alerts")
+    messages, has_more = store.list_by_channel("does-not-exist")
+    assert messages == []
+    assert has_more is False
+
+
+# ── delete_older_than (message expiry) ──────────────────────────
+
+
+def test_delete_older_than_removes_only_old_messages(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    store.save_message("broadcast", {"n": 1}, "2024-01-01T00:00:00+00:00", channel="alerts")
+    store.save_message("broadcast", {"n": 2}, "2024-06-01T00:00:00+00:00", channel="alerts")
+
+    removed = store.delete_older_than("2024-03-01T00:00:00+00:00")
+    assert removed == 1
+    remaining = store.list_messages()
+    assert [m["payload"]["n"] for m in remaining] == [2]
+
+
+def test_delete_older_than_returns_zero_when_nothing_expired(tmp_path):
+    store = MessageStore(tmp_path / "messages.db")
+    store.save_message("broadcast", {"n": 1}, "2024-06-01T00:00:00+00:00", channel="alerts")
+    assert store.delete_older_than("2024-01-01T00:00:00+00:00") == 0
+
+
+# ── resolve_message_ttl_days ─────────────────────────────────────
+
+
+def test_resolve_message_ttl_days_prefers_explicit_argument(monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "30")
+    assert resolve_message_ttl_days(3) == 3
+
+
+def test_resolve_message_ttl_days_falls_back_to_env(monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "14")
+    assert resolve_message_ttl_days() == 14
+
+
+def test_resolve_message_ttl_days_defaults_when_unset(monkeypatch):
+    monkeypatch.delenv("MESSAGE_TTL_DAYS", raising=False)
+    assert resolve_message_ttl_days() == DEFAULT_MESSAGE_TTL_DAYS
