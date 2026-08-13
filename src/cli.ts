@@ -3,13 +3,17 @@ import { buildSite } from './site';
 import { startDevelopmentServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <port>]';
 }
 
-function parseArguments(args: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } {
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
+function parseArguments(args: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } {
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
+    if (argument === '--incremental' || argument === '--clean') {
+      options[argument.slice(2) as 'incremental' | 'clean'] = true;
+      continue;
+    }
     if (argument !== '--content' && argument !== '--output' && argument !== '--templates' && argument !== '--port') throw new Error(`Unknown option: ${argument}`);
     const value = args[index + 1];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${argument}`);
@@ -36,7 +40,7 @@ function main(): void {
     return;
   }
   const pages = buildSite(options);
-  process.stdout.write(`Generated ${pages.length} page(s).\n`);
+  process.stdout.write(`Generated ${pages.length} page(s). ${pages.stats.pagesBuilt} built, ${pages.stats.pagesSkipped} skipped, ${pages.stats.timeSavedMs}ms saved.\n`);
 }
 
 try {

@@ -98,6 +98,60 @@ tags:
 
     expect(() => buildSite({ contentDir: content, outputDir: join(workspace, 'public') })).toThrow('Template does not exist: missing');
   });
+
+  it('only rebuilds changed pages during incremental builds', () => {
+    const content = join(workspace, 'content');
+    const output = join(workspace, 'public');
+    mkdirSync(content);
+    writeFileSync(join(content, 'first.md'), '# First');
+    writeFileSync(join(content, 'second.md'), '# Second');
+
+    const initial = buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const unchanged = buildSite({ contentDir: content, outputDir: output, incremental: true });
+    writeFileSync(join(content, 'first.md'), '# Updated');
+    const changed = buildSite({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(initial.stats).toEqual(expect.objectContaining({ pagesBuilt: 2, pagesSkipped: 0 }));
+    expect(unchanged.stats).toEqual(expect.objectContaining({ pagesBuilt: 0, pagesSkipped: 2 }));
+    expect(changed.stats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 1 }));
+    expect(readFileSync(join(output, 'first.html'), 'utf8')).toContain('<h1>Updated</h1>');
+    expect(existsSync(join(workspace, '.ssg-cache.json'))).toBe(true);
+  });
+
+  it('invalidates cached pages when templates change and removes deleted pages', () => {
+    const content = join(workspace, 'content');
+    const output = join(workspace, 'public');
+    const templates = join(workspace, 'templates');
+    mkdirSync(content);
+    mkdirSync(templates);
+    writeFileSync(join(content, 'first.md'), '---\ntitle: First\n---\nContent');
+    writeFileSync(join(content, 'second.md'), '---\ntitle: Second\n---\nContent');
+    writeFileSync(join(templates, 'default.hbs'), '<article>{{title}}</article>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    writeFileSync(join(templates, 'default.hbs'), '<main>{{title}}</main>');
+    const templated = buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    rmSync(join(content, 'second.md'));
+    const deleted = buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+
+    expect(templated.stats).toEqual(expect.objectContaining({ pagesBuilt: 2, pagesSkipped: 0 }));
+    expect(readFileSync(join(output, 'first.html'), 'utf8')).toContain('<main>First</main>');
+    expect(deleted.stats).toEqual(expect.objectContaining({ pagesBuilt: 0, pagesSkipped: 1 }));
+    expect(existsSync(join(output, 'second.html'))).toBe(false);
+  });
+
+  it('performs a clean incremental build when requested', () => {
+    const content = join(workspace, 'content');
+    const output = join(workspace, 'public');
+    mkdirSync(content);
+    writeFileSync(join(content, 'page.md'), '# Page');
+
+    buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const clean = buildSite({ contentDir: content, outputDir: output, incremental: true, clean: true });
+
+    expect(clean.stats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 0 }));
+    expect(readFileSync(join(output, 'page.html'), 'utf8')).toContain('<h1>Page</h1>');
+  });
 });
 
 describe('startDevelopmentServer', () => {
