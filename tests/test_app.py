@@ -2,6 +2,7 @@ import asyncio
 import json
 
 import pytest
+import fakeredis.aioredis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -9,10 +10,16 @@ from app import NotificationServer
 
 @pytest.fixture
 async def server():
-    application = NotificationServer()
-    async with application.create_server(port=0) as running_server:
-        port = running_server.sockets[0].getsockname()[1]
-        yield application, f"ws://127.0.0.1:{port}"
+    application = NotificationServer(
+        database_url="sqlite:///:memory:", redis_client=fakeredis.aioredis.FakeRedis(decode_responses=True)
+    )
+    await application.start()
+    try:
+        async with application.create_server(port=0) as running_server:
+            port = running_server.sockets[0].getsockname()[1]
+            yield application, f"ws://127.0.0.1:{port}"
+    finally:
+        await application.close()
 
 
 async def receive_json(connection):
@@ -141,3 +148,52 @@ async def test_channel_endpoints_report_active_subscribers(server):
             [first_welcome["payload"]["client_id"], second_welcome["payload"]["client_id"]]
         )
     }
+
+
+async def test_redis_pubsub_distributes_between_server_instances():
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    first = NotificationServer(database_url="sqlite:///:memory:", redis_client=redis)
+    second = NotificationServer(database_url="sqlite:///:memory:", redis_client=redis)
+    await first.start()
+    await second.start()
+    try:
+        async with first.create_server(port=0) as first_server, second.create_server(port=0) as second_server:
+            first_port = first_server.sockets[0].getsockname()[1]
+            second_port = second_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{first_port}") as publisher, connect(
+                f"ws://127.0.0.1:{second_port}"
+            ) as subscriber:
+                await receive_json(publisher)
+                await receive_json(subscriber)
+                await subscriber.send(json.dumps({"type": "subscribe", "payload": {}, "channel": "alerts"}))
+                await asyncio.sleep(0.01)
+                await publisher.send(
+                    json.dumps({"type": "broadcast", "payload": {"text": "shared"}, "channel": "alerts"})
+                )
+                message = await receive_json(subscriber)
+        assert message["payload"] == {"text": "shared"}
+    finally:
+        await first.close()
+        await second.close()
+
+
+async def test_messages_endpoint_returns_persisted_history(tmp_path):
+    application = NotificationServer(
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
+        redis_client=fakeredis.aioredis.FakeRedis(decode_responses=True),
+    )
+    await application.start()
+    try:
+        async with application.create_server(port=0) as running_server:
+            port = running_server.sockets[0].getsockname()[1]
+            async with connect(f"ws://127.0.0.1:{port}") as client:
+                await receive_json(client)
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+                await receive_json(client)
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": "second"}}))
+                await receive_json(client)
+            history = await get_json("127.0.0.1", port, "/messages?limit=1&offset=1")
+        assert history["messages"][0]["payload"] == {"text": "first"}
+        assert history["messages"][0]["channel"] is None
+    finally:
+        await application.close()
