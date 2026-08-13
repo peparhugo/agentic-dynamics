@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "bin": {
-    "ssg": "dist/cli.js"
+    "ssg": "dist/src/cli.js"
   },
   "scripts": {
     "build": "tsc",

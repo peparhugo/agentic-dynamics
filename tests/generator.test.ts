@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src/generator.js';
+import { buildSite, type Plugin } from '../src/generator.js';
 import { parseArguments } from '../src/cli.js';
 
 describe('static site generator', () => {
@@ -54,5 +54,21 @@ describe('static site generator', () => {
     await buildSite({ contentDir: path.join(workspace, 'content'), outputDir: path.join(workspace, 'output'), templatesDir: path.join(workspace, 'templates') });
 
     await expect(fs.readFile(path.join(workspace, 'output', 'post.html'), 'utf8')).resolves.toBe('<section><article data-kind="note"><p>Body</p>\n</article></section>');
+  });
+
+  it('runs plugin lifecycle hooks in order', async () => {
+    await fs.writeFile(path.join(workspace, 'content', 'page.md'), '# Page');
+    const events: string[] = [];
+    const plugin: Plugin = {
+      onStart: () => events.push('start'),
+      beforeBuild: (context) => events.push(`before:${context.pages[0].slug}`),
+      onFile: (page) => events.push(`file:${page.slug}`),
+      afterBuild: () => events.push('after'),
+      onEnd: () => events.push('end'),
+    };
+
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir: path.join(workspace, 'output'), plugins: [plugin] });
+
+    expect(events).toEqual(['start', 'before:page', 'file:page', 'after', 'end']);
   });
 });

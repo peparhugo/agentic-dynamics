@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-import { promises as fs } from 'node:fs';
-import { createServer, type Server } from 'node:http';
-import path from 'node:path';
-import chokidar, { type FSWatcher } from 'chokidar';
-import { WebSocketServer } from 'ws';
+import { startDevelopmentServer } from '../plugins/dev-server.js';
 import { buildSite } from './generator.js';
 
 function usage(): string {
@@ -39,68 +35,7 @@ export function parseArguments(args: string[]): CliOptions {
   return options;
 }
 
-const reloadScript = '<script>new WebSocket(`ws://${location.host}`).addEventListener("message", () => location.reload());</script>';
-
-function withReloadScript(html: string): string {
-  return html.includes('</body>') ? html.replace('</body>', `${reloadScript}</body>`) : `${html}${reloadScript}`;
-}
-
-async function serveFile(requestPath: string, outputDir: string, response: import('node:http').ServerResponse): Promise<void> {
-  const relativePath = requestPath === '/' ? 'index.html' : decodeURIComponent(requestPath).replace(/^\/+/, '');
-  const file = path.resolve(outputDir, relativePath);
-  if (!file.startsWith(`${outputDir}${path.sep}`) && file !== path.join(outputDir, 'index.html')) {
-    response.writeHead(403).end();
-    return;
-  }
-  try {
-    const stat = await fs.stat(file);
-    if (!stat.isFile()) throw new Error('Not a file');
-    if (path.extname(file) === '.html') {
-      response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(withReloadScript(await fs.readFile(file, 'utf8')));
-      return;
-    }
-    response.writeHead(200).end(await fs.readFile(file));
-  } catch {
-    response.writeHead(404).end('Not found');
-  }
-}
-
-export interface DevelopmentServer {
-  server: Server;
-  watcher: FSWatcher;
-  close(): Promise<void>;
-}
-
-export async function startDevelopmentServer(options: CliOptions = {}): Promise<DevelopmentServer> {
-  const outputDir = path.resolve('./dist');
-  const contentDir = path.resolve(options.contentDir ?? './content');
-  const templatesDir = path.resolve(options.templatesDir ?? './templates');
-  const server = createServer((request, response) => void serveFile(new URL(request.url ?? '/', 'http://localhost').pathname, outputDir, response));
-  const sockets = new WebSocketServer({ server });
-  const rebuild = async (): Promise<void> => {
-    try {
-      const pages = await buildSite({ contentDir, templatesDir, outputDir });
-      process.stdout.write(`Generated ${pages.length} page(s).\n`);
-      sockets.clients.forEach((client) => client.send('reload'));
-    } catch (error) {
-      process.stderr.write(`Build failed: ${error instanceof Error ? error.message : String(error)}\n`);
-    }
-  };
-  await rebuild();
-  const watcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
-  watcher.on('all', () => void rebuild());
-  await new Promise<void>((resolve) => server.listen(options.port ?? 3000, 'localhost', resolve));
-  return {
-    server,
-    watcher,
-    close: async () => {
-      await watcher.close();
-      sockets.clients.forEach((client) => client.close());
-      sockets.close();
-      await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
-    },
-  };
-}
+export { startDevelopmentServer } from '../plugins/dev-server.js';
 
 async function main(): Promise<void> {
   try {
