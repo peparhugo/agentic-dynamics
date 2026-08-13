@@ -31,6 +31,34 @@ Template and layout names may include or omit `.hbs`. Select another template di
 
 Markdown files in nested directories retain their relative paths. Every page is linked from the generated `index.html`.
 
+## Plugins
+
+Add TypeScript plugin modules under `plugins/` and load them from `ssg.config.ts`. Hooks run in configuration order and may be synchronous or asynchronous. `onFile` receives a mutable page after the built-in Markdown and template plugins have rendered it.
+
+```ts
+// plugins/footer.ts
+import type { Plugin } from 'ssg';
+
+const footer: Plugin = {
+  name: 'footer',
+  onFile(page) {
+    page.html += '<footer>Built with ssg</footer>';
+  },
+};
+
+export default footer;
+```
+
+```ts
+// ssg.config.ts
+import { defineConfig } from 'ssg';
+import footer from './plugins/footer';
+
+export default defineConfig({ plugins: [footer] });
+```
+
+Plugins support `onStart(context)`, `beforeBuild(context)`, `onFile(page)`, `afterBuild(context)`, and `onEnd(context)`. Markdown parsing, Handlebars rendering, and the development server are available as the built-in `MarkdownPlugin`, `TemplatePlugin`, and `DevServerPlugin` classes.
+
 ## Development server
 
 `npx ssg serve` builds the site, serves `./dist` at `http://localhost:3000`, and watches `content/` and `templates/`. A successful rebuild automatically reloads connected browser pages. Select another port or use the same directory options accepted by `build`:
