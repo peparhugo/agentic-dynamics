@@ -3,14 +3,16 @@ import { buildSite } from './site.js';
 import { startDevelopmentServer } from './server.js';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>] [--incremental] [--clean]';
 }
 
-function parseArguments(arguments_: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } {
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
+function parseArguments(arguments_: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } {
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
+    if (argument === '--incremental') options.incremental = true;
+    else if (argument === '--clean') options.clean = true;
+    else if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
       const value = arguments_[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`Missing value for ${argument}`);
       if (argument === '--content') options.contentDir = value;
@@ -35,7 +37,7 @@ async function main(): Promise<void> {
   const options = parseArguments(arguments_);
   if (command === 'build') {
     const pages = await buildSite(options);
-    process.stdout.write(`Built ${pages.length} page(s).\n`);
+    process.stdout.write(`Built ${pages.stats.pagesBuilt} page(s), skipped ${pages.stats.pagesSkipped}; time saved: ${pages.stats.timeSaved} page(s).\n`);
     return;
   }
   const developmentServer = await startDevelopmentServer(options);

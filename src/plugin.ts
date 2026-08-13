@@ -5,6 +5,7 @@ export interface BuildContext {
   outputDir: string;
   templatesDir: string;
   pages: Page[];
+  incremental: boolean;
 }
 
 export interface Plugin {

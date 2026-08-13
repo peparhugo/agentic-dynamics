@@ -71,4 +71,59 @@ describe('buildSite', () => {
 
     await expect(fs.readFile(path.join(output, 'default.html'), 'utf8')).resolves.toContain('<h1>Default</h1><p>Text</p>');
   });
+
+  it('skips unchanged pages during incremental builds and records a manifest', async () => {
+    const content = path.join(directory, 'content');
+    const output = path.join(directory, 'dist');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'first.md'), '# First');
+    await fs.writeFile(path.join(content, 'second.md'), '# Second');
+
+    const firstBuild = await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const secondBuild = await buildSite({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(firstBuild.stats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSaved: 0 });
+    expect(secondBuild.stats).toEqual({ pagesBuilt: 0, pagesSkipped: 2, timeSaved: 2 });
+    await expect(fs.readFile(path.join(output, '.ssg-cache.json'), 'utf8')).resolves.toContain('first.md');
+  });
+
+  it('rebuilds changed sources and templates, and removes deleted pages incrementally', async () => {
+    const content = path.join(directory, 'content');
+    const templates = path.join(directory, 'templates');
+    const output = path.join(directory, 'dist');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'first.md'), '# First');
+    await fs.writeFile(path.join(content, 'second.md'), '# Second');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{body}}}</main>');
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+
+    await fs.writeFile(path.join(content, 'first.md'), '# Updated');
+    const sourceBuild = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    expect(sourceBuild.stats).toEqual({ pagesBuilt: 1, pagesSkipped: 1, timeSaved: 1 });
+    await expect(fs.readFile(path.join(output, 'first.html'), 'utf8')).resolves.toContain('Updated');
+
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{body}}}</article>');
+    const templateBuild = await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    expect(templateBuild.stats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSaved: 0 });
+    await expect(fs.readFile(path.join(output, 'second.html'), 'utf8')).resolves.toContain('<article>');
+
+    await fs.rm(path.join(content, 'second.md'));
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates, incremental: true });
+    await expect(fs.access(path.join(output, 'second.html'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('performs a clean build when requested', async () => {
+    const content = path.join(directory, 'content');
+    const output = path.join(directory, 'dist');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Page');
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    await fs.writeFile(path.join(output, 'stale.txt'), 'stale');
+
+    const build = await buildSite({ contentDir: content, outputDir: output, incremental: true, clean: true });
+
+    expect(build.stats).toEqual({ pagesBuilt: 1, pagesSkipped: 0, timeSaved: 0 });
+    await expect(fs.access(path.join(output, 'stale.txt'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });

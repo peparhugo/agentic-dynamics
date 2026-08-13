@@ -37,7 +37,7 @@ export class DevServerPlugin {
     const contentDir = path.resolve(options.contentDir ?? './content');
     const templatesDir = path.resolve(options.templatesDir ?? './templates');
     const outputDir = path.resolve(options.outputDir ?? './dist');
-    const buildOptions = { contentDir, templatesDir, outputDir, plugins: options.plugins };
+    const buildOptions = { contentDir, templatesDir, outputDir, plugins: options.plugins, incremental: true };
     await buildSite(buildOptions);
     const server: Server = createServer(async (request, response) => {
       const filePath = await resolveFile(outputDir, request.url ?? '/');
