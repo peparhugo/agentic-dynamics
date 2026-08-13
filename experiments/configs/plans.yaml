@@ -83,6 +83,60 @@ plans:
         depends_on: [regenerate]
         cmd: [firebase, deploy, --only, hosting]
 
+  cross_models:
+    description: "Flash → Haiku → Sonnet → Sol → Terra → analyze → reviews → regenerate → deploy"
+    phases:
+      - id: flash
+        kind: matrix
+        model: deepseek/deepseek-v4-flash
+        model_filter: flash
+        workers: 4
+      - id: haiku
+        kind: matrix
+        depends_on: [flash]
+        model: anthropic/claude-haiku-4-5
+        model_filter: haiku
+        workers: 4
+      - id: sonnet
+        kind: matrix
+        depends_on: [haiku]
+        model: anthropic/claude-sonnet-5
+        model_filter: sonnet
+        workers: 4
+      - id: sol
+        kind: matrix
+        depends_on: [sonnet]
+        model: openai/gpt-5.6-sol
+        model_filter: sol
+        workers: 4
+      - id: terra
+        kind: matrix
+        depends_on: [sol]
+        model: openai/gpt-5.6-terra
+        model_filter: terra
+        workers: 4
+      - id: analyze
+        kind: shell
+        depends_on: [terra]
+        cmd: [python, scripts/analyze_stories.py]
+      - id: reviews
+        kind: review
+        depends_on: [analyze]
+        review_model: deepseek/deepseek-v4-flash
+        workers: 4
+      - id: regenerate
+        kind: pipeline
+        depends_on: [reviews]
+        steps:
+          - [python, scripts/backfill_costs.py]
+          - [python, scripts/sync_data.py]
+          - [python, scripts/build_data.py]
+          - [python, scripts/lab_story_review.py]
+      - id: deploy
+        kind: shell
+        depends_on: [regenerate]
+        cmd: [firebase, deploy, --only, hosting]
+
   feature:
     description: "Spec → implement → lint → test → review → ship"
     phases:

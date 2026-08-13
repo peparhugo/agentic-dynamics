@@ -406,7 +406,8 @@ def _gen_matrix_cells(kind_params: dict) -> list[dict]:
                     key = f"{story}|{tier}|{quality}|{condition}"
                     if key in completed:
                         continue
-                    short = f"{story[:3]}_{tier[:2]}_{quality[:2]}_{condition[:3]}"
+                    slug = model.split("/", 1)[-1].replace("-", "_").replace(".", "_")
+                    short = f"{slug}_{story}_{tier}_{quality}_{condition}"
                     jobs.append({
                         "cell_id": short,
                         "story": story, "tier": tier,
