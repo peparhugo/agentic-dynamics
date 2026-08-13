@@ -5,11 +5,12 @@ import json
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote
 
 from websockets.asyncio.server import ServerConnection, serve
 
 
-SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
+SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system", "subscribe", "unsubscribe"})
 
 
 class NotificationServer:
@@ -17,6 +18,7 @@ class NotificationServer:
 
     def __init__(self) -> None:
         self.clients: dict[str, ServerConnection] = {}
+        self.channels: dict[str, set[str]] = {}
         self._clients_lock = asyncio.Lock()
 
     @property
@@ -31,11 +33,24 @@ class NotificationServer:
 
     async def unregister(self, websocket: ServerConnection) -> None:
         async with self._clients_lock:
-            self.clients.pop(str(websocket.id), None)
+            client_id = str(websocket.id)
+            self.clients.pop(client_id, None)
+            for channel in tuple(self.channels):
+                self.channels[channel].discard(client_id)
+                if not self.channels[channel]:
+                    del self.channels[channel]
 
     async def _client_snapshot(self) -> list[ServerConnection]:
         async with self._clients_lock:
             return list(self.clients.values())
+
+    async def _channel_client_snapshot(self, channel: str) -> list[ServerConnection]:
+        async with self._clients_lock:
+            return [
+                self.clients[client_id]
+                for client_id in self.channels.get(channel, set())
+                if client_id in self.clients
+            ]
 
     @staticmethod
     def _validate_message(message: Any) -> dict[str, Any]:
@@ -48,17 +63,41 @@ class NotificationServer:
         timestamp = message.get("timestamp")
         if not isinstance(timestamp, str) or not timestamp:
             raise ValueError("timestamp must be a non-empty string")
+        channel = message.get("channel")
+        if channel is not None and (not isinstance(channel, str) or not channel):
+            raise ValueError("channel must be a non-empty string")
+        if message["type"] in {"subscribe", "unsubscribe"}:
+            subscription_channel = message["payload"].get("channel", channel)
+            if not isinstance(subscription_channel, str) or not subscription_channel:
+                raise ValueError("subscription channel must be a non-empty string")
         return message
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         payload = json.dumps(message)
-        clients = await self._client_snapshot()
+        channel = message.get("channel")
+        clients = (
+            await self._channel_client_snapshot(channel)
+            if channel is not None
+            else await self._client_snapshot()
+        )
         results = await asyncio.gather(
             *(client.send(payload) for client in clients), return_exceptions=True
         )
         for client, result in zip(clients, results):
             if isinstance(result, Exception):
                 await self.unregister(client)
+
+    async def update_subscription(self, client_id: str, message: dict[str, Any]) -> None:
+        channel = message["payload"].get("channel", message.get("channel"))
+        async with self._clients_lock:
+            if message["type"] == "subscribe":
+                self.channels.setdefault(channel, set()).add(client_id)
+            else:
+                subscribers = self.channels.get(channel)
+                if subscribers is not None:
+                    subscribers.discard(client_id)
+                    if not subscribers:
+                        del self.channels[channel]
 
     async def handle_connection(self, websocket: ServerConnection) -> None:
         client_id = await self.register(websocket)
@@ -71,7 +110,9 @@ class NotificationServer:
                     await websocket.send(json.dumps(system_message({"error": str(error)})))
                     continue
 
-                if message["type"] == "broadcast":
+                if message["type"] in {"subscribe", "unsubscribe"}:
+                    await self.update_subscription(client_id, message)
+                elif message["type"] == "broadcast":
                     await self.broadcast(message)
                 elif message["type"] == "direct":
                     recipient_id = message["payload"].get("client_id")
@@ -83,10 +124,28 @@ class NotificationServer:
             await self.unregister(websocket)
 
     async def health_response(self, connection: ServerConnection, request: Any) -> Any:
-        if request.path != "/health":
-            return None
-        body = json.dumps({"connected_clients": self.connected_client_count})
-        return connection.respond(HTTPStatus.OK, body)
+        if request.path == "/health":
+            body = json.dumps({"connected_clients": self.connected_client_count})
+            return connection.respond(HTTPStatus.OK, body)
+        if request.path == "/channels":
+            async with self._clients_lock:
+                channels = [
+                    {"name": name, "subscriber_count": len(subscribers)}
+                    for name, subscribers in sorted(self.channels.items())
+                ]
+            return connection.respond(HTTPStatus.OK, json.dumps({"channels": channels}))
+        prefix = "/channels/"
+        suffix = "/subscribers"
+        if request.path.startswith(prefix) and request.path.endswith(suffix):
+            name = unquote(request.path[len(prefix) : -len(suffix)])
+            if name:
+                async with self._clients_lock:
+                    subscribers = sorted(self.channels.get(name, set()))
+                return connection.respond(
+                    HTTPStatus.OK,
+                    json.dumps({"channel": name, "subscribers": subscribers}),
+                )
+        return None
 
 
 def system_message(payload: dict[str, Any]) -> dict[str, Any]:

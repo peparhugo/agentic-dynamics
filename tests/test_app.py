@@ -78,6 +78,63 @@ async def test_disconnect_removes_client(notification_server):
     assert application.connected_client_count == 0
 
 
+async def test_channel_messages_reach_only_subscribers_and_endpoints_list_members(notification_server):
+    _, url = notification_server
+    subscribe = {
+        "type": "subscribe",
+        "payload": {"channel": "alerts"},
+        "timestamp": "2026-08-13T00:00:00Z",
+    }
+    message = {
+        "type": "broadcast",
+        "channel": "alerts",
+        "payload": {"text": "important"},
+        "timestamp": "2026-08-13T00:00:01Z",
+    }
+    async with connect(url) as subscriber, connect(url) as other:
+        subscriber_welcome = json.loads(await subscriber.recv())
+        await other.recv()
+        await subscriber.send(json.dumps(subscribe))
+        await subscriber.send(json.dumps(message))
+
+        assert json.loads(await subscriber.recv()) == message
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(other.recv(), timeout=0.05)
+
+        assert await asyncio.to_thread(http_get, url, "/channels") == {
+            "channels": [{"name": "alerts", "subscriber_count": 1}]
+        }
+        assert await asyncio.to_thread(http_get, url, "/channels/alerts/subscribers") == {
+            "channel": "alerts",
+            "subscribers": [subscriber_welcome["payload"]["client_id"]],
+        }
+
+
+async def test_unsubscribe_stops_channel_delivery(notification_server):
+    _, url = notification_server
+    subscribe = {
+        "type": "subscribe",
+        "payload": {"channel": "chat"},
+        "timestamp": "2026-08-13T00:00:00Z",
+    }
+    unsubscribe = {**subscribe, "type": "unsubscribe"}
+    message = {
+        "type": "broadcast",
+        "channel": "chat",
+        "payload": {"text": "hello"},
+        "timestamp": "2026-08-13T00:00:01Z",
+    }
+    async with connect(url) as client:
+        await client.recv()
+        await client.send(json.dumps(subscribe))
+        await client.send(json.dumps(unsubscribe))
+        await client.send(json.dumps(message))
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(client.recv(), timeout=0.05)
+        assert await asyncio.to_thread(http_get, url, "/channels") == {"channels": []}
+
+
 def http_get(websocket_url: str, path: str) -> dict[str, int]:
     import http.client
 
