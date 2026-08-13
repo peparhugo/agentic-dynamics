@@ -1,5 +1,7 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from urllib.request import urlopen
 
 import pytest
@@ -164,3 +166,64 @@ async def test_messages_endpoint_returns_persisted_notifications(notification_se
         previous = await asyncio.to_thread(fetch_json, port, "/messages?limit=1&offset=1")
         assert previous["messages"][0]["channel"] is None
         assert previous["messages"][0]["payload"] == {"text": "first"}
+
+
+async def test_rate_limit_returns_error_without_publishing(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    application = NotificationServer()
+    server, url = await start_application(application)
+    try:
+        async with connect(url) as sender:
+            await receive_json(sender)
+            for text in ("first", "second"):
+                await sender.send(json.dumps({"type": "broadcast", "payload": {"text": text}}))
+                assert (await receive_json(sender))["payload"] == {"text": text}
+
+            await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "blocked"}}))
+            error = await receive_json(sender)
+            assert error["type"] == "system"
+            assert error["payload"] == {"event": "error", "message": "rate limit exceeded"}
+    finally:
+        server.close()
+        await server.wait_closed()
+        await application.close()
+
+
+async def test_history_filters_channel_since_and_paginates(notification_server):
+    _, url, port = notification_server
+    since = datetime.now(timezone.utc)
+    async with connect(url) as sender:
+        await receive_json(sender)
+        await sender.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        for text in ("first", "second", "third"):
+            await sender.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": text}}))
+            await receive_json(sender)
+        await sender.send(json.dumps({"type": "broadcast", "channel": "other", "payload": {"text": "ignored"}}))
+
+        query = f"/history?channel=alerts&since={quote(since.isoformat())}&limit=2"
+        history = await asyncio.to_thread(fetch_json, port, query)
+        assert [message["payload"]["text"] for message in history["messages"]] == ["first", "second"]
+        assert history["has_more"] is True
+
+        next_page = await asyncio.to_thread(fetch_json, port, f"{query}&offset=2")
+        assert [message["payload"]["text"] for message in next_page["messages"]] == ["third"]
+        assert next_page["has_more"] is False
+
+
+async def test_startup_removes_expired_messages(tmp_path, monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "7")
+    store = MessageStore(str(tmp_path / "messages.db"))
+    store.save(
+        {
+            "type": "system",
+            "payload": {"event": "old"},
+            "timestamp": (datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
+        }
+    )
+    application = NotificationServer(store=store)
+    await application.start()
+    try:
+        await asyncio.sleep(0.01)
+        assert store.list(limit=50, offset=0) == []
+    finally:
+        await application.close()

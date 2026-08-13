@@ -10,7 +10,7 @@ import threading
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -66,6 +66,61 @@ class MessageStore:
             {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
             for row in rows
         ]
+
+    def history(self, channel: str, since: str, limit: int, offset: int = 0) -> tuple[list[dict[str, Any]], bool]:
+        """Return a chronological page of channel messages after ``since``."""
+        with self._lock:
+            rows = self._connection.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "WHERE channel = ? AND datetime(timestamp) >= datetime(?) "
+                "ORDER BY datetime(timestamp) ASC, id ASC LIMIT ? OFFSET ?",
+                (channel, since, limit + 1, offset),
+            ).fetchall()
+        has_more = len(rows) > limit
+        return (
+            [
+                {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+                for row in rows[:limit]
+            ],
+            has_more,
+        )
+
+    def delete_before(self, cutoff: str) -> None:
+        with self._lock, self._connection:
+            self._connection.execute("DELETE FROM messages WHERE datetime(timestamp) < datetime(?)", (cutoff,))
+
+
+class MemoryRateLimiter:
+    """Process-local limiter used when a Redis connection is unavailable."""
+
+    def __init__(self) -> None:
+        self._counts: dict[str, tuple[int, int]] = {}
+        self._lock = asyncio.Lock()
+
+    async def allow(self, client_id: str, limit: int) -> bool:
+        now = int(datetime.now(timezone.utc).timestamp() // 60)
+        async with self._lock:
+            window, count = self._counts.get(client_id, (now, 0))
+            if window != now:
+                count = 0
+            count += 1
+            self._counts[client_id] = (now, count)
+            return count <= limit
+
+
+class RedisRateLimiter:
+    """Fixed-window per-client rate limiter backed by Redis atomic counters."""
+
+    def __init__(self, redis_client: Any) -> None:
+        self.redis = redis_client
+
+    async def allow(self, client_id: str, limit: int) -> bool:
+        window = int(datetime.now(timezone.utc).timestamp() // 60)
+        key = f"notifications:rate-limit:{client_id}:{window}"
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, 60)
+        return count <= limit
 
 
 class MemoryBroker:
@@ -175,7 +230,11 @@ class RedisBroker:
 
 
 def _timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return _utc_now().isoformat()
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class BaseTransport(ABC):
@@ -273,16 +332,23 @@ class NotificationServer:
     """Routes JSON notifications using a shared Redis pub/sub backbone."""
 
     def __init__(
-        self, broker: Any | None = None, store: MessageStore | None = None, transport: BaseTransport | None = None
+        self,
+        broker: Any | None = None,
+        store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
+        rate_limiter: Any | None = None,
     ) -> None:
         self._clients: set[str] = set()
         self._lock = threading.RLock()
         self._broker = broker or (RedisBroker(os.environ["REDIS_URL"]) if os.getenv("REDIS_URL") else MemoryBroker())
         self._store = store or MessageStore()
+        self._rate_limit = self._rate_limit_from_config()
+        self._rate_limiter = rate_limiter or self._rate_limiter_from_broker()
         self._transport = transport or self._transport_from_config()
         self._transport.configure(self.handle_message, self._add_client, self._remove_client)
         self._started = False
         self._start_lock = asyncio.Lock()
+        self._cleanup_task: asyncio.Task[None] | None = None
 
     @staticmethod
     def _transport_from_config() -> BaseTransport:
@@ -290,6 +356,31 @@ class NotificationServer:
         if transport_name == "websocket":
             return WebSocketTransport()
         raise ValueError(f"unsupported TRANSPORT: {transport_name}")
+
+    @staticmethod
+    def _rate_limit_from_config() -> int:
+        try:
+            rate_limit = int(os.getenv("RATE_LIMIT", "100"))
+        except ValueError as error:
+            raise ValueError("RATE_LIMIT must be a positive integer") from error
+        if rate_limit < 1:
+            raise ValueError("RATE_LIMIT must be a positive integer")
+        return rate_limit
+
+    def _rate_limiter_from_broker(self) -> MemoryRateLimiter | RedisRateLimiter:
+        if isinstance(self._broker, RedisBroker):
+            return RedisRateLimiter(self._broker.redis)
+        return MemoryRateLimiter()
+
+    @staticmethod
+    def _message_ttl_from_config() -> int:
+        try:
+            ttl_days = int(os.getenv("MESSAGE_TTL_DAYS", "7"))
+        except ValueError as error:
+            raise ValueError("MESSAGE_TTL_DAYS must be a non-negative integer") from error
+        if ttl_days < 0:
+            raise ValueError("MESSAGE_TTL_DAYS must be a non-negative integer")
+        return ttl_days
 
     @property
     def client_count(self) -> int:
@@ -299,13 +390,21 @@ class NotificationServer:
     async def start(self) -> None:
         async with self._start_lock:
             if not self._started:
+                self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
                 await self._broker.start(self._deliver_published)
                 self._started = True
 
     async def close(self) -> None:
+        if self._cleanup_task is not None:
+            await self._cleanup_task
+            self._cleanup_task = None
         if self._started:
             await self._broker.close()
             self._started = False
+
+    async def _cleanup_expired_messages(self) -> None:
+        cutoff = (_utc_now() - timedelta(days=self._message_ttl_from_config())).isoformat()
+        await asyncio.to_thread(self._store.delete_before, cutoff)
 
     async def handler(self, websocket: ServerConnection) -> None:
         await self.start()
@@ -317,6 +416,9 @@ class NotificationServer:
         await self._broker.add_client(client_id)
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
+        if not await self._rate_limiter.allow(sender_id, self._rate_limit):
+            await self._send_error(sender_id, "rate limit exceeded")
+            return
         try:
             message = json.loads(raw_message)
             message_type = message["type"]
@@ -380,6 +482,25 @@ class NotificationServer:
             except ValueError:
                 return connection.respond(HTTPStatus.BAD_REQUEST, "limit must be 1-1000 and offset must be non-negative")
             return connection.respond(HTTPStatus.OK, json.dumps({"messages": self._store.list(limit, offset)}))
+        if parsed.path == "/history":
+            parameters = parse_qs(parsed.query)
+            channel = parameters.get("channel", [None])[0]
+            since = parameters.get("since", [None])[0]
+            try:
+                limit = int(parameters.get("limit", ["50"])[0])
+                offset = int(parameters.get("offset", ["0"])[0])
+                if not isinstance(channel, str) or not channel or not isinstance(since, str) or not 1 <= limit <= 1000 or offset < 0:
+                    raise ValueError
+                parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                if parsed_since.tzinfo is None:
+                    raise ValueError
+            except ValueError:
+                return connection.respond(
+                    HTTPStatus.BAD_REQUEST,
+                    "channel and timezone-aware since are required; limit must be 1-1000 and offset must be non-negative",
+                )
+            messages, has_more = self._store.history(channel, parsed_since.astimezone(timezone.utc).isoformat(), limit, offset)
+            return connection.respond(HTTPStatus.OK, json.dumps({"messages": messages, "has_more": has_more}))
         if parsed.path == "/channels":
             channels = [{"name": name, "subscriber_count": len(await self._broker.subscribers(name))} for name in await self._broker.channel_names()]
             return connection.respond(HTTPStatus.OK, json.dumps({"channels": channels}))
