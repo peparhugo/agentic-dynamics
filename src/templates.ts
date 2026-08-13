@@ -9,12 +9,24 @@ export function escapeHtml(input: string): string {
     .replace(/'/g, '&#39;');
 }
 
-export function renderPage(page: Page): string {
+/**
+ * Renders a page's inner content (heading, date, tags, body HTML) without
+ * the surrounding document shell. Used both by the built-in `renderPage`
+ * and as the `{{{body}}}` value fed into custom Handlebars layouts.
+ */
+export function renderArticleBody(page: Page): string {
   const tagsHtml = page.tags.length
     ? `<ul class="tags">${page.tags.map((t) => `<li>${escapeHtml(t)}</li>`).join('')}</ul>`
     : '';
   const dateHtml = page.date ? `<time datetime="${escapeHtml(page.date)}">${escapeHtml(page.date)}</time>` : '';
 
+  return `<h1>${escapeHtml(page.title)}</h1>
+${dateHtml}
+${tagsHtml}
+${page.html}`;
+}
+
+export function renderPage(page: Page): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,17 +40,19 @@ export function renderPage(page: Page): string {
 <a href="index.html">&larr; Home</a>
 </header>
 <article>
-<h1>${escapeHtml(page.title)}</h1>
-${dateHtml}
-${tagsHtml}
-${page.html}
+${renderArticleBody(page)}
 </article>
 </body>
 </html>
 `;
 }
 
-export function renderIndex(pages: Page[]): string {
+/**
+ * Renders the home page's page-listing markup, without the surrounding
+ * document shell. Used both by the built-in `renderIndex` and as the
+ * `{{{body}}}` value fed into a custom "index" Handlebars layout.
+ */
+export function renderIndexBody(pages: Page[]): string {
   const sorted = [...pages].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const items = sorted
     .map((page) => {
@@ -47,6 +61,12 @@ export function renderIndex(pages: Page[]): string {
     })
     .join('\n');
 
+  return `<ul class="page-list">
+${items}
+</ul>`;
+}
+
+export function renderIndex(pages: Page[]): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -59,9 +79,7 @@ export function renderIndex(pages: Page[]): string {
 <header>
 <h1>Home</h1>
 </header>
-<ul class="page-list">
-${items}
-</ul>
+${renderIndexBody(pages)}
 </body>
 </html>
 `;

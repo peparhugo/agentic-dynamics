@@ -54,5 +54,6 @@ export function parseMarkdown(raw: string, relativePath: string): Page {
     date: normalizeDate(frontMatter.date),
     tags: normalizeTags(frontMatter.tags),
     html,
+    template: frontMatter.template ? String(frontMatter.template) : undefined,
   };
 }

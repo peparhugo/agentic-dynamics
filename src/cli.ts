@@ -13,10 +13,12 @@ export function run(argv: string[]): void {
     .description('Generate the site from Markdown content')
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
-    .action((opts: { content: string; output: string }) => {
+    .option('--templates <dir>', 'templates directory', './templates')
+    .action((opts: { content: string; output: string; templates: string }) => {
       const contentDir = path.resolve(process.cwd(), opts.content);
       const outputDir = path.resolve(process.cwd(), opts.output);
-      const result = buildSite({ contentDir, outputDir });
+      const templatesDir = path.resolve(process.cwd(), opts.templates);
+      const result = buildSite({ contentDir, outputDir, templatesDir });
       // eslint-disable-next-line no-console
       console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
     });

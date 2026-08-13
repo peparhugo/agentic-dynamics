@@ -1,4 +1,4 @@
-import { renderIndex, renderPage } from '../src/templates';
+import { renderArticleBody, renderIndex, renderIndexBody, renderPage } from '../src/templates';
 import { Page } from '../src/types';
 
 function makePage(overrides: Partial<Page> = {}): Page {
@@ -10,6 +10,7 @@ function makePage(overrides: Partial<Page> = {}): Page {
     date: '2024-01-01',
     tags: ['a', 'b'],
     html: '<p>Body</p>',
+    template: undefined,
     ...overrides,
   };
 }
@@ -59,5 +60,28 @@ describe('renderIndex', () => {
     const html = renderIndex([page]);
 
     expect(html).toContain('href="hello.html"');
+  });
+});
+
+describe('renderArticleBody', () => {
+  it('renders the same content that renderPage embeds in its <article>', () => {
+    const page = makePage();
+    const body = renderArticleBody(page);
+
+    expect(body).toContain('<h1>Hello</h1>');
+    expect(body).toContain('<li>a</li>');
+    expect(body).toContain('<p>Body</p>');
+    expect(renderPage(page)).toContain(body);
+  });
+});
+
+describe('renderIndexBody', () => {
+  it('renders the same listing that renderIndex embeds in its <body>', () => {
+    const page = makePage();
+    const body = renderIndexBody([page]);
+
+    expect(body).toContain('class="page-list"');
+    expect(body).toContain('href="hello.html"');
+    expect(renderIndex([page])).toContain(body);
   });
 });

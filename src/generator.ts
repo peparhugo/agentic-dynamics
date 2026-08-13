@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { parseMarkdown } from './parser';
+import { TemplateEngine } from './templateEngine';
 import { renderIndex, renderPage } from './templates';
 import { BuildOptions, BuildResult, Page } from './types';
 
@@ -54,7 +55,7 @@ header { margin-bottom: 2rem; }
 `;
 
 export function buildSite(options: BuildOptions): BuildResult {
-  const { contentDir, outputDir } = options;
+  const { contentDir, outputDir, templatesDir } = options;
 
   if (!fs.existsSync(contentDir)) {
     throw new Error(`Content directory not found: ${contentDir}`);
@@ -64,11 +65,15 @@ export function buildSite(options: BuildOptions): BuildResult {
 
   fs.mkdirSync(outputDir, { recursive: true });
 
+  const engine = templatesDir && fs.existsSync(templatesDir) ? new TemplateEngine(templatesDir) : undefined;
+
   for (const page of pages) {
-    writeFile(path.join(outputDir, page.outputFile), renderPage(page));
+    const html = engine?.renderPage(page, pages) ?? renderPage(page);
+    writeFile(path.join(outputDir, page.outputFile), html);
   }
 
-  writeFile(path.join(outputDir, 'index.html'), renderIndex(pages));
+  const indexHtml = engine?.renderIndex(pages) ?? renderIndex(pages);
+  writeFile(path.join(outputDir, 'index.html'), indexHtml);
   writeFile(path.join(outputDir, 'style.css'), DEFAULT_STYLESHEET);
 
   return { pages, outputDir };

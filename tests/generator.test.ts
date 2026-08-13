@@ -122,3 +122,104 @@ describe('buildSite', () => {
     expect(fs.existsSync(path.join(outputDir, 'posts', 'first-post.html'))).toBe(true);
   });
 });
+
+describe('buildSite with templatesDir', () => {
+  let contentDir: string;
+  let outputDir: string;
+  let templatesDir: string;
+
+  beforeEach(() => {
+    contentDir = makeTmpDir();
+    outputDir = makeTmpDir();
+    templatesDir = makeTmpDir();
+  });
+
+  afterEach(() => {
+    fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    fs.rmSync(templatesDir, { recursive: true, force: true });
+  });
+
+  function writeTemplateFile(relativePath: string, contents: string) {
+    const filePath = path.join(templatesDir, relativePath);
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, contents, 'utf-8');
+  }
+
+  it('renders pages through the default layout when no template is specified', () => {
+    writeTemplateFile('layouts/default.hbs', '<div class="layout-default">{{{body}}}</div>');
+    fs.writeFileSync(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\n# About us');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'about.html'), 'utf-8');
+    expect(html).toContain('class="layout-default"');
+    expect(html).toContain('<h1>About</h1>');
+  });
+
+  it('renders a page through the layout named in its frontmatter `template` field', () => {
+    writeTemplateFile('layouts/default.hbs', '<div class="layout-default">{{{body}}}</div>');
+    writeTemplateFile('layouts/post.hbs', '<div class="layout-post">{{{body}}}</div>');
+    fs.writeFileSync(
+      path.join(contentDir, 'post.md'),
+      '---\ntitle: My Post\ntemplate: post\n---\nPost body'
+    );
+    fs.writeFileSync(path.join(contentDir, 'page.md'), '---\ntitle: Plain Page\n---\nPage body');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const postHtml = fs.readFileSync(path.join(outputDir, 'post.html'), 'utf-8');
+    const pageHtml = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(postHtml).toContain('class="layout-post"');
+    expect(pageHtml).toContain('class="layout-default"');
+  });
+
+  it('includes header/nav/footer partials in rendered pages', () => {
+    writeTemplateFile('partials/header.hbs', '<header>SITE HEADER</header>');
+    writeTemplateFile('partials/nav.hbs', '<nav>SITE NAV</nav>');
+    writeTemplateFile('partials/footer.hbs', '<footer>SITE FOOTER</footer>');
+    writeTemplateFile(
+      'layouts/default.hbs',
+      '{{> header}}{{> nav}}<main>{{{body}}}</main>{{> footer}}'
+    );
+    fs.writeFileSync(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\nBody');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'about.html'), 'utf-8');
+    expect(html).toContain('SITE HEADER');
+    expect(html).toContain('SITE NAV');
+    expect(html).toContain('SITE FOOTER');
+  });
+
+  it('renders the index page through an "index" layout when present', () => {
+    writeTemplateFile('layouts/index.hbs', '<div class="home">{{{body}}}</div>');
+    fs.writeFileSync(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\nBody');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf-8');
+    expect(html).toContain('class="home"');
+    expect(html).toContain('href="about.html"');
+  });
+
+  it('falls back to the built-in renderer when templatesDir does not exist', () => {
+    fs.writeFileSync(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\nBody');
+    fs.rmSync(templatesDir, { recursive: true, force: true });
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'about.html'), 'utf-8');
+    expect(html).toContain('<h1>About</h1>');
+    expect(html).toContain('<article>');
+  });
+
+  it('falls back to the built-in renderer for a page when no layouts exist at all', () => {
+    fs.writeFileSync(path.join(contentDir, 'about.md'), '---\ntitle: About\n---\nBody');
+
+    buildSite({ contentDir, outputDir, templatesDir });
+
+    const html = fs.readFileSync(path.join(outputDir, 'about.html'), 'utf-8');
+    expect(html).toContain('<article>');
+  });
+});

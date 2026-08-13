@@ -87,4 +87,27 @@ Body
 
     expect(page.date).toBeUndefined();
   });
+
+  it('extracts the template field from frontmatter', () => {
+    const raw = `---
+title: A Post
+template: post
+---
+Body
+`;
+    const page = parseMarkdown(raw, 'a-post.md');
+
+    expect(page.template).toBe('post');
+  });
+
+  it('leaves template undefined when absent from frontmatter', () => {
+    const raw = `---
+title: No Template
+---
+Body
+`;
+    const page = parseMarkdown(raw, 'no-template.md');
+
+    expect(page.template).toBeUndefined();
+  });
 });
