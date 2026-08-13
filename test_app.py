@@ -1,7 +1,9 @@
+import sqlite3
 import xml.etree.ElementTree as ET
 
 import app as task_app
 import pytest
+from werkzeug.security import check_password_hash
 
 
 SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -11,16 +13,13 @@ TASK = "urn:tasks"
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
+    monkeypatch.setattr(task_app, "JWT_SECRET", "test-secret")
     task_app.init_db()
     return task_app.app.test_client()
 
 
 def soap_request(operation, fields=""):
-    return (
-        f'<soap:Envelope xmlns:soap="{SOAP}" xmlns:t="{TASK}">'
-        f"<soap:Body><t:{operation}>{fields}</t:{operation}></soap:Body>"
-        "</soap:Envelope>"
-    )
+    return f'<soap:Envelope xmlns:soap="{SOAP}" xmlns:t="{TASK}"><soap:Body><t:{operation}>{fields}</t:{operation}></soap:Body></soap:Envelope>'
 
 
 def xml(response):
@@ -28,11 +27,7 @@ def xml(response):
 
 
 def task_values(response):
-    task = xml(response).find(f".//{{{TASK}}}CreateTaskResponse/Task")
-    if task is None:
-        task = xml(response).find(f".//{{{TASK}}}GetTaskResponse/Task")
-    if task is None:
-        task = xml(response).find(f".//{{{TASK}}}UpdateTaskResponse/Task")
+    task = next(iter(xml(response).findall(".//Task")), None)
     return {child.tag: child.text for child in task}
 
 
@@ -40,8 +35,60 @@ def fault_text(response):
     return xml(response).findtext(f".//{{{SOAP}}}Fault/faultstring")
 
 
+def register(client, username="alice", password="password"):
+    return client.post("/auth/register", json={"username": username, "password": password})
+
+
+def token(client, username="alice", password="password"):
+    register(client, username, password)
+    return client.post("/auth/login", json={"username": username, "password": password}).get_json()["token"]
+
+
+def auth(token):
+    return {"Authorization": f"Bearer {token}"}
+
+
+def test_register_hashes_password(client):
+    response = register(client)
+    with task_app.get_db() as conn:
+        user = conn.execute("SELECT * FROM users WHERE username = ?", ("alice",)).fetchone()
+
+    assert response.status_code == 201
+    assert response.get_json() == {"id": 1, "username": "alice"}
+    assert user["password_hash"] != "password"
+    assert check_password_hash(user["password_hash"], "password")
+
+
+def test_register_rejects_invalid_and_duplicate_users(client):
+    invalid = client.post("/auth/register", json={"username": "alice"})
+    register(client)
+    duplicate = register(client)
+
+    assert invalid.status_code == 400
+    assert duplicate.status_code == 409
+
+
+def test_login_returns_token_and_rejects_invalid_credentials(client):
+    register(client)
+    valid = client.post("/auth/login", json={"username": "alice", "password": "password"})
+    invalid = client.post("/auth/login", json={"username": "alice", "password": "wrong"})
+
+    assert valid.status_code == 200
+    assert valid.get_json()["token"]
+    assert invalid.status_code == 401
+
+
+def test_tasks_require_valid_authentication(client):
+    missing = client.post("/soap", data=soap_request("ListTasks"))
+    invalid = client.post("/soap", data=soap_request("ListTasks"), headers=auth("invalid"))
+
+    assert missing.status_code == 401
+    assert invalid.status_code == 401
+    assert fault_text(missing) == "authentication required"
+
+
 def test_create_task_uses_pending_status(client):
-    response = client.post("/soap", data=soap_request("CreateTask", "<title>Write tests</title>"))
+    response = client.post("/soap", data=soap_request("CreateTask", "<title>Write tests</title>"), headers=auth(token(client)))
 
     assert response.status_code == 201
     assert response.content_type.startswith("text/xml")
@@ -51,52 +98,71 @@ def test_create_task_uses_pending_status(client):
 
 
 def test_create_task_requires_title(client):
-    response = client.post("/soap", data=soap_request("CreateTask"))
+    response = client.post("/soap", data=soap_request("CreateTask"), headers=auth(token(client)))
 
     assert response.status_code == 400
     assert fault_text(response) == "title is required"
 
 
-def test_list_tasks_is_newest_first(client):
-    client.post("/soap", data=soap_request("CreateTask", "<title>Older</title>"))
-    client.post("/soap", data=soap_request("CreateTask", "<title>Newer</title>"))
+def test_list_tasks_is_newest_first_and_scoped_to_owner(client):
+    alice_token = token(client)
+    bob_token = token(client, "bob")
+    client.post("/soap", data=soap_request("CreateTask", "<title>Older</title>"), headers=auth(alice_token))
+    client.post("/soap", data=soap_request("CreateTask", "<title>Newer</title>"), headers=auth(alice_token))
+    client.post("/soap", data=soap_request("CreateTask", "<title>Bob's</title>"), headers=auth(bob_token))
 
-    response = client.post("/soap", data=soap_request("ListTasks"))
+    response = client.post("/soap", data=soap_request("ListTasks"), headers=auth(alice_token))
     tasks = xml(response).findall(f".//{{{TASK}}}ListTasksResponse/Task")
 
     assert response.status_code == 200
     assert [task.findtext("title") for task in tasks] == ["Newer", "Older"]
 
 
-def test_get_task_and_missing_task(client):
-    created = client.post("/soap", data=soap_request("CreateTask", "<title>Read</title>"))
+def test_users_cannot_get_or_update_other_users_tasks(client):
+    alice_token = token(client)
+    created = client.post("/soap", data=soap_request("CreateTask", "<title>Private</title>"), headers=auth(alice_token))
     identifier = task_values(created)["id"]
+    bob_token = token(client, "bob")
 
-    response = client.post("/soap", data=soap_request("GetTask", f"<id>{identifier}</id>"))
-    missing = client.post("/soap", data=soap_request("GetTask", "<id>999</id>"))
+    fetched = client.post("/soap", data=soap_request("GetTask", f"<id>{identifier}</id>"), headers=auth(bob_token))
+    updated = client.post("/soap", data=soap_request("UpdateTask", f"<id>{identifier}</id><status>complete</status>"), headers=auth(bob_token))
 
-    assert task_values(response)["title"] == "Read"
-    assert missing.status_code == 404
-    assert fault_text(missing) == "task not found"
+    assert fetched.status_code == 404
+    assert updated.status_code == 404
 
 
 def test_update_task_allows_partial_updates(client):
-    created = client.post("/soap", data=soap_request("CreateTask", "<title>Draft</title>"))
+    access_token = token(client)
+    created = client.post("/soap", data=soap_request("CreateTask", "<title>Draft</title>"), headers=auth(access_token))
     identifier = task_values(created)["id"]
-
-    response = client.post(
-        "/soap", data=soap_request("UpdateTask", f"<id>{identifier}</id><status>complete</status>")
-    )
+    response = client.post("/soap", data=soap_request("UpdateTask", f"<id>{identifier}</id><status>complete</status>"), headers=auth(access_token))
 
     assert task_values(response)["title"] == "Draft"
     assert task_values(response)["status"] == "complete"
 
 
 def test_rejects_invalid_soap_requests(client):
-    malformed = client.post("/soap", data="not xml")
-    unknown = client.post("/soap", data=soap_request("DeleteTask"))
+    access_token = token(client)
+    malformed = client.post("/soap", data="not xml", headers=auth(access_token))
+    unknown = client.post("/soap", data=soap_request("DeleteTask"), headers=auth(access_token))
 
     assert malformed.status_code == 400
     assert fault_text(malformed) == "invalid SOAP XML"
     assert unknown.status_code == 400
     assert fault_text(unknown) == "unknown SOAP operation"
+
+
+def test_init_db_migrates_existing_tasks_database(tmp_path, monkeypatch):
+    database = tmp_path / "legacy.db"
+    with sqlite3.connect(database) as conn:
+        conn.execute("CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL, status TEXT NOT NULL, created_at TEXT NOT NULL)")
+        conn.execute("INSERT INTO tasks VALUES (1, 'Legacy', 'pending', '2020-01-01T00:00:00+00:00')")
+    monkeypatch.setattr(task_app, "DATABASE", str(database))
+
+    task_app.init_db()
+
+    with task_app.get_db() as conn:
+        columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+        task = conn.execute("SELECT * FROM tasks WHERE id = 1").fetchone()
+    assert "owner_id" in columns
+    assert task["title"] == "Legacy"
