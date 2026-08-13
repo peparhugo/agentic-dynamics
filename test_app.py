@@ -115,6 +115,31 @@ def test_get_and_update_task(client):
     assert client.get(f"/tasks/{created['id']}", headers=headers).get_json() == response.get_json()
 
 
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    headers = auth_headers(client)
+    created = client.post("/tasks", json={"title": "Notify me"}, headers=headers).get_json()
+    calls = []
+    monkeypatch.setattr(app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    response = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    assert calls == [("alice", "Notify me")]
+
+
+def test_recompleting_task_does_not_queue_duplicate_notification(client, monkeypatch):
+    headers = auth_headers(client)
+    created = client.post("/tasks", json={"title": "Only once"}, headers=headers).get_json()
+    calls = []
+    monkeypatch.setattr(app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+    response = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    assert calls == [("alice", "Only once")]
+
+
 def test_missing_task_returns_json_404(client):
     response = client.get("/tasks/99", headers=auth_headers(client))
 

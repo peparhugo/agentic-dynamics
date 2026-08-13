@@ -13,6 +13,8 @@ from pathlib import Path
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import send_notification_email
+
 
 app = Flask(__name__)
 
@@ -281,9 +283,15 @@ def edit_task(task_id: int):
     status = data.get("status")
     if "status" in data and not isinstance(status, str):
         return jsonify({"error": "status must be a string"}), 400
+    existing_task = get_task(task_id, g.current_user["id"])
+    if existing_task is None:
+        return jsonify({"error": "task not found"}), 404
+    status_changed_to_completed = status == "completed" and existing_task["status"] != "completed"
     task = update_task(task_id, g.current_user["id"], title=title, status=status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if status_changed_to_completed:
+        send_notification_email.delay(g.current_user["username"], task["title"])
     return jsonify(task)
 
 
