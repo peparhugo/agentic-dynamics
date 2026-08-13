@@ -28,4 +28,26 @@ describe('CLI', () => {
   it('rejects unsupported commands', async () => {
     await expect(run(['serve'])).rejects.toThrow('Unknown command: serve');
   });
+
+  it('accepts a custom template directory', async () => {
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'public');
+    const templatesDir = path.join(temporaryDirectory, 'views');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '# Post');
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<section>{{{content}}}</section>');
+    jest.spyOn(console, 'log').mockImplementation();
+
+    try {
+      await run([
+        'build', '--content', contentDir, '--output', outputDir, '--templates', templatesDir,
+      ]);
+      await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8'))
+        .resolves.toBe('<section><h1>Post</h1>\n</section>');
+    } finally {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
 });

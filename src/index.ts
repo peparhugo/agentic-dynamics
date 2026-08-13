@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 export interface GeneratedPage {
@@ -19,10 +21,14 @@ export interface GeneratedPage {
 
 interface ParsedPage extends GeneratedPage {
   html: string;
+  frontmatter: Record<string, unknown>;
+  template?: string;
+  layout?: string;
 }
 
 const DEFAULT_CONTENT_DIR = './content';
 const DEFAULT_OUTPUT_DIR = './dist';
+const DEFAULT_TEMPLATES_DIR = './templates';
 
 function escapeHtml(value: string): string {
   return value
@@ -123,9 +129,82 @@ function indexTemplate(pages: ParsedPage[]): string {
 `;
 }
 
+async function isDirectory(directory: string): Promise<boolean> {
+  try {
+    return (await fs.stat(directory)).isDirectory();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function findTemplateFile(directory: string, name: string): Promise<string> {
+  const requested = path.resolve(directory, name.endsWith('.hbs') ? name : `${name}.hbs`);
+  const relative = path.relative(directory, requested);
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Template must be inside ${directory}: ${name}`);
+  }
+  try {
+    if ((await fs.stat(requested)).isFile()) return requested;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  throw new Error(`Template not found: ${name}`);
+}
+
+async function registerPartials(handlebars: typeof Handlebars, partialsDir: string): Promise<void> {
+  if (!await isDirectory(partialsDir)) return;
+  const files = await findHandlebarsFiles(partialsDir);
+  await Promise.all(files.map(async (file) => {
+    const relative = path.relative(partialsDir, file).replace(/\.hbs$/i, '').split(path.sep).join('/');
+    handlebars.registerPartial(relative, await fs.readFile(file, 'utf8'));
+  }));
+}
+
+async function findHandlebarsFiles(directory: string): Promise<string[]> {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(entries.map(async (entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return findHandlebarsFiles(entryPath);
+    return /\.hbs$/i.test(entry.name) ? [entryPath] : [];
+  }));
+  return files.flat().sort();
+}
+
+async function renderPage(page: ParsedPage, templatesDir: string, handlebars: typeof Handlebars): Promise<string> {
+  const defaultTemplate = path.join(templatesDir, 'default.hbs');
+  const hasDefaultTemplate = await fs.stat(defaultTemplate).then((stat) => stat.isFile()).catch(() => false);
+  if (!page.template && !hasDefaultTemplate && !page.layout) return pageTemplate(page);
+
+  const context = {
+    ...page.frontmatter,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    url: page.url,
+    content: new handlebars.SafeString(page.html),
+  };
+  let rendered = page.template || hasDefaultTemplate
+    ? handlebars.compile(await fs.readFile(
+      page.template ? await findTemplateFile(templatesDir, page.template) : defaultTemplate,
+      'utf8',
+    ))(context)
+    : page.html;
+
+  if (page.layout) {
+    const layoutPath = await findTemplateFile(path.join(templatesDir, 'layouts'), page.layout);
+    rendered = handlebars.compile(await fs.readFile(layoutPath, 'utf8'))({
+      ...context,
+      body: new handlebars.SafeString(rendered),
+    });
+  }
+  return rendered;
+}
+
 export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPage[]> {
   const contentDir = path.resolve(options.contentDir ?? DEFAULT_CONTENT_DIR);
   const outputDir = path.resolve(options.outputDir ?? DEFAULT_OUTPUT_DIR);
+  const templatesDir = path.resolve(options.templatesDir ?? DEFAULT_TEMPLATES_DIR);
   const files = await findMarkdownFiles(contentDir);
 
   const pages = await Promise.all(files.map(async (sourcePath): Promise<ParsedPage> => {
@@ -145,6 +224,9 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
       outputPath: path.join(outputDir, relativeOutput),
       url: relativeOutput.split(path.sep).join('/'),
       html: await marked.parse(parsed.content),
+      frontmatter: parsed.data,
+      template: typeof parsed.data.template === 'string' ? parsed.data.template : undefined,
+      layout: typeof parsed.data.layout === 'string' ? parsed.data.layout : undefined,
     };
   }));
 
@@ -159,12 +241,14 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
   });
 
   await fs.rm(outputDir, { recursive: true, force: true });
+  const handlebars = Handlebars.create();
+  await registerPartials(handlebars, path.join(templatesDir, 'partials'));
   await Promise.all(pages.map(async (page) => {
     await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
-    await fs.writeFile(page.outputPath, pageTemplate(page), 'utf8');
+    await fs.writeFile(page.outputPath, await renderPage(page, templatesDir, handlebars), 'utf8');
   }));
   await fs.mkdir(outputDir, { recursive: true });
   await fs.writeFile(path.join(outputDir, 'index.html'), indexTemplate(pages), 'utf8');
 
-  return pages.map(({ html: _html, ...page }) => page);
+  return pages.map(({ html: _html, frontmatter: _frontmatter, template: _template, layout: _layout, ...page }) => page);
 }

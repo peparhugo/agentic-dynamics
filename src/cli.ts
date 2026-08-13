@@ -5,6 +5,7 @@ import { buildSite } from './index';
 interface CliOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 const USAGE = `Usage: ssg build [options]
@@ -12,6 +13,7 @@ const USAGE = `Usage: ssg build [options]
 Options:
   --content <dir>  Markdown content directory (default: ./content)
   --output <dir>   Generated site directory (default: ./dist)
+  --templates <dir> Template directory (default: ./templates)
   -h, --help       Show this help message`;
 
 function parseArguments(args: string[]): CliOptions | null {
@@ -27,7 +29,7 @@ function parseArguments(args: string[]): CliOptions | null {
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
-    if (option !== '--content' && option !== '--output') {
+    if (option !== '--content' && option !== '--output' && option !== '--templates') {
       throw new Error(`Unknown option: ${option}\n\n${USAGE}`);
     }
     if (!value || value.startsWith('-')) {
@@ -35,8 +37,10 @@ function parseArguments(args: string[]): CliOptions | null {
     }
     if (option === '--content') {
       options.contentDir = value;
-    } else {
+    } else if (option === '--output') {
       options.outputDir = value;
+    } else {
+      options.templatesDir = value;
     }
     index += 1;
   }

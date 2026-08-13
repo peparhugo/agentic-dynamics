@@ -71,4 +71,65 @@ This is **static**.
     await expect(fs.stat(path.join(outputDir, 'stale.html'))).rejects.toThrow();
     await expect(fs.readFile(path.join(outputDir, 'index.html'), 'utf8')).resolves.toContain('<h1>Pages</h1>');
   });
+
+  it('uses the default template, layout, and partials', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'partials'));
+    await fs.writeFile(path.join(contentDir, 'hello.md'), `---
+title: Hello
+layout: base
+author: Sam & Pat
+---
+This is **templated**.`);
+    await fs.writeFile(
+      path.join(templatesDir, 'default.hbs'),
+      '<article>{{> header}}<p>{{author}}</p>{{{content}}}</article>',
+    );
+    await fs.writeFile(path.join(templatesDir, 'partials', 'header.hbs'), '<h1>{{title}}</h1>');
+    await fs.writeFile(
+      path.join(templatesDir, 'layouts', 'base.hbs'),
+      '<!doctype html><html><body>{{{body}}}{{> footer}}</body></html>',
+    );
+    await fs.writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>{{title}}</footer>');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'hello.html'), 'utf8');
+
+    expect(page).toBe('<!doctype html><html><body><article><h1>Hello</h1><p>Sam &amp; Pat</p><p>This is <strong>templated</strong>.</p>\n</article><footer>Hello</footer></body></html>');
+  });
+
+  it('allows each page to select a template', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), `---
+title: Selected
+template: post.hbs
+---
+# Body`);
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), 'default {{{content}}}');
+    await fs.writeFile(path.join(templatesDir, 'post.hbs'), '<main data-title="{{title}}">{{{content}}}</main>');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8'))
+      .resolves.toBe('<main data-title="Selected"><h1>Body</h1>\n</main>');
+  });
+
+  it('reports a missing selected template', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '---\ntemplate: missing\n---\nBody');
+
+    await expect(buildSite({ contentDir, outputDir, templatesDir }))
+      .rejects.toThrow('Template not found: missing');
+  });
 });
