@@ -140,13 +140,17 @@ class TaskRepository(BaseRepository):
             }
         )
 
-    def list_for_owner(self, owner_id):
+    def list_for_owner(self, owner_id, cursor, limit):
         with self.connection_factory() as connection:
-            return connection.execute(
+            rows = connection.execute(
                 f"SELECT {self.response_columns} FROM tasks WHERE owner_id = ? "
-                "ORDER BY created_at DESC, id DESC",
-                (owner_id,),
+                "AND (? IS NULL OR id < ?) ORDER BY id DESC LIMIT ?",
+                (owner_id, cursor, cursor, limit + 1),
             ).fetchall()
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            return rows, total
 
     def get_for_owner(self, task_id, owner_id):
         with self.connection_factory() as connection:

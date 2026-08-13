@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -23,6 +25,29 @@ app.config["JWT_SECRET_KEY"] = os.environ.get(
     "JWT_SECRET_KEY", "development-only-change-me"
 )
 app.config["JWT_EXPIRATION_SECONDS"] = 3600
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
+
+
+def rate_limit_key():
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if separator == " " and scheme.lower() == "bearer" and token:
+        user_id = decode_token(token)
+        if user_id is not None:
+            return f"user:{user_id}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    in_memory_fallback=["100 per minute"],
+    in_memory_fallback_enabled=True,
+)
 
 
 def get_db():
@@ -208,8 +233,31 @@ def create_task():
 @app.get("/tasks")
 @login_required
 def list_tasks():
-    rows = get_task_repository().list_for_owner(g.current_user_id)
-    return jsonify([task_response(row) for row in rows])
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+    except ValueError:
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if cursor is not None and cursor < 1:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    if limit < 1 or limit > 100:
+        return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+    rows, total = get_task_repository().list_for_owner(
+        g.current_user_id, cursor, limit
+    )
+    has_next_page = len(rows) > limit
+    page = rows[:limit]
+    next_cursor = str(page[-1]["id"]) if has_next_page else None
+    return jsonify(
+        {
+            "data": [task_response(row) for row in page],
+            "next_cursor": next_cursor,
+            "total": total,
+        }
+    )
 
 
 @app.get("/tasks/<int:task_id>")
