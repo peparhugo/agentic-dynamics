@@ -3,6 +3,7 @@ import path from 'path';
 import { parseFrontmatter, Frontmatter } from './frontmatter';
 import { markdownToHtml } from './markdown';
 import { TemplateEngine } from './templates';
+import { PluginManager, PluginContext } from './plugin';
 
 export interface PageData {
   slug: string;
@@ -42,7 +43,8 @@ export async function parseMarkdownFile(
 export async function generatePages(
   contentDir: string,
   outputDir: string,
-  templateEngine?: TemplateEngine
+  templateEngine?: TemplateEngine,
+  pluginManager?: PluginManager
 ): Promise<PageData[]> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -50,11 +52,18 @@ export async function generatePages(
 
   const files = await readMarkdownFiles(contentDir);
   const pages: PageData[] = [];
+  const context: PluginContext = { contentDir, outputDir, templatesDir: '' };
 
   for (const file of files) {
     const filePath = path.join(contentDir, file);
     const pageData = await parseMarkdownFile(filePath);
     pages.push(pageData);
+
+    if (pluginManager) {
+      await pluginManager.executeFileHook(pageData, context);
+    } else {
+      pageData.html = markdownToHtml(pageData.content);
+    }
 
     const outputPath = path.join(outputDir, `${pageData.slug}.html`);
     const html = templateEngine
@@ -173,14 +182,27 @@ export function generatePageHtmlWithTemplate(
 export async function build(
   contentDir: string = './content',
   outputDir: string = './dist',
-  templatesDir: string = './templates'
+  templatesDir: string = './templates',
+  pluginManager?: PluginManager
 ): Promise<void> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
+  const context: PluginContext = { contentDir, outputDir, templatesDir };
+
+  if (pluginManager) {
+    await pluginManager.executeHook('onStart', context);
+    await pluginManager.executeHook('beforeBuild', context);
+  }
+
   let templateEngine: TemplateEngine | undefined;
-  if (fs.existsSync(templatesDir)) {
+  if (pluginManager) {
+    const templatePlugin = pluginManager.getPlugin('template-plugin') as any;
+    if (templatePlugin && templatePlugin.getTemplateEngine) {
+      templateEngine = templatePlugin.getTemplateEngine();
+    }
+  } else if (fs.existsSync(templatesDir)) {
     templateEngine = new TemplateEngine({
       templatesDir,
       layoutsDir: path.join(templatesDir, 'layouts'),
@@ -188,9 +210,14 @@ export async function build(
     });
   }
 
-  const pages = await generatePages(contentDir, outputDir, templateEngine);
+  const pages = await generatePages(contentDir, outputDir, templateEngine, pluginManager);
   const indexHtml = generateIndexHtml(pages);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf-8');
+
+  if (pluginManager) {
+    await pluginManager.executeHook('afterBuild', context, pages);
+    await pluginManager.executeHook('onEnd', context);
+  }
 }
 
 function escapeHtml(text: string): string {

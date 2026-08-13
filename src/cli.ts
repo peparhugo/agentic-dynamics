@@ -2,6 +2,8 @@
 
 import { build } from './generator';
 import { DevServer } from './dev-server';
+import { loadPluginsFromConfig } from './plugin-loader';
+import { DevServerPlugin } from './plugins/dev-server-plugin';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
