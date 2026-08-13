@@ -29,6 +29,17 @@ async def connect(port):
     return socket, welcome["payload"]["client_id"]
 
 
+async def get_json(port, path):
+    reader, writer = await asyncio.open_connection("127.0.0.1", port)
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    status, body = response.split(b"\r\n\r\n", 1)
+    return status.split(b"\r\n", 1)[0], json.loads(body)
+
+
 @pytest.mark.asyncio
 async def test_connect_assigns_unique_client_ids(notification_server):
     app, websocket_port, _ = notification_server
@@ -79,6 +90,58 @@ async def test_disconnect_removes_client(notification_server):
             break
         await asyncio.sleep(0.01)
     assert await app.client_count() == 0
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_reaches_only_subscribers(notification_server):
+    _, websocket_port, soap_port = notification_server
+    first, _ = await connect(websocket_port)
+    second, _ = await connect(websocket_port)
+    other, _ = await connect(websocket_port)
+    await first.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+    await second.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+    await other.send(json.dumps({"type": "subscribe", "channel": "chat", "payload": {}}))
+    for _ in range(20):
+        _, channels = await get_json(soap_port, "/channels")
+        if channels == {"alerts": 2, "chat": 1}:
+            break
+        await asyncio.sleep(0.01)
+    await first.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}}))
+    messages = [json.loads(await first.recv()), json.loads(await second.recv())]
+    assert all(message["payload"] == {"text": "warning"} for message in messages)
+    assert all(message["channel"] == "alerts" for message in messages)
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(other.recv(), timeout=0.05)
+    await first.close()
+    await second.close()
+    await other.close()
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_and_channel_rest_endpoints(notification_server):
+    _, websocket_port, soap_port = notification_server
+    first, first_id = await connect(websocket_port)
+    second, second_id = await connect(websocket_port)
+    await first.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+    await first.send(json.dumps({"type": "subscribe", "channel": "chat", "payload": {}}))
+    await second.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}}))
+    for _ in range(20):
+        status, channels = await get_json(soap_port, "/channels")
+        if channels == {"alerts": 2, "chat": 1}:
+            break
+        await asyncio.sleep(0.01)
+    assert status == b"HTTP/1.1 200 OK"
+    assert channels == {"alerts": 2, "chat": 1}
+    status, subscribers = await get_json(soap_port, "/channels/alerts/subscribers")
+    assert status == b"HTTP/1.1 200 OK"
+    assert subscribers == sorted([first_id, second_id])
+    await first.send(json.dumps({"type": "unsubscribe", "channel": "alerts", "payload": {}}))
+    await first.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "one"}}))
+    assert json.loads(await second.recv())["payload"] == {"text": "one"}
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(first.recv(), timeout=0.05)
+    await first.close()
+    await second.close()
 
 
 @pytest.mark.asyncio
