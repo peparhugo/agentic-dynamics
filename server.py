@@ -1,4 +1,11 @@
-"""WebSocket-based notification server with a Redis pub/sub backbone.
+"""Notification server with a Redis pub/sub backbone and a pluggable transport.
+
+The core notification logic lives in :class:`NotificationServer` and is
+completely transport-agnostic: it talks to clients exclusively through the
+:class:`BaseTransport` interface. Concrete transports (WebSocket, SSE,
+polling, raw TCP, ...) can be plugged in without touching the core logic.
+The active transport is chosen from the ``TRANSPORT`` environment variable
+(``websocket`` by default).
 
 Features
 --------
@@ -54,6 +61,7 @@ import logging
 import os
 import sqlite3
 import threading
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, unquote, urlsplit
 
@@ -86,7 +94,7 @@ def make_message(msg_type: str, payload: dict) -> dict:
 
 
 class ClientRegistry:
-    """Thread-safe registry mapping client IDs to WebSocket connections.
+    """Thread-safe registry mapping client IDs to connection handles.
 
     All mutating and reading operations are guarded by a ``threading.Lock``,
     so the registry is safe to touch from any thread. Operations never block
@@ -97,9 +105,9 @@ class ClientRegistry:
         self._clients: dict[str, ServerConnection] = {}
         self._lock = threading.Lock()
 
-    def add(self, client_id: str, ws: ServerConnection) -> None:
+    def add(self, client_id: str, connection: ServerConnection) -> None:
         with self._lock:
-            self._clients[client_id] = ws
+            self._clients[client_id] = connection
 
     def remove(self, client_id: str) -> None:
         with self._lock:
@@ -365,8 +373,232 @@ def _clamp_int(
     return parsed
 
 
+class BaseTransport(ABC):
+    """Abstract interface between the core notification logic and a client
+    transport mechanism.
+
+    A transport owns the connection plumbing (accepting connections, holding
+    the client->connection map and the per-client receive loop) and bridges it
+    to the server through a small set of callbacks:
+
+    * ``server.on_client_connected(client_id)``  -- connection established
+    * ``server.on_client_message(client_id, raw)`` -- one inbound message
+    * ``server.on_client_disconnected(client_id)`` -- connection torn down
+
+    The core server never sees transport-specific objects; it only sends
+    encoded messages through :meth:`send_message` and :meth:`broadcast`.
+    Implement SSE, polling or raw TCP transports by subclassing this class and
+    wiring them into the :func:`create_transport` factory.
+    """
+
+    def __init__(self, server: "NotificationServer", host: str, port: int) -> None:
+        self.server = server
+        self.host = host
+        self.port = port
+
+    # ── lifecycle ──────────────────────────────────────────────
+
+    @abstractmethod
+    async def start(self) -> None:
+        """Begin accepting client connections."""
+
+    @abstractmethod
+    async def stop(self) -> None:
+        """Stop accepting connections and release resources."""
+
+    @property
+    @abstractmethod
+    def started(self) -> bool:
+        """Whether the transport is currently accepting connections."""
+
+    # ── client lifecycle ───────────────────────────────────────
+
+    @abstractmethod
+    async def on_connect(self, connection) -> str:
+        """Register a new connection and return its unique client id."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str, connection=None) -> None:
+        """Deregister a client connection."""
+
+    # ── messaging ──────────────────────────────────────────────
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> bool:
+        """Deliver an encoded message to one client; returns success."""
+
+    @abstractmethod
+    async def broadcast(
+        self, message: str, targets: set[str] | None = None
+    ) -> int:
+        """Deliver an encoded message to ``targets`` (all clients if None).
+
+        Returns the number of clients the message was actually delivered to.
+        """
+
+    # ── introspection ──────────────────────────────────────────
+
+    @abstractmethod
+    async def client_exists(self, client_id: str) -> bool:
+        """Return whether ``client_id`` is currently connected."""
+
+    @abstractmethod
+    async def client_count(self) -> int:
+        """Return the number of currently connected clients."""
+
+    @property
+    @abstractmethod
+    def sockets(self):
+        """The underlying listening sockets, or ``None`` when not started."""
+
+    @property
+    @abstractmethod
+    def bound_port(self) -> int:
+        """The port clients connect to (handles ``port=0``)."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket transport built on the ``websockets`` library.
+
+    Accepts connections over ``ws://host:port`` and also serves the server's
+    plain-HTTP REST endpoints (``/health``, ``/channels``, ``/messages``)
+    during the WebSocket handshake request.
+    """
+
+    def __init__(self, server: "NotificationServer", host: str, port: int) -> None:
+        super().__init__(server, host, port)
+        self.registry = ClientRegistry()
+        self._ids = itertools.count(1)
+        self._server = None
+
+    # ── lifecycle ──────────────────────────────────────────────
+
+    async def start(self) -> None:
+        if self._server is not None:
+            return
+        self._server = await serve(
+            self._client_handler,
+            self.host,
+            self.port,
+            process_request=self.server._process_request,
+        )
+
+    async def stop(self) -> None:
+        if self._server is None:
+            return
+        self._server.close()
+        await self._server.wait_closed()
+        self._server = None
+
+    @property
+    def started(self) -> bool:
+        return self._server is not None
+
+    @property
+    def sockets(self):
+        return self._server.sockets if self._server is not None else None
+
+    @property
+    def bound_port(self) -> int:
+        if self.sockets is None:
+            return self.port
+        return self.sockets[0].getsockname()[1]
+
+    # ── client lifecycle ───────────────────────────────────────
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        client_id = f"client-{next(self._ids)}"
+        self.registry.add(client_id, connection)
+        logger.info("client connected: %s", client_id)
+        return client_id
+
+    async def on_disconnect(self, client_id: str, connection=None) -> None:
+        self.registry.remove(client_id)
+        logger.info("client disconnected: %s", client_id)
+
+    # ── messaging ──────────────────────────────────────────────
+
+    async def send_message(self, client_id: str, message: str) -> bool:
+        ws = self.registry.get(client_id)
+        if ws is None:
+            return False
+        try:
+            await ws.send(message)
+            return True
+        except ConnectionClosed:
+            await self.on_disconnect(client_id, ws)
+            await self.server.on_client_disconnected(client_id)
+            return False
+
+    async def broadcast(
+        self, message: str, targets: set[str] | None = None
+    ) -> int:
+        if targets is None:
+            targets = set(self.registry.snapshot())
+        sent = 0
+        for client_id in targets:
+            ws = self.registry.get(client_id)
+            if ws is None:
+                continue
+            try:
+                await ws.send(message)
+                sent += 1
+            except ConnectionClosed:
+                await self.on_disconnect(client_id, ws)
+                await self.server.on_client_disconnected(client_id)
+        return sent
+
+    # ── introspection ──────────────────────────────────────────
+
+    async def client_exists(self, client_id: str) -> bool:
+        return self.registry.get(client_id) is not None
+
+    async def client_count(self) -> int:
+        return self.registry.count()
+
+    # ── connection handling ────────────────────────────────────
+
+    async def _client_handler(self, ws: ServerConnection) -> None:
+        client_id = await self.on_connect(ws)
+        try:
+            await self.server.on_client_connected(client_id)
+            async for raw in ws:
+                await self.server.on_client_message(client_id, raw)
+        except ConnectionClosed:
+            pass
+        finally:
+            await self.on_disconnect(client_id, ws)
+            await self.server.on_client_disconnected(client_id)
+
+
+def create_transport(server: "NotificationServer", host: str, port: int) -> BaseTransport:
+    """Build the transport selected by the ``TRANSPORT`` environment variable.
+
+    ``websocket`` (or ``ws``) is the default and currently the only built-in
+    transport; additional transports (SSE, polling, raw TCP) can be registered
+    here by extending ``TRANSPORTS``.
+    """
+    transports: dict[str, type[BaseTransport]] = {
+        "websocket": WebSocketTransport,
+        "ws": WebSocketTransport,
+    }
+    name = os.environ.get("TRANSPORT", "websocket").strip().lower()
+    try:
+        transport_cls = transports[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown transport: {name!r} (expected one of {sorted(transports)})"
+        ) from None
+    return transport_cls(server, host, port)
+
+
 class NotificationServer:
-    """WebSocket notification server built on the ``websockets`` library."""
+    """Transport-agnostic notification server.
+
+    The server owns the core notification logic (channels, history, Redis
+    backbone, message protocol) and communicates with clients exclusively
+    through its :attr:`transport`, an instance of :class:`BaseTransport`.
+    """
 
     def __init__(
         self,
@@ -374,14 +606,13 @@ class NotificationServer:
         port: int = 8765,
         redis_client=None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.port = port
-        self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
         self.store = MessageStore(database_url)
-        self._ids = itertools.count(1)
-        self._server = None
+        self.transport = transport or create_transport(self, host, port)
         self._listener_task: asyncio.Task | None = None
         if redis_client is not None or os.environ.get("REDIS_URL"):
             self.broker = RedisBroker(
@@ -394,16 +625,11 @@ class NotificationServer:
 
     async def start(self) -> None:
         """Start accepting connections on ``host:port``."""
-        if self._server is not None:
+        if self.transport.started:
             return
         if self.broker is not None:
             await self.broker.connect()
-        self._server = await serve(
-            self._client_handler,
-            self.host,
-            self.port,
-            process_request=self._process_request,
-        )
+        await self.transport.start()
         if self.broker is not None:
             self._listener_task = asyncio.create_task(self._redis_listener())
 
@@ -418,23 +644,17 @@ class NotificationServer:
             self._listener_task = None
         if self.broker is not None:
             await self.broker.close()
-        if self._server is None:
-            return
-        self._server.close()
-        await self._server.wait_closed()
-        self._server = None
+        await self.transport.stop()
         self.store.close()
 
     @property
     def sockets(self):
-        return self._server.sockets if self._server is not None else None
+        return self.transport.sockets
 
     @property
     def bound_port(self) -> int:
         """Return the actual bound port (handles ``port=0``)."""
-        if self.sockets is None:
-            return self.port
-        return self.sockets[0].getsockname()[1]
+        return self.transport.bound_port
 
     # ── message helpers ────────────────────────────────────────
 
@@ -442,9 +662,9 @@ class NotificationServer:
     def _encode(msg: dict) -> str:
         return json.dumps(msg)
 
-    async def _send(self, ws: ServerConnection, msg_type: str, payload: dict) -> None:
+    async def _send(self, client_id: str, msg_type: str, payload: dict) -> None:
         msg = make_message(msg_type, payload)
-        await ws.send(self._encode(msg))
+        await self.transport.send_message(client_id, self._encode(msg))
         self.store.insert(None, msg_type, payload, msg["timestamp"])
 
     # ── public API ─────────────────────────────────────────────
@@ -469,33 +689,18 @@ class NotificationServer:
                 json.dumps({"kind": "broadcast", "channel": channel, "message": msg}),
             )
             if channel is not None:
-                return sum(
-                    1
-                    for cid in self.channels.subscribers(channel)
-                    if self.registry.get(cid) is not None
-                )
-            return self.registry.count()
-
-        message = self._encode(msg)
+                count = 0
+                for cid in self.channels.subscribers(channel):
+                    if await self.transport.client_exists(cid):
+                        count += 1
+                return count
+            return await self.transport.client_count()
 
         if channel is not None:
-            targets = {
-                cid: ws
-                for cid in self.channels.subscribers(channel)
-                if (ws := self.registry.get(cid)) is not None
-            }
+            targets = self.channels.subscribers(channel)
         else:
-            targets = self.registry.snapshot()
-
-        sent = 0
-        for client_id, ws in targets.items():
-            try:
-                await ws.send(message)
-                sent += 1
-            except ConnectionClosed:
-                self.registry.remove(client_id)
-                self.channels.remove_client(client_id)
-        return sent
+            targets = None
+        return await self.transport.broadcast(self._encode(msg), targets=targets)
 
     async def send_direct(self, target_id: str, payload: dict) -> bool:
         """Send a ``direct`` message to a single client.
@@ -503,11 +708,12 @@ class NotificationServer:
         Returns ``False`` if the target client is not connected (or, in Redis
         mode, not known to any instance of the cluster).
         """
-        ws = self.registry.get(target_id)
         msg = make_message("direct", payload)
 
         if self.broker is not None:
-            if ws is None and not await self.broker.client_exists(target_id):
+            if not await self.transport.client_exists(
+                target_id
+            ) and not await self.broker.client_exists(target_id):
                 return False
             self.store.insert(None, "direct", payload, msg["timestamp"])
             await self.broker.publish(
@@ -516,20 +722,36 @@ class NotificationServer:
             )
             return True
 
-        if ws is None:
+        if not await self.transport.client_exists(target_id):
             return False
         self.store.insert(None, "direct", payload, msg["timestamp"])
-        message = self._encode(msg)
-        try:
-            await ws.send(message)
-        except ConnectionClosed:
-            self.registry.remove(target_id)
-            return False
-        return True
+        return await self.transport.send_message(target_id, self._encode(msg))
 
     async def client_count(self) -> int:
         """Return the number of currently connected clients."""
-        return self.registry.count()
+        return await self.transport.client_count()
+
+    # ── transport callbacks ────────────────────────────────────
+
+    async def on_client_connected(self, client_id: str) -> None:
+        """Hook called by the transport when a client connection is accepted."""
+        if self.broker is not None:
+            await self.broker.set_client(
+                client_id, json.dumps({"connected_at": utc_now_iso()})
+            )
+        await self._send(
+            client_id, "system", {"event": "connected", "client_id": client_id}
+        )
+
+    async def on_client_message(self, client_id: str, raw: str) -> None:
+        """Hook called by the transport for each inbound client message."""
+        await self._handle_message(client_id, raw)
+
+    async def on_client_disconnected(self, client_id: str) -> None:
+        """Hook called by the transport when a client connection is torn down."""
+        self.channels.remove_client(client_id)
+        if self.broker is not None:
+            await self.broker.remove_client(client_id)
 
     # ── Redis backbone ─────────────────────────────────────────
 
@@ -568,59 +790,32 @@ class NotificationServer:
             channel = envelope.get("channel")
             if channel:
                 targets = {
-                    cid: ws
+                    cid
                     for cid in self.channels.subscribers(channel)
-                    if (ws := self.registry.get(cid)) is not None
+                    if await self.transport.client_exists(cid)
                 }
             else:
-                targets = self.registry.snapshot()
+                targets = None
         elif kind == "direct":
             target = envelope.get("target")
-            ws = self.registry.get(target)
-            targets = {target: ws} if ws is not None else {}
+            targets = (
+                {target}
+                if await self.transport.client_exists(target)
+                else set()
+            )
         else:
             return
 
-        for client_id, ws in targets.items():
-            try:
-                await ws.send(encoded)
-            except ConnectionClosed:
-                self.registry.remove(client_id)
-                self.channels.remove_client(client_id)
+        await self.transport.broadcast(encoded, targets=targets)
 
-    # ── connection handling ────────────────────────────────────
+    # ── message handling ───────────────────────────────────────
 
-    async def _client_handler(self, ws: ServerConnection) -> None:
-        client_id = f"client-{next(self._ids)}"
-        self.registry.add(client_id, ws)
-        if self.broker is not None:
-            await self.broker.set_client(
-                client_id, json.dumps({"connected_at": utc_now_iso()})
-            )
-        logger.info("client connected: %s", client_id)
-        try:
-            await self._send(
-                ws, "system", {"event": "connected", "client_id": client_id}
-            )
-            async for raw in ws:
-                await self._handle_message(client_id, ws, raw)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
-            self.channels.remove_client(client_id)
-            if self.broker is not None:
-                await self.broker.remove_client(client_id)
-            logger.info("client disconnected: %s", client_id)
-
-    async def _handle_message(
-        self, client_id: str, ws: ServerConnection, raw: str
-    ) -> None:
+    async def _handle_message(self, client_id: str, raw: str) -> None:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError:
             await self._send(
-                ws,
+                client_id,
                 "system",
                 {"client_id": client_id, "error": "invalid JSON message"},
             )
@@ -628,7 +823,7 @@ class NotificationServer:
 
         if not isinstance(data, dict):
             await self._send(
-                ws,
+                client_id,
                 "system",
                 {"client_id": client_id, "error": "message must be a JSON object"},
             )
@@ -640,14 +835,14 @@ class NotificationServer:
         if msg_type == "broadcast":
             await self.broadcast(payload, channel=self._extract_channel(data, payload))
         elif msg_type == "subscribe":
-            await self._handle_subscribe(client_id, ws, data, payload)
+            await self._handle_subscribe(client_id, data, payload)
         elif msg_type == "unsubscribe":
-            await self._handle_unsubscribe(client_id, ws, data, payload)
+            await self._handle_unsubscribe(client_id, data, payload)
         elif msg_type == "direct":
             target = payload.get("to")
             if not isinstance(target, str) or not target:
                 await self._send(
-                    ws,
+                    client_id,
                     "system",
                     {
                         "client_id": client_id,
@@ -659,7 +854,7 @@ class NotificationServer:
             forwarded["from"] = client_id
             if not await self.send_direct(target, forwarded):
                 await self._send(
-                    ws,
+                    client_id,
                     "system",
                     {
                         "client_id": client_id,
@@ -668,7 +863,7 @@ class NotificationServer:
                 )
         else:
             await self._send(
-                ws,
+                client_id,
                 "system",
                 {
                     "client_id": client_id,
@@ -701,12 +896,12 @@ class NotificationServer:
         return channels[0] if channels else None
 
     async def _handle_subscribe(
-        self, client_id: str, ws: ServerConnection, data: dict, payload: dict
+        self, client_id: str, data: dict, payload: dict
     ) -> None:
         channels = self._extract_channels(data, payload)
         if not channels:
             await self._send(
-                ws,
+                client_id,
                 "system",
                 {
                     "client_id": client_id,
@@ -717,7 +912,7 @@ class NotificationServer:
         for channel in channels:
             self.channels.subscribe(channel, client_id)
         await self._send(
-            ws,
+            client_id,
             "system",
             {
                 "client_id": client_id,
@@ -727,12 +922,12 @@ class NotificationServer:
         )
 
     async def _handle_unsubscribe(
-        self, client_id: str, ws: ServerConnection, data: dict, payload: dict
+        self, client_id: str, data: dict, payload: dict
     ) -> None:
         channels = self._extract_channels(data, payload)
         if not channels:
             await self._send(
-                ws,
+                client_id,
                 "system",
                 {
                     "client_id": client_id,
@@ -743,7 +938,7 @@ class NotificationServer:
         for channel in channels:
             self.channels.unsubscribe(channel, client_id)
         await self._send(
-            ws,
+            client_id,
             "system",
             {
                 "client_id": client_id,
@@ -783,7 +978,7 @@ class NotificationServer:
         body = json.dumps(
             {
                 "status": "ok",
-                "clients": self.registry.count(),
+                "clients": await self.client_count(),
                 "timestamp": utc_now_iso(),
             }
         ).encode("utf-8")
@@ -839,8 +1034,8 @@ async def main() -> None:
     server = NotificationServer()
     await server.start()
     print(
-        f"WebSocket notification server listening on "
-        f"ws://{server.host}:{server.bound_port}"
+        f"Notification server ({type(server.transport).__name__}) listening on "
+        f"{server.host}:{server.bound_port}"
     )
     try:
         await asyncio.Future()  # run forever
