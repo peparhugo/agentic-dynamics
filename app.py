@@ -1,146 +1,171 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Async WebSocket notification server."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+from __future__ import annotations
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
+import argparse
+import asyncio
+import json
+import threading
+import uuid
+from datetime import datetime, timezone
+from http import HTTPStatus
+from typing import Any
 
-app = Flask(__name__)
+import websockets
+from websockets.exceptions import ConnectionClosed
 
-DATABASE = os.environ.get("DATABASE", "todos.db")
-
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+SUPPORTED_TYPES = {"broadcast", "direct", "system"}
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
+class ClientRegistry:
+    """Thread-safe mapping of client IDs to WebSocket connections."""
+
+    def __init__(self) -> None:
+        self._clients: dict[str, Any] = {}
+        self._lock = threading.RLock()
+
+    def add(self, websocket: Any) -> str:
+        client_id = str(uuid.uuid4())
+        with self._lock:
+            self._clients[client_id] = websocket
+        return client_id
+
+    def remove(self, client_id: str) -> None:
+        with self._lock:
+            self._clients.pop(client_id, None)
+
+    def get(self, client_id: str) -> Any | None:
+        with self._lock:
+            return self._clients.get(client_id)
+
+    def snapshot(self) -> list[tuple[str, Any]]:
+        with self._lock:
+            return list(self._clients.items())
+
+    @property
+    def count(self) -> int:
+        with self._lock:
+            return len(self._clients)
 
 
-# ── Models ────────────────────────────────────────────────────
+class NotificationServer:
+    def __init__(self) -> None:
+        self.clients = ClientRegistry()
 
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
-        )
-        conn.commit()
+    @staticmethod
+    def message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
+            "type": message_type,
+            "payload": payload,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    async def send(self, websocket: Any, message_type: str, payload: dict[str, Any]) -> None:
+        await websocket.send(json.dumps(self.message(message_type, payload)))
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
+    async def broadcast(self, payload: dict[str, Any]) -> None:
+        clients = self.clients.snapshot()
+        if not clients:
+            return
+        results = await asyncio.gather(
+            *(self.send(websocket, "broadcast", payload) for _, websocket in clients),
+            return_exceptions=True,
+        )
+        for (client_id, _), result in zip(clients, results):
+            if isinstance(result, ConnectionClosed):
+                self.clients.remove(client_id)
 
+    async def direct(self, recipient_id: str, payload: dict[str, Any]) -> bool:
+        recipient = self.clients.get(recipient_id)
+        if recipient is None:
+            return False
+        try:
+            await self.send(recipient, "direct", payload)
+        except ConnectionClosed:
+            self.clients.remove(recipient_id)
+            return False
+        return True
 
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+    async def handle_message(self, websocket: Any, client_id: str, raw: str) -> None:
+        try:
+            message = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            await self.send(websocket, "system", {"error": "invalid JSON"})
+            return
 
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
+        if not isinstance(message, dict):
+            await self.send(websocket, "system", {"error": "message must be an object"})
+            return
+        message_type = message.get("type")
+        payload = message.get("payload")
+        if message_type not in SUPPORTED_TYPES or not isinstance(payload, dict):
+            await self.send(
+                websocket,
+                "system",
+                {"error": "message requires a supported type and object payload"},
             )
-            conn.commit()
-    return get_task(task_id)
+            return
+
+        if message_type == "broadcast":
+            await self.broadcast(payload)
+        elif message_type == "direct":
+            recipient_id = payload.get("client_id")
+            content = payload.get("message")
+            if not isinstance(recipient_id, str) or not isinstance(content, dict):
+                await self.send(
+                    websocket,
+                    "system",
+                    {"error": "direct payload requires client_id and message object"},
+                )
+            elif not await self.direct(recipient_id, content):
+                await self.send(websocket, "system", {"error": "client not found"})
+        else:
+            await self.send(
+                websocket,
+                "system",
+                {"error": "system messages are generated by the server"},
+            )
+
+    async def handler(self, websocket: Any) -> None:
+        client_id = self.clients.add(websocket)
+        try:
+            await self.send(websocket, "system", {"client_id": client_id})
+            async for raw in websocket:
+                await self.handle_message(websocket, client_id, raw)
+        except ConnectionClosed:
+            pass
+        finally:
+            self.clients.remove(client_id)
+
+    async def process_request(self, path: str, request_headers: Any) -> Any:
+        if path != "/health":
+            return None
+        body = json.dumps({"connected_clients": self.clients.count}).encode("utf-8")
+        return (
+            HTTPStatus.OK,
+            [("Content-Type", "application/json"), ("Content-Length", str(len(body)))],
+            body,
+        )
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
-def list_tasks():
-    return jsonify(get_tasks())
-
-
-@app.route("/tasks", methods=["POST"])
-def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
+async def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
+    server = NotificationServer()
+    async with websockets.serve(
+        server.handler,
+        host,
+        port,
+        process_request=server.process_request,
+    ):
+        await asyncio.Future()
 
 
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    args = parser.parse_args()
+    asyncio.run(serve(args.host, args.port))
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    main()
