@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseFrontmatter, Frontmatter } from './frontmatter';
 import { markdownToHtml } from './markdown';
+import { TemplateEngine } from './templates';
 
 export interface PageData {
   slug: string;
@@ -40,7 +41,8 @@ export async function parseMarkdownFile(
 
 export async function generatePages(
   contentDir: string,
-  outputDir: string
+  outputDir: string,
+  templateEngine?: TemplateEngine
 ): Promise<PageData[]> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
@@ -55,7 +57,9 @@ export async function generatePages(
     pages.push(pageData);
 
     const outputPath = path.join(outputDir, `${pageData.slug}.html`);
-    const html = generatePageHtml(pageData);
+    const html = templateEngine
+      ? generatePageHtmlWithTemplate(pageData, templateEngine)
+      : generatePageHtml(pageData);
     fs.writeFileSync(outputPath, html, 'utf-8');
   }
 
@@ -140,15 +144,51 @@ export function generateIndexHtml(pages: PageData[]): string {
 </html>`;
 }
 
+export function generatePageHtmlWithTemplate(
+  page: PageData,
+  templateEngine: TemplateEngine
+): string {
+  const templateName = String(page.frontmatter.template || 'page');
+  const layoutName = String(page.frontmatter.layout || 'default');
+
+  const context = {
+    title: page.frontmatter.title || page.slug,
+    slug: page.slug,
+    filename: page.filename,
+    date: page.frontmatter.date,
+    tags: page.frontmatter.tags,
+    content: page.html,
+    ...page.frontmatter,
+  };
+
+  const templateContent = templateEngine.renderTemplate(templateName, context);
+
+  if (templateEngine.hasLayout(layoutName)) {
+    return templateEngine.renderPageWithLayout(templateContent, layoutName, context);
+  }
+
+  return templateContent;
+}
+
 export async function build(
   contentDir: string = './content',
-  outputDir: string = './dist'
+  outputDir: string = './dist',
+  templatesDir: string = './templates'
 ): Promise<void> {
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const pages = await generatePages(contentDir, outputDir);
+  let templateEngine: TemplateEngine | undefined;
+  if (fs.existsSync(templatesDir)) {
+    templateEngine = new TemplateEngine({
+      templatesDir,
+      layoutsDir: path.join(templatesDir, 'layouts'),
+      partialsDir: path.join(templatesDir, 'partials'),
+    });
+  }
+
+  const pages = await generatePages(contentDir, outputDir, templateEngine);
   const indexHtml = generateIndexHtml(pages);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml, 'utf-8');
 }

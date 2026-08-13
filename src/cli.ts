@@ -6,12 +6,13 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
 
   if (args.length === 0 || args[0] !== 'build') {
-    console.error('Usage: ssg build [--content <dir>] [--output <dir>]');
+    console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
     process.exit(1);
   }
 
   let contentDir = './content';
   let outputDir = './dist';
+  let templatesDir = './templates';
 
   for (let i = 1; i < args.length; i++) {
     if (args[i] === '--content' && args[i + 1]) {
@@ -20,11 +21,14 @@ async function main(): Promise<void> {
     } else if (args[i] === '--output' && args[i + 1]) {
       outputDir = args[i + 1];
       i++;
+    } else if (args[i] === '--templates' && args[i + 1]) {
+      templatesDir = args[i + 1];
+      i++;
     }
   }
 
   try {
-    await build(contentDir, outputDir);
+    await build(contentDir, outputDir, templatesDir);
     console.log(`✓ Site built successfully to ${outputDir}`);
   } catch (error) {
     if (error instanceof Error) {
