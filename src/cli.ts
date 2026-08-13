@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import * as path from 'path';
+import { loadConfig } from './config';
 import { startDevServer } from './devServer';
+import { SSGEngine } from './engine';
 import { buildSite } from './generator';
+import { createMarkdownPlugin } from './plugins/markdownPlugin';
+import { createTemplatePlugin } from './plugins/templatePlugin';
 
 export function run(argv: string[]): void {
   const program = new Command();
@@ -15,10 +19,35 @@ export function run(argv: string[]): void {
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
     .option('--templates <dir>', 'templates directory', './templates')
-    .action((opts: { content: string; output: string; templates: string }) => {
+    .option('--config <path>', 'plugin config file (e.g. ssg.config.ts); enables the custom plugin pipeline')
+    .action((opts: { content: string; output: string; templates: string; config?: string }) => {
       const contentDir = path.resolve(process.cwd(), opts.content);
       const outputDir = path.resolve(process.cwd(), opts.output);
       const templatesDir = path.resolve(process.cwd(), opts.templates);
+
+      if (opts.config) {
+        const configPath = path.resolve(process.cwd(), opts.config);
+        const config = loadConfig(configPath);
+        const plugins = config.plugins.length > 0 ? config.plugins : [createMarkdownPlugin(), createTemplatePlugin()];
+        const engine = new SSGEngine(plugins);
+        engine
+          .run({
+            contentDir: config.contentDir ? path.resolve(process.cwd(), config.contentDir) : contentDir,
+            outputDir: config.outputDir ? path.resolve(process.cwd(), config.outputDir) : outputDir,
+            templatesDir: config.templatesDir ? path.resolve(process.cwd(), config.templatesDir) : templatesDir,
+          })
+          .then((result) => {
+            // eslint-disable-next-line no-console
+            console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
+          })
+          .catch((err) => {
+            // eslint-disable-next-line no-console
+            console.error('Build failed:', err instanceof Error ? err.message : err);
+            process.exitCode = 1;
+          });
+        return;
+      }
+
       const result = buildSite({ contentDir, outputDir, templatesDir });
       // eslint-disable-next-line no-console
       console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
