@@ -120,6 +120,45 @@ class MessageDatabase:
             result = cursor.fetchone()
             return result["count"]
 
+    def get_messages_since(self, channel: str, since: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Get messages from a specific channel since a timestamp."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ? AND timestamp >= ?
+                ORDER BY timestamp ASC
+                LIMIT ?
+                """,
+                (channel, since, limit)
+            )
+
+            rows = cursor.fetchall()
+            messages = []
+            for row in rows:
+                messages.append({
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                })
+            return messages
+
+    def delete_old_messages(self, days: int) -> int:
+        """Delete messages older than specified days. Returns count of deleted messages."""
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                DELETE FROM messages
+                WHERE datetime(timestamp) < datetime('now', ? || ' days')
+                """,
+                (f"-{days}",)
+            )
+            conn.commit()
+            return cursor.rowcount
+
     def clear_messages(self) -> None:
         """Clear all messages from the database (for testing)."""
         with self._get_connection() as conn:

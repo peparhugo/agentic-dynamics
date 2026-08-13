@@ -16,7 +16,7 @@ import asyncio
 import json
 import uuid
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 import threading
 
@@ -26,6 +26,7 @@ from websockets import ConnectionClosed
 
 from database import MessageDatabase
 from redis_pubsub import RedisPublisher, RedisSubscriber, ClientConnectionState
+from rate_limiter import RateLimiter
 from transport import BaseTransport, WebSocketTransport
 
 
@@ -114,6 +115,11 @@ class NotificationServer:
         self.publisher = RedisPublisher(self.redis_url)
         self.subscriber = RedisSubscriber(self.redis_url)
         self.connection_state = ClientConnectionState(self.redis_url)
+        self.rate_limiter = RateLimiter(self.redis_url)
+
+        # Message expiry configuration (in days)
+        self.message_ttl_days = int(os.getenv("MESSAGE_TTL_DAYS", "7"))
+        self._cleanup_task = None
 
         # Initialize transport
         if transport is None:
@@ -132,6 +138,7 @@ class NotificationServer:
         self.http_app.router.add_get("/channels", self._channels_handler)
         self.http_app.router.add_get("/channels/{name}/subscribers", self._channel_subscribers_handler)
         self.http_app.router.add_get("/messages", self._messages_handler)
+        self.http_app.router.add_get("/history", self._history_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Health check endpoint."""
@@ -183,6 +190,45 @@ class NotificationServer:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
         except (ValueError, TypeError):
+            return web.json_response({
+                "error": "Invalid query parameters",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }, status=400)
+
+    async def _history_handler(self, request: web.Request) -> web.Response:
+        """Get message history for a specific channel since a timestamp."""
+        try:
+            channel = request.query.get("channel")
+            since = request.query.get("since")
+            limit = int(request.query.get("limit", 50))
+
+            if not channel:
+                return web.json_response({
+                    "error": "channel parameter is required",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }, status=400)
+
+            if not since:
+                return web.json_response({
+                    "error": "since parameter is required (ISO 8601 timestamp)",
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }, status=400)
+
+            # Validate limit
+            limit = min(max(limit, 1), 1000)
+
+            messages = self.db.get_messages_since(channel, since, limit)
+            has_more = len(messages) >= limit
+
+            return web.json_response({
+                "channel": channel,
+                "messages": messages,
+                "limit": limit,
+                "count": len(messages),
+                "has_more": has_more,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except (ValueError, TypeError) as e:
             return web.json_response({
                 "error": "Invalid query parameters",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -251,6 +297,25 @@ class NotificationServer:
 
     async def _handle_message(self, client_id: str, raw_message: str) -> None:
         """Handle an incoming message from a client."""
+        # Check rate limit
+        if not self.rate_limiter.is_allowed(client_id):
+            try:
+                error_msg = {
+                    "type": "error",
+                    "payload": {
+                        "message": "Rate limit exceeded",
+                        "limit": self.rate_limiter.rate_limit,
+                        "window": self.rate_limiter.window_seconds,
+                    },
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                websocket = self.registry.get_client(client_id)
+                if websocket:
+                    await self._send_safe(websocket, json.dumps(error_msg))
+            except Exception:
+                pass
+            return
+
         try:
             message = json.loads(raw_message)
             msg_type = message.get("type")
@@ -339,6 +404,17 @@ class NotificationServer:
         except ConnectionClosed:
             pass
 
+    async def _cleanup_old_messages(self) -> None:
+        """Background task to cleanup messages older than MESSAGE_TTL_DAYS."""
+        while True:
+            try:
+                await asyncio.sleep(3600)  # Run every hour
+                deleted_count = self.db.delete_old_messages(self.message_ttl_days)
+                if deleted_count > 0:
+                    print(f"Cleaned up {deleted_count} messages older than {self.message_ttl_days} days")
+            except Exception as e:
+                print(f"Error cleaning up old messages: {e}")
+
     async def start(self) -> None:
         """Start both WebSocket and HTTP servers."""
         # Initialize Redis connections
@@ -348,6 +424,9 @@ class NotificationServer:
             await self.subscriber.start()
         except Exception:
             pass
+
+        # Start cleanup task
+        self._cleanup_task = asyncio.create_task(self._cleanup_old_messages())
 
         # Start WebSocket server
         ws_server = await websockets.serve(self._handle_client, self.host, self.ws_port)
@@ -376,6 +455,18 @@ class NotificationServer:
             self.connection_state.close()
         except Exception:
             pass
+
+        try:
+            self.rate_limiter.close()
+        except Exception:
+            pass
+
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
 
 
 async def main():
