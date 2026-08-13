@@ -17,6 +17,8 @@ Redis key layout (all prefixed with ``notifications``):
   * ``notifications:client_channels:<client_id>``    — SET of channels a client
     subscribes to.
   * ``notifications:client:<client_id>``             — JSON connection state.
+  * ``notifications:ratelimit:<client_id>``          — INCR counter for the
+    per-client message rate limit window.
   * ``notifications:id_counter``                     — INCR for client ids.
 
 The connection is configured through the ``REDIS_URL`` environment variable.
@@ -50,6 +52,7 @@ CHANNELS_KEY = f"{KEY_PREFIX}:channels"
 SUB_KEY_PREFIX = f"{KEY_PREFIX}:sub:"
 CLIENT_CHANNELS_PREFIX = f"{KEY_PREFIX}:client_channels:"
 CLIENT_STATE_PREFIX = f"{KEY_PREFIX}:client:"
+RATE_LIMIT_PREFIX = f"{KEY_PREFIX}:ratelimit:"
 ID_COUNTER_KEY = f"{KEY_PREFIX}:id_counter"
 
 DEFAULT_REDIS_URL = "redis://127.0.0.1:6379/0"
@@ -78,6 +81,11 @@ def client_channels_key(client_id: str) -> str:
 def client_state_key(client_id: str) -> str:
     """Return the Redis key holding a client's connection state."""
     return f"{CLIENT_STATE_PREFIX}{client_id}"
+
+
+def rate_limit_key(client_id: str) -> str:
+    """Return the Redis key holding a client's rate-limit counter."""
+    return f"{RATE_LIMIT_PREFIX}{client_id}"
 
 
 def decode(value: bytes | str) -> str:

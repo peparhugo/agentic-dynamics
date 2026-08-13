@@ -20,9 +20,28 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 DEFAULT_DATABASE_URL = os.environ.get("DATABASE_URL", "notification.db")
+
+
+def normalize_timestamp(timestamp: str) -> str:
+    """Normalize an ISO-8601 timestamp to a canonical, lexically sortable form.
+
+    All stored timestamps are converted to UTC ISO-8601 with a fixed width so
+    that string comparison in SQLite matches chronological order.
+    """
+    ts = timestamp
+    if ts.endswith(("Z", "z")):
+        ts = ts[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(ts)
+    except (ValueError, TypeError):
+        return timestamp
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 class MessageStore:
@@ -59,10 +78,11 @@ class MessageStore:
         timestamp: str,
     ) -> int:
         """Persist a message and return its row id."""
+        normalized = normalize_timestamp(timestamp)
         cursor = self._conn.execute(
             "INSERT INTO messages (channel, type, payload, timestamp) "
             "VALUES (?, ?, ?, ?)",
-            (channel, msg_type, json.dumps(payload), timestamp),
+            (channel, msg_type, json.dumps(payload), normalized),
         )
         self._conn.commit()
         return cursor.lastrowid
@@ -87,3 +107,53 @@ class MessageStore:
         """Return the total number of stored messages."""
         row = self._conn.execute("SELECT COUNT(*) AS n FROM messages").fetchone()
         return int(row["n"])
+
+    @staticmethod
+    def _decode_row(row: sqlite3.Row) -> dict[str, Any]:
+        """Convert a messages row into a JSON-friendly dict."""
+        record = dict(row)
+        record["payload"] = json.loads(record["payload"])
+        return record
+
+    def history(
+        self,
+        channel: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 50,
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Return stored messages in chronological order for a channel/range.
+
+        ``channel`` filters to a single channel (use ``""`` for broadcasts);
+        ``None`` returns messages from every channel. ``since`` is an ISO-8601
+        timestamp; only messages strictly newer than it are returned. Messages
+        are ordered oldest-first and pagination is cursor-based on ``since``:
+        up to ``limit`` messages are returned along with a ``has_more`` flag
+        indicating whether additional older/newer messages exist.
+        """
+        limit = max(1, min(int(limit), 1000))
+        conditions: list[str] = []
+        params: list[Any] = []
+        if channel is not None:
+            conditions.append("channel = ?")
+            params.append(channel)
+        if since:
+            conditions.append("timestamp > ?")
+            params.append(normalize_timestamp(since))
+        sql = "SELECT id, channel, type, payload, timestamp FROM messages"
+        if conditions:
+            sql += " WHERE " + " AND ".join(conditions)
+        sql += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        rows = self._conn.execute(sql, params + [limit + 1]).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        return [self._decode_row(row) for row in rows], has_more
+
+    def delete_older_than(self, days: float) -> int:
+        """Delete messages older than ``days`` days and return the count."""
+        days = max(0, float(days))
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        cursor = self._conn.execute(
+            "DELETE FROM messages WHERE timestamp < ?", (normalize_timestamp(cutoff),)
+        )
+        self._conn.commit()
+        return cursor.rowcount

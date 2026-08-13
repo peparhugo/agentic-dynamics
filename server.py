@@ -66,6 +66,7 @@ from broker import (
     create_redis_client,
     decode,
     direct_redis_channel,
+    rate_limit_key,
     sub_key,
 )
 from messages import build_message, utc_now
@@ -148,6 +149,10 @@ class NotificationServer:
         redis_client: Any = None,
         database_url: Optional[str] = None,
         transport: Optional[BaseTransport] = None,
+        rate_limit: Optional[int] = None,
+        rate_limit_window: int = 60,
+        message_ttl_days: Optional[int] = None,
+        expiry_interval: int = 3600,
     ) -> None:
         self.host = host
         self.port = port
@@ -159,11 +164,55 @@ class NotificationServer:
         self.transport = (
             transport if transport is not None else create_transport(self, host, port)
         )
+        self.rate_limit, self.rate_limit_window = self._resolve_rate_limit(
+            rate_limit, rate_limit_window
+        )
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        )
+        self.expiry_interval = max(1, int(expiry_interval))
         self._started = False
         self._id_counter = 0
         self._id_lock = asyncio.Lock()
         self._pubsub = None
         self._listener_task: Optional[asyncio.Task] = None
+        self._expiry_task: Optional[asyncio.Task] = None
+
+    @staticmethod
+    def _resolve_rate_limit(
+        value: Optional[int], window: int
+    ) -> tuple[int, int]:
+        """Resolve the per-client message rate limit from a value or RATE_LIMIT env.
+
+        ``RATE_LIMIT`` accepts a plain integer (messages per minute) or a
+        ``count/window`` form where window is seconds (or ``min``).
+        """
+        if value is None:
+            value = os.environ.get("RATE_LIMIT", "100")
+        text = str(value).strip().lower()
+        window = max(1, int(window))
+        if not text or text in ("0", "off", "none", "disabled", "unlimited"):
+            return 0, window
+        if "/" in text:
+            count_part, _, window_part = text.partition("/")
+            window_part = window_part.strip()
+            if window_part in ("min", "m", "minute", "minutes"):
+                window = 60
+            else:
+                try:
+                    window = max(1, int(window_part))
+                except ValueError:
+                    window = 60
+            try:
+                return max(0, int(count_part)), window
+            except ValueError:
+                return 100, window
+        try:
+            return max(0, int(text)), window
+        except ValueError:
+            return 100, window
 
     # ── Client id allocation ──────────────────────────────────────
 
@@ -410,10 +459,42 @@ class NotificationServer:
         await self._pubsub.psubscribe(SUBSCRIBE_PATTERN)
         self._listener_task = asyncio.create_task(self._redis_listener())
 
+    # ── Rate limiting ─────────────────────────────────────────────
+
+    async def _rate_limited(self, client_id: str) -> bool:
+        """Return True if the client has exceeded its per-window message budget.
+
+        Uses a Redis INCR counter per client id with a sliding fixed window
+        (``rate_limit_window`` seconds). A non-positive limit disables the
+        check.
+        """
+        if self.rate_limit <= 0:
+            return False
+        key = rate_limit_key(client_id)
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, self.rate_limit_window)
+        return count > self.rate_limit
+
     # ── Inbound client messages ───────────────────────────────────
 
     async def handle_client_message(self, client_id: str, raw: str) -> None:
         """Process a raw message received from a connected client."""
+        if await self._rate_limited(client_id):
+            await self.send_direct(
+                client_id,
+                build_message(
+                    "system",
+                    {
+                        "error": (
+                            f"rate limit exceeded: "
+                            f"{self.rate_limit} messages per "
+                            f"{self.rate_limit_window}s"
+                        )
+                    },
+                ),
+            )
+            return
         try:
             data = json.loads(raw)
         except (ValueError, TypeError):
@@ -554,7 +635,56 @@ class NotificationServer:
                     "offset": offset,
                 }
             )
+        if path == "/history":
+            params = self._query_params(request)
+            channel: Optional[str] = None
+            if "channel" in params:
+                channel = params["channel"][0] if params["channel"] else ""
+            since = params.get("since", [None])[0]
+            try:
+                limit = max(1, min(int(params.get("limit", ["50"])[0]), 1000))
+            except ValueError:
+                limit = 50
+            if since:
+                try:
+                    from datetime import datetime as _dt
+
+                    ts = since[:-1] + "+00:00" if since.endswith(("Z", "z")) else since
+                    _dt.fromisoformat(ts)
+                except ValueError:
+                    return self._json_response(
+                        {"error": "invalid since timestamp"},
+                        status=400,
+                        reason="Bad Request",
+                    )
+            messages, has_more = self.store.history(
+                channel=channel, since=since, limit=limit
+            )
+            return self._json_response(
+                {
+                    "channel": channel if channel is not None else "",
+                    "since": since,
+                    "limit": limit,
+                    "messages": messages,
+                    "has_more": has_more,
+                }
+            )
         return None
+
+    # ── Message expiry ────────────────────────────────────────────
+
+    def _run_expiry_once(self) -> int:
+        """Delete messages older than ``message_ttl_days`` days."""
+        return self.store.delete_older_than(self.message_ttl_days)
+
+    async def _expiry_loop(self) -> None:
+        """Periodically purge expired messages as a background task."""
+        while True:
+            try:
+                self._run_expiry_once()
+            except Exception:
+                logger.exception("message expiry cleanup error")
+            await asyncio.sleep(self.expiry_interval)
 
     # ── Lifecycle ─────────────────────────────────────────────────
 
@@ -565,6 +695,11 @@ class NotificationServer:
         await self.transport.start()
         self.port = self.bound_port
         await self._start_redis_listener()
+        try:
+            self._run_expiry_once()
+        except Exception:
+            logger.exception("message expiry cleanup failed on startup")
+        self._expiry_task = asyncio.create_task(self._expiry_loop())
         self._started = True
 
     @property
@@ -576,6 +711,13 @@ class NotificationServer:
         return self.transport.url
 
     async def close(self) -> None:
+        if self._expiry_task is not None:
+            self._expiry_task.cancel()
+            try:
+                await self._expiry_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._expiry_task = None
         if self._listener_task is not None:
             self._listener_task.cancel()
             try:
