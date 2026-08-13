@@ -262,6 +262,194 @@ async def test_health_endpoint_reflects_disconnect(server):
     assert body["connected_clients"] == 0
 
 
+# ── Channel subscriptions ────────────────────────────────────────
+
+
+async def test_subscribe_confirms_and_appears_in_channel_list(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        confirm = await recv_json(ws)
+        assert confirm["type"] == "system"
+        assert confirm["payload"]["event"] == "subscribed"
+        assert confirm["payload"]["channel"] == "alerts"
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/channels"
+        )
+        assert status == 200
+        assert body["channels"] == [{"name": "alerts", "subscribers": 1}]
+    finally:
+        await ws.close()
+
+
+async def test_unsubscribe_removes_client_from_channel(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)  # subscribed confirmation
+
+        await ws.send(json.dumps({"type": "unsubscribe", "payload": {"channel": "alerts"}}))
+        confirm = await recv_json(ws)
+        assert confirm["payload"]["event"] == "unsubscribed"
+        assert confirm["payload"]["channel"] == "alerts"
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/channels"
+        )
+        assert status == 200
+        assert body["channels"] == []
+    finally:
+        await ws.close()
+
+
+async def test_subscribe_without_channel_returns_error(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+        got = await recv_json(ws)
+        assert got["type"] == "system"
+        assert "error" in got["payload"]
+    finally:
+        await ws.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(server):
+    ws = await connect(server)
+    try:
+        welcome = await recv_json(ws)
+        client_id = welcome["payload"]["client_id"]
+
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/channels/alerts/subscribers"
+        )
+        assert status == 200
+        assert body == {"channel": "alerts", "subscribers": [client_id]}
+
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/channels/chat/subscribers"
+        )
+        assert status == 200
+        assert body == {"channel": "chat", "subscribers": [client_id]}
+    finally:
+        await ws.close()
+
+
+async def test_channel_message_reaches_only_subscribers(server):
+    ws1 = await connect(server)
+    ws2 = await connect(server)
+    ws3 = await connect(server)
+    try:
+        await recv_json(ws1)  # welcome
+        await recv_json(ws2)  # welcome
+        await recv_json(ws1)  # join notice for ws2
+        await recv_json(ws3)  # welcome
+        await recv_json(ws1)  # join notice for ws3
+        await recv_json(ws2)  # join notice for ws3
+
+        # only ws1 and ws2 subscribe to "alerts"; ws3 stays unsubscribed
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1)
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws2)
+
+        await ws1.send(
+            json.dumps(
+                {"type": "broadcast", "payload": {"channel": "alerts", "text": "fire"}}
+            )
+        )
+
+        got1 = await recv_json(ws1)
+        got2 = await recv_json(ws2)
+        assert got1["payload"] == {"channel": "alerts", "text": "fire"}
+        assert got2["payload"] == {"channel": "alerts", "text": "fire"}
+
+        with pytest.raises(asyncio.TimeoutError):
+            await recv_json(ws3, timeout=0.3)
+    finally:
+        await ws1.close()
+        await ws2.close()
+        await ws3.close()
+
+
+async def test_message_without_channel_still_broadcasts_to_all(server):
+    ws1 = await connect(server)
+    ws2 = await connect(server)
+    try:
+        await recv_json(ws1)  # welcome
+        await recv_json(ws2)  # welcome
+        await recv_json(ws1)  # join notice for ws2
+
+        # ws2 subscribes to a channel, but an unscoped broadcast should still reach it
+        await ws2.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws2)
+
+        await ws1.send(json.dumps({"type": "broadcast", "payload": {"text": "hi all"}}))
+        got1 = await recv_json(ws1)
+        got2 = await recv_json(ws2)
+        assert got1["payload"] == {"text": "hi all"}
+        assert got2["payload"] == {"text": "hi all"}
+    finally:
+        await ws1.close()
+        await ws2.close()
+
+
+async def test_disconnect_removes_channel_subscription(server):
+    ws1 = await connect(server)
+    ws2 = await connect(server)
+    try:
+        welcome1 = await recv_json(ws1)  # welcome
+        await recv_json(ws2)  # welcome
+        await recv_json(ws1)  # join notice for ws2
+
+        client1_id = welcome1["payload"]["client_id"]
+        await ws1.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws1)
+
+        await ws1.close()
+        await recv_json(ws2)  # client_left notice
+        await asyncio.sleep(0.1)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/channels/alerts/subscribers"
+        )
+        assert status == 200
+        assert client1_id not in body["subscribers"]
+        assert body["subscribers"] == []
+    finally:
+        await ws2.close()
+
+
+async def test_channels_endpoint_empty_with_no_subscriptions(server):
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/channels"
+    )
+    assert status == 200
+    assert body == {"channels": []}
+
+
+async def test_unknown_channel_subscribers_endpoint_returns_empty_list(server):
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/channels/does-not-exist/subscribers"
+    )
+    assert status == 200
+    assert body == {"channel": "does-not-exist", "subscribers": []}
+
+
 # ── Message helpers ───────────────────────────────────────────────
 
 

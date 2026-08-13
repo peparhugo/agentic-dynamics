@@ -2,28 +2,35 @@
 WebSocket-based notification server.
 
 - Accepts WebSocket connections, assigns each client a unique ID.
-- Supports broadcast / direct / system JSON messages.
-- Cleans up clients on disconnect.
-- Exposes GET /health as a plain HTTP endpoint (served on the same port,
-  intercepted before the WebSocket handshake) returning the connected
-  client count.
+- Supports broadcast / direct / system / subscribe / unsubscribe JSON messages.
+- Clients can subscribe to named channels; a "broadcast" message carrying a
+  "channel" field in its payload is delivered only to that channel's
+  subscribers, while one without a channel still goes to every client.
+- Cleans up clients (and their channel subscriptions) on disconnect.
+- Exposes plain HTTP endpoints (served on the same port, intercepted before
+  the WebSocket handshake): GET /health, GET /channels, and
+  GET /channels/{name}/subscribers.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any, Optional
+from urllib.parse import unquote
 
 import websockets
 from websockets.legacy.server import WebSocketServerProtocol
 
-MESSAGE_TYPES = {"broadcast", "direct", "system"}
+MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+
+CHANNEL_SUBSCRIBERS_PATH = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 
 def utc_now_iso() -> str:
@@ -88,11 +95,49 @@ class ClientRegistry:
             return list(self._clients.items())
 
 
+@dataclass
+class ChannelRegistry:
+    """Thread-safe registry mapping channel names to sets of subscribed client IDs."""
+
+    _channels: dict = field(default_factory=dict)
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def subscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, channel: str, client_id: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def unsubscribe_all(self, client_id: str) -> None:
+        with self._lock:
+            for channel in list(self._channels.keys()):
+                subscribers = self._channels[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[channel]
+
+    def subscribers(self, channel: str) -> list:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
+
+    def channel_counts(self) -> dict:
+        with self._lock:
+            return {name: len(subs) for name, subs in self._channels.items()}
+
+
 class NotificationServer:
     def __init__(self, host: str = "localhost", port: int = 8765):
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
+        self.channels = ChannelRegistry()
         self._server: Optional[websockets.WebSocketServer] = None
 
     async def register(self, websocket: WebSocketServerProtocol) -> str:
@@ -123,12 +168,58 @@ class NotificationServer:
             except websockets.ConnectionClosed:
                 pass
 
+    async def broadcast_to_channel(
+        self, channel: str, message: dict, exclude: Optional[str] = None
+    ) -> None:
+        data = json.dumps(message)
+        for client_id in self.channels.subscribers(channel):
+            if client_id == exclude:
+                continue
+            websocket = self.registry.get(client_id)
+            if websocket is None:
+                continue
+            try:
+                await websocket.send(data)
+            except websockets.ConnectionClosed:
+                pass
+
     async def _dispatch(self, client_id: str, message: dict) -> None:
         msg_type = message["type"]
         payload = message["payload"]
 
         if msg_type == "broadcast":
-            await self.broadcast(make_message("broadcast", payload))
+            channel = payload.get("channel")
+            outgoing = make_message("broadcast", payload)
+            if channel:
+                await self.broadcast_to_channel(channel, outgoing)
+            else:
+                await self.broadcast(outgoing)
+
+        elif msg_type == "subscribe":
+            channel = payload.get("channel")
+            if not isinstance(channel, str) or not channel:
+                await self.send_to(
+                    client_id,
+                    make_message("system", {"error": "subscribe requires payload.channel"}),
+                )
+                return
+            self.channels.subscribe(channel, client_id)
+            await self.send_to(
+                client_id, make_message("system", {"event": "subscribed", "channel": channel})
+            )
+
+        elif msg_type == "unsubscribe":
+            channel = payload.get("channel")
+            if not isinstance(channel, str) or not channel:
+                await self.send_to(
+                    client_id,
+                    make_message("system", {"error": "unsubscribe requires payload.channel"}),
+                )
+                return
+            self.channels.unsubscribe(channel, client_id)
+            await self.send_to(
+                client_id, make_message("system", {"event": "unsubscribed", "channel": channel})
+            )
 
         elif msg_type == "direct":
             target_id = payload.get("target")
@@ -178,6 +269,7 @@ class NotificationServer:
             pass
         finally:
             await self.unregister(client_id)
+            self.channels.unsubscribe_all(client_id)
             await self.broadcast(
                 make_message("system", {"event": "client_left", "client_id": client_id})
             )
@@ -187,6 +279,28 @@ class NotificationServer:
             body = json.dumps({"connected_clients": self.registry.count()}).encode()
             headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
             return HTTPStatus.OK, headers, body
+
+        if path == "/channels":
+            counts = self.channels.channel_counts()
+            body = json.dumps(
+                {
+                    "channels": [
+                        {"name": name, "subscribers": count}
+                        for name, count in sorted(counts.items())
+                    ]
+                }
+            ).encode()
+            headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
+            return HTTPStatus.OK, headers, body
+
+        match = CHANNEL_SUBSCRIBERS_PATH.match(path)
+        if match:
+            channel = unquote(match.group(1))
+            subscribers = self.channels.subscribers(channel)
+            body = json.dumps({"channel": channel, "subscribers": subscribers}).encode()
+            headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
+            return HTTPStatus.OK, headers, body
+
         return None
 
     async def start(self) -> "websockets.WebSocketServer":
