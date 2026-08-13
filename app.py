@@ -13,6 +13,8 @@ from xml.etree import ElementTree as ET
 from flask import Flask, Response, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 SOAP_ENV = "http://schemas.xmlsoap.org/soap/envelope/"
 TASK_NS = "urn:task-service"
@@ -257,10 +259,19 @@ def task_item(task_id: int):
     if request.method == "GET":
         task = get_task(task_id, g.user["id"])
     else:
+        previous_task = get_task(task_id, g.user["id"])
         data = request.get_json(silent=True) or {}
         task = update_task(
             task_id, g.user["id"], title=data.get("title"), status=data.get("status")
         )
+        if (
+            request.method == "PUT"
+            and previous_task is not None
+            and previous_task["status"] != "completed"
+            and task is not None
+            and task["status"] == "completed"
+        ):
+            send_notification_email.delay(g.user["username"], task["title"])
     if task is None:
         return jsonify(error="task not found"), 404
     return jsonify(task)

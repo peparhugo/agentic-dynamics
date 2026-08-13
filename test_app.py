@@ -157,6 +157,42 @@ def test_users_only_access_their_own_tasks(client, auth):
     assert client.get(f"/tasks/{task_id}", headers=auth).get_json()["status"] == "pending"
 
 
+def test_put_completed_enqueues_owner_notification(client, auth, monkeypatch):
+    created = client.post("/tasks", json={"title": "Ship API"}, headers=auth)
+    task_id = created.get_json()["id"]
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda user_email, task_title: calls.append((user_email, task_title)),
+    )
+
+    response = client.put(
+        f"/tasks/{task_id}", json={"status": "completed"}, headers=auth
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "completed"
+    assert calls == [("alice", "Ship API")]
+
+
+def test_notification_only_on_put_transition_to_completed(client, auth, monkeypatch):
+    created = client.post("/tasks", json={"title": "Write tests"}, headers=auth)
+    task_id = created.get_json()["id"]
+    calls = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: calls.append(args),
+    )
+
+    client.put(f"/tasks/{task_id}", json={"status": "pending"}, headers=auth)
+    client.patch(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth)
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=auth)
+
+    assert calls == []
+
+
 def test_migration_preserves_existing_tasks(tmp_path, monkeypatch):
     database = tmp_path / "legacy.db"
     import sqlite3
