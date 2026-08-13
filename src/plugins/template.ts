@@ -1,4 +1,5 @@
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { extname, join, relative, resolve } from 'node:path';
 import Handlebars from 'handlebars';
 import { BuildContext, BuildPage, document, escapeHtml, Plugin } from '../plugin';
@@ -33,9 +34,14 @@ export class TemplatePlugin implements Plugin {
   async onStart(context: BuildContext): Promise<void> {
     this.templates.clear();
     const files = await templateFiles(context.templatesDir);
-    await Promise.all(files.map(async (file) => {
+    const sources = await Promise.all(files.map(async (file) => ({ file, source: await readFile(file, 'utf8') })));
+    context.templateHash = createHash('sha256').update(sources
+      .sort((a, b) => a.file.localeCompare(b.file))
+      .map(({ file, source }) => `${relative(context.templatesDir, file)}\0${source}`)
+      .join('\0')).digest('hex');
+    await Promise.all(sources.map(async ({ file, source }) => {
       const name = relative(context.templatesDir, file).replace(/\\/g, '/').replace(/\.hbs$/i, '');
-      this.templates.set(name, Handlebars.compile(await readFile(file, 'utf8')));
+      this.templates.set(name, Handlebars.compile(source));
     }));
     for (const [name, template] of this.templates) {
       if (name.startsWith('partials/')) Handlebars.registerPartial(name.slice('partials/'.length), template);

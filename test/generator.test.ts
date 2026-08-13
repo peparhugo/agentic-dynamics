@@ -1,7 +1,7 @@
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildSite } from '../src/generator';
+import { buildSite, buildSiteWithStats } from '../src/generator';
 import { parseArguments } from '../src/cli';
 import { startDevServer } from '../src/server';
 import { loadConfiguredPlugins } from '../src/config';
@@ -84,6 +84,75 @@ describe('buildSite', () => {
 
     await expect(readFile(join(output, 'page.html'), 'utf8')).resolves.toBe('<html><main>Default Page: <p>Text</p></main></html>');
   });
+
+  it('skips unchanged pages during incremental builds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'first.md'), '# First');
+    await writeFile(join(content, 'second.md'), '# Second');
+
+    await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true });
+    const firstOutput = join(output, 'first.html');
+    const initialMtime = (await stat(firstOutput)).mtimeMs;
+    const result = await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true });
+
+    expect(result.stats).toMatchObject({ built: 0, skipped: 2 });
+    expect((await stat(firstOutput)).mtimeMs).toBe(initialMtime);
+    await expect(readFile(join(output, '.ssg-cache.json'), 'utf8')).resolves.toContain('first.html');
+  });
+
+  it('rebuilds only changed source pages and invalidates all pages for template changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await mkdir(templates, { recursive: true });
+    await writeFile(join(content, 'first.md'), '---\ntemplate: default\n---\n# First');
+    await writeFile(join(content, 'second.md'), '---\ntemplate: default\n---\n# Second');
+    await writeFile(join(templates, 'default.hbs'), '<article>{{{content}}}</article>');
+
+    await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    await writeFile(join(content, 'first.md'), '---\ntemplate: default\n---\n# Updated');
+    const sourceResult = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(sourceResult.stats).toMatchObject({ built: 1, skipped: 1 });
+    await expect(readFile(join(output, 'first.html'), 'utf8')).resolves.toContain('Updated');
+
+    await writeFile(join(templates, 'default.hbs'), '<main>{{{content}}}</main>');
+    const templateResult = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(templateResult.stats).toMatchObject({ built: 2, skipped: 0 });
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('<main>');
+  });
+
+  it('performs a clean build when requested', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'page.md'), '# Page');
+
+    await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true });
+    const result = await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true, clean: true });
+
+    expect(result.stats).toMatchObject({ built: 1, skipped: 0 });
+  });
+
+  it('removes output for deleted pages during incremental builds', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const output = join(root, 'output');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'deleted.md'), '# Deleted');
+    await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true });
+
+    await writeFile(join(content, 'replacement.md'), '# Replacement');
+    await unlink(join(content, 'deleted.md'));
+    await buildSiteWithStats({ contentDir: content, outputDir: output, incremental: true });
+
+    await expect(readFile(join(output, 'deleted.html'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
 
 describe('loadConfiguredPlugins', () => {
@@ -99,6 +168,10 @@ describe('loadConfiguredPlugins', () => {
 describe('parseArguments', () => {
   it('accepts custom content and output directories', () => {
     expect(parseArguments(['--content', 'posts', '--output', 'public', '--templates', 'views'])).toEqual({ contentDir: 'posts', outputDir: 'public', templatesDir: 'views' });
+  });
+
+  it('accepts incremental build flags', () => {
+    expect(parseArguments(['--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
   });
 
   it('rejects invalid options', () => {

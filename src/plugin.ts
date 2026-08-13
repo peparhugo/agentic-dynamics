@@ -14,12 +14,34 @@ export interface BuildOptions {
   outputDir?: string;
   templatesDir?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
+}
+
+export interface BuildStats {
+  built: number;
+  skipped: number;
+  timeSavedMs: number;
+}
+
+export interface CachedPage {
+  sourceHash: string;
+  page: BuildPage;
+  renderTimeMs: number;
+}
+
+export interface BuildCache {
+  version: 1;
+  templateHash: string;
+  pages: Record<string, CachedPage>;
 }
 
 export interface BuildPage extends Page {
   template?: string;
   layout?: string;
   data: Record<string, unknown>;
+  sourceHash?: string;
+  renderTimeMs?: number;
 }
 
 export interface BuildContext {
@@ -28,6 +50,11 @@ export interface BuildContext {
   outputDir: string;
   templatesDir: string;
   pages: BuildPage[];
+  cachePath: string;
+  cache?: BuildCache;
+  templateHash: string;
+  skippedPages: Set<string>;
+  stats: BuildStats;
 }
 
 export interface Plugin {
@@ -45,6 +72,10 @@ export function createBuildContext(options: BuildOptions = {}): BuildContext {
     outputDir: resolve(options.outputDir ?? 'dist'),
     templatesDir: resolve(options.templatesDir ?? 'templates'),
     pages: [],
+    cachePath: join(resolve(options.outputDir ?? 'dist'), '.ssg-cache.json'),
+    templateHash: '',
+    skippedPages: new Set(),
+    stats: { built: 0, skipped: 0, timeSavedMs: 0 },
   };
 }
 
@@ -60,6 +91,14 @@ export async function runHook(plugins: Plugin[], hook: keyof Plugin, context: Bu
 export async function resetOutput(context: BuildContext): Promise<void> {
   await rm(context.outputDir, { recursive: true, force: true });
   await mkdir(context.outputDir, { recursive: true });
+}
+
+export async function prepareOutput(context: BuildContext): Promise<void> {
+  if (!context.options.incremental || context.options.clean || !context.cache) {
+    await resetOutput(context);
+  } else {
+    await mkdir(context.outputDir, { recursive: true });
+  }
 }
 
 export async function writeIndex(context: BuildContext): Promise<void> {

@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-import { buildSite } from './generator';
+import { buildSiteWithStats } from './generator';
 import { ServeOptions, startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <number>]';
 }
 
 export function parseArguments(args: string[], allowPort = false): ServeOptions {
   const options: ServeOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates' || (allowPort && argument === '--port')) {
+    if (argument === '--incremental' || argument === '--clean') {
+      options[argument.slice(2) as 'incremental' | 'clean'] = true;
+    } else if (argument === '--content' || argument === '--output' || argument === '--templates' || (allowPort && argument === '--port')) {
       const value = args[++index];
       if (!value || value.startsWith('--')) throw new Error(`${argument} requires a ${argument === '--port' ? 'number' : 'directory'}`);
       if (argument === '--content') options.contentDir = value;
@@ -30,8 +32,8 @@ export function parseArguments(args: string[], allowPort = false): ServeOptions 
 
 export async function run(args: string[]): Promise<void> {
   if (args[0] === 'build') {
-    const pages = await buildSite(parseArguments(args.slice(1)));
-    process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    const { pages, stats } = await buildSiteWithStats(parseArguments(args.slice(1)));
+    process.stdout.write(`Generated ${pages.length} page(s). Built ${stats.built}, skipped ${stats.skipped}, time saved ${stats.timeSavedMs}ms.\n`);
     return;
   }
   if (args[0] === 'serve') {

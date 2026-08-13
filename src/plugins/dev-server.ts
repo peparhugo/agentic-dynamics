@@ -43,7 +43,7 @@ async function serveFile(root: string, request: IncomingMessage, response: Serve
 export class DevServerPlugin implements Plugin {
   async start(options: ServeOptions = {}): Promise<DevServer> {
     const outputDir = resolve(options.outputDir ?? 'dist');
-    const buildOptions: BuildOptions = { ...options, outputDir };
+    const buildOptions: BuildOptions = { ...options, outputDir, incremental: true };
     await buildSite(buildOptions);
     const server = createServer((request, response) => void serveFile(outputDir, request, response).catch(() => response.writeHead(500).end('Internal Server Error')));
     const webSockets = new WebSocketServer({ server, path: '/__ssg_live_reload' });

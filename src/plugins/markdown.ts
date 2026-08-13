@@ -1,4 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { basename, extname, join, relative, sep } from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
@@ -27,17 +28,23 @@ export class MarkdownPlugin implements Plugin {
   async beforeBuild(context: BuildContext): Promise<void> {
     const files = await markdownFiles(context.contentDir);
     context.pages = await Promise.all(files.map(async (file) => {
-      const parsed = matter(await readFile(file, 'utf8'));
+      const source = await readFile(file, 'utf8');
+      const sourceHash = createHash('sha256').update(source).digest('hex');
       const sourcePath = relative(context.contentDir, file);
+      const outputPath = sourcePath.replace(/\.(md|markdown)$/i, '.html').split(sep).join('/');
+      const cached = context.cache?.pages[outputPath];
+      if (cached?.sourceHash === sourceHash) return { ...cached.page, sourceHash };
+      const parsed = matter(source);
       return {
         title: asString(parsed.data.title) ?? basename(file, extname(file)),
         date: asString(parsed.data.date),
         tags: asTags(parsed.data.tags),
-        outputPath: sourcePath.replace(/\.(md|markdown)$/i, '.html').split(sep).join('/'),
+        outputPath,
         html: await marked.parse(parsed.content),
         template: asString(parsed.data.template),
         layout: asString(parsed.data.layout),
         data: parsed.data,
+        sourceHash,
       };
     }));
     context.pages.sort((a, b) => a.title.localeCompare(b.title));
