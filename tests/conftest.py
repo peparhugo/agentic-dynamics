@@ -16,6 +16,11 @@ def client():
     app_module.init_db()
     app_module.app.config["TESTING"] = True
 
+    # The limiter's Redis storage is shared across tests (it's a real
+    # Redis instance keyed by IP/user), so reset it before each test to
+    # keep rate-limit counters from leaking between tests.
+    app_module.limiter.reset()
+
     with app_module.app.test_client() as test_client:
         yield test_client
 

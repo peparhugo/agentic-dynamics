@@ -20,10 +20,26 @@ class TaskRepository(BaseRepository):
             "owner_id": owner_id,
         }
 
-    def get_all(self, owner_id: int) -> list[dict]:
-        return self._fetch_all(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
+    def get_page(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> list[dict]:
+        """Fetch up to ``limit + 1`` tasks (newest first) after ``cursor``.
+
+        Fetching one extra row lets the caller detect whether another page
+        follows without a second query.
+        """
+        query = "SELECT * FROM tasks WHERE owner_id = ?"
+        params = [owner_id]
+        if cursor is not None:
+            query += " AND id < ?"
+            params.append(cursor)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(limit + 1)
+        return self._fetch_all(query, tuple(params))
+
+    def count(self, owner_id: int) -> int:
+        row = self._fetch_one(
+            "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?", (owner_id,)
         )
+        return row["total"] if row else 0
 
     def get_by_id(self, task_id: int, owner_id: int) -> dict | None:
         return self._fetch_one(

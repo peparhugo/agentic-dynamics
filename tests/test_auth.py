@@ -158,8 +158,8 @@ def test_users_only_see_their_own_tasks(client):
     alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
     bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
 
-    assert [t["title"] for t in alice_tasks] == ["alice task"]
-    assert [t["title"] for t in bob_tasks] == ["bob task"]
+    assert [t["title"] for t in alice_tasks["data"]] == ["alice task"]
+    assert [t["title"] for t in bob_tasks["data"]] == ["bob task"]
 
 
 def test_user_cannot_get_other_users_task(client):

@@ -32,7 +32,8 @@ def test_create_task_no_body(client, auth_headers):
 def test_list_tasks_empty(client, auth_headers):
     resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    data = resp.get_json()
+    assert data == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_order_desc(client, auth_headers):
@@ -42,9 +43,11 @@ def test_list_tasks_order_desc(client, auth_headers):
 
     resp = client.get("/tasks", headers=auth_headers)
     assert resp.status_code == 200
-    data = resp.get_json()
-    titles = [t["title"] for t in data]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["third", "second", "first"]
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
 
 
 def test_get_task_success(client, auth_headers):
@@ -103,4 +106,4 @@ def test_update_task_not_found(client, auth_headers):
 def test_create_then_persisted_in_db(client, auth_headers):
     created = client.post("/tasks", json={"title": "Persisted"}, headers=auth_headers).get_json()
     listed = client.get("/tasks", headers=auth_headers).get_json()
-    assert any(t["id"] == created["id"] and t["status"] == "pending" for t in listed)
+    assert any(t["id"] == created["id"] and t["status"] == "pending" for t in listed["data"])
