@@ -233,6 +233,178 @@ async def test_health_returns_connected_client_count(server):
     assert body["clients"] == 0
 
 
+# ── Channels ─────────────────────────────────────────────────────
+
+def http_get(port, path):
+    with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=5) as resp:
+        return resp.status, json.loads(resp.read().decode())
+
+
+async def subscribe(ws, channel):
+    await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": channel}}))
+
+
+async def unsubscribe(ws, channel):
+    await ws.send(json.dumps({"type": "unsubscribe", "payload": {"channel": channel}}))
+
+
+async def test_subscribe_confirms_and_delivers_channel_messages(server):
+    ws_a = await connect(server["ws_port"])
+    ws_b = await connect(server["ws_port"])
+    await get_client_id(ws_a)
+    await get_client_id(ws_b)
+
+    await subscribe(ws_a, "alerts")
+    msg = await recv_json(ws_a)
+    assert msg["type"] == "system"
+    assert msg["payload"]["event"] == "subscribed"
+    assert msg["payload"]["channel"] == "alerts"
+
+    await ws_a.send(
+        json.dumps({"type": "broadcast", "payload": {"text": "fire"}, "channel": "alerts"})
+    )
+    got_a = await recv_json(ws_a)
+    assert got_a["type"] == "broadcast"
+    assert got_a["payload"] == {"text": "fire"}
+    assert got_a["channel"] == "alerts"
+
+    with pytest.raises((asyncio.TimeoutError, websockets.exceptions.ConnectionClosed)):
+        await asyncio.wait_for(ws_b.recv(), 0.5)
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_channel_message_ignores_non_subscribers(server):
+    ws_a = await connect(server["ws_port"])
+    ws_b = await connect(server["ws_port"])
+    await get_client_id(ws_a)
+    await get_client_id(ws_b)
+    await subscribe(ws_a, "chat")
+    await recv_json(ws_a)
+
+    await ws_a.send(
+        json.dumps({"type": "broadcast", "payload": {"text": "hi"}, "channel": "chat"})
+    )
+    got_a = await recv_json(ws_a)
+    assert got_a["payload"] == {"text": "hi"}
+    with pytest.raises((asyncio.TimeoutError, websockets.exceptions.ConnectionClosed)):
+        await asyncio.wait_for(ws_b.recv(), 0.5)
+
+    await ws_b.send(json.dumps({"type": "broadcast", "payload": {"text": "open"}}))
+    got_a = await recv_json(ws_a)
+    got_b = await recv_json(ws_b)
+    assert got_a["payload"] == {"text": "open"}
+    assert got_b["payload"] == {"text": "open"}
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_unsubscribe_stops_delivery(server):
+    registry = server["registry"]
+    ws = await connect(server["ws_port"])
+    cid = await get_client_id(ws)
+    await subscribe(ws, "system")
+    await recv_json(ws)
+    assert registry.channel_subscribers("system") == {cid}
+
+    await unsubscribe(ws, "system")
+    msg = await recv_json(ws)
+    assert msg["payload"]["event"] == "unsubscribed"
+    assert registry.channel_subscribers("system") == set()
+
+    await ws.send(
+        json.dumps({"type": "broadcast", "payload": {"text": "gone"}, "channel": "system"})
+    )
+    with pytest.raises((asyncio.TimeoutError, websockets.exceptions.ConnectionClosed)):
+        await asyncio.wait_for(ws.recv(), 0.5)
+    await ws.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(server):
+    registry = server["registry"]
+    ws = await connect(server["ws_port"])
+    cid = await get_client_id(ws)
+    await subscribe(ws, "alerts")
+    await recv_json(ws)
+    await subscribe(ws, "chat")
+    await recv_json(ws)
+
+    channels = registry.channels()
+    assert set(channels) == {"alerts", "chat"}
+    assert channels["alerts"] == {cid}
+    assert channels["chat"] == {cid}
+
+    await ws.send(
+        json.dumps({"type": "broadcast", "payload": {"n": 1}, "channel": "chat"})
+    )
+    got = await recv_json(ws)
+    assert got["payload"] == {"n": 1}
+    await ws.close()
+
+
+async def test_disconnect_cleans_channel_membership(server):
+    registry = server["registry"]
+    ws = await connect(server["ws_port"])
+    cid = await get_client_id(ws)
+    await subscribe(ws, "system")
+    await recv_json(ws)
+    await ws.close()
+    assert await wait_for_count(registry, 0)
+    assert registry.channel_subscribers("system") == set()
+    assert registry.channels() == {}
+
+
+async def test_subscribe_requires_channel(server):
+    ws = await connect(server["ws_port"])
+    await get_client_id(ws)
+    await ws.send(json.dumps({"type": "subscribe", "payload": {}}))
+    msg = await recv_json(ws)
+    assert msg["type"] == "system"
+    assert "channel" in msg["payload"]["error"]
+    await ws.close()
+
+
+async def test_rest_channels_lists_subscriber_counts(server):
+    ws_a = await connect(server["ws_port"])
+    ws_b = await connect(server["ws_port"])
+    await get_client_id(ws_a)
+    await get_client_id(ws_b)
+    await subscribe(ws_a, "alerts")
+    await recv_json(ws_a)
+    await subscribe(ws_b, "alerts")
+    await recv_json(ws_b)
+    await subscribe(ws_a, "chat")
+    await recv_json(ws_a)
+
+    status, body = http_get(server["http_port"], "/channels")
+    assert status == 200
+    by_name = {c["name"]: c["subscribers"] for c in body["channels"]}
+    assert by_name == {"alerts": 2, "chat": 1}
+
+    await ws_a.close()
+    await ws_b.close()
+
+
+async def test_rest_channel_subscribers_lists_ids(server):
+    ws = await connect(server["ws_port"])
+    cid = await get_client_id(ws)
+    await subscribe(ws, "system")
+    await recv_json(ws)
+
+    status, body = http_get(server["http_port"], "/channels/system/subscribers")
+    assert status == 200
+    assert body["channel"] == "system"
+    assert body["subscribers"] == [cid]
+
+    status, body = http_get(server["http_port"], "/channels/nope/subscribers")
+    assert status == 200
+    assert body["subscribers"] == []
+
+    await ws.close()
+
+
 def test_health_unknown_path_returns_404(server):
     # Uses a plain HTTP request against the health server via urllib.
     port = server["http_port"]
