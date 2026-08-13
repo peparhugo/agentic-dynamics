@@ -5,6 +5,8 @@ A simple REST API for managing tasks with SQLite persistence.
 """
 
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from datetime import datetime, timedelta
 import os
 import jwt
@@ -16,6 +18,21 @@ from repository import Database, UserRepository, TaskRepository
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key")
+
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get("REDIS_URL", "memory://"),
+    swallow_errors=True
+)
+
+
+@app.before_request
+def disable_limiter_for_testing():
+    """Disable limiter in testing mode unless explicitly enabled."""
+    if app.config.get("TESTING") and not app.config.get("RATELIMIT_ENABLED"):
+        limiter.enabled = False
 
 
 def get_db():
@@ -61,6 +78,17 @@ def get_user_email(user_id):
     return get_user_repository().get_email(user_id)
 
 
+def get_rate_limit_key():
+    """Get rate limit key from user_id in token or IP."""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        user_id = verify_token(token)
+        if user_id is not None:
+            return f"user_{user_id}"
+    return get_remote_address()
+
+
 def auth_required(f):
     """Decorator to protect endpoints with JWT authentication."""
     @wraps(f)
@@ -82,6 +110,7 @@ def auth_required(f):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 def register():
     """Register a new user."""
     data = request.get_json(silent=True) or {}
@@ -111,6 +140,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 def login():
     """Login user and return JWT token."""
     data = request.get_json(silent=True) or {}
@@ -135,6 +165,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 @auth_required
 def create_task(user_id):
     """Create a new task."""
@@ -157,14 +188,24 @@ def create_task(user_id):
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 @auth_required
 def list_tasks(user_id):
-    """List all tasks for the authenticated user ordered by created_at descending."""
-    tasks = get_task_repository().read_by_owner(user_id)
-    return jsonify(tasks)
+    """List tasks for the authenticated user with cursor-based pagination."""
+    cursor = request.args.get("cursor", None)
+    limit = request.args.get("limit", 20, type=int)
+
+    if limit < 1:
+        limit = 20
+    elif limit > 100:
+        limit = 100
+
+    result = get_task_repository().read_by_owner_paginated(user_id, cursor, limit)
+    return jsonify(result)
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 @auth_required
 def get_task(user_id, task_id):
     """Get a single task by ID."""
@@ -177,6 +218,7 @@ def get_task(user_id, task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 @auth_required
 def update_task(user_id, task_id):
     """Update task title and/or status."""
@@ -216,6 +258,7 @@ def update_task(user_id, task_id):
 
 
 @app.route("/health", methods=["GET"])
+@limiter.limit("100 per minute", key_func=get_rate_limit_key)
 def health():
     """Health check endpoint."""
     return jsonify({"status": "ok"})

@@ -137,6 +137,38 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [self.dict_from_row(row) for row in rows]
 
+    def read_by_owner_paginated(self, owner_id, cursor=None, limit=20):
+        """Get tasks for a user with cursor-based pagination."""
+        with self.get_db() as conn:
+            if cursor:
+                rows = conn.execute(
+                    "SELECT id, title, status, created_at, owner_id FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1)
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT id, title, status, created_at, owner_id FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1)
+                ).fetchall()
+
+            total_rows = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE owner_id = ?",
+                (owner_id,)
+            ).fetchone()
+            total = total_rows["count"] if total_rows else 0
+
+        tasks = [self.dict_from_row(row) for row in rows]
+        next_cursor = None
+        if len(tasks) > limit:
+            next_cursor = tasks[limit - 1]["id"]
+            tasks = tasks[:limit]
+
+        return {
+            "data": tasks,
+            "next_cursor": next_cursor,
+            "total": total
+        }
+
     def update(self, task_id, title=None, status=None):
         """Update task title and/or status."""
         with self.get_db() as conn:

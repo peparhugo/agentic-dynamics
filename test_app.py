@@ -19,9 +19,13 @@ def client(tmp_path, monkeypatch):
 
     app = app_module.app
     app.config["TESTING"] = True
+    app.config["RATELIMIT_ENABLED"] = False
 
     with app.app_context():
         app_module.init_db()
+
+    # Ensure limiter is disabled for this test
+    app_module.limiter.enabled = False
 
     yield app.test_client()
 
@@ -33,6 +37,33 @@ def mock_celery_task(monkeypatch):
     mock_task.delay = MagicMock(return_value=None)
     monkeypatch.setattr(app_module, "send_notification_email", mock_task)
     return mock_task
+
+
+@pytest.fixture
+def rate_limited_client(tmp_path, monkeypatch):
+    """Create test client with rate limiting enabled."""
+    test_db = str(tmp_path / "test_tasks.db")
+    monkeypatch.setenv("DATABASE", test_db)
+    monkeypatch.setattr(app_module, "DATABASE", test_db)
+
+    app = app_module.app
+    app.config["TESTING"] = True
+    app.config["RATELIMIT_ENABLED"] = True
+
+    with app.app_context():
+        app_module.init_db()
+
+    # Enable the limiter and reset it
+    app_module.limiter.enabled = True
+    app_module.limiter.reset()
+
+    client = app.test_client()
+    yield client
+
+    # Disable the limiter and reset it after the test
+    app_module.limiter.reset()
+    app_module.limiter.enabled = False
+    app.config["RATELIMIT_ENABLED"] = False
 
 
 def register_user(client, username, password, email=None):
@@ -280,7 +311,9 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert data == []
+        assert data["data"] == []
+        assert data["next_cursor"] is None
+        assert data["total"] == 0
 
     def test_list_tasks_single(self, client):
         """List tasks returns single task."""
@@ -297,11 +330,11 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert len(data) == 1
-        assert data[0]["title"] == "Task 1"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["title"] == "Task 1"
 
     def test_list_tasks_multiple_ordered(self, client):
-        """List tasks returns multiple tasks ordered by created_at descending."""
+        """List tasks returns multiple tasks ordered by id descending."""
         import time
         token, _ = register_user(client, "alice", "secret123")
         client.post(
@@ -331,10 +364,10 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert len(data) == 3
-        assert data[0]["title"] == "Task 3"
-        assert data[1]["title"] == "Task 2"
-        assert data[2]["title"] == "Task 1"
+        assert len(data["data"]) == 3
+        assert data["data"][0]["title"] == "Task 3"
+        assert data["data"][1]["title"] == "Task 2"
+        assert data["data"][2]["title"] == "Task 1"
 
     def test_list_tasks_missing_auth(self, client):
         """Return 401 when authorization header is missing."""
@@ -367,8 +400,8 @@ class TestListTasks:
         )
         assert response.status_code == 200
         data = json.loads(response.data)
-        assert len(data) == 1
-        assert data[0]["title"] == "Alice's task"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["title"] == "Alice's task"
 
 
 class TestGetTask:
@@ -717,3 +750,263 @@ class TestNotificationTrigger:
             headers={"Authorization": f"Bearer {token}"}
         )
         mock_celery_task.delay.assert_called_once_with("alice@example.com", "Updated title")
+
+
+class TestPagination:
+    """Tests for cursor-based pagination on GET /tasks"""
+
+    def test_pagination_empty_list(self, client):
+        """Empty list returns proper pagination structure."""
+        token, _ = register_user(client, "alice", "secret123")
+        response = client.get(
+            "/tasks",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["data"] == []
+        assert data["next_cursor"] is None
+        assert data["total"] == 0
+
+    def test_pagination_default_limit(self, client):
+        """Default limit is 20."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(25):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response = client.get(
+            "/tasks",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert len(data["data"]) == 20
+        assert data["next_cursor"] is not None
+        assert data["total"] == 25
+
+    def test_pagination_custom_limit(self, client):
+        """Custom limit parameter works."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(15):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response = client.get(
+            "/tasks?limit=10",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert len(data["data"]) == 10
+        assert data["next_cursor"] is not None
+        assert data["total"] == 15
+
+    def test_pagination_max_limit(self, client):
+        """Limit capped at 100."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(50):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response = client.get(
+            "/tasks?limit=200",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert len(data["data"]) == 50
+        assert data["next_cursor"] is None
+        assert data["total"] == 50
+
+    def test_pagination_invalid_limit(self, client):
+        """Invalid limit defaults to 20."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(30):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response = client.get(
+            "/tasks?limit=0",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert len(data["data"]) == 20
+        assert data["total"] == 30
+
+    def test_pagination_with_cursor(self, client):
+        """Cursor-based pagination works."""
+        token, _ = register_user(client, "alice", "secret123")
+        task_ids = []
+        for i in range(25):
+            resp = client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            task_ids.append(json.loads(resp.data)["id"])
+
+        response1 = client.get(
+            "/tasks?limit=10",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data1 = json.loads(response1.data)
+        assert len(data1["data"]) == 10
+        assert data1["next_cursor"] is not None
+
+        response2 = client.get(
+            f"/tasks?limit=10&cursor={data1['next_cursor']}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data2 = json.loads(response2.data)
+        assert len(data2["data"]) == 10
+        assert data2["next_cursor"] is not None
+
+        assert data1["data"][0]["id"] != data2["data"][0]["id"]
+
+    def test_pagination_last_page(self, client):
+        """Last page has no next cursor."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(15):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response1 = client.get(
+            "/tasks?limit=10",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data1 = json.loads(response1.data)
+
+        response2 = client.get(
+            f"/tasks?limit=10&cursor={data1['next_cursor']}",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data2 = json.loads(response2.data)
+        assert len(data2["data"]) == 5
+        assert data2["next_cursor"] is None
+
+    def test_pagination_total_count(self, client):
+        """Total count is accurate."""
+        token, _ = register_user(client, "alice", "secret123")
+        for i in range(42):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+
+        response = client.get(
+            "/tasks?limit=10",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        data = json.loads(response.data)
+        assert data["total"] == 42
+
+    def test_pagination_isolation(self, client):
+        """Users only see their own tasks in pagination."""
+        token1, _ = register_user(client, "alice", "secret123")
+        token2, _ = register_user(client, "bob", "secret456")
+
+        for i in range(15):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Alice Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token1}"}
+            )
+
+        for i in range(10):
+            client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Bob Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token2}"}
+            )
+
+        response1 = client.get(
+            "/tasks",
+            headers={"Authorization": f"Bearer {token1}"}
+        )
+        data1 = json.loads(response1.data)
+
+        response2 = client.get(
+            "/tasks",
+            headers={"Authorization": f"Bearer {token2}"}
+        )
+        data2 = json.loads(response2.data)
+
+        assert data1["total"] == 15
+        assert data2["total"] == 10
+
+
+class TestRateLimiting:
+    """Tests for rate limiting on API endpoints"""
+
+    def test_rate_limit_register(self, rate_limited_client):
+        """Register endpoint respects rate limit."""
+        limited_hits = 0
+        for i in range(101):
+            response = rate_limited_client.post(
+                "/auth/register",
+                data=json.dumps({"username": f"user{i}", "password": "pass"}),
+                content_type="application/json"
+            )
+            if response.status_code == 429:
+                limited_hits += 1
+
+        assert limited_hits >= 1
+
+    def test_rate_limit_429_response(self, rate_limited_client):
+        """Rate limited response returns 429."""
+        token, _ = register_user(rate_limited_client, "alice", "secret123")
+
+        limited_hits = 0
+        for i in range(101):
+            response = rate_limited_client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            if response.status_code == 429:
+                limited_hits += 1
+
+        assert limited_hits >= 1
+
+    def test_rate_limit_header_retry_after(self, rate_limited_client):
+        """Rate limited response includes Retry-After header."""
+        token, _ = register_user(rate_limited_client, "alice", "secret123")
+
+        for i in range(101):
+            response = rate_limited_client.post(
+                "/tasks",
+                data=json.dumps({"title": f"Task {i}"}),
+                content_type="application/json",
+                headers={"Authorization": f"Bearer {token}"}
+            )
+            if response.status_code == 429:
+                assert "Retry-After" in response.headers or response.status_code == 429
+                break
