@@ -445,9 +445,19 @@ def clean_redis_state():
     state.connect()
     if state.available:
         state.clear()
+    limiter = app.RateLimiter(limit=app.RATE_LIMIT_DEFAULT)
+    limiter.connect()
+    if limiter.available:
+        limiter.reset()
+    limiter.close()
     yield
     if state.available:
         state.clear()
+    limiter = app.RateLimiter(limit=app.RATE_LIMIT_DEFAULT)
+    limiter.connect()
+    if limiter.available:
+        limiter.reset()
+    limiter.close()
 
 
 @pytest.fixture

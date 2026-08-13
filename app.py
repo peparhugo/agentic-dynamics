@@ -37,7 +37,21 @@ Persistence
 -----------
 Every published message is stored in a SQLite ``messages`` table
 (``id``, ``channel``, ``type``, ``payload``, ``timestamp``) and is
-retrievable through the REST endpoint ``GET /messages?limit=50&offset=0``.
+retrievable through the REST endpoint ``GET /messages?limit=50&offset=0``
+or the channel/time-filtered ``GET /history`` endpoint below.
+
+Rate limiting
+-------------
+Each client is limited to a configurable number of messages per minute
+(default 100, ``RATE_LIMIT``). Limits are enforced per client id with Redis
+counters (``ntf:rate:{client_id}:{bucket}``); when Redis is unavailable the
+limiter degrades to an in-process counter. Exceeding the limit returns a
+``system`` error message without dropping the connection.
+
+Message expiry
+--------------
+Messages older than ``MESSAGE_TTL_DAYS`` (default 7) are cleaned up by a
+background task started at server startup, then periodically re-run.
 
 Transport layer
 ---------------
@@ -52,6 +66,8 @@ Configuration
 * ``REDIS_URL`` - Redis connection URL (default ``redis://localhost:6379/0``)
 * ``DATABASE_URL`` - SQLite database path/URL (default ``sqlite:///notifications.db``)
 * ``TRANSPORT`` - transport name (default ``websocket``)
+* ``RATE_LIMIT`` - per-client messages per minute (default ``100``)
+* ``MESSAGE_TTL_DAYS`` - retention window for persisted messages (default ``7``)
 
 REST endpoints
 --------------
@@ -59,6 +75,8 @@ REST endpoints
 * ``GET /channels`` - active channels with subscriber counts
 * ``GET /channels/{name}/subscribers`` - a channel's subscriber IDs
 * ``GET /messages?limit=50&offset=0`` - persisted message history
+* ``GET /history?channel=X&since=ISO&limit=50&offset=0`` - filtered history in
+  chronological order with a ``has_more`` pagination flag
 
 The client registry is shared between the asyncio WebSocket handlers and
 a background OS thread running the HTTP health server, so it is guarded
@@ -71,10 +89,11 @@ import json
 import os
 import sqlite3
 import threading
+import time
 import urllib.parse
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import redis
 import redis.asyncio as aioredis
@@ -88,6 +107,8 @@ HTTP_PORT = 8080
 REDIS_URL_DEFAULT = "redis://localhost:6379/0"
 DATABASE_URL_DEFAULT = "sqlite:///notifications.db"
 TRANSPORT_DEFAULT = "websocket"
+RATE_LIMIT_DEFAULT = 100
+MESSAGE_TTL_DAYS_DEFAULT = 7
 
 # Redis channel used as the pub/sub message backbone.
 NOTIFICATIONS_CHANNEL = "ntf:notifications"
@@ -95,6 +116,9 @@ NOTIFICATIONS_CHANNEL = "ntf:notifications"
 CLIENT_SET_KEY = "ntf:clients"
 CLIENT_CHANNELS_PREFIX = "ntf:client:"
 CLIENT_CHANNELS_SUFFIX = ":channels"
+# Redis keys that track per-client message counters for rate limiting.
+RATE_LIMIT_PREFIX = "ntf:rate:"
+RATE_LIMIT_WINDOW = 60
 
 SUPPORTED_TYPES = ("broadcast", "direct", "system", "subscribe", "unsubscribe")
 
@@ -141,6 +165,61 @@ def resolve_transport(explicit=None) -> str:
     if explicit:
         return explicit
     return os.environ.get("TRANSPORT") or TRANSPORT_DEFAULT
+
+
+def resolve_rate_limit(explicit=None) -> int:
+    """Resolve the per-client message limit from ``explicit`` or ``RATE_LIMIT``.
+
+    A non-positive value disables rate limiting.
+    """
+    if explicit is not None:
+        try:
+            return int(explicit)
+        except (TypeError, ValueError):
+            return RATE_LIMIT_DEFAULT
+    raw = os.environ.get("RATE_LIMIT")
+    if raw is None:
+        return RATE_LIMIT_DEFAULT
+    try:
+        return int(raw)
+    except ValueError:
+        return RATE_LIMIT_DEFAULT
+
+
+def resolve_ttl_days(explicit=None) -> int:
+    """Resolve the message retention window from ``explicit`` or ``MESSAGE_TTL_DAYS``.
+
+    A non-positive value disables automatic expiry.
+    """
+    if explicit is not None:
+        try:
+            return int(explicit)
+        except (TypeError, ValueError):
+            return MESSAGE_TTL_DAYS_DEFAULT
+    raw = os.environ.get("MESSAGE_TTL_DAYS")
+    if raw is None:
+        return MESSAGE_TTL_DAYS_DEFAULT
+    try:
+        return int(raw)
+    except ValueError:
+        return MESSAGE_TTL_DAYS_DEFAULT
+
+
+def normalize_iso(value: str) -> str:
+    """Normalize an ISO 8601 timestamp to the store's canonical string form.
+
+    Stored timestamps are produced by :func:`utcnow_iso`, so they always use
+    the ``+00:00`` UTC offset with fixed-width fields. Normalizing incoming
+    ``since``/cutoff values (accepting ``Z`` or other offsets) keeps string
+    comparison in SQL reliable.
+    """
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00").replace("z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+    except (ValueError, TypeError, AttributeError):
+        return value
 
 
 def _channels_key(client_id: str) -> str:
@@ -241,6 +320,73 @@ class MessageStore:
     def count(self) -> int:
         with self._lock:
             return self._conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+
+    def list_history(self, channel: str = None, since: str = None,
+                     limit: int = 50, offset: int = 0):
+        """Return persisted messages in chronological order.
+
+        Filters on ``channel`` (exact match) and ``since`` (ISO timestamp,
+        inclusive). Returns ``(messages, has_more)``; ``has_more`` is ``True``
+        when additional pages exist past ``offset + limit``.
+        """
+        try:
+            limit = max(1, int(limit))
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = max(0, int(offset))
+        except (TypeError, ValueError):
+            offset = 0
+        conditions = []
+        params = []
+        if channel is not None:
+            conditions.append("channel = ?")
+            params.append(channel)
+        if since is not None:
+            conditions.append("timestamp >= ?")
+            params.append(normalize_iso(since))
+        where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        with self._lock:
+            rows = self._conn.execute(
+                f"SELECT id, channel, type, payload, timestamp FROM messages "
+                f"{where} ORDER BY id ASC LIMIT ? OFFSET ?",
+                (*params, limit + 1, offset),
+            ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        messages = []
+        for row in rows:
+            payload = row["payload"]
+            try:
+                payload = json.loads(payload)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            messages.append(
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": payload,
+                    "timestamp": row["timestamp"],
+                }
+            )
+        return messages, has_more
+
+    def delete_older_than(self, ttl_days: int) -> int:
+        """Delete messages older than ``ttl_days`` and return the row count."""
+        try:
+            ttl_days = max(0, int(ttl_days))
+        except (TypeError, ValueError):
+            return 0
+        if ttl_days <= 0:
+            return 0
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=ttl_days)).isoformat()
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+            )
+            self._conn.commit()
+            return cur.rowcount
 
     def close(self) -> None:
         with self._lock:
@@ -343,6 +489,107 @@ class ClientStateStore:
             self._client.delete(CLIENT_SET_KEY)
             for key in self._client.scan_iter(match=f"{CLIENT_CHANNELS_PREFIX}*"):
                 self._client.delete(key)
+        except Exception:
+            pass
+
+
+class RateLimiter:
+    """Per-client message rate limiting backed by Redis counters.
+
+    Each client may send up to ``limit`` messages per fixed 60-second window.
+    Counters are kept in Redis as ``ntf:rate:{client_id}:{bucket}`` using
+    ``INCR`` with a matching expiry; when Redis is unreachable the limiter
+    degrades to an in-process counter so the server keeps working (mirroring
+    the degradation behaviour of :class:`ClientStateStore`).
+    """
+
+    def __init__(self, limit: int = None, redis_url: str = None) -> None:
+        self._limit = resolve_rate_limit(limit)
+        self._url = resolve_redis_url(redis_url)
+        self._client = None
+        self.available = False
+        self._memory: dict[str, dict[int, int]] = {}
+        self._mem_lock = threading.Lock()
+
+    @property
+    def limit(self) -> int:
+        return self._limit
+
+    @property
+    def enabled(self) -> bool:
+        return self._limit is not None and self._limit > 0
+
+    def connect(self) -> None:
+        try:
+            client = redis.Redis.from_url(
+                self._url, socket_connect_timeout=2, socket_timeout=2
+            )
+            client.ping()
+            self._client = client
+            self.available = True
+        except Exception:
+            self.available = False
+            self._client = None
+
+    def _bucket(self) -> int:
+        return int(time.time() // RATE_LIMIT_WINDOW)
+
+    @staticmethod
+    def _rate_key(client_id: str, bucket: int) -> str:
+        return f"{RATE_LIMIT_PREFIX}{client_id}:{bucket}"
+
+    def allow(self, client_id: str):
+        """Record one message from ``client_id``.
+
+        Returns a ``(allowed, remaining)`` tuple: ``allowed`` is ``False``
+        when the client has exceeded its per-window limit and ``remaining`` is
+        the number of messages still permitted in the window (``None`` when
+        rate limiting is disabled).
+        """
+        if not self.enabled:
+            return True, None
+        bucket = self._bucket()
+        if self.available and self._client is not None:
+            try:
+                key = self._rate_key(client_id, bucket)
+                count = self._client.incr(key)
+                if count == 1:
+                    self._client.expire(key, RATE_LIMIT_WINDOW + 30)
+                allowed = count <= self._limit
+                remaining = max(0, self._limit - count) if allowed else 0
+                return allowed, remaining
+            except Exception:
+                pass
+        with self._mem_lock:
+            entry = self._memory.setdefault(client_id, {})
+            count = entry.get(bucket, 0) + 1
+            entry[bucket] = count
+            if len(entry) > 2:
+                for old in [b for b in entry if b != bucket]:
+                    del entry[old]
+            allowed = count <= self._limit
+            remaining = max(0, self._limit - count) if allowed else 0
+            return allowed, remaining
+
+    def reset(self, client_id: str = None) -> None:
+        """Clear counters (optionally for a single client)."""
+        if self.available and self._client is not None:
+            try:
+                pattern = f"{RATE_LIMIT_PREFIX}{client_id}:*" if client_id else f"{RATE_LIMIT_PREFIX}*"
+                for key in self._client.scan_iter(match=pattern):
+                    self._client.delete(key)
+            except Exception:
+                pass
+        with self._mem_lock:
+            if client_id is not None:
+                self._memory.pop(client_id, None)
+            else:
+                self._memory.clear()
+
+    def close(self) -> None:
+        try:
+            if self._client is not None:
+                self._client.close()
         except Exception:
             pass
 
@@ -798,11 +1045,14 @@ def get_transport(name=None, registry: ClientRegistry = None) -> BaseTransport:
     raise ValueError(f"unknown transport: {resolved!r}")
 
 
-async def ws_handler(connection, transport: BaseTransport, broker: RedisBroker = None) -> None:
+async def ws_handler(connection, transport: BaseTransport, broker: RedisBroker = None,
+                     rate_limiter: RateLimiter = None) -> None:
     """Handle a single client connection lifecycle.
 
     Protocol handling is transport-agnostic: the transport owns how
-    messages are read from and written to ``connection``.
+    messages are read from and written to ``connection``. When a
+    ``rate_limiter`` is provided, each client message is checked against the
+    per-client limit and an error is returned (never dropped) on overflow.
     """
     registry = transport.registry
     client_id = transport.on_connect(connection)
@@ -815,6 +1065,21 @@ async def ws_handler(connection, transport: BaseTransport, broker: RedisBroker =
             raw = await transport.receive(connection)
             if raw is None:
                 break
+            if rate_limiter is not None:
+                allowed, _ = rate_limiter.allow(client_id)
+                if not allowed:
+                    await transport.send_message(
+                        client_id,
+                        build_message(
+                            "system",
+                            {
+                                "error": "rate limit exceeded",
+                                "limit": rate_limiter.limit,
+                                "window_seconds": RATE_LIMIT_WINDOW,
+                            },
+                        ),
+                    )
+                    continue
             try:
                 data = json.loads(raw)
             except (json.JSONDecodeError, TypeError):
@@ -972,6 +1237,34 @@ class HealthHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(
                 200, json.dumps({"messages": messages, "limit": limit, "offset": offset})
             )
+        elif path == "/history":
+            query = urllib.parse.parse_qs(split.query)
+            channel = query.get("channel", [None])[0] or None
+            since = query.get("since", [None])[0] or None
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except (ValueError, IndexError):
+                limit = 50
+            try:
+                offset = int(query.get("offset", ["0"])[0])
+            except (ValueError, IndexError):
+                offset = 0
+            messages, has_more = self.store.list_history(
+                channel=channel, since=since, limit=limit, offset=offset
+            )
+            self.send_json(
+                200,
+                json.dumps(
+                    {
+                        "messages": messages,
+                        "has_more": has_more,
+                        "limit": limit,
+                        "offset": offset,
+                        "channel": channel,
+                        "since": since,
+                    }
+                ),
+            )
         else:
             self.send_response(404)
             self.end_headers()
@@ -986,6 +1279,25 @@ class HealthHandler(http.server.BaseHTTPRequestHandler):
 
     def log_message(self, *args):
         pass
+
+
+async def ttl_cleanup_loop(store: MessageStore, ttl_days: int,
+                           interval: int = 3600) -> None:
+    """Background task deleting expired messages.
+
+    Runs an immediate cleanup pass, then re-runs every ``interval`` seconds.
+    Exceptions are swallowed so the loop keeps running.
+    """
+    while True:
+        try:
+            if store is not None:
+                store.delete_older_than(ttl_days)
+        except Exception:
+            pass
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            break
 
 
 def start_health_server(registry, store=None, host: str = HTTP_HOST, port: int = HTTP_PORT):
@@ -1007,6 +1319,8 @@ async def make_server(
     redis_url: str = None,
     db_path: str = None,
     transport: str = None,
+    rate_limit: int = None,
+    message_ttl_days: int = None,
 ) -> dict:
     """Create a running notification server for programmatic use/tests.
 
@@ -1027,11 +1341,24 @@ async def make_server(
     subscriber_task = None
     if broker.available:
         subscriber_task = asyncio.get_event_loop().create_task(broker.subscribe_loop())
+    ttl_days = resolve_ttl_days(message_ttl_days)
+    ttl_task = None
+    if ttl_days > 0:
+        store.delete_older_than(ttl_days)
+        ttl_task = asyncio.get_event_loop().create_task(
+            ttl_cleanup_loop(store, ttl_days)
+        )
+    rate_limiter = RateLimiter(limit=rate_limit, redis_url=redis_url)
+    rate_limiter.connect()
     httpd = start_health_server(registry, store=store, host=http_host, port=http_port)
     transport_obj = get_transport(transport, registry=registry)
     registry.set_transport(transport_obj)
     ws_server = await transport_obj.serve(
-        ws_host, ws_port, lambda connection: ws_handler(connection, transport_obj, broker)
+        ws_host,
+        ws_port,
+        lambda connection: ws_handler(
+            connection, transport_obj, broker, rate_limiter=rate_limiter
+        ),
     )
     return {
         "registry": registry,
@@ -1043,6 +1370,9 @@ async def make_server(
         "broker": broker,
         "state_store": state_store,
         "subscriber_task": subscriber_task,
+        "ttl_task": ttl_task,
+        "ttl_days": ttl_days,
+        "rate_limiter": rate_limiter,
         "transport": transport_obj,
     }
 
@@ -1055,6 +1385,13 @@ async def close_server(server: dict) -> None:
         subscriber_task.cancel()
         try:
             await subscriber_task
+        except (asyncio.CancelledError, Exception):
+            pass
+    ttl_task = server.get("ttl_task")
+    if ttl_task is not None:
+        ttl_task.cancel()
+        try:
+            await ttl_task
         except (asyncio.CancelledError, Exception):
             pass
     if broker is not None:
@@ -1071,6 +1408,9 @@ async def close_server(server: dict) -> None:
     store = server.get("store")
     if store is not None:
         store.close()
+    rate_limiter = server.get("rate_limiter")
+    if rate_limiter is not None:
+        rate_limiter.close()
 
 
 async def main() -> None:
