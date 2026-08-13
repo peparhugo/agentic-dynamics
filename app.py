@@ -1,128 +1,209 @@
 """
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+WebSocket-based notification server.
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
+Features:
+- Accept WebSocket connections and assign unique IDs
+- Broadcast messages to all connected clients
+- Handle client disconnections
+- REST endpoint for health status
+- Thread-safe client registry
 """
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
+import asyncio
+import json
+import uuid
+from datetime import datetime, timezone
+from typing import Dict, Any
+import threading
 
-app = Flask(__name__)
-
-DATABASE = os.environ.get("DATABASE", "todos.db")
-
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+from aiohttp import web
+import websockets
+from websockets import ConnectionClosed
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
+class ClientRegistry:
+    """Thread-safe registry of connected clients."""
+
+    def __init__(self):
+        self._clients: Dict[str, Any] = {}
+        self._lock = threading.RLock()
+
+    def register(self, client_id: str, websocket: Any) -> None:
+        """Register a new client."""
+        with self._lock:
+            self._clients[client_id] = websocket
+
+    def unregister(self, client_id: str) -> None:
+        """Unregister a client."""
+        with self._lock:
+            self._clients.pop(client_id, None)
+
+    def get_client(self, client_id: str) -> Any | None:
+        """Get a specific client."""
+        with self._lock:
+            return self._clients.get(client_id)
+
+    def get_all_clients(self) -> Dict[str, Any]:
+        """Get all connected clients."""
+        with self._lock:
+            return dict(self._clients)
+
+    def get_count(self) -> int:
+        """Get the number of connected clients."""
+        with self._lock:
+            return len(self._clients)
 
 
-# ── Models ────────────────────────────────────────────────────
+class NotificationServer:
+    """WebSocket notification server."""
 
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
-            (title, now),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
+    def __init__(self, host: str = "localhost", ws_port: int = 8765, http_port: int = 8080):
+        self.host = host
+        self.ws_port = ws_port
+        self.http_port = http_port
+        self.registry = ClientRegistry()
+        self.http_app = web.Application()
+        self._setup_http_routes()
+
+    def _setup_http_routes(self) -> None:
+        """Setup HTTP REST routes."""
+        self.http_app.router.add_get("/health", self._health_handler)
+
+    async def _health_handler(self, request: web.Request) -> web.Response:
+        """Health check endpoint."""
+        return web.json_response({
+            "status": "healthy",
+            "connected_clients": self.registry.get_count(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def _handle_client(self, websocket: Any, path: str) -> None:
+        """Handle a new WebSocket client connection."""
+        client_id = str(uuid.uuid4())
+        self.registry.register(client_id, websocket)
+
+        try:
+            # Send welcome message
+            welcome = {
+                "type": "system",
+                "payload": {
+                    "message": "Connected",
+                    "client_id": client_id,
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            await websocket.send(json.dumps(welcome))
+
+            # Broadcast connection event
+            await self.broadcast({
+                "type": "system",
+                "payload": {
+                    "message": f"Client {client_id} connected",
+                    "client_count": self.registry.get_count(),
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }, exclude=client_id)
+
+            # Handle incoming messages
+            async for message in websocket:
+                await self._handle_message(client_id, message)
+
+        except ConnectionClosed:
+            pass
+        finally:
+            self.registry.unregister(client_id)
+
+            # Broadcast disconnection event
+            await self.broadcast({
+                "type": "system",
+                "payload": {
+                    "message": f"Client {client_id} disconnected",
+                    "client_count": self.registry.get_count(),
+                },
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+
+    async def _handle_message(self, client_id: str, raw_message: str) -> None:
+        """Handle an incoming message from a client."""
+        try:
+            message = json.loads(raw_message)
+            msg_type = message.get("type")
+
+            if msg_type == "broadcast":
+                await self.broadcast({
+                    "type": "broadcast",
+                    "payload": message.get("payload", {}),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }, exclude=client_id)
+
+            elif msg_type == "direct":
+                target_id = message.get("payload", {}).get("target_id")
+                if target_id:
+                    await self.send_direct(target_id, {
+                        "type": "direct",
+                        "payload": {
+                            "from": client_id,
+                            "message": message.get("payload", {}).get("message"),
+                        },
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    })
+
+        except json.JSONDecodeError:
+            pass
+
+    async def broadcast(self, message: dict, exclude: str | None = None) -> None:
+        """Broadcast a message to all connected clients."""
+        clients = self.registry.get_all_clients()
+        if not clients:
+            return
+
+        message_json = json.dumps(message)
+        tasks = []
+
+        for client_id, websocket in clients.items():
+            if exclude and client_id == exclude:
+                continue
+            tasks.append(self._send_safe(websocket, message_json))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def send_direct(self, client_id: str, message: dict) -> None:
+        """Send a direct message to a specific client."""
+        client = self.registry.get_client(client_id)
+        if client:
+            await self._send_safe(client, json.dumps(message))
+
+    async def _send_safe(self, websocket: Any, message: str) -> None:
+        """Safely send a message, handling closed connections."""
+        try:
+            await websocket.send(message)
+        except ConnectionClosed:
+            pass
+
+    async def start(self) -> None:
+        """Start both WebSocket and HTTP servers."""
+        # Start WebSocket server
+        ws_server = await websockets.serve(self._handle_client, self.host, self.ws_port)
+
+        # Start HTTP server
+        runner = web.AppRunner(self.http_app)
+        await runner.setup()
+        site = web.TCPSite(runner, self.host, self.http_port)
+        await site.start()
+
+        print(f"WebSocket server running on ws://{self.host}:{self.ws_port}")
+        print(f"HTTP server running on http://{self.host}:{self.http_port}")
+
+        return ws_server, runner
 
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
-
-
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
-def list_tasks():
-    return jsonify(get_tasks())
-
-
-@app.route("/tasks", methods=["POST"])
-def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
-
-
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+async def main():
+    """Run the notification server."""
+    server = NotificationServer(host="0.0.0.0", ws_port=8765, http_port=8080)
+    await server.start()
+    await asyncio.Future()  # Run forever
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    asyncio.run(main())
