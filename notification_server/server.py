@@ -6,8 +6,14 @@
 - Cleans up the client registry on disconnect.
 - Exposes GET /health (plain HTTP, served via the websockets handshake hook)
   returning the number of currently connected clients.
-- Persists an audit trail of every event to a flat JSON-Lines file — no
-  database is used anywhere in this service.
+- Persists an audit trail of every event to a flat JSON-Lines file, and a
+  queryable history of every message to SQLite (GET /messages).
+- Uses Redis pub/sub as the message-distribution backbone: every outgoing
+  message is published to a shared channel, and a background worker task
+  relays messages arriving from other server instances to locally connected
+  clients. This lets multiple server processes share one backbone. Client
+  connection presence is also mirrored into Redis so it is visible across
+  instances and survives an individual server restart.
 """
 
 import argparse
@@ -15,13 +21,17 @@ import asyncio
 import json
 import logging
 import re
+import uuid
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import websockets
 from websockets.datastructures import Headers
 from websockets.http11 import Response
 
+from .db import DEFAULT_DB_PATH, MessageStore, resolve_database_path
 from .messages import MessageError, encode, make_message, now_iso, parse_client_message
+from .redis_backend import RedisBackend, make_redis_client
 from .registry import ChannelRegistry, ClientRegistry
 from .storage import FlatFileStorage
 
@@ -33,18 +43,32 @@ CHANNEL_SUBSCRIBERS_PATH_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 
 class NotificationServer:
-    def __init__(self, host="localhost", port=8765, storage_path=DEFAULT_DATA_PATH):
+    def __init__(
+        self,
+        host="localhost",
+        port=8765,
+        storage_path=DEFAULT_DATA_PATH,
+        database_url=None,
+        redis_url=None,
+        redis_client=None,
+    ):
         self.host = host
         self.port = port
+        self.server_id = str(uuid.uuid4())
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
         self.storage = FlatFileStorage(storage_path)
+        self.messages = MessageStore(resolve_database_path(database_url))
+        self._owns_redis_client = redis_client is None
+        self.redis = RedisBackend(redis_client or make_redis_client(redis_url))
+        self._redis_worker_task = None
         self._server = None
 
     # ── connection lifecycle ────────────────────────────────────
 
     async def handler(self, websocket):
         client_id = self.registry.add(websocket)
+        await self.redis.register_client(client_id, self.server_id)
         self.storage.append_event(
             {"event": "connect", "client_id": client_id, "timestamp": now_iso()}
         )
@@ -58,6 +82,7 @@ class NotificationServer:
         finally:
             self.registry.remove(client_id)
             self.channels.unsubscribe_all(client_id)
+            await self.redis.unregister_client(client_id)
             self.storage.append_event(
                 {"event": "disconnect", "client_id": client_id, "timestamp": now_iso()}
             )
@@ -72,15 +97,17 @@ class NotificationServer:
 
         msg_type = data["type"]
         payload = data["payload"]
+        timestamp = now_iso()
         self.storage.append_event(
             {
                 "event": "message",
                 "type": msg_type,
                 "from": client_id,
                 "payload": payload,
-                "timestamp": now_iso(),
+                "timestamp": timestamp,
             }
         )
+        self.messages.save_message(msg_type, payload, timestamp, channel=payload.get("channel"))
 
         if msg_type == "broadcast":
             await self.broadcast(payload, sender_id=client_id)
@@ -122,6 +149,19 @@ class NotificationServer:
         await self._safe_send(websocket, encode(ack))
 
     # ── message delivery ────────────────────────────────────────
+    #
+    # Delivery to clients connected to *this* process happens directly
+    # against the local registry, same as before. Every outgoing message is
+    # additionally published to Redis so the worker loop in every other
+    # server instance sharing the same backbone can relay it to clients
+    # connected there.
+
+    def _local_broadcast_targets(self, channel):
+        if channel is not None:
+            subscriber_ids = self.channels.subscribers(channel)
+            all_clients = self.registry.all()
+            return {cid: ws for cid, ws in all_clients.items() if cid in subscriber_ids}
+        return self.registry.all()
 
     async def broadcast(self, payload, sender_id=None):
         body = dict(payload)
@@ -130,24 +170,47 @@ class NotificationServer:
         message = make_message("broadcast", body)
         data = encode(message)
         channel = payload.get("channel")
-        if channel is not None:
-            subscriber_ids = self.channels.subscribers(channel)
-            all_clients = self.registry.all()
-            clients = {cid: ws for cid, ws in all_clients.items() if cid in subscriber_ids}
-        else:
-            clients = self.registry.all()
+        clients = self._local_broadcast_targets(channel)
         if clients:
             await asyncio.gather(*(self._safe_send(ws, data) for ws in clients.values()))
+        await self.redis.publish(
+            {
+                "origin_server_id": self.server_id,
+                "kind": "broadcast",
+                "channel": channel,
+                "message": message,
+            }
+        )
         return message
 
     async def send_direct(self, target_id, content, sender_id=None) -> bool:
-        websocket = self.registry.get(target_id)
-        if websocket is None:
-            return False
         message = make_message(
             "direct", {"content": content, "sender_id": sender_id, "target_id": target_id}
         )
-        await self._safe_send(websocket, encode(message))
+        websocket = self.registry.get(target_id)
+        if websocket is not None:
+            await self._safe_send(websocket, encode(message))
+            await self.redis.publish(
+                {
+                    "origin_server_id": self.server_id,
+                    "kind": "direct",
+                    "target_id": target_id,
+                    "message": message,
+                }
+            )
+            return True
+
+        remote_server_id = await self.redis.get_client_server(target_id)
+        if remote_server_id is None:
+            return False
+        await self.redis.publish(
+            {
+                "origin_server_id": self.server_id,
+                "kind": "direct",
+                "target_id": target_id,
+                "message": message,
+            }
+        )
         return True
 
     async def send_system(self, target_id, payload) -> bool:
@@ -165,10 +228,39 @@ class NotificationServer:
         except websockets.exceptions.ConnectionClosed:
             pass
 
-    # ── REST: GET /health, /channels, /channels/{name}/subscribers ─
+    # ── redis worker: relay messages published by other instances ──
+
+    async def _redis_worker_loop(self):
+        try:
+            async for envelope in self.redis.listen():
+                if envelope.get("origin_server_id") == self.server_id:
+                    continue
+                await self._deliver_remote_envelope(envelope)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("redis worker loop crashed")
+
+    async def _deliver_remote_envelope(self, envelope):
+        message = envelope.get("message")
+        if message is None:
+            return
+        data = encode(message)
+        kind = envelope.get("kind")
+        if kind == "broadcast":
+            clients = self._local_broadcast_targets(envelope.get("channel"))
+            if clients:
+                await asyncio.gather(*(self._safe_send(ws, data) for ws in clients.values()))
+        elif kind == "direct":
+            websocket = self.registry.get(envelope.get("target_id"))
+            if websocket is not None:
+                await self._safe_send(websocket, data)
+
+    # ── REST: GET /health, /channels, /channels/{name}/subscribers, /messages
 
     def process_request(self, connection, request):
-        path = request.path
+        parsed = urlsplit(request.path)
+        path = parsed.path
         if path == "/health":
             return self._json_response({"connected_clients": self.registry.count()})
         if path == "/channels":
@@ -178,6 +270,12 @@ class NotificationServer:
                 for name, subs in sorted(channels.items())
             ]
             return self._json_response({"channels": data})
+        if path == "/messages":
+            query = parse_qs(parsed.query)
+            limit = int(query.get("limit", ["50"])[0])
+            offset = int(query.get("offset", ["0"])[0])
+            messages = self.messages.list_messages(limit=limit, offset=offset)
+            return self._json_response({"messages": messages, "limit": limit, "offset": offset})
         match = CHANNEL_SUBSCRIBERS_PATH_RE.match(path)
         if match:
             channel = match.group(1)
@@ -199,6 +297,10 @@ class NotificationServer:
     # ── run/serve ────────────────────────────────────────────────
 
     async def start(self):
+        # Subscribe before accepting connections so no published message can
+        # be missed by this instance's worker loop.
+        await self.redis.subscribe()
+        self._redis_worker_task = asyncio.create_task(self._redis_worker_loop())
         self._server = await websockets.serve(
             self.handler,
             self.host,
@@ -213,6 +315,14 @@ class NotificationServer:
             self._server.close()
             await self._server.wait_closed()
             self._server = None
+        if self._redis_worker_task is not None:
+            self._redis_worker_task.cancel()
+            try:
+                await self._redis_worker_task
+            except asyncio.CancelledError:
+                pass
+            self._redis_worker_task = None
+        await self.redis.close(close_client=self._owns_redis_client)
 
     async def serve_forever(self):
         await self.start()
@@ -224,10 +334,18 @@ def main():
     parser.add_argument("--host", default="localhost")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--data", default=str(DEFAULT_DATA_PATH))
+    parser.add_argument("--database-url", default=None, help="defaults to $DATABASE_URL")
+    parser.add_argument("--redis-url", default=None, help="defaults to $REDIS_URL")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    server = NotificationServer(host=args.host, port=args.port, storage_path=args.data)
+    server = NotificationServer(
+        host=args.host,
+        port=args.port,
+        storage_path=args.data,
+        database_url=args.database_url,
+        redis_url=args.redis_url,
+    )
     asyncio.run(server.serve_forever())
 
 

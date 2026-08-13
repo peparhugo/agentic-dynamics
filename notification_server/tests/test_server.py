@@ -12,7 +12,10 @@ from notification_server.server import NotificationServer
 @pytest_asyncio.fixture
 async def running_server(tmp_path):
     server = NotificationServer(
-        host="localhost", port=0, storage_path=tmp_path / "events.jsonl"
+        host="localhost",
+        port=0,
+        storage_path=tmp_path / "events.jsonl",
+        database_url=f"sqlite:///{tmp_path / 'messages.db'}",
     )
     await server.start()
     port = server._server.sockets[0].getsockname()[1]
