@@ -14,6 +14,10 @@ Set `REDIS_URL` to the shared Redis broker (default `redis://127.0.0.1:6379/0`)
 and `DATABASE_URL` to a SQLite URL or path (default `sqlite:///messages.db`).
 Messages are persisted before being published to Redis, and each server instance
 subscribes to Redis to deliver messages to its locally connected clients.
+Set `RATE_LIMIT` to change the per-client inbound message limit (default 100 per
+minute). Redis counters enforce the limit consistently across server instances.
+Messages older than `MESSAGE_TTL_DAYS` (default 7) are removed by a background
+task started with the server.
 
 WebSocket clients connect to `ws://127.0.0.1:8765`. On connection, each client
 receives a `system` message containing its unique `payload.client_id`.
@@ -39,6 +43,11 @@ clients attached to every server instance.
 
 `GET /messages?limit=50&offset=0` returns persisted messages newest first. `limit`
 may be between 1 and 1000, and `offset` must be non-negative.
+
+`GET /history?channel=X&since=ISO_TIMESTAMP&limit=50` returns persisted messages
+for one channel at or after the timezone-aware timestamp, in chronological order.
+The response contains `messages` and a `has_more` pagination flag. `limit` defaults
+to 50 and may be between 1 and 1000.
 
 ## SOAP health API
 

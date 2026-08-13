@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from xml.etree import ElementTree
 
 import pytest
@@ -348,3 +348,115 @@ async def test_message_query_rejects_invalid_pagination(server):
     headers, body = await rest_get(server, "/messages?limit=0&offset=-1")
     assert headers.startswith(b"HTTP/1.1 400 Bad Request")
     assert "error" in json.loads(body)
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_rejects_messages_over_configured_limit(tmp_path):
+    redis_client = FakeAsyncRedis(server=FakeServer())
+    instance = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=redis_client,
+        database_url=str(tmp_path / "rate-limit.db"),
+        rate_limit=2,
+    )
+    await instance.start()
+    try:
+        async with connect(f"ws://{instance.host}:{instance.websocket_port}") as websocket:
+            await receive_json(websocket)
+            for text in ("first", "second"):
+                await websocket.send(json.dumps({
+                    "type": "broadcast", "payload": {"text": text}
+                }))
+                assert (await receive_json(websocket))["payload"]["text"] == text
+
+            await websocket.send(json.dumps({
+                "type": "broadcast", "payload": {"text": "rejected"}
+            }))
+            error = await receive_json(websocket)
+            assert error["type"] == "system"
+            assert error["payload"]["event"] == "error"
+            assert "maximum 2 messages per minute" in error["payload"]["detail"]
+
+        history = instance.messages.list(10, 0)
+        assert [item["payload"]["text"] for item in history] == ["second", "first"]
+    finally:
+        await instance.stop()
+        await redis_client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_history_filters_and_paginates_chronologically(server):
+    timestamps = (
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:01:00Z",
+        "2026-01-01T00:02:00Z",
+        "2026-01-01T00:03:00Z",
+    )
+    for index, timestamp in enumerate(timestamps):
+        server.messages.add({
+            "type": "broadcast",
+            "channel": "alerts" if index != 2 else "other",
+            "payload": {"index": index},
+            "timestamp": timestamp,
+        })
+
+    headers, body = await rest_get(
+        server, "/history?channel=alerts&since=2026-01-01T00:00:30Z&limit=1"
+    )
+    assert headers.startswith(b"HTTP/1.1 200 OK")
+    page = json.loads(body)
+    assert page["has_more"] is True
+    assert [item["payload"]["index"] for item in page["messages"]] == [1]
+
+    _, body = await rest_get(
+        server, "/history?channel=alerts&since=2026-01-01T00:01:01Z&limit=50"
+    )
+    page = json.loads(body)
+    assert page["has_more"] is False
+    assert [item["payload"]["index"] for item in page["messages"]] == [3]
+
+
+@pytest.mark.asyncio
+async def test_history_rejects_missing_or_invalid_parameters(server):
+    for path in (
+        "/history?since=2026-01-01T00:00:00Z",
+        "/history?channel=alerts&since=not-a-timestamp",
+        "/history?channel=alerts&since=2026-01-01T00:00:00&limit=0",
+    ):
+        headers, body = await rest_get(server, path)
+        assert headers.startswith(b"HTTP/1.1 400 Bad Request")
+        assert "error" in json.loads(body)
+
+
+@pytest.mark.asyncio
+async def test_startup_cleanup_removes_expired_messages(tmp_path):
+    database = str(tmp_path / "expiry.db")
+    redis_client = FakeAsyncRedis(server=FakeServer())
+    instance = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=redis_client,
+        database_url=database,
+        message_ttl_days=7,
+    )
+    instance.messages.open()
+    expired = datetime.now(timezone.utc) - timedelta(days=8)
+    current = datetime.now(timezone.utc)
+    for text, timestamp in (("expired", expired), ("current", current)):
+        instance.messages.add({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"text": text},
+            "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
+        })
+    instance.messages.close()
+
+    await instance.start()
+    try:
+        assert [item["payload"]["text"] for item in instance.messages.list(10, 0)] == [
+            "current"
+        ]
+    finally:
+        await instance.stop()
+        await redis_client.aclose()
