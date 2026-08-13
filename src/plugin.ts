@@ -7,6 +7,8 @@ export interface PluginContext {
   outputDir: string;
   templatesDir: string;
   pages: Page[];
+  cleanBuild: boolean;
+  pagesToBuild: Set<string>;
 }
 
 export interface Plugin {
@@ -24,5 +26,7 @@ export function createPluginContext(options: BuildOptions = {}): PluginContext {
     outputDir: path.resolve(options.outputDir ?? 'dist'),
     templatesDir: path.resolve(options.templatesDir ?? 'templates'),
     pages: [],
+    cleanBuild: true,
+    pagesToBuild: new Set(),
   };
 }

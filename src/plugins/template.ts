@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Handlebars from 'handlebars';
 import type { Page } from '../generator';
@@ -50,8 +50,6 @@ export class TemplatePlugin implements Plugin {
     } catch (error: unknown) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    await rm(context.outputDir, { recursive: true, force: true });
-    await mkdir(context.outputDir, { recursive: true });
   }
 
   async onFile(page: Page, context: PluginContext): Promise<void> {

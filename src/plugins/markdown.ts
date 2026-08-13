@@ -5,6 +5,8 @@ import { marked } from 'marked';
 import type { Page } from '../generator';
 import type { Plugin, PluginContext } from '../plugin';
 
+const parsedFrontmatter = new Map<string, { source: string; page: Page }>();
+
 function metadataString(value: unknown): string | undefined {
   if (typeof value === 'string') return value;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -20,14 +22,20 @@ export async function parsePages(contentDir: string): Promise<Page[]> {
   const entries = await readdir(contentDir, { withFileTypes: true });
   const files = entries.filter((entry) => entry.isFile() && /\.md$/i.test(entry.name));
   const pages = await Promise.all(files.map(async (file) => {
-    const source = await readFile(path.join(contentDir, file.name), 'utf8');
+    const sourcePath = path.join(contentDir, file.name);
+    const source = await readFile(sourcePath, 'utf8');
+    const cached = parsedFrontmatter.get(sourcePath);
+    if (cached?.source === source) {
+      // Plugins can augment pages, so do not expose the cached page object itself.
+      return { ...cached.page, tags: [...cached.page.tags], data: { ...cached.page.data } };
+    }
     const parsed = matter(source);
     const slug = path.basename(file.name, path.extname(file.name));
     const title = metadataString(parsed.data.title) ?? slug;
     const date = metadataString(parsed.data.date);
     const rawTags = parsed.data.tags;
     const tags = Array.isArray(rawTags) ? rawTags.filter((tag): tag is string => typeof tag === 'string') : [];
-    return {
+    const page = {
       slug,
       title,
       date,
@@ -36,7 +44,10 @@ export async function parsePages(contentDir: string): Promise<Page[]> {
       template: templateName(parsed.data.template),
       layout: templateName(parsed.data.layout),
       data: parsed.data,
+      sourcePath,
     };
+    parsedFrontmatter.set(sourcePath, { source, page });
+    return page;
   }));
   return pages.sort((left, right) => (right.date ?? '').localeCompare(left.date ?? ''));
 }

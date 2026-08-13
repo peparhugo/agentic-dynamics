@@ -3,7 +3,7 @@ import { buildSite } from './generator';
 import { startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <port>]';
 }
 
 async function main(argv: string[]): Promise<void> {
@@ -13,10 +13,14 @@ async function main(argv: string[]): Promise<void> {
   let outputDir: string | undefined;
   let templatesDir: string | undefined;
   let port: number | undefined;
+  let incremental = false;
+  let clean = false;
   for (let index = 1; index < argv.length; index += 1) {
     const option = argv[index];
     const value = argv[index + 1];
-    if ((option === '--content' || option === '--output' || option === '--templates' || option === '--port') && value) {
+    if (option === '--incremental') incremental = true;
+    else if (option === '--clean') clean = true;
+    else if ((option === '--content' || option === '--output' || option === '--templates' || option === '--port') && value) {
       if (option === '--content') contentDir = value;
       else if (option === '--output') outputDir = value;
       else if (option === '--templates') templatesDir = value;
@@ -31,8 +35,9 @@ async function main(argv: string[]): Promise<void> {
   }
   if (command === 'build') {
     if (port !== undefined) throw new Error(usage());
-    const pages = await buildSite({ contentDir, outputDir, templatesDir });
-    process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    let stats;
+    const pages = await buildSite({ contentDir, outputDir, templatesDir, incremental, clean, onBuildStats: (value) => { stats = value; } });
+    process.stdout.write(`Generated ${pages.length} page(s). Built ${stats?.pagesBuilt ?? 0}, skipped ${stats?.pagesSkipped ?? 0}, time saved: ${stats?.timeSaved ?? 0} page(s).\n`);
     return;
   }
   const server = await startDevServer({ contentDir, outputDir, templatesDir, port });
