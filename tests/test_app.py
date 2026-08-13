@@ -279,6 +279,76 @@ def test_user_cannot_update_other_users_task(client):
 # ── Migration ─────────────────────────────────────────────────
 
 
+# ── Notification trigger (async email on completion) ───────────
+
+
+def test_status_change_to_completed_triggers_notification(client, auth, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email, "delay", lambda *args, **kwargs: calls.append(args)
+    )
+    created = create(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert calls == [("alice", "Buy milk")]
+
+
+def test_status_change_to_non_completed_does_not_trigger_notification(client, auth, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email, "delay", lambda *args, **kwargs: calls.append(args)
+    )
+    created = create(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "done"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert calls == []
+
+
+def test_title_only_update_does_not_trigger_notification(client, auth, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email, "delay", lambda *args, **kwargs: calls.append(args)
+    )
+    created = create(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"title": "Buy oat milk"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert calls == []
+
+
+def test_already_completed_task_does_not_retrigger_notification(client, auth, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        app_module.send_notification_email, "delay", lambda *args, **kwargs: calls.append(args)
+    )
+    created = create(client, auth, "Buy milk").get_json()
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert calls == [("alice", "Buy milk")]
+
+
+def test_completed_update_response_unaffected_by_notification(client, auth, monkeypatch):
+    monkeypatch.setattr(
+        app_module.send_notification_email, "delay", lambda *args, **kwargs: None
+    )
+    created = create(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["status"] == "completed"
+    assert data["title"] == "Buy milk"
+
+
 def test_migration_adds_owner_id_to_existing_tasks_table(tmp_path):
     db_path = tmp_path / "legacy.db"
     import sqlite3

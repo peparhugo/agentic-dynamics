@@ -13,6 +13,8 @@ import sqlite3
 import os
 import jwt
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -249,6 +251,7 @@ def show_task(task_id: int):
 @token_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    previous = get_task(task_id, request.user_id)
     task = update_task(
         task_id,
         request.user_id,
@@ -257,6 +260,10 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if task["status"] == "completed" and previous["status"] != "completed":
+        owner = get_user_by_id(task["owner_id"])
+        if owner is not None:
+            send_notification_email.delay(owner["username"], task["title"])
     return jsonify(task)
 
 
