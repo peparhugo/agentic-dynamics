@@ -13,15 +13,38 @@ from .redis_registry import RedisPresence
 from .registry import ClientRegistry
 from .soap import create_soap_app
 from .store import MessageStore
+from .transport import BaseTransport
 from .ws_server import NotificationServer
+from .ws_transport import WebSocketTransport
 
 logger = logging.getLogger(__name__)
+
+TRANSPORTS: dict[str, type[BaseTransport]] = {
+    "websocket": WebSocketTransport,
+}
 
 
 def _db_path(database_url: str) -> str:
     if database_url.startswith("sqlite:///"):
         return database_url[len("sqlite:///"):]
     return database_url
+
+
+def _build_transport(name: str | None = None) -> BaseTransport:
+    """Build the configured Transport; selected by the `TRANSPORT` env var.
+
+    Defaults to `websocket`. Adding a new mechanism (SSE, polling, raw TCP,
+    ...) means writing a `BaseTransport` subclass and registering it in
+    `TRANSPORTS` here — the core `NotificationServer` needs no changes.
+    """
+    name = (name if name is not None else os.environ.get("TRANSPORT", "websocket")).lower()
+    try:
+        transport_cls = TRANSPORTS[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown transport {name!r}; expected one of {sorted(TRANSPORTS)}"
+        ) from None
+    return transport_cls()
 
 
 async def run(
@@ -31,9 +54,11 @@ async def run(
     soap_port: int = 8080,
     redis_url: str | None = None,
     database_url: str | None = None,
+    transport: BaseTransport | None = None,
 ) -> None:
     redis_url = redis_url if redis_url is not None else os.environ.get("REDIS_URL")
     database_url = database_url or os.environ.get("DATABASE_URL", "notifications.db")
+    transport = transport or _build_transport()
 
     registry = ClientRegistry()
     store = MessageStore(_db_path(database_url))
@@ -49,7 +74,9 @@ async def run(
         presence = RedisPresence(redis_client, server_id=str(uuid.uuid4()))
         logger.info("Redis pub/sub backbone enabled via %s", redis_url)
 
-    notification_server = NotificationServer(registry, broker=broker, presence=presence, store=store)
+    notification_server = NotificationServer(
+        registry, transport=transport, broker=broker, presence=presence, store=store
+    )
 
     soap_app = create_soap_app(registry, store=store)
     runner = web.AppRunner(soap_app)

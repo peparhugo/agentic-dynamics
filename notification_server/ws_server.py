@@ -1,17 +1,16 @@
-"""Async WebSocket notification server built on the `websockets` library."""
+"""Async notification server core: routing logic over a pluggable Transport."""
 from __future__ import annotations
 
-import asyncio
 import logging
 import uuid
 
-import websockets
-
 from .broker import RedisBroker
-from .messages import InvalidMessage, dumps, error_message, make_message, parse_message
+from .messages import InvalidMessage, error_message, make_message, parse_message
 from .redis_registry import RedisPresence
 from .registry import ClientRegistry
 from .store import MessageStore
+from .transport import BaseTransport
+from .ws_transport import WebSocketTransport
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,13 @@ class NotificationServer:
         self,
         registry: ClientRegistry | None = None,
         *,
+        transport: BaseTransport | None = None,
         broker: RedisBroker | None = None,
         presence: RedisPresence | None = None,
         store: MessageStore | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
+        self.transport = transport or WebSocketTransport()
         self.broker = broker
         self.presence = presence
         self.store = store
@@ -44,21 +45,21 @@ class NotificationServer:
         if self.broker is not None:
             await self.broker.stop()
 
-    async def handler(self, websocket) -> None:
+    async def handler(self, connection) -> None:
         client_id = str(uuid.uuid4())
-        self.registry.add(client_id, websocket)
+        self.registry.add(client_id, connection)
+        await self.transport.on_connect(connection)
         if self.presence is not None:
             await self.presence.add_client(client_id)
         try:
             await self._send(
-                websocket, make_message("system", {"event": "connected", "client_id": client_id})
+                connection, make_message("system", {"event": "connected", "client_id": client_id})
             )
-            async for raw in websocket:
+            async for raw in self.transport.receive(connection):
                 await self._handle_raw(client_id, raw)
-        except websockets.exceptions.ConnectionClosed:
-            pass
         finally:
             self.registry.remove(client_id)
+            await self.transport.on_disconnect(connection)
             if self.presence is not None:
                 await self.presence.remove_client(client_id)
 
@@ -104,9 +105,7 @@ class NotificationServer:
             if channel
             else self.registry.connections()
         )
-        if not targets:
-            return
-        await asyncio.gather(*(self._send(ws, outgoing) for ws in targets), return_exceptions=True)
+        await self.transport.broadcast(targets, outgoing)
 
     async def _subscribe(self, sender_id: str, message: dict) -> None:
         channel = message.get("channel")
@@ -190,12 +189,8 @@ class NotificationServer:
             outgoing["type"], outgoing["payload"], outgoing["timestamp"], outgoing.get("channel")
         )
 
-    @staticmethod
-    async def _send(websocket, message: dict) -> None:
-        try:
-            await websocket.send(dumps(message))
-        except websockets.exceptions.ConnectionClosed:
-            pass
+    async def _send(self, connection, message: dict) -> None:
+        await self.transport.send_message(connection, message)
 
     def serve(self, host: str = "localhost", port: int = 8765):
-        return websockets.serve(self.handler, host, port)
+        return self.transport.serve(self.handler, host, port)
