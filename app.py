@@ -5,6 +5,7 @@ import json
 import os
 import sqlite3
 import uuid
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any
@@ -167,15 +168,91 @@ class MessageStore:
         self.connection.close()
 
 
+class BaseTransport(ABC):
+    """Connection mechanism used by the notification server."""
+
+    @abstractmethod
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        """Register a newly connected client."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Remove a disconnected client."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> bool:
+        """Send a serialized message to one client."""
+
+    @abstractmethod
+    async def broadcast(self, message: str, recipients: list[str]) -> None:
+        """Send a serialized message to local recipients."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport."""
+
+    def __init__(self) -> None:
+        self.clients: dict[str, WebSocketServerProtocol] = {}
+        self._clients_lock = asyncio.Lock()
+
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        async with self._clients_lock:
+            self.clients[client_id] = connection
+
+    async def on_disconnect(self, client_id: str) -> None:
+        async with self._clients_lock:
+            self.clients.pop(client_id, None)
+
+    async def send_message(self, client_id: str, message: str) -> bool:
+        async with self._clients_lock:
+            websocket = self.clients.get(client_id)
+        if websocket is None:
+            return False
+        try:
+            await websocket.send(message)
+        except Exception:
+            await self.on_disconnect(client_id)
+            return False
+        return True
+
+    async def broadcast(self, message: str, recipients: list[str]) -> None:
+        for client_id in recipients:
+            await self.send_message(client_id, message)
+
+    async def client_count(self) -> int:
+        async with self._clients_lock:
+            return len(self.clients)
+
+    async def handle_connection(self, server: "NotificationServer", websocket: WebSocketServerProtocol) -> None:
+        client_id = await server.register(websocket)
+        try:
+            async for raw_message in websocket:
+                await server.handle_message(client_id, raw_message)
+        finally:
+            await server.unregister(client_id)
+
+
+def create_transport(name: str | None = None) -> BaseTransport:
+    transport_name = (name if name is not None else os.getenv("TRANSPORT", "websocket")).lower()
+    if transport_name == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"unsupported transport: {transport_name}")
+
+
 class NotificationServer:
     """Coordinates connected clients and distributes notifications through a broker."""
 
-    def __init__(self, redis_url: str | None = None, database_url: str | None = None, broker: Any = None) -> None:
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+        broker: Any = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
         self.broker = broker or (RedisBroker(redis_url) if redis_url else MemoryBroker())
         self.store = MessageStore(database_url if database_url is not None else os.getenv("DATABASE_URL"))
-        self.clients: dict[str, WebSocketServerProtocol] = {}
-        self._clients_lock = asyncio.Lock()
+        self.transport = transport or create_transport()
         self.instance_id = str(uuid.uuid4())
         self.listener: Any = None
         self.worker: asyncio.Task[None] | None = None
@@ -205,29 +282,24 @@ class NotificationServer:
                 raw_message = event["data"]
             message = json.loads(raw_message)
             recipients = message.get("recipients")
-            async with self._clients_lock:
-                local = set(self.clients)
-            for client_id in recipients:
-                if client_id in local:
-                    await self._send_serialized(client_id, message["message"])
+            await self.transport.broadcast(message["message"], recipients)
 
-    async def register(self, websocket: WebSocketServerProtocol) -> str:
+    async def register(self, connection: Any) -> str:
         await self.start()
         client_id = str(uuid.uuid4())
-        async with self._clients_lock:
-            self.clients[client_id] = websocket
+        await self.transport.on_connect(client_id, connection)
         await self.broker.register(client_id, self.instance_id)
         await self.send(client_id, "system", {"event": "connected", "client_id": client_id}, persist=False)
         return client_id
 
     async def unregister(self, client_id: str) -> None:
-        async with self._clients_lock:
-            self.clients.pop(client_id, None)
+        await self.transport.on_disconnect(client_id)
         await self.broker.unregister(client_id)
 
     async def client_count(self) -> int:
-        async with self._clients_lock:
-            return len(self.clients)
+        if isinstance(self.transport, WebSocketTransport):
+            return await self.transport.client_count()
+        return len(await self.broker.client_members())
 
     @staticmethod
     def message(message_type: str, payload: dict[str, Any], channel: str | None = None) -> str:
@@ -237,16 +309,10 @@ class NotificationServer:
         return json.dumps(message)
 
     async def _send_serialized(self, client_id: str, message: str) -> bool:
-        async with self._clients_lock:
-            websocket = self.clients.get(client_id)
-        if websocket is None:
-            return False
-        try:
-            await websocket.send(message)
-        except Exception:
+        sent = await self.transport.send_message(client_id, message)
+        if not sent:
             await self.unregister(client_id)
-            return False
-        return True
+        return sent
 
     async def send(self, client_id: str, message_type: str, payload: dict[str, Any], channel: str | None = None, persist: bool = True) -> bool:
         message = self.message(message_type, payload, channel)
@@ -280,12 +346,9 @@ class NotificationServer:
         return await self.broker.channel_members(channel)
 
     async def websocket_handler(self, websocket: WebSocketServerProtocol) -> None:
-        client_id = await self.register(websocket)
-        try:
-            async for raw_message in websocket:
-                await self.handle_message(client_id, raw_message)
-        finally:
-            await self.unregister(client_id)
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("websocket_handler requires the websocket transport")
+        await self.transport.handle_connection(self, websocket)
 
     async def handle_message(self, sender_id: str, raw_message: str) -> None:
         try:
