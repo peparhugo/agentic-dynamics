@@ -7,11 +7,13 @@ describe('static site generator', () => {
   let directory: string;
   let content: string;
   let output: string;
+  let templates: string;
 
   beforeEach(async () => {
     directory = await mkdtemp(path.join(os.tmpdir(), 'ssg-'));
     content = path.join(directory, 'content');
     output = path.join(directory, 'site');
+    templates = path.join(directory, 'templates');
     await mkdir(content);
   });
 
@@ -34,5 +36,30 @@ describe('static site generator', () => {
     await expect(readFile(path.join(output, 'first.html'), 'utf8')).resolves.toContain('<title>First Post</title>');
     await expect(readFile(path.join(output, 'second.html'), 'utf8')).resolves.toContain('<h1>Second</h1>');
     await expect(readFile(path.join(output, 'index.html'), 'utf8')).resolves.toContain('<a href="first.html">First Post</a>');
+  });
+
+  it('renders selected page templates inside layouts with partials', async () => {
+    await mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await mkdir(path.join(templates, 'partials'));
+    await writeFile(path.join(templates, 'post.hbs'), '<article><h1>{{title}}</h1>{{{body}}}</article>');
+    await writeFile(path.join(templates, 'layouts', 'site.hbs'), '<!doctype html>{{> header}}<main>{{{body}}}</main>{{> footer}}');
+    await writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{siteName}}</header>');
+    await writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+    await writeFile(path.join(content, 'hello.md'), '---\ntitle: Hello\ntemplate: post\nlayout: site\nsiteName: Example Site\n---\nWelcome');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(readFile(path.join(output, 'hello.html'), 'utf8')).resolves.toBe('<!doctype html><header>Example Site</header><main><article><h1>Hello</h1><p>Welcome</p>\n</article></main><footer>Footer</footer>');
+  });
+
+  it('uses default page and layout templates when no frontmatter selection is given', async () => {
+    await mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await writeFile(path.join(templates, 'default.hbs'), '<section>{{title}}: {{{body}}}</section>');
+    await writeFile(path.join(templates, 'layouts', 'default.hbs'), '<html><body>{{{body}}}</body></html>');
+    await writeFile(path.join(content, 'hello.md'), '---\ntitle: Hello\n---\nWelcome');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(readFile(path.join(output, 'hello.html'), 'utf8')).resolves.toBe('<html><body><section>Hello: <p>Welcome</p>\n</section></body></html>');
   });
 });
