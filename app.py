@@ -8,9 +8,11 @@ import json
 import signal
 import threading
 import uuid
+from collections.abc import Iterable
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
+from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
@@ -21,7 +23,7 @@ from websockets.legacy.server import WebSocketServer, WebSocketServerProtocol
 
 SOAP_ENV = "http://schemas.xmlsoap.org/soap/envelope/"
 SERVICE_NS = "urn:notification-server"
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 MAX_SOAP_REQUEST_SIZE = 64 * 1024
 
 
@@ -29,11 +31,13 @@ def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def message(message_type: str, payload: dict[str, Any]) -> str:
-    return json.dumps(
-        {"type": message_type, "payload": payload, "timestamp": utc_timestamp()},
-        separators=(",", ":"),
-    )
+def message(
+    message_type: str, payload: dict[str, Any], channel: str | None = None
+) -> str:
+    data = {"type": message_type, "payload": payload, "timestamp": utc_timestamp()}
+    if channel is not None:
+        data["channel"] = channel
+    return json.dumps(data, separators=(",", ":"))
 
 
 class ClientRegistry:
@@ -41,6 +45,7 @@ class ClientRegistry:
 
     def __init__(self) -> None:
         self._clients: dict[str, WebSocketServerProtocol] = {}
+        self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
     def add(self, client: WebSocketServerProtocol) -> str:
@@ -52,6 +57,11 @@ class ClientRegistry:
     def remove(self, client_id: str) -> None:
         with self._lock:
             self._clients.pop(client_id, None)
+            for channel in list(self._channels):
+                subscribers = self._channels[channel]
+                subscribers.discard(client_id)
+                if not subscribers:
+                    del self._channels[channel]
 
     def get(self, client_id: str) -> WebSocketServerProtocol | None:
         with self._lock:
@@ -60,6 +70,40 @@ class ClientRegistry:
     def snapshot(self) -> list[tuple[str, WebSocketServerProtocol]]:
         with self._lock:
             return list(self._clients.items())
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            if client_id in self._clients:
+                self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        with self._lock:
+            subscribers = self._channels.get(channel)
+            if subscribers is None:
+                return
+            subscribers.discard(client_id)
+            if not subscribers:
+                del self._channels[channel]
+
+    def channel_snapshot(self, channel: str) -> list[tuple[str, WebSocketServerProtocol]]:
+        with self._lock:
+            return [
+                (client_id, self._clients[client_id])
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+
+    def channels(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {"name": name, "subscriber_count": len(subscribers)}
+                for name, subscribers in sorted(self._channels.items())
+                if subscribers
+            ]
+
+    def subscribers(self, channel: str) -> list[str]:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
 
     @property
     def count(self) -> int:
@@ -87,7 +131,7 @@ class NotificationServer:
         )
         try:
             self._soap_server = await asyncio.start_server(
-                self.handle_soap_connection, self.host, self.soap_port
+                self.handle_http_connection, self.host, self.soap_port
             )
         except Exception:
             self._websocket_server.close()
@@ -145,6 +189,7 @@ class NotificationServer:
 
         message_type = incoming["type"]
         payload = incoming["payload"]
+        channel = incoming.get("channel")
         if message_type == "system":
             await websocket.send(
                 message(
@@ -154,26 +199,62 @@ class NotificationServer:
             )
         elif message_type == "broadcast":
             await self.broadcast(
-                message("broadcast", {"sender_id": client_id, **payload})
+                message("broadcast", {"sender_id": client_id, **payload}, channel),
+                channel,
+            )
+        elif message_type == "direct":
+            await self._send_direct(client_id, websocket, payload, channel)
+        elif channel is None:
+            await websocket.send(
+                message(
+                    "system",
+                    {"event": "error", "detail": f"{message_type} requires channel"},
+                )
             )
         else:
-            await self._send_direct(client_id, websocket, payload)
+            if message_type == "subscribe":
+                self.clients.subscribe(client_id, channel)
+                event = "subscribed"
+            else:
+                self.clients.unsubscribe(client_id, channel)
+                event = "unsubscribed"
+            await websocket.send(message("system", {"event": event}, channel))
 
     @staticmethod
     def _validate_message(incoming: Any) -> None:
         if not isinstance(incoming, dict):
             raise ValueError("message must be a JSON object")
-        if set(incoming) != {"type", "payload", "timestamp"}:
-            raise ValueError("message must contain only type, payload, and timestamp")
+        required = {"type", "payload", "timestamp"}
+        fields = set(incoming)
+        if not required.issubset(fields) or fields - required - {"channel"}:
+            raise ValueError(
+                "message must contain type, payload, timestamp, and optional channel"
+            )
         if incoming["type"] not in SUPPORTED_TYPES:
             raise ValueError("unsupported message type")
         if not isinstance(incoming["payload"], dict):
             raise ValueError("payload must be an object")
         if not isinstance(incoming["timestamp"], str):
             raise ValueError("timestamp must be a string")
+        if "channel" in incoming and (
+            not isinstance(incoming["channel"], str) or not incoming["channel"]
+        ):
+            raise ValueError("channel must be a non-empty string")
 
-    async def broadcast(self, encoded_message: str) -> None:
-        clients = self.clients.snapshot()
+    async def broadcast(self, encoded_message: str, channel: str | None = None) -> None:
+        clients = (
+            self.clients.snapshot()
+            if channel is None
+            else self.clients.channel_snapshot(channel)
+        )
+        await self._send_to_clients(clients, encoded_message)
+
+    async def _send_to_clients(
+        self,
+        clients: Iterable[tuple[str, WebSocketServerProtocol]],
+        encoded_message: str,
+    ) -> None:
+        clients = list(clients)
         results = await asyncio.gather(
             *(client.send(encoded_message) for _, client in clients),
             return_exceptions=True,
@@ -187,6 +268,7 @@ class NotificationServer:
         sender_id: str,
         sender: WebSocketServerProtocol,
         payload: dict[str, Any],
+        channel: str | None = None,
     ) -> None:
         recipient_id = payload.get("client_id")
         if not isinstance(recipient_id, str):
@@ -203,10 +285,19 @@ class NotificationServer:
                 message("system", {"event": "error", "detail": "client not found"})
             )
             return
+        if channel is not None and recipient_id not in self.clients.subscribers(channel):
+            await sender.send(
+                message(
+                    "system",
+                    {"event": "error", "detail": "client is not subscribed to channel"},
+                    channel,
+                )
+            )
+            return
         forwarded_payload = {key: value for key, value in payload.items() if key != "client_id"}
         try:
             await recipient.send(
-                message("direct", {"sender_id": sender_id, **forwarded_payload})
+                message("direct", {"sender_id": sender_id, **forwarded_payload}, channel)
             )
         except ConnectionClosed:
             self.clients.remove(recipient_id)
@@ -214,22 +305,29 @@ class NotificationServer:
                 message("system", {"event": "error", "detail": "client disconnected"})
             )
 
-    async def handle_soap_connection(
+    async def handle_http_connection(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         try:
-            status, body = await self._soap_response(reader)
+            method, target, headers = await self._read_http_request(reader)
+            if method == "GET":
+                status, content_type, body = self._rest_response(target)
+            else:
+                status, body = await self._soap_response(reader, method, target, headers)
+                content_type = "text/xml; charset=utf-8"
         except (ValueError, asyncio.IncompleteReadError) as exc:
             status = HTTPStatus.BAD_REQUEST
+            content_type = "text/xml; charset=utf-8"
             body = self._soap_fault("Client", str(exc))
         except Exception:
             status = HTTPStatus.INTERNAL_SERVER_ERROR
+            content_type = "text/xml; charset=utf-8"
             body = self._soap_fault("Server", "Internal server error")
 
         encoded_body = body.encode("utf-8")
         writer.write(
             f"HTTP/1.1 {status.value} {status.phrase}\r\n"
-            "Content-Type: text/xml; charset=utf-8\r\n"
+            f"Content-Type: {content_type}\r\n"
             f"Content-Length: {len(encoded_body)}\r\n"
             "Connection: close\r\n\r\n".encode("ascii")
             + encoded_body
@@ -238,13 +336,14 @@ class NotificationServer:
         writer.close()
         await writer.wait_closed()
 
-    async def _soap_response(
-        self, reader: asyncio.StreamReader
-    ) -> tuple[HTTPStatus, str]:
+    @staticmethod
+    async def _read_http_request(
+        reader: asyncio.StreamReader,
+    ) -> tuple[str, str, dict[str, str]]:
         request_line = (await reader.readline()).decode("ascii").strip()
         parts = request_line.split()
-        if len(parts) != 3 or parts[0] != "POST" or parts[1] != "/soap":
-            raise ValueError("SOAP requests must use POST /soap")
+        if len(parts) != 3:
+            raise ValueError("malformed HTTP request line")
 
         headers: dict[str, str] = {}
         while True:
@@ -255,6 +354,17 @@ class NotificationServer:
             if not separator:
                 raise ValueError("malformed HTTP header")
             headers[name.lower().strip()] = value.strip()
+        return parts[0], parts[1], headers
+
+    async def _soap_response(
+        self,
+        reader: asyncio.StreamReader,
+        method: str,
+        target: str,
+        headers: dict[str, str],
+    ) -> tuple[HTTPStatus, str]:
+        if method != "POST" or urlsplit(target).path != "/soap":
+            raise ValueError("SOAP requests must use POST /soap")
 
         try:
             content_length = int(headers["content-length"])
@@ -280,6 +390,30 @@ class NotificationServer:
             "</ns:GetHealthResponse></soap:Body></soap:Envelope>"
         )
         return HTTPStatus.OK, response
+
+    def _rest_response(self, target: str) -> tuple[HTTPStatus, str, str]:
+        path = urlsplit(target).path
+        if path == "/channels":
+            body: dict[str, Any] = {"channels": self.clients.channels()}
+            status = HTTPStatus.OK
+        elif path.startswith("/channels/") and path.endswith("/subscribers"):
+            encoded_name = path[len("/channels/") : -len("/subscribers")].rstrip("/")
+            name = unquote(encoded_name)
+            if not name or "/" in name:
+                return self._json_error(HTTPStatus.NOT_FOUND, "endpoint not found")
+            body = {"channel": name, "subscribers": self.clients.subscribers(name)}
+            status = HTTPStatus.OK
+        else:
+            return self._json_error(HTTPStatus.NOT_FOUND, "endpoint not found")
+        return status, "application/json; charset=utf-8", json.dumps(body, separators=(",", ":"))
+
+    @staticmethod
+    def _json_error(status: HTTPStatus, detail: str) -> tuple[HTTPStatus, str, str]:
+        return (
+            status,
+            "application/json; charset=utf-8",
+            json.dumps({"error": detail}, separators=(",", ":")),
+        )
 
     @staticmethod
     def _soap_fault(code: str, detail: str) -> str:

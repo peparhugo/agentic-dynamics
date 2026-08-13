@@ -17,9 +17,18 @@ after connecting. Every WebSocket message has this exact shape:
 {"type":"broadcast","payload":{"text":"hello"},"timestamp":"2026-08-13T12:00:00Z"}
 ```
 
-Supported types are `broadcast`, `direct`, and `system`. A direct message must
+Supported types are `broadcast`, `direct`, `subscribe`, `unsubscribe`, and
+`system`. A direct message must
 include the destination as `payload.client_id`. Clients cannot originate
 `system` messages.
+
+Add a top-level `channel` field to `subscribe` and `unsubscribe` messages to
+change a connection's subscriptions. A `broadcast` or `direct` message with a
+`channel` is delivered only to subscribers of that channel. Messages without a
+channel retain their original behavior.
+
+The HTTP port also exposes `GET /channels` and
+`GET /channels/{name}/subscribers` as JSON endpoints.
 
 ## SOAP Health API
 

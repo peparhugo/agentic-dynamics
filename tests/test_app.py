@@ -55,6 +55,30 @@ async def soap_request(server, xml):
     return headers.decode(), response_body
 
 
+async def get_request(server, path):
+    reader, writer = await asyncio.open_connection(
+        "127.0.0.1", server.bound_soap_port
+    )
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\n\r\n".encode())
+    await writer.drain()
+    response = await reader.read()
+    writer.close()
+    await writer.wait_closed()
+    headers, response_body = response.split(b"\r\n\r\n", 1)
+    return headers.decode(), json.loads(response_body)
+
+
+async def send_message(socket, message_type, payload=None, channel=None):
+    outgoing = {
+        "type": message_type,
+        "payload": payload or {},
+        "timestamp": "client-time",
+    }
+    if channel is not None:
+        outgoing["channel"] = channel
+    await socket.send(json.dumps(outgoing))
+
+
 def envelope(operation="GetHealth"):
     return (
         f'<soap:Envelope xmlns:soap="{SOAP_ENV}" xmlns:ns="{SERVICE_NS}">'
@@ -151,6 +175,110 @@ async def test_missing_direct_recipient_returns_error(server):
     response = json.loads(await socket.recv())
     assert response["type"] == "system"
     assert response["payload"]["detail"] == "client not found"
+    await socket.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_only_reaches_subscribers(server):
+    sender, sender_greeting = await connect(server)
+    subscriber, _ = await connect(server)
+    outsider, _ = await connect(server)
+    await send_message(sender, "subscribe", channel="alerts")
+    await send_message(subscriber, "subscribe", channel="alerts")
+    for socket in (sender, subscriber):
+        acknowledgement = json.loads(await socket.recv())
+        assert acknowledgement["payload"]["event"] == "subscribed"
+
+    await send_message(sender, "broadcast", {"text": "warning"}, "alerts")
+    for socket in (sender, subscriber):
+        received = json.loads(await socket.recv())
+        assert_message_shape({key: received[key] for key in ("type", "payload", "timestamp")}, "broadcast")
+        assert received["channel"] == "alerts"
+        assert received["payload"] == {
+            "sender_id": sender_greeting["payload"]["client_id"],
+            "text": "warning",
+        }
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(outsider.recv(), timeout=0.05)
+    await asyncio.gather(sender.close(), subscriber.close(), outsider.close())
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_and_multiple_channel_memberships(server):
+    socket, _ = await connect(server)
+    for channel in ("alerts", "chat"):
+        await send_message(socket, "subscribe", channel=channel)
+        await socket.recv()
+
+    headers, body = await get_request(server, "/channels")
+    assert headers.startswith("HTTP/1.1 200 OK")
+    assert body == {"channels": [
+        {"name": "alerts", "subscriber_count": 1},
+        {"name": "chat", "subscriber_count": 1},
+    ]}
+
+    await send_message(socket, "unsubscribe", channel="alerts")
+    acknowledgement = json.loads(await socket.recv())
+    assert acknowledgement["payload"]["event"] == "unsubscribed"
+    _, body = await get_request(server, "/channels")
+    assert body == {"channels": [{"name": "chat", "subscriber_count": 1}]}
+    await socket.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint_and_disconnect_cleanup(server):
+    first, first_greeting = await connect(server)
+    second, second_greeting = await connect(server)
+    for socket in (first, second):
+        await send_message(socket, "subscribe", channel="system status")
+        await socket.recv()
+
+    headers, body = await get_request(server, "/channels/system%20status/subscribers")
+    assert headers.startswith("HTTP/1.1 200 OK")
+    assert body["channel"] == "system status"
+    assert body["subscribers"] == sorted([
+        first_greeting["payload"]["client_id"],
+        second_greeting["payload"]["client_id"],
+    ])
+
+    await first.close()
+    for _ in range(20):
+        _, body = await get_request(server, "/channels/system%20status/subscribers")
+        if len(body["subscribers"]) == 1:
+            break
+        await asyncio.sleep(0.01)
+    assert body["subscribers"] == [second_greeting["payload"]["client_id"]]
+    await second.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_without_channel_still_broadcast_to_all(server):
+    first, _ = await connect(server)
+    second, _ = await connect(server)
+    await send_message(first, "subscribe", channel="alerts")
+    await first.recv()
+    await send_message(second, "broadcast", {"text": "global"})
+    first_received, second_received = await asyncio.gather(first.recv(), second.recv())
+    assert json.loads(first_received)["payload"]["text"] == "global"
+    assert json.loads(second_received)["payload"]["text"] == "global"
+    await asyncio.gather(first.close(), second.close())
+
+
+@pytest.mark.asyncio
+async def test_subscription_requires_valid_channel(server):
+    socket, _ = await connect(server)
+    await send_message(socket, "subscribe")
+    response = json.loads(await socket.recv())
+    assert response["payload"]["detail"] == "subscribe requires channel"
+
+    await socket.send(json.dumps({
+        "type": "subscribe",
+        "payload": {},
+        "timestamp": "now",
+        "channel": "",
+    }))
+    response = json.loads(await socket.recv())
+    assert response["payload"]["detail"] == "channel must be a non-empty string"
     await socket.close()
 
 
