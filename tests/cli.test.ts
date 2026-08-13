@@ -28,4 +28,24 @@ describe('CLI', () => {
     await expect(run(['build', '--content'])).rejects.toThrow('Missing value for --content');
     await expect(run(['build', '--port', '80'])).rejects.toThrow('Unknown option: --port');
   });
+
+  test('accepts a custom templates directory', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const content = path.join(root, 'posts');
+    const output = path.join(root, 'web');
+    const templates = path.join(root, 'views');
+    const stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'post.md'), 'Custom');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{content}}}</main>');
+
+    try {
+      await run(['build', '--content', content, '--output', output, '--templates', templates]);
+      await expect(fs.readFile(path.join(output, 'post.html'), 'utf8')).resolves.toBe('<main><p>Custom</p></main>');
+    } finally {
+      stdout.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });

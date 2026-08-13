@@ -1,6 +1,6 @@
 # ssg
 
-A strict TypeScript CLI that turns Markdown files into a static HTML site. Frontmatter supports `title`, `date`, and `tags`.
+A strict TypeScript CLI that turns Markdown files into a static HTML site. Frontmatter supports `title`, `date`, `tags`, `template`, and `layout`.
 
 ## Usage
 
@@ -15,6 +15,18 @@ The default input directory is `./content` and the default output directory is `
 ```sh
 npx ssg build --content ./posts --output ./public
 ```
+
+Templates are Handlebars files under `./templates`. Use `default.hbs` as the default page template, `layouts/default.hbs` as the default layout, and reusable partials from `partials/*.hbs`. The rendered Markdown is available as `{{{content}}}` in page templates, and rendered page output is available as `{{{body}}}` in layouts.
+
+```yaml
+---
+title: About
+template: page
+layout: main
+---
+```
+
+Template and layout names may include or omit `.hbs`. Select another template directory with `--templates <dir>`. Set `layout: false` to skip a default layout.
 
 Markdown files in nested directories retain their relative paths. Every page is linked from the generated `index.html`.
 

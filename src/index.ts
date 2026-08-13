@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 export interface GeneratedPage {
@@ -18,6 +20,10 @@ export interface GeneratedPage {
 
 interface Page extends GeneratedPage {
   html: string;
+}
+
+interface TemplateEngine {
+  renderPage(template: unknown, layout: unknown, context: Record<string, unknown>, fallback: string): Promise<string>;
 }
 
 function escapeHtml(value: string): string {
@@ -46,6 +52,73 @@ ${body}
 </body>
 </html>
 `;
+}
+
+async function isFile(file: string): Promise<boolean> {
+  try {
+    return (await fs.stat(file)).isFile();
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+function templatePath(directory: string, value: string): string {
+  const name = value.endsWith('.hbs') ? value : `${value}.hbs`;
+  const resolved = path.resolve(directory, name);
+  if (!isWithin(directory, resolved) || path.extname(resolved).toLowerCase() !== '.hbs') {
+    throw new Error(`Invalid template path: ${value}`);
+  }
+  return resolved;
+}
+
+async function registerPartials(handlebars: typeof Handlebars, directory: string, root = directory): Promise<void> {
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  await Promise.all(entries.map(async (entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return registerPartials(handlebars, entryPath, root);
+    if (entry.isFile() && path.extname(entry.name).toLowerCase() === '.hbs') {
+      const name = path.relative(root, entryPath).slice(0, -4).split(path.sep).join('/');
+      handlebars.registerPartial(name, await fs.readFile(entryPath, 'utf8'));
+    }
+  }));
+}
+
+async function createTemplateEngine(templatesDir: string): Promise<TemplateEngine> {
+  const handlebars = Handlebars.create();
+  const layoutsDir = path.join(templatesDir, 'layouts');
+  await registerPartials(handlebars, path.join(templatesDir, 'partials'));
+
+  const render = async (directory: string, name: string, context: Record<string, unknown>): Promise<string> => {
+    const file = templatePath(directory, name);
+    if (!await isFile(file)) throw new Error(`Template not found: ${name}`);
+    return handlebars.compile(await fs.readFile(file, 'utf8'))(context);
+  };
+
+  return {
+    async renderPage(template, layout, context, fallback) {
+      const defaultTemplate = await isFile(path.join(templatesDir, 'default.hbs'));
+      const templateName = typeof template === 'string' && template.trim() ? template.trim() : undefined;
+      if (template !== undefined && !templateName) throw new Error('Frontmatter template must be a non-empty string');
+      const page = templateName
+        ? await render(templatesDir, templateName, context)
+        : defaultTemplate ? await render(templatesDir, 'default', context) : fallback;
+
+      const defaultLayout = await isFile(path.join(layoutsDir, 'default.hbs'));
+      const layoutName = typeof layout === 'string' && layout.trim() ? layout.trim() : undefined;
+      if (layout !== undefined && layout !== false && !layoutName) {
+        throw new Error('Frontmatter layout must be a non-empty string or false');
+      }
+      if (layout === false || (!layoutName && !defaultLayout)) return page;
+      return render(layoutsDir, layoutName ?? 'default', { ...context, body: page });
+    },
+  };
 }
 
 async function markdownFiles(directory: string): Promise<string[]> {
@@ -92,10 +165,12 @@ function isWithin(parent: string, candidate: string): boolean {
 export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPage[]> {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
+  const templatesDir = path.resolve(options.templatesDir ?? './templates');
   if (isWithin(contentDir, outputDir) || isWithin(outputDir, contentDir)) {
     throw new Error('Content and output directories must not overlap');
   }
   const files = await markdownFiles(contentDir);
+  const templates = await createTemplateEngine(templatesDir);
 
   const pages = await Promise.all(files.map(async (file): Promise<Page> => {
     const source = await fs.readFile(file, 'utf8');
@@ -115,13 +190,23 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
     ].filter(Boolean).join('\n');
     const body = `${metadata}${metadata ? '\n' : ''}    <article>\n${markdownHtml.trimEnd()}\n    </article>`;
 
+    const fallback = renderDocument(title, body);
+    const context: Record<string, unknown> = {
+      ...parsed.data,
+      title,
+      date,
+      tags,
+      url,
+      content: markdownHtml.trimEnd(),
+    };
+
     return {
       title,
       date,
       tags,
       outputPath: path.join(outputDir, relativePath),
       url,
-      html: renderDocument(title, body),
+      html: await templates.renderPage(parsed.data.template, parsed.data.layout, context, fallback),
     };
   }));
 

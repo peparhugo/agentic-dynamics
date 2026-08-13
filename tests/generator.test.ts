@@ -72,6 +72,66 @@ This is **important**.
     expect(page).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
   });
 
+  test('renders an explicit template, layout, and partials', async () => {
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'));
+    await fs.writeFile(path.join(content, 'post.md'), `---
+title: Template Post
+template: article
+layout: main
+author: Ada
+---
+Hello **templates**.
+`);
+    await fs.writeFile(path.join(templates, 'article.hbs'), '<article>{{> header}}<p>{{author}}</p>{{{content}}}</article>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templates, 'layouts', 'main.hbs'), '<!doctype html><nav>{{> nav}}</nav><main>{{{body}}}</main>');
+    await fs.writeFile(path.join(templates, 'partials', 'nav.hbs'), '<a href="/">Home</a>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+    const page = await fs.readFile(path.join(output, 'post.html'), 'utf8');
+
+    expect(page).toBe('<!doctype html><nav><a href="/">Home</a></nav><main><article><header>Template Post</header><p>Ada</p><p>Hello <strong>templates</strong>.</p></article></main>');
+  });
+
+  test('uses default templates and layouts and supports layout opt-out', async () => {
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.writeFile(path.join(content, 'wrapped.md'), '---\ntitle: Wrapped\n---\nDefault');
+    await fs.writeFile(path.join(content, 'plain.md'), '---\ntitle: Plain\nlayout: false\n---\nNo layout');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section data-url="{{url}}"><h1>{{title}}</h1>{{{content}}}</section>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<html><body>{{{body}}}</body></html>');
+
+    await buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    await expect(fs.readFile(path.join(output, 'wrapped.html'), 'utf8'))
+      .resolves.toBe('<html><body><section data-url="wrapped.html"><h1>Wrapped</h1><p>Default</p></section></body></html>');
+    await expect(fs.readFile(path.join(output, 'plain.html'), 'utf8'))
+      .resolves.toBe('<section data-url="plain.html"><h1>Plain</h1><p>No layout</p></section>');
+  });
+
+  test('reports missing templates and rejects template path traversal', async () => {
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'dist');
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'post.md'), '---\ntemplate: missing\n---\nPost');
+    await expect(buildSite({ contentDir: content, outputDir: output, templatesDir: templates }))
+      .rejects.toThrow('Template not found: missing');
+
+    await fs.writeFile(path.join(content, 'post.md'), '---\ntemplate: ../outside\n---\nPost');
+    await expect(buildSite({ contentDir: content, outputDir: output, templatesDir: templates }))
+      .rejects.toThrow('Invalid template path: ../outside');
+  });
+
   test('rejects paths that could overwrite content or the generated index', async () => {
     const content = path.join(root, 'site', 'content');
     await fs.mkdir(content, { recursive: true });

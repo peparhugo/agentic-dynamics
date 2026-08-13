@@ -5,23 +5,25 @@ import { buildSite } from './index';
 interface CliOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]';
 }
 
 function parseOptions(args: string[]): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const option = args[index];
-    if (option !== '--content' && option !== '--output') {
+    if (option !== '--content' && option !== '--output' && option !== '--templates') {
       throw new Error(`Unknown option: ${option}`);
     }
     const value = args[index + 1];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${option}`);
     if (option === '--content') options.contentDir = value;
     if (option === '--output') options.outputDir = value;
+    if (option === '--templates') options.templatesDir = value;
     index += 1;
   }
   return options;
