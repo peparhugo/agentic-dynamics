@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-import { buildSite } from './generator';
+import { buildSiteWithStats } from './generator';
 import { startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--incremental] [--clean] [--port <number>]';
 }
 
-function parseArguments(arguments_: string[], allowPort = false): { contentDir?: string; outputDir?: string; port?: number } {
-  const options: { contentDir?: string; outputDir?: string; port?: number } = {};
+function parseArguments(arguments_: string[], allowPort = false): { contentDir?: string; outputDir?: string; port?: number; incremental?: boolean; clean?: boolean } {
+  const options: { contentDir?: string; outputDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
-    if (argument === '--content' || argument === '--output' || (allowPort && argument === '--port')) {
+    if (!allowPort && (argument === '--incremental' || argument === '--clean')) {
+      options[argument === '--incremental' ? 'incremental' : 'clean'] = true;
+    } else if (argument === '--content' || argument === '--output' || (allowPort && argument === '--port')) {
       const value = arguments_[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`Missing value for ${argument}`);
       if (argument === '--port') {
@@ -36,8 +38,8 @@ async function main(): Promise<void> {
     await startDevServer(options);
     return;
   }
-  const pages = await buildSite(options);
-  console.log(`Generated ${pages.length} page(s).`);
+  const { pages, stats } = await buildSiteWithStats(options);
+  console.log(`Generated ${pages.length} page(s). Pages built: ${stats.pagesBuilt}, pages skipped: ${stats.pagesSkipped}, time saved: ${stats.timeSaved} page-build(s).`);
 }
 
 main().catch((error: unknown) => {

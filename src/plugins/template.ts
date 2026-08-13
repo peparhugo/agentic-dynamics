@@ -90,6 +90,8 @@ export class TemplatePlugin implements Plugin {
     const destination = resolve(context.options.outputDir, page.outputPath);
     await mkdir(resolve(destination, '..'), { recursive: true });
     await writeFile(destination, document);
+    const cached = context.cache?.pages[page.sourcePath];
+    if (cached) cached.renderedHtml = document;
   }
 
   async afterBuild(context: PluginContext): Promise<void> {

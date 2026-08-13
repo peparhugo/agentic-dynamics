@@ -1,9 +1,14 @@
-import type { BuildOptions, Page, PageData } from './generator';
+import type { BuildOptions, CachedPage, Page, PageData } from './generator';
 
 export interface PluginContext {
   options: Required<BuildOptions>;
   pages: Page[];
   sourcePages: Array<{ page: Page; data: PageData }>;
+  cache?: {
+    pages: Record<string, CachedPage>;
+    reusableSources: Set<string>;
+    templateHash: string;
+  };
 }
 
 export interface Plugin {

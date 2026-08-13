@@ -1,9 +1,9 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { buildSite } from '../src/generator';
+import { buildSite, buildSiteWithStats } from '../src/generator';
 import { startDevServer } from '../src/server';
 
 const execFileAsync = promisify(execFile);
@@ -92,8 +92,52 @@ describe('CLI', () => {
       '--output', outputDir
     ]);
 
-    expect(stdout).toBe('Generated 1 page(s).\n');
+    expect(stdout).toBe('Generated 1 page(s). Pages built: 1, pages skipped: 0, time saved: 0 page-build(s).\n');
     await expect(readFile(join(outputDir, 'post.html'), 'utf8')).resolves.toContain('<h1>CLI page</h1>');
+  });
+});
+
+describe('incremental builds', () => {
+  it('skips unchanged pages, rebuilds changed sources, and invalidates all pages for template changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-incremental-'));
+    const contentDir = join(root, 'content');
+    const outputDir = join(root, 'public');
+    const templatesDir = join(root, 'templates');
+    await mkdir(contentDir);
+    await mkdir(templatesDir);
+    await writeFile(join(templatesDir, 'default.hbs'), '<article>{{title}}: {{{content}}}</article>');
+    const first = join(contentDir, 'first.md');
+    await writeFile(first, '---\ntitle: First\n---\nOne');
+    await writeFile(join(contentDir, 'second.md'), '---\ntitle: Second\n---\nTwo');
+
+    expect((await buildSiteWithStats({ contentDir, outputDir, templatesDir, incremental: true })).stats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSaved: 0 });
+    expect((await buildSiteWithStats({ contentDir, outputDir, templatesDir, incremental: true })).stats).toEqual({ pagesBuilt: 0, pagesSkipped: 2, timeSaved: 2 });
+
+    await writeFile(first, '---\ntitle: First\n---\nUpdated');
+    expect((await buildSiteWithStats({ contentDir, outputDir, templatesDir, incremental: true })).stats).toEqual({ pagesBuilt: 1, pagesSkipped: 1, timeSaved: 1 });
+    await expect(readFile(join(outputDir, 'first.html'), 'utf8')).resolves.toContain('Updated');
+
+    await writeFile(join(templatesDir, 'default.hbs'), '<main>{{title}}: {{{content}}}</main>');
+    expect((await buildSiteWithStats({ contentDir, outputDir, templatesDir, incremental: true })).stats).toEqual({ pagesBuilt: 2, pagesSkipped: 0, timeSaved: 0 });
+    await expect(readFile(join(outputDir, 'second.html'), 'utf8')).resolves.toContain('<main>Second');
+
+    await rm(join(contentDir, 'second.md'));
+    expect((await buildSiteWithStats({ contentDir, outputDir, templatesDir, incremental: true })).stats).toEqual({ pagesBuilt: 0, pagesSkipped: 1, timeSaved: 1 });
+    await expect(readFile(join(outputDir, 'second.html'), 'utf8')).rejects.toThrow();
+  });
+
+  it('performs a clean build when requested and writes a manifest', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-incremental-clean-'));
+    const contentDir = join(root, 'content');
+    const outputDir = join(root, 'public');
+    await mkdir(contentDir);
+    await writeFile(join(contentDir, 'page.md'), '# Page');
+
+    await buildSiteWithStats({ contentDir, outputDir, incremental: true });
+    const result = await buildSiteWithStats({ contentDir, outputDir, incremental: true, clean: true });
+
+    expect(result.stats).toEqual({ pagesBuilt: 1, pagesSkipped: 0, timeSaved: 0 });
+    await expect(readFile(join(outputDir, '.ssg-cache.json'), 'utf8')).resolves.toContain('page.md');
   });
 });
 

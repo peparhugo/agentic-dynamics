@@ -1,4 +1,5 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { relative, resolve } from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
@@ -25,7 +26,13 @@ export class MarkdownPlugin implements Plugin {
   async beforeBuild(context: PluginContext): Promise<void> {
     const files = await markdownFiles(context.options.contentDir);
     context.sourcePages = await Promise.all(files.map(async (sourcePath) => {
-      const parsed = matter(await readFile(sourcePath, 'utf8'));
+      const source = await readFile(sourcePath, 'utf8');
+      const sourceHash = createHash('sha256').update(source).digest('hex');
+      const cached = context.cache?.pages[sourcePath];
+      if (cached?.sourceHash === sourceHash) {
+        return { page: cached.page, data: cached.data };
+      }
+      const parsed = matter(source);
       const data = parsed.data as PageData;
       const outputPath = relative(context.options.contentDir, sourcePath).replace(/\.md$/i, '.html');
       const title = typeof data.title === 'string' && data.title.trim()
