@@ -165,6 +165,51 @@ def test_update_task(client, headers):
     assert response.json["created_at"] == created["created_at"]
 
 
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    headers = auth_headers(client, "alice@example.com")
+    created = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=headers
+    ).json
+    queued_notifications = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued_notifications.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued_notifications == [("alice@example.com", "Ship release")]
+
+
+@pytest.mark.parametrize("initial_status", ["completed", "done"])
+def test_notification_only_queues_on_transition_to_completed(
+    client, headers, monkeypatch, initial_status
+):
+    created = client.post("/tasks", json={"title": "One email"}, headers=headers).json
+    queued_notifications = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued_notifications.append(args),
+    )
+    client.put(
+        f"/tasks/{created['id']}", json={"status": initial_status}, headers=headers
+    )
+    queued_notifications.clear()
+
+    response = client.put(
+        f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    expected = [] if initial_status == "completed" else [("alice", "One email")]
+    assert queued_notifications == expected
+
+
 def test_update_rejects_invalid_fields(client, headers):
     created = client.post("/tasks", json={"title": "Valid"}, headers=headers).json
 
