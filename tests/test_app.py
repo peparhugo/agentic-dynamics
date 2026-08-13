@@ -234,3 +234,49 @@ async def test_messages_endpoint_returns_persisted_messages(tmp_path):
         server.close()
         await server.wait_closed()
         await app.close()
+
+
+async def test_rate_limit_rejects_messages_after_client_limit(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "1")
+    app = NotificationServer()
+    server = await serve(app.handler, "127.0.0.1", 0, process_request=app.process_request)
+    port = server.sockets[0].getsockname()[1]
+    message = {"type": "broadcast", "payload": {"text": "hello"}, "timestamp": "2026-01-01T00:00:00Z"}
+    try:
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            await websocket.send(json.dumps(message))
+            assert await receive_json(websocket) == message
+            await websocket.send(json.dumps(message))
+            error = await receive_json(websocket)
+            assert error["type"] == "system"
+            assert error["payload"] == {"error": "rate limit exceeded"}
+    finally:
+        server.close()
+        await server.wait_closed()
+        await app.close()
+
+
+async def test_history_filters_by_channel_since_and_paginates(tmp_path):
+    app = NotificationServer(database_url=str(tmp_path / "history.db"))
+    server = await serve(app.handler, "127.0.0.1", 0, process_request=app.process_request)
+    port = server.sockets[0].getsockname()[1]
+    messages = [
+        {"type": "broadcast", "channel": "alerts", "payload": {"number": 1}, "timestamp": "2026-01-01T00:00:00Z"},
+        {"type": "broadcast", "channel": "other", "payload": {"number": 2}, "timestamp": "2026-01-01T00:01:00Z"},
+        {"type": "broadcast", "channel": "alerts", "payload": {"number": 3}, "timestamp": "2026-01-01T00:02:00Z"},
+        {"type": "broadcast", "channel": "alerts", "payload": {"number": 4}, "timestamp": "2026-01-01T00:03:00Z"},
+    ]
+    try:
+        for message in messages:
+            await app.broadcast(message)
+        _, body = await get_json(port, "/history?channel=alerts&since=2026-01-01T00:01:00Z&limit=1")
+        assert body["has_more"] is True
+        assert [message["payload"]["number"] for message in body["messages"]] == [3]
+        _, body = await get_json(port, "/history?channel=alerts&since=2026-01-01T00:01:00Z&limit=1&offset=1")
+        assert body["has_more"] is False
+        assert [message["payload"]["number"] for message in body["messages"]] == [4]
+    finally:
+        server.close()
+        await server.wait_closed()
+        await app.close()
