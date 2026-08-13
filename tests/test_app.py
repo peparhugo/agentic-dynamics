@@ -176,6 +176,45 @@ async def test_messages_endpoint_persists_notifications(running_server):
         assert messages["messages"][0]["payload"] == {"text": "first"}
 
 
+async def test_rate_limit_returns_an_error_without_publishing():
+    notification_server = NotificationServer(rate_limit=2)
+    server = await notification_server.start(port=0)
+    url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(url) as connection:
+            await receive_json(connection)
+            for text in ("first", "second"):
+                await connection.send(json.dumps({"type": "broadcast", "payload": {"text": text}}))
+                assert (await receive_json(connection))["payload"]["text"] == text
+            await connection.send(json.dumps({"type": "broadcast", "payload": {"text": "third"}}))
+            assert (await receive_json(connection))["payload"] == {"error": "rate limit exceeded"}
+            assert len(notification_server.store.list(10, 0)) == 2
+    finally:
+        server.close()
+        await server.wait_closed()
+        await notification_server.stop()
+
+
+async def test_history_filters_by_channel_and_since_in_chronological_order(running_server):
+    _, url = running_server
+    async with connect(url) as connection:
+        await receive_json(connection)
+        await connection.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await connection.send(json.dumps({"type": "subscribe", "channel": "other"}))
+        for channel, text in (("alerts", "first"), ("other", "ignored"), ("alerts", "second"), ("alerts", "third")):
+            await connection.send(json.dumps({"type": "broadcast", "channel": channel, "payload": {"text": text}}))
+            await receive_json(connection)
+
+        history = await get_json(url, "/history?channel=alerts&since=1970-01-01T00:00:00%2B00:00&limit=2")
+        assert [message["payload"]["text"] for message in history["messages"]] == ["first", "second"]
+        assert history["has_more"] is True
+
+        since = history["messages"][1]["timestamp"]
+        history = await get_json(url, f"/history?channel=alerts&since={since.replace('+', '%2B')}&limit=2")
+        assert [message["payload"]["text"] for message in history["messages"]] == ["second", "third"]
+        assert history["has_more"] is False
+
+
 async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
     redis_url = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/15")
     client = redis.from_url(redis_url)

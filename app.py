@@ -1,5 +1,7 @@
 """Async WebSocket notification server backed by Redis and SQLite."""
 
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
@@ -133,6 +135,31 @@ class MessageStore:
             for row in rows
         ]
 
+    def history(self, channel: str, since: str | None, limit: int) -> tuple[list[dict[str, Any]], bool]:
+        query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE channel = ?"
+        parameters: list[Any] = [channel]
+        if since is not None:
+            query += " AND timestamp >= ?"
+            parameters.append(since)
+        query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+        parameters.append(limit + 1)
+        with self._lock:
+            rows = self._connection.execute(query, parameters).fetchall()
+        has_more = len(rows) > limit
+        return (
+            [
+                {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+                for row in rows[:limit]
+            ],
+            has_more,
+        )
+
+    def delete_older_than(self, timestamp: str) -> int:
+        with self._lock:
+            cursor = self._connection.execute("DELETE FROM messages WHERE timestamp < ?", (timestamp,))
+            self._connection.commit()
+            return cursor.rowcount
+
     def close(self) -> None:
         with self._lock:
             self._connection.close()
@@ -227,6 +254,35 @@ class RedisClientState:
         return sorted(await self.client.smembers(f"{self.PREFIX}channel:{channel}:clients"))
 
 
+class RateLimiter:
+    """Per-client fixed-window limiter using Redis counters when available."""
+
+    PREFIX = "notification:rate:"
+
+    def __init__(self, url: str | None, limit: int) -> None:
+        self.client = redis.from_url(url, decode_responses=True) if url else None
+        self.limit = limit
+        self._counters: dict[str, tuple[int, float]] = {}
+
+    async def allow(self, client_id: str) -> bool:
+        if self.client:
+            key = f"{self.PREFIX}{client_id}"
+            count = await self.client.incr(key)
+            if count == 1:
+                await self.client.expire(key, 60)
+            return count <= self.limit
+        now = asyncio.get_running_loop().time()
+        count, expires_at = self._counters.get(client_id, (0, now + 60))
+        if now >= expires_at:
+            count, expires_at = 0, now + 60
+        self._counters[client_id] = (count + 1, expires_at)
+        return count < self.limit
+
+    async def close(self) -> None:
+        if self.client:
+            await self.client.aclose()
+
+
 class NotificationServer:
     """Routes JSON notifications using a shared pub/sub backbone."""
 
@@ -235,15 +291,25 @@ class NotificationServer:
         redis_url: str | None = None,
         database_url: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
+        self.rate_limit = rate_limit if rate_limit is not None else int(os.getenv("RATE_LIMIT", "100"))
+        self.message_ttl_days = message_ttl_days if message_ttl_days is not None else int(os.getenv("MESSAGE_TTL_DAYS", "7"))
+        if self.rate_limit < 1:
+            raise ValueError("RATE_LIMIT must be positive")
+        if self.message_ttl_days < 0:
+            raise ValueError("MESSAGE_TTL_DAYS must be non-negative")
         self.clients = ClientRegistry()
         self.store = MessageStore(database_url)
         self.state = RedisClientState(redis_url)
+        self.rate_limiter = RateLimiter(redis_url, self.rate_limit)
         self.broker: RedisBroker | InMemoryBroker = RedisBroker(redis_url) if redis_url else InMemoryBroker()
         self.transport = transport or self._configured_transport()
         self._subscription: Any = None
         self._listener: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
 
     @staticmethod
     def _configured_transport() -> BaseTransport:
@@ -272,6 +338,9 @@ class NotificationServer:
         return json.dumps(self.message("system", {"client_id": client_id}))
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
+        if not await self.rate_limiter.allow(sender_id):
+            await self._send_error(sender_id, "rate limit exceeded")
+            return
         if isinstance(raw_message, bytes):
             await self._send_error(sender_id, "messages must be JSON text")
             return
@@ -357,6 +426,24 @@ class NotificationServer:
             channel = unquote(encoded_name)
             return self._json_response({"channel": channel, "subscribers": await self.state.subscribers(channel, self.clients)})
         parsed = urlsplit(request.path)
+        if parsed.path == "/history":
+            try:
+                params = parse_qs(parsed.query)
+                channel = params["channel"][0]
+                if not channel:
+                    raise ValueError
+                since = params.get("since", [None])[0]
+                if since is not None:
+                    parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                    if parsed_since.tzinfo is None:
+                        raise ValueError
+                limit = int(params.get("limit", ["50"])[0])
+                if not 1 <= limit <= 1000:
+                    raise ValueError
+            except (KeyError, ValueError):
+                return self._json_response({"error": "channel, ISO_TIMESTAMP since, and limit (1-1000) are required"}, 400)
+            messages, has_more = self.store.history(channel, since, limit)
+            return self._json_response({"messages": messages, "has_more": has_more})
         if parsed.path == "/messages":
             try:
                 params = parse_qs(parsed.query)
@@ -376,15 +463,27 @@ class NotificationServer:
     async def start(self, host: str = "127.0.0.1", port: int = 8765) -> Server:
         self._subscription = await self.broker.subscribe()
         self._listener = asyncio.create_task(self._listen())
+        self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
         return await self.transport.start(self, host, port)
+
+    async def _cleanup_expired_messages(self) -> None:
+        while True:
+            cutoff = datetime.now(timezone.utc).timestamp() - self.message_ttl_days * 86400
+            self.store.delete_older_than(datetime.fromtimestamp(cutoff, timezone.utc).isoformat())
+            await asyncio.sleep(86400)
 
     async def stop(self) -> None:
         if self._listener:
             self._listener.cancel()
             with suppress(asyncio.CancelledError):
                 await self._listener
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._cleanup_task
         if self._subscription is not None:
             await self.broker.unsubscribe(self._subscription)
+        await self.rate_limiter.close()
         self.store.close()
 
 
