@@ -144,10 +144,11 @@ class WebSocketTransport(BaseTransport):
                 await self.server.redis_backbone.clear_client_state(client_id)
 
     @staticmethod
-    def _json_response(payload: dict) -> Response:
+    def _json_response(payload: dict, status: int = 200) -> Response:
         body = json.dumps(payload).encode()
         headers = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
-        return Response(200, "OK", headers, body)
+        reason = "OK" if status == 200 else "Bad Request"
+        return Response(status, reason, headers, body)
 
     async def process_request(self, connection: ServerConnection, request: Request) -> Response | None:
         parsed = urllib.parse.urlsplit(request.path)
@@ -169,6 +170,24 @@ class WebSocketTransport(BaseTransport):
                 return self._json_response({"messages": [], "limit": limit, "offset": offset})
             messages = await self.server.message_store.list_messages(limit=limit, offset=offset)
             return self._json_response({"messages": messages, "limit": limit, "offset": offset})
+
+        if path == "/history":
+            query = urllib.parse.parse_qs(parsed.query)
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            limit = _parse_int(query.get("limit", ["50"])[0], default=50)
+            if not channel:
+                return self._json_response({"error": "channel is required"}, status=400)
+            if self.server.message_store is None:
+                return self._json_response(
+                    {"messages": [], "has_more": False, "limit": limit, "channel": channel}
+                )
+            messages, has_more = await self.server.message_store.list_by_channel(
+                channel, since=since, limit=limit
+            )
+            return self._json_response(
+                {"messages": messages, "has_more": has_more, "limit": limit, "channel": channel}
+            )
 
         match = _CHANNEL_SUBSCRIBERS_PATH.match(path)
         if match:

@@ -81,3 +81,45 @@ class MessageStore:
                 item["payload"] = json.loads(item["payload"])
                 results.append(item)
             return results
+
+    async def list_by_channel(
+        self, channel: str, since: str | None = None, limit: int = 50
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Chronological history for a channel, optionally since a timestamp.
+
+        Fetches one extra row beyond `limit` to determine `has_more`
+        without a second COUNT query.
+        """
+        await self.init()
+        return await asyncio.to_thread(self._list_by_channel_sync, channel, since, limit)
+
+    def _list_by_channel_sync(
+        self, channel: str, since: str | None, limit: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        with self._connect() as conn:
+            query = "SELECT id, channel, type, payload, timestamp FROM messages WHERE channel = ?"
+            params: list[Any] = [channel]
+            if since:
+                query += " AND timestamp > ?"
+                params.append(since)
+            query += " ORDER BY timestamp ASC, id ASC LIMIT ?"
+            params.append(limit + 1)
+            rows = conn.execute(query, params).fetchall()
+            has_more = len(rows) > limit
+            results = []
+            for row in rows[:limit]:
+                item = dict(row)
+                item["payload"] = json.loads(item["payload"])
+                results.append(item)
+            return results, has_more
+
+    async def delete_older_than(self, cutoff_timestamp: str) -> int:
+        """Delete messages with a timestamp before `cutoff_timestamp`. Returns rows deleted."""
+        await self.init()
+        return await asyncio.to_thread(self._delete_older_than_sync, cutoff_timestamp)
+
+    def _delete_older_than_sync(self, cutoff_timestamp: str) -> int:
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff_timestamp,))
+            conn.commit()
+            return cursor.rowcount

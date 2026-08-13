@@ -23,8 +23,11 @@ import uuid
 
 from websockets.asyncio.server import serve
 
+from datetime import datetime, timedelta, timezone
+
 from messages import MESSAGE_TYPES, make_message
 from persistence import MessageStore
+from rate_limiter import RateLimiter, default_rate_limiter
 from redis_backbone import RedisBackbone
 from transport import BaseTransport, ClientRegistry, WebSocketTransport, create_transport
 
@@ -39,6 +42,9 @@ __all__ = [
     "create_app",
     "run_server",
 ]
+
+DEFAULT_MESSAGE_TTL_DAYS = 7
+DEFAULT_CLEANUP_INTERVAL_SECONDS = 3600.0
 
 
 class ChannelRegistry:
@@ -87,12 +93,23 @@ class NotificationServer:
         message_store: MessageStore | None = None,
         server_id: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limiter: RateLimiter | None = None,
+        message_ttl_days: int | None = None,
+        cleanup_interval_seconds: float = DEFAULT_CLEANUP_INTERVAL_SECONDS,
     ) -> None:
         self.channels = ChannelRegistry()
         self.redis_backbone = redis_backbone
         self.message_store = message_store
         self.server_id = server_id or str(uuid.uuid4())
         self.transport = transport or create_transport(self, on_stale_client=self.channels.remove_client)
+        self.rate_limiter = rate_limiter if rate_limiter is not None else default_rate_limiter()
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else int(os.environ.get("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS))
+        )
+        self._cleanup_interval_seconds = cleanup_interval_seconds
+        self._cleanup_task: asyncio.Task | None = None
 
     @property
     def registry(self) -> ClientRegistry:
@@ -107,13 +124,32 @@ class NotificationServer:
         return self.transport.process_request
 
     async def start(self) -> None:
-        """Begin subscribing to the Redis backbone, if configured."""
+        """Begin subscribing to the Redis backbone, if configured, and start
+        the background task that expires old persisted messages."""
         if self.redis_backbone is not None:
             await self.redis_backbone.start(self._on_redis_message)
+        if self.message_store is not None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def stop(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         if self.redis_backbone is not None:
             await self.redis_backbone.stop()
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            await self._cleanup_expired_messages()
+            await asyncio.sleep(self._cleanup_interval_seconds)
+
+    async def _cleanup_expired_messages(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        return await self.message_store.delete_older_than(cutoff)
 
     async def _deliver_broadcast_local(self, message: dict, channel: str | None) -> int:
         target_ids = set(await self.channels.subscribers(channel)) if channel is not None else None
@@ -170,6 +206,14 @@ class NotificationServer:
         return delivered
 
     async def _handle_incoming(self, client_id: str, raw: str | bytes) -> None:
+        if self.rate_limiter is not None and not await self.rate_limiter.check(client_id):
+            await self._send_error(
+                client_id,
+                f"rate limit exceeded: max {self.rate_limiter.limit} messages "
+                f"per {self.rate_limiter.window_seconds}s",
+            )
+            return
+
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -233,20 +277,31 @@ def create_app(
     redis_url: str | None = None,
     database_url: str | None = None,
     server_id: str | None = None,
+    rate_limit: int | None = None,
 ) -> NotificationServer:
     redis_url = redis_url if redis_url is not None else os.environ.get("REDIS_URL")
     database_url = database_url if database_url is not None else os.environ.get("DATABASE_URL", "messages.db")
     server_id = server_id or str(uuid.uuid4())
 
     redis_backbone = None
+    rate_limiter = None
     if redis_url:
         import redis.asyncio as redis_asyncio
 
-        redis_backbone = RedisBackbone(redis_asyncio.from_url(redis_url), server_id=server_id)
+        redis_client = redis_asyncio.from_url(redis_url)
+        redis_backbone = RedisBackbone(redis_client, server_id=server_id)
+        # Reuse the same Redis connection for rate-limit counters so a
+        # single REDIS_URL backs both the pub/sub backbone and the limiter.
+        rate_limiter = RateLimiter(redis_client, limit=rate_limit)
+    else:
+        rate_limiter = default_rate_limiter(limit=rate_limit)
 
     message_store = MessageStore(database_url)
     return NotificationServer(
-        redis_backbone=redis_backbone, message_store=message_store, server_id=server_id
+        redis_backbone=redis_backbone,
+        message_store=message_store,
+        server_id=server_id,
+        rate_limiter=rate_limiter,
     )
 
 
