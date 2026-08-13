@@ -25,3 +25,12 @@ Use a different template directory with:
 ```sh
 npx ssg build --templates ./theme/templates
 ```
+
+For local development, build and serve `./dist` with live reload:
+
+```sh
+npx ssg serve
+npx ssg serve --port 4000
+```
+
+The development server watches the content and template directories, rebuilds when files change, and reloads connected browsers after a successful build. It accepts the same `--content`, `--output`, and `--templates` options as `build`.
