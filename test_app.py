@@ -372,6 +372,8 @@ def test_app_imports():
     assert hasattr(app_module, 'websocket_handler')
     assert hasattr(app_module, 'health_handler')
     assert hasattr(app_module, 'create_message')
+    assert hasattr(app_module, 'channels_handler')
+    assert hasattr(app_module, 'channel_subscribers_handler')
 
 
 def test_message_json_serializable():
@@ -416,3 +418,310 @@ async def test_broadcast_preserves_message_structure():
     assert sent_message["payload"]["key"] == "value"
     assert sent_message["payload"]["number"] == 42
     assert sent_message["timestamp"] == original_message["timestamp"]
+
+
+@pytest.mark.asyncio
+async def test_client_subscribe_to_channel(client_registry):
+    """Test client subscribing to a channel."""
+    mock_ws = object()
+    await client_registry.register("client1", mock_ws)
+
+    result = await client_registry.subscribe("client1", "alerts")
+    assert result is True
+
+    subscribers = await client_registry.get_channel_subscribers("alerts")
+    assert "client1" in subscribers
+
+
+@pytest.mark.asyncio
+async def test_client_unsubscribe_from_channel(client_registry):
+    """Test client unsubscribing from a channel."""
+    mock_ws = object()
+    await client_registry.register("client1", mock_ws)
+
+    await client_registry.subscribe("client1", "alerts")
+    subscribers = await client_registry.get_channel_subscribers("alerts")
+    assert "client1" in subscribers
+
+    await client_registry.unsubscribe("client1", "alerts")
+    subscribers = await client_registry.get_channel_subscribers("alerts")
+    assert "client1" not in subscribers
+
+
+@pytest.mark.asyncio
+async def test_subscribe_nonexistent_client(client_registry):
+    """Test subscribing a non-existent client (should fail gracefully)."""
+    result = await client_registry.subscribe("nonexistent", "alerts")
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_get_channels_list(client_registry):
+    """Test getting list of all channels with subscriber counts."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws1 = MockWebSocket()
+    mock_ws2 = MockWebSocket()
+    mock_ws3 = MockWebSocket()
+
+    await client_registry.register("client1", mock_ws1)
+    await client_registry.register("client2", mock_ws2)
+    await client_registry.register("client3", mock_ws3)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "alerts")
+    await client_registry.subscribe("client2", "system")
+    await client_registry.subscribe("client3", "system")
+
+    channels = await client_registry.get_channels()
+    assert len(channels) == 2
+    assert channels["alerts"] == 2
+    assert channels["system"] == 2
+
+
+@pytest.mark.asyncio
+async def test_get_channel_subscribers(client_registry):
+    """Test getting subscriber list for a specific channel."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws1 = MockWebSocket()
+    mock_ws2 = MockWebSocket()
+
+    await client_registry.register("client1", mock_ws1)
+    await client_registry.register("client2", mock_ws2)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "alerts")
+
+    subscribers = await client_registry.get_channel_subscribers("alerts")
+    assert len(subscribers) == 2
+    assert "client1" in subscribers
+    assert "client2" in subscribers
+
+
+@pytest.mark.asyncio
+async def test_get_nonexistent_channel_subscribers(client_registry):
+    """Test getting subscribers for a channel that doesn't exist."""
+    subscribers = await client_registry.get_channel_subscribers("nonexistent")
+    assert len(subscribers) == 0
+
+
+@pytest.mark.asyncio
+async def test_broadcast_to_specific_channel(client_registry):
+    """Test broadcasting to only subscribers of a specific channel."""
+    class MockWebSocket:
+        def __init__(self):
+            self.messages = []
+
+        async def send(self, message):
+            self.messages.append(message)
+
+    ws1 = MockWebSocket()
+    ws2 = MockWebSocket()
+    ws3 = MockWebSocket()
+
+    await client_registry.register("client1", ws1)
+    await client_registry.register("client2", ws2)
+    await client_registry.register("client3", ws3)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "alerts")
+    await client_registry.subscribe("client3", "system")
+
+    message = create_message("broadcast", {"text": "alert message"})
+    await client_registry.broadcast(message, channel="alerts")
+
+    # Only subscribers of "alerts" should receive
+    assert len(ws1.messages) == 1
+    assert len(ws2.messages) == 1
+    assert len(ws3.messages) == 0
+
+
+@pytest.mark.asyncio
+async def test_broadcast_without_channel_still_broadcasts_to_all(client_registry):
+    """Test that broadcast without channel still broadcasts to all clients."""
+    class MockWebSocket:
+        def __init__(self):
+            self.messages = []
+
+        async def send(self, message):
+            self.messages.append(message)
+
+    ws1 = MockWebSocket()
+    ws2 = MockWebSocket()
+    ws3 = MockWebSocket()
+
+    await client_registry.register("client1", ws1)
+    await client_registry.register("client2", ws2)
+    await client_registry.register("client3", ws3)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "system")
+
+    message = create_message("broadcast", {"text": "global message"})
+    await client_registry.broadcast(message)
+
+    # All clients should receive
+    assert len(ws1.messages) == 1
+    assert len(ws2.messages) == 1
+    assert len(ws3.messages) == 1
+
+
+@pytest.mark.asyncio
+async def test_client_multiple_channel_subscriptions(client_registry):
+    """Test that a client can subscribe to multiple channels."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws = MockWebSocket()
+    await client_registry.register("client1", mock_ws)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client1", "system")
+    await client_registry.subscribe("client1", "chat")
+
+    alerts_subs = await client_registry.get_channel_subscribers("alerts")
+    system_subs = await client_registry.get_channel_subscribers("system")
+    chat_subs = await client_registry.get_channel_subscribers("chat")
+
+    assert "client1" in alerts_subs
+    assert "client1" in system_subs
+    assert "client1" in chat_subs
+
+
+@pytest.mark.asyncio
+async def test_unregister_removes_from_all_channels(client_registry):
+    """Test that unregistering a client removes it from all channel subscriptions."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws = MockWebSocket()
+    await client_registry.register("client1", mock_ws)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client1", "system")
+
+    # Verify subscriptions exist
+    alerts_subs = await client_registry.get_channel_subscribers("alerts")
+    assert "client1" in alerts_subs
+
+    # Unregister client
+    await client_registry.unregister("client1")
+
+    # Verify client is removed from all channels
+    alerts_subs = await client_registry.get_channel_subscribers("alerts")
+    system_subs = await client_registry.get_channel_subscribers("system")
+    assert "client1" not in alerts_subs
+    assert "client1" not in system_subs
+
+    # Verify empty channels are cleaned up
+    channels = await client_registry.get_channels()
+    assert len(channels) == 0
+
+
+@pytest.mark.asyncio
+async def test_broadcast_to_empty_channel(client_registry):
+    """Test broadcasting to a channel with no subscribers."""
+    class MockWebSocket:
+        def __init__(self):
+            self.messages = []
+
+        async def send(self, message):
+            self.messages.append(message)
+
+    ws1 = MockWebSocket()
+    await client_registry.register("client1", ws1)
+
+    message = create_message("broadcast", {"text": "nobody listening"})
+    # Should not raise
+    await client_registry.broadcast(message, channel="empty")
+
+    # Client should not receive message
+    assert len(ws1.messages) == 0
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoint(client_registry):
+    """Test the /channels endpoint returns correct format."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws1 = MockWebSocket()
+    mock_ws2 = MockWebSocket()
+    mock_ws3 = MockWebSocket()
+
+    await client_registry.register("client1", mock_ws1)
+    await client_registry.register("client2", mock_ws2)
+    await client_registry.register("client3", mock_ws3)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "alerts")
+    await client_registry.subscribe("client3", "system")
+
+    # Swap registry temporarily
+    original_registry = sys.modules['app'].registry
+    sys.modules['app'].registry = client_registry
+
+    try:
+        from app import channels_handler
+        class MockRequest:
+            pass
+
+        request = MockRequest()
+        response = await channels_handler(request)
+        data = json.loads(response.text)
+
+        assert "channels" in data
+        assert "timestamp" in data
+        assert data["channels"]["alerts"] == 2
+        assert data["channels"]["system"] == 1
+    finally:
+        sys.modules['app'].registry = original_registry
+
+
+@pytest.mark.asyncio
+async def test_channel_subscribers_endpoint(client_registry):
+    """Test the /channels/{name}/subscribers endpoint."""
+    class MockWebSocket:
+        async def send(self, message):
+            pass
+
+    mock_ws1 = MockWebSocket()
+    mock_ws2 = MockWebSocket()
+
+    await client_registry.register("client1", mock_ws1)
+    await client_registry.register("client2", mock_ws2)
+
+    await client_registry.subscribe("client1", "alerts")
+    await client_registry.subscribe("client2", "alerts")
+
+    # Swap registry temporarily
+    original_registry = sys.modules['app'].registry
+    sys.modules['app'].registry = client_registry
+
+    try:
+        from app import channel_subscribers_handler
+
+        class MockRequest:
+            def __init__(self):
+                self.match_info = {"name": "alerts"}
+
+        request = MockRequest()
+        response = await channel_subscribers_handler(request)
+        data = json.loads(response.text)
+
+        assert data["channel"] == "alerts"
+        assert len(data["subscribers"]) == 2
+        assert data["count"] == 2
+        assert "client1" in data["subscribers"]
+        assert "client2" in data["subscribers"]
+        assert "timestamp" in data
+    finally:
+        sys.modules['app'].registry = original_registry
