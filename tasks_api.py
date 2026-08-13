@@ -19,6 +19,8 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from task_repository import TaskRepository
+from user_repository import UserRepository
 
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tasks.db")
 
@@ -80,15 +82,6 @@ def init_db(db_path):
         conn.commit()
     finally:
         conn.close()
-
-
-def _next_task_id(db):
-    """Reserve and return the next task id, persisting the incremented counter."""
-    db.execute("BEGIN IMMEDIATE")
-    row = db.execute("SELECT value FROM counters WHERE name = 'task_id'").fetchone()
-    next_id = row["value"]
-    db.execute("UPDATE counters SET value = ? WHERE name = 'task_id'", (next_id + 1,))
-    return next_id
 
 
 def _task_to_dict(row):
@@ -163,8 +156,8 @@ def create_app(db_path=None, secret_key=None):
             except jwt.PyJWTError:
                 return jsonify({"error": "invalid or expired token"}), 401
 
-            db = get_db()
-            user = db.execute("SELECT * FROM users WHERE id = ?", (payload.get("sub"),)).fetchone()
+            user_repo = UserRepository(get_db())
+            user = user_repo.get_by_id(payload.get("sub"))
             if user is None:
                 return jsonify({"error": "invalid or expired token"}), 401
 
@@ -191,20 +184,14 @@ def create_app(db_path=None, secret_key=None):
 
         username = username.strip()
         email = email.strip() if email is not None else f"{username}@example.com"
-        db = get_db()
-        existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        user_repo = UserRepository(get_db())
+        existing = user_repo.get_by_username(username)
         if existing is not None:
             return jsonify({"error": "username already taken"}), 409
 
         password_hash = generate_password_hash(password)
         created_at = datetime.now(timezone.utc).isoformat()
-        cursor = db.execute(
-            "INSERT INTO users (username, password_hash, email, created_at) VALUES (?, ?, ?, ?)",
-            (username, password_hash, email, created_at),
-        )
-        db.commit()
-
-        row = db.execute("SELECT * FROM users WHERE id = ?", (cursor.lastrowid,)).fetchone()
+        row = user_repo.create(username, password_hash, email, created_at)
         return jsonify(_user_to_dict(row)), 201
 
     @app.post("/auth/login")
@@ -216,8 +203,8 @@ def create_app(db_path=None, secret_key=None):
         if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
             return jsonify({"error": "username and password are required"}), 400
 
-        db = get_db()
-        row = db.execute("SELECT * FROM users WHERE username = ?", (username.strip(),)).fetchone()
+        user_repo = UserRepository(get_db())
+        row = user_repo.get_by_username(username.strip())
         if row is None or not check_password_hash(row["password_hash"], password):
             return jsonify({"error": "invalid username or password"}), 401
 
@@ -232,36 +219,23 @@ def create_app(db_path=None, secret_key=None):
         if not isinstance(title, str) or not title.strip():
             return jsonify({"error": "title is required"}), 400
 
-        db = get_db()
-        task_id = _next_task_id(db)
+        task_repo = TaskRepository(get_db())
         created_at = datetime.now(timezone.utc).isoformat()
-        db.execute(
-            "INSERT INTO tasks (id, title, status, created_at, owner_id) VALUES (?, ?, ?, ?, ?)",
-            (task_id, title, "pending", created_at, g.current_user["id"]),
-        )
-        db.commit()
-
-        row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        row = task_repo.create(title, "pending", created_at, g.current_user["id"])
         return jsonify(_task_to_dict(row)), 201
 
     @app.get("/tasks")
     @require_auth
     def list_tasks():
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (g.current_user["id"],),
-        ).fetchall()
+        task_repo = TaskRepository(get_db())
+        rows = task_repo.list_by_owner(g.current_user["id"])
         return jsonify([_task_to_dict(r) for r in rows]), 200
 
     @app.get("/tasks/<int:task_id>")
     @require_auth
     def get_task(task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.current_user["id"]),
-        ).fetchone()
+        task_repo = TaskRepository(get_db())
+        row = task_repo.get_by_id_and_owner(task_id, g.current_user["id"])
         if row is None:
             return jsonify({"error": f"Task {task_id} not found"}), 404
         return jsonify(_task_to_dict(row)), 200
@@ -269,11 +243,8 @@ def create_app(db_path=None, secret_key=None):
     @app.put("/tasks/<int:task_id>")
     @require_auth
     def update_task(task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, g.current_user["id"]),
-        ).fetchone()
+        task_repo = TaskRepository(get_db())
+        row = task_repo.get_by_id_and_owner(task_id, g.current_user["id"])
         if row is None:
             return jsonify({"error": f"Task {task_id} not found"}), 404
 
@@ -297,13 +268,7 @@ def create_app(db_path=None, secret_key=None):
                 return jsonify({"error": "status must be a non-empty string"}), 400
             status = new_status
 
-        db.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ? AND owner_id = ?",
-            (title, status, task_id, g.current_user["id"]),
-        )
-        db.commit()
-
-        row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        row = task_repo.update(task_id, g.current_user["id"], title, status)
 
         if previous_status != "completed" and status == "completed":
             owner_email = g.current_user["email"]
