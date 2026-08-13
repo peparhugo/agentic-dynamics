@@ -23,7 +23,8 @@ import json
 import os
 import sqlite3
 import threading
-from typing import Any, Dict, List, Optional, Set
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import redis
 from redis.asyncio import Redis as AsyncRedis
@@ -45,6 +46,48 @@ def sqlite_path() -> str:
     if url.startswith("sqlite:///"):
         return url[len("sqlite:///") :]
     return url
+
+
+def message_ttl_days() -> int:
+    """Return the message retention window in days from ``MESSAGE_TTL_DAYS``."""
+    return int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+
+
+def rate_limit_value() -> int:
+    """Return the per-client per-minute message limit from ``RATE_LIMIT``."""
+    return int(os.environ.get("RATE_LIMIT", "100"))
+
+
+def _parse_iso(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 timestamp into a tz-aware UTC ``datetime``.
+
+    Handles ``Z`` suffixes and naive timestamps (assumed UTC). Returns None
+    when the value cannot be parsed.
+    """
+    if value is None:
+        return None
+    text = value.strip()
+    if text.endswith("Z") or text.endswith("z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _normalize_iso(value: Optional[str]) -> Optional[str]:
+    """Normalize an ISO-8601 timestamp to UTC ``isoformat()`` or None."""
+    dt = _parse_iso(value)
+    return dt.isoformat() if dt is not None else None
+
+
+def _ts_before(timestamp: str, cutoff: datetime) -> bool:
+    """Return True when ``timestamp`` parses and is older than ``cutoff``."""
+    dt = _parse_iso(timestamp)
+    return dt is not None and dt < cutoff
 
 
 class MessageStore:
@@ -95,6 +138,16 @@ class MessageStore:
                 conn.commit()
                 return int(cur.lastrowid)
 
+    @staticmethod
+    def _decode(row: sqlite3.Row) -> Dict[str, Any]:
+        """Convert a database row into a dict with ``payload`` JSON-parsed."""
+        message = dict(row)
+        try:
+            message["payload"] = json.loads(message["payload"])
+        except (TypeError, ValueError):
+            pass
+        return message
+
     def list_messages(
         self, limit: int = 50, offset: int = 0
     ) -> List[Dict[str, Any]]:
@@ -106,15 +159,61 @@ class MessageStore:
                     " ORDER BY id DESC LIMIT ? OFFSET ?",
                     (int(limit), int(offset)),
                 ).fetchall()
-        messages = []
-        for row in rows:
-            message = dict(row)
-            try:
-                message["payload"] = json.loads(message["payload"])
-            except (TypeError, ValueError):
-                pass
-            messages.append(message)
-        return messages
+        return [self._decode(row) for row in rows]
+
+    def query_history(
+        self,
+        channel: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> Tuple[List[Dict[str, Any]], bool]:
+        """Return messages for ``channel`` from ``since`` in chronological order.
+
+        Filters on an exact channel name when ``channel`` is given and only
+        returns messages with ``timestamp >= since`` when ``since`` is given.
+        Returns ``(messages, has_more)`` where ``has_more`` tells the caller
+        whether another page of results is available for pagination.
+        """
+        clauses: List[str] = []
+        params: List[Any] = []
+        if channel is not None:
+            clauses.append("channel = ?")
+            params.append(channel)
+        since_iso = _normalize_iso(since)
+        if since_iso is not None:
+            clauses.append("timestamp >= ?")
+            params.append(since_iso)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages"
+                    f"{where} ORDER BY id ASC LIMIT ? OFFSET ?",
+                    (*params, int(limit) + 1, int(offset)),
+                ).fetchall()
+        has_more = len(rows) > int(limit)
+        return [self._decode(row) for row in rows[: int(limit)]], has_more
+
+    def cleanup_expired(self, ttl_days: Optional[int] = None) -> int:
+        """Delete messages older than ``ttl_days`` (default ``MESSAGE_TTL_DAYS``).
+
+        Returns the number of messages removed.
+        """
+        ttl_days = int(
+            ttl_days if ttl_days is not None else message_ttl_days()
+        )
+        cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+        with self._lock:
+            with self._connect() as conn:
+                rows = conn.execute("SELECT id, timestamp FROM messages").fetchall()
+                expired = [
+                    row["id"] for row in rows if _ts_before(row["timestamp"], cutoff)
+                ]
+                for message_id in expired:
+                    conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+                conn.commit()
+                return len(expired)
 
     def count(self) -> int:
         """Return the total number of stored messages."""
@@ -185,6 +284,44 @@ class ConnectionState:
     def subscribers(self, channel: str) -> List[str]:
         """Return the sorted client ids subscribed to ``channel`` in Redis."""
         return sorted(c.decode() for c in self._redis.smembers(self._channel_key(channel)))
+
+
+class RateLimiter:
+    """Redis-backed per-client message rate limiter.
+
+    Every client is allowed ``limit`` messages per ``window`` seconds. The
+    count is stored in Redis under a per-client key so the limit is enforced
+    consistently across every server instance sharing the same broker
+    channel. Callers use :meth:`check` for each inbound client message and
+    return an error to the client when it returns False.
+    """
+
+    def __init__(
+        self,
+        url: Optional[str] = None,
+        limit: Optional[int] = None,
+        window: int = 60,
+        namespace: str = "notif",
+    ):
+        self._redis = redis.Redis.from_url(url or redis_url())
+        self.limit = int(limit if limit is not None else rate_limit_value())
+        self.window = int(window)
+        self.namespace = namespace
+
+    def _key(self, client_id: str) -> str:
+        return f"{self.namespace}:rate:{client_id}"
+
+    def check(self, client_id: str) -> bool:
+        """Record one message from ``client_id`` and return True when allowed."""
+        key = self._key(client_id)
+        count = int(self._redis.incr(key))
+        if count == 1:
+            self._redis.expire(key, self.window)
+        return count <= self.limit
+
+    def reset(self, client_id: str) -> None:
+        """Clear the counter for ``client_id`` (mainly for tests)."""
+        self._redis.delete(self._key(client_id))
 
 
 class MessageBroker:

@@ -11,9 +11,14 @@ An asyncio-based server that:
   server instances can share the same delivery network,
 * mirrors client connection state into Redis so it survives restarts,
 * persists every message to a SQLite history database,
+* enforces a per-client message rate limit (``RATE_LIMIT`` env var) using
+  Redis counters and replies with an ``"error"`` message on excess,
 * exposes ``GET /health``, ``GET /channels``,
-  ``GET /channels/{name}/subscribers`` and ``GET /messages`` as plain
-  HTTP endpoints.
+  ``GET /channels/{name}/subscribers``, ``GET /messages`` and
+  ``GET /history`` (channel / since / limit pagination) as plain HTTP
+  endpoints,
+* runs a background task that purges messages older than
+  ``MESSAGE_TTL_DAYS`` days on startup.
 
 All client I/O goes through a pluggable :class:`transport.BaseTransport`.
 The default :class:`transport.WebSocketTransport` accepts WebSocket
@@ -38,6 +43,8 @@ Configuration
 * ``TRANSPORT``    - transport to use (default ``websocket``)
 * ``REDIS_URL``    - broker connection URL (default ``redis://localhost:6379/0``)
 * ``DATABASE_URL`` - SQLite database path (default ``messages.db``)
+* ``RATE_LIMIT``   - per-client messages-per-minute limit (default ``100``)
+* ``MESSAGE_TTL_DAYS`` - message retention window in days (default ``7``)
 """
 
 import asyncio
@@ -49,7 +56,7 @@ from urllib.parse import parse_qs, urlsplit
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Headers, Request, Response
 
-from broker import ConnectionState, MessageBroker, MessageStore
+from broker import ConnectionState, MessageBroker, MessageStore, RateLimiter
 from registry import ClientRegistry
 from transport import (
     BaseTransport,
@@ -77,6 +84,8 @@ class NotificationServer:
         store: Optional[MessageStore] = None,
         channel: Optional[str] = None,
         transport: Optional[BaseTransport] = None,
+        rate_limiter: Optional[RateLimiter] = None,
+        cleanup_interval: float = 3600.0,
     ):
         self.host = host
         self.registry = ClientRegistry()
@@ -85,6 +94,11 @@ class NotificationServer:
         self.broker = broker
         self.store = store or MessageStore()
         self.state = ConnectionState(namespace=f"notif:{self.broker.channel}")
+        self.rate_limiter = rate_limiter or RateLimiter(
+            namespace=f"notif:{self.broker.channel}:rate"
+        )
+        self.cleanup_interval = cleanup_interval
+        self._cleanup_task: Optional[asyncio.Task] = None
         self.instance_id = str(uuid.uuid4())
         self.transport = transport or create_transport(host=host, port=port)
 
@@ -96,25 +110,50 @@ class NotificationServer:
     # ── lifecycle ────────────────────────────────────────────────────────
 
     async def start(self) -> "NotificationServer":
-        """Start the transport and connect the broker."""
+        """Start the transport, connect the broker and launch the cleanup task."""
         await self.transport.start(self)
         await self.broker.start(self._on_broker_message)
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         return self
 
     async def stop(self) -> None:
-        """Shut the transport down and disconnect the broker."""
+        """Cancel the cleanup task, then stop transport and broker."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         await self.transport.stop()
         await self.broker.stop()
+
+    async def _cleanup_loop(self) -> None:
+        """Periodically purge expired messages in the background."""
+        while True:
+            try:
+                await asyncio.to_thread(self.store.cleanup_expired)
+            except Exception:
+                pass
+            await asyncio.sleep(self.cleanup_interval)
 
     # ── message handling ─────────────────────────────────────────────────
 
     async def _on_message(self, client_id: str, raw: str) -> None:
-        """Handle an inbound client message (broadcast / direct / channel requests)."""
+        """Handle an inbound client message (broadcast / direct / channel requests).
+
+        Every inbound message is checked against the per-client rate limit;
+        when the limit is exceeded an ``"error"`` message is sent back to the
+        sender instead of processing the message.
+        """
         try:
             data = json.loads(raw)
         except (TypeError, ValueError):
             return
         if not isinstance(data, dict):
+            return
+        if not self.rate_limiter.check(client_id):
+            await self._send_rate_limit_error(client_id)
             return
         msg_type = data.get("type")
         payload = data.get("payload") or {}
@@ -134,6 +173,27 @@ class NotificationServer:
             channel = self._channel_from(data, payload)
             if channel:
                 self.unsubscribe(client_id, channel)
+
+    async def _send_rate_limit_error(self, client_id: str) -> None:
+        """Reply to ``client_id`` with an ``"error"`` message (never drops silently)."""
+        connection = self.registry.get(client_id)
+        if connection is None:
+            return
+        try:
+            await self.transport.send_message(
+                connection,
+                "error",
+                {
+                    "error": "rate_limit_exceeded",
+                    "message": (
+                        f"rate limit of {self.rate_limiter.limit} messages per "
+                        "minute exceeded"
+                    ),
+                    "limit": self.rate_limiter.limit,
+                },
+            )
+        except ConnectionClosed:
+            pass
 
     @staticmethod
     def _channel_from(data: Dict[str, Any], payload: Dict[str, Any]) -> Optional[str]:
@@ -326,6 +386,25 @@ class NotificationServer:
             offset = max(0, offset)
             body = json.dumps(
                 {"messages": self.store.list_messages(limit=limit, offset=offset)}
+            ).encode("utf-8")
+        elif path == "/history":
+            channel = (query.get("channel") or [None])[0] or None
+            since = (query.get("since") or [None])[0] or None
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except (TypeError, ValueError):
+                limit = 50
+            try:
+                offset = int(query.get("offset", ["0"])[0])
+            except (TypeError, ValueError):
+                offset = 0
+            limit = max(1, min(limit, 500))
+            offset = max(0, offset)
+            messages, has_more = self.store.query_history(
+                channel=channel, since=since, limit=limit, offset=offset
+            )
+            body = json.dumps(
+                {"messages": messages, "has_more": has_more}
             ).encode("utf-8")
         else:
             return None
