@@ -1,146 +1,142 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
+"""Async WebSocket notification server with a small HTTP health endpoint."""
 
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+import asyncio
+import json
+import uuid
+from datetime import datetime, timezone
+from http import HTTPStatus
+from typing import Any
 
-from flask import Flask, request, jsonify
-from datetime import datetime
-import sqlite3
-import os
-
-app = Flask(__name__)
-
-DATABASE = os.environ.get("DATABASE", "todos.db")
+from websockets.asyncio.server import ServerConnection, serve
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+SUPPORTED_MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
+class NotificationServer:
+    """Maintains connected WebSocket clients and routes notification messages."""
+
+    def __init__(self) -> None:
+        self._clients: dict[str, ServerConnection] = {}
+        self._lock = asyncio.Lock()
+
+    @property
+    def client_count(self) -> int:
+        return len(self._clients)
+
+    async def register(self, websocket: ServerConnection) -> str:
+        client_id = str(uuid.uuid4())
+        async with self._lock:
+            self._clients[client_id] = websocket
+        return client_id
+
+    async def unregister(self, client_id: str) -> None:
+        async with self._lock:
+            self._clients.pop(client_id, None)
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        serialized = json.dumps(message)
+        async with self._lock:
+            clients = list(self._clients.items())
+
+        failed_clients: list[str] = []
+        for client_id, websocket in clients:
+            try:
+                await websocket.send(serialized)
+            except Exception:
+                failed_clients.append(client_id)
+
+        if failed_clients:
+            async with self._lock:
+                for client_id in failed_clients:
+                    self._clients.pop(client_id, None)
+
+    async def send_direct(self, client_id: str, message: dict[str, Any]) -> bool:
+        async with self._lock:
+            websocket = self._clients.get(client_id)
+        if websocket is None:
+            return False
+
+        try:
+            await websocket.send(json.dumps(message))
+        except Exception:
+            await self.unregister(client_id)
+            return False
+        return True
+
+    async def websocket_handler(self, websocket: ServerConnection) -> None:
+        client_id = await self.register(websocket)
+        await websocket.send(json.dumps(self._message("system", {"client_id": client_id})))
+        try:
+            async for raw_message in websocket:
+                message = self._parse_message(raw_message)
+                if message["type"] == "broadcast":
+                    await self.broadcast(message)
+                elif message["type"] == "direct":
+                    target_id = message["payload"].get("client_id")
+                    if not isinstance(target_id, str) or not await self.send_direct(target_id, message):
+                        await websocket.send(
+                            json.dumps(self._message("system", {"error": "client not found"}))
+                        )
+                else:
+                    await self.broadcast(message)
+        except ValueError as error:
+            await websocket.send(json.dumps(self._message("system", {"error": str(error)})))
+        finally:
+            await self.unregister(client_id)
+
+    def health_response(self, connection: ServerConnection, request: Any) -> Response | None:
+        if request.path != "/health":
+            return None
+        body = json.dumps({"connected_clients": self.client_count}).encode()
+        return Response(
+            HTTPStatus.OK,
+            "OK",
+            headers=Headers({"Content-Type": "application/json"}),
+            body=body,
         )
 
-
-# ── Models ────────────────────────────────────────────────────
-
-
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
-        )
-        conn.commit()
+    @staticmethod
+    def _message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
         return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
+            "type": message_type,
+            "payload": payload,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    @staticmethod
+    def _parse_message(raw_message: str | bytes) -> dict[str, Any]:
+        if not isinstance(raw_message, str):
+            raise ValueError("messages must be JSON text")
+        try:
+            message = json.loads(raw_message)
+        except json.JSONDecodeError as error:
+            raise ValueError("messages must be valid JSON") from error
 
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
+        if not isinstance(message, dict):
+            raise ValueError("messages must be JSON objects")
+        if message.get("type") not in SUPPORTED_MESSAGE_TYPES:
+            raise ValueError("unsupported message type")
+        if not isinstance(message.get("payload"), dict):
+            raise ValueError("payload must be an object")
+        if not isinstance(message.get("timestamp"), str):
+            raise ValueError("timestamp must be a string")
+        return message
 
 
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
-def list_tasks():
-    return jsonify(get_tasks())
-
-
-@app.route("/tasks", methods=["POST"])
-def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
-
-
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
-    )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+async def run_server(host: str = "127.0.0.1", port: int = 8765) -> None:
+    """Run the notification service until cancelled."""
+    notification_server = NotificationServer()
+    async with serve(
+        notification_server.websocket_handler,
+        host,
+        port,
+        process_request=notification_server.health_response,
+    ):
+        await asyncio.Future()
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    asyncio.run(run_server())
