@@ -7,8 +7,16 @@ Clients can subscribe to named channels; broadcast messages carrying a
 'channel' field in their payload are routed only to that channel's
 subscribers, while channel-less broadcasts still reach everyone. Also
 exposes plain HTTP endpoints (GET /health, GET /channels, GET /channels/
-{name}/subscribers, GET /messages) via the transport, when the transport
-supports serving HTTP.
+{name}/subscribers, GET /messages, GET /history) via the transport, when
+the transport supports serving HTTP.
+
+Inbound client messages are rate-limited per client ID (RATE_LIMIT env
+var, default 100/minute) using Redis counters, so the limit holds across
+every server instance sharing the same Redis backbone. Exceeding it does
+not drop the connection -- the client gets a 'system' error message back
+and can keep sending once the window resets. Persisted messages older
+than MESSAGE_TTL_DAYS (default 7) are purged by a background task that
+starts when the server does and re-runs periodically.
 
 The WebSocket transport is the default (and only one shipped today); a new
 transport (SSE, polling, raw TCP, ...) can be added by implementing
@@ -41,7 +49,7 @@ import json
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from urllib.parse import unquote
 from uuid import uuid4
@@ -49,6 +57,7 @@ from uuid import uuid4
 import redis.asyncio as redis_asyncio
 
 from notification_server.presence import RedisPresence
+from notification_server.rate_limit import RateLimiter
 from notification_server.registry import ClientRegistry
 from notification_server.store import MessageStore
 from notification_server.transport import create_transport
@@ -62,6 +71,9 @@ CHANNEL_SUBSCRIBERS_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 DEFAULT_DATABASE_URL = "notifications.db"
+DEFAULT_RATE_LIMIT = 100
+DEFAULT_MESSAGE_TTL_DAYS = 7
+DEFAULT_CLEANUP_INTERVAL_SECONDS = 3600
 
 
 def now_iso() -> str:
@@ -83,6 +95,22 @@ def _parse_query_int(query: dict, key: str, default: int, minimum: int, maximum:
     return max(minimum, min(maximum, value))
 
 
+def _parse_since(value: str | None) -> tuple[bool, str | None]:
+    """Normalize an ISO-8601 `since` query value to the same UTC-offset
+    format `now_iso()` stores timestamps in, so plain string comparison in
+    SQL stays chronologically correct. Returns (ok, normalized_value_or_None);
+    ok is False when `value` is present but not a valid timestamp."""
+    if not value:
+        return True, None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False, None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return True, dt.astimezone(timezone.utc).isoformat()
+
+
 class NotificationServer:
     """Wraps a pluggable Transport with client registry, Redis-backed
     message routing/presence, and SQLite-backed message history."""
@@ -98,6 +126,9 @@ class NotificationServer:
         db_path: str | None = None,
         instance_id: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: float | None = None,
+        cleanup_interval_seconds: float | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -108,12 +139,24 @@ class NotificationServer:
         self.db_path = db_path or os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
         self.instance_id = instance_id or str(uuid4())
 
+        self.rate_limit = rate_limit if rate_limit is not None else int(
+            os.environ.get("RATE_LIMIT", DEFAULT_RATE_LIMIT)
+        )
+        self.message_ttl_days = message_ttl_days if message_ttl_days is not None else float(
+            os.environ.get("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS)
+        )
+        self.cleanup_interval_seconds = (
+            cleanup_interval_seconds if cleanup_interval_seconds is not None else DEFAULT_CLEANUP_INTERVAL_SECONDS
+        )
+
         self._redis_client_override = redis_client
         self.redis = None
         self.presence: RedisPresence | None = None
         self.store: MessageStore | None = None
+        self.rate_limiter: RateLimiter | None = None
         self._pubsub = None
         self._pubsub_task: asyncio.Task | None = None
+        self._cleanup_task: asyncio.Task | None = None
 
         self._client_ids: dict[Any, str] = {}
 
@@ -122,6 +165,7 @@ class NotificationServer:
             self.redis_url, decode_responses=True
         )
         self.presence = RedisPresence(self.redis)
+        self.rate_limiter = RateLimiter(self.redis, limit=self.rate_limit)
 
         self.store = MessageStore(self.db_path)
         await self.store.init()
@@ -129,6 +173,7 @@ class NotificationServer:
         self._pubsub = self.redis.pubsub()
         await self._pubsub.subscribe(self.BUS_CHANNEL)
         self._pubsub_task = asyncio.create_task(self._consume_bus())
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
         self.transport.on_connect(self._handle_connect)
         self.transport.on_message(self._handle_message)
@@ -150,11 +195,30 @@ class NotificationServer:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._pubsub_task
             self._pubsub_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._cleanup_task
+            self._cleanup_task = None
         if self._pubsub is not None:
             await self._pubsub.aclose()
             self._pubsub = None
         if self.redis is not None:
             await self.redis.aclose()
+
+    # -- message expiry -------------------------------------------------
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            await self._run_cleanup()
+            await asyncio.sleep(self.cleanup_interval_seconds)
+
+    async def _run_cleanup(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        deleted = await self.store.delete_older_than(cutoff)
+        if deleted:
+            logger.info("expired %d messages older than %s days", deleted, self.message_ttl_days)
+        return deleted
 
     @property
     def bound_port(self) -> int:
@@ -196,10 +260,12 @@ class NotificationServer:
 
     # -- HTTP -------------------------------------------------------
 
-    async def _handle_http(self, path: str, query: dict) -> dict | None:
+    async def _handle_http(self, path: str, query: dict) -> dict | tuple[int, dict] | None:
         """Resolve a plain HTTP GET path/query into a JSON-serializable
         response body, or None if the path isn't recognized. The transport
-        is responsible for turning this into an actual protocol response."""
+        is responsible for turning this into an actual protocol response.
+        A plain dict implies a 200 OK response; a (status, dict) tuple lets
+        an endpoint report a non-200 status such as a 400 validation error."""
         if path == "/health":
             return {"connected_clients": self.registry.count()}
 
@@ -212,12 +278,35 @@ class NotificationServer:
             messages = await self.store.list_messages(limit=limit, offset=offset)
             return {"messages": messages, "limit": limit, "offset": offset}
 
+        if path == "/history":
+            return await self._handle_history(query)
+
         match = CHANNEL_SUBSCRIBERS_RE.match(path)
         if match:
             channel = unquote(match.group(1))
             return {"channel": channel, "subscribers": await self.presence.subscribers(channel)}
 
         return None
+
+    async def _handle_history(self, query: dict) -> tuple[int, dict] | dict:
+        channel = query.get("channel", [None])[0]
+        if not channel:
+            return 400, {"error": "'channel' query parameter is required"}
+
+        since_ok, since = _parse_since(query.get("since", [None])[0])
+        if not since_ok:
+            return 400, {"error": "'since' must be an ISO-8601 timestamp"}
+
+        limit = _parse_query_int(query, "limit", default=50, minimum=1, maximum=500)
+        offset = _parse_query_int(query, "offset", default=0, minimum=0, maximum=2**31)
+        messages, has_more = await self.store.list_history(channel, since, limit=limit, offset=offset)
+        return {
+            "messages": messages,
+            "channel": channel,
+            "limit": limit,
+            "offset": offset,
+            "has_more": has_more,
+        }
 
     # -- connection lifecycle ------------------------------------------
 
@@ -243,6 +332,11 @@ class NotificationServer:
     async def _handle_message(self, connection: Any, raw_message) -> None:
         client_id = self._client_ids.get(connection)
         if client_id is None:
+            return
+        if not await self.rate_limiter.allow(client_id):
+            await self._send_error(
+                connection, f"rate limit exceeded: max {self.rate_limit} messages per minute"
+            )
             return
         await self._route(client_id, connection, raw_message)
 

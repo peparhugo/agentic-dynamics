@@ -26,7 +26,7 @@ from typing import Any, Awaitable, Callable
 ConnectHandler = Callable[[Any], Awaitable[None]]
 MessageHandler = Callable[[Any, Any], Awaitable[None]]
 DisconnectHandler = Callable[[Any], Awaitable[None]]
-HttpHandler = Callable[[str, dict], Awaitable[dict | None]]
+HttpHandler = Callable[[str, dict], Awaitable[dict | tuple[int, dict] | None]]
 
 
 class BaseTransport(ABC):

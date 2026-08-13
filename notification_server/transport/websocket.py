@@ -78,15 +78,18 @@ class WebSocketTransport(BaseTransport):
 
         split = urlsplit(request.path)
         query = parse_qs(split.query)
-        data = await self._http_handler(split.path, query)
-        if data is None:
+        result = await self._http_handler(split.path, query)
+        if result is None:
             return None
-        return self._json_response(data)
+        status, data = result if isinstance(result, tuple) else (200, result)
+        return self._json_response(data, status)
 
-    @staticmethod
-    def _json_response(data: dict) -> Response:
+    _REASONS = {200: "OK", 400: "Bad Request", 404: "Not Found", 429: "Too Many Requests"}
+
+    @classmethod
+    def _json_response(cls, data: dict, status: int = 200) -> Response:
         body = json.dumps(data).encode("utf-8")
         headers = Headers()
         headers["Content-Type"] = "application/json"
         headers["Content-Length"] = str(len(body))
-        return Response(200, "OK", headers, body)
+        return Response(status, cls._REASONS.get(status, ""), headers, body)
