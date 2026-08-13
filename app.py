@@ -1,12 +1,7 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
-
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+"""A small Flask API for managing tasks."""
 
 from flask import Flask, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 import sqlite3
 import os
 
@@ -37,7 +32,7 @@ def init_db():
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         cursor = conn.execute(
             "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
@@ -95,10 +90,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
@@ -113,9 +108,14 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    if "title" in data and (not isinstance(data["title"], str) or not data["title"].strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+    if "status" in data and not isinstance(data["status"], str):
+        return jsonify({"error": "status must be a string"}), 400
+
     task = update_task(
         task_id,
-        title=data.get("title"),
+        title=data["title"].strip() if "title" in data else None,
         status=data.get("status"),
     )
     if task is None:
@@ -123,6 +123,8 @@ def edit_task(task_id: int):
     return jsonify(task)
 
 
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
