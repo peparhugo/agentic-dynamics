@@ -32,10 +32,10 @@ def redis_backend():
 async def make_instance(redis_backend, tmp_path):
     instances = []
 
-    async def _make(server_id="server-a", db_path=None, shared_db=None):
+    async def _make(server_id="server-a", db_path=None, shared_db=None, rate_limit=None):
         client = fakeredis_aioredis.FakeRedis(server=redis_backend)
         db = shared_db or db_path or str(tmp_path / f"{server_id}.db")
-        app = NotificationServer(redis_client=client, db_path=db, server_id=server_id)
+        app = NotificationServer(redis_client=client, db_path=db, server_id=server_id, rate_limit=rate_limit)
         server = await websockets.serve(
             app.handler, "localhost", 0, process_request=app.process_request
         )
@@ -313,6 +313,57 @@ async def test_messages_endpoint_respects_limit_and_offset(make_instance):
         assert body["offset"] == 1
         # Most-recent-first ordering: skip seq=4, then seq=3, seq=2.
         assert [m["payload"]["seq"] for m in body["messages"]] == [3, 2]
+
+
+async def test_rate_limit_is_shared_across_instances_via_redis(make_instance):
+    instance_a = await make_instance(server_id="server-a", rate_limit=2)
+    instance_b = await make_instance(server_id="server-b", rate_limit=2)
+
+    async with websockets.connect(instance_a.ws_url) as a:
+        a_id = await _connected(a)
+
+        for _ in range(2):
+            await a.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"text": "hi"},
+                "timestamp": "2026-08-13T00:00:00+00:00",
+            }))
+            await a.recv()
+
+        # a's own instance has already used up the shared budget for a_id...
+        await a.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "over"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        err = json.loads(await a.recv())
+        assert err["payload"]["event"] == "error"
+
+        # ...and the limit for the same client ID is enforced on instance b too,
+        # since both instances increment the same Redis counter.
+        assert await instance_b.app.rate_limiter.check(a_id) is False
+
+
+async def test_history_endpoint_reflects_messages_persisted_by_any_instance(make_instance):
+    instance = await make_instance()
+    loop = asyncio.get_running_loop()
+
+    async with websockets.connect(instance.ws_url) as client:
+        await _connected(client)
+        for i in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "alerts", "seq": i},
+                "timestamp": f"2026-08-13T00:00:0{i}+00:00",
+            }))
+            await client.recv()
+
+        status, body = await loop.run_in_executor(
+            None, _fetch, instance.http_url, "/history?channel=alerts&limit=2"
+        )
+        assert status == 200
+        assert body["has_more"] is True
+        assert [m["payload"]["seq"] for m in body["messages"]] == [0, 1]
 
 
 async def test_messages_endpoint_survives_server_restart(make_instance, tmp_path):

@@ -26,6 +26,7 @@ logger = logging.getLogger("notification_server.transport.websocket")
 HEALTH_PATH = "/health"
 CHANNELS_PATH = "/channels"
 MESSAGES_PATH = "/messages"
+HISTORY_PATH = "/history"
 CHANNEL_SUBSCRIBERS_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 DEFAULT_MESSAGES_LIMIT = 50
@@ -91,6 +92,23 @@ class WebSocketTransport(BaseTransport):
             offset = self._parse_query_int(query, "offset", 0, minimum=0)
             messages = await asyncio.to_thread(store.get_messages, limit, offset)
             body = json.dumps({"messages": messages, "limit": limit, "offset": offset})
+            return self._json_response(connection, 200, body)
+
+        if path == HISTORY_PATH:
+            channel = (query.get("channel", [None])[0] or "").strip()
+            if not channel:
+                body = json.dumps({"error": "channel is required"})
+                return self._json_response(connection, 400, body)
+            since = query.get("since", [None])[0]
+            limit = self._parse_query_int(query, "limit", DEFAULT_MESSAGES_LIMIT, minimum=1, maximum=MAX_MESSAGES_LIMIT)
+            messages, has_more = await asyncio.to_thread(store.get_history, channel, since, limit)
+            body = json.dumps({
+                "messages": messages,
+                "channel": channel,
+                "since": since,
+                "limit": limit,
+                "has_more": has_more,
+            })
             return self._json_response(connection, 200, body)
 
         match = CHANNEL_SUBSCRIBERS_RE.match(path)

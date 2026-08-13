@@ -10,14 +10,18 @@ persistence, and fan-out across server instances via Redis.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import uuid
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable
 
 import websockets
 
 from .messages import InvalidMessage, build_message, parse_message
+from .rate_limiter import DEFAULT_LIMIT as DEFAULT_RATE_LIMIT
+from .rate_limiter import RateLimiter
 from .redis_bus import RedisBus
 from .registry import ClientRegistry
 from .store import MessageStore
@@ -30,6 +34,10 @@ logger = logging.getLogger("notification_server")
 # connection control-plane chatter (system/subscribe/unsubscribe). These are
 # the ones persisted to SQLite and distributed over the Redis bus.
 CONTENT_TYPES = {"broadcast", "direct"}
+
+DEFAULT_MESSAGE_TTL_DAYS = 7
+# How often the expiry sweep re-runs after its first, on-startup pass.
+CLEANUP_INTERVAL_SECONDS = 3600
 
 
 class NotificationServer:
@@ -61,12 +69,24 @@ class NotificationServer:
         db_path: str | None = None,
         server_id: str | None = None,
         transport: "str | type[BaseTransport] | BaseTransport | None" = None,
+        rate_limit: int | None = None,
+        message_ttl_days: float | None = None,
     ) -> None:
         self.server_id = server_id or uuid.uuid4().hex
         self.registry = ClientRegistry(redis_client=redis_client, server_id=self.server_id)
         self.bus = RedisBus(redis_client) if redis_client is not None else None
         self.store = MessageStore(db_path or os.environ.get("DATABASE_URL", "notification_server.db"))
+        self.rate_limiter = RateLimiter(
+            redis_client=redis_client,
+            limit=rate_limit if rate_limit is not None else int(os.environ.get("RATE_LIMIT", DEFAULT_RATE_LIMIT)),
+        )
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else float(os.environ.get("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS))
+        )
         self._started = False
+        self._cleanup_task: asyncio.Task | None = None
 
         self.transport = self._make_transport(transport)
         # `handler`/`process_request` are the entry points a transport's own
@@ -93,15 +113,34 @@ class NotificationServer:
         return transport_cls(self)
 
     async def start(self) -> None:
-        """Idempotently subscribe to the Redis bus, if one is configured."""
+        """Idempotently subscribe to the Redis bus (if configured) and start the message-expiry sweep."""
         if self.bus is not None and not self._started:
             await self.bus.start(self._on_bus_message)
             self._started = True
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._cleanup_loop())
 
     async def close(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._cleanup_task
+            self._cleanup_task = None
         if self.bus is not None:
             await self.bus.stop()
         self.store.close()
+
+    async def _cleanup_loop(self) -> None:
+        """Background task: expire old messages on startup, then on a fixed interval."""
+        while True:
+            await self._expire_old_messages()
+            await asyncio.sleep(CLEANUP_INTERVAL_SECONDS)
+
+    async def _expire_old_messages(self) -> None:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        deleted = await asyncio.to_thread(self.store.delete_older_than, cutoff)
+        if deleted:
+            logger.info("expired %d message(s) older than %s days", deleted, self.message_ttl_days)
 
     async def _client_connected(self, client_id: str) -> None:
         logger.info("client %s connected", client_id)
@@ -129,6 +168,13 @@ class NotificationServer:
         )
 
     async def _dispatch(self, client_id: str, raw: str) -> None:
+        if not await self.rate_limiter.check(client_id):
+            await self.transport.send_message(client_id, build_message("system", {
+                "event": "error",
+                "detail": f"rate limit exceeded: max {self.rate_limiter.limit} messages per minute",
+            }))
+            return
+
         try:
             message = parse_message(raw)
         except InvalidMessage as exc:

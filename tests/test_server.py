@@ -1,5 +1,6 @@
 import asyncio
 import json
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 import pytest
@@ -20,6 +21,22 @@ async def running_server():
     finally:
         server.close()
         await server.wait_closed()
+        await app.close()
+
+
+@pytest.fixture
+async def rate_limited_server():
+    app = NotificationServer(rate_limit=3)
+    server = await websockets.serve(
+        app.handler, "localhost", 0, process_request=app.process_request
+    )
+    port = server.sockets[0].getsockname()[1]
+    try:
+        yield app, f"ws://localhost:{port}", f"http://localhost:{port}"
+    finally:
+        server.close()
+        await server.wait_closed()
+        await app.close()
 
 
 async def _connected(client):
@@ -348,6 +365,261 @@ async def test_subscribers_endpoint_empty_for_unknown_channel(running_server):
     status, body = await loop.run_in_executor(None, fetch)
     assert status == 200
     assert body == {"channel": "does-not-exist", "subscribers": []}
+
+
+async def test_messages_within_rate_limit_are_processed_normally(rate_limited_server):
+    _, ws_url, _ = rate_limited_server
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        for i in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"seq": i},
+                "timestamp": "2026-08-13T00:00:00+00:00",
+            }))
+            echoed = json.loads(await client.recv())
+            assert echoed["type"] == "broadcast"
+            assert echoed["payload"]["seq"] == i
+
+
+async def test_exceeding_rate_limit_returns_error_without_disconnecting(rate_limited_server):
+    _, ws_url, _ = rate_limited_server
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        for _ in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"text": "ok"},
+                "timestamp": "2026-08-13T00:00:00+00:00",
+            }))
+            await client.recv()
+
+        await client.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "one too many"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        err = json.loads(await client.recv())
+        assert err["type"] == "system"
+        assert err["payload"]["event"] == "error"
+        assert "rate limit" in err["payload"]["detail"]
+
+        # connection stays open and usable — the message is rejected, not dropped
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        # still over the limit, so this is rejected too rather than silently ignored,
+        # proving the connection is still alive and usable after the earlier rejection
+        err2 = json.loads(await client.recv())
+        assert err2["payload"]["event"] == "error"
+
+
+async def test_rate_limit_is_tracked_independently_per_client(rate_limited_server):
+    _, ws_url, _ = rate_limited_server
+    async with websockets.connect(ws_url) as c1, websockets.connect(ws_url) as c2:
+        await _connected(c1)
+        await _connected(c2)
+        await c1.recv()  # client_joined for c2
+
+        for _ in range(3):
+            await c1.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"text": "from c1"},
+                "timestamp": "2026-08-13T00:00:00+00:00",
+            }))
+            await c1.recv()
+            await c2.recv()
+
+        # c1 is now rate-limited...
+        await c1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "over limit"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        err = json.loads(await c1.recv())
+        assert err["payload"]["event"] == "error"
+
+        # ...but c2's own budget is untouched
+        await c2.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "from c2"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        ok = json.loads(await c2.recv())
+        assert ok["type"] == "broadcast"
+        assert ok["payload"]["text"] == "from c2"
+
+
+async def test_history_endpoint_requires_channel(running_server):
+    _, _, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch():
+        try:
+            urlopen(f"{http_url}/history", timeout=2)
+        except HTTPError as exc:
+            return exc.code, json.loads(exc.read())
+
+    status, body = await loop.run_in_executor(None, fetch)
+    assert status == 400
+    assert "error" in body
+
+
+async def test_history_endpoint_returns_channel_messages_in_chronological_order(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await client.recv()  # subscribed ack
+
+        for i in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "alerts", "seq": i},
+                "timestamp": f"2026-08-13T00:00:0{i}+00:00",
+            }))
+            await client.recv()
+
+        status, body = await loop.run_in_executor(None, fetch, "/history?channel=alerts")
+        assert status == 200
+        assert body["channel"] == "alerts"
+        assert body["has_more"] is False
+        assert [m["payload"]["seq"] for m in body["messages"]] == [0, 1, 2]
+
+
+async def test_history_endpoint_filters_by_since(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        for i in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "alerts", "seq": i},
+                "timestamp": f"2026-08-13T00:00:0{i}+00:00",
+            }))
+            await client.recv()
+
+        status, body = await loop.run_in_executor(
+            None, fetch, "/history?channel=alerts&since=2026-08-13T00:00:00%2B00:00"
+        )
+        assert status == 200
+        assert [m["payload"]["seq"] for m in body["messages"]] == [1, 2]
+
+
+async def test_history_endpoint_paginates_with_has_more(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        for i in range(3):
+            await client.send(json.dumps({
+                "type": "broadcast",
+                "payload": {"channel": "alerts", "seq": i},
+                "timestamp": f"2026-08-13T00:00:0{i}+00:00",
+            }))
+            await client.recv()
+
+        status, body = await loop.run_in_executor(None, fetch, "/history?channel=alerts&limit=2")
+        assert status == 200
+        assert body["limit"] == 2
+        assert body["has_more"] is True
+        assert [m["payload"]["seq"] for m in body["messages"]] == [0, 1]
+
+        status, body = await loop.run_in_executor(
+            None, fetch, "/history?channel=alerts&since=2026-08-13T00:00:01%2B00:00&limit=2"
+        )
+        assert status == 200
+        assert body["has_more"] is False
+        assert [m["payload"]["seq"] for m in body["messages"]] == [2]
+
+
+async def test_history_endpoint_only_returns_matching_channel(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        await client.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "alerts", "text": "alert msg"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await client.recv()
+        await client.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "chat", "text": "chat msg"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await client.recv()
+
+        status, body = await loop.run_in_executor(None, fetch, "/history?channel=alerts")
+        assert status == 200
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["payload"]["text"] == "alert msg"
+
+
+async def test_rate_limit_is_configurable_via_env_var(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "5")
+    app = NotificationServer()
+    try:
+        assert app.rate_limiter.limit == 5
+    finally:
+        await app.close()
+
+
+async def test_message_ttl_is_configurable_via_env_var(monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "3")
+    app = NotificationServer()
+    try:
+        assert app.message_ttl_days == 3
+    finally:
+        await app.close()
+
+
+async def test_expired_messages_are_cleaned_up_on_startup(tmp_path):
+    from notification_server.store import MessageStore
+
+    db_path = str(tmp_path / "history.db")
+    seed_store = MessageStore(db_path)
+    seed_store.save_message("broadcast", {"text": "ancient"}, "2000-01-01T00:00:00+00:00", channel="alerts")
+    seed_store.save_message("broadcast", {"text": "fresh"}, "2026-08-13T00:00:00+00:00", channel="alerts")
+    seed_store.close()
+
+    app = NotificationServer(db_path=db_path, message_ttl_days=7)
+    try:
+        await app.start()
+        await asyncio.sleep(0.05)
+        messages, _ = app.store.get_history(channel="alerts")
+        assert [m["payload"]["text"] for m in messages] == ["fresh"]
+    finally:
+        await app.close()
 
 
 async def test_health_endpoint_reports_connected_client_count(running_server):
