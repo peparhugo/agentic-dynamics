@@ -111,4 +111,37 @@ layout: bare
 
     await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template not found:');
   });
+
+  it('loads TypeScript plugins and runs lifecycle hooks in order', async () => {
+    const pluginsDir = path.join(root, 'plugins');
+    const traceFile = path.join(root, 'hooks.txt');
+    const configFile = path.join(root, 'ssg.config.ts');
+    await fs.mkdir(pluginsDir);
+    await fs.writeFile(path.join(contentDir, 'plugin.md'), '# Original');
+    await fs.writeFile(path.join(pluginsDir, 'custom.ts'), `
+import { appendFileSync } from 'node:fs';
+const trace = ${JSON.stringify(traceFile)};
+export default {
+  onStart() { appendFileSync(trace, 'start\\n'); },
+  beforeBuild() { appendFileSync(trace, 'before\\n'); },
+  onFile(page: any) {
+    appendFileSync(trace, 'file\\n');
+    page.title = 'Changed by plugin';
+    page.content += '<p>Extended</p>';
+  },
+  afterBuild() { appendFileSync(trace, 'after\\n'); },
+  onEnd() { appendFileSync(trace, 'end\\n'); }
+};
+`);
+    await fs.writeFile(configFile, `
+import custom from './plugins/custom';
+export default { plugins: [custom] };
+`);
+
+    const pages = await buildSite({ contentDir, outputDir, configFile });
+
+    expect(pages[0].title).toBe('Changed by plugin');
+    await expect(fs.readFile(path.join(outputDir, 'plugin.html'), 'utf8')).resolves.toContain('<p>Extended</p>');
+    await expect(fs.readFile(traceFile, 'utf8')).resolves.toBe('start\nbefore\nfile\nafter\nend\n');
+  });
 });

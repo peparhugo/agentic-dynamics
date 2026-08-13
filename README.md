@@ -52,3 +52,23 @@ Reusable partials live in `templates/partials/` and can be included by filename,
 for example `{{> header}}`. Set `template: false` or `layout: false` to skip a
 default template or layout for a page. Without template files, the original
 built-in page output remains unchanged.
+
+## Plugins
+
+Add TypeScript plugins to `plugins/` and load them from `ssg.config.ts`. Hooks run
+in plugin order for every lifecycle stage. Configured `onFile` hooks run after
+Markdown parsing and before template rendering, so they can inspect or change a
+page's frontmatter, rendered Markdown, metadata, or output paths.
+
+```ts
+// ssg.config.ts
+import type { SsgConfig } from './src/generator';
+import readingTime from './plugins/reading-time';
+
+export default { plugins: [readingTime] } satisfies SsgConfig;
+```
+
+Plugins may implement `onStart(context)`, `beforeBuild(context)`,
+`onFile(page)`, `afterBuild(context)`, and `onEnd(context)`. Hooks may be sync
+or async. The built-in `MarkdownPlugin`, `TemplatePlugin`, and
+`DevServerPlugin` use the same interface.
