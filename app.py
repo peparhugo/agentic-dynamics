@@ -5,14 +5,14 @@ import json
 import os
 import sqlite3
 import threading
-import uuid
-from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
+
+from transport import BaseTransport, WebSocketTransport
 
 
 Message = dict[str, Any]
@@ -23,8 +23,14 @@ STATE_PREFIX = "notifications"
 class NotificationServer:
     """Manages connected WebSocket clients and notification delivery."""
 
-    def __init__(self, redis_client: Any | None = None, database_url: str | None = None) -> None:
-        self._clients: dict[str, ServerConnection] = {}
+    def __init__(
+        self,
+        redis_client: Any | None = None,
+        database_url: str | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
+        self._transport = transport or self._transport_from_config()
+        self._connected_clients: set[str] = set()
         self._channels: dict[str, set[str]] = {}
         self._clients_lock = threading.Lock()
         self._database_lock = threading.Lock()
@@ -44,6 +50,13 @@ class NotificationServer:
         self._database.commit()
 
     @staticmethod
+    def _transport_from_config() -> BaseTransport:
+        transport_name = os.environ.get("TRANSPORT", "websocket").lower()
+        if transport_name == "websocket":
+            return WebSocketTransport()
+        raise ValueError(f"Unsupported transport: {transport_name}")
+
+    @staticmethod
     def _database_path(database_url: str | None) -> str:
         value = database_url or os.environ.get("DATABASE_URL", ":memory:")
         if value.startswith("sqlite:///"):
@@ -55,7 +68,7 @@ class NotificationServer:
     @property
     def connected_client_count(self) -> int:
         with self._clients_lock:
-            return len(self._clients)
+            return len(self._connected_clients)
 
     @staticmethod
     def _message(message_type: str, payload: dict[str, Any], channel: str | None = None) -> Message:
@@ -100,17 +113,14 @@ class NotificationServer:
         message = event.get("message")
         if not isinstance(message, dict):
             return
-        encoded = json.dumps(message)
         if event.get("route") == "direct":
             recipient = event.get("recipient")
-            client = self._get_client(recipient) if isinstance(recipient, str) else None
-            if client is not None:
-                await client.send(encoded)
+            if isinstance(recipient, str):
+                await self._transport.send_message(recipient, message)
             return
         channel = event.get("channel")
-        clients = self._channel_snapshot(channel) if isinstance(channel, str) else self._client_snapshot()
-        if clients:
-            await asyncio.gather(*(client.send(encoded) for client in clients), return_exceptions=True)
+        client_ids = self._channel_snapshot(channel) if isinstance(channel, str) else None
+        await self._transport.broadcast(message, client_ids)
 
     def _persist(self, message: Message) -> None:
         with self._database_lock:
@@ -137,34 +147,23 @@ class NotificationServer:
             for channel in self._channels:
                 await self._redis.srem(f"{STATE_PREFIX}:channel:{channel}", client_id)
 
-    def _add_client(self, client_id: str, connection: ServerConnection) -> None:
-        with self._clients_lock:
-            self._clients[client_id] = connection
-
     async def _remove_client(self, client_id: str) -> None:
         with self._clients_lock:
             channels = [channel for channel, subscribers in self._channels.items() if client_id in subscribers]
-            self._clients.pop(client_id, None)
+            self._connected_clients.discard(client_id)
             for channel in channels:
                 self._channels[channel].discard(client_id)
                 if not self._channels[channel]:
                     del self._channels[channel]
+        await self._transport.on_disconnect(client_id)
         if self._redis is not None:
             await self._redis.hdel(f"{STATE_PREFIX}:clients", client_id)
             for channel in channels:
                 await self._redis.srem(f"{STATE_PREFIX}:channel:{channel}", client_id)
 
-    def _client_snapshot(self) -> list[ServerConnection]:
+    def _channel_snapshot(self, channel: str) -> list[str]:
         with self._clients_lock:
-            return list(self._clients.values())
-
-    def _channel_snapshot(self, channel: str) -> list[ServerConnection]:
-        with self._clients_lock:
-            return [self._clients[client_id] for client_id in self._channels.get(channel, set()) if client_id in self._clients]
-
-    def _get_client(self, client_id: str) -> ServerConnection | None:
-        with self._clients_lock:
-            return self._clients.get(client_id)
+            return list(self._channels.get(channel, set()))
 
     async def _subscribe(self, client_id: str, channel: str) -> None:
         with self._clients_lock:
@@ -207,7 +206,9 @@ class NotificationServer:
     async def send_direct(self, client_id: str, payload: dict[str, Any]) -> bool:
         """Publish a direct message, returning local recipient availability without Redis."""
         await self._ensure_broker()
-        if self._redis is None and self._get_client(client_id) is None:
+        with self._clients_lock:
+            connected = client_id in self._connected_clients
+        if self._redis is None and not connected:
             return False
         message = self._message("direct", payload)
         self._persist(message)
@@ -216,10 +217,11 @@ class NotificationServer:
 
     async def handler(self, connection: ServerConnection) -> None:
         await self._ensure_broker()
-        client_id = uuid.uuid4().hex
-        self._add_client(client_id, connection)
+        client_id = await self._transport.on_connect(connection)
+        with self._clients_lock:
+            self._connected_clients.add(client_id)
         await self._set_client_state(client_id)
-        await connection.send(json.dumps(self._message("system", {"client_id": client_id})))
+        await self._transport.send_message(client_id, self._message("system", {"client_id": client_id}))
         try:
             async for raw_message in connection:
                 await self._handle_message(client_id, raw_message)
@@ -236,25 +238,19 @@ class NotificationServer:
             if not isinstance(payload, dict):
                 raise ValueError("payload must be an object")
         except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-            sender = self._get_client(sender_id)
-            if sender is not None:
-                await sender.send(json.dumps(self._message("system", {"error": "invalid message"})))
+            await self._transport.send_message(sender_id, self._message("system", {"error": "invalid message"}))
             return
 
         if message_type == "broadcast":
             channel = message.get("channel")
             if channel is not None and not isinstance(channel, str):
-                sender = self._get_client(sender_id)
-                if sender is not None:
-                    await sender.send(json.dumps(self._message("system", {"error": "channel must be a string"})))
+                await self._transport.send_message(sender_id, self._message("system", {"error": "channel must be a string"}))
                 return
             await self.broadcast(payload, channel)
         elif message_type in {"subscribe", "unsubscribe"}:
             channel = message.get("channel")
             if not isinstance(channel, str):
-                sender = self._get_client(sender_id)
-                if sender is not None:
-                    await sender.send(json.dumps(self._message("system", {"error": "channel required"})))
+                await self._transport.send_message(sender_id, self._message("system", {"error": "channel required"}))
                 return
             if message_type == "subscribe":
                 await self._subscribe(sender_id, channel)
@@ -265,17 +261,11 @@ class NotificationServer:
             if isinstance(recipient_id, str):
                 await self.send_direct(recipient_id, payload)
             else:
-                sender = self._get_client(sender_id)
-                if sender is not None:
-                    await sender.send(json.dumps(self._message("system", {"error": "client_id required"})))
+                await self._transport.send_message(sender_id, self._message("system", {"error": "client_id required"}))
         elif message_type == "system":
-            sender = self._get_client(sender_id)
-            if sender is not None:
-                await sender.send(json.dumps(self._message("system", payload)))
+            await self._transport.send_message(sender_id, self._message("system", payload))
         else:
-            sender = self._get_client(sender_id)
-            if sender is not None:
-                await sender.send(json.dumps(self._message("system", {"error": "unsupported message type"})))
+            await self._transport.send_message(sender_id, self._message("system", {"error": "unsupported message type"}))
 
     def _messages(self, limit: int, offset: int) -> list[Message]:
         with self._database_lock:
