@@ -4,6 +4,8 @@ from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 import jwt
@@ -15,12 +17,18 @@ DATABASE = os.environ.get("TASKS_DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_TTL_SECONDS = int(os.environ.get("JWT_TTL_SECONDS", "3600"))
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/3"
+)
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
 
 
-def create_app(database=None):
+def create_app(database=None, ratelimit_storage_uri=None, rate_limit="100 per minute"):
     app = Flask(__name__)
     app.config["DATABASE"] = database or DATABASE
     app.config["JWT_SECRET"] = JWT_SECRET
+    app.config["RATELIMIT_STORAGE_URI"] = ratelimit_storage_uri or RATELIMIT_STORAGE_URI
 
     def get_db():
         if "db" not in g:
@@ -107,6 +115,35 @@ def create_app(database=None):
             return f(user, *args, **kwargs)
         return decorated
 
+    def rate_limit_key():
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token = auth.split(" ", 1)[1].strip()
+            if token:
+                try:
+                    payload = jwt.decode(
+                        token, app.config["JWT_SECRET"], algorithms=[JWT_ALGORITHM]
+                    )
+                except jwt.PyJWTError:
+                    payload = None
+                if payload is not None and payload.get("sub") is not None:
+                    return f"user:{payload['sub']}"
+        return f"ip:{get_remote_address()}"
+
+    limiter = Limiter(
+        key_func=rate_limit_key,
+        app=app,
+        storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+        # A single limit shared across every endpoint per key, rather than
+        # one counter per route, so "100 requests per minute" means total
+        # requests across the whole API.
+        application_limits=[rate_limit],
+        headers_enabled=True,
+        # Each app instance (e.g. one per test) gets its own counters even
+        # though they may share the same Redis instance.
+        key_prefix=os.path.basename(app.config["DATABASE"]),
+    )
+
     @app.errorhandler(404)
     def not_found(e):
         return jsonify({"error": "not found"}), 404
@@ -114,6 +151,10 @@ def create_app(database=None):
     @app.errorhandler(400)
     def bad_request(e):
         return jsonify({"error": "bad request"}), 400
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(e):
+        return jsonify({"error": "rate limit exceeded"}), 429
 
     @app.route("/auth/register", methods=["POST"])
     def register():
@@ -169,8 +210,40 @@ def create_app(database=None):
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks(user):
-        rows = get_task_repo().list_by_owner(user["id"])
-        return jsonify([dict(r) for r in rows])
+        cursor_param = request.args.get("cursor")
+        limit_param = request.args.get("limit")
+
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit = DEFAULT_PAGE_LIMIT
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+            if limit < 1:
+                return jsonify({"error": "limit must be a positive integer"}), 400
+        limit = min(limit, MAX_PAGE_LIMIT)
+
+        task_repo = get_task_repo()
+        rows = task_repo.list_by_owner_paginated(user["id"], cursor, limit)
+        has_more = len(rows) > limit
+        page_rows = rows[:limit]
+        next_cursor = str(page_rows[-1]["id"]) if has_more and page_rows else None
+        total = task_repo.count_by_owner(user["id"])
+
+        return jsonify(
+            {
+                "data": [dict(r) for r in page_rows],
+                "next_cursor": next_cursor,
+                "total": total,
+            }
+        )
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth

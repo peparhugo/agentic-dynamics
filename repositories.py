@@ -64,6 +64,30 @@ class TaskRepository(BaseRepository):
             (owner_id,),
         ).fetchall()
 
+    def list_by_owner_paginated(self, owner_id, cursor, limit):
+        """Return up to `limit + 1` rows after `cursor`, newest first.
+
+        Ordering by id (rather than created_at) keeps the cursor comparison
+        a simple integer inequality while preserving the same newest-first
+        order, since ids are assigned in creation order.
+        """
+        if cursor is None:
+            return self.db.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                (owner_id, limit + 1),
+            ).fetchall()
+        return self.db.execute(
+            "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+            "ORDER BY id DESC LIMIT ?",
+            (owner_id, cursor, limit + 1),
+        ).fetchall()
+
+    def count_by_owner(self, owner_id):
+        row = self.db.execute(
+            "SELECT COUNT(*) AS count FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()
+        return row["count"]
+
     def get_by_id_and_owner(self, task_id, owner_id):
         return self.db.execute(
             "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",

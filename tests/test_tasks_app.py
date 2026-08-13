@@ -19,6 +19,26 @@ def client():
     os.remove(path)
 
 
+@pytest.fixture
+def make_client():
+    """Like `client`, but lets a test pick a custom rate limit."""
+    created = []
+
+    def _make(rate_limit="100 per minute"):
+        fd, path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        app = create_app(database=path, rate_limit=rate_limit)
+        app.testing = True
+        test_client = app.test_client()
+        created.append((test_client, path))
+        return test_client
+
+    yield _make
+
+    for test_client, path in created:
+        os.remove(path)
+
+
 def register(client, username="alice", password="hunter2pass"):
     return client.post("/auth/register", json={"username": username, "password": password})
 
@@ -124,8 +144,8 @@ def test_users_only_see_their_own_tasks(client):
     create_task(client, "Alice task", headers=alice_headers)
     create_task(client, "Bob task", headers=bob_headers)
 
-    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
-    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
+    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()["data"]
 
     assert [t["title"] for t in alice_tasks] == ["Alice task"]
     assert [t["title"] for t in bob_tasks] == ["Bob task"]
@@ -189,7 +209,8 @@ def test_list_tasks_empty(client):
     headers = auth_headers(client)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    data = resp.get_json()
+    assert data == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc_by_created_at(client):
@@ -200,8 +221,11 @@ def test_list_tasks_ordered_desc_by_created_at(client):
 
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["Third", "Second", "First"]
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
 
 
 def test_get_task_success(client):
@@ -402,3 +426,205 @@ def test_migration_adds_owner_id_without_dropping_existing_rows():
         assert row == ("legacy task", None)
     finally:
         os.remove(path)
+
+
+# ── Pagination ────────────────────────────────────────────────────
+
+
+def _create_tasks(client, headers, count):
+    for i in range(count):
+        create_task(client, f"Task {i}", headers=headers)
+
+
+def test_list_tasks_default_page_size_is_20(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 25)
+
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+    assert body["next_cursor"] == str(body["data"][-1]["id"])
+
+
+def test_list_tasks_pagination_walks_every_item_exactly_once(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 25)
+
+    seen_ids = []
+    cursor = None
+    for _ in range(10):
+        params = {"limit": "10"}
+        if cursor is not None:
+            params["cursor"] = cursor
+        resp = client.get("/tasks", query_string=params, headers=headers)
+        assert resp.status_code == 200
+        body = resp.get_json()
+        seen_ids.extend(t["id"] for t in body["data"])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            break
+
+    assert len(seen_ids) == 25
+    assert len(set(seen_ids)) == 25
+
+
+def test_list_tasks_custom_limit_is_respected(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 5)
+
+    resp = client.get("/tasks", query_string={"limit": "2"}, headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 2
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_limit_is_capped_at_100(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 5)
+
+    resp = client.get("/tasks", query_string={"limit": "1000"}, headers=headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 5
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_last_page_has_null_next_cursor(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 3)
+
+    resp = client.get("/tasks", query_string={"limit": "10"}, headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 3
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
+
+
+def test_list_tasks_no_cursor_returns_first_page(client):
+    headers = auth_headers(client)
+    _create_tasks(client, headers, 3)
+
+    resp = client.get("/tasks", headers=headers)
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
+    assert titles == ["Task 2", "Task 1", "Task 0"]
+
+
+def test_list_tasks_invalid_cursor_returns_400(client):
+    headers = auth_headers(client)
+    resp = client.get(
+        "/tasks", query_string={"cursor": "not-a-number"}, headers=headers
+    )
+    assert resp.status_code == 400
+
+
+def test_list_tasks_invalid_limit_returns_400(client):
+    headers = auth_headers(client)
+    resp = client.get(
+        "/tasks", query_string={"limit": "not-a-number"}, headers=headers
+    )
+    assert resp.status_code == 400
+
+
+def test_list_tasks_non_positive_limit_returns_400(client):
+    headers = auth_headers(client)
+    resp = client.get("/tasks", query_string={"limit": "0"}, headers=headers)
+    assert resp.status_code == 400
+
+
+def test_list_tasks_pagination_isolated_per_user(client):
+    alice_headers = auth_headers(client, "alice", "hunter2pass")
+    bob_headers = auth_headers(client, "bob", "swordfish123")
+    _create_tasks(client, alice_headers, 3)
+    _create_tasks(client, bob_headers, 2)
+
+    alice_body = client.get("/tasks", headers=alice_headers).get_json()
+    bob_body = client.get("/tasks", headers=bob_headers).get_json()
+
+    assert alice_body["total"] == 3
+    assert bob_body["total"] == 2
+
+
+# ── Rate limiting ────────────────────────────────────────────────
+
+
+def test_requests_within_limit_all_succeed(make_client):
+    client = make_client(rate_limit="5 per minute")
+    headers = auth_headers(client)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(5)]
+    assert all(r.status_code == 200 for r in responses)
+
+
+def test_request_over_limit_returns_429(make_client):
+    client = make_client(rate_limit="3 per minute")
+    headers = auth_headers(client)
+
+    for _ in range(3):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    blocked = client.get("/tasks", headers=headers)
+    assert blocked.status_code == 429
+    assert "error" in blocked.get_json()
+
+
+def test_429_response_has_retry_after_header(make_client):
+    # Registration and login are rate limited by IP (no user identity yet),
+    # so the limit must cover those two calls before the user-keyed quota
+    # for /tasks is exercised below.
+    client = make_client(rate_limit="2 per minute")
+    headers = auth_headers(client)
+
+    client.get("/tasks", headers=headers)
+    client.get("/tasks", headers=headers)
+    blocked = client.get("/tasks", headers=headers)
+
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+    assert int(blocked.headers["Retry-After"]) >= 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(make_client):
+    client = make_client(rate_limit="2 per minute")
+
+    for _ in range(2):
+        resp = client.post(
+            "/auth/login", json={"username": "ghost", "password": "whatever1"}
+        )
+        assert resp.status_code == 401
+
+    blocked = client.post(
+        "/auth/login", json={"username": "ghost", "password": "whatever1"}
+    )
+    assert blocked.status_code == 429
+    assert "Retry-After" in blocked.headers
+
+
+def test_rate_limit_is_per_user_not_shared(make_client):
+    # Both users register/login from the same test-client IP (4 IP-keyed
+    # requests total), so the limit must be high enough to cover that
+    # before each user's independent /tasks quota is exercised below.
+    client = make_client(rate_limit="5 per minute")
+    alice_headers = auth_headers(client, "alice", "hunter2pass")
+    bob_headers = auth_headers(client, "bob", "swordfish123")
+
+    for _ in range(5):
+        assert client.get("/tasks", headers=alice_headers).status_code == 200
+
+    assert client.get("/tasks", headers=alice_headers).status_code == 429
+    # Bob has his own quota and is unaffected by Alice exhausting hers.
+    assert client.get("/tasks", headers=bob_headers).status_code == 200
+
+
+def test_rate_limit_is_shared_across_endpoints_for_same_user(make_client):
+    client = make_client(rate_limit="3 per minute")
+    headers = auth_headers(client)
+
+    assert client.get("/tasks", headers=headers).status_code == 200
+    assert create_task(client, "Task", headers=headers).status_code == 201
+    assert client.get("/tasks", headers=headers).status_code == 200
+
+    blocked = client.get("/tasks", headers=headers)
+    assert blocked.status_code == 429
