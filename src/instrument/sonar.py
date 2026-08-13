@@ -30,6 +30,11 @@ _SONAR_SCANNER_CANDIDATES = [
     "/opt/sonar-scanner-*/bin/sonar-scanner",
 ]
 
+# Process-local cache keyed by project key. A commit is scanned twice (once as
+# the child of its session, once as the parent of the next), so this halves the
+# number of scanner runs. Safe because project keys embed the commit hash.
+_SONAR_CACHE: dict[str, SonarMetrics] = {}
+
 
 def _find_sonar_scanner() -> str | None:
     """Locate the sonar-scanner executable, falling back to known paths."""
@@ -180,6 +185,9 @@ def run_sonar_analysis(
     if not project_key:
         project_key = f"exp_{wt.name}"
 
+    if project_key in _SONAR_CACHE:
+        return _SONAR_CACHE[project_key]
+
     metrics = SonarMetrics(project_key=project_key)
 
     props_path = wt / "sonar-project.properties"
@@ -228,7 +236,10 @@ sonar.scm.disabled=true
     if remaining < 2:
         return SonarMetrics(project_key=project_key, error="no time remaining for API fetch")
 
-    return _fetch_measures(project_key, sonar_url, sonar_user, sonar_password, metrics, remaining)
+    result = _fetch_measures(project_key, sonar_url, sonar_user, sonar_password, metrics, remaining)
+    if result.analyzed:
+        _SONAR_CACHE[project_key] = result
+    return result
 
 
 def _fetch_measures(
