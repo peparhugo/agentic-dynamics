@@ -50,7 +50,7 @@ def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
         cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
         )
         conn.commit()
