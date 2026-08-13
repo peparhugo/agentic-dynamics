@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
+import urllib.parse
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -20,6 +22,9 @@ from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Request, Response
+
+from persistence import MessageStore
+from redis_backbone import RedisBackbone
 
 MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
@@ -109,41 +114,104 @@ class ChannelRegistry:
 
 
 class NotificationServer:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        redis_backbone: RedisBackbone | None = None,
+        message_store: MessageStore | None = None,
+        server_id: str | None = None,
+    ) -> None:
         self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
+        self.redis_backbone = redis_backbone
+        self.message_store = message_store
+        self.server_id = server_id or str(uuid.uuid4())
 
-    async def broadcast(
-        self, payload: dict, msg_type: str = "broadcast", channel: str | None = None
-    ) -> int:
-        message = json.dumps(make_message(msg_type, payload, channel=channel))
+    async def start(self) -> None:
+        """Begin subscribing to the Redis backbone, if configured."""
+        if self.redis_backbone is not None:
+            await self.redis_backbone.start(self._on_redis_message)
+
+    async def stop(self) -> None:
+        if self.redis_backbone is not None:
+            await self.redis_backbone.stop()
+
+    async def _deliver_broadcast_local(self, message: dict, channel: str | None) -> int:
+        encoded = json.dumps(message)
         target_ids = set(await self.channels.subscribers(channel)) if channel is not None else None
         sent = 0
         for client_id, connection in await self.registry.snapshot():
             if target_ids is not None and client_id not in target_ids:
                 continue
             try:
-                await connection.send(message)
+                await connection.send(encoded)
                 sent += 1
             except ConnectionClosed:
                 await self.registry.remove(client_id)
                 await self.channels.remove_client(client_id)
         return sent
 
-    async def send_direct(self, client_id: str, payload: dict) -> bool:
+    async def _deliver_direct_local(self, client_id: str, message: dict) -> bool:
         connection = await self.registry.get(client_id)
         if connection is None:
             return False
-        message = json.dumps(make_message("direct", payload))
         try:
-            await connection.send(message)
+            await connection.send(json.dumps(message))
             return True
         except ConnectionClosed:
             await self.registry.remove(client_id)
             return False
 
+    async def _on_redis_message(self, envelope: dict) -> None:
+        # Messages this same instance published were already delivered to
+        # its local clients synchronously — skip to avoid double delivery.
+        if envelope.get("_origin") == self.server_id:
+            return
+        message = envelope.get("message")
+        if not isinstance(message, dict):
+            return
+        if envelope.get("kind") == "direct":
+            await self._deliver_direct_local(envelope.get("target_client_id"), message)
+        else:
+            await self._deliver_broadcast_local(message, envelope.get("channel"))
+
+    async def broadcast(
+        self, payload: dict, msg_type: str = "broadcast", channel: str | None = None
+    ) -> int:
+        message = make_message(msg_type, payload, channel=channel)
+        if self.message_store is not None:
+            await self.message_store.save(message)
+        sent = await self._deliver_broadcast_local(message, channel)
+        if self.redis_backbone is not None:
+            await self.redis_backbone.publish(
+                {
+                    "_origin": self.server_id,
+                    "kind": "broadcast",
+                    "channel": channel,
+                    "message": message,
+                }
+            )
+        return sent
+
+    async def send_direct(self, client_id: str, payload: dict) -> bool:
+        message = make_message("direct", payload)
+        if self.message_store is not None:
+            await self.message_store.save(message)
+        delivered = await self._deliver_direct_local(client_id, message)
+        if not delivered and self.redis_backbone is not None:
+            await self.redis_backbone.publish(
+                {
+                    "_origin": self.server_id,
+                    "kind": "direct",
+                    "target_client_id": client_id,
+                    "message": message,
+                }
+            )
+        return delivered
+
     async def handler(self, connection: ServerConnection) -> None:
         client_id = await self.registry.add(connection)
+        if self.redis_backbone is not None:
+            await self.redis_backbone.set_client_state(client_id)
         try:
             await connection.send(
                 json.dumps(
@@ -157,6 +225,8 @@ class NotificationServer:
         finally:
             await self.registry.remove(client_id)
             await self.channels.remove_client(client_id)
+            if self.redis_backbone is not None:
+                await self.redis_backbone.clear_client_state(client_id)
 
     async def _handle_incoming(self, client_id: str, raw: str | bytes) -> None:
         try:
@@ -239,15 +309,27 @@ class NotificationServer:
     async def process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        if request.path == "/health":
+        parsed = urllib.parse.urlsplit(request.path)
+        path = parsed.path
+
+        if path == "/health":
             count = await self.registry.count()
             return self._json_response({"connected_clients": count})
 
-        if request.path == "/channels":
+        if path == "/channels":
             counts = await self.channels.channel_counts()
             return self._json_response({"channels": counts})
 
-        match = _CHANNEL_SUBSCRIBERS_PATH.match(request.path)
+        if path == "/messages":
+            query = urllib.parse.parse_qs(parsed.query)
+            limit = _parse_int(query.get("limit", ["50"])[0], default=50)
+            offset = _parse_int(query.get("offset", ["0"])[0], default=0)
+            if self.message_store is None:
+                return self._json_response({"messages": [], "limit": limit, "offset": offset})
+            messages = await self.message_store.list_messages(limit=limit, offset=offset)
+            return self._json_response({"messages": messages, "limit": limit, "offset": offset})
+
+        match = _CHANNEL_SUBSCRIBERS_PATH.match(path)
         if match:
             channel = match.group(1)
             subscribers = await self.channels.subscribers(channel)
@@ -256,14 +338,42 @@ class NotificationServer:
         return None
 
 
-def create_app() -> NotificationServer:
-    return NotificationServer()
+def _parse_int(value: str, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def create_app(
+    redis_url: str | None = None,
+    database_url: str | None = None,
+    server_id: str | None = None,
+) -> NotificationServer:
+    redis_url = redis_url if redis_url is not None else os.environ.get("REDIS_URL")
+    database_url = database_url if database_url is not None else os.environ.get("DATABASE_URL", "messages.db")
+    server_id = server_id or str(uuid.uuid4())
+
+    redis_backbone = None
+    if redis_url:
+        import redis.asyncio as redis_asyncio
+
+        redis_backbone = RedisBackbone(redis_asyncio.from_url(redis_url), server_id=server_id)
+
+    message_store = MessageStore(database_url)
+    return NotificationServer(
+        redis_backbone=redis_backbone, message_store=message_store, server_id=server_id
+    )
 
 
 async def run_server(host: str = "localhost", port: int = 8765) -> None:
     app = create_app()
-    async with serve(app.handler, host, port, process_request=app.process_request):
-        await asyncio.Future()  # run forever
+    await app.start()
+    try:
+        async with serve(app.handler, host, port, process_request=app.process_request):
+            await asyncio.Future()  # run forever
+    finally:
+        await app.stop()
 
 
 if __name__ == "__main__":
