@@ -9,7 +9,7 @@ export {
 } from './engine';
 export type { TemplateMeta, SiteContext, SitePageRef } from './engine';
 export { buildSite, slugify } from './build';
-export type { SiteBuildResult } from './build';
+export type { SiteBuildResult, BuildSiteOptions } from './build';
 export { parseArgs, runCli } from './cli';
 export type { CliOptions } from './cli';
 export {
@@ -20,4 +20,13 @@ export {
   RELOAD_MESSAGE,
 } from './server';
 export type { DevServer, DevServerOptions } from './server';
+export { PluginPipeline } from './plugin';
+export type { Plugin, PluginContext, PluginHook } from './plugin';
+export { SSGEngine } from './core';
+export type { SSGEngineOptions } from './core';
+export { loadConfig, loadPluginsFromConfig, defaultPlugins, resolvePluginEntry } from './config';
+export type { SsgConfig, PluginEntry, PluginConstructor } from './config';
+export { MarkdownPlugin } from './plugins/MarkdownPlugin';
+export { TemplatePlugin } from './plugins/TemplatePlugin';
+export { DevServerPlugin } from './plugins/DevServerPlugin';
 export type { Page, PageData } from './types';

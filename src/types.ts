@@ -12,4 +12,5 @@ export interface Page {
   body: string;
   html: string;
   outputFile: string;
+  templated?: string | null;
 }
