@@ -4,7 +4,6 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 import time
 from datetime import datetime, timezone
 from functools import wraps
@@ -13,6 +12,12 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from repositories import (
+    BaseRepository,
+    DuplicateUsernameError,
+    TaskRepository,
+    UserRepository,
+)
 
 
 app = Flask(__name__)
@@ -24,44 +29,19 @@ DATABASE = os.environ.get("DATABASE", "tasks.db")
 
 
 def get_db():
-    connection = sqlite3.connect(DATABASE)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return BaseRepository.connect(DATABASE)
 
 
 def init_db():
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
+    BaseRepository.initialize_database(DATABASE)
 
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            # Nullable ownership preserves legacy rows without exposing them to users.
-            connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)"
-        )
+
+def task_repository():
+    return TaskRepository(DATABASE)
+
+
+def user_repository():
+    return UserRepository(DATABASE)
 
 
 def _base64url_encode(value):
@@ -125,11 +105,10 @@ def decode_token(token):
     ):
         return None
 
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, username FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    return dict(user) if user is not None else None
+    user = user_repository().get_by_id(user_id)
+    if user is None:
+        return None
+    return {"id": user["id"], "username": user["username"]}
 
 
 def require_auth(view):
@@ -151,57 +130,24 @@ def require_auth(view):
 
 def create_task(title, owner_id):
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-            (title, created_at, owner_id),
-        )
-        task_id = cursor.lastrowid
-    return get_task(task_id, owner_id)
+    return task_repository().create_for_owner(title, created_at, owner_id)
 
 
 def get_tasks(owner_id):
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (owner_id,),
-        ).fetchall()
-    return [dict(row) for row in rows]
+    return task_repository().list_for_owner(owner_id)
 
 
 def get_task(task_id, owner_id):
-    with get_db() as connection:
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-    return dict(row) if row is not None else None
+    return task_repository().get_for_owner(task_id, owner_id)
 
 
 def update_task(task_id, owner_id, title=None, status=None):
-    if get_task(task_id, owner_id) is None:
-        return None
-
-    updates = []
-    values = []
+    updates = {}
     if title is not None:
-        updates.append("title = ?")
-        values.append(title)
+        updates["title"] = title
     if status is not None:
-        updates.append("status = ?")
-        values.append(status)
-
-    if updates:
-        values.extend((task_id, owner_id))
-        with get_db() as connection:
-            connection.execute(
-                f"UPDATE tasks SET {', '.join(updates)} "
-                "WHERE id = ? AND owner_id = ?",
-                values,
-            )
-    return get_task(task_id, owner_id)
+        updates["status"] = status
+    return task_repository().update_for_owner(task_id, owner_id, **updates)
 
 
 def json_body():
@@ -227,15 +173,12 @@ def register():
         return jsonify(error="username and password are required"), 400
 
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user = user_repository().create_user(
+            username, generate_password_hash(password)
+        )
+    except DuplicateUsernameError:
         return jsonify(error="username already exists"), 409
-    return jsonify(id=user_id, username=username), 201
+    return jsonify(id=user["id"], username=username), 201
 
 
 @app.post("/auth/login")
@@ -244,10 +187,7 @@ def login():
     if username is None:
         return jsonify(error="username and password are required"), 400
 
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, password_hash FROM users WHERE username = ?", (username,)
-        ).fetchone()
+    user = user_repository().get_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify(error="invalid credentials"), 401
     return jsonify(token=create_token(user["id"]))
