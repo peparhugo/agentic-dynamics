@@ -15,8 +15,9 @@ export function createProgram(): Command {
     .description('Generate the site')
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
-    .action(async (options: { content: string; output: string }) => {
-      const pages = await buildSite({ contentDir: options.content, outputDir: options.output });
+    .option('--templates <dir>', 'template directory', './templates')
+    .action(async (options: { content: string; output: string; templates: string }) => {
+      const pages = await buildSite({ contentDir: options.content, outputDir: options.output, templateDir: options.templates });
       process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${pathForMessage(options.output)}\n`);
     });
 

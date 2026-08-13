@@ -59,6 +59,61 @@ describe('static site generator', () => {
     await expect(fs.stat(path.join(output, 'ignore.html'))).rejects.toThrow();
   });
 
+  test('renders pages with the default template, layout, and partials', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'public');
+    const templates = path.join(workspace, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'hello.md'), '---\ntitle: Hello <World>\nsubtitle: A custom value\n---\nMarkdown **content**');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article><h1>{{title}}</h1><p>{{subtitle}}</p>{{{content}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<!doctype html>{{> header}}<main>{{{body}}}</main>{{> footer}}');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
+    const rendered = await fs.readFile(path.join(output, 'hello.html'), 'utf8');
+
+    expect(rendered).toContain('<header>Hello &lt;World&gt;</header>');
+    expect(rendered).toContain('<h1>Hello &lt;World&gt;</h1>');
+    expect(rendered).toContain('<p>A custom value</p>');
+    expect(rendered).toContain('<p>Markdown <strong>content</strong></p>');
+    expect(rendered).toContain('<footer>Footer</footer>');
+  });
+
+  test('supports page-selected templates and layouts with optional hbs extensions', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'public');
+    const templates = path.join(workspace, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'post.md'), '---\ntitle: Selected\ntemplate: post.hbs\nlayout: article\n---\nBody');
+    await fs.writeFile(path.join(templates, 'post.hbs'), '<section>{{{content}}}</section>');
+    await fs.writeFile(path.join(templates, 'layouts', 'article.hbs'), '<html><title>{{title}}</title>{{{body}}}</html>');
+
+    const [page] = await buildSite({ contentDir: content, outputDir: output, templateDir: templates });
+
+    expect(page.template).toBe('post.hbs');
+    expect(page.layout).toBe('article');
+    await expect(fs.readFile(path.join(output, 'post.html'), 'utf8')).resolves.toBe(
+      '<html><title>Selected</title><section><p>Body</p>\n</section></html>',
+    );
+  });
+
+  test('reports a missing selected template', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'public');
+    const templates = path.join(workspace, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'post.md'), '---\ntemplate: missing\n---\nBody');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '{{{body}}}');
+
+    await expect(buildSite({ contentDir: content, outputDir: output, templateDir: templates }))
+      .rejects.toThrow('Template not found: missing');
+  });
+
   test('cleans stale output and supports an empty content directory', async () => {
     const content = path.join(workspace, 'content');
     const output = path.join(workspace, 'output');

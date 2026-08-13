@@ -28,4 +28,26 @@ Content is read recursively from `./content` and HTML is written to `./dist`. Ov
 npx ssg build --content ./articles --output ./public
 ```
 
+## Templates
+
+Put Handlebars templates in `./templates`, layouts in `./templates/layouts`, and reusable partials in `./templates/partials`. Pages use `default.hbs` and the `layouts/default.hbs` layout unless frontmatter selects another file:
+
+```yaml
+---
+title: My post
+template: post
+layout: site
+---
+```
+
+Page templates receive frontmatter plus `title`, `date`, `tags`, `url`, and raw Markdown HTML as `content`. Layouts additionally receive the rendered page as `body`. Use triple braces for HTML and partial syntax for includes:
+
+```handlebars
+{{> header}}
+<main>{{{body}}}</main>
+{{> footer}}
+```
+
+Override the template directory with `npx ssg build --templates ./theme`. If no template directory exists, the built-in page renderer remains in use.
+
 Run tests with `npm test`.
