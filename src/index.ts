@@ -252,3 +252,5 @@ export async function buildSite(options: BuildOptions = {}): Promise<GeneratedPa
 
   return pages.map(({ html: _html, frontmatter: _frontmatter, template: _template, layout: _layout, ...page }) => page);
 }
+
+export { serveSite, type DevServer, type ServeOptions } from './server';

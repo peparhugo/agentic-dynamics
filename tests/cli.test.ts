@@ -26,7 +26,11 @@ describe('CLI', () => {
   });
 
   it('rejects unsupported commands', async () => {
-    await expect(run(['serve'])).rejects.toThrow('Unknown command: serve');
+    await expect(run(['preview'])).rejects.toThrow('Unknown command: preview');
+  });
+
+  it('rejects invalid server ports', async () => {
+    await expect(run(['serve', '--port', '70000'])).rejects.toThrow('Invalid port: 70000');
   });
 
   it('accepts a custom template directory', async () => {
