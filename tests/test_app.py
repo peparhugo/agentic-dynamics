@@ -6,18 +6,26 @@ from xml.etree import ElementTree
 import pytest
 import pytest_asyncio
 import websockets
+import fakeredis.aioredis
 
 from app import NotificationServer, SERVICE_NS, SOAP_ENV
 
 
 @pytest_asyncio.fixture
-async def server():
-    instance = NotificationServer(websocket_port=0, soap_port=0)
+async def server(tmp_path):
+    broker = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    instance = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=broker,
+        database_url=str(tmp_path / "messages.db"),
+    )
     await instance.start()
     try:
         yield instance
     finally:
         await instance.stop()
+        await broker.aclose()
 
 
 async def connect(server):
@@ -305,3 +313,89 @@ async def test_soap_rejects_unsupported_operation(server):
     fault = root.find(f".//{{{SOAP_ENV}}}Fault")
     assert fault is not None
     assert "unsupported SOAP operation" in body.decode()
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    fake_server = fakeredis.FakeServer()
+    first_broker = fakeredis.aioredis.FakeRedis(
+        server=fake_server, decode_responses=True
+    )
+    second_broker = fakeredis.aioredis.FakeRedis(
+        server=fake_server, decode_responses=True
+    )
+    first_server = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=first_broker,
+        database_url=str(tmp_path / "first.db"),
+    )
+    second_server = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=second_broker,
+        database_url=str(tmp_path / "second.db"),
+    )
+    await asyncio.gather(first_server.start(), second_server.start())
+    sender, greeting = await connect(first_server)
+    recipient, _ = await connect(second_server)
+    try:
+        await send_message(sender, "broadcast", {"text": "distributed"})
+        sender_message, recipient_message = await asyncio.gather(
+            sender.recv(), recipient.recv()
+        )
+        for raw in (sender_message, recipient_message):
+            received = json.loads(raw)
+            assert received["payload"] == {
+                "sender_id": greeting["payload"]["client_id"],
+                "text": "distributed",
+            }
+    finally:
+        await asyncio.gather(sender.close(), recipient.close())
+        await asyncio.gather(first_server.stop(), second_server.stop())
+        await asyncio.gather(first_broker.aclose(), second_broker.aclose())
+
+
+@pytest.mark.asyncio
+async def test_message_history_persists_across_restart(tmp_path):
+    database = str(tmp_path / "history.db")
+    fake_server = fakeredis.FakeServer()
+
+    async def start_server():
+        broker = fakeredis.aioredis.FakeRedis(
+            server=fake_server, decode_responses=True
+        )
+        instance = NotificationServer(
+            websocket_port=0,
+            soap_port=0,
+            redis_client=broker,
+            database_url=database,
+        )
+        await instance.start()
+        return instance, broker
+
+    first, first_broker = await start_server()
+    socket, _ = await connect(first)
+    await send_message(socket, "subscribe", channel="history")
+    await socket.recv()
+    await send_message(socket, "broadcast", {"sequence": 1}, "history")
+    await send_message(socket, "broadcast", {"sequence": 2}, "history")
+    await socket.recv()
+    await socket.recv()
+    await socket.close()
+    await first.stop()
+    await first_broker.aclose()
+
+    second, second_broker = await start_server()
+    try:
+        headers, body = await get_request(second, "/messages?limit=1&offset=1")
+        assert headers.startswith("HTTP/1.1 200 OK")
+        assert len(body["messages"]) == 1
+        stored = body["messages"][0]
+        assert set(stored) == {"id", "channel", "type", "payload", "timestamp"}
+        assert stored["channel"] == "history"
+        assert stored["type"] == "broadcast"
+        assert stored["payload"]["sequence"] == 1
+    finally:
+        await second.stop()
+        await second_broker.aclose()

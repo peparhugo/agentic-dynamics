@@ -7,7 +7,8 @@ health endpoint requirement.
 ## Run
 
 ```bash
-python3 app.py --host 127.0.0.1 --websocket-port 8765 --soap-port 8080
+REDIS_URL=redis://localhost:6379/0 DATABASE_URL=notifications.db \
+  python3 app.py --host 127.0.0.1 --websocket-port 8765 --soap-port 8080
 ```
 
 Clients receive a `system` message containing their `client_id` immediately
@@ -28,7 +29,8 @@ change a connection's subscriptions. A `broadcast` or `direct` message with a
 channel retain their original behavior.
 
 The HTTP port also exposes `GET /channels` and
-`GET /channels/{name}/subscribers` as JSON endpoints.
+`GET /channels/{name}/subscribers` as JSON endpoints. Message history is
+available from `GET /messages?limit=50&offset=0`, newest first.
 
 ## SOAP Health API
 
