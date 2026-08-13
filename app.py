@@ -1,4 +1,4 @@
-"""Async WebSocket notification server backed by Redis and SQLite."""
+"""Async notification server backed by Redis and SQLite."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import sqlite3
+from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -283,17 +284,17 @@ class MessageStore:
 
 
 class ClientRegistry:
-    """Local sockets paired with globally shared connection state."""
+    """Local transport connections paired with globally shared connection state."""
 
     def __init__(self, backbone: InMemoryBackbone | RedisBackbone) -> None:
         self._backbone = backbone
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
-    async def add(self, websocket: ServerConnection) -> str:
+    async def add(self, connection: Any) -> str:
         client_id = str(uuid4())
         async with self._lock:
-            self._clients[client_id] = websocket
+            self._clients[client_id] = connection
         await self._backbone.add_client(client_id)
         return client_id
 
@@ -305,11 +306,11 @@ class ClientRegistry:
     async def count(self) -> int:
         return await self._backbone.count()
 
-    async def snapshot(self) -> list[tuple[str, ServerConnection]]:
+    async def snapshot(self) -> list[tuple[str, Any]]:
         async with self._lock:
             return list(self._clients.items())
 
-    async def get(self, client_id: str) -> ServerConnection | None:
+    async def get(self, client_id: str) -> Any | None:
         async with self._lock:
             return self._clients.get(client_id)
 
@@ -319,7 +320,7 @@ class ClientRegistry:
     async def unsubscribe(self, client_id: str, channel: str) -> None:
         await self._backbone.unsubscribe_client(client_id, channel)
 
-    async def channel_snapshot(self, channel: str) -> list[tuple[str, ServerConnection]]:
+    async def channel_snapshot(self, channel: str) -> list[tuple[str, Any]]:
         async with self._lock:
             local = list(self._clients.items())
         return [item for item in local if await self._backbone.is_subscribed(item[0], channel)]
@@ -337,13 +338,95 @@ class ClientRegistry:
         return await self._backbone.is_connected(client_id)
 
 
+class BaseTransport(ABC):
+    """Interface between notification routing and a client transport."""
+
+    def bind(self, server: NotificationServer) -> None:
+        self.server = server
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> str:
+        """Register a transport connection and return its client ID."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Remove a transport connection."""
+
+    @abstractmethod
+    async def send_message(self, connection: Any, message: dict[str, Any]) -> None:
+        """Send one wire-format message to a connection."""
+
+    @abstractmethod
+    async def broadcast(
+        self, clients: list[tuple[str, Any]], message: dict[str, Any]
+    ) -> None:
+        """Deliver a message to a collection of local connections."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    async def handler(self, websocket: ServerConnection) -> None:
+        await self.server.start()
+        client_id = await self.on_connect(websocket)
+        try:
+            async for raw_message in websocket:
+                try:
+                    message = json.loads(raw_message)
+                except (json.JSONDecodeError, UnicodeDecodeError) as error:
+                    await self.send_message(
+                        websocket,
+                        make_message("system", {"event": "error", "message": str(error)}),
+                    )
+                    continue
+                await self.server.handle_message(client_id, websocket, message)
+        except ConnectionClosed:
+            pass
+        finally:
+            await self.on_disconnect(client_id)
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        client_id = await self.server.clients.add(connection)
+        await self.send_message(
+            connection, make_message("system", {"event": "connected", "client_id": client_id})
+        )
+        return client_id
+
+    async def on_disconnect(self, client_id: str) -> None:
+        await self.server.clients.remove(client_id)
+
+    async def send_message(
+        self, connection: ServerConnection, message: dict[str, Any]
+    ) -> None:
+        await connection.send(json.dumps(message))
+
+    async def broadcast(
+        self, clients: list[tuple[str, Any]], message: dict[str, Any]
+    ) -> None:
+        results = await asyncio.gather(
+            *(self.send_message(connection, message) for _, connection in clients),
+            return_exceptions=True,
+        )
+        for (client_id, _), result in zip(clients, results):
+            if isinstance(result, Exception):
+                await self.on_disconnect(client_id)
+
+
+def create_transport(name: str) -> BaseTransport:
+    """Create the configured client transport."""
+    if name.lower() == "websocket":
+        return WebSocketTransport()
+    raise ValueError(f"unsupported transport: {name}")
+
+
 class NotificationServer:
-    """Manage WebSocket clients and route notifications through a shared backbone."""
+    """Route notifications through a shared backbone and pluggable transport."""
 
     def __init__(
         self,
         backbone: InMemoryBackbone | RedisBackbone | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         redis_url = os.getenv("REDIS_URL")
         self.backbone = backbone or (
@@ -351,6 +434,8 @@ class NotificationServer:
         )
         self.store = MessageStore(database_url or os.getenv("DATABASE_URL", ":memory:"))
         self.clients = ClientRegistry(self.backbone)
+        self.transport = transport or create_transport(os.getenv("TRANSPORT", "websocket"))
+        self.transport.bind(self)
         self._worker: asyncio.Task[None] | None = None
         self._worker_ready = asyncio.Event()
 
@@ -365,7 +450,7 @@ class NotificationServer:
             await asyncio.gather(self._worker, return_exceptions=True)
             self._worker = None
         for client_id, _ in await self.clients.snapshot():
-            await self.clients.remove(client_id)
+            await self.transport.on_disconnect(client_id)
         await self.store.close()
         await self.backbone.close()
 
@@ -383,24 +468,16 @@ class NotificationServer:
             self._worker_ready.set()
 
     async def websocket_handler(self, websocket: ServerConnection) -> None:
-        await self.start()
-        client_id = await self.clients.add(websocket)
-        await websocket.send(
-            json.dumps(make_message("system", {"event": "connected", "client_id": client_id}))
-        )
-        try:
-            async for raw_message in websocket:
-                await self._handle_message(client_id, websocket, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            await self.clients.remove(client_id)
+        """Compatibility entry point for the default WebSocket API."""
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("websocket_handler requires the websocket transport")
+        await self.transport.handler(websocket)
 
-    async def _handle_message(
-        self, client_id: str, websocket: ServerConnection, raw_message: str | bytes
+    async def handle_message(
+        self, client_id: str, connection: Any, message: Any
     ) -> None:
+        """Process a decoded message received by any transport."""
         try:
-            message = json.loads(raw_message)
             self._validate_message(message)
             message_type = message["type"]
             channel = message.get("channel")
@@ -415,9 +492,22 @@ class NotificationServer:
             else:
                 raise ValueError("clients cannot send system messages")
         except (json.JSONDecodeError, TypeError, ValueError) as error:
-            await websocket.send(
-                json.dumps(make_message("system", {"event": "error", "message": str(error)}))
+            await self.transport.send_message(
+                connection, make_message("system", {"event": "error", "message": str(error)})
             )
+
+    async def _handle_message(
+        self, client_id: str, connection: Any, raw_message: str | bytes
+    ) -> None:
+        """Preserve the previous internal WebSocket message entry point."""
+        try:
+            message = json.loads(raw_message)
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            await self.transport.send_message(
+                connection, make_message("system", {"event": "error", "message": str(error)})
+            )
+            return
+        await self.handle_message(client_id, connection, message)
 
     @staticmethod
     def _validate_message(message: Any) -> None:
@@ -472,13 +562,7 @@ class NotificationServer:
             clients = await self.clients.channel_snapshot(envelope["channel"])
         else:
             clients = await self.clients.snapshot()
-        results = await asyncio.gather(
-            *(websocket.send(json.dumps(message)) for _, websocket in clients),
-            return_exceptions=True,
-        )
-        for (client_id, _), result in zip(clients, results):
-            if isinstance(result, Exception):
-                await self.clients.remove(client_id)
+        await self.transport.broadcast(clients, message)
 
     async def health_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
