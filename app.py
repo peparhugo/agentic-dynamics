@@ -1,146 +1,150 @@
 """
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
-
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
+WebSocket-based notification server with REST health endpoint.
 """
 
-from flask import Flask, request, jsonify
+import asyncio
+import json
+import uuid
 from datetime import datetime
-import sqlite3
-import os
-
-app = Flask(__name__)
-
-DATABASE = os.environ.get("DATABASE", "todos.db")
+from typing import Dict
+import websockets
+from websockets.exceptions import ConnectionClosed
+from aiohttp import web
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+class ClientRegistry:
+    """Thread-safe registry of connected WebSocket clients."""
+
+    def __init__(self):
+        self.clients: Dict[str, object] = {}
+        self.lock = asyncio.Lock()
+
+    async def register(self, client_id: str, websocket: object):
+        async with self.lock:
+            self.clients[client_id] = websocket
+
+    async def unregister(self, client_id: str):
+        async with self.lock:
+            self.clients.pop(client_id, None)
+
+    async def get_client_count(self) -> int:
+        async with self.lock:
+            return len(self.clients)
+
+    async def broadcast(self, message: dict):
+        """Send message to all connected clients."""
+        async with self.lock:
+            disconnected = set()
+            for client_id, websocket in self.clients.items():
+                try:
+                    await websocket.send(json.dumps(message))
+                except (ConnectionClosed, Exception):
+                    disconnected.add(client_id)
+
+        for client_id in disconnected:
+            await self.unregister(client_id)
+
+    async def send_direct(self, client_id: str, message: dict):
+        """Send message to specific client."""
+        async with self.lock:
+            websocket = self.clients.get(client_id)
+
+        if websocket:
+            try:
+                await websocket.send(json.dumps(message))
+            except (ConnectionClosed, Exception):
+                await self.unregister(client_id)
 
 
-def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
-            ")"
-        )
+# Global registry
+registry = ClientRegistry()
 
 
-# ── Models ────────────────────────────────────────────────────
+def create_message(msg_type: str, payload: dict) -> dict:
+    """Create a properly formatted message."""
+    return {
+        "type": msg_type,
+        "payload": payload,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
+async def websocket_handler(websocket):
+    """Handle WebSocket connection."""
+    client_id = str(uuid.uuid4())
 
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+    # Register client
+    await registry.register(client_id, websocket)
 
-
-def create_task(title: str) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
-
-
-def get_tasks():
-    with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
-
-
-def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id)
-
-
-# ── Routes ─────────────────────────────────────────────────────
-
-@app.route("/tasks", methods=["GET"])
-def list_tasks():
-    return jsonify(get_tasks())
-
-
-@app.route("/tasks", methods=["POST"])
-def add_task():
-    data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
-        return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
-    return jsonify(task), 201
-
-
-@app.route("/tasks/<int:task_id>", methods=["GET"])
-def show_task(task_id: int):
-    task = get_task(task_id)
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
-
-
-@app.route("/tasks/<int:task_id>", methods=["PUT"])
-def edit_task(task_id: int):
-    data = request.get_json(silent=True) or {}
-    task = update_task(
-        task_id,
-        title=data.get("title"),
-        status=data.get("status"),
+    # Notify all clients of new connection
+    await registry.broadcast(
+        create_message("system", {"event": "client_joined", "client_id": client_id})
     )
-    if task is None:
-        return jsonify({"error": "task not found"}), 404
-    return jsonify(task)
+
+    try:
+        async for raw_message in websocket:
+            try:
+                message = json.loads(raw_message)
+                msg_type = message.get("type")
+
+                if msg_type == "broadcast":
+                    await registry.broadcast(
+                        create_message("broadcast", message.get("payload", {}))
+                    )
+                elif msg_type == "direct":
+                    target_client_id = message.get("target_client_id")
+                    if target_client_id:
+                        await registry.send_direct(
+                            target_client_id,
+                            create_message("direct", message.get("payload", {})),
+                        )
+                else:
+                    await websocket.send(
+                        json.dumps(
+                            create_message("system", {"error": f"Unknown message type: {msg_type}"})
+                        )
+                    )
+            except json.JSONDecodeError:
+                await websocket.send(
+                    json.dumps(create_message("system", {"error": "Invalid JSON"}))
+                )
+    except ConnectionClosed:
+        pass
+    finally:
+        # Unregister client
+        await registry.unregister(client_id)
+        # Notify all clients of disconnection
+        await registry.broadcast(
+            create_message("system", {"event": "client_left", "client_id": client_id})
+        )
+
+
+async def health_handler(request):
+    """Health check endpoint returning connected client count."""
+    count = await registry.get_client_count()
+    return web.json_response({"status": "ok", "connected_clients": count})
+
+
+async def start_servers():
+    """Start both WebSocket and REST servers."""
+    async with websockets.serve(websocket_handler, "localhost", 8765):
+        app = web.Application()
+        app.router.add_get("/health", health_handler)
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "localhost", 8766)
+        await site.start()
+
+        print("WebSocket server running on ws://localhost:8765")
+        print("REST API running on http://localhost:8766")
+
+        try:
+            await asyncio.Event().wait()
+        except KeyboardInterrupt:
+            pass
+        finally:
+            await runner.cleanup()
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    asyncio.run(start_servers())
