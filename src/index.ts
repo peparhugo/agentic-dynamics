@@ -4,6 +4,7 @@ export { TemplatePlugin } from './plugins/template';
 export { DevServerPlugin, serveSite, type DevServer, type ServeOptions } from './server';
 export type {
   BuildOptions,
+  BuildStats,
   GeneratedPage,
   Plugin,
   PluginContext,

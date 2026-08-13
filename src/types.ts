@@ -22,6 +22,7 @@ export interface PluginContext {
   outputDir: string;
   templatesDir: string;
   pages: PluginPage[];
+  buildStats?: BuildStats;
 }
 
 export interface Plugin {
@@ -42,4 +43,14 @@ export interface BuildOptions {
   templatesDir?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
+  onStats?(stats: BuildStats): void;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSaved: number;
+  duration: number;
 }

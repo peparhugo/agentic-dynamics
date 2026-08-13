@@ -54,4 +54,23 @@ describe('CLI', () => {
       await fs.rm(temporaryDirectory, { recursive: true, force: true });
     }
   });
+
+  it('accepts incremental and clean flags and reports build stats', async () => {
+    const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'public');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '# Post');
+    const log = jest.spyOn(console, 'log').mockImplementation();
+
+    try {
+      await run(['build', '--content', contentDir, '--output', outputDir, '--incremental']);
+      await run(['build', '--content', contentDir, '--output', outputDir, '--incremental']);
+      expect(log).toHaveBeenLastCalledWith(expect.stringMatching(/^Build stats: 0 built, 1 skipped, \d+ms saved\.$/));
+      await run(['build', '--content', contentDir, '--output', outputDir, '--incremental', '--clean']);
+      expect(log).toHaveBeenLastCalledWith(expect.stringMatching(/^Build stats: 1 built, 0 skipped, 0ms saved\.$/));
+    } finally {
+      await fs.rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  });
 });

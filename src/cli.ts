@@ -2,12 +2,15 @@
 
 import { buildSite } from './index';
 import { serveSite } from './server';
+import type { BuildStats } from './types';
 
 interface CliOptions {
   contentDir?: string;
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 const USAGE = `Usage: ssg <command> [options]
@@ -20,6 +23,8 @@ Options:
   --content <dir>  Markdown content directory (default: ./content)
   --output <dir>   Generated site directory (default: ./dist)
   --templates <dir> Template directory (default: ./templates)
+  --incremental    Only rebuild changed pages
+  --clean          Ignore the build cache and perform a clean build
   --port <number>   Development server port (default: 3000)
   -h, --help       Show this help message`;
 
@@ -36,6 +41,11 @@ function parseArguments(args: string[]): { command: 'build' | 'serve'; options: 
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
+    if (option === '--incremental' || option === '--clean') {
+      if (args[0] !== 'build') throw new Error(`Unknown option: ${option}\n\n${USAGE}`);
+      options[option === '--incremental' ? 'incremental' : 'clean'] = true;
+      continue;
+    }
     if (option !== '--content' && option !== '--output' && option !== '--templates' && option !== '--port') {
       throw new Error(`Unknown option: ${option}\n\n${USAGE}`);
     }
@@ -69,8 +79,10 @@ export async function run(args: string[]): Promise<void> {
     console.log(`Serving ${parsed.options.outputDir ?? './dist'} at http://localhost:${server.port}`);
     return;
   }
-  const pages = await buildSite(parsed.options);
+  const stats: BuildStats = { pagesBuilt: 0, pagesSkipped: 0, timeSaved: 0, duration: 0 };
+  const pages = await buildSite({ ...parsed.options, onStats: (value) => { Object.assign(stats, value); } });
   console.log(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
+  console.log(`Build stats: ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSaved}ms saved.`);
 }
 
 if (require.main === module) {

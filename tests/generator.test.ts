@@ -194,4 +194,73 @@ template: post.hbs
     await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8'))
       .resolves.toContain('<p>From config</p>');
   });
+
+  it('skips unchanged pages during incremental builds and persists their rendered data', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'first.md'), '---\ntitle: First\n---\n# One');
+    await fs.writeFile(path.join(contentDir, 'second.md'), '# Two');
+    let firstStats;
+    let secondStats;
+
+    await buildSite({ contentDir, outputDir, incremental: true, onStats: (stats) => { firstStats = stats; } });
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDir, '.ssg-cache.json'), 'utf8'));
+    await buildSite({ contentDir, outputDir, incremental: true, onStats: (stats) => { secondStats = stats; } });
+
+    expect(firstStats).toEqual(expect.objectContaining({ pagesBuilt: 2, pagesSkipped: 0 }));
+    expect(secondStats).toEqual(expect.objectContaining({ pagesBuilt: 0, pagesSkipped: 2 }));
+    expect(secondStats).toEqual(expect.objectContaining({ timeSaved: expect.any(Number) }));
+    expect(manifest.pages['first.md'].page.frontmatter).toEqual({ title: 'First' });
+    expect(manifest.pages['first.md'].page.output).toContain('<h1>One</h1>');
+  });
+
+  it('rebuilds only changed sources and removes outputs for deleted sources', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const first = path.join(contentDir, 'first.md');
+    const second = path.join(contentDir, 'second.md');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(first, '# One');
+    await fs.writeFile(second, '# Two');
+    await buildSite({ contentDir, outputDir, incremental: true });
+    await fs.writeFile(first, '# Changed');
+    await fs.rm(second);
+    let stats;
+
+    await buildSite({ contentDir, outputDir, incremental: true, onStats: (value) => { stats = value; } });
+
+    expect(stats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 0 }));
+    await expect(fs.readFile(path.join(outputDir, 'first.html'), 'utf8')).resolves.toContain('<h1>Changed</h1>');
+    await expect(fs.stat(path.join(outputDir, 'second.html'))).rejects.toThrow();
+  });
+
+  it('invalidates pages when templates change and performs a clean build on request', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '# Post');
+    const template = path.join(templatesDir, 'default.hbs');
+    await fs.writeFile(template, '<main>{{{content}}}</main>');
+    await buildSite({ contentDir, outputDir, templatesDir, incremental: true });
+    await fs.writeFile(template, '<article>{{{content}}}</article>');
+    let changedStats;
+    let cleanStats;
+
+    await buildSite({
+      contentDir, outputDir, templatesDir, incremental: true,
+      onStats: (stats) => { changedStats = stats; },
+    });
+    await buildSite({
+      contentDir, outputDir, templatesDir, incremental: true, clean: true,
+      onStats: (stats) => { cleanStats = stats; },
+    });
+
+    expect(changedStats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 0 }));
+    expect(cleanStats).toEqual(expect.objectContaining({ pagesBuilt: 1, pagesSkipped: 0 }));
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8'))
+      .resolves.toContain('<article><h1>Post</h1>');
+  });
 });
