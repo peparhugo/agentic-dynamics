@@ -3,6 +3,8 @@ from .messages import Message, MessageValidationError
 from .broker import RedisBroker
 from .persistence import MessageStore
 from .state import RedisClientState
+from .transport import BaseTransport, build_transport
+from .websocket_transport import WebSocketTransport
 
 __all__ = [
     "ClientRegistry",
@@ -12,4 +14,7 @@ __all__ = [
     "RedisBroker",
     "MessageStore",
     "RedisClientState",
+    "BaseTransport",
+    "build_transport",
+    "WebSocketTransport",
 ]

@@ -5,10 +5,18 @@ import os
 
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 DEFAULT_DATABASE_URL = "notifications.db"
+DEFAULT_TRANSPORT = "websocket"
 
 
 def redis_url() -> str:
     return os.environ.get("REDIS_URL", DEFAULT_REDIS_URL)
+
+
+def transport_name() -> str:
+    """Which `BaseTransport` implementation to use, selected via the
+    TRANSPORT env var (e.g. "websocket", "sse", "polling"). Defaults to
+    "websocket"."""
+    return os.environ.get("TRANSPORT", DEFAULT_TRANSPORT)
 
 
 def database_path() -> str:
