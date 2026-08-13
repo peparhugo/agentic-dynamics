@@ -82,4 +82,46 @@ Text
     expect(page).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
     expect(page).toContain('&lt;unsafe&gt;');
   });
+
+  it('uses default templates, layouts, and partials', async () => {
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templatesDir, 'partials'));
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<article><h1>{{title}}</h1>{{{content}}}</article>');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'default.hbs'), '<html><body>{{> nav}}{{{body}}}{{> footer}}</body></html>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'nav.hbs'), '<nav>{{title}}</nav>');
+    await fs.writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>End</footer>');
+    await fs.writeFile(path.join(contentDir, 'page.md'), '---\ntitle: Templates\n---\n## Content');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'page.html'), 'utf8');
+
+    expect(page).toBe('<html><body><nav>Templates</nav><article><h1>Templates</h1><h2>Content</h2>\n</article><footer>End</footer></body></html>');
+  });
+
+  it('supports per-page templates and layouts', async () => {
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+    await fs.writeFile(path.join(templatesDir, 'post.hbs'), '<main data-kind="{{kind}}">{{{content}}}</main>');
+    await fs.writeFile(path.join(templatesDir, 'layouts', 'wide.hbs'), '<section><h1>{{title}}</h1>{{{body}}}</section>');
+    await fs.writeFile(path.join(contentDir, 'page.md'), '---\ntitle: Custom\nkind: news\ntemplate: post\nlayout: wide\n---\nText');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'page.html'), 'utf8');
+
+    expect(page).toContain('<section><h1>Custom</h1><main data-kind="news"><p>Text</p>');
+  });
+
+  it('escapes template values but preserves rendered Markdown', async () => {
+    const templatesDir = path.join(root, 'templates');
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<h1>{{title}}</h1>{{{content}}}');
+    await fs.writeFile(path.join(contentDir, 'page.md'), '---\ntitle: <unsafe>\n---\n**Safe HTML**');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+    const page = await fs.readFile(path.join(outputDir, 'page.html'), 'utf8');
+
+    expect(page).toContain('<h1>&lt;unsafe&gt;</h1>');
+    expect(page).toContain('<strong>Safe HTML</strong>');
+  });
 });

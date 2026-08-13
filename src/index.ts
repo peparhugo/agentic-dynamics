@@ -1,11 +1,13 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
 export interface Page {
@@ -19,6 +21,9 @@ export interface Page {
 
 interface RenderedPage extends Page {
   html: string;
+  data: Record<string, unknown>;
+  template?: string;
+  layout?: string | false;
 }
 
 function escapeHtml(value: string): string {
@@ -28,6 +33,64 @@ function escapeHtml(value: string): string {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
+}
+
+function templateName(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+async function isFile(filePath: string): Promise<boolean> {
+  try {
+    return (await fs.stat(filePath)).isFile();
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+function templatePath(directory: string, name: string): string {
+  const withExtension = path.extname(name) ? name : `${name}.hbs`;
+  const resolved = path.resolve(directory, withExtension);
+  const relative = path.relative(directory, resolved);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    throw new Error(`Template must be inside ${directory}: ${name}`);
+  }
+  return resolved;
+}
+
+async function templateFiles(directory: string, base = directory): Promise<string[]> {
+  let entries;
+  try {
+    entries = await fs.readdir(directory, { withFileTypes: true });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const absolutePath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      return templateFiles(absolutePath, base);
+    }
+    return entry.isFile() && /\.hbs$/i.test(entry.name)
+      ? [path.relative(base, absolutePath)]
+      : [];
+  }));
+  return nested.flat();
+}
+
+async function loadPartials(templatesDir: string): Promise<Record<string, string>> {
+  const directory = path.join(templatesDir, 'partials');
+  const files = await templateFiles(directory);
+  const partials: Record<string, string> = {};
+  await Promise.all(files.map(async (file) => {
+    const name = file.slice(0, -path.extname(file).length).split(path.sep).join('/');
+    partials[name] = await fs.readFile(path.join(directory, file), 'utf8');
+  }));
+  return partials;
 }
 
 function asDate(value: unknown): string | undefined {
@@ -115,6 +178,16 @@ function indexDocument(pages: Page[]): string {
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDir = path.resolve(options.contentDir ?? 'content');
   const outputDir = path.resolve(options.outputDir ?? 'dist');
+  const templatesDir = path.resolve(options.templatesDir ?? 'templates');
+  const defaultTemplatePath = templatePath(templatesDir, 'default');
+  const defaultLayoutPath = templatePath(path.join(templatesDir, 'layouts'), 'default');
+  const [hasDefaultTemplate, hasDefaultLayout, partials] = await Promise.all([
+    isFile(defaultTemplatePath),
+    isFile(defaultLayoutPath),
+    loadPartials(templatesDir)
+  ]);
+  const handlebars = Handlebars.create();
+  handlebars.registerPartial(partials);
   const files = await markdownFiles(contentDir);
   const pages = await Promise.all(files.map(async (sourcePath): Promise<RenderedPage> => {
     const source = await fs.readFile(path.join(contentDir, sourcePath), 'utf8');
@@ -130,7 +203,10 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
       sourcePath,
       outputPath,
       url: urlFor(outputPath),
-      html: await marked.parse(parsed.content)
+      html: await marked.parse(parsed.content),
+      data: parsed.data,
+      template: templateName(parsed.data.template),
+      layout: parsed.data.layout === false ? false : templateName(parsed.data.layout)
     };
   }));
 
@@ -146,10 +222,35 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   await fs.mkdir(outputDir, { recursive: true });
   await Promise.all(pages.map(async (page) => {
     const destination = path.join(outputDir, page.outputPath);
+    const context: Record<string, unknown> = {
+      ...page.data,
+      title: page.title,
+      date: page.date,
+      tags: page.tags,
+      sourcePath: page.sourcePath,
+      outputPath: page.outputPath,
+      url: page.url,
+      content: page.html,
+      body: page.html
+    };
+    const selectedTemplate = page.template
+      ? templatePath(templatesDir, page.template)
+      : hasDefaultTemplate ? defaultTemplatePath : undefined;
+    let rendered = selectedTemplate
+      ? handlebars.compile(await fs.readFile(selectedTemplate, 'utf8'))(context)
+      : pageDocument(page);
+    const selectedLayout = page.layout === false
+      ? undefined
+      : page.layout
+        ? templatePath(path.join(templatesDir, 'layouts'), page.layout)
+        : hasDefaultLayout ? defaultLayoutPath : undefined;
+    if (selectedLayout) {
+      rendered = handlebars.compile(await fs.readFile(selectedLayout, 'utf8'))({ ...context, body: rendered });
+    }
     await fs.mkdir(path.dirname(destination), { recursive: true });
-    await fs.writeFile(destination, pageDocument(page), 'utf8');
+    await fs.writeFile(destination, rendered, 'utf8');
   }));
   await fs.writeFile(path.join(outputDir, 'index.html'), indexDocument(pages), 'utf8');
 
-  return pages.map(({ html: _html, ...page }) => page);
+  return pages.map(({ html: _html, data: _data, template: _template, layout: _layout, ...page }) => page);
 }

@@ -14,6 +14,25 @@ The command reads `./content` and writes the generated site to `./dist`. Use cus
 npx ssg build --content posts --output public
 ```
 
+Templates are loaded from `./templates` by default. Pass `--templates <dir>` to use
+a different directory. Pages may select a Handlebars template and layout in their
+frontmatter:
+
+```md
+---
+title: First post
+template: post
+layout: site
+---
+```
+
+`template: post` loads `templates/post.hbs`, and `layout: site` loads
+`templates/layouts/site.hbs`. If omitted, `default.hbs` files are used when
+present. Layouts insert rendered page content with `{{{body}}}`. Reusable files
+in `templates/partials` can be included by name, for example `{{> header}}`.
+Template values such as `{{title}}` are HTML escaped; rendered Markdown is
+available as `{{{content}}}`. Set `layout: false` to render without a layout.
+
 Frontmatter can define `title`, `date`, and `tags`:
 
 ```md

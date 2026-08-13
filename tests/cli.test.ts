@@ -26,4 +26,24 @@ describe('CLI', () => {
     await expect(run(['serve'])).rejects.toThrow('Usage: ssg build');
     await expect(run(['build', '--content'])).rejects.toThrow('--content requires a directory');
   });
+
+  it('accepts a custom templates directory', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-cli-'));
+    const content = path.join(root, 'content');
+    const output = path.join(root, 'output');
+    const templates = path.join(root, 'views');
+    await fs.mkdir(content);
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'post.md'), '# Post');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<custom>{{{content}}}</custom>');
+    const stdout = jest.spyOn(process.stdout, 'write').mockImplementation(() => true);
+
+    try {
+      await run(['build', '--content', content, '--output', output, '--templates', templates]);
+      expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toContain('<custom><h1>Post</h1>');
+    } finally {
+      stdout.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
 });
