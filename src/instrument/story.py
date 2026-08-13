@@ -147,6 +147,9 @@ class SessionSpec:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "SessionSpec":
+        missing = [k for k in ("session_number", "prompt") if k not in d]
+        if missing:
+            raise ValueError(f"SessionSpec missing required fields: {missing}")
         return cls(
             session_number=d["session_number"],
             task_type=d.get("task_type", "feature_addition"),

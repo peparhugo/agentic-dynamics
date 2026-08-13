@@ -40,6 +40,8 @@ from instrument import (
 
 from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci, probe_session_schema
 
+from instrument.solution import COMPOSITE_WEIGHTS, COMPOSITE_WEIGHTS_SONAR
+
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
 REPORTS_DIR = RESULTS_DIR / "reports"
@@ -479,10 +481,10 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
     if narration_penalty > 0:
         solution.correctness_score = max(0, solution.correctness_score - narration_penalty)
         solution.composite_score = (
-            0.35 * solution.correctness_score
-            + 0.30 * solution.constraint_score
-            + 0.20 * solution.code_quality_score
-            + 0.15 * solution.novelty_score
+            COMPOSITE_WEIGHTS["correctness"] * solution.correctness_score
+            + COMPOSITE_WEIGHTS["constraint"] * solution.constraint_score
+            + COMPOSITE_WEIGHTS["quality"] * solution.code_quality_score
+            + COMPOSITE_WEIGHTS["novelty"] * solution.novelty_score
         )
         solution.constraints_met = 0
         solution.constraint_score = 0.0
@@ -582,19 +584,21 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── Recompute composite score after canonical correctness is established ──
     if solution.sonar_analyzed:
+        w = COMPOSITE_WEIGHTS_SONAR
         solution.composite_score = (
-            0.30 * solution.correctness_score
-            + 0.25 * solution.constraint_score
-            + 0.20 * solution.sonar_quality_score
-            + 0.15 * solution.code_quality_score
-            + 0.10 * solution.novelty_score
+            w["correctness"] * solution.correctness_score
+            + w["constraint"] * solution.constraint_score
+            + w["sonar_quality"] * solution.sonar_quality_score
+            + w["quality"] * solution.code_quality_score
+            + w["novelty"] * solution.novelty_score
         )
     else:
+        w = COMPOSITE_WEIGHTS
         solution.composite_score = (
-            0.35 * solution.correctness_score
-            + 0.30 * solution.constraint_score
-            + 0.20 * solution.code_quality_score
-            + 0.15 * solution.novelty_score
+            w["correctness"] * solution.correctness_score
+            + w["constraint"] * solution.constraint_score
+            + w["quality"] * solution.code_quality_score
+            + w["novelty"] * solution.novelty_score
         )
 
     # ── Basin Escape ──

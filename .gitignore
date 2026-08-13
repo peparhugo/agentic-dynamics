@@ -20,6 +20,9 @@ experiments/results/stories/logs/
 # Mutation compiler cache (runtime artifact, written by compile_mutation)
 experiments/codebases/.mutation_cache/
 
+# Generated per-story analysis artifacts (rebuilt by analyze_stories.py)
+experiments/results/analysis/
+
 # Local message/chat databases (runtime artifacts)
 messages.db
 

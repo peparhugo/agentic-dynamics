@@ -12,6 +12,18 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+# Composite-score weights — single source of truth (P2-3). The non-sonar and
+# sonar sets were previously duplicated across solution.py, analyze_worktrees.py,
+# and build_data.py.
+COMPOSITE_WEIGHTS: dict[str, float] = {
+    "correctness": 0.35, "constraint": 0.30, "quality": 0.20, "novelty": 0.15,
+}
+COMPOSITE_WEIGHTS_SONAR: dict[str, float] = {
+    "correctness": 0.30, "constraint": 0.25, "sonar_quality": 0.20,
+    "quality": 0.15, "novelty": 0.10,
+}
+
+
 @dataclass
 class SolutionMetrics:
     """Quality metrics for a generated solution.
@@ -150,19 +162,21 @@ def evaluate_solution(
 
     # ── Composite ──
     if m.sonar_analyzed:
+        w = COMPOSITE_WEIGHTS_SONAR
         m.composite_score = (
-            0.30 * m.correctness_score
-            + 0.25 * m.constraint_score
-            + 0.20 * m.sonar_quality_score
-            + 0.15 * m.code_quality_score
-            + 0.10 * m.novelty_score
+            w["correctness"] * m.correctness_score
+            + w["constraint"] * m.constraint_score
+            + w["sonar_quality"] * m.sonar_quality_score
+            + w["quality"] * m.code_quality_score
+            + w["novelty"] * m.novelty_score
         )
     else:
+        w = COMPOSITE_WEIGHTS
         m.composite_score = (
-            0.35 * m.correctness_score
-            + 0.30 * m.constraint_score
-            + 0.20 * m.code_quality_score
-            + 0.15 * m.novelty_score
+            w["correctness"] * m.correctness_score
+            + w["constraint"] * m.constraint_score
+            + w["quality"] * m.code_quality_score
+            + w["novelty"] * m.novelty_score
         )
 
     return m

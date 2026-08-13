@@ -131,6 +131,8 @@ def load_plans(path: Path) -> dict[str, PlanDefinition]:
 
 
 def _parse_phase(p: dict) -> PlanPhase:
+    if "id" not in p or "kind" not in p:
+        raise ValueError(f"phase missing required 'id'/'kind': {p!r}")
     reserved = ("id", "kind", "description", "depends_on")
     kind_params = {k: v for k, v in p.items() if k not in reserved}
     if p["kind"] == "fan_out":
@@ -286,8 +288,10 @@ def _set_state(plan_name: str, phase_id: str, **kwargs) -> None:
     try:
         r = _r()
         r.hset(_phase_key(plan_name, phase_id), mapping={k: str(v) for k, v in kwargs.items()})
-    except Exception:
-        pass
+    except Exception as e:
+        # State writes must not be silently swallowed (P1-4): telemetry may
+        # no-op, but phase state is the control plane's source of truth.
+        print(f"WARNING: failed to write state {plan_name}/{phase_id}: {e}", file=sys.stderr)
 
 
 # ── Worker lifecycle ──────────────────────────────────────────────
@@ -1015,12 +1019,16 @@ EXECUTORS: dict[str, Any] = {
 
 # ── Plan runner ───────────────────────────────────────────────────
 
+# Max wall-clock (seconds) a polling phase (matrix/review) may run before the
+# runner aborts rather than polling forever (P1-4).
+MAX_PHASE_WALLCLOCK = int(os.environ.get("FINOPS_MAX_PHASE_WALLCLOCK", str(6 * 3600)))
+
 
 def _set_current(plan_name: str, phase_id: str) -> None:
     try:
         _r().set(_current_key(plan_name), phase_id)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"WARNING: failed to set current phase for {plan_name}: {e}", file=sys.stderr)
 
 
 def _interpolate_levels(levels: list[list[str]], from_phase: str | None,
@@ -1091,7 +1099,11 @@ def run_plan(plan: PlanDefinition, *, from_phase: str | None = None,
 
             if phase.kind in ("matrix", "review"):
                 # These executors poll internally — loop until done
+                deadline = time.monotonic() + MAX_PHASE_WALLCLOCK
                 while not executor(phase, context):
+                    if time.monotonic() > deadline:
+                        print(f"  Phase '{phase.id}' exceeded {MAX_PHASE_WALLCLOCK}s wall-clock — aborting")
+                        return
                     time.sleep(30)
             else:
                 # Synchronous executors — run once

@@ -29,6 +29,7 @@ DATA_DIR = ROOT / "experiments" / "data"
 from _constants import WORKTREE_ROOT, MODEL_LABELS, bootstrap_ci, probe_session_schema
 
 from instrument.routing import compute_routing  # noqa: E402
+from instrument.solution import COMPOSITE_WEIGHTS  # noqa: E402
 
 MODEL_DISPLAY_ORDER = [
     "deepseek/deepseek-v4-pro",
@@ -1123,7 +1124,7 @@ def build():
                 "provenance": "design",
             },
             "composite_weights": {
-                "correctness": 0.35, "constraint": 0.30, "quality": 0.20, "novelty": 0.15,
+                **COMPOSITE_WEIGHTS,
                 "provenance": "design",
             },
         },

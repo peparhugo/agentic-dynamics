@@ -421,7 +421,7 @@ class TestPythonModulesLoad:
             / "experiments" / "configs" / "plans.yaml"
         )
         plans = load_plans(plan_path)
-        assert len(plans) == 5
+        assert {"ci", "deploy", "full_matrix", "feature", "ship_features"} <= set(plans)
 
         for name, plan in plans.items():
             errors = validate_plan(plan)

@@ -59,3 +59,12 @@ Phase 3 complete. Phase 4 (robustness P1-1…P1-5) and Phase 5 (cleanup P2-1…P
 - **P1-5 config unification** — `model_slug()` + `SESSION_TIMEOUT`/`STORY_SESSIONS` centralized in `_constants.py`; `run_story.py` exposes `late_degrade`; `worker.py` derives `TIMEOUT_PER_CELL` from the session timeout; `story.py` honors `OPENCODE_BIN`.
 
 P1-4 (pipeline watchdog/PID tracking) deferred. Phase 5 (P2) remains.
+
+## Phase 4 (complete) + Phase 5 (partial) — done 2026-08-13
+
+- **P1-4** — `_set_state`/`_set_current` now log Redis write failures (no longer silently swallowed); polling phases get a `MAX_PHASE_WALLCLOCK` watchdog (env `FINOPS_MAX_PHASE_WALLCLOCK`, default 6h). Worker PID tracking + SIGTERM handler deferred.
+- **P2-3** — `COMPOSITE_WEIGHTS` / `COMPOSITE_WEIGHTS_SONAR` centralized in `solution.py`; `analyze_worktrees.py` and `build_data.py` reference them (was duplicated 4×).
+- **P2-4** — `.gitignore` now covers `experiments/results/analysis/`; CI test list drops the non-existent `test_value_score.py` and adds the new/backend tests; fixed stale `plans.yaml` count assertion.
+- **P2-5** — `SessionSpec.from_dict` and `_parse_phase` validate required fields and raise `ValueError` instead of `KeyError`.
+
+Deferred (larger refactors, dedicated session recommended): P2-1 (delete deprecated `adapter/experiment/lab_book`, retire `plan.py`/`review_worker.py`, lazy-import optional deps), P2-2 (`build_data.py` god-script extraction), P2-6 (already `ask`, low value).
