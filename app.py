@@ -11,16 +11,21 @@ from datetime import datetime, timezone
 from functools import wraps
 
 from flask import Flask, current_app, g, jsonify, request
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
 from repositories import TaskRepository, UserRepository, initialize_database
 
 
-def create_app(database: str | None = None) -> Flask:
+def create_app(database: str | None = None, limiter_storage_uri: str | None = None) -> Flask:
     app = Flask(__name__)
     app.config["DATABASE"] = database or os.environ.get("DATABASE", "tasks.db")
     app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-only-secret")
+    app.config["RATELIMIT_STORAGE_URI"] = (
+        limiter_storage_uri or os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/2")
+    )
+    app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
     def get_db() -> sqlite3.Connection:
         connection = sqlite3.connect(current_app.config["DATABASE"])
@@ -64,6 +69,21 @@ def create_app(database: str | None = None) -> Flask:
             return user_id
         except (ValueError, TypeError, json.JSONDecodeError):
             return None
+
+    def rate_limit_key() -> str:
+        authorization = request.headers.get("Authorization", "")
+        scheme, _, token = authorization.partition(" ")
+        user_id = decode_token(token) if scheme == "Bearer" and token else None
+        if user_id is not None:
+            return f"user:{user_id}"
+        return f"ip:{request.remote_addr or 'unknown'}"
+
+    Limiter(
+        key_func=rate_limit_key,
+        app=app,
+        default_limits=["100 per minute"],
+        headers_enabled=True,
+    )
 
     def require_auth(view):
         @wraps(view)
@@ -145,9 +165,24 @@ def create_app(database: str | None = None) -> Flask:
     @app.get("/tasks")
     @require_auth
     def list_tasks():
+        cursor_value = request.args.get("cursor")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(request.args.get("limit", 20))
+        except ValueError:
+            return jsonify({"error": "cursor and limit must be integers"}), 400
+        if cursor is not None and cursor < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+        if not 1 <= limit <= 100:
+            return jsonify({"error": "limit must be between 1 and 100"}), 400
         with get_db() as connection:
-            tasks = TaskRepository(connection).list_for_owner(g.user_id)
-        return jsonify([dict(task) for task in tasks])
+            repository = TaskRepository(connection)
+            tasks = repository.list_page_for_owner(g.user_id, cursor, limit + 1)
+            total = repository.count_for_owner(g.user_id)
+        has_next_page = len(tasks) > limit
+        page = tasks[:limit]
+        next_cursor = str(page[-1]["id"]) if has_next_page else None
+        return jsonify({"data": [dict(task) for task in page], "next_cursor": next_cursor, "total": total})
 
     @app.get("/tasks/<int:task_id>")
     @require_auth

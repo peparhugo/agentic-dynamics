@@ -5,7 +5,7 @@ from app import create_app
 
 
 def make_client(tmp_path):
-    app = create_app(str(tmp_path / "tasks.db"))
+    app = create_app(str(tmp_path / "tasks.db"), limiter_storage_uri="memory://")
     app.config["JWT_SECRET"] = "test-secret"
     return app.test_client()
 
@@ -83,7 +83,10 @@ def test_list_tasks_is_newest_first(tmp_path):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    body = response.get_json()
+    assert [task["id"] for task in body["data"]] == [second["id"], first["id"]]
+    assert body["next_cursor"] is None
+    assert body["total"] == 2
 
 
 def test_get_and_update_task(tmp_path):
@@ -141,7 +144,7 @@ def test_users_only_see_and_change_their_own_tasks(tmp_path):
     fetched = client.get(f"/tasks/{task['id']}", headers=bob_headers)
     updated = client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=bob_headers)
 
-    assert listed.get_json() == []
+    assert listed.get_json() == {"data": [], "next_cursor": None, "total": 0}
     assert fetched.status_code == 404
     assert updated.status_code == 404
 
@@ -173,3 +176,48 @@ def test_missing_task_returns_json_404(tmp_path):
 
     assert response.status_code == 404
     assert response.get_json() == {"error": "task not found"}
+
+
+def test_list_tasks_uses_cursor_pagination(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+    created = [
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=headers).get_json()
+        for number in range(3)
+    ]
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+    first_body = first_page.get_json()
+    second_page = client.get(f"/tasks?cursor={first_body['next_cursor']}&limit=2", headers=headers)
+
+    assert first_page.status_code == 200
+    assert [task["id"] for task in first_body["data"]] == [created[2]["id"], created[1]["id"]]
+    assert first_body["next_cursor"] == str(created[1]["id"])
+    assert first_body["total"] == 3
+    assert second_page.get_json() == {
+        "data": [created[0]],
+        "next_cursor": None,
+        "total": 3,
+    }
+
+
+def test_list_tasks_rejects_invalid_pagination_parameters(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+
+    invalid_cursor = client.get("/tasks?cursor=zero", headers=headers)
+    invalid_limit = client.get("/tasks?limit=101", headers=headers)
+
+    assert invalid_cursor.status_code == 400
+    assert invalid_limit.status_code == 400
+
+
+def test_rate_limit_returns_retry_after_header(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+
+    responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+
+    assert responses[-2].status_code == 200
+    assert responses[-1].status_code == 429
+    assert responses[-1].headers["Retry-After"]

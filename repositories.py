@@ -61,9 +61,33 @@ class TaskRepository(BaseRepository):
 
     def list_for_owner(self, owner_id: int) -> Iterable[sqlite3.Row]:
         return self.connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
+            "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY id DESC",
             (owner_id,),
         ).fetchall()
+
+    def list_page_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> list[sqlite3.Row]:
+        if cursor is None:
+            return self.connection.execute(
+                """
+                SELECT id, title, status, created_at FROM tasks
+                WHERE owner_id = ? ORDER BY id DESC LIMIT ?
+                """,
+                (owner_id, limit),
+            ).fetchall()
+        return self.connection.execute(
+            """
+            SELECT id, title, status, created_at FROM tasks
+            WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?
+            """,
+            (owner_id, cursor, limit),
+        ).fetchall()
+
+    def count_for_owner(self, owner_id: int) -> int:
+        return self.connection.execute(
+            "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()[0]
 
     def get_for_owner(self, task_id: int, owner_id: int) -> sqlite3.Row | None:
         return self.connection.execute(

@@ -1,3 +1,4 @@
 Flask
+Flask-Limiter[redis]
 celery[redis]
 pytest
