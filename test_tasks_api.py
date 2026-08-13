@@ -1,6 +1,7 @@
 import os
 import sqlite3
 import time
+from unittest.mock import patch
 
 import pytest
 
@@ -399,3 +400,105 @@ def test_migration_adds_owner_id_without_losing_data(tmp_path):
         # Legacy task has no owner, so the new user doesn't see it, but it's
         # still present in the database untouched.
         assert resp.get_json() == []
+
+
+# ── Registration: email ───────────────────────────────────────────────
+
+
+def test_register_default_email(client):
+    resp = register(client, "dana", "password123")
+    assert resp.status_code == 201
+    assert resp.get_json()["email"] == "dana@example.com"
+
+
+def test_register_custom_email(client):
+    resp = client.post(
+        "/auth/register",
+        json={"username": "erin", "password": "password123", "email": "erin@company.com"},
+    )
+    assert resp.status_code == 201
+    assert resp.get_json()["email"] == "erin@company.com"
+
+
+def test_register_blank_email_rejected(client):
+    resp = client.post(
+        "/auth/register",
+        json={"username": "frank", "password": "password123", "email": "   "},
+    )
+    assert resp.status_code == 400
+
+
+# ── Completion notification trigger ─────────────────────────────────────
+
+
+def test_completing_task_triggers_notification_email(auth_client):
+    created = create_task(auth_client, "Ship feature").get_json()
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    mock_delay.assert_called_once_with("alice@example.com", "Ship feature")
+
+
+def test_completing_task_with_title_change_uses_new_title(auth_client):
+    created = create_task(auth_client, "Old title").get_json()
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = auth_client.put(
+            f"/tasks/{created['id']}", json={"title": "New title", "status": "completed"}
+        )
+
+    assert resp.status_code == 200
+    mock_delay.assert_called_once_with("alice@example.com", "New title")
+
+
+def test_updating_to_non_completed_status_does_not_notify(auth_client):
+    created = create_task(auth_client, "Task").get_json()
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = auth_client.put(f"/tasks/{created['id']}", json={"status": "in_progress"})
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_already_completed_task_does_not_renotify(auth_client):
+    created = create_task(auth_client, "Task").get_json()
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = auth_client.put(f"/tasks/{created['id']}", json={"title": "Renamed"})
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_title_only_update_does_not_notify(auth_client):
+    created = create_task(auth_client, "Task").get_json()
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = auth_client.put(f"/tasks/{created['id']}", json={"title": "Renamed"})
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_notification_enqueue_failure_does_not_break_response(auth_client):
+    created = create_task(auth_client, "Task").get_json()
+    with patch("tasks_api.send_notification_email.delay", side_effect=Exception("broker down")):
+        resp = auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+
+
+def test_completing_other_users_task_is_not_possible_and_does_not_notify(client):
+    alice_token = make_auth_client(client, "alice", "password123")
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
+    alice_task = create_task(client, "Alice private task").get_json()
+
+    bob_token = make_auth_client(client, "bob", "password123")
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
+    with patch("tasks_api.send_notification_email.delay") as mock_delay:
+        resp = client.put(f"/tasks/{alice_task['id']}", json={"status": "completed"})
+
+    assert resp.status_code == 404
+    mock_delay.assert_not_called()

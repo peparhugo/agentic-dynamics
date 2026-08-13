@@ -18,6 +18,8 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tasks.db")
 
 JWT_ALGORITHM = "HS256"
@@ -54,6 +56,7 @@ def init_db(db_path):
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
+                email TEXT,
                 created_at TEXT NOT NULL
             )
             """
@@ -66,6 +69,13 @@ def init_db(db_path):
         existing_columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "owner_id" not in existing_columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+
+        # Migration: databases created before the email notification feature
+        # won't have an email column on users. Existing rows get NULL, i.e.
+        # legacy users who won't receive notifications until they set one.
+        existing_user_columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in existing_user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
         conn.commit()
     finally:
@@ -95,6 +105,7 @@ def _user_to_dict(row):
     return {
         "id": row["id"],
         "username": row["username"],
+        "email": row["email"],
         "created_at": row["created_at"],
     }
 
@@ -167,6 +178,7 @@ def create_app(db_path=None, secret_key=None):
         data = request.get_json(silent=True) or {}
         username = data.get("username")
         password = data.get("password")
+        email = data.get("email")
 
         if not isinstance(username, str) or not username.strip():
             return jsonify({"error": "username is required"}), 400
@@ -174,8 +186,11 @@ def create_app(db_path=None, secret_key=None):
             return jsonify(
                 {"error": f"password is required and must be at least {MIN_PASSWORD_LENGTH} characters"}
             ), 400
+        if email is not None and (not isinstance(email, str) or not email.strip()):
+            return jsonify({"error": "email must be a non-empty string"}), 400
 
         username = username.strip()
+        email = email.strip() if email is not None else f"{username}@example.com"
         db = get_db()
         existing = db.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing is not None:
@@ -184,8 +199,8 @@ def create_app(db_path=None, secret_key=None):
         password_hash = generate_password_hash(password)
         created_at = datetime.now(timezone.utc).isoformat()
         cursor = db.execute(
-            "INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)",
-            (username, password_hash, created_at),
+            "INSERT INTO users (username, password_hash, email, created_at) VALUES (?, ?, ?, ?)",
+            (username, password_hash, email, created_at),
         )
         db.commit()
 
@@ -267,7 +282,8 @@ def create_app(db_path=None, secret_key=None):
             return jsonify({"error": "title or status is required"}), 400
 
         title = row["title"]
-        status = row["status"]
+        previous_status = row["status"]
+        status = previous_status
 
         if "title" in data:
             new_title = data["title"]
@@ -288,6 +304,15 @@ def create_app(db_path=None, secret_key=None):
         db.commit()
 
         row = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+        if previous_status != "completed" and status == "completed":
+            owner_email = g.current_user["email"]
+            if owner_email:
+                try:
+                    send_notification_email.delay(owner_email, row["title"])
+                except Exception:
+                    app.logger.exception("Failed to enqueue completion notification email")
+
         return jsonify(_task_to_dict(row)), 200
 
     return app
