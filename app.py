@@ -12,6 +12,8 @@ from functools import wraps
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "todos.db")
@@ -34,7 +36,8 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             )
             """
         )
@@ -54,6 +57,11 @@ def init_db() -> None:
         if "owner_id" not in columns:
             # Nullable ownership preserves task records created before auth existed.
             connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+        user_columns = {
+            row["name"] for row in connection.execute("PRAGMA table_info(users)")
+        }
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def encode_token(user_id: int) -> str:
@@ -126,13 +134,16 @@ def validate_title(value: object) -> str | None:
     return value.strip()
 
 
-def validate_credentials(data: object) -> tuple[str, str] | None:
+def validate_credentials(data: object) -> tuple[str, str, str | None] | None:
     if not isinstance(data, dict):
         return None
     username, password = data.get("username"), data.get("password")
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return None
-    return username.strip(), password
+    email = data.get("email")
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return None
+    return username.strip(), password, email.strip() if email else None
 
 
 @app.post("/auth/register")
@@ -141,12 +152,12 @@ def register():
     if credentials is None:
         return jsonify(error="username and password are required"), 400
 
-    username, password = credentials
+    username, password, email = credentials
     try:
         with get_db() as connection:
             connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, generate_password_hash(password), email),
             )
     except sqlite3.IntegrityError:
         return jsonify(error="username already exists"), 409
@@ -159,7 +170,7 @@ def login():
     if credentials is None:
         return jsonify(error="username and password are required"), 400
 
-    username, password = credentials
+    username, password, _ = credentials
     with get_db() as connection:
         user = connection.execute(
             "SELECT id, password_hash FROM users WHERE username = ?", (username,)
@@ -231,13 +242,31 @@ def update_task(user_id: int, task_id: int):
     if not updates:
         return jsonify(error="title or status is required"), 400
 
-    parameters.extend((task_id, user_id))
+    notification = None
     with get_db() as connection:
+        existing_task = connection.execute(
+            """
+            SELECT tasks.status, tasks.title, users.username, users.email
+            FROM tasks JOIN users ON users.id = tasks.owner_id
+            WHERE tasks.id = ? AND tasks.owner_id = ?
+            """,
+            (task_id, user_id),
+        ).fetchone()
+        if existing_task is None:
+            return jsonify(error="task not found"), 404
+
+        parameters.extend((task_id, user_id))
         cursor = connection.execute(
             f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?", parameters
         )
-        if cursor.rowcount == 0:
-            return jsonify(error="task not found"), 404
+        if data.get("status") == "completed" and existing_task["status"] != "completed":
+            notification = (
+                existing_task["email"] or f"{existing_task['username']}@example.com",
+                existing_task["title"],
+            )
+
+    if notification:
+        send_notification_email.delay(*notification)
 
     return jsonify(get_task(task_id, user_id))
 

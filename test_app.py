@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
@@ -70,6 +71,30 @@ def test_get_and_update_task(client):
     assert update_response.get_json()["title"] == "Published"
     assert update_response.get_json()["status"] == "done"
     assert client.get(f"/tasks/{task['id']}", headers=headers).get_json() == update_response.get_json()
+
+
+def test_completing_a_task_enqueues_an_email_notification(client):
+    headers = register_and_login(client)
+    task = create(client, "Send report", headers)
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice@example.com", "Send report")
+
+
+def test_recompleting_a_task_does_not_enqueue_another_notification(client):
+    headers = register_and_login(client)
+    task = create(client, "Send report", headers)
+
+    with patch("app.send_notification_email.delay") as delay:
+        client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+        client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    delay.assert_called_once_with("alice@example.com", "Send report")
 
 
 def test_missing_task_returns_json_404(client):
