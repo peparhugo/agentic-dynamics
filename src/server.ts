@@ -4,6 +4,8 @@ import { createServer, Server } from 'node:http';
 import path from 'node:path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { buildSite, BuildOptions } from './index';
+import { loadPlugins } from './config';
+import { DevServerPlugin } from './plugins/dev-server';
 
 const reloadScript = `<script>
 (() => {
@@ -64,7 +66,20 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
   const port = options.port ?? 3000;
   const host = options.host ?? 'localhost';
 
-  await buildSite({ contentDir, outputDir, templatesDir });
+  const sockets = new WebSocketServer({ noServer: true });
+  const devServer = new DevServerPlugin(() => {
+    for (const client of sockets.clients) {
+      if (client.readyState === WebSocket.OPEN) client.send('reload');
+    }
+  });
+  const buildOptions: BuildOptions = {
+    contentDir,
+    outputDir,
+    templatesDir,
+    configFile: options.configFile
+  };
+  buildOptions.plugins = [...loadPlugins(options), devServer];
+  await buildSite(buildOptions);
 
   const server = createServer(async (request, response) => {
     try {
@@ -97,7 +112,6 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
       response.end(status === 404 ? 'Not found' : 'Internal server error');
     }
   });
-  const sockets = new WebSocketServer({ noServer: true });
   server.on('upgrade', (request, socket, head) => {
     if (request.url !== '/__ssg_reload') {
       socket.destroy();
@@ -117,10 +131,7 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
     do {
       rebuildAgain = false;
       try {
-        await buildSite({ contentDir, outputDir, templatesDir });
-        for (const client of sockets.clients) {
-          if (client.readyState === WebSocket.OPEN) client.send('reload');
-        }
+        await buildSite(buildOptions);
       } catch (error) {
         options.io?.stderr.write(`Rebuild failed: ${error instanceof Error ? error.message : String(error)}\n`);
       }
@@ -155,3 +166,5 @@ export async function startDevServer(options: DevServerOptions = {}): Promise<De
     }
   };
 }
+
+export { DevServerPlugin } from './plugins/dev-server';

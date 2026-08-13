@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
 import { runCli } from '../src/cli';
-import { buildSite } from '../src';
+import { buildSite, Plugin } from '../src';
 import { startDevServer } from '../src/server';
 
 describe('static site generator', () => {
@@ -83,6 +83,67 @@ This is **important**.
       contentDir: path.join(root, 'missing'),
       outputDir
     })).rejects.toThrow('Content directory does not exist');
+  });
+
+  test('runs plugin lifecycle hooks in order for each page', async () => {
+    await fs.writeFile(path.join(contentDir, 'b.md'), '# B');
+    await fs.writeFile(path.join(contentDir, 'a.md'), '# A');
+    const calls: string[] = [];
+    const plugin = (name: string): Plugin => ({
+      onStart: () => { calls.push(`${name}:start`); },
+      beforeBuild: () => { calls.push(`${name}:before`); },
+      onFile: page => {
+        calls.push(`${name}:file:${page.title}`);
+        page.html = page.html.replace('</h1>', ` ${name}</h1>`);
+      },
+      afterBuild: () => { calls.push(`${name}:after`); },
+      onEnd: () => { calls.push(`${name}:end`); }
+    });
+
+    await buildSite({ contentDir, outputDir, plugins: [plugin('one'), plugin('two')] });
+
+    expect(calls).toEqual([
+      'one:start', 'two:start',
+      'one:before', 'two:before',
+      'one:file:A', 'two:file:A',
+      'one:file:B', 'two:file:B',
+      'one:after', 'two:after',
+      'one:end', 'two:end'
+    ]);
+    await expect(fs.readFile(path.join(outputDir, 'a.html'), 'utf8'))
+      .resolves.toContain('<h1>A one two</h1>');
+  });
+
+  test('loads ordered plugins from ssg.config.ts', async () => {
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Original');
+    const configFile = path.join(root, 'ssg.config.ts');
+    await fs.writeFile(configFile, `
+      export default {
+        plugins: [{
+          onFile(page: { title: string }) {
+            page.title = 'Configured';
+          }
+        }]
+      };
+    `);
+
+    const pages = await buildSite({ contentDir, outputDir, configFile });
+
+    expect(pages[0].title).toBe('Configured');
+    await expect(fs.readFile(path.join(outputDir, 'page.html'), 'utf8'))
+      .resolves.toContain('<title>Configured</title>');
+  });
+
+  test('runs onEnd after a failed build', async () => {
+    const onEnd = jest.fn();
+    const plugin: Plugin = {
+      beforeBuild: () => { throw new Error('plugin failed'); },
+      onEnd
+    };
+
+    await expect(buildSite({ contentDir, outputDir, plugins: [plugin] }))
+      .rejects.toThrow('plugin failed');
+    expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
   test('uses a default Handlebars template and default layout', async () => {

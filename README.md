@@ -65,3 +65,38 @@ Hello **world**.
 Use `{{{body}}}` where page output belongs in `templates/layouts/site.hbs`.
 When frontmatter omits `template` or `layout`, `default.hbs` is used when that
 file exists. Without templates, the original built-in page output is retained.
+
+## Plugins
+
+Add TypeScript plugins under `plugins` and load them from `ssg.config.ts`:
+
+```ts
+import type { SsgConfig } from 'ssg';
+import analytics from './plugins/analytics';
+
+export default {
+  plugins: [analytics]
+} satisfies SsgConfig;
+```
+
+A plugin can implement any lifecycle hook. Hooks run in plugin order; `onFile`
+runs once for each parsed page:
+
+```ts
+import type { Plugin } from 'ssg';
+
+const analytics: Plugin = {
+  name: 'analytics',
+  onStart(context) {},
+  beforeBuild(context) {},
+  onFile(page, context) {},
+  afterBuild(context) {},
+  onEnd(context) {}
+};
+
+export default analytics;
+```
+
+`MarkdownPlugin`, `TemplatePlugin`, and `DevServerPlugin` provide the built-in
+Markdown, rendering, and live-reload behavior. `buildSite` also accepts a
+`plugins` array directly for programmatic use.
