@@ -28,6 +28,8 @@ Content is read recursively from `./content` and HTML is written to `./dist`. Ov
 npx ssg build --content ./articles --output ./public
 ```
 
+Use `npx ssg build --incremental` to rebuild only pages whose Markdown, selected template, layout, partials, or plugins changed. Build metadata is stored in `.ssg-cache.json` beside the output directory. A missing cache automatically triggers a clean build; use `--clean` to force one. Incremental builds report built and skipped pages plus estimated time saved.
+
 ## Templates
 
 Put Handlebars templates in `./templates`, layouts in `./templates/layouts`, and reusable partials in `./templates/partials`. Pages use `default.hbs` and the `layouts/default.hbs` layout unless frontmatter selects another file:

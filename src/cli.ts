@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { buildSite } from './index';
 import { startDevServer } from './server';
+import type { BuildStats } from './types';
 
 export function createProgram(): Command {
   const program = new Command();
@@ -17,9 +18,23 @@ export function createProgram(): Command {
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
     .option('--templates <dir>', 'template directory', './templates')
-    .action(async (options: { content: string; output: string; templates: string }) => {
-      const pages = await buildSite({ contentDir: options.content, outputDir: options.output, templateDir: options.templates });
-      process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${pathForMessage(options.output)}\n`);
+    .option('--incremental', 'only rebuild changed pages')
+    .option('--clean', 'force a clean build')
+    .action(async (options: { content: string; output: string; templates: string; incremental?: boolean; clean?: boolean }) => {
+      let stats: BuildStats | undefined;
+      const pages = await buildSite({
+        contentDir: options.content,
+        outputDir: options.output,
+        templateDir: options.templates,
+        incremental: options.incremental,
+        clean: options.clean,
+        onStats: (result) => { stats = result; },
+      });
+      if (options.incremental && stats) {
+        process.stdout.write(`Built ${stats.pagesBuilt} page${stats.pagesBuilt === 1 ? '' : 's'}, skipped ${stats.pagesSkipped} in ${stats.durationMs}ms (saved ${stats.timeSavedMs}ms)\n`);
+      } else {
+        process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${pathForMessage(options.output)}\n`);
+      }
     });
 
   program

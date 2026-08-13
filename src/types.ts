@@ -25,6 +25,24 @@ export interface BuildOptions {
   templateDir?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
+  cacheFile?: string;
+  onStats?(stats: BuildStats): void;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  durationMs: number;
+  timeSavedMs: number;
+  cleanBuild: boolean;
+}
+
+export interface IncrementalBuildState {
+  enabled: boolean;
+  cleanBuild: boolean;
+  skippedOutputPaths: Set<string>;
 }
 
 export interface BuildContext {
@@ -33,6 +51,8 @@ export interface BuildContext {
   readonly templateDir: string;
   readonly options: BuildOptions;
   pages: Page[];
+  incremental: IncrementalBuildState;
+  stats: BuildStats;
 }
 
 export type HookResult = void | Promise<void>;

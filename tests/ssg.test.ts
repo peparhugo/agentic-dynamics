@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import { WebSocket } from 'ws';
-import { buildSite, parseMarkdown, renderPage, startDevServer } from '../src';
+import { buildSite, parseMarkdown, renderPage, SsgEngine, startDevServer } from '../src';
 import type { Plugin } from '../src';
 import { createProgram } from '../src/cli';
 
@@ -218,6 +218,77 @@ describe('static site generator', () => {
     await expect(fs.readFile(path.join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>CLI page</h1>');
     expect(write).toHaveBeenCalledWith(`Generated 1 page in ${output}\n`);
     write.mockRestore();
+  });
+
+  test('incremental builds skip unchanged pages and persist a manifest', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'dist');
+    const cache = path.join(workspace, '.ssg-cache.json');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+
+    const first = new SsgEngine({ contentDir: content, outputDir: output, incremental: true });
+    await first.build();
+    const oneBefore = await fs.stat(path.join(output, 'one.html'));
+    const twoBefore = await fs.stat(path.join(output, 'two.html'));
+    const indexBefore = await fs.stat(path.join(output, 'index.html'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    const second = new SsgEngine({ contentDir: content, outputDir: output, incremental: true });
+    await second.build();
+
+    expect(first.lastBuildStats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0, cleanBuild: true });
+    expect(second.lastBuildStats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2, cleanBuild: false });
+    expect((await fs.stat(path.join(output, 'one.html'))).mtimeMs).toBe(oneBefore.mtimeMs);
+    expect((await fs.stat(path.join(output, 'two.html'))).mtimeMs).toBe(twoBefore.mtimeMs);
+    expect((await fs.stat(path.join(output, 'index.html'))).mtimeMs).toBe(indexBefore.mtimeMs);
+    await expect(fs.readFile(cache, 'utf8')).resolves.toContain('sourceHash');
+  });
+
+  test('incremental builds rebuild only changed sources and remove deleted output', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'dist');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    const twoBefore = await fs.stat(path.join(output, 'two.html'));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    await fs.writeFile(path.join(content, 'one.md'), '# Changed');
+
+    const engine = new SsgEngine({ contentDir: content, outputDir: output, incremental: true });
+    await engine.build();
+
+    expect(engine.lastBuildStats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(fs.readFile(path.join(output, 'one.html'), 'utf8')).resolves.toContain('<h1>Changed</h1>');
+    expect((await fs.stat(path.join(output, 'two.html'))).mtimeMs).toBe(twoBefore.mtimeMs);
+
+    await fs.rm(path.join(content, 'two.md'));
+    await buildSite({ contentDir: content, outputDir: output, incremental: true });
+    await expect(fs.stat(path.join(output, 'two.html'))).rejects.toThrow();
+  });
+
+  test('incremental builds invalidate pages when templates change and --clean rebuilds all pages', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'dist');
+    const templates = path.join(workspace, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Page');
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<article>{{{content}}}</article>');
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<main>{{{body}}}</main>');
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<section>{{{content}}}</section>');
+
+    const changed = new SsgEngine({ contentDir: content, outputDir: output, templateDir: templates, incremental: true });
+    await changed.build();
+    expect(changed.lastBuildStats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0, cleanBuild: false });
+    await expect(fs.readFile(path.join(output, 'page.html'), 'utf8')).resolves.toContain('<section>');
+
+    const clean = new SsgEngine({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, clean: true });
+    await clean.build();
+    expect(clean.lastBuildStats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 0, cleanBuild: true });
   });
 
   test('serves dist with live reload and rebuilds changed content', async () => {

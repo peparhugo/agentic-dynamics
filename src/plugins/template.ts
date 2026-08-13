@@ -65,7 +65,7 @@ export class TemplatePlugin implements Plugin {
     const stats = await fs.stat(context.templateDir).catch(() => undefined);
     this.useTemplates = stats?.isDirectory() ?? false;
     if (this.useTemplates) await this.loadPartials(path.join(context.templateDir, 'partials'));
-    await fs.rm(context.outputDir, { recursive: true, force: true });
+    if (context.incremental.cleanBuild) await fs.rm(context.outputDir, { recursive: true, force: true });
     await fs.mkdir(context.outputDir, { recursive: true });
   }
 
@@ -76,7 +76,16 @@ export class TemplatePlugin implements Plugin {
   }
 
   async afterBuild(context: BuildContext): Promise<void> {
-    await fs.writeFile(path.join(context.outputDir, 'index.html'), renderIndex(context.pages), 'utf8');
+    const destination = path.join(context.outputDir, 'index.html');
+    const rendered = renderIndex(context.pages);
+    if (!context.incremental.cleanBuild) {
+      const existing = await fs.readFile(destination, 'utf8').catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
+        throw error;
+      });
+      if (existing === rendered) return;
+    }
+    await fs.writeFile(destination, rendered, 'utf8');
   }
 
   private async loadPartials(partialsDir: string): Promise<void> {
