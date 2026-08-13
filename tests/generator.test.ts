@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { buildSite } from '../src/generator';
+import { startDevServer } from '../src/server';
 
 const execFileAsync = promisify(execFile);
 
@@ -93,5 +94,42 @@ describe('CLI', () => {
 
     expect(stdout).toBe('Generated 1 page(s).\n');
     await expect(readFile(join(outputDir, 'post.html'), 'utf8')).resolves.toContain('<h1>CLI page</h1>');
+  });
+});
+
+describe('development server', () => {
+  it('serves built pages with live reload and rebuilds changed content', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-server-'));
+    const contentDir = join(root, 'content');
+    const outputDir = join(root, 'public');
+    await mkdir(contentDir);
+    const pagePath = join(contentDir, 'page.md');
+    await writeFile(pagePath, '---\ntitle: First\n---\nInitial');
+    const server = await startDevServer({ contentDir, outputDir, templatesDir: resolve('templates'), port: 0 });
+
+    try {
+      const page = await fetch(`http://localhost:${server.port}/page.html`);
+      expect(page.status).toBe(200);
+      await expect(page.text()).resolves.toContain('new WebSocket(`ws://${location.host}`)');
+
+      await writeFile(pagePath, '---\ntitle: Second\n---\nUpdated');
+      await new Promise<void>((resolveBuild, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for rebuild')), 5000);
+        const interval = setInterval(async () => {
+          try {
+            const output = await readFile(join(outputDir, 'page.html'), 'utf8');
+            if (output.includes('<h1>Second</h1>')) {
+              clearTimeout(timeout);
+              clearInterval(interval);
+              resolveBuild();
+            }
+          } catch {
+            // The output directory is briefly replaced during rebuilds.
+          }
+        }, 50);
+      });
+    } finally {
+      await server.close();
+    }
   });
 });
