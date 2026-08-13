@@ -1,5 +1,4 @@
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -8,6 +7,12 @@ from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import (
+    BaseRepository,
+    DuplicateUserError,
+    TaskRepository,
+    UserRepository,
+)
 
 
 app = Flask(__name__)
@@ -17,42 +22,16 @@ JWT_ALGORITHM = "HS256"
 JWT_LIFETIME = timedelta(hours=1)
 
 
-def get_db():
-    connection = sqlite3.connect(DATABASE)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
-
-
 def init_db():
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
+    BaseRepository.initialize_database(DATABASE)
+
+
+def users():
+    return UserRepository(DATABASE)
+
+
+def tasks():
+    return TaskRepository(DATABASE)
 
 
 def task_json(row):
@@ -82,10 +61,7 @@ def require_auth(view):
         except (jwt.PyJWTError, KeyError, TypeError, ValueError):
             return error("invalid token", 401)
 
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT id FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+        user = users().get_by_id(user_id)
         if user is None:
             return error("invalid token", 401)
         return view(user_id, *args, **kwargs)
@@ -114,13 +90,8 @@ def register():
     username, password = values
 
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user_id = users().create_user(username, generate_password_hash(password))
+    except DuplicateUserError:
         return error("username already exists", 409)
 
     return jsonify({"id": user_id, "username": username}), 201
@@ -133,10 +104,7 @@ def login():
         return error("username and password are required", 400)
     username, password = values
 
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT id, password_hash FROM users WHERE username = ?", (username,)
-        ).fetchone()
+    user = users().get_by_username(username)
     if user is None or not check_password_hash(user["password_hash"], password):
         return error("invalid credentials", 401)
 
@@ -162,22 +130,7 @@ def create_task(user_id):
 
     title = title.strip()
     created_at = datetime.now(timezone.utc).isoformat()
-    connection = get_db()
-    try:
-        # Reserve the database for writing while deriving the next ID.
-        connection.execute("BEGIN IMMEDIATE")
-        row = connection.execute(
-            "SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM tasks"
-        ).fetchone()
-        task_id = row["next_id"]
-        connection.execute(
-            "INSERT INTO tasks (id, title, status, created_at, owner_id) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (task_id, title, "pending", created_at, user_id),
-        )
-        connection.commit()
-    finally:
-        connection.close()
+    task_id = tasks().create_for_owner(title, created_at, user_id)
 
     return jsonify(
         {
@@ -192,24 +145,14 @@ def create_task(user_id):
 @app.get("/tasks")
 @require_auth
 def list_tasks(user_id):
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (user_id,),
-        ).fetchall()
+    rows = tasks().list_for_owner(user_id)
     return jsonify([task_json(row) for row in rows])
 
 
 @app.get("/tasks/<int:task_id>")
 @require_auth
 def get_task(user_id, task_id):
-    with get_db() as connection:
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE id = ? AND owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
+    row = tasks().get_for_owner(task_id, user_id)
     if row is None:
         return error("task not found", 404)
     return jsonify(task_json(row))
@@ -222,46 +165,26 @@ def update_task(user_id, task_id):
     if not isinstance(data, dict):
         return error("JSON object is required", 400)
 
-    updates = []
-    values = []
+    updates = {}
 
     if "title" in data:
         title = data["title"]
         if not isinstance(title, str) or not title.strip():
             return error("title must be a non-empty string", 400)
-        updates.append("title = ?")
-        values.append(title.strip())
+        updates["title"] = title.strip()
 
     if "status" in data:
         status = data["status"]
         if not isinstance(status, str) or not status.strip():
             return error("status must be a non-empty string", 400)
-        updates.append("status = ?")
-        values.append(status.strip())
+        updates["status"] = status.strip()
 
     if not updates:
         return error("title or status is required", 400)
 
-    with get_db() as connection:
-        existing = connection.execute(
-            "SELECT tasks.id, tasks.title, tasks.status, users.username AS owner_email "
-            "FROM tasks JOIN users ON users.id = tasks.owner_id "
-            "WHERE tasks.id = ? AND tasks.owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
-        if existing is None:
-            return error("task not found", 404)
-
-        values.extend((task_id, user_id))
-        connection.execute(
-            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-            values,
-        )
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks "
-            "WHERE id = ? AND owner_id = ?",
-            (task_id, user_id),
-        ).fetchone()
+    existing, row = tasks().update_for_owner(task_id, user_id, **updates)
+    if existing is None:
+        return error("task not found", 404)
 
     if existing["status"] != "completed" and row["status"] == "completed":
         send_notification_email.delay(existing["owner_email"], row["title"])
