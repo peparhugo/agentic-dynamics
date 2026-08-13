@@ -20,6 +20,11 @@ async def receive_json(websocket):
     return json.loads(await asyncio.wait_for(websocket.recv(), timeout=1))
 
 
+async def assert_receives_nothing(websocket):
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(websocket.recv(), timeout=0.05)
+
+
 async def test_connect_assigns_unique_ids_and_persists_state(running_server):
     server, port, data_dir = running_server
     async with connect(f"ws://127.0.0.1:{port}") as first, connect(
@@ -74,8 +79,7 @@ async def test_direct_message_only_reaches_target(running_server):
         message = await receive_json(recipient)
         assert message["type"] == "direct"
         assert message["payload"]["text"] == "private"
-        with pytest.raises(asyncio.TimeoutError):
-            await asyncio.wait_for(sender.recv(), timeout=0.05)
+        await assert_receives_nothing(sender)
 
 
 async def test_invalid_messages_return_system_errors(running_server):
@@ -114,3 +118,113 @@ async def test_health_reports_connected_count(running_server):
         status, body = await asyncio.to_thread(request_health)
         assert status == 200
         assert body == {"connected_clients": 1}
+
+
+async def test_channel_message_only_reaches_subscribers(running_server):
+    _, port, data_dir = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as first, connect(
+        f"ws://127.0.0.1:{port}"
+    ) as second, connect(f"ws://127.0.0.1:{port}") as third:
+        await receive_json(first)
+        await receive_json(second)
+        await receive_json(third)
+        await first.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await second.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await asyncio.sleep(0.01)
+
+        await third.send(
+            json.dumps(
+                {"type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}}
+            )
+        )
+
+        first_received = await receive_json(first)
+        second_received = await receive_json(second)
+        assert first_received == second_received
+        assert first_received["channel"] == "alerts"
+        assert first_received["payload"] == {"text": "warning"}
+        await assert_receives_nothing(third)
+
+    history = [json.loads(line) for line in (data_dir / "messages.jsonl").read_text().splitlines()]
+    assert any(message.get("channel") == "alerts" for message in history)
+
+
+async def test_unsubscribe_and_disconnect_remove_active_channels(running_server):
+    server, port, _ = running_server
+    first = await connect(f"ws://127.0.0.1:{port}")
+    second = await connect(f"ws://127.0.0.1:{port}")
+    first_id = (await receive_json(first))["payload"]["client_id"]
+    second_id = (await receive_json(second))["payload"]["client_id"]
+    await first.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+    await second.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+    await asyncio.sleep(0.01)
+
+    assert await server.channel_subscribers("chat") == sorted([first_id, second_id])
+    await first.send(json.dumps({"type": "unsubscribe", "channel": "chat"}))
+    await asyncio.sleep(0.01)
+    assert await server.channel_subscribers("chat") == [second_id]
+
+    await second.close()
+    for _ in range(20):
+        if not await server.channel_counts():
+            break
+        await asyncio.sleep(0.01)
+    assert await server.channel_counts() == []
+    await first.close()
+
+
+async def test_client_can_subscribe_to_multiple_channels(running_server):
+    _, port, _ = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as subscriber, connect(
+        f"ws://127.0.0.1:{port}"
+    ) as publisher:
+        await receive_json(subscriber)
+        await receive_json(publisher)
+        await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+        await subscriber.send(json.dumps({"type": "subscribe", "channel": "system"}))
+        await asyncio.sleep(0.01)
+
+        for channel in ("alerts", "system"):
+            await publisher.send(
+                json.dumps({"type": "broadcast", "channel": channel, "payload": {}})
+            )
+            assert (await receive_json(subscriber))["channel"] == channel
+        await assert_receives_nothing(publisher)
+
+
+async def test_channel_endpoints_report_subscriptions(running_server):
+    _, port, _ = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as websocket:
+        client_id = (await receive_json(websocket))["payload"]["client_id"]
+        await websocket.send(json.dumps({"type": "subscribe", "channel": "team chat"}))
+        await asyncio.sleep(0.01)
+
+        def get_json(path):
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}") as response:
+                return response.status, json.load(response)
+
+        status, channels = await asyncio.to_thread(get_json, "/channels")
+        assert status == 200
+        assert channels == {
+            "channels": [{"name": "team chat", "subscriber_count": 1}]
+        }
+
+        status, subscribers = await asyncio.to_thread(
+            get_json, "/channels/team%20chat/subscribers"
+        )
+        assert status == 200
+        assert subscribers == {"channel": "team chat", "subscribers": [client_id]}
+
+
+async def test_invalid_channel_control_messages_return_errors(running_server):
+    _, port, _ = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as websocket:
+        await receive_json(websocket)
+        await websocket.send(json.dumps({"type": "subscribe"}))
+        assert (await receive_json(websocket))["payload"] == {
+            "error": "subscribe requires channel"
+        }
+        await websocket.send(json.dumps({"type": "unsubscribe", "channel": ""}))
+        assert (await receive_json(websocket))["payload"] == {
+            "error": "channel must be a non-empty string"
+        }

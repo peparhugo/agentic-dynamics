@@ -1,8 +1,8 @@
 # WebSocket Notification Server
 
 An asyncio notification server using `websockets`, with a WebSocket endpoint and
-an HTTP `GET /health` endpoint on the same port. Current client state is stored in
-`clients.json`; all accepted messages and connection events are appended to
+HTTP status endpoints on the same port. Current client state is stored in
+`clients.json`; delivered messages and connection events are appended to
 `messages.jsonl`.
 
 ```bash
@@ -23,3 +23,20 @@ messages go to every client. A `direct` payload must include the target client's
 ```json
 {"type":"direct","payload":{"client_id":"...","text":"private"}}
 ```
+
+Clients can dynamically subscribe to multiple named channels. Subscription
+control messages are silent:
+
+```json
+{"type":"subscribe","channel":"alerts"}
+{"type":"unsubscribe","channel":"alerts"}
+```
+
+Adding a top-level `channel` to a `broadcast` or `system` message delivers it
+only to subscribers. A channeled `direct` message is delivered only when its
+target subscribes to that channel. Messages without a channel retain their
+original broadcast or direct behavior.
+
+`GET /health` reports the connected client count. `GET /channels` lists active
+channels and subscriber counts, while `GET /channels/{name}/subscribers` lists
+the subscriber IDs for a channel.
