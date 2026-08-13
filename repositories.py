@@ -142,15 +142,37 @@ class TaskRepository(BaseRepository[dict[str, Any]]):
 
     def get_all(self, owner_id: int | None = None) -> list[dict[str, Any]]:
         with self._lock:
-            tasks = [
-                task
-                for task in self._store()["tasks"]
-                if owner_id is None or task["owner_id"] == owner_id
-            ]
-            tasks.sort(
-                key=lambda task: (task["created_at"], task["id"]), reverse=True
-            )
+            tasks = self._ordered_tasks(owner_id)
             return [task.copy() for task in tasks]
+
+    def paginate(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]], int | None, int]:
+        with self._lock:
+            tasks = self._ordered_tasks(owner_id)
+            start = 0
+            if cursor is not None:
+                try:
+                    start = next(
+                        index + 1
+                        for index, task in enumerate(tasks)
+                        if task["id"] == cursor
+                    )
+                except StopIteration as error:
+                    raise ValueError("invalid cursor") from error
+
+            page = tasks[start : start + limit]
+            next_cursor = page[-1]["id"] if start + len(page) < len(tasks) else None
+            return [task.copy() for task in page], next_cursor, len(tasks)
+
+    def _ordered_tasks(self, owner_id: int | None) -> list[dict[str, Any]]:
+        tasks = [
+            task
+            for task in self._store()["tasks"]
+            if owner_id is None or task["owner_id"] == owner_id
+        ]
+        tasks.sort(key=lambda task: (task["created_at"], task["id"]), reverse=True)
+        return tasks
 
     def update(
         self, entity_id: int, owner_id: int | None = None, **changes: Any

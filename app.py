@@ -14,6 +14,8 @@ from threading import Lock
 from typing import Any, Callable, TypeVar
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from notification_tasks import send_notification_email
@@ -24,6 +26,9 @@ app = Flask(__name__)
 app.config.update(
     JWT_SECRET=os.environ.get("JWT_SECRET", "development-only-secret"),
     JWT_TTL_SECONDS=3600,
+    RATELIMIT_STORAGE_URI=os.environ.get(
+        "RATE_LIMIT_STORAGE_URI", "redis://localhost:6379/1"
+    ),
 )
 
 
@@ -32,6 +37,28 @@ _store_lock = Lock()
 F = TypeVar("F", bound=Callable[..., Any])
 user_repository = UserRepository(lambda: _store, _store_lock)
 task_repository = TaskRepository(lambda: _store, _store_lock)
+
+
+def rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and separator and token:
+        try:
+            user_id = decode_token(token)
+            if user_repository.get_by_id(user_id) is not None:
+                return f"user:{user_id}"
+        except ValueError:
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+    headers_enabled=True,
+    in_memory_fallback=["100 per minute"],
+)
 
 
 def init_db() -> None:
@@ -215,7 +242,27 @@ def login():
 @app.get("/tasks")
 @auth_required
 def list_tasks():
-    return jsonify(task_repository.get_all(g.current_user.id))
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+        if cursor is not None and cursor <= 0:
+            raise ValueError
+        if not 1 <= limit <= 100:
+            raise ValueError
+        tasks, next_cursor, total = task_repository.paginate(
+            g.current_user.id, cursor, limit
+        )
+    except ValueError:
+        return jsonify({"error": "cursor must be a valid task id and limit must be between 1 and 100"}), 400
+    return jsonify(
+        {
+            "data": tasks,
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.post("/tasks")

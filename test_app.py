@@ -7,6 +7,7 @@ from unittest.mock import patch
 def client():
     task_app.app.config.update(TESTING=True, JWT_SECRET="test-secret")
     task_app.init_db()
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -90,7 +91,11 @@ def test_task_crud_is_scoped_to_owner(client):
 
     register(client, "bob")
     bob_token = token_for(client, "bob")
-    assert client.get("/tasks", headers=auth(bob_token)).get_json() == []
+    assert client.get("/tasks", headers=auth(bob_token)).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task_id}", headers=auth(bob_token)).status_code == 404
     assert client.put(
         f"/tasks/{task_id}", json={"status": "done"}, headers=auth(bob_token)
@@ -103,7 +108,91 @@ def test_task_crud_is_scoped_to_owner(client):
     )
     assert response.status_code == 200
     assert response.get_json()["status"] == "done"
-    assert len(client.get("/tasks", headers=auth(alice_token)).get_json()) == 1
+    tasks = client.get("/tasks", headers=auth(alice_token)).get_json()
+    assert len(tasks["data"]) == 1
+    assert tasks["total"] == 1
+
+
+def test_tasks_are_cursor_paginated(client):
+    register(client)
+    token = token_for(client)
+    for number in range(5):
+        response = client.post(
+            "/tasks", json={"title": f"Task {number}"}, headers=auth(token)
+        )
+        assert response.status_code == 201
+
+    first = client.get("/tasks?limit=2", headers=auth(token))
+    assert first.status_code == 200
+    first_page = first.get_json()
+    assert [task["id"] for task in first_page["data"]] == [5, 4]
+    assert first_page["next_cursor"] == "4"
+    assert first_page["total"] == 5
+
+    second = client.get(
+        f"/tasks?limit=2&cursor={first_page['next_cursor']}", headers=auth(token)
+    ).get_json()
+    assert [task["id"] for task in second["data"]] == [3, 2]
+    assert second["next_cursor"] == "2"
+    assert second["total"] == 5
+
+    last = client.get(
+        f"/tasks?limit=2&cursor={second['next_cursor']}", headers=auth(token)
+    ).get_json()
+    assert [task["id"] for task in last["data"]] == [1]
+    assert last["next_cursor"] is None
+    assert last["total"] == 5
+
+
+def test_task_pagination_defaults_to_twenty_and_allows_one_hundred(client):
+    register(client)
+    token = token_for(client)
+    for number in range(21):
+        client.post(
+            "/tasks", json={"title": f"Task {number}"}, headers=auth(token)
+        )
+
+    default_page = client.get("/tasks", headers=auth(token)).get_json()
+    assert len(default_page["data"]) == 20
+    assert default_page["next_cursor"] == "2"
+    assert default_page["total"] == 21
+
+    max_page = client.get("/tasks?limit=100", headers=auth(token)).get_json()
+    assert len(max_page["data"]) == 21
+    assert max_page["next_cursor"] is None
+
+
+@pytest.mark.parametrize("query", ["limit=0", "limit=101", "limit=nope", "cursor=0", "cursor=999"])
+def test_task_pagination_rejects_invalid_parameters(client, query):
+    register(client)
+    token = token_for(client)
+    assert client.get(f"/tasks?{query}", headers=auth(token)).status_code == 400
+
+
+def test_authenticated_user_is_rate_limited_across_endpoints(client):
+    register(client)
+    token = token_for(client)
+    headers = auth(token)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    response = client.get("/tasks/1", headers=headers)
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_is_per_authenticated_user(client):
+    register(client, "alice")
+    alice_token = token_for(client, "alice")
+    register(client, "bob")
+    bob_token = token_for(client, "bob")
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth(alice_token)).status_code == 200
+
+    assert client.get("/tasks", headers=auth(alice_token)).status_code == 429
+    assert client.get("/tasks", headers=auth(bob_token)).status_code == 200
 
 
 def test_completing_task_enqueues_owner_notification(client):
