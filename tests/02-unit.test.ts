@@ -40,6 +40,16 @@ describe('CLI arguments', () => {
     });
   });
 
+  it('reads serve options and validates the port', () => {
+    expect(parseArgs(['serve', '--port', '4000'])).toEqual({
+      command: 'serve',
+      port: 4000,
+    });
+    expect(() => parseArgs(['serve', '--port', 'invalid'])).toThrow('Invalid port');
+    expect(() => parseArgs(['serve', '--port', '0'])).toThrow('Invalid port');
+    expect(() => parseArgs(['serve', '--port', '65536'])).toThrow('Invalid port');
+  });
+
   it('rejects invalid and incomplete options', () => {
     expect(() => parseArgs(['build', '--other'])).toThrow('Unknown option');
     expect(() => parseArgs(['build', '--content'])).toThrow('Missing value');

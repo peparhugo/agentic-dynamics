@@ -16,6 +16,18 @@ Override them with:
 npx ssg build --content posts --output public --templates theme
 ```
 
+## Development server
+
+Build and serve the site with live reload at `http://localhost:3000`:
+
+```sh
+npx ssg serve
+```
+
+The server watches `content/` and `templates/`, rebuilds after changes, and reloads
+connected browsers. Use another port with `npx ssg serve --port 4000`. The build path
+options are also available to the `serve` command.
+
 Supported frontmatter fields include `title`, `date`, `tags`, `template`, and `layout`.
 Any additional fields are available as template variables. ISO dates are parsed as
 strings and displayed in a readable UTC format. Raw HTML embedded in Markdown is
