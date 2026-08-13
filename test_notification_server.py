@@ -212,3 +212,202 @@ async def test_invalid_json_returns_error(server):
     assert got["payload"]["message"] == "error"
 
     await ws.close()
+
+
+async def subscribe(ws, channel: str):
+    await ws.send(json.dumps(make_message("subscribe", {"channel": channel})))
+    got = json.loads(await ws.recv())
+    assert got["payload"]["message"] == "subscribed"
+    assert got["payload"]["channel"] == channel
+    return got
+
+
+async def unsubscribe(ws, channel: str):
+    await ws.send(json.dumps(make_message("unsubscribe", {"channel": channel})))
+    got = json.loads(await ws.recv())
+    assert got["payload"]["message"] == "unsubscribed"
+    assert got["payload"]["channel"] == channel
+    return got
+
+
+async def test_subscribe_delivers_channel_messages_only(server):
+    addr, _ = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+
+    payload = {"text": "intruder detected"}
+    await ws2.send(json.dumps(make_message("broadcast", payload, ) | {"channel": "alerts"}))
+
+    got = json.loads(await ws1.recv())
+    assert got["type"] == "broadcast"
+    assert got["payload"] == payload
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws2.recv(), 0.2)
+
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_channel_message_does_not_reach_non_subscribers(server):
+    addr, _ = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await subscribe(ws2, "chat")
+
+    payload = {"text": "channel scoped"}
+    await ws1.send(json.dumps(make_message("broadcast", payload) | {"channel": "chat"}))
+
+    got = json.loads(await ws2.recv())
+    assert got["payload"] == payload
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws1.recv(), 0.2)
+
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_unsubscribe_stops_delivery(server):
+    addr, _ = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await unsubscribe(ws1, "alerts")
+
+    payload = {"text": "after unsubscribe"}
+    await ws2.send(json.dumps(make_message("broadcast", payload) | {"channel": "alerts"}))
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(ws1.recv(), 0.2)
+
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_client_subscribes_to_multiple_channels(server):
+    addr, _ = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await subscribe(ws1, "chat")
+    await subscribe(ws2, "chat")
+
+    payload = {"text": "alert only"}
+    await ws2.send(json.dumps(make_message("broadcast", payload) | {"channel": "alerts"}))
+    got = json.loads(await ws1.recv())
+    assert got["payload"] == payload
+
+    payload2 = {"text": "chat only"}
+    await ws2.send(json.dumps(make_message("broadcast", payload2) | {"channel": "chat"}))
+    got2 = json.loads(await ws1.recv())
+    got3 = json.loads(await ws2.recv())
+    assert got2["payload"] == payload2
+    assert got3["payload"] == payload2
+
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_message_without_channel_still_broadcasts_to_all(server):
+    addr, _ = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+
+    payload = {"text": "to everyone"}
+    await ws2.send(json.dumps(make_message("broadcast", payload)))
+
+    got1 = json.loads(await ws1.recv())
+    got2 = json.loads(await ws2.recv())
+    assert got1["payload"] == payload
+    assert got2["payload"] == payload
+
+    await ws1.close()
+    await ws2.close()
+
+
+async def test_subscribe_missing_channel_errors(server):
+    addr, _ = server
+    ws, _, _ = await connect_client(addr)
+
+    await ws.send(json.dumps(make_message("subscribe", {})))
+    got = json.loads(await ws.recv())
+    assert got["type"] == "system"
+    assert got["payload"]["message"] == "error"
+
+    await ws.close()
+
+
+async def test_channels_endpoint_lists_channels_and_counts(server):
+    addr, srv = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await subscribe(ws2, "alerts")
+    await subscribe(ws2, "chat")
+
+    status, body = await http_get(addr, "/channels")
+    assert status == 200
+    by_name = {c["name"]: c for c in body["channels"]}
+    assert by_name["alerts"]["subscribers"] == 2
+    assert by_name["chat"]["subscribers"] == 1
+
+    await ws1.close()
+    await ws2.close()
+    await wait_count(srv.registry, 0)
+
+
+async def test_channel_subscribers_endpoint(server):
+    addr, srv = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await subscribe(ws2, "alerts")
+
+    status, body = await http_get(addr, "/channels/alerts/subscribers")
+    assert status == 200
+    assert set(body["subscribers"]) == {id1, id2}
+
+    status, body = await http_get(addr, "/channels/chat/subscribers")
+    assert status == 200
+    assert body["subscribers"] == []
+
+    await ws1.close()
+    await ws2.close()
+    await wait_count(srv.registry, 0)
+
+
+async def test_channels_endpoint_after_disconnect(server):
+    addr, srv = server
+    ws1, id1, _ = await connect_client(addr)
+    ws2, id2, _ = await connect_client(addr)
+
+    await subscribe(ws1, "alerts")
+    await subscribe(ws2, "alerts")
+    await subscribe(ws2, "chat")
+
+    await ws1.close()
+    await wait_count(srv.registry, 1)
+
+    status, body = await http_get(addr, "/channels")
+    assert status == 200
+    by_name = {c["name"]: c for c in body["channels"]}
+    assert by_name["alerts"]["subscribers"] == 1
+    assert by_name["chat"]["subscribers"] == 1
+
+    await ws2.close()
+    await wait_count(srv.registry, 0)
+
+    status, body = await http_get(addr, "/channels")
+    assert status == 200
+    assert body["channels"] == []
