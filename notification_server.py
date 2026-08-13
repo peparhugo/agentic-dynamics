@@ -1,10 +1,17 @@
 """
-WebSocket-based notification server.
+Notification server with a pluggable transport layer.
 
-Accepts WebSocket connections, assigns each client a unique ID, and lets
-clients broadcast JSON notification messages to every connected client.
-Also exposes a plain HTTP GET /health endpoint (served over the same
-socket) that reports the number of currently connected clients.
+Accepts client connections over whatever Transport is configured (a
+WebSocketTransport by default — see transport.py), assigns each client a
+unique ID, and lets clients broadcast JSON notification messages to every
+connected client, to a channel's subscribers, or directly to one other
+client. The routing/business logic here never touches a wire protocol
+directly — it only calls the small Transport contract (on_connect,
+on_disconnect, send_message, broadcast), so new transports (SSE, polling,
+raw TCP, ...) can be added without modifying this file. Also exposes a
+plain HTTP GET /health endpoint (served over the same socket, for the
+WebSocket transport) that reports the number of currently connected
+clients.
 """
 
 from __future__ import annotations
@@ -12,66 +19,26 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
-import urllib.parse
 import uuid
-from datetime import datetime, timezone
-from typing import Any
 
-from websockets.asyncio.server import ServerConnection, serve
-from websockets.datastructures import Headers
-from websockets.exceptions import ConnectionClosed
-from websockets.http11 import Request, Response
+from websockets.asyncio.server import serve
 
+from messages import MESSAGE_TYPES, make_message
 from persistence import MessageStore
 from redis_backbone import RedisBackbone
+from transport import BaseTransport, ClientRegistry, WebSocketTransport, create_transport
 
-MESSAGE_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
-
-_CHANNEL_SUBSCRIBERS_PATH = re.compile(r"^/channels/([^/]+)/subscribers$")
-
-
-def utc_timestamp() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def make_message(msg_type: str, payload: dict, channel: str | None = None) -> dict:
-    if msg_type not in MESSAGE_TYPES:
-        raise ValueError(f"unsupported message type: {msg_type!r}")
-    message = {"type": msg_type, "payload": payload, "timestamp": utc_timestamp()}
-    if channel is not None:
-        message["channel"] = channel
-    return message
-
-
-class ClientRegistry:
-    """Thread-safe (asyncio-safe) registry of connected clients."""
-
-    def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
-        self._lock = asyncio.Lock()
-
-    async def add(self, connection: ServerConnection) -> str:
-        client_id = str(uuid.uuid4())
-        async with self._lock:
-            self._clients[client_id] = connection
-        return client_id
-
-    async def remove(self, client_id: str) -> None:
-        async with self._lock:
-            self._clients.pop(client_id, None)
-
-    async def count(self) -> int:
-        async with self._lock:
-            return len(self._clients)
-
-    async def snapshot(self) -> list[tuple[str, ServerConnection]]:
-        async with self._lock:
-            return list(self._clients.items())
-
-    async def get(self, client_id: str) -> ServerConnection | None:
-        async with self._lock:
-            return self._clients.get(client_id)
+__all__ = [
+    "MESSAGE_TYPES",
+    "ChannelRegistry",
+    "ClientRegistry",
+    "NotificationServer",
+    "make_message",
+    "BaseTransport",
+    "WebSocketTransport",
+    "create_app",
+    "run_server",
+]
 
 
 class ChannelRegistry:
@@ -119,12 +86,25 @@ class NotificationServer:
         redis_backbone: RedisBackbone | None = None,
         message_store: MessageStore | None = None,
         server_id: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
-        self.registry = ClientRegistry()
         self.channels = ChannelRegistry()
         self.redis_backbone = redis_backbone
         self.message_store = message_store
         self.server_id = server_id or str(uuid.uuid4())
+        self.transport = transport or create_transport(self, on_stale_client=self.channels.remove_client)
+
+    @property
+    def registry(self) -> ClientRegistry:
+        return self.transport.registry
+
+    @property
+    def handler(self):
+        return self.transport.handler
+
+    @property
+    def process_request(self):
+        return self.transport.process_request
 
     async def start(self) -> None:
         """Begin subscribing to the Redis backbone, if configured."""
@@ -136,30 +116,11 @@ class NotificationServer:
             await self.redis_backbone.stop()
 
     async def _deliver_broadcast_local(self, message: dict, channel: str | None) -> int:
-        encoded = json.dumps(message)
         target_ids = set(await self.channels.subscribers(channel)) if channel is not None else None
-        sent = 0
-        for client_id, connection in await self.registry.snapshot():
-            if target_ids is not None and client_id not in target_ids:
-                continue
-            try:
-                await connection.send(encoded)
-                sent += 1
-            except ConnectionClosed:
-                await self.registry.remove(client_id)
-                await self.channels.remove_client(client_id)
-        return sent
+        return await self.transport.broadcast(message, target_ids)
 
     async def _deliver_direct_local(self, client_id: str, message: dict) -> bool:
-        connection = await self.registry.get(client_id)
-        if connection is None:
-            return False
-        try:
-            await connection.send(json.dumps(message))
-            return True
-        except ConnectionClosed:
-            await self.registry.remove(client_id)
-            return False
+        return await self.transport.send_message(client_id, message)
 
     async def _on_redis_message(self, envelope: dict) -> None:
         # Messages this same instance published were already delivered to
@@ -208,26 +169,6 @@ class NotificationServer:
             )
         return delivered
 
-    async def handler(self, connection: ServerConnection) -> None:
-        client_id = await self.registry.add(connection)
-        if self.redis_backbone is not None:
-            await self.redis_backbone.set_client_state(client_id)
-        try:
-            await connection.send(
-                json.dumps(
-                    make_message("system", {"event": "connected", "client_id": client_id})
-                )
-            )
-            async for raw in connection:
-                await self._handle_incoming(client_id, raw)
-        except ConnectionClosed:
-            pass
-        finally:
-            await self.registry.remove(client_id)
-            await self.channels.remove_client(client_id)
-            if self.redis_backbone is not None:
-                await self.redis_backbone.clear_client_state(client_id)
-
     async def _handle_incoming(self, client_id: str, raw: str | bytes) -> None:
         try:
             data = json.loads(raw)
@@ -271,78 +212,21 @@ class NotificationServer:
                 await self._send_error(client_id, f"unknown client_id: {target_id!r}")
         elif msg_type == "system":
             # System messages from clients are acknowledged but not rebroadcast.
-            connection = await self.registry.get(client_id)
-            if connection is not None:
-                await connection.send(
-                    json.dumps(make_message("system", {"event": "ack", "received": payload}))
-                )
+            await self.transport.send_message(
+                client_id, make_message("system", {"event": "ack", "received": payload})
+            )
 
     async def _send_error(self, client_id: str, error: str) -> None:
-        connection = await self.registry.get(client_id)
-        if connection is None:
-            return
-        try:
-            await connection.send(
-                json.dumps(make_message("system", {"event": "error", "message": error}))
-            )
-        except ConnectionClosed:
-            await self.registry.remove(client_id)
+        await self.transport.send_message(
+            client_id, make_message("system", {"event": "error", "message": error})
+        )
 
     async def _send_ack(self, client_id: str, event: str, channel: str) -> None:
-        connection = await self.registry.get(client_id)
-        if connection is None:
-            return
-        try:
-            await connection.send(
-                json.dumps(make_message("system", {"event": event, "channel": channel}))
-            )
-        except ConnectionClosed:
-            await self.registry.remove(client_id)
+        delivered = await self.transport.send_message(
+            client_id, make_message("system", {"event": event, "channel": channel})
+        )
+        if not delivered:
             await self.channels.remove_client(client_id)
-
-    @staticmethod
-    def _json_response(payload: dict) -> Response:
-        body = json.dumps(payload).encode()
-        headers = Headers([("Content-Type", "application/json"), ("Content-Length", str(len(body)))])
-        return Response(200, "OK", headers, body)
-
-    async def process_request(
-        self, connection: ServerConnection, request: Request
-    ) -> Response | None:
-        parsed = urllib.parse.urlsplit(request.path)
-        path = parsed.path
-
-        if path == "/health":
-            count = await self.registry.count()
-            return self._json_response({"connected_clients": count})
-
-        if path == "/channels":
-            counts = await self.channels.channel_counts()
-            return self._json_response({"channels": counts})
-
-        if path == "/messages":
-            query = urllib.parse.parse_qs(parsed.query)
-            limit = _parse_int(query.get("limit", ["50"])[0], default=50)
-            offset = _parse_int(query.get("offset", ["0"])[0], default=0)
-            if self.message_store is None:
-                return self._json_response({"messages": [], "limit": limit, "offset": offset})
-            messages = await self.message_store.list_messages(limit=limit, offset=offset)
-            return self._json_response({"messages": messages, "limit": limit, "offset": offset})
-
-        match = _CHANNEL_SUBSCRIBERS_PATH.match(path)
-        if match:
-            channel = match.group(1)
-            subscribers = await self.channels.subscribers(channel)
-            return self._json_response({"channel": channel, "subscribers": subscribers})
-
-        return None
-
-
-def _parse_int(value: str, default: int) -> int:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def create_app(
