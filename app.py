@@ -1,260 +1,216 @@
-"""
-Tier 2 Small seed — Multi-file Flask Auth API (Python, ~500 LOC)
-
-A modular Flask app with Blueprints, JWT authentication, SQLite persistence,
-and pytest tests. Designed as a baseline for tier 2 multi-session stories.
-"""
-
-from flask import Flask
-from flask import Blueprint
-from flask import request, jsonify
-from datetime import datetime, timedelta
-from functools import wraps
-import sqlite3
-import hashlib
 import os
-import secrets
-import time
+import sqlite3
+from datetime import datetime, timezone
+from xml.etree import ElementTree as ET
 
-app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-
-DATABASE = os.environ.get("DATABASE", "auth_api.db")
-TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+from flask import Flask, Response, current_app, request
 
 
-# ── Database ────────────────────────────────────────────────────
+SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
+TASK_NS = "urn:task-management"
+ET.register_namespace("soap", SOAP_NS)
+ET.register_namespace("task", TASK_NS)
+
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    connection = sqlite3.connect(current_app.config["DATABASE"])
+    connection.row_factory = sqlite3.Row
+    return connection
 
 
 def init_db():
-    with get_db() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
+    with get_db() as connection:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'user',
+                title TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
                 created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS tokens (
-                token TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                expires_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-        """)
-
-
-# ── Auth Utilities ──────────────────────────────────────────────
-
-
-# Legacy migration helper
-def _run_migration_v1():
-    import sqlite3 as _sql
-    _sql.connect(DATABASE).execute("SELECT 1").fetchone()
-
-def hash_password(password: str) -> str:
-    salt = "static_salt_1234"
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
-
-
-def create_token(user_id: int) -> str:
-    token = secrets.token_hex(32)
-    expires = (datetime.utcnow() + timedelta(seconds=TOKEN_TTL)).isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (token, user_id, expires),
+            )
+            """
         )
-        conn.commit()
-    return token
 
 
-def get_user_from_token(token: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT u.* FROM users u JOIN tokens t ON u.id = t.user_id "
-            "WHERE t.token = ? AND t.expires_at > ?",
-            (token, datetime.utcnow().isoformat()),
-        ).fetchone()
-    return dict(row) if row else None
+def local_name(element):
+    return element.tag.rsplit("}", 1)[-1]
 
 
-
-def verify_token(token: str) -> dict | None:
-    return get_user_from_token(token)
-
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.headers.get("Authorization", "")
-        if not auth.startswith("Bearer "):
-            return jsonify({"error": "missing authorization header"}), 401
-        token = auth.split(" ", 1)[1]
-        user = get_user_from_token(token)
-        if user is None:
-            return jsonify({"error": "invalid or expired token"}), 401
-        return f(user, *args, **kwargs)
-    return decorated
+def child_text(element, name):
+    for child in element:
+        if local_name(child) == name:
+            return child.text or ""
+    return None
 
 
-# ── Auth Blueprint ──────────────────────────────────────────────
+def add_task(parent, task):
+    task_element = ET.SubElement(parent, f"{{{TASK_NS}}}task")
+    for field in ("id", "title", "status", "created_at"):
+        ET.SubElement(task_element, f"{{{TASK_NS}}}{field}").text = str(task[field])
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+def soap_response(operation, tasks, status=200):
+    envelope = ET.Element(f"{{{SOAP_NS}}}Envelope")
+    body = ET.SubElement(envelope, f"{{{SOAP_NS}}}Body")
+    result = ET.SubElement(body, f"{{{TASK_NS}}}{operation}Response")
+    if isinstance(tasks, sqlite3.Row):
+        add_task(result, tasks)
+    else:
+        for task in tasks:
+            add_task(result, task)
+    return Response(
+        ET.tostring(envelope, encoding="utf-8", xml_declaration=True),
+        status=status,
+        content_type="text/xml; charset=utf-8",
+    )
 
 
-@auth_bp.route("/register", methods=["POST"])
-def register():
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    if not username or not password:
-        return jsonify({"error": "username and password required"}), 400
-    if len(password) < 8:
-        return jsonify({"error": "password must be at least 8 characters"}), 400
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing:
-            return jsonify({"error": "username already taken"}), 409
-        now = datetime.utcnow().isoformat()
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) "
-            "VALUES (?, ?, 'user', ?)",
-            (username, hash_password(password), now),
+def soap_fault(message, status):
+    envelope = ET.Element(f"{{{SOAP_NS}}}Envelope")
+    body = ET.SubElement(envelope, f"{{{SOAP_NS}}}Body")
+    fault = ET.SubElement(body, f"{{{SOAP_NS}}}Fault")
+    ET.SubElement(fault, "faultcode").text = "soap:Client"
+    ET.SubElement(fault, "faultstring").text = message
+    return Response(
+        ET.tostring(envelope, encoding="utf-8", xml_declaration=True),
+        status=status,
+        content_type="text/xml; charset=utf-8",
+    )
+
+
+def parse_operation():
+    try:
+        envelope = ET.fromstring(request.data)
+    except ET.ParseError:
+        return None, soap_fault("invalid SOAP XML", 400)
+
+    body = envelope.find(f"{{{SOAP_NS}}}Body")
+    if body is None or len(body) != 1:
+        return None, soap_fault("SOAP body must contain one operation", 400)
+    return body[0], None
+
+
+def create_task(operation):
+    title = (child_text(operation, "title") or "").strip()
+    if not title:
+        return soap_fault("title is required", 400)
+
+    created_at = datetime.now(timezone.utc).isoformat()
+    with get_db() as connection:
+        cursor = connection.execute(
+            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
+            (title, created_at),
         )
-        conn.commit()
-    return jsonify({"message": "user registered", "username": username}), 201
-
-
-@auth_bp.route("/login", methods=["POST"])
-def login():
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    if not username or not password:
-        return jsonify({"error": "username and password required"}), 400
-    with get_db() as conn:
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-            (username, hash_password(password)),
+        task = connection.execute(
+            "SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)
         ).fetchone()
-    if user is None:
-        return jsonify({"error": "invalid credentials"}), 401
-    token = create_token(user["id"])
-    return jsonify({"token": token, "username": user["username"], "role": user["role"]})
+    return soap_response("CreateTask", task, 201)
 
 
-# ── Items Blueprint ─────────────────────────────────────────────
-
-items_bp = Blueprint("items", __name__, url_prefix="/items")
-
-
-@items_bp.route("", methods=["GET"])
-@require_auth
-def list_items(user: dict):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM items WHERE user_id = ? ORDER BY created_at DESC",
-            (user["id"],),
+def list_tasks():
+    with get_db() as connection:
+        tasks = connection.execute(
+            "SELECT * FROM tasks ORDER BY created_at DESC, id DESC"
         ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    return soap_response("ListTasks", tasks)
 
 
-@items_bp.route("", methods=["POST"])
-@require_auth
-def create_item(user: dict):
-    data = request.get_json(silent=True) or {}
-    name = data.get("name", "").strip()
-    if not name:
-        return jsonify({"error": "name is required"}), 400
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO items (user_id, name, description, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user["id"], name, data.get("description", ""), now),
+def get_task(operation):
+    task_id, error = parse_task_id(operation)
+    if error:
+        return error
+    with get_db() as connection:
+        task = connection.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    if task is None:
+        return soap_fault("task not found", 404)
+    return soap_response("GetTask", task)
+
+
+def parse_task_id(operation):
+    try:
+        task_id = int(child_text(operation, "id"))
+        if task_id < 1:
+            raise ValueError
+    except (TypeError, ValueError):
+        return None, soap_fault("valid task id is required", 400)
+    return task_id, None
+
+
+def update_task(operation):
+    task_id, error = parse_task_id(operation)
+    if error:
+        return error
+
+    title = child_text(operation, "title")
+    status = child_text(operation, "status")
+    updates = []
+    values = []
+    if title is not None:
+        title = title.strip()
+        if not title:
+            return soap_fault("title cannot be empty", 400)
+        updates.append("title = ?")
+        values.append(title)
+    if status is not None:
+        status = status.strip()
+        if not status:
+            return soap_fault("status cannot be empty", 400)
+        updates.append("status = ?")
+        values.append(status)
+    if not updates:
+        return soap_fault("title or status is required", 400)
+
+    with get_db() as connection:
+        existing = connection.execute(
+            "SELECT id FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+        if existing is None:
+            return soap_fault("task not found", 404)
+        values.append(task_id)
+        connection.execute(
+            f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", values
         )
-        conn.commit()
-        return jsonify({
-            "id": cursor.lastrowid,
-            "name": name,
-            "description": data.get("description", ""),
-            "created_at": now,
-        }), 201
-
-
-@items_bp.route("/<int:item_id>", methods=["GET"])
-@require_auth
-def get_item(user: dict, item_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
+        task = connection.execute(
+            "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
-    if row is None:
-        return jsonify({"error": "item not found"}), 404
-    return jsonify(dict(row))
+    return soap_response("UpdateTask", task)
 
 
-@items_bp.route("/<int:item_id>", methods=["DELETE"])
-@require_auth
-def delete_item(user: dict, item_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "item not found"}), 404
-        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
-        conn.commit()
-    return jsonify({"message": "item deleted"})
+def create_app(test_config=None):
+    app = Flask(__name__)
+    app.config.from_mapping(
+        DATABASE=os.environ.get("DATABASE", os.path.join(app.instance_path, "tasks.db"))
+    )
+    if test_config:
+        app.config.update(test_config)
+
+    os.makedirs(os.path.dirname(os.path.abspath(app.config["DATABASE"])), exist_ok=True)
+
+    @app.post("/soap")
+    def soap_endpoint():
+        operation, error = parse_operation()
+        if error:
+            return error
+        handlers = {
+            "CreateTask": create_task,
+            "ListTasks": lambda _operation: list_tasks(),
+            "GetTask": get_task,
+            "UpdateTask": update_task,
+        }
+        handler = handlers.get(local_name(operation))
+        if handler is None:
+            return soap_fault("unknown operation", 400)
+        return handler(operation)
+
+    with app.app_context():
+        init_db()
+    return app
 
 
-# ── Admin Blueprint ─────────────────────────────────────────────
-
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-
-
-@admin_bp.route("/users", methods=["GET"])
-@require_auth
-def list_users(user: dict):
-    if user.get("role") != "admin":
-        return jsonify({"error": "admin access required"}), 403
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, username, role, created_at FROM users ORDER BY created_at"
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
-
-
-# ── Register Blueprints ─────────────────────────────────────────
-
-app.register_blueprint(auth_bp)
-app.register_blueprint(items_bp)
-app.register_blueprint(admin_bp)
-
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
+app = create_app()
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    app.run()
