@@ -1,8 +1,21 @@
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSite } from '../src/generator';
 import { parseArguments } from '../src/cli';
+import { serveSite } from '../src/server';
+
+function request(url: string): Promise<string> {
+  return new Promise((resolveRequest, reject) => {
+    get(url, (response) => {
+      let body = '';
+      response.setEncoding('utf8');
+      response.on('data', (chunk) => { body += chunk; });
+      response.on('end', () => resolveRequest(body));
+    }).on('error', reject);
+  });
+}
 
 describe('static site generator', () => {
   it('renders Markdown pages and a frontmatter-powered index', async () => {
@@ -25,7 +38,9 @@ describe('static site generator', () => {
 
   it('parses build directory options', () => {
     expect(parseArguments(['--content', 'posts', '--output', 'site', '--templates', 'views'])).toEqual({ content: 'posts', output: 'site', templates: 'views' });
+    expect(parseArguments(['--port', '4000'])).toEqual({ port: 4000 });
     expect(() => parseArguments(['--content'])).toThrow('--content requires a directory');
+    expect(() => parseArguments(['--port', 'invalid'])).toThrow('--port must be an integer between 1 and 65535');
   });
 
   it('renders frontmatter templates inside layouts with partials', async () => {
@@ -51,5 +66,20 @@ describe('static site generator', () => {
     await expect(readFile(join(output, 'post.html'), 'utf8')).resolves.toContain('<footer>Footer</footer>');
     await expect(readFile(join(output, 'default.html'), 'utf8')).resolves.toContain('<section class="default">Default post: <p>Default content.</p>');
     await expect(readFile(join(output, 'default.html'), 'utf8')).resolves.toContain('<main class="default-layout">');
+  });
+
+  it('serves generated pages with the live reload client', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const content = join(root, 'content');
+    const output = join(root, 'dist');
+    await mkdir(content, { recursive: true });
+    await writeFile(join(content, 'welcome.md'), '# Welcome\n');
+
+    const server = await serveSite({ content, output, port: 0 });
+    try {
+      await expect(request(`http://localhost:${server.port}/welcome.html`)).resolves.toContain('/__ssg_live_reload');
+    } finally {
+      await server.close();
+    }
   });
 });
