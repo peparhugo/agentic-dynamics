@@ -11,6 +11,11 @@ REDIS_URL=redis://localhost:6379/0 DATABASE_URL=notifications.db \
   python3 app.py --host 127.0.0.1 --websocket-port 8765 --soap-port 8080
 ```
 
+The client transport is selected with `TRANSPORT`; `websocket` is the default.
+Additional transports can implement `BaseTransport` and be supplied to
+`NotificationServer`, or registered for config selection with
+`register_transport`, without changing notification routing or persistence.
+
 Clients receive a `system` message containing their `client_id` immediately
 after connecting. Every WebSocket message has this exact shape:
 

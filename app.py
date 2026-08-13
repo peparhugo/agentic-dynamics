@@ -9,7 +9,6 @@ import os
 import signal
 import threading
 import uuid
-from collections.abc import Iterable
 from datetime import datetime, timezone
 from http import HTTPStatus
 from typing import Any
@@ -17,11 +16,10 @@ from urllib.parse import parse_qs, unquote, urlsplit
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape
 
-import websockets
 import aiosqlite
 import redis.asyncio as redis
-from websockets.exceptions import ConnectionClosed
-from websockets.legacy.server import WebSocketServer, WebSocketServerProtocol
+
+from transports import BaseTransport, WebSocketTransport, create_transport
 
 
 SOAP_ENV = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -50,11 +48,11 @@ class ClientRegistry:
     """A registry safe to inspect or mutate from any thread."""
 
     def __init__(self) -> None:
-        self._clients: dict[str, WebSocketServerProtocol] = {}
+        self._clients: dict[str, Any] = {}
         self._channels: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
-    def add(self, client: WebSocketServerProtocol) -> str:
+    def add(self, client: Any) -> str:
         client_id = str(uuid.uuid4())
         with self._lock:
             self._clients[client_id] = client
@@ -69,11 +67,11 @@ class ClientRegistry:
                 if not subscribers:
                     del self._channels[channel]
 
-    def get(self, client_id: str) -> WebSocketServerProtocol | None:
+    def get(self, client_id: str) -> Any | None:
         with self._lock:
             return self._clients.get(client_id)
 
-    def snapshot(self) -> list[tuple[str, WebSocketServerProtocol]]:
+    def snapshot(self) -> list[tuple[str, Any]]:
         with self._lock:
             return list(self._clients.items())
 
@@ -91,7 +89,7 @@ class ClientRegistry:
             if not subscribers:
                 del self._channels[channel]
 
-    def channel_snapshot(self, channel: str) -> list[tuple[str, WebSocketServerProtocol]]:
+    def channel_snapshot(self, channel: str) -> list[tuple[str, Any]]:
         with self._lock:
             return [
                 (client_id, self._clients[client_id])
@@ -194,6 +192,7 @@ class NotificationServer:
         redis_url: str | None = None,
         database_url: str | None = None,
         redis_client: Any | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.websocket_port = websocket_port
@@ -208,7 +207,12 @@ class NotificationServer:
         self.messages = MessageStore(
             database_url or os.getenv("DATABASE_URL", "notifications.db")
         )
-        self._websocket_server: WebSocketServer | None = None
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport is None:
+            transport = create_transport(transport_name, self, host, websocket_port)
+        else:
+            transport.bind(self)
+        self.transport = transport
         self._soap_server: asyncio.AbstractServer | None = None
         self._pubsub: Any | None = None
         self._broker_task: asyncio.Task[None] | None = None
@@ -219,17 +223,12 @@ class NotificationServer:
             self._pubsub = self.redis.pubsub()
             await self._pubsub.subscribe(REDIS_MESSAGE_CHANNEL)
             self._broker_task = asyncio.create_task(self._consume_broker())
-            self._websocket_server = await websockets.serve(
-                self.handle_websocket, self.host, self.websocket_port
-            )
+            await self.transport.start()
             self._soap_server = await asyncio.start_server(
                 self.handle_http_connection, self.host, self.soap_port
             )
         except Exception:
-            if self._websocket_server is not None:
-                self._websocket_server.close()
-                await self._websocket_server.wait_closed()
-                self._websocket_server = None
+            await self.transport.stop()
             await self._stop_backends()
             raise
 
@@ -238,10 +237,7 @@ class NotificationServer:
             self._soap_server.close()
             await self._soap_server.wait_closed()
             self._soap_server = None
-        if self._websocket_server is not None:
-            self._websocket_server.close()
-            await self._websocket_server.wait_closed()
-            self._websocket_server = None
+        await self.transport.stop()
         for client_id, _ in self.clients.snapshot():
             await self._remove_client(client_id)
         await self._stop_backends()
@@ -260,9 +256,9 @@ class NotificationServer:
 
     @property
     def bound_websocket_port(self) -> int:
-        if self._websocket_server is None or not self._websocket_server.sockets:
-            raise RuntimeError("server is not running")
-        return self._websocket_server.sockets[0].getsockname()[1]
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("WebSocket transport is not configured")
+        return self.transport.bound_port
 
     @property
     def bound_soap_port(self) -> int:
@@ -270,19 +266,22 @@ class NotificationServer:
             raise RuntimeError("server is not running")
         return self._soap_server.sockets[0].getsockname()[1]
 
-    async def handle_websocket(self, websocket: WebSocketServerProtocol) -> None:
-        client_id = self.clients.add(websocket)
+    async def handle_websocket(self, websocket: Any) -> None:
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("WebSocket transport is not configured")
+        await self.transport.handle_connection(websocket)
+
+    async def on_connect(self, connection: Any) -> str:
+        client_id = self.clients.add(connection)
         await self.redis.hset(REDIS_CLIENTS_KEY, client_id, self.instance_id)
-        await websocket.send(
+        await self.transport.send_message(
+            connection,
             message("system", {"event": "connected", "client_id": client_id})
         )
-        try:
-            async for raw_message in websocket:
-                await self._process_message(client_id, websocket, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            await self._remove_client(client_id)
+        return client_id
+
+    async def on_disconnect(self, client_id: str) -> None:
+        await self._remove_client(client_id)
 
     async def _remove_client(self, client_id: str) -> None:
         self.clients.remove(client_id)
@@ -300,21 +299,24 @@ class NotificationServer:
     async def _process_message(
         self,
         client_id: str,
-        websocket: WebSocketServerProtocol,
+        connection: Any,
         raw_message: str | bytes,
     ) -> None:
         try:
             incoming = json.loads(raw_message)
             self._validate_message(incoming)
         except (json.JSONDecodeError, TypeError, ValueError) as exc:
-            await websocket.send(message("system", {"event": "error", "detail": str(exc)}))
+            await self.transport.send_message(
+                connection, message("system", {"event": "error", "detail": str(exc)})
+            )
             return
 
         message_type = incoming["type"]
         payload = incoming["payload"]
         channel = incoming.get("channel")
         if message_type == "system":
-            await websocket.send(
+            await self.transport.send_message(
+                connection,
                 message(
                     "system",
                     {"event": "error", "detail": "system messages are server-only"},
@@ -325,9 +327,10 @@ class NotificationServer:
                 "broadcast", {"sender_id": client_id, **payload}, channel
             )
         elif message_type == "direct":
-            await self._send_direct(client_id, websocket, payload, channel)
+            await self._send_direct(client_id, connection, payload, channel)
         elif channel is None:
-            await websocket.send(
+            await self.transport.send_message(
+                connection,
                 message(
                     "system",
                     {"event": "error", "detail": f"{message_type} requires channel"},
@@ -345,7 +348,14 @@ class NotificationServer:
                 if not await self.redis.scard(self._channel_key(channel)):
                     await self.redis.hdel(REDIS_CHANNELS_KEY, channel)
                 event = "unsubscribed"
-            await websocket.send(message("system", {"event": event}, channel))
+            await self.transport.send_message(
+                connection, message("system", {"event": event}, channel)
+            )
+
+    async def process_message(
+        self, client_id: str, connection: Any, raw_message: str | bytes
+    ) -> None:
+        await self._process_message(client_id, connection, raw_message)
 
     @staticmethod
     def _validate_message(incoming: Any) -> None:
@@ -410,34 +420,21 @@ class NotificationServer:
                 clients = self.clients.snapshot()
             else:
                 clients = self.clients.channel_snapshot(data["channel"])
-            await self._send_to_clients(
+            await self.transport.broadcast(
                 clients, json.dumps(data, separators=(",", ":"))
             )
-
-    async def _send_to_clients(
-        self,
-        clients: Iterable[tuple[str, WebSocketServerProtocol]],
-        encoded_message: str,
-    ) -> None:
-        clients = list(clients)
-        results = await asyncio.gather(
-            *(client.send(encoded_message) for _, client in clients),
-            return_exceptions=True,
-        )
-        for (client_id, _), result in zip(clients, results):
-            if isinstance(result, Exception):
-                self.clients.remove(client_id)
 
     async def _send_direct(
         self,
         sender_id: str,
-        sender: WebSocketServerProtocol,
+        sender: Any,
         payload: dict[str, Any],
         channel: str | None = None,
     ) -> None:
         recipient_id = payload.get("client_id")
         if not isinstance(recipient_id, str):
-            await sender.send(
+            await self.transport.send_message(
+                sender,
                 message(
                     "system",
                     {"event": "error", "detail": "direct payload requires client_id"},
@@ -445,14 +442,16 @@ class NotificationServer:
             )
             return
         if await self.redis.hget(REDIS_CLIENTS_KEY, recipient_id) is None:
-            await sender.send(
+            await self.transport.send_message(
+                sender,
                 message("system", {"event": "error", "detail": "client not found"})
             )
             return
         if channel is not None and not await self.redis.sismember(
             self._channel_key(channel), recipient_id
         ):
-            await sender.send(
+            await self.transport.send_message(
+                sender,
                 message(
                     "system",
                     {"event": "error", "detail": "client is not subscribed to channel"},
