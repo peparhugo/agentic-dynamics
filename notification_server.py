@@ -1,17 +1,21 @@
 """
-WebSocket-based notification server with async support and thread-safe client registry.
+WebSocket-based notification server with Redis pub/sub backbone and SQLite persistence.
 
 Features:
 - Accept WebSocket connections from clients
 - Assign unique IDs to each client
-- Broadcast messages to all connected clients
-- Handle client disconnect
-- REST endpoint: GET /health with connected client count
+- Broadcast messages via Redis pub/sub
+- Store messages in SQLite for history
+- Client state stored in Redis (survives server restart)
+- REST endpoint: GET /messages?limit=50&offset=0
+- Multiple server instances share the same Redis backbone
 """
 
 import asyncio
 import json
 import uuid
+import sqlite3
+import os
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Set, Dict, Any
@@ -19,30 +23,105 @@ import logging
 
 import websockets
 from websockets.asyncio.server import serve, ServerConnection
+import redis.asyncio as aioredis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients with channel support."""
+class MessagePersistence:
+    """SQLite-based message persistence for history."""
 
-    def __init__(self):
+    def __init__(self, db_path: str = None):
+        self.db_path = db_path or os.environ.get("DATABASE_URL", "messages.db")
+        self.lock = Lock()
+        self.init_db()
+
+    def init_db(self) -> None:
+        """Initialize the messages table."""
+        with self.get_connection() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS messages ("
+                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  channel TEXT NOT NULL,"
+                "  type TEXT NOT NULL,"
+                "  payload TEXT NOT NULL,"
+                "  timestamp TEXT NOT NULL"
+                ")"
+            )
+            conn.commit()
+
+    def get_connection(self):
+        """Get a database connection."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+    def store_message(self, channel: str, msg_type: str, payload: dict, timestamp: str) -> int:
+        """Store a message in the database."""
+        with self.lock:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "INSERT INTO messages (channel, type, payload, timestamp) VALUES (?, ?, ?, ?)",
+                    (channel, msg_type, json.dumps(payload), timestamp),
+                )
+                conn.commit()
+                return cursor.lastrowid
+
+    def get_messages(self, limit: int = 50, offset: int = 0) -> list:
+        """Retrieve messages from the database."""
+        with self.get_connection() as conn:
+            rows = conn.execute(
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "ORDER BY id DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
+            return [
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                }
+                for row in rows
+            ]
+
+    def get_message_count(self) -> int:
+        """Get total message count."""
+        with self.get_connection() as conn:
+            row = conn.execute("SELECT COUNT(*) as count FROM messages").fetchone()
+            return row["count"]
+
+
+class ClientRegistry:
+    """Thread-safe registry of connected WebSocket clients with Redis-backed state."""
+
+    def __init__(self, redis_client=None):
         self._clients: Dict[str, ServerConnection] = {}
         self._subscriptions: Dict[str, Set[str]] = {}
         self._lock = Lock()
+        self.redis = redis_client
 
-    def add(self, client_id: str, connection: ServerConnection) -> None:
+    async def add(self, client_id: str, connection: ServerConnection) -> None:
         """Add a client to the registry."""
         with self._lock:
             self._clients[client_id] = connection
             self._subscriptions[client_id] = set()
+        if self.redis:
+            await self.redis.set(f"client:{client_id}", "1", ex=3600)
 
-    def remove(self, client_id: str) -> None:
+    async def remove(self, client_id: str) -> None:
         """Remove a client from the registry."""
         with self._lock:
             self._clients.pop(client_id, None)
             self._subscriptions.pop(client_id, None)
+        if self.redis:
+            try:
+                await self.redis.delete(f"client:{client_id}")
+                await self.redis.delete(f"subscriptions:{client_id}")
+            except Exception:
+                pass
 
     def get(self, client_id: str) -> ServerConnection | None:
         """Get a client connection by ID."""
@@ -59,17 +138,21 @@ class ClientRegistry:
         with self._lock:
             return len(self._clients)
 
-    def subscribe(self, client_id: str, channel: str) -> None:
+    async def subscribe(self, client_id: str, channel: str) -> None:
         """Subscribe a client to a channel."""
         with self._lock:
             if client_id in self._subscriptions:
                 self._subscriptions[client_id].add(channel)
+        if self.redis:
+            await self.redis.sadd(f"subscriptions:{client_id}", channel)
 
-    def unsubscribe(self, client_id: str, channel: str) -> None:
+    async def unsubscribe(self, client_id: str, channel: str) -> None:
         """Unsubscribe a client from a channel."""
         with self._lock:
             if client_id in self._subscriptions:
                 self._subscriptions[client_id].discard(channel)
+        if self.redis:
+            await self.redis.srem(f"subscriptions:{client_id}", channel)
 
     def get_subscriptions(self, client_id: str) -> Set[str]:
         """Get all channels a client is subscribed to."""
@@ -124,19 +207,31 @@ class NotificationMessage:
 
 
 class NotificationServer:
-    """WebSocket notification server with broadcast capability."""
+    """WebSocket notification server with Redis pub/sub backbone and SQLite persistence."""
 
-    def __init__(self, host: str = "127.0.0.1", ws_port: int = 8765, http_port: int = 8080):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        ws_port: int = 8765,
+        http_port: int = 8080,
+        redis_url: str = None,
+        db_path: str = None,
+        redis_client=None,
+    ):
         self.host = host
         self.ws_port = ws_port
         self.http_port = http_port
-        self.clients = ClientRegistry()
+        self.redis_url = redis_url or os.environ.get("REDIS_URL", "redis://localhost:6379")
+        self.redis = redis_client
+        self.persistence = MessagePersistence(db_path)
+        self.clients = ClientRegistry(redis_client=redis_client)
         self.loop = None
+        self.pubsub = None
 
     async def handle_client(self, websocket: ServerConnection) -> None:
         """Handle a connected WebSocket client."""
         client_id = str(uuid.uuid4())
-        self.clients.add(client_id, websocket)
+        await self.clients.add(client_id, websocket)
 
         logger.info(f"Client {client_id} connected. Total clients: {self.clients.count()}")
 
@@ -155,12 +250,12 @@ class NotificationServer:
                     if msg.type == "subscribe":
                         channel = msg.payload.get("channel")
                         if channel:
-                            self.clients.subscribe(client_id, channel)
+                            await self.clients.subscribe(client_id, channel)
                             logger.info(f"Client {client_id} subscribed to channel: {channel}")
                     elif msg.type == "unsubscribe":
                         channel = msg.payload.get("channel")
                         if channel:
-                            self.clients.unsubscribe(client_id, channel)
+                            await self.clients.unsubscribe(client_id, channel)
                             logger.info(f"Client {client_id} unsubscribed from channel: {channel}")
                     elif msg.type == "broadcast":
                         await self.broadcast(
@@ -190,11 +285,16 @@ class NotificationServer:
         except websockets.exceptions.ConnectionClosed:
             pass
         finally:
-            self.clients.remove(client_id)
+            await self.clients.remove(client_id)
             logger.info(f"Client {client_id} disconnected. Total clients: {self.clients.count()}")
 
     async def broadcast(self, message: NotificationMessage) -> None:
-        """Broadcast a message to all connected clients."""
+        """Broadcast a message to all connected clients and publish to Redis."""
+        self.persistence.store_message("broadcast", message.type, message.payload, message.timestamp)
+
+        if self.redis:
+            await self.redis.publish("broadcast", message.to_json())
+
         clients = self.clients.get_all()
         if not clients:
             logger.debug("No clients to broadcast to")
@@ -210,7 +310,12 @@ class NotificationServer:
             await asyncio.gather(*tasks, return_exceptions=True)
 
     async def broadcast_to_channel(self, channel: str, message: NotificationMessage) -> None:
-        """Broadcast a message to all clients subscribed to a channel."""
+        """Broadcast a message to all clients subscribed to a channel and publish to Redis."""
+        self.persistence.store_message(channel, message.type, message.payload, message.timestamp)
+
+        if self.redis:
+            await self.redis.publish(f"channel:{channel}", message.to_json())
+
         subscribers = self.clients.get_channel_subscribers(channel)
         if not subscribers:
             logger.debug(f"No subscribers for channel {channel}")
@@ -259,11 +364,49 @@ class NotificationServer:
             writer.close()
             return
 
-        method, path = parts[0], parts[1]
+        method, path_with_query = parts[0], parts[1]
+
+        path = path_with_query.split("?")[0]
+        query_string = path_with_query.split("?")[1] if "?" in path_with_query else ""
 
         if method == "GET" and path == "/health":
             client_count = self.clients.count()
             response_body = json.dumps({"connected_clients": client_count})
+            response = (
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: application/json\r\n"
+                f"Content-Length: {len(response_body)}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
+                f"{response_body}"
+            )
+            writer.write(response.encode())
+        elif method == "GET" and path == "/messages":
+            limit = 50
+            offset = 0
+            if query_string:
+                for param in query_string.split("&"):
+                    if "=" in param:
+                        key, value = param.split("=", 1)
+                        if key == "limit":
+                            try:
+                                limit = int(value)
+                            except ValueError:
+                                pass
+                        elif key == "offset":
+                            try:
+                                offset = int(value)
+                            except ValueError:
+                                pass
+
+            messages = self.persistence.get_messages(limit=limit, offset=offset)
+            total_count = self.persistence.get_message_count()
+            response_body = json.dumps({
+                "messages": messages,
+                "total": total_count,
+                "limit": limit,
+                "offset": offset,
+            })
             response = (
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: application/json\r\n"
@@ -311,6 +454,74 @@ class NotificationServer:
         await writer.drain()
         writer.close()
 
+    async def redis_subscribe(self) -> None:
+        """Subscribe to Redis pub/sub channels for distributed messaging."""
+        if not self.redis:
+            return
+
+        pubsub = self.redis.pubsub()
+        self.pubsub = pubsub
+        await pubsub.subscribe("broadcast", "channel:*")
+        logger.info("Subscribed to Redis pub/sub channels")
+
+        try:
+            async for message in pubsub.listen():
+                if message["type"] == "message":
+                    try:
+                        channel = message["channel"]
+                        if isinstance(channel, bytes):
+                            channel = channel.decode()
+                        data = message["data"]
+                        if isinstance(data, bytes):
+                            data = data.decode()
+
+                        msg = NotificationMessage.from_json(data)
+                        logger.info(f"Received from Redis on {channel}: {msg.type}")
+
+                        if channel == "broadcast":
+                            await self.broadcast_to_clients(msg)
+                        elif channel.startswith("channel:"):
+                            channel_name = channel[8:]
+                            await self.broadcast_to_channel_clients(channel_name, msg)
+                    except Exception as e:
+                        logger.error(f"Error processing Redis message: {e}")
+        except asyncio.CancelledError:
+            await pubsub.unsubscribe()
+            await pubsub.close()
+
+    async def broadcast_to_clients(self, message: NotificationMessage) -> None:
+        """Send message to all locally connected clients."""
+        clients = self.clients.get_all()
+        if not clients:
+            return
+
+        message_json = message.to_json()
+        tasks = []
+
+        for client_id, connection in clients.items():
+            tasks.append(self._send_safe(connection, message_json, client_id))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def broadcast_to_channel_clients(self, channel: str, message: NotificationMessage) -> None:
+        """Send message to locally connected clients subscribed to a channel."""
+        subscribers = self.clients.get_channel_subscribers(channel)
+        if not subscribers:
+            return
+
+        message_json = message.to_json()
+        tasks = []
+        clients = self.clients.get_all()
+
+        for client_id in subscribers:
+            connection = clients.get(client_id)
+            if connection:
+                tasks.append(self._send_safe(connection, message_json, client_id))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
     async def http_server(self) -> None:
         """Start HTTP server for health checks."""
         server = await asyncio.start_server(
@@ -329,17 +540,46 @@ class NotificationServer:
             await asyncio.Future()  # Run forever
 
     async def start(self) -> None:
-        """Start both WebSocket and HTTP servers."""
+        """Start WebSocket server, HTTP server, and Redis subscription."""
         self.loop = asyncio.get_running_loop()
-        await asyncio.gather(
+
+        if not self.redis:
+            try:
+                self.redis = await aioredis.from_url(self.redis_url, decode_responses=True)
+                self.clients.redis = self.redis
+                logger.info(f"Connected to Redis at {self.redis_url}")
+            except Exception as e:
+                logger.warning(f"Failed to connect to Redis: {e}. Continuing without Redis.")
+                self.redis = None
+
+        tasks = [
             self.ws_server(),
             self.http_server(),
-        )
+        ]
+
+        if self.redis:
+            tasks.append(self.redis_subscribe())
+
+        await asyncio.gather(*tasks)
 
 
-def create_server(host: str = "127.0.0.1", ws_port: int = 8765, http_port: int = 8080) -> NotificationServer:
+def create_server(
+    host: str = "127.0.0.1",
+    ws_port: int = 8765,
+    http_port: int = 8080,
+    redis_url: str = None,
+    db_path: str = None,
+    redis_client=None,
+) -> NotificationServer:
     """Factory function to create a NotificationServer."""
-    return NotificationServer(host=host, ws_port=ws_port, http_port=http_port)
+    return NotificationServer(
+        host=host,
+        ws_port=ws_port,
+        http_port=http_port,
+        redis_url=redis_url,
+        db_path=db_path,
+        redis_client=redis_client,
+    )
 
 
 if __name__ == "__main__":

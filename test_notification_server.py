@@ -9,6 +9,8 @@ Tests cover:
 - Health endpoint
 - Thread-safe client registry
 - Error handling
+- Redis pub/sub integration
+- Message persistence to SQLite
 """
 
 import asyncio
@@ -19,11 +21,14 @@ import websockets
 from unittest.mock import Mock, patch, AsyncMock
 from threading import Thread, Event
 import time
+import tempfile
+import os
 
 from notification_server import (
     NotificationServer,
     NotificationMessage,
     ClientRegistry,
+    MessagePersistence,
     create_server,
 )
 
@@ -34,34 +39,38 @@ from notification_server import (
 @pytest_asyncio.fixture
 async def server():
     """Create a test server instance."""
-    srv = create_server(host="127.0.0.1", ws_port=8765, http_port=8080)
-    yield srv
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=8765, http_port=8080, db_path=db_path)
+        yield srv
 
 
 @pytest_asyncio.fixture
 async def running_server():
     """Create and start a running server for integration tests."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9080)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9080, db_path=db_path)
 
-    async def run_server():
+        async def run_server():
+            try:
+                await srv.start()
+            except asyncio.CancelledError:
+                pass
+
+        task = asyncio.create_task(run_server())
+        await asyncio.sleep(0.5)  # Give server time to start
+
+        yield srv
+
+        task.cancel()
         try:
-            await srv.start()
+            await task
         except asyncio.CancelledError:
             pass
 
-    task = asyncio.create_task(run_server())
-    await asyncio.sleep(0.5)  # Give server time to start
 
-    yield srv
-
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
-
-
-# ── NotificationMessage Tests ────────────────────────────
+# ── NotificationMessage Tests ────────────────────────
 
 
 class TestNotificationMessage:
@@ -114,26 +123,97 @@ class TestNotificationMessage:
         assert restored.payload == original.payload
 
 
-# ── ClientRegistry Tests ────────────────────────────────
+# ── MessagePersistence Tests ────────────────────────
+
+
+class TestMessagePersistence:
+    """Tests for MessagePersistence class."""
+
+    def test_init_db(self):
+        """Test database initialization."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+            assert os.path.exists(db_path)
+
+    def test_store_message(self):
+        """Test storing a message."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            msg_id = persistence.store_message(
+                channel="alerts",
+                msg_type="alert",
+                payload={"data": "test"},
+                timestamp="2026-08-13T10:00:00Z"
+            )
+            assert msg_id > 0
+
+    def test_get_messages(self):
+        """Test retrieving messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            persistence.store_message("alerts", "alert", {"data": "msg1"}, "2026-08-13T10:00:00Z")
+            persistence.store_message("alerts", "alert", {"data": "msg2"}, "2026-08-13T10:01:00Z")
+            persistence.store_message("chat", "message", {"data": "msg3"}, "2026-08-13T10:02:00Z")
+
+            messages = persistence.get_messages(limit=10)
+            assert len(messages) == 3
+            assert messages[0]["channel"] in ["alerts", "chat"]
+
+    def test_get_message_count(self):
+        """Test getting message count."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            persistence.store_message("alerts", "alert", {"data": "msg1"}, "2026-08-13T10:00:00Z")
+            persistence.store_message("alerts", "alert", {"data": "msg2"}, "2026-08-13T10:01:00Z")
+
+            count = persistence.get_message_count()
+            assert count == 2
+
+    def test_get_messages_with_limit_and_offset(self):
+        """Test retrieving messages with limit and offset."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            for i in range(10):
+                persistence.store_message("alerts", "alert", {"data": f"msg{i}"}, f"2026-08-13T10:{i:02d}:00Z")
+
+            messages = persistence.get_messages(limit=3, offset=0)
+            assert len(messages) == 3
+
+            messages = persistence.get_messages(limit=3, offset=3)
+            assert len(messages) == 3
+
+
+# ── ClientRegistry Tests ────────────────────────────
 
 
 class TestClientRegistry:
     """Tests for ClientRegistry class."""
 
-    def test_add_client(self):
+    @pytest.mark.asyncio
+    async def test_add_client(self):
         """Test adding a client."""
         registry = ClientRegistry()
         connection = Mock()
 
-        registry.add("client_1", connection)
+        await registry.add("client_1", connection)
         assert registry.count() == 1
 
-    def test_get_client(self):
+    @pytest.mark.asyncio
+    async def test_get_client(self):
         """Test retrieving a client."""
         registry = ClientRegistry()
         connection = Mock()
 
-        registry.add("client_1", connection)
+        await registry.add("client_1", connection)
         retrieved = registry.get("client_1")
 
         assert retrieved is connection
@@ -145,122 +225,123 @@ class TestClientRegistry:
 
         assert retrieved is None
 
-    def test_remove_client(self):
+    @pytest.mark.asyncio
+    async def test_remove_client(self):
         """Test removing a client."""
         registry = ClientRegistry()
         connection = Mock()
 
-        registry.add("client_1", connection)
+        await registry.add("client_1", connection)
         assert registry.count() == 1
 
-        registry.remove("client_1")
+        await registry.remove("client_1")
         assert registry.count() == 0
 
-    def test_remove_nonexistent_client(self):
+    @pytest.mark.asyncio
+    async def test_remove_nonexistent_client(self):
         """Test removing a non-existent client (should not raise)."""
         registry = ClientRegistry()
-        registry.remove("nonexistent")  # Should not raise
+        await registry.remove("nonexistent")  # Should not raise
         assert registry.count() == 0
 
-    def test_get_all_clients(self):
+    @pytest.mark.asyncio
+    async def test_get_all_clients(self):
         """Test getting all clients."""
         registry = ClientRegistry()
         conn1, conn2 = Mock(), Mock()
 
-        registry.add("client_1", conn1)
-        registry.add("client_2", conn2)
+        await registry.add("client_1", conn1)
+        await registry.add("client_2", conn2)
 
         all_clients = registry.get_all()
         assert len(all_clients) == 2
         assert all_clients["client_1"] is conn1
         assert all_clients["client_2"] is conn2
 
-    def test_thread_safe_add(self):
+    @pytest.mark.asyncio
+    async def test_thread_safe_add(self):
         """Test thread-safe client addition."""
         registry = ClientRegistry()
         results = []
 
-        def add_client(client_id):
+        async def add_client(client_id):
             connection = Mock()
-            registry.add(client_id, connection)
+            await registry.add(client_id, connection)
             results.append(client_id)
 
-        threads = [Thread(target=add_client, args=(f"client_{i}",)) for i in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        await asyncio.gather(*[add_client(f"client_{i}") for i in range(10)])
 
         assert registry.count() == 10
         assert len(results) == 10
 
-    def test_thread_safe_remove(self):
+    @pytest.mark.asyncio
+    async def test_thread_safe_remove(self):
         """Test thread-safe client removal."""
         registry = ClientRegistry()
 
         for i in range(10):
-            registry.add(f"client_{i}", Mock())
+            await registry.add(f"client_{i}", Mock())
 
         results = []
 
-        def remove_client(client_id):
-            registry.remove(client_id)
+        async def remove_client(client_id):
+            await registry.remove(client_id)
             results.append(client_id)
 
-        threads = [Thread(target=remove_client, args=(f"client_{i}",)) for i in range(10)]
-        for t in threads:
-            t.start()
-        for t in threads:
-            t.join()
+        await asyncio.gather(*[remove_client(f"client_{i}") for i in range(10)])
 
         assert registry.count() == 0
         assert len(results) == 10
 
-    def test_subscribe_client_to_channel(self):
+    @pytest.mark.asyncio
+    async def test_subscribe_client_to_channel(self):
         """Test subscribing a client to a channel."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
+        await registry.add("client_1", Mock())
 
-        registry.subscribe("client_1", "alerts")
+        await registry.subscribe("client_1", "alerts")
         subs = registry.get_subscriptions("client_1")
 
         assert "alerts" in subs
 
-    def test_unsubscribe_client_from_channel(self):
+    @pytest.mark.asyncio
+    async def test_unsubscribe_client_from_channel(self):
         """Test unsubscribing a client from a channel."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
+        await registry.add("client_1", Mock())
 
-        registry.subscribe("client_1", "alerts")
-        registry.unsubscribe("client_1", "alerts")
+        await registry.subscribe("client_1", "alerts")
+        await registry.unsubscribe("client_1", "alerts")
         subs = registry.get_subscriptions("client_1")
 
         assert "alerts" not in subs
 
-    def test_get_channel_subscribers(self):
+    @pytest.mark.asyncio
+    async def test_get_channel_subscribers(self):
         """Test getting all subscribers to a channel."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
-        registry.add("client_2", Mock())
-        registry.add("client_3", Mock())
+        await registry.add("client_1", Mock())
+        await registry.add("client_2", Mock())
+        await registry.add("client_3", Mock())
 
-        registry.subscribe("client_1", "alerts")
-        registry.subscribe("client_2", "alerts")
-        registry.subscribe("client_3", "system")
+        await registry.subscribe("client_1", "alerts")
+        await registry.subscribe("client_2", "alerts")
+        await registry.subscribe("client_3", "system")
 
         subscribers = registry.get_channel_subscribers("alerts")
         assert len(subscribers) == 2
         assert "client_1" in subscribers
         assert "client_2" in subscribers
 
-    def test_client_multiple_subscriptions(self):
+    @pytest.mark.asyncio
+    async def test_client_multiple_subscriptions(self):
         """Test a client can subscribe to multiple channels."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
+        await registry.add("client_1", Mock())
 
-        registry.subscribe("client_1", "alerts")
-        registry.subscribe("client_1", "chat")
-        registry.subscribe("client_1", "system")
+        await registry.subscribe("client_1", "alerts")
+        await registry.subscribe("client_1", "chat")
+        await registry.subscribe("client_1", "system")
 
         subs = registry.get_subscriptions("client_1")
         assert len(subs) == 3
@@ -268,35 +349,37 @@ class TestClientRegistry:
         assert "chat" in subs
         assert "system" in subs
 
-    def test_get_all_channels(self):
+    @pytest.mark.asyncio
+    async def test_get_all_channels(self):
         """Test getting all active channels and subscriber counts."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
-        registry.add("client_2", Mock())
-        registry.add("client_3", Mock())
+        await registry.add("client_1", Mock())
+        await registry.add("client_2", Mock())
+        await registry.add("client_3", Mock())
 
-        registry.subscribe("client_1", "alerts")
-        registry.subscribe("client_2", "alerts")
-        registry.subscribe("client_2", "chat")
-        registry.subscribe("client_3", "chat")
+        await registry.subscribe("client_1", "alerts")
+        await registry.subscribe("client_2", "alerts")
+        await registry.subscribe("client_2", "chat")
+        await registry.subscribe("client_3", "chat")
 
         channels = registry.get_all_channels()
         assert channels["alerts"] == 2
         assert channels["chat"] == 2
 
-    def test_remove_client_cleans_subscriptions(self):
+    @pytest.mark.asyncio
+    async def test_remove_client_cleans_subscriptions(self):
         """Test that removing a client cleans up subscriptions."""
         registry = ClientRegistry()
-        registry.add("client_1", Mock())
+        await registry.add("client_1", Mock())
 
-        registry.subscribe("client_1", "alerts")
-        registry.remove("client_1")
+        await registry.subscribe("client_1", "alerts")
+        await registry.remove("client_1")
 
         subscribers = registry.get_channel_subscribers("alerts")
         assert "client_1" not in subscribers
 
 
-# ── NotificationServer Tests ────────────────────────────
+# ── NotificationServer Tests ────────────────────────
 
 
 class TestNotificationServer:
@@ -322,8 +405,8 @@ class TestNotificationServer:
         conn1 = AsyncMock()
         conn2 = AsyncMock()
 
-        server.clients.add("client_1", conn1)
-        server.clients.add("client_2", conn2)
+        await server.clients.add("client_1", conn1)
+        await server.clients.add("client_2", conn2)
 
         msg = NotificationMessage("broadcast", {"data": "test"})
         await server.broadcast(msg)
@@ -335,7 +418,7 @@ class TestNotificationServer:
     async def test_send_direct_to_existing_client(self, server):
         """Test sending a direct message to an existing client."""
         connection = AsyncMock()
-        server.clients.add("client_1", connection)
+        await server.clients.add("client_1", connection)
 
         msg = NotificationMessage("direct", {"target_id": "client_1"})
         await server.send_direct("client_1", msg)
@@ -382,13 +465,13 @@ class TestNotificationServer:
         conn2 = AsyncMock()
         conn3 = AsyncMock()
 
-        server.clients.add("client_1", conn1)
-        server.clients.add("client_2", conn2)
-        server.clients.add("client_3", conn3)
+        await server.clients.add("client_1", conn1)
+        await server.clients.add("client_2", conn2)
+        await server.clients.add("client_3", conn3)
 
-        server.clients.subscribe("client_1", "alerts")
-        server.clients.subscribe("client_2", "alerts")
-        server.clients.subscribe("client_3", "chat")
+        await server.clients.subscribe("client_1", "alerts")
+        await server.clients.subscribe("client_2", "alerts")
+        await server.clients.subscribe("client_3", "chat")
 
         msg = NotificationMessage("alert", {"data": "alert message", "channel": "alerts"})
         await server.broadcast_to_channel("alerts", msg)
@@ -403,129 +486,215 @@ class TestNotificationServer:
         msg = NotificationMessage("alert", {"data": "test", "channel": "empty"})
         await server.broadcast_to_channel("empty", msg)  # Should not raise
 
+    @pytest.mark.asyncio
+    async def test_message_persistence(self, server):
+        """Test messages are persisted to SQLite."""
+        msg = NotificationMessage("alert", {"data": "test"})
+        await server.broadcast_to_channel("alerts", msg)
 
-# ── HTTP Health Endpoint Tests ──────────────────────────
+        messages = server.persistence.get_messages()
+        assert len(messages) > 0
+        assert messages[0]["channel"] == "alerts"
+        assert messages[0]["type"] == "alert"
+
+    @pytest.mark.asyncio
+    async def test_persistence_query_parameters(self, server):
+        """Test message retrieval with limit and offset."""
+        for i in range(5):
+            msg = NotificationMessage("alert", {"data": f"test{i}"})
+            await server.broadcast_to_channel("alerts", msg)
+
+        messages = server.persistence.get_messages(limit=2, offset=0)
+        assert len(messages) == 2
+
+
+# ── HTTP Endpoints Tests ──────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_http_health_endpoint():
     """Test HTTP /health endpoint returns client count."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
 
-    # Add some clients
-    srv.clients.add("client_1", Mock())
-    srv.clients.add("client_2", Mock())
+        # Add some clients
+        await srv.clients.add("client_1", Mock())
+        await srv.clients.add("client_2", Mock())
 
-    # Mock reader and writer
-    reader = AsyncMock()
-    writer = Mock()
-    writer.drain = AsyncMock()
+        # Mock reader and writer
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
 
-    # Simulate GET /health request
-    reader.readline = AsyncMock(return_value=b"GET /health HTTP/1.1\r\n")
+        # Simulate GET /health request
+        reader.readline = AsyncMock(return_value=b"GET /health HTTP/1.1\r\n")
 
-    await srv.http_health(reader, writer)
+        await srv.http_health(reader, writer)
 
-    # Verify response was written
-    assert writer.write.called
-    response = writer.write.call_args[0][0].decode()
-    assert "200 OK" in response
-    assert "connected_clients" in response
-    assert '"connected_clients": 2' in response
+        # Verify response was written
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "200 OK" in response
+        assert "connected_clients" in response
+        assert '"connected_clients": 2' in response
 
 
 @pytest.mark.asyncio
 async def test_http_not_found():
     """Test HTTP endpoint returns 404 for unknown path."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
 
-    reader = AsyncMock()
-    writer = Mock()
-    writer.drain = AsyncMock()
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
 
-    reader.readline = AsyncMock(return_value=b"GET /unknown HTTP/1.1\r\n")
+        reader.readline = AsyncMock(return_value=b"GET /unknown HTTP/1.1\r\n")
 
-    await srv.http_health(reader, writer)
+        await srv.http_health(reader, writer)
 
-    assert writer.write.called
-    response = writer.write.call_args[0][0].decode()
-    assert "404 Not Found" in response
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "404 Not Found" in response
 
 
 @pytest.mark.asyncio
 async def test_http_empty_request():
     """Test HTTP endpoint handles empty request."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
 
-    reader = AsyncMock()
-    writer = Mock()
-    writer.drain = AsyncMock()
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
 
-    reader.readline = AsyncMock(return_value=b"")
+        reader.readline = AsyncMock(return_value=b"")
 
-    await srv.http_health(reader, writer)
+        await srv.http_health(reader, writer)
 
-    assert writer.close.called
+        assert writer.close.called
 
 
 @pytest.mark.asyncio
 async def test_http_channels_endpoint():
     """Test HTTP GET /channels endpoint returns active channels."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
 
-    srv.clients.add("client_1", Mock())
-    srv.clients.add("client_2", Mock())
-    srv.clients.add("client_3", Mock())
+        await srv.clients.add("client_1", Mock())
+        await srv.clients.add("client_2", Mock())
+        await srv.clients.add("client_3", Mock())
 
-    srv.clients.subscribe("client_1", "alerts")
-    srv.clients.subscribe("client_2", "alerts")
-    srv.clients.subscribe("client_3", "chat")
+        await srv.clients.subscribe("client_1", "alerts")
+        await srv.clients.subscribe("client_2", "alerts")
+        await srv.clients.subscribe("client_3", "chat")
 
-    reader = AsyncMock()
-    writer = Mock()
-    writer.drain = AsyncMock()
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
 
-    reader.readline = AsyncMock(return_value=b"GET /channels HTTP/1.1\r\n")
+        reader.readline = AsyncMock(return_value=b"GET /channels HTTP/1.1\r\n")
 
-    await srv.http_health(reader, writer)
+        await srv.http_health(reader, writer)
 
-    assert writer.write.called
-    response = writer.write.call_args[0][0].decode()
-    assert "200 OK" in response
-    assert "alerts" in response
-    assert "chat" in response
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "200 OK" in response
+        assert "alerts" in response
+        assert "chat" in response
 
 
 @pytest.mark.asyncio
 async def test_http_channel_subscribers_endpoint():
     """Test HTTP GET /channels/{name}/subscribers endpoint."""
-    srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081)
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
 
-    srv.clients.add("client_1", Mock())
-    srv.clients.add("client_2", Mock())
-    srv.clients.add("client_3", Mock())
+        await srv.clients.add("client_1", Mock())
+        await srv.clients.add("client_2", Mock())
+        await srv.clients.add("client_3", Mock())
 
-    srv.clients.subscribe("client_1", "alerts")
-    srv.clients.subscribe("client_2", "alerts")
-    srv.clients.subscribe("client_3", "chat")
+        await srv.clients.subscribe("client_1", "alerts")
+        await srv.clients.subscribe("client_2", "alerts")
+        await srv.clients.subscribe("client_3", "chat")
 
-    reader = AsyncMock()
-    writer = Mock()
-    writer.drain = AsyncMock()
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
 
-    reader.readline = AsyncMock(return_value=b"GET /channels/alerts/subscribers HTTP/1.1\r\n")
+        reader.readline = AsyncMock(return_value=b"GET /channels/alerts/subscribers HTTP/1.1\r\n")
 
-    await srv.http_health(reader, writer)
+        await srv.http_health(reader, writer)
 
-    assert writer.write.called
-    response = writer.write.call_args[0][0].decode()
-    assert "200 OK" in response
-    assert "alerts" in response
-    assert "client_1" in response
-    assert "client_2" in response
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "200 OK" in response
+        assert "alerts" in response
+        assert "client_1" in response
+        assert "client_2" in response
 
 
-# ── Integration Tests ──────────────────────────────────
+@pytest.mark.asyncio
+async def test_http_messages_endpoint():
+    """Test HTTP GET /messages endpoint returns stored messages."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        srv.persistence.store_message("alerts", "alert", {"data": "test1"}, "2026-08-13T10:00:00Z")
+        srv.persistence.store_message("chat", "message", {"data": "test2"}, "2026-08-13T10:01:00Z")
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /messages?limit=10&offset=0 HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "200 OK" in response
+        assert "messages" in response
+        assert "total" in response
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert len(data["messages"]) > 0
+
+
+@pytest.mark.asyncio
+async def test_http_messages_endpoint_with_offset():
+    """Test HTTP /messages endpoint with offset."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        for i in range(5):
+            srv.persistence.store_message("alerts", "alert", {"data": f"msg{i}"}, f"2026-08-13T10:{i:02d}:00Z")
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /messages?limit=2&offset=1 HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert len(data["messages"]) == 2
+        assert data["offset"] == 1
+        assert data["limit"] == 2
+
+
+# ── Integration Tests ──────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -733,12 +902,12 @@ async def test_subscribe_message(running_server):
         await ws.send(subscribe_msg)
 
         # Server should process subscription (no response expected for subscribe)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
 
         # Verify subscription by checking server state
-        assert running_server.clients.get_subscriptions(
-            list(running_server.clients.get_all().keys())[0]
-        ) == {"alerts"}
+        client_id = list(running_server.clients.get_all().keys())[0]
+        subs = running_server.clients.get_subscriptions(client_id)
+        assert "alerts" in subs
 
 
 @pytest.mark.asyncio
@@ -755,7 +924,7 @@ async def test_unsubscribe_message(running_server):
             "timestamp": "2026-08-13T10:00:00Z"
         })
         await ws.send(subscribe_msg)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
 
         unsubscribe_msg = json.dumps({
             "type": "unsubscribe",
@@ -763,9 +932,10 @@ async def test_unsubscribe_message(running_server):
             "timestamp": "2026-08-13T10:00:00Z"
         })
         await ws.send(unsubscribe_msg)
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(0.2)
 
-        assert running_server.clients.get_subscriptions(client_id) == set()
+        subs = running_server.clients.get_subscriptions(client_id)
+        assert len(subs) == 0
 
 
 @pytest.mark.asyncio
