@@ -34,6 +34,8 @@ async function renderMarkdown(source: string): Promise<string> {
 export class MarkdownPlugin implements Plugin {
   async beforeBuild(context: BuildContext): Promise<void> {
     context.sourcePages = await Promise.all(context.files.map(async (file) => {
+      const cached = context.cachedSourcePages[file];
+      if (cached && !context.filesToBuild.has(file)) return cached;
       const source = await fs.readFile(path.join(context.contentDir, file), 'utf8');
       const parsed = matter(source);
       const metadata = metadataFromFrontmatter(parsed);

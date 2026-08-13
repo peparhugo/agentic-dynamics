@@ -27,6 +27,7 @@ describe('static site generator', () => {
 
   it('parses build CLI options and rejects invalid commands', () => {
     expect(parseArguments(['build', '--content', 'posts', '--output', 'public', '--templates', 'theme'])).toEqual({ contentDir: 'posts', outputDir: 'public', templatesDir: 'theme' });
+    expect(parseArguments(['build', '--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
     expect(parseArguments(['serve', '--content', 'posts', '--templates', 'theme', '--port', '4000'])).toEqual({ contentDir: 'posts', templatesDir: 'theme', port: 4000 });
     expect(() => parseArguments(['invalid'])).toThrow('Usage:');
   });
@@ -70,5 +71,47 @@ describe('static site generator', () => {
     await buildSite({ contentDir: path.join(workspace, 'content'), outputDir: path.join(workspace, 'output'), plugins: [plugin] });
 
     expect(events).toEqual(['start', 'before:page', 'file:page', 'after', 'end']);
+  });
+
+  it('skips unchanged pages during an incremental build', async () => {
+    await fs.writeFile(path.join(workspace, 'content', 'first.md'), '---\ntitle: First\n---\n\nFirst');
+    await fs.writeFile(path.join(workspace, 'content', 'second.md'), '---\ntitle: Second\n---\n\nSecond');
+    const outputDir = path.join(workspace, 'output');
+    const rendered: string[] = [];
+    const plugin: Plugin = { onFile: (page) => rendered.push(page.slug) };
+
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir, plugins: [plugin] });
+    rendered.length = 0;
+    let stats;
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir, plugins: [plugin], incremental: true, onBuildComplete: (result) => { stats = result; } });
+
+    expect(rendered).toEqual([]);
+    expect(stats).toEqual(expect.objectContaining({ pagesBuilt: 0, pagesSkipped: 2 }));
+    await expect(fs.readFile(path.join(outputDir, 'first.html'), 'utf8')).resolves.toContain('First');
+    await expect(fs.readFile(path.join(outputDir, 'index.html'), 'utf8')).resolves.toContain('Second');
+  });
+
+  it('rebuilds changed pages and all pages when templates change', async () => {
+    await fs.mkdir(path.join(workspace, 'templates'));
+    await fs.writeFile(path.join(workspace, 'templates', 'default.hbs'), '<p>{{title}}</p>');
+    await fs.writeFile(path.join(workspace, 'content', 'first.md'), '---\ntitle: First\n---\n\nFirst');
+    await fs.writeFile(path.join(workspace, 'content', 'second.md'), '---\ntitle: Second\n---\n\nSecond');
+    const outputDir = path.join(workspace, 'output');
+    const templatesDir = path.join(workspace, 'templates');
+    const rendered: string[] = [];
+    const plugin: Plugin = { onFile: (page) => rendered.push(page.slug) };
+
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir, templatesDir, plugins: [plugin] });
+    rendered.length = 0;
+    await fs.writeFile(path.join(workspace, 'content', 'first.md'), '---\ntitle: Updated\n---\n\nFirst');
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir, templatesDir, plugins: [plugin], incremental: true });
+    expect(rendered).toEqual(['first']);
+    await expect(fs.readFile(path.join(outputDir, 'first.html'), 'utf8')).resolves.toContain('Updated');
+
+    rendered.length = 0;
+    await fs.writeFile(path.join(templatesDir, 'default.hbs'), '<article>{{title}}</article>');
+    await buildSite({ contentDir: path.join(workspace, 'content'), outputDir, templatesDir, plugins: [plugin], incremental: true });
+    expect(rendered).toEqual(['first', 'second']);
+    await expect(fs.readFile(path.join(outputDir, 'second.html'), 'utf8')).resolves.toBe('<article>Second</article>');
   });
 });

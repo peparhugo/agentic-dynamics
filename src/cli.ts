@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 import { startDevelopmentServer } from '../plugins/dev-server.js';
-import { buildSite } from './generator.js';
+import { buildSite, type BuildStats } from './generator.js';
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n       ssg serve [--content <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]\n       ssg serve [--content <dir>] [--templates <dir>] [--port <port>]';
 }
 
 export interface CliOptions {
@@ -11,6 +11,8 @@ export interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseArguments(args: string[]): CliOptions {
@@ -19,6 +21,12 @@ export function parseArguments(args: string[]): CliOptions {
   const options: CliOptions = {};
   for (let index = 1; index < args.length; index += 1) {
     const flag = args[index];
+    if (flag === '--incremental' || flag === '--clean') {
+      if (command !== 'build') throw new Error(usage());
+      if (flag === '--incremental') options.incremental = true;
+      if (flag === '--clean') options.clean = true;
+      continue;
+    }
     const value = args[index + 1];
     if ((flag !== '--content' && flag !== '--output' && flag !== '--templates' && flag !== '--port') || !value || value.startsWith('--')) throw new Error(usage());
     if ((command === 'serve' && flag === '--output') || (command === 'build' && flag === '--port')) throw new Error(usage());
@@ -48,8 +56,10 @@ async function main(): Promise<void> {
       process.stdout.write(`Serving at http://localhost:${port}\n`);
       return;
     }
-    const pages = await buildSite(options);
+    let stats: BuildStats | undefined;
+    const pages = await buildSite({ ...options, onBuildComplete: (result) => { stats = result; } });
     process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    process.stdout.write(`Build stats: ${stats?.pagesBuilt ?? 0} pages built, ${stats?.pagesSkipped ?? 0} pages skipped, ${stats?.timeSavedMs ?? 0}ms saved.\n`);
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 1;

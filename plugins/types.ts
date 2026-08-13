@@ -23,7 +23,22 @@ export interface BuildContext {
   files: string[];
   sourcePages: SourcePage[];
   pages: Page[];
+  incremental: boolean;
+  clean: boolean;
+  sourceHashes: Record<string, string>;
+  templateHash: string;
+  cachedSourcePages: Record<string, SourcePage>;
+  filesToBuild: Set<string>;
+  shouldBuildIndex: boolean;
+  stats: BuildStats;
   developmentServer?: DevelopmentServer;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
+  durationMs: number;
 }
 
 export interface DevelopmentServer {

@@ -46,6 +46,7 @@ export class TemplatePlugin implements Plugin {
   }
 
   async afterBuild(context: BuildContext): Promise<void> {
+    if (!context.shouldBuildIndex) return;
     const links = context.pages.map((page) => {
       const details = [page.date, page.tags.length > 0 ? page.tags.join(', ') : undefined].filter(Boolean).join(' | ');
       return `<li><a href="${encodeURIComponent(page.slug)}.html">${escapeHtml(page.title)}</a>${details ? ` <small>${escapeHtml(details)}</small>` : ''}</li>`;
