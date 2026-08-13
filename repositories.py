@@ -115,6 +115,21 @@ class TaskRepository(BaseRepository):
                 "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
             ).fetchall()
 
+    def list_page_for_owner(self, owner_id, cursor, limit):
+        """Return an ID-cursor page and the owner's total task count."""
+        with self.connection_factory() as conn:
+            total = conn.execute("SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)).fetchone()[0]
+            if cursor is None:
+                tasks = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?", (owner_id, limit)
+                ).fetchall()
+            else:
+                tasks = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit),
+                ).fetchall()
+        return tasks, total
+
     def get_for_owner(self, identifier, owner_id):
         with self.connection_factory() as conn:
             return conn.execute(

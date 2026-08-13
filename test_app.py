@@ -3,6 +3,7 @@ import xml.etree.ElementTree as ET
 
 import app as task_app
 import pytest
+from limits.storage import storage_from_string
 from werkzeug.security import check_password_hash
 
 
@@ -14,6 +15,8 @@ TASK = "urn:tasks"
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "tasks.db"))
     monkeypatch.setattr(task_app, "JWT_SECRET", "test-secret")
+    # Exercise application behavior without requiring an external Redis server in unit tests.
+    task_app.limiter.reset()
     task_app.init_db()
     return task_app.app.test_client()
 
@@ -119,6 +122,49 @@ def test_list_tasks_is_newest_first_and_scoped_to_owner(client):
 
     assert response.status_code == 200
     assert [task.findtext("title") for task in tasks] == ["Newer", "Older"]
+
+
+def test_get_tasks_uses_owner_scoped_cursor_pagination(client):
+    alice_token = token(client)
+    bob_token = token(client, "bob")
+    for title in ("First", "Second", "Third"):
+        client.post("/soap", data=soap_request("CreateTask", f"<title>{title}</title>"), headers=auth(alice_token))
+    client.post("/soap", data=soap_request("CreateTask", "<title>Bob's</title>"), headers=auth(bob_token))
+
+    first = client.get("/tasks?limit=2", headers=auth(alice_token))
+    first_body = first.get_json()
+    second = client.get(f"/tasks?cursor={first_body['next_cursor']}&limit=2", headers=auth(alice_token))
+
+    assert first.status_code == 200
+    assert [task["title"] for task in first_body["data"]] == ["Third", "Second"]
+    assert first_body["total"] == 3
+    assert first_body["next_cursor"] == str(first_body["data"][-1]["id"])
+    assert [task["title"] for task in second.get_json()["data"]] == ["First"]
+    assert second.get_json()["next_cursor"] is None
+
+
+def test_get_tasks_validates_pagination_parameters(client):
+    access_token = token(client)
+
+    invalid_limit = client.get("/tasks?limit=zero", headers=auth(access_token))
+    invalid_cursor = client.get("/tasks?cursor=0", headers=auth(access_token))
+    capped_limit = client.get("/tasks?limit=101", headers=auth(access_token))
+
+    assert invalid_limit.status_code == 400
+    assert invalid_cursor.status_code == 400
+    assert capped_limit.status_code == 200
+
+
+def test_rate_limit_returns_retry_after_header(client, monkeypatch):
+    monkeypatch.setattr(task_app.limiter, "_storage", storage_from_string("memory://"))
+    for _ in range(100):
+        response = client.post("/auth/register", json={"username": "", "password": "password"})
+
+    limited = client.post("/auth/register", json={"username": "", "password": "password"})
+
+    assert response.status_code == 400
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"]
 
 
 def test_users_cannot_get_or_update_other_users_tasks(client):

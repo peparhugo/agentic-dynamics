@@ -12,6 +12,8 @@ from functools import wraps
 from xml.etree import ElementTree as ET
 
 from flask import Flask, Response, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -23,8 +25,36 @@ TASK_NAMESPACE = "urn:tasks"
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_EXPIRATION_HOURS = 24
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
 
 app = Flask(__name__)
+
+
+def rate_limit_key():
+    """Use the authenticated identity when available; auth routes fall back to the client."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    user_id = decode_jwt(token) if scheme.lower() == "bearer" and token else None
+    return f"user:{user_id}" if user_id is not None else request.remote_addr
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=RATELIMIT_STORAGE_URI,
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def rate_limit_exceeded(error):
+    response = jsonify(error="rate limit exceeded")
+    response.status_code = 429
+    retry_after = error.retry_after
+    if retry_after is not None:
+        response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 def get_db():
@@ -196,6 +226,29 @@ def login():
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify(error="invalid credentials"), 401
     return jsonify(token=encode_jwt(user["id"]))
+
+
+@app.get("/tasks")
+@require_auth
+def get_tasks(owner_id):
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+    except ValueError:
+        return jsonify(error="cursor and limit must be integers"), 400
+    if cursor is not None and cursor < 1:
+        return jsonify(error="cursor must be a positive integer"), 400
+    if limit < 1:
+        return jsonify(error="limit must be a positive integer"), 400
+
+    tasks, total = TaskRepository(get_db).list_page_for_owner(owner_id, cursor, min(limit, 100))
+    return jsonify(
+        data=[dict(task) for task in tasks],
+        next_cursor=str(tasks[-1]["id"]) if len(tasks) == min(limit, 100) else None,
+        total=total,
+    )
 
 
 @app.post("/soap")
