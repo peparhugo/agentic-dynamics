@@ -163,6 +163,69 @@ def test_update_task(client):
     assert response.get_json()["status"] == "complete"
 
 
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    headers = auth_headers(client, username="alice@example.com")
+    task_id = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=headers
+    ).get_json()["id"]
+    mock_delay = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: mock_delay.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task_id}", json={"status": "completed"}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert mock_delay == [("alice@example.com", "Ship release")]
+
+
+@pytest.mark.parametrize("status", ["pending", "complete"])
+def test_non_completed_status_does_not_queue_notification(
+    client, monkeypatch, status
+):
+    headers = auth_headers(client)
+    task_id = client.post(
+        "/tasks", json={"title": "Keep working"}, headers=headers
+    ).get_json()["id"]
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task_id}", json={"status": status}, headers=headers
+    )
+
+    assert response.status_code == 200
+    assert queued == []
+
+
+def test_already_completed_task_does_not_queue_another_notification(
+    client, monkeypatch
+):
+    headers = auth_headers(client)
+    task_id = client.post(
+        "/tasks", json={"title": "Done once"}, headers=headers
+    ).get_json()["id"]
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+    assert queued == [("alice", "Done once")]
+
+
 def test_users_only_see_and_update_their_own_tasks(client):
     alice_headers = auth_headers(client, "alice")
     alice_task = client.post(
