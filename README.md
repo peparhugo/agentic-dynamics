@@ -33,6 +33,17 @@ in `templates/partials` can be included by name, for example `{{> header}}`.
 Template values such as `{{title}}` are HTML escaped; rendered Markdown is
 available as `{{{content}}}`. Set `layout: false` to render without a layout.
 
+Start a development server at `http://localhost:3000` with:
+
+```sh
+npx ssg serve
+```
+
+The server builds into `./dist`, watches `content/` and `templates/`, and reloads
+open browser pages after successful rebuilds. Use `--port <number>` to select a
+different port. The `--content`, `--output`, and `--templates` options work for
+both `build` and `serve`.
+
 Frontmatter can define `title`, `date`, and `tags`:
 
 ```md

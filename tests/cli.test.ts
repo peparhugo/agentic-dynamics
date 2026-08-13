@@ -23,8 +23,10 @@ describe('CLI', () => {
   });
 
   it('rejects unsupported commands and incomplete options', async () => {
-    await expect(run(['serve'])).rejects.toThrow('Usage: ssg build');
+    await expect(run(['preview'])).rejects.toThrow('Usage: ssg <build|serve>');
     await expect(run(['build', '--content'])).rejects.toThrow('--content requires a directory');
+    await expect(run(['build', '--port', '3001'])).rejects.toThrow('--port is only available for serve');
+    await expect(run(['serve', '--port', 'invalid'])).rejects.toThrow('--port must be an integer');
   });
 
   it('accepts a custom templates directory', async () => {
