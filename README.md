@@ -4,7 +4,8 @@ Install dependencies and start the server:
 
 ```bash
 python3 -m pip install -r requirements.txt
-python3 app.py --host 127.0.0.1 --port 8765
+REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=sqlite:///messages.db \
+  python3 app.py --host 127.0.0.1 --port 8765
 ```
 
 Connect WebSocket clients to `ws://127.0.0.1:8765`. On connection, each client
@@ -26,6 +27,14 @@ channel is delivered only when its target is subscribed.
 `GET /health` returns the current connected client count. `GET /channels`
 returns active channels and subscriber counts, and
 `GET /channels/{name}/subscribers` returns the channel's subscriber IDs.
+`GET /messages?limit=50&offset=0` returns persisted messages, newest first.
+
+When `REDIS_URL` is set, each server publishes messages to Redis and runs a
+subscription worker that delivers them to its local WebSocket clients. This
+allows any number of server instances to share message delivery and connection
+metadata. `DATABASE_URL` selects the SQLite history database and defaults to an
+in-memory database; use an absolute URL such as `sqlite:////var/lib/app/messages.db`
+or a relative URL such as `sqlite:///messages.db` for durable history.
 
 Every outgoing message has this shape:
 
