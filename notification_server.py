@@ -44,6 +44,17 @@ Persistence (optional):
     explicit `database_url`), every notification message is stored in
     the `messages` table for history.
   * REST endpoint: GET /messages?limit=50&offset=0.
+  * REST endpoint: GET /history?channel=X&since=ISO&limit=50&offset=0
+    returns messages for a channel/time range in chronological order,
+    paginated with a `has_more` flag.
+  * Messages older than MESSAGE_TTL_DAYS (default 7) are purged by a
+    background task started on server startup.
+
+Rate limiting (optional):
+  * Each client is limited to RATE_LIMIT (default 100) inbound messages
+    per minute using per-client Redis counters. When the limit is hit an
+    error message is returned to the client instead of the message being
+    silently dropped.
 """
 
 from __future__ import annotations
@@ -54,10 +65,11 @@ import logging
 import os
 import sqlite3
 import threading
+import time
 import urllib.parse
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from websockets.asyncio.server import serve
@@ -72,11 +84,18 @@ DIRECT = "direct"
 SYSTEM = "system"
 SUBSCRIBE = "subscribe"
 UNSUBSCRIBE = "unsubscribe"
-MSG_TYPES = (BROADCAST, DIRECT, SYSTEM, SUBSCRIBE, UNSUBSCRIBE)
+ERROR = "error"
+MSG_TYPES = (BROADCAST, DIRECT, SYSTEM, SUBSCRIBE, UNSUBSCRIBE, ERROR)
 
 HEALTH_PATH = "/health"
 CHANNELS_PATH = "/channels"
 MESSAGES_PATH = "/messages"
+HISTORY_PATH = "/history"
+
+RATE_LIMIT_DEFAULT = 100
+RATE_LIMIT_WINDOW = 60
+MESSAGE_TTL_DEFAULT = 7
+REDIS_RATE_LIMIT_PREFIX = "notification:ratelimit:"
 
 REDIS_BACKBONE_CHANNEL = os.environ.get(
     "REDIS_BACKBONE_CHANNEL", "notification:events"
@@ -153,6 +172,12 @@ def _decode(value: object) -> object:
     if isinstance(value, (list, tuple, set)):
         return [_decode(v) for v in value]
     return value
+
+
+def _iso_minus_days(days: int) -> str:
+    """Return an ISO timestamp ``days`` days in the past (UTC)."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    return cutoff.isoformat(timespec="milliseconds")
 
 
 class EventLog:
@@ -275,6 +300,109 @@ class MessageStore:
             with self._conn() as conn:
                 row = conn.execute("SELECT COUNT(*) AS n FROM messages").fetchone()
                 return int(row["n"])
+
+    def history(self, channel: str | None = None, since: str | None = None,
+                limit: int = 50, offset: int = 0) -> dict:
+        """Return stored messages for a channel/time range, chronological.
+
+        Returns ``{"messages": [...], "has_more": bool}``. Messages are
+        ordered by timestamp ascending; ``has_more`` reports whether more
+        rows exist beyond the current page (``limit``/``offset``).
+        """
+        if self.path is None:
+            return {"messages": [], "has_more": False}
+        limit = max(1, int(limit))
+        offset = max(0, int(offset))
+        clauses: list[str] = []
+        params: list[object] = []
+        if channel is not None:
+            clauses.append("channel = ?")
+            params.append(channel)
+        if since is not None:
+            clauses.append("timestamp >= ?")
+            params.append(since)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self._lock:
+            with self._conn() as conn:
+                rows = conn.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages"
+                    f"{where} ORDER BY timestamp ASC, id ASC LIMIT ? OFFSET ?",
+                    (*params, limit + 1, offset),
+                ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        result = []
+        for row in rows:
+            item = dict(row)
+            try:
+                item["payload"] = json.loads(item["payload"])
+            except (TypeError, ValueError):
+                pass
+            result.append(item)
+        return {"messages": result, "has_more": has_more}
+
+    def purge(self, ttl_days: int) -> int:
+        """Delete messages older than ``ttl_days``; return rows removed."""
+        if self.path is None or not self.path.exists():
+            return 0
+        cutoff = _iso_minus_days(int(ttl_days))
+        with self._lock:
+            with self._conn() as conn:
+                cursor = conn.execute(
+                    "DELETE FROM messages WHERE timestamp < ?", (cutoff,)
+                )
+                conn.commit()
+                return cursor.rowcount
+
+
+class RateLimiter:
+    """Per-client inbound message rate limiter.
+
+    Limits each client to ``limit`` messages per rolling minute. Uses
+    Redis counters (``notification:ratelimit:{client_id}:{window}``)
+    when a redis client is available; otherwise falls back to in-process
+    counters so the server still works without a Redis backend.
+    """
+
+    def __init__(self, redis_client=None, limit: int = RATE_LIMIT_DEFAULT):
+        self.redis_client = redis_client
+        self.limit = max(0, int(limit))
+        self._local: dict[str, tuple[int, int]] = {}
+        self._lock = threading.Lock()
+
+    @property
+    def enabled(self) -> bool:
+        return self.limit > 0
+
+    async def allow(self, client_id: str) -> bool:
+        """Record one inbound message; return True if it may proceed."""
+        if not self.enabled:
+            return True
+        if self.redis_client is not None:
+            return await self._allow_redis(client_id)
+        return self._allow_local(client_id)
+
+    async def _allow_redis(self, client_id: str) -> bool:
+        window = int(time.time()) // RATE_LIMIT_WINDOW
+        key = f"{REDIS_RATE_LIMIT_PREFIX}{client_id}:{window}"
+        try:
+            count = await self.redis_client.incr(key)
+            if count == 1:
+                await self.redis_client.expire(key, RATE_LIMIT_WINDOW * 2)
+            return count <= self.limit
+        except Exception:
+            logger.exception("rate limiter redis failure; allowing message")
+            return True
+
+    def _allow_local(self, client_id: str) -> bool:
+        window = int(time.time()) // RATE_LIMIT_WINDOW
+        with self._lock:
+            count, seen = self._local.get(client_id, (0, window))
+            if seen != window:
+                count = 0
+            count += 1
+            self._local[client_id] = (count, window)
+            return count <= self.limit
 
 
 class RedisBackbone:
@@ -554,7 +682,10 @@ class NotificationServer:
                  redis_url: str | None = None,
                  database_url: str | Path | None = None,
                  redis_client=None,
-                 transport: str | BaseTransport | None = None):
+                 transport: str | BaseTransport | None = None,
+                 rate_limit: int | None = None,
+                 message_ttl_days: int | None = None,
+                 cleanup_interval: float | None = None):
         self.host = host
         self.requested_port = port
         self.registry = ClientRegistry()
@@ -563,6 +694,7 @@ class NotificationServer:
         self.server_id = uuid.uuid4().hex
         self._pubsub = None
         self._subscriber_task = None
+        self._cleanup_task = None
 
         self.transport = self._build_transport(transport)
 
@@ -579,6 +711,21 @@ class NotificationServer:
             self.backbone = RedisBackbone(self.redis_client)
 
         self.message_store = MessageStore(database_url)
+        self.rate_limiter = RateLimiter(
+            redis_client=self.redis_client,
+            limit=(
+                rate_limit if rate_limit is not None
+                else _parse_int(os.environ.get("RATE_LIMIT"), RATE_LIMIT_DEFAULT)
+            ),
+        )
+        self.message_ttl_days = (
+            message_ttl_days if message_ttl_days is not None
+            else _parse_int(os.environ.get("MESSAGE_TTL_DAYS"), MESSAGE_TTL_DEFAULT)
+        )
+        self.cleanup_interval = (
+            cleanup_interval if cleanup_interval is not None
+            else _parse_int(os.environ.get("MESSAGE_CLEANUP_INTERVAL"), 3600)
+        )
 
     # -- helpers ------------------------------------------------------
 
@@ -608,6 +755,11 @@ class NotificationServer:
     async def start(self) -> "NotificationServer":
         await self.transport.start()
         await self._setup_backbone()
+        try:
+            self._purge_expired()
+        except Exception:
+            logger.exception("initial message history cleanup failed")
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         return self
 
     async def _setup_backbone(self) -> None:
@@ -623,10 +775,18 @@ class NotificationServer:
                 )
                 self.redis_client = None
                 self.backbone = None
+                self.rate_limiter.redis_client = None
                 return
         self._subscriber_task = asyncio.create_task(self._subscriber_loop())
 
     async def close(self) -> None:
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
         if self._subscriber_task is not None:
             self._subscriber_task.cancel()
             try:
@@ -683,6 +843,29 @@ class NotificationServer:
                 "limit": limit,
                 "offset": offset,
             })
+        if path == HISTORY_PATH:
+            query = request.path.split("?", 1)[1] if "?" in request.path else ""
+            params = urllib.parse.parse_qs(query)
+            channel = (params.get("channel") or [None])[0]
+            since = (params.get("since") or [None])[0]
+            limit = _parse_int((params.get("limit") or ["50"])[0], 50)
+            offset = _parse_int((params.get("offset") or ["0"])[0], 0)
+            if not channel:
+                channel = None
+            if not since:
+                since = None
+            result = self.message_store.history(
+                channel=channel, since=since, limit=limit, offset=offset,
+            )
+            return self._http_json({
+                "messages": result["messages"],
+                "has_more": result["has_more"],
+                "count": len(result["messages"]),
+                "limit": limit,
+                "offset": offset,
+                "channel": channel,
+                "since": since,
+            })
         return None
 
     @staticmethod
@@ -702,6 +885,9 @@ class NotificationServer:
         await self.transport.handle_connection(connection)
 
     async def _dispatch(self, client_id: str, message: dict) -> None:
+        if not await self.rate_limiter.allow(client_id):
+            await self._send_rate_limit_error(client_id)
+            return
         msg_type = message.get("type")
         payload = message.get("payload")
         if not isinstance(payload, dict):
@@ -745,6 +931,35 @@ class NotificationServer:
                 "client_id": client_id,
                 "type": str(msg_type),
             })
+
+    async def _send_rate_limit_error(self, client_id: str) -> None:
+        """Notify a client that its inbound messages were rate limited."""
+        conn = self.registry.get(client_id)
+        if conn is None:
+            return
+        message = build_message(ERROR, {
+            "message": "rate limit exceeded",
+            "limit": self.rate_limiter.limit,
+            "window_seconds": RATE_LIMIT_WINDOW,
+        })
+        self.event_log.append("rate_limited", {
+            "client_id": client_id,
+            "limit": self.rate_limiter.limit,
+        })
+        await self._send_raw(client_id, conn, json.dumps(message))
+
+    async def _cleanup_loop(self) -> None:
+        """Background task: periodically purge expired message history."""
+        while True:
+            try:
+                self._purge_expired()
+            except Exception:
+                logger.exception("message history cleanup failed")
+            await asyncio.sleep(self.cleanup_interval)
+
+    def _purge_expired(self) -> int:
+        """Delete stored messages older than the configured TTL."""
+        return self.message_store.purge(self.message_ttl_days)
 
     async def broadcast(self, payload: dict) -> int:
         """Send a broadcast message to every connected client."""
