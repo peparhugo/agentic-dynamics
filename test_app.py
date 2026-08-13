@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 import shutil
+from unittest.mock import patch, MagicMock
 from app import app
 import app as app_module
 
@@ -34,7 +35,8 @@ def auth_token(client):
     """Register a user and return their auth token."""
     response = client.post("/auth/register", json={
         "username": "testuser",
-        "password": "testpass123"
+        "password": "testpass123",
+        "email": "testuser@example.com"
     })
     assert response.status_code == 201
 
@@ -59,10 +61,12 @@ def test_register_success(client):
     """Test registering a new user."""
     response = client.post("/auth/register", json={
         "username": "newuser",
-        "password": "password123"
+        "password": "password123",
+        "email": "newuser@example.com"
     })
     assert response.status_code == 201
     assert response.json["username"] == "newuser"
+    assert response.json["email"] == "newuser@example.com"
     assert "id" in response.json
 
 
@@ -70,11 +74,13 @@ def test_register_duplicate_username(client):
     """Test registering with an existing username returns 409."""
     client.post("/auth/register", json={
         "username": "user1",
-        "password": "pass1"
+        "password": "pass1",
+        "email": "user1@example.com"
     })
     response = client.post("/auth/register", json={
         "username": "user1",
-        "password": "pass2"
+        "password": "pass2",
+        "email": "user1b@example.com"
     })
     assert response.status_code == 409
     assert "already exists" in response.json["error"]
@@ -83,7 +89,8 @@ def test_register_duplicate_username(client):
 def test_register_missing_username(client):
     """Test registering without username returns 400."""
     response = client.post("/auth/register", json={
-        "password": "password123"
+        "password": "password123",
+        "email": "user@example.com"
     })
     assert response.status_code == 400
     assert "required" in response.json["error"]
@@ -92,7 +99,18 @@ def test_register_missing_username(client):
 def test_register_missing_password(client):
     """Test registering without password returns 400."""
     response = client.post("/auth/register", json={
-        "username": "user1"
+        "username": "user1",
+        "email": "user@example.com"
+    })
+    assert response.status_code == 400
+    assert "required" in response.json["error"]
+
+
+def test_register_missing_email(client):
+    """Test registering without email returns 400."""
+    response = client.post("/auth/register", json={
+        "username": "user1",
+        "password": "password123"
     })
     assert response.status_code == 400
     assert "required" in response.json["error"]
@@ -102,7 +120,8 @@ def test_login_success(client):
     """Test logging in with valid credentials."""
     client.post("/auth/register", json={
         "username": "testuser",
-        "password": "testpass"
+        "password": "testpass",
+        "email": "testuser@example.com"
     })
     response = client.post("/auth/login", json={
         "username": "testuser",
@@ -116,7 +135,8 @@ def test_login_invalid_password(client):
     """Test login with wrong password returns 401."""
     client.post("/auth/register", json={
         "username": "testuser",
-        "password": "correctpass"
+        "password": "correctpass",
+        "email": "testuser@example.com"
     })
     response = client.post("/auth/login", json={
         "username": "testuser",
@@ -285,7 +305,8 @@ def test_get_task_unauthorized(client):
     # Register and create task as user 1
     response1 = client.post("/auth/register", json={
         "username": "user1",
-        "password": "pass1"
+        "password": "pass1",
+        "email": "user1@example.com"
     })
     user1_id = response1.json["id"]
 
@@ -303,7 +324,8 @@ def test_get_task_unauthorized(client):
     # Register user 2
     response2 = client.post("/auth/register", json={
         "username": "user2",
-        "password": "pass2"
+        "password": "pass2",
+        "email": "user2@example.com"
     })
     login2 = client.post("/auth/login", json={
         "username": "user2",
@@ -389,7 +411,8 @@ def test_update_task_unauthorized(client):
     # Register and create task as user 1
     response1 = client.post("/auth/register", json={
         "username": "user1",
-        "password": "pass1"
+        "password": "pass1",
+        "email": "user1@example.com"
     })
 
     login1 = client.post("/auth/login", json={
@@ -406,7 +429,8 @@ def test_update_task_unauthorized(client):
     # Register user 2
     client.post("/auth/register", json={
         "username": "user2",
-        "password": "pass2"
+        "password": "pass2",
+        "email": "user2@example.com"
     })
     login2 = client.post("/auth/login", json={
         "username": "user2",
@@ -476,7 +500,8 @@ def test_user_isolation_list_tasks(client):
     # User 1 creates tasks
     response1 = client.post("/auth/register", json={
         "username": "user1",
-        "password": "pass1"
+        "password": "pass1",
+        "email": "user1@example.com"
     })
     login1 = client.post("/auth/login", json={
         "username": "user1",
@@ -494,7 +519,8 @@ def test_user_isolation_list_tasks(client):
     # User 2 creates tasks
     client.post("/auth/register", json={
         "username": "user2",
-        "password": "pass2"
+        "password": "pass2",
+        "email": "user2@example.com"
     })
     login2 = client.post("/auth/login", json={
         "username": "user2",
@@ -519,3 +545,90 @@ def test_user_isolation_list_tasks(client):
     tasks = response.json
     assert len(tasks) == 1
     assert tasks[0]["title"] == "User2 Task1"
+
+
+# ── Notification tests ──────────────────────────────────────────
+
+def test_notification_sent_when_status_changes_to_completed(client, auth_token):
+    """Test that a notification email is triggered when status changes to 'completed'."""
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    create_response = client.post("/tasks", json={"title": "Test Task"}, headers=headers)
+    task_id = create_response.json["id"]
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        response = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+        assert response.status_code == 200
+        assert response.json["status"] == "completed"
+        mock_delay.assert_called_once()
+        args = mock_delay.call_args
+        assert args[0][0] == "testuser@example.com"
+        assert args[0][1] == "Test Task"
+
+
+def test_notification_not_sent_on_other_status_changes(client, auth_token):
+    """Test that notification is not sent when changing to non-completed status."""
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    create_response = client.post("/tasks", json={"title": "Test Task"}, headers=headers)
+    task_id = create_response.json["id"]
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        response = client.put(f"/tasks/{task_id}", json={"status": "in_progress"}, headers=headers)
+        assert response.status_code == 200
+        assert response.json["status"] == "in_progress"
+        mock_delay.assert_not_called()
+
+
+def test_notification_not_resent_if_already_completed(client, auth_token):
+    """Test that notification is not resent if task is already completed and status doesn't change."""
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    create_response = client.post("/tasks", json={"title": "Test Task"}, headers=headers)
+    task_id = create_response.json["id"]
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+        assert mock_delay.call_count == 1
+
+        client.put(f"/tasks/{task_id}", json={"title": "Updated Title"}, headers=headers)
+        assert mock_delay.call_count == 1
+
+        client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+        assert mock_delay.call_count == 1
+
+
+def test_notification_includes_correct_user_email(client):
+    """Test that notification includes the correct user's email."""
+    response1 = client.post("/auth/register", json={
+        "username": "user1",
+        "password": "pass1",
+        "email": "user1@test.com"
+    })
+
+    login1 = client.post("/auth/login", json={
+        "username": "user1",
+        "password": "pass1"
+    })
+    token1 = login1.json["token"]
+
+    headers = {"Authorization": f"Bearer {token1}"}
+    create_response = client.post("/tasks", json={"title": "Important Task"}, headers=headers)
+    task_id = create_response.json["id"]
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        response = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+        assert response.status_code == 200
+        mock_delay.assert_called_once()
+        args = mock_delay.call_args
+        assert args[0][0] == "user1@test.com"
+        assert args[0][1] == "Important Task"
+
+
+def test_notification_not_sent_when_status_not_in_request(client, auth_token):
+    """Test that notification is not sent if status is not in the request."""
+    headers = {"Authorization": f"Bearer {auth_token}"}
+    create_response = client.post("/tasks", json={"title": "Test Task"}, headers=headers)
+    task_id = create_response.json["id"]
+
+    with patch("app.send_notification_email.delay") as mock_delay:
+        response = client.put(f"/tasks/{task_id}", json={"title": "New Title"}, headers=headers)
+        assert response.status_code == 200
+        mock_delay.assert_not_called()

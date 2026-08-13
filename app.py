@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from tasks import send_notification_email
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -107,6 +108,18 @@ def migrate_tasks_add_owner():
             save_tasks(tasks_data)
 
 
+def migrate_users_add_email():
+    """Add email to existing users that don't have it."""
+    users_data = load_users()
+    modified = False
+    for user in users_data["users"]:
+        if "email" not in user:
+            user["email"] = f"user{user['id']}@example.com"
+            modified = True
+    if modified:
+        save_users(users_data)
+
+
 # ── Authentication ─────────────────────────────────────────────
 
 def generate_token(user_id):
@@ -157,13 +170,14 @@ def token_required(f):
 
 @app.route("/auth/register", methods=["POST"])
 def register():
-    """Register a new user. Requires 'username' and 'password' in JSON body."""
+    """Register a new user. Requires 'username', 'password', and 'email' in JSON body."""
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip()
 
-    if not username or not password:
-        return jsonify({"error": "username and password are required"}), 400
+    if not username or not password or not email:
+        return jsonify({"error": "username, password, and email are required"}), 400
 
     users_data = load_users()
 
@@ -174,6 +188,7 @@ def register():
     new_user = {
         "id": user_id,
         "username": username,
+        "email": email,
         "password_hash": generate_password_hash(password),
         "created_at": datetime.utcnow().isoformat()
     }
@@ -182,7 +197,7 @@ def register():
     users_data["next_id"] = user_id + 1
     save_users(users_data)
 
-    return jsonify({"id": user_id, "username": username}), 201
+    return jsonify({"id": user_id, "username": username, "email": email}), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -273,6 +288,8 @@ def update_task(user_id, task_id):
     if task.get("owner_id") != user_id:
         return jsonify({"error": "unauthorized"}), 403
 
+    old_status = task.get("status")
+
     if "title" in data:
         title = data["title"]
         if isinstance(title, str):
@@ -285,6 +302,13 @@ def update_task(user_id, task_id):
         task["status"] = data["status"]
 
     save_tasks(tasks_data)
+
+    if "status" in data and data["status"] == "completed" and old_status != "completed":
+        users_data = load_users()
+        user = next((u for u in users_data["users"] if u["id"] == user_id), None)
+        if user:
+            send_notification_email.delay(user["email"], task["title"])
+
     return jsonify(task), 200
 
 
@@ -298,4 +322,5 @@ if __name__ == "__main__":
     init_tasks_file()
     init_users_file()
     migrate_tasks_add_owner()
+    migrate_users_add_email()
     app.run(debug=True)
