@@ -3,7 +3,8 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import { WebSocket, WebSocketServer } from 'ws';
-import { buildSite, type BuildOptions } from './index';
+import { buildSite } from './engine';
+import type { BuildOptions, Plugin, PluginContext } from './types';
 
 export interface ServeOptions extends BuildOptions {
   port?: number;
@@ -74,82 +75,109 @@ function listen(server: Server, port: number): Promise<number> {
   });
 }
 
-export async function serveSite(options: ServeOptions = {}): Promise<DevServer> {
-  const outputDir = path.resolve(options.outputDir ?? './dist');
-  const contentDir = path.resolve(options.contentDir ?? './content');
-  const templatesDir = path.resolve(options.templatesDir ?? './templates');
-  const buildOptions = { contentDir, outputDir, templatesDir };
-  await buildSite(buildOptions);
+export class DevServerPlugin implements Plugin {
+  private readonly server: Server;
+  private readonly sockets: WebSocketServer;
+  private watcher?: FSWatcher;
+  private started = false;
+  private building = false;
+  private rebuildPending = false;
+  private context?: PluginContext;
+  private selectedPort?: number;
 
-  const server = createServer(async (request, response) => {
-    if (request.method !== 'GET' && request.method !== 'HEAD') {
-      response.writeHead(405, { Allow: 'GET, HEAD' }).end();
-      return;
-    }
+  constructor(private readonly options: ServeOptions = {}) {
+    this.server = createServer(async (request, response) => {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        response.writeHead(405, { Allow: 'GET, HEAD' }).end();
+        return;
+      }
 
-    const file = await requestedFile(outputDir, request.url ?? '/');
-    if (!file) {
-      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
-      return;
-    }
+      const file = await requestedFile(this.context?.outputDir ?? path.resolve(this.options.outputDir ?? './dist'), request.url ?? '/');
+      if (!file) {
+        response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }).end('Not found');
+        return;
+      }
 
-    const contentType = CONTENT_TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
-    if (contentType.startsWith('text/html')) {
-      const html = injectLiveReload(await fs.readFile(file, 'utf8'));
-      response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': Buffer.byteLength(html) });
-      response.end(request.method === 'HEAD' ? undefined : html);
-      return;
-    }
+      const contentType = CONTENT_TYPES[path.extname(file).toLowerCase()] ?? 'application/octet-stream';
+      if (contentType.startsWith('text/html')) {
+        const html = injectLiveReload(await fs.readFile(file, 'utf8'));
+        response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': Buffer.byteLength(html) });
+        response.end(request.method === 'HEAD' ? undefined : html);
+        return;
+      }
 
-    const size = (await fs.stat(file)).size;
-    response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': size });
-    if (request.method === 'HEAD') response.end();
-    else createReadStream(file).pipe(response);
-  });
-  const sockets = new WebSocketServer({ server });
-  const watcher: FSWatcher = chokidar.watch([contentDir, templatesDir], { ignoreInitial: true });
-  const watcherReady = new Promise<void>((resolve) => watcher.once('ready', resolve));
-  let building = false;
-  let rebuildPending = false;
+      const size = (await fs.stat(file)).size;
+      response.writeHead(200, { 'Content-Type': contentType, 'Content-Length': size });
+      if (request.method === 'HEAD') response.end();
+      else createReadStream(file).pipe(response);
+    });
+    this.sockets = new WebSocketServer({ server: this.server });
+  }
 
-  const rebuild = async (): Promise<void> => {
-    if (building) {
-      rebuildPending = true;
-      return;
-    }
-    building = true;
-    do {
-      rebuildPending = false;
-      try {
-        const pages = await buildSite(buildOptions);
-        console.log(`Rebuilt ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
-        for (const client of sockets.clients) {
+  async afterBuild(context: PluginContext): Promise<void> {
+    this.context = context;
+    if (this.started) {
+      setImmediate(() => {
+        for (const client of this.sockets.clients) {
           if (client.readyState === WebSocket.OPEN) client.send('reload');
         }
+      });
+      return;
+    }
+    this.started = true;
+    this.watcher = chokidar.watch([context.contentDir, context.templatesDir], { ignoreInitial: true });
+    const ready = new Promise<void>((resolve) => this.watcher?.once('ready', resolve));
+    this.watcher.on('all', () => void this.rebuild());
+    await ready;
+    this.selectedPort = await listen(this.server, this.options.port ?? 3000);
+  }
+
+  private async rebuild(): Promise<void> {
+    if (this.building) {
+      this.rebuildPending = true;
+      return;
+    }
+    this.building = true;
+    do {
+      this.rebuildPending = false;
+      try {
+        const pages = await buildSite({
+          ...this.options,
+          contentDir: this.context?.contentDir,
+          outputDir: this.context?.outputDir,
+          templatesDir: this.context?.templatesDir,
+          plugins: [...(this.options.plugins ?? []), this],
+        });
+        console.log(`Rebuilt ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
       } catch (error) {
         console.error(`Rebuild failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-    } while (rebuildPending);
-    building = false;
-  };
-  watcher.on('all', () => void rebuild());
+    } while (this.rebuildPending);
+    this.building = false;
+  }
 
+  get port(): number {
+    if (this.selectedPort === undefined) throw new Error('Development server has not started');
+    return this.selectedPort;
+  }
+
+  async close(): Promise<void> {
+    await this.watcher?.close();
+    for (const client of this.sockets.clients) client.terminate();
+    if (!this.server.listening) return;
+    await new Promise<void>((resolve, reject) => {
+      this.sockets.close(() => this.server.close((error) => error ? reject(error) : resolve()));
+    });
+  }
+}
+
+export async function serveSite(options: ServeOptions = {}): Promise<DevServer> {
+  const plugin = new DevServerPlugin(options);
   try {
-    await watcherReady;
-    const port = await listen(server, options.port ?? 3000);
-    return {
-      port,
-      async close(): Promise<void> {
-        await watcher.close();
-        for (const client of sockets.clients) client.terminate();
-        await new Promise<void>((resolve, reject) => {
-          sockets.close(() => server.close((error) => error ? reject(error) : resolve()));
-        });
-      },
-    };
+    await buildSite({ ...options, plugins: [...(options.plugins ?? []), plugin] });
+    return plugin;
   } catch (error) {
-    await watcher.close();
-    sockets.close();
+    await plugin.close().catch(() => undefined);
     throw error;
   }
 }

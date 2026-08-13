@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src';
+import { buildSite, type Plugin } from '../src';
 
 describe('buildSite', () => {
   let temporaryDirectory: string;
@@ -131,5 +131,67 @@ template: post.hbs
 
     await expect(buildSite({ contentDir, outputDir, templatesDir }))
       .rejects.toThrow('Template not found: missing');
+  });
+
+  it('runs plugin lifecycle hooks in order and lets plugins transform pages', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '# Original');
+    const calls: string[] = [];
+    const first: Plugin = {
+      onStart: () => { calls.push('first:start'); },
+      beforeBuild: () => { calls.push('first:before'); },
+      onFile: (page) => {
+        calls.push(`first:file:${page.title}`);
+        page.html = '<p>Changed</p>';
+      },
+      afterBuild: () => { calls.push('first:after'); },
+      onEnd: () => { calls.push('first:end'); },
+    };
+    const second: Plugin = {
+      onStart: () => { calls.push('second:start'); },
+      beforeBuild: () => { calls.push('second:before'); },
+      onFile: (page) => { calls.push(`second:file:${page.title}`); },
+      afterBuild: () => { calls.push('second:after'); },
+      onEnd: () => { calls.push('second:end'); },
+    };
+
+    await buildSite({ contentDir, outputDir, plugins: [first, second] });
+
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8')).resolves.toContain('<p>Changed</p>');
+    expect(calls).toEqual([
+      'first:start', 'second:start',
+      'first:before', 'second:before',
+      'first:file:post', 'second:file:post',
+      'first:after', 'second:after',
+      'first:end', 'second:end',
+    ]);
+  });
+
+  it('loads TypeScript plugins from the configured ssg config', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'dist');
+    const pluginsDir = path.join(temporaryDirectory, 'plugins');
+    const configFile = path.join(temporaryDirectory, 'ssg.config.ts');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(pluginsDir);
+    await fs.writeFile(path.join(contentDir, 'post.md'), '# Original');
+    await fs.writeFile(path.join(pluginsDir, 'suffix.ts'), `
+      export default {
+        onFile(page: { html: string }): void {
+          page.html += '<p>From config</p>';
+        },
+      };
+    `);
+    await fs.writeFile(configFile, `
+      import suffix from './plugins/suffix';
+      export default { plugins: [suffix] };
+    `);
+
+    await buildSite({ contentDir, outputDir, configFile });
+
+    await expect(fs.readFile(path.join(outputDir, 'post.html'), 'utf8'))
+      .resolves.toContain('<p>From config</p>');
   });
 });

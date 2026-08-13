@@ -53,3 +53,16 @@ layout: base
 ```
 
 Templates receive frontmatter plus `title`, `date`, `tags`, `url`, and the rendered Markdown as `{{{content}}}`. Layouts receive the rendered page as `{{{body}}}`. Files under `partials/` are available by relative name, such as `{{> header}}`.
+
+## Plugins
+
+Add TypeScript plugin modules under `plugins/` and load them from `ssg.config.ts`:
+
+```ts
+import type { Plugin, SsgConfig } from 'ssg';
+import myPlugin from './plugins/my-plugin';
+
+export default { plugins: [myPlugin] } satisfies SsgConfig;
+```
+
+A plugin can implement `onStart(context)`, `beforeBuild(context)`, `onFile(page, context)`, `afterBuild(context)`, and `onEnd(context)`. Hooks run in configuration order. The built-in Markdown plugin runs before configured `onFile` hooks, and the built-in template plugin runs after them.
