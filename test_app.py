@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import patch
 
 import jwt
 import pytest
@@ -93,6 +94,57 @@ def test_update_single_field(client, auth_headers):
     assert response.status_code == 200
     assert response.get_json()["title"] == "Task"
     assert response.get_json()["status"] == "in-progress"
+
+
+def test_completing_task_queues_notification(client, auth_headers):
+    task_id = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth_headers
+    ).get_json()["id"]
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice", "Ship release")
+
+
+def test_notification_only_queued_on_transition_to_completed(client, auth_headers):
+    task_id = client.post(
+        "/tasks", json={"title": "Finished task"}, headers=auth_headers
+    ).get_json()["id"]
+    client.put(
+        f"/tasks/{task_id}", json={"status": "completed"}, headers=auth_headers
+    )
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"title": "Renamed task", "status": "completed"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    delay.assert_not_called()
+
+
+def test_non_completed_status_does_not_queue_notification(client, auth_headers):
+    task_id = client.post(
+        "/tasks", json={"title": "Ongoing task"}, headers=auth_headers
+    ).get_json()["id"]
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task_id}",
+            json={"status": "in-progress"},
+            headers=auth_headers,
+        )
+
+    assert response.status_code == 200
+    delay.assert_not_called()
 
 
 @pytest.mark.parametrize("method", ["get", "put"])
