@@ -26,3 +26,10 @@ Tracks the P0 fixes from `2026-08-13_architecture-hardening-review.md` (Phase 1:
 
 - P0-4 (strategy absolute $ thresholds), P0-8…P0-12, P1, P2 — per the review's phases 2–5.
 - Note: story pass rates remain ~100% because the tests are **agent-authored** (the review's "binary correctness" limitation). Honest *independent* pass/fail requires `scripts/validate_session.py` re-runs — deferred.
+
+## Phase 2 — P0-4 strategy thresholds (done 2026-08-13)
+
+`classify_strategy` no longer uses absolute USD thresholds. Replaced `cost >= 0.01` / `cost <= 0.003` / `cost >= 0.005` with behavioral signals (`thinking_ratio`, correctness, escape, novelty), so the archetype is invariant under uniform price rescaling and unbiased across providers. The `strategy_score` cost-penalty term was removed for the same reason.
+
+- `tests/test_strategy.py` — locks in: expected archetypes, price-rescale invariance, and "cheap model can be wasteful / expensive model can be efficient".
+- **Deferred:** existing `analysis/*.json` store the pre-fix strategy labels; re-running `analyze_stories.py` will propagate the corrected classification into `data.js`.

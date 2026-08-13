@@ -102,10 +102,10 @@ def classify_strategy(
 ) -> StrategyReport:
     """Classify the model's strategy from multi-dimensional metrics.
 
-    The classification logic:
+    The classification logic (behavioral only — cost is reported, not classified):
 
-    1. If correction is low AND cost is high → WASTEFUL
-    2. If correctness is high AND cost is low AND escape is low → EFFICIENT
+    1. If correctness is low AND reasoning is heavy → WASTEFUL
+    2. If correctness is high AND reasoning is lean → EFFICIENT
     3. If correctness is high AND escape is high AND novelty is high → EXPLORATORY
     4. Otherwise → CONSERVATIVE (reliably correct, standard approach)
 
@@ -133,13 +133,16 @@ def classify_strategy(
     thinking_ratio = efficiency.thinking_ratio
     energy = efficiency.total_energy_j
 
-    # Detection signals
+    # Detection signals — behavioral only. Cost is a provider-price artifact and
+    # is reported in the verdict text, but never used to classify strategy, so
+    # the archetype is invariant under uniform price rescaling and unbiased
+    # across providers. (P0-4: absolute USD thresholds had biased Claude as
+    # "expensive" and DeepSeek as "efficient" purely by price, not behavior.)
     is_correct = correctness >= 0.7
     is_novel = novelty >= 0.4
     is_escaped = escape >= 0.5
-    is_expensive = thinking_ratio >= 0.6 or cost >= 0.01
-    is_efficient = thinking_ratio <= 0.3 and cost <= 0.003
-    is_wasteful = correctness <= 0.3 and cost >= 0.005
+    is_reasoning_lean = thinking_ratio <= 0.3
+    is_wasteful = correctness <= 0.3 and thinking_ratio >= 0.4
 
     # Classification
     if is_wasteful:
@@ -161,7 +164,7 @@ def classify_strategy(
         )
         r.recommendation = "Promote this operator. The perturbation succeeded."
         r.exploration_premium = novelty * correctness / max(cost, 0.0001)
-    elif is_correct and is_efficient:
+    elif is_correct and is_reasoning_lean:
         r.strategy = StrategyType.EFFICIENT
         r.verdict = (
             f"EFFICIENT — model solved correctly ({correctness:.0%}) "
@@ -180,13 +183,15 @@ def classify_strategy(
         )
         r.recommendation = "Reliable but not novel. Good for production, not for exploration."
 
-    # Composite strategic score
+    # Composite strategic score — behavioral dimensions only. The absolute-USD
+    # cost penalty (min(cost*100, 1.0), effectively capping at $0.01) was
+    # removed: it biased the score against expensive providers. Cost is reported
+    # in the verdict, not scored here.
     r.strategy_score = (
         0.35 * correctness
         + 0.15 * novelty
-        + 0.20 * (1.0 - min(thinking_ratio, 1.0))  # penalize excessive thinking
-        + 0.15 * (1.0 - min(cost * 100, 1.0))        # penalize high cost
-        + 0.15 * (1.0 if is_correct else 0.0)
+        + 0.30 * (1.0 - min(thinking_ratio, 1.0))  # penalize excessive thinking
+        + 0.20 * (1.0 if is_correct else 0.0)
     )
 
     return r

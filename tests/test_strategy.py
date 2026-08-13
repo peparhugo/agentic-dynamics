@@ -1,0 +1,64 @@
+"""Tests for strategy classification — P0-4 price-rescaling invariance.
+
+The strategy archetype must reflect *behavior*, not provider price. These tests
+lock in that classification is invariant under a uniform price rescale and that
+no model is "expensive" or "efficient" purely by its price tier.
+"""
+
+from instrument.basin import BasinMetrics
+from instrument.solution import SolutionMetrics
+from instrument.efficiency import EfficiencyMetrics
+from instrument.strategy import classify_strategy, StrategyType
+
+
+def _classify(correctness, novelty, escape, thinking_ratio, cost) -> StrategyType:
+    basin = BasinMetrics(
+        escape_score=escape,
+        novelty_score=novelty,
+        model="test/model",
+        perturbation_operator="inject_false_premise",
+        run_id="r1",
+    )
+    solution = SolutionMetrics(
+        correctness_score=correctness,
+        novelty_score=novelty,
+        composite_score=correctness,
+    )
+    efficiency = EfficiencyMetrics(
+        total_cost_usd=cost,
+        thinking_ratio=thinking_ratio,
+        total_energy_j=1000.0,
+        total_tokens=1000,
+    )
+    return classify_strategy(basin, solution, efficiency, "specification_corruption").strategy
+
+
+# (correctness, novelty, escape, thinking_ratio) → expected archetype
+CASES = [
+    (0.9, 0.6, 0.7, 0.2, StrategyType.EXPLORATORY),   # correct + novel + escaped
+    (0.9, 0.2, 0.2, 0.1, StrategyType.EFFICIENT),     # correct + reasoning-lean
+    (0.2, 0.1, 0.1, 0.5, StrategyType.WASTEFUL),      # wrong + reasoning-heavy
+    (0.9, 0.2, 0.2, 0.5, StrategyType.CONSERVATIVE),  # correct, moderate reasoning
+]
+
+
+def test_classification_matches_expected_archetype():
+    for correctness, novelty, escape, thinking, expected in CASES:
+        assert _classify(correctness, novelty, escape, thinking, cost=0.005) == expected
+
+
+def test_classification_invariant_under_price_rescale():
+    for correctness, novelty, escape, thinking, _ in CASES:
+        cheap = _classify(correctness, novelty, escape, thinking, cost=0.0001)
+        pricey = _classify(correctness, novelty, escape, thinking, cost=10.0)
+        assert cheap == pricey, (
+            f"classification changed under price rescale ({cheap} vs {pricey}) "
+            f"for correctness={correctness} thinking={thinking}"
+        )
+
+
+def test_cheap_model_can_be_wasteful_and_expensive_model_can_be_efficient():
+    # A cheap run with heavy, failed reasoning must still classify WASTEFUL.
+    assert _classify(0.2, 0.1, 0.1, 0.8, cost=0.0001) == StrategyType.WASTEFUL
+    # An expensive run with lean, correct reasoning must still classify EFFICIENT.
+    assert _classify(0.9, 0.2, 0.2, 0.1, cost=100.0) == StrategyType.EFFICIENT
