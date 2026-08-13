@@ -9,6 +9,8 @@ import jwt
 from flask import Flask, request, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
+from notifications import send_notification_email
+
 TOKEN_TTL_SECONDS = int(os.environ.get("TOKEN_TTL_SECONDS", "3600"))
 
 
@@ -25,10 +27,16 @@ def init_db(database: str) -> None:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL
+            password_hash TEXT NOT NULL,
+            email TEXT NOT NULL DEFAULT ''
         )
         """
     )
+    # Migration: pre-existing databases created before email was added
+    # won't have the column yet, so add it without touching existing rows.
+    user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    if "email" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''")
     conn.execute(
         """
         CREATE TABLE IF NOT EXISTS tasks (
@@ -114,11 +122,15 @@ def create_app(database: str = "tasks.db") -> Flask:
         data = request.get_json(silent=True) or {}
         username = data.get("username")
         password = data.get("password")
+        email = data.get("email")
         if not isinstance(username, str) or not username.strip():
             return jsonify({"error": "username is required"}), 400
         if not isinstance(password, str) or not password:
             return jsonify({"error": "password is required"}), 400
+        if email is not None and not isinstance(email, str):
+            return jsonify({"error": "email must be a string"}), 400
         username = username.strip()
+        email = email.strip() if isinstance(email, str) and email.strip() else f"{username}@example.com"
 
         conn = db()
         try:
@@ -130,14 +142,14 @@ def create_app(database: str = "tasks.db") -> Flask:
 
             password_hash = generate_password_hash(password)
             cur = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             user_id = cur.lastrowid
         finally:
             conn.close()
-        return jsonify({"id": user_id, "username": username}), 201
+        return jsonify({"id": user_id, "username": username, "email": email}), 201
 
     @app.route("/auth/login", methods=["POST"])
     def login():
@@ -231,6 +243,7 @@ def create_app(database: str = "tasks.db") -> Flask:
 
             title = row["title"]
             status = row["status"]
+            previous_status = row["status"]
 
             if "title" in data:
                 new_title = data.get("title")
@@ -254,6 +267,14 @@ def create_app(database: str = "tasks.db") -> Flask:
             ).fetchone()
         finally:
             conn.close()
+
+        just_completed = status == "completed" and previous_status != "completed"
+        if just_completed:
+            try:
+                send_notification_email.delay(user["email"], row["title"])
+            except Exception:
+                app.logger.exception("failed to enqueue completion notification email")
+
         return jsonify(dict(row))
 
     return app

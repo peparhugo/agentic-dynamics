@@ -1,6 +1,7 @@
 import pytest
 
 from taskapp import create_app
+from notifications import send_notification_email
 
 
 @pytest.fixture
@@ -270,6 +271,82 @@ class TestTaskOwnership:
             f"/tasks/{alice_task['id']}", json={"title": "Hacked"}, headers=bob_headers
         )
         assert resp.status_code == 404
+
+
+class TestNotificationTrigger:
+    def test_notification_sent_when_status_changes_to_completed(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        headers = auth_headers(client, "alice", "password123")
+        created = create(client, "Finish report", headers=headers).get_json()
+
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+
+        assert resp.status_code == 200
+        mock_delay.assert_called_once_with("alice@example.com", "Finish report")
+
+    def test_notification_uses_registered_email(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        client.post(
+            "/auth/register",
+            json={"username": "carol", "password": "password123", "email": "carol@work.com"},
+        )
+        token = login(client, "carol", "password123").get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+        created = create(client, "Ship feature", headers=headers).get_json()
+
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+        mock_delay.assert_called_once_with("carol@work.com", "Ship feature")
+
+    def test_notification_not_sent_for_non_completed_status(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        headers = auth_headers(client)
+        created = create(client, "Task", headers=headers).get_json()
+
+        client.put(f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=headers)
+
+        mock_delay.assert_not_called()
+
+    def test_notification_not_sent_on_title_only_update(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        headers = auth_headers(client)
+        created = create(client, "Task", headers=headers).get_json()
+
+        client.put(f"/tasks/{created['id']}", json={"title": "New title"}, headers=headers)
+
+        mock_delay.assert_not_called()
+
+    def test_notification_not_sent_when_task_created(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        headers = auth_headers(client)
+
+        create(client, "Task", headers=headers)
+
+        mock_delay.assert_not_called()
+
+    def test_notification_not_resent_when_already_completed(self, client, mocker):
+        mock_delay = mocker.patch.object(send_notification_email, "delay")
+        headers = auth_headers(client)
+        created = create(client, "Task", headers=headers).get_json()
+
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+
+        mock_delay.assert_called_once_with("alice@example.com", "Task")
+
+    def test_notification_failure_does_not_break_response(self, client, mocker):
+        mocker.patch.object(send_notification_email, "delay", side_effect=RuntimeError("broker down"))
+        headers = auth_headers(client)
+        created = create(client, "Task", headers=headers).get_json()
+
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers
+        )
+
+        assert resp.status_code == 200
+        assert resp.get_json()["status"] == "completed"
 
 
 class TestErrorFormat:
