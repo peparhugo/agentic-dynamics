@@ -34,3 +34,18 @@ npx ssg serve --port 4000
 ```
 
 The development server watches the content and template directories, rebuilds when files change, and reloads connected browsers after a successful build. It accepts the same `--content`, `--output`, and `--templates` options as `build`.
+
+## Plugins
+
+Add TypeScript plugins in `./plugins` and load them from `ssg.config.ts`:
+
+```ts
+import type { SsgConfig } from 'ssg';
+import example from './plugins/example';
+
+export default {
+  plugins: [example],
+} satisfies SsgConfig;
+```
+
+A plugin can implement `onStart`, `beforeBuild`, `onFile`, `afterBuild`, and `onEnd`. Each lifecycle hook runs in plugin order. `onFile(page, context)` can update a parsed page before it is rendered. Markdown parsing, Handlebars rendering, and the development server use the same plugin lifecycle internally.

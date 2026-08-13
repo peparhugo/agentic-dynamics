@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src';
+import { buildSite, createEngine, type Plugin } from '../src';
 
 describe('buildSite', () => {
   let root: string;
@@ -150,5 +150,50 @@ Page body.
 
     await fs.writeFile(path.join(templates, 'absent.hbs'), '{{> unknown}}');
     await expect(buildSite({ content, output, templates })).rejects.toThrow('partial unknown');
+  });
+
+  it('runs plugin lifecycle hooks in order and allows page transforms', async () => {
+    await fs.writeFile(path.join(content, 'post.md'), '# Body');
+    const calls: string[] = [];
+    const plugin = (name: string): Plugin => ({
+      name,
+      onStart: () => { calls.push(`${name}:start`); },
+      beforeBuild: () => { calls.push(`${name}:before`); },
+      onFile: (page) => { calls.push(`${name}:file`); page.title += name; },
+      afterBuild: () => { calls.push(`${name}:after`); },
+      onEnd: () => { calls.push(`${name}:end`); },
+    });
+
+    const engine = await createEngine({ content, output, config: false, plugins: [plugin('A'), plugin('B')] });
+    await engine.start();
+    const pages = await engine.build();
+    await engine.end();
+
+    expect(pages[0].title).toBe('postAB');
+    expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toContain('<title>postAB</title>');
+    expect(calls).toEqual([
+      'A:start', 'B:start', 'A:before', 'B:before', 'A:file', 'B:file',
+      'A:after', 'B:after', 'A:end', 'B:end',
+    ]);
+  });
+
+  it('loads TypeScript plugins from ssg.config.ts', async () => {
+    const plugins = path.join(root, 'plugins');
+    await fs.mkdir(plugins);
+    await fs.writeFile(path.join(content, 'post.md'), 'Body');
+    await fs.writeFile(path.join(plugins, 'title.ts'), `
+      import type { Plugin } from '${path.resolve(__dirname, '../src').replaceAll('\\', '\\\\')}';
+      const plugin: Plugin = { onFile(page) { page.title = 'Configured'; } };
+      export default plugin;
+    `);
+    await fs.writeFile(path.join(root, 'ssg.config.ts'), `
+      import title from './plugins/title';
+      export default { plugins: [title] };
+    `);
+
+    const pages = await buildSite({ content, output, config: path.join(root, 'ssg.config.ts') });
+
+    expect(pages[0].title).toBe('Configured');
+    expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toContain('<title>Configured</title>');
   });
 });
