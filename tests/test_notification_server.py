@@ -232,6 +232,69 @@ async def test_messages_endpoint_persists_message_history(tmp_path):
     }
 
 
+async def test_history_returns_channel_messages_in_chronological_pages(tmp_path):
+    server = NotificationServer(database_url=f"sqlite:///{tmp_path / 'history.db'}")
+    async with serve(
+        server.websocket_handler,
+        "127.0.0.1",
+        0,
+        process_request=server.health_response,
+    ) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            await websocket.send(json.dumps({
+                "type": "subscribe",
+                "channel": "alerts",
+                "payload": {},
+                "timestamp": "2026-01-01T00:00:00+00:00",
+            }))
+            await asyncio.sleep(0)
+            for timestamp, text in [
+                ("2026-01-01T00:00:02+00:00", "second"),
+                ("2026-01-01T00:00:01+00:00", "first"),
+                ("2026-01-01T00:00:03+00:00", "third"),
+            ]:
+                await websocket.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": text}, "timestamp": timestamp}))
+                assert (await receive_json(websocket))["payload"]["text"] == text
+
+        status, first_page = await get_json(port, "/history?channel=alerts&since=2026-01-01T00:00:00%2B00:00&limit=2")
+        _, second_page = await get_json(port, "/history?channel=alerts&since=2026-01-01T00:00:00%2B00:00&limit=2&offset=2")
+
+    await server.close()
+    assert b"200 OK" in status
+    assert [message["payload"]["text"] for message in first_page["messages"]] == ["first", "second"]
+    assert first_page["has_more"] is True
+    assert [message["payload"]["text"] for message in second_page["messages"]] == ["third"]
+    assert second_page["has_more"] is False
+
+
+async def test_rate_limit_uses_redis_counter_per_client(monkeypatch, tmp_path):
+    redis_server = fakeredis.aioredis.FakeServer()
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    monkeypatch.setattr(
+        app.redis_async,
+        "from_url",
+        lambda *args, **kwargs: fakeredis.aioredis.FakeRedis(server=redis_server, decode_responses=True),
+    )
+    server = NotificationServer("redis://broker", f"sqlite:///{tmp_path / 'rate-limit.db'}")
+    async with serve(server.websocket_handler, "127.0.0.1", 0) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            message = {"type": "broadcast", "payload": {}, "timestamp": "2026-01-01T00:00:00+00:00"}
+            await websocket.send(json.dumps(message))
+            assert await receive_json(websocket) == message
+            await websocket.send(json.dumps(message))
+            assert await receive_json(websocket) == message
+            await websocket.send(json.dumps(message))
+            response = await receive_json(websocket)
+
+    await server.close()
+    assert response["type"] == "system"
+    assert response["payload"] == {"error": "rate limit exceeded"}
+
+
 async def test_redis_pubsub_delivers_between_server_instances(monkeypatch, tmp_path):
     redis_server = fakeredis.aioredis.FakeServer()
     monkeypatch.setattr(
