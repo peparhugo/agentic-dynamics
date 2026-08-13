@@ -1,7 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { get } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildSite } from '../src/site';
+import { startDevelopmentServer } from '../src/server';
 
 describe('buildSite', () => {
   let workspace: string;
@@ -89,5 +91,40 @@ describe('buildSite', () => {
     writeFileSync(join(content, 'missing.md'), '---\ntemplate: missing\n---\nContent');
 
     expect(() => buildSite({ contentDir: content, outputDir: join(workspace, 'public') })).toThrow('Template does not exist: missing');
+  });
+});
+
+describe('startDevelopmentServer', () => {
+  let workspace: string;
+  let server: ReturnType<typeof startDevelopmentServer>;
+
+  beforeEach(() => {
+    workspace = mkdtempSync(join(tmpdir(), 'ssg-server-test-'));
+    const content = join(workspace, 'content');
+    mkdirSync(content);
+    writeFileSync(join(content, 'welcome.md'), '---\ntitle: Welcome\n---\nHello');
+    server = startDevelopmentServer({ contentDir: content, outputDir: join(workspace, 'dist'), port: 0 });
+  });
+
+  afterEach(async () => {
+    await server.close();
+    rmSync(workspace, { recursive: true, force: true });
+  });
+
+  it('serves generated pages with the live reload script', async () => {
+    await new Promise<void>((resolve) => server.server.once('listening', resolve));
+    const address = server.server.address();
+    if (!address || typeof address === 'string') throw new Error('Server did not bind to a TCP port');
+    const html = await new Promise<string>((resolve, reject) => {
+      get(`http://localhost:${address.port}/welcome.html`, (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => { body += chunk; });
+        response.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+
+    expect(html).toContain('new WebSocket');
+    expect(html).toContain('/__ssg_reload');
   });
 });
