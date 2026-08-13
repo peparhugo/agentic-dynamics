@@ -1,6 +1,7 @@
 import asyncio
 import json
 
+import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from websockets.asyncio.client import connect
@@ -117,3 +118,48 @@ async def test_unsubscribe_stops_channel_delivery(notification_server):
         await second.send(json.dumps({"type": "broadcast", "payload": {}, "channel": "system"}))
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(first.recv(), timeout=0.05)
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_persists_and_paginates_messages(notification_server):
+    _, url = notification_server
+    async with connect(url) as client:
+        await receive_json(client)
+        await client.send(json.dumps({"type": "broadcast", "payload": {"number": 1}}))
+        await receive_json(client)
+        await client.send(json.dumps({"type": "broadcast", "payload": {"number": 2}, "channel": "alerts"}))
+
+        response = await get_json(url, "/messages?limit=1&offset=0")
+        messages = json.loads(response.split(b"\r\n\r\n", 1)[1])
+        assert messages[0]["type"] == "broadcast"
+        assert messages[0]["channel"] == "alerts"
+        assert messages[0]["payload"] == {"number": 2}
+
+        response = await get_json(url, "/messages?limit=1&offset=1")
+        messages = json.loads(response.split(b"\r\n\r\n", 1)[1])
+        assert messages[0]["channel"] is None
+        assert messages[0]["payload"] == {"number": 1}
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances_and_stores_client_state():
+    fake_server = fakeredis.aioredis.FakeServer()
+    first_app = NotificationServer(redis_client=fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True))
+    second_redis = fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True)
+    second_app = NotificationServer(redis_client=second_redis)
+    async with serve(first_app.handler, "127.0.0.1", 0, process_request=first_app.process_request) as first_server:
+        async with serve(second_app.handler, "127.0.0.1", 0, process_request=second_app.process_request) as second_server:
+            first_url = f"ws://127.0.0.1:{first_server.sockets[0].getsockname()[1]}"
+            second_url = f"ws://127.0.0.1:{second_server.sockets[0].getsockname()[1]}"
+            async with connect(first_url) as publisher, connect(second_url) as subscriber:
+                await receive_json(publisher)
+                welcome = await receive_json(subscriber)
+                client_id = welcome["payload"]["client_id"]
+                assert await second_redis.hexists("notifications:clients", client_id)
+
+                await subscriber.send(json.dumps({"type": "subscribe", "payload": {}, "channel": "alerts"}))
+                await asyncio.sleep(0)
+                await publisher.send(json.dumps({"type": "broadcast", "payload": {"text": "shared"}, "channel": "alerts"}))
+                message = await asyncio.wait_for(receive_json(subscriber), timeout=1)
+                assert message["payload"] == {"text": "shared"}
+                assert message["channel"] == "alerts"
