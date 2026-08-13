@@ -7,13 +7,18 @@ import hashlib
 import hmac
 import json
 import os
-import sqlite3
 from xml.etree import ElementTree as ET
 
 from flask import Flask, Response, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import (
+    BaseRepository,
+    RepositoryConflict,
+    TaskRepository,
+    UserRepository,
+)
 
 
 SOAP_ENV = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -31,40 +36,19 @@ app.config.update(
 
 
 def get_db():
-    connection = sqlite3.connect(DATABASE)
-    connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA foreign_keys = ON")
-    return connection
+    return BaseRepository.open_database(DATABASE)
 
 
 def init_db():
-    """Create the schema and migrate databases made by earlier versions."""
-    with get_db() as connection:
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "username TEXT NOT NULL UNIQUE, "
-            "password_hash TEXT NOT NULL)"
-        )
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
-            "title TEXT NOT NULL, "
-            "status TEXT NOT NULL DEFAULT 'pending', "
-            "created_at TEXT NOT NULL, "
-            "owner_id INTEGER REFERENCES users(id))"
-        )
-        columns = {
-            row["name"] for row in connection.execute("PRAGMA table_info(tasks)")
-        }
-        if "owner_id" not in columns:
-            # Nullable ownership preserves legacy rows without exposing them to users.
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)"
-        )
+    BaseRepository.initialize_database(get_db)
+
+
+def task_repository() -> TaskRepository:
+    return TaskRepository(get_db)
+
+
+def user_repository() -> UserRepository:
+    return UserRepository(get_db)
 
 
 def _b64encode(value: bytes) -> str:
@@ -130,13 +114,10 @@ def require_auth(view):
         user_id = decode_token(token) if scheme.lower() == "bearer" and token else None
         if user_id is None:
             return _unauthorized()
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT id, username FROM users WHERE id = ?", (user_id,)
-            ).fetchone()
+        user = user_repository().get_identity(user_id)
         if user is None:
             return _unauthorized()
-        g.user = dict(user)
+        g.user = user
         return view(*args, **kwargs)
 
     return wrapped
@@ -144,37 +125,15 @@ def require_auth(view):
 
 def create_task(title: str, owner_id: int) -> dict:
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) "
-            "VALUES (?, 'pending', ?, ?)",
-            (title, created_at, owner_id),
-        )
-        task_id = cursor.lastrowid
-    return {
-        "id": task_id,
-        "title": title,
-        "status": "pending",
-        "created_at": created_at,
-        "owner_id": owner_id,
-    }
+    return task_repository().create_for_owner(title, owner_id, created_at)
 
 
 def get_tasks(owner_id: int) -> list[dict]:
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (owner_id,),
-        ).fetchall()
-    return [dict(row) for row in rows]
+    return task_repository().list_for_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as connection:
-        row = connection.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-    return dict(row) if row else None
+    return task_repository().get_for_owner(task_id, owner_id)
 
 
 def update_task(
@@ -183,24 +142,7 @@ def update_task(
     title: str | None = None,
     status: str | None = None,
 ) -> dict | None:
-    if get_task(task_id, owner_id) is None:
-        return None
-
-    updates = []
-    values = []
-    if title is not None:
-        updates.append("title = ?")
-        values.append(title)
-    if status is not None:
-        updates.append("status = ?")
-        values.append(status)
-    if updates:
-        with get_db() as connection:
-            connection.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-                (*values, task_id, owner_id),
-            )
-    return get_task(task_id, owner_id)
+    return task_repository().update_for_owner(task_id, owner_id, title, status)
 
 
 @app.post("/auth/register")
@@ -214,15 +156,12 @@ def register():
         return jsonify(error="password is required"), 400
     username = username.strip()
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(password)),
-            )
-            user_id = cursor.lastrowid
-    except sqlite3.IntegrityError:
+        user = user_repository().create_user(
+            username, generate_password_hash(password)
+        )
+    except RepositoryConflict:
         return jsonify(error="username already exists"), 409
-    return jsonify(id=user_id, username=username), 201
+    return jsonify(id=user["id"], username=username), 201
 
 
 @app.post("/auth/login")
@@ -232,10 +171,7 @@ def login():
     password = data.get("password")
     if not isinstance(username, str) or not isinstance(password, str):
         return jsonify(error="invalid username or password"), 401
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT * FROM users WHERE username = ?", (username.strip(),)
-        ).fetchone()
+    user = user_repository().get_by_username(username.strip())
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify(error="invalid username or password"), 401
     return jsonify(token=create_token(user["id"]))
