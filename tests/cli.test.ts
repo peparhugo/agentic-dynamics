@@ -23,10 +23,12 @@ describe('CLI', () => {
   });
 
   test('rejects unsupported commands and invalid options', async () => {
-    await expect(run([])).rejects.toThrow('Usage: ssg build');
-    await expect(run(['serve'])).rejects.toThrow('Usage: ssg build');
+    await expect(run([])).rejects.toThrow('Usage: ssg <build|serve>');
+    await expect(run(['deploy'])).rejects.toThrow('Usage: ssg <build|serve>');
     await expect(run(['build', '--content'])).rejects.toThrow('Missing value for --content');
     await expect(run(['build', '--port', '80'])).rejects.toThrow('Unknown option: --port');
+    await expect(run(['serve', '--port', '0'])).rejects.toThrow('Invalid port: 0');
+    await expect(run(['serve', '--port', 'abc'])).rejects.toThrow('Invalid port: abc');
   });
 
   test('accepts a custom templates directory', async () => {
