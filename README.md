@@ -4,6 +4,9 @@ An asyncio notification server using `websockets`, with Redis pub/sub as its
 cross-instance message backbone and SQLite message history. Connected clients
 and channel subscriptions are tracked in Redis.
 
+WebSocket is the default pluggable transport and can be selected explicitly
+with `TRANSPORT=websocket`.
+
 ```bash
 python -m pip install -r requirements.txt
 REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=sqlite:///data/messages.db \
