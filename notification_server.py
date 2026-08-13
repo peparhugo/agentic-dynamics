@@ -33,7 +33,14 @@ can be routed to the right instance even when the target client is not
 connected locally.
 
 All broadcast/direct messages are additionally persisted to SQLite for
-history, retrievable via GET /messages?limit=&offset=.
+history, retrievable via GET /messages?limit=&offset= (most recent first)
+or GET /history?channel=&since=&limit= (chronological, paginated per
+channel). Messages older than MESSAGE_TTL_DAYS are purged periodically by a
+background task started alongside the server.
+
+Each incoming client message is rate limited per client ID (RATE_LIMIT
+messages per rolling 60s window, backed by a Redis counter); messages over
+the limit are rejected with a system error rather than silently dropped.
 """
 
 from __future__ import annotations
@@ -46,9 +53,10 @@ import os
 import re
 import sqlite3
 import threading
+import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any, Optional
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -65,6 +73,10 @@ CHANNEL_SUBSCRIBERS_PATH = re.compile(r"^/channels/([^/]+)/subscribers$")
 DEFAULT_REDIS_URL = "redis://localhost:6379/0"
 DEFAULT_DATABASE_URL = "notifications.db"
 DEFAULT_TRANSPORT = "websocket"
+DEFAULT_RATE_LIMIT = 100
+RATE_LIMIT_WINDOW_SECONDS = 60
+DEFAULT_MESSAGE_TTL_DAYS = 7
+MESSAGE_CLEANUP_INTERVAL_SECONDS = 3600
 
 # Redis key/channel naming.
 REDIS_GLOBAL_CHANNEL = "notify:global"
@@ -245,6 +257,31 @@ class RedisConnectionState:
         await self.redis.delete(instance_key)
 
 
+def rate_limit_key(client_id: str, window: int) -> str:
+    return f"notify:ratelimit:{client_id}:{window}"
+
+
+class RateLimiter:
+    """Per-client-ID rate limiter backed by a Redis fixed-window counter.
+
+    Each client gets a counter keyed by (client_id, current 60s window); the
+    key expires on its own once the window passes, so no separate cleanup is
+    needed.
+    """
+
+    def __init__(self, redis_client: "aioredis.Redis", limit: int):
+        self.redis = redis_client
+        self.limit = limit
+
+    async def allow(self, client_id: str) -> bool:
+        window = int(time.time() // RATE_LIMIT_WINDOW_SECONDS)
+        key = rate_limit_key(client_id, window)
+        count = await self.redis.incr(key)
+        if count == 1:
+            await self.redis.expire(key, RATE_LIMIT_WINDOW_SECONDS)
+        return count <= self.limit
+
+
 @dataclass
 class MessageStore:
     """SQLite-backed history of persisted (broadcast/direct) messages."""
@@ -295,6 +332,47 @@ class MessageStore:
             }
             for row in rows
         ]
+
+    def fetch_by_channel(self, channel: str, since: Optional[str], limit: int) -> tuple:
+        """Return (messages, has_more) for `channel`, oldest first. When
+        `since` is given, only messages strictly newer than that ISO
+        timestamp are included, so passing the last returned message's
+        timestamp as `since` fetches the next page."""
+        with self._lock:
+            if since:
+                rows = self._conn.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "WHERE channel = ? AND timestamp > ? "
+                    "ORDER BY timestamp ASC, id ASC LIMIT ?",
+                    (channel, since, limit + 1),
+                ).fetchall()
+            else:
+                rows = self._conn.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "WHERE channel = ? ORDER BY timestamp ASC, id ASC LIMIT ?",
+                    (channel, limit + 1),
+                ).fetchall()
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        messages = [
+            {
+                "id": row[0],
+                "channel": row[1],
+                "type": row[2],
+                "payload": json.loads(row[3]),
+                "timestamp": row[4],
+            }
+            for row in rows
+        ]
+        return messages, has_more
+
+    def purge_older_than(self, cutoff_iso: str) -> int:
+        with self._lock:
+            cursor = self._conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (cutoff_iso,)
+            )
+            self._conn.commit()
+            return cursor.rowcount
 
     def close(self) -> None:
         with self._lock:
@@ -437,6 +515,8 @@ class NotificationServer:
         database_url: Optional[str] = None,
         redis_client: Optional["aioredis.Redis"] = None,
         transport: Optional[BaseTransport] = None,
+        rate_limit: Optional[int] = None,
+        message_ttl_days: Optional[float] = None,
     ):
         self.host = host
         self.port = port
@@ -452,6 +532,19 @@ class NotificationServer:
         self.database_url = database_url or os.environ.get("DATABASE_URL", DEFAULT_DATABASE_URL)
         self.messages = MessageStore(self.database_url)
 
+        self.rate_limit = (
+            rate_limit
+            if rate_limit is not None
+            else int(os.environ.get("RATE_LIMIT", DEFAULT_RATE_LIMIT))
+        )
+        self.rate_limiter = RateLimiter(self.redis, self.rate_limit)
+
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else float(os.environ.get("MESSAGE_TTL_DAYS", DEFAULT_MESSAGE_TTL_DAYS))
+        )
+
         self.transport = transport or create_transport(self, self.host, self.port)
 
         self._pubsub: Optional["aioredis.client.PubSub"] = None
@@ -459,6 +552,7 @@ class NotificationServer:
         self._worker_ready: Optional[asyncio.Event] = None
         self._sub_commands: asyncio.Queue = asyncio.Queue()
         self._active_redis_channels: set = set()
+        self._cleanup_task: Optional[asyncio.Task] = None
 
     @property
     def registry(self):
@@ -595,6 +689,20 @@ class NotificationServer:
     ) -> None:
         await asyncio.to_thread(self.messages.save, channel, msg_type, payload, timestamp)
 
+    async def _cleanup_expired_messages(self) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=self.message_ttl_days)).isoformat()
+        return await asyncio.to_thread(self.messages.purge_older_than, cutoff)
+
+    async def _expiry_worker(self) -> None:
+        """Background task: purges messages older than MESSAGE_TTL_DAYS,
+        starting immediately on server startup and then on a fixed interval."""
+        try:
+            while True:
+                await self._cleanup_expired_messages()
+                await asyncio.sleep(MESSAGE_CLEANUP_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            pass
+
     # ── Dispatch ──────────────────────────────────────────────────────
 
     async def _dispatch(self, client_id: str, message: dict) -> None:
@@ -677,6 +785,16 @@ class NotificationServer:
         )
 
     async def handle_client_message(self, client_id: str, raw: str) -> None:
+        allowed = await self.rate_limiter.allow(client_id)
+        if not allowed:
+            await self.send_to(
+                client_id,
+                make_message(
+                    "system",
+                    {"error": f"rate limit exceeded: max {self.rate_limit} messages per minute"},
+                ),
+            )
+            return
         try:
             message = parse_message(raw)
         except ProtocolError as exc:
@@ -728,6 +846,31 @@ class NotificationServer:
             headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
             return HTTPStatus.OK, headers, body
 
+        if route == "/history":
+            channel = query.get("channel", [None])[0]
+            if not channel:
+                body = json.dumps({"error": "channel is required"}).encode()
+                headers = [
+                    ("Content-Type", "application/json"),
+                    ("Content-Length", str(len(body))),
+                ]
+                return HTTPStatus.BAD_REQUEST, headers, body
+            since = query.get("since", [None])[0]
+            limit = _parse_int(query.get("limit", [None])[0], default=50, minimum=1, maximum=500)
+            messages, has_more = await asyncio.to_thread(
+                self.messages.fetch_by_channel, channel, since, limit
+            )
+            body = json.dumps(
+                {
+                    "messages": messages,
+                    "channel": channel,
+                    "limit": limit,
+                    "has_more": has_more,
+                }
+            ).encode()
+            headers = [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]
+            return HTTPStatus.OK, headers, body
+
         match = CHANNEL_SUBSCRIBERS_PATH.match(route)
         if match:
             channel = unquote(match.group(1))
@@ -743,6 +886,7 @@ class NotificationServer:
         self._worker_task = asyncio.create_task(self._redis_worker())
         await self._worker_ready.wait()
         await self.transport.start()
+        self._cleanup_task = asyncio.create_task(self._expiry_worker())
         return self.transport
 
     async def stop(self) -> None:
@@ -752,6 +896,11 @@ class NotificationServer:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._worker_task
             self._worker_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._cleanup_task
+            self._cleanup_task = None
         await self.state.clear_instance()
         if self._owns_redis:
             await self.redis.close()

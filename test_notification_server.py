@@ -2,12 +2,14 @@ import asyncio
 import http.client
 import json
 import socket
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import fakeredis
 import pytest
 import websockets
 
-from notification_server import NotificationServer, make_message
+from notification_server import NotificationServer, make_message, utc_now_iso
 
 
 def free_port() -> int:
@@ -764,6 +766,255 @@ async def test_direct_message_routes_to_client_on_another_instance():
     finally:
         await srv1.stop()
         await srv2.stop()
+
+
+# ── Rate limiting ────────────────────────────────────────────────────
+
+
+async def test_messages_within_limit_are_all_processed():
+    srv = make_server(rate_limit=5)
+    await srv.start()
+    try:
+        ws = await connect(srv)
+        try:
+            await recv_json(ws)  # welcome
+            for i in range(4):
+                await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+                got = await recv_json(ws)
+                assert got["type"] == "broadcast"
+                assert got["payload"] == {"n": i}
+        finally:
+            await ws.close()
+    finally:
+        await srv.stop()
+
+
+async def test_messages_over_limit_get_rate_limit_error_not_dropped():
+    srv = make_server(rate_limit=3)
+    await srv.start()
+    try:
+        ws = await connect(srv)
+        try:
+            await recv_json(ws)  # welcome
+
+            for i in range(3):
+                await ws.send(json.dumps({"type": "broadcast", "payload": {"n": i}}))
+                await recv_json(ws)
+
+            # 4th message this window should be rejected with an error, not silently dropped
+            await ws.send(json.dumps({"type": "broadcast", "payload": {"n": 99}}))
+            got = await recv_json(ws)
+            assert got["type"] == "system"
+            assert "rate limit" in got["payload"]["error"].lower()
+        finally:
+            await ws.close()
+    finally:
+        await srv.stop()
+
+
+async def test_rate_limit_is_tracked_per_client():
+    srv = make_server(rate_limit=2)
+    await srv.start()
+    try:
+        ws1 = await connect(srv)
+        ws2 = await connect(srv)
+        try:
+            await recv_json(ws1)  # welcome
+            await recv_json(ws2)  # welcome
+            await recv_json(ws1)  # join notice for ws2
+
+            # exhaust ws1's limit
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"n": 0}}))
+            await recv_json(ws1)
+            await recv_json(ws2)
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"n": 1}}))
+            await recv_json(ws1)
+            await recv_json(ws2)
+            await ws1.send(json.dumps({"type": "broadcast", "payload": {"n": 2}}))
+            got1 = await recv_json(ws1)
+            assert got1["type"] == "system"
+            assert "rate limit" in got1["payload"]["error"].lower()
+
+            # ws2 still has its own untouched budget
+            await ws2.send(json.dumps({"type": "broadcast", "payload": {"n": 3}}))
+            got2 = await recv_json(ws2)
+            assert got2["type"] == "broadcast"
+            assert got2["payload"] == {"n": 3}
+        finally:
+            await ws1.close()
+            await ws2.close()
+    finally:
+        await srv.stop()
+
+
+async def test_rate_limit_default_pulled_from_env_var(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "17")
+    srv = make_server()
+    try:
+        assert srv.rate_limit == 17
+    finally:
+        await srv.redis.close()
+        srv.messages.close()
+
+
+# ── Message history endpoint ────────────────────────────────────────
+
+
+async def test_history_requires_channel_param(server):
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/history"
+    )
+    assert status == 400
+    assert "error" in body
+
+
+async def test_history_returns_channel_messages_in_chronological_order(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+
+        for i in range(3):
+            await ws.send(
+                json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "n": i}})
+            )
+            await recv_json(ws)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/history?channel=alerts"
+        )
+        assert status == 200
+        assert body["channel"] == "alerts"
+        assert body["has_more"] is False
+        assert [m["payload"]["n"] for m in body["messages"]] == [0, 1, 2]
+    finally:
+        await ws.close()
+
+
+async def test_history_only_returns_messages_for_requested_channel(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "chat"}}))
+        await recv_json(ws)
+
+        await ws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "text": "a"}})
+        )
+        await recv_json(ws)
+        await ws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "chat", "text": "c"}})
+        )
+        await recv_json(ws)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/history?channel=chat"
+        )
+        assert status == 200
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["payload"]["text"] == "c"
+    finally:
+        await ws.close()
+
+
+async def test_history_paginates_with_has_more_and_since_cursor(server):
+    ws = await connect(server)
+    try:
+        await recv_json(ws)  # welcome
+        await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
+        await recv_json(ws)
+
+        for i in range(5):
+            await ws.send(
+                json.dumps({"type": "broadcast", "payload": {"channel": "alerts", "n": i}})
+            )
+            await recv_json(ws)
+
+        loop = asyncio.get_running_loop()
+        status, body = await loop.run_in_executor(
+            None, http_get, server.host, server.port, "/history?channel=alerts&limit=2"
+        )
+        assert status == 200
+        assert body["has_more"] is True
+        assert [m["payload"]["n"] for m in body["messages"]] == [0, 1]
+
+        cursor = body["messages"][-1]["timestamp"]
+        status, body2 = await loop.run_in_executor(
+            None,
+            http_get,
+            server.host,
+            server.port,
+            f"/history?channel=alerts&limit=2&since={quote(cursor, safe='')}",
+        )
+        assert status == 200
+        assert [m["payload"]["n"] for m in body2["messages"]] == [2, 3]
+        assert body2["has_more"] is True
+    finally:
+        await ws.close()
+
+
+async def test_history_empty_for_channel_with_no_messages(server):
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/history?channel=nowhere"
+    )
+    assert status == 200
+    assert body["messages"] == []
+    assert body["has_more"] is False
+
+
+# ── Message expiry / cleanup ────────────────────────────────────────
+
+
+async def test_expired_messages_are_purged_by_cleanup(server):
+    old_timestamp = (
+        datetime.now(timezone.utc) - timedelta(days=10)
+    ).isoformat()
+    recent_timestamp = utc_now_iso()
+
+    await asyncio.to_thread(
+        server.messages.save, "alerts", "broadcast", {"text": "old"}, old_timestamp
+    )
+    await asyncio.to_thread(
+        server.messages.save, "alerts", "broadcast", {"text": "new"}, recent_timestamp
+    )
+
+    deleted = await server._cleanup_expired_messages()
+    assert deleted == 1
+
+    loop = asyncio.get_running_loop()
+    status, body = await loop.run_in_executor(
+        None, http_get, server.host, server.port, "/history?channel=alerts"
+    )
+    assert status == 200
+    assert [m["payload"]["text"] for m in body["messages"]] == ["new"]
+
+
+async def test_message_ttl_days_default_pulled_from_env_var(monkeypatch):
+    monkeypatch.setenv("MESSAGE_TTL_DAYS", "3")
+    srv = make_server()
+    try:
+        assert srv.message_ttl_days == 3
+    finally:
+        await srv.redis.close()
+        srv.messages.close()
+
+
+async def test_cleanup_task_starts_on_startup_and_stops_on_shutdown():
+    srv = make_server(message_ttl_days=7)
+    await srv.start()
+    try:
+        assert srv._cleanup_task is not None
+        assert not srv._cleanup_task.done()
+    finally:
+        await srv.stop()
+    assert srv._cleanup_task is None
 
 
 async def test_message_history_shared_across_instances_via_sqlite(tmp_path):
