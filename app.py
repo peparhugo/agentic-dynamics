@@ -14,6 +14,7 @@ from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository, initialize_database
 
 
 def create_app(database: str | None = None) -> Flask:
@@ -28,29 +29,7 @@ def create_app(database: str | None = None) -> Flask:
 
     def init_db() -> None:
         with get_db() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT NOT NULL UNIQUE,
-                    password_hash TEXT NOT NULL
-                )
-                """
-            )
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS tasks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    title TEXT NOT NULL,
-                    status TEXT NOT NULL DEFAULT 'pending',
-                    created_at TEXT NOT NULL
-                )
-                """
-            )
-            columns = {row["name"] for row in connection.execute("PRAGMA table_info(tasks)")}
-            if "owner_id" not in columns:
-                # Nullable preserves rows created before task ownership was introduced.
-                connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
+            initialize_database(connection)
 
     def encode_token(user_id: int) -> str:
         header = {"alg": "HS256", "typ": "JWT"}
@@ -95,7 +74,7 @@ def create_app(database: str | None = None) -> Flask:
             if user_id is None:
                 return jsonify({"error": "unauthorized"}), 401
             with get_db() as connection:
-                user = connection.execute("SELECT id FROM users WHERE id = ?", (user_id,)).fetchone()
+                user = UserRepository(connection).get_by_id(user_id)
             if user is None:
                 return jsonify({"error": "unauthorized"}), 401
             g.user_id = user_id
@@ -105,14 +84,7 @@ def create_app(database: str | None = None) -> Flask:
 
     def task_or_404(task_id: int) -> sqlite3.Row | None:
         with get_db() as connection:
-            task = connection.execute(
-                """
-                SELECT tasks.id, tasks.title, tasks.status, tasks.created_at, users.username AS owner_email
-                FROM tasks JOIN users ON users.id = tasks.owner_id
-                WHERE tasks.id = ? AND tasks.owner_id = ?
-                """,
-                (task_id, g.user_id),
-            ).fetchone()
+            task = TaskRepository(connection).get_for_owner(task_id, g.user_id)
         return task
 
     def task_response(task: sqlite3.Row, updates: dict | None = None) -> dict:
@@ -131,13 +103,12 @@ def create_app(database: str | None = None) -> Flask:
             return jsonify({"error": "username and password are required"}), 400
         try:
             with get_db() as connection:
-                cursor = connection.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (username.strip(), generate_password_hash(password)),
+                user_id = UserRepository(connection).create_user(
+                    username.strip(), generate_password_hash(password)
                 )
         except sqlite3.IntegrityError:
             return jsonify({"error": "username already exists"}), 409
-        return jsonify({"id": cursor.lastrowid, "username": username.strip()}), 201
+        return jsonify({"id": user_id, "username": username.strip()}), 201
 
     @app.post("/auth/login")
     def login():
@@ -147,9 +118,7 @@ def create_app(database: str | None = None) -> Flask:
         if not isinstance(username, str) or not isinstance(password, str):
             return jsonify({"error": "invalid credentials"}), 401
         with get_db() as connection:
-            user = connection.execute(
-                "SELECT id, password_hash FROM users WHERE username = ?", (username.strip(),)
-            ).fetchone()
+            user = UserRepository(connection).get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "invalid credentials"}), 401
         return jsonify({"token": encode_token(user["id"])})
@@ -165,12 +134,9 @@ def create_app(database: str | None = None) -> Flask:
         title = title.strip()
         created_at = datetime.now(timezone.utc).isoformat()
         with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-                (title, created_at, g.user_id),
-            )
+            task_id = TaskRepository(connection).create_task(title, created_at, g.user_id)
         return jsonify({
-            "id": cursor.lastrowid,
+            "id": task_id,
             "title": title,
             "status": "pending",
             "created_at": created_at,
@@ -180,10 +146,7 @@ def create_app(database: str | None = None) -> Flask:
     @require_auth
     def list_tasks():
         with get_db() as connection:
-            tasks = connection.execute(
-                "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (g.user_id,),
-            ).fetchall()
+            tasks = TaskRepository(connection).list_for_owner(g.user_id)
         return jsonify([dict(task) for task in tasks])
 
     @app.get("/tasks/<int:task_id>")
@@ -215,12 +178,8 @@ def create_app(database: str | None = None) -> Flask:
                 return jsonify({"error": "status must be a non-empty string"}), 400
             updates["status"] = data["status"].strip()
 
-        assignments = ", ".join(f"{column} = ?" for column in updates)
         with get_db() as connection:
-            connection.execute(
-                f"UPDATE tasks SET {assignments} WHERE id = ? AND owner_id = ?",
-                (*updates.values(), task_id, g.user_id),
-            )
+            TaskRepository(connection).update_for_owner(task_id, g.user_id, updates)
         if task["status"] != "completed" and updates.get("status") == "completed":
             send_notification_email.delay(task["owner_email"], updates.get("title", task["title"]))
         return jsonify(task_response(task, updates))
