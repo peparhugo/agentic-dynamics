@@ -9,6 +9,8 @@ import uuid
 from aiohttp import web
 
 from .broker import RedisBroker
+from .expiry import MessageExpiry
+from .rate_limit import RateLimiter
 from .redis_registry import RedisPresence
 from .registry import ClientRegistry
 from .soap import create_soap_app
@@ -65,6 +67,7 @@ async def run(
 
     broker = None
     presence = None
+    rate_limiter = None
     redis_client = None
     if redis_url:
         import redis.asyncio as redis_asyncio
@@ -72,11 +75,20 @@ async def run(
         redis_client = redis_asyncio.from_url(redis_url)
         broker = RedisBroker(redis_client)
         presence = RedisPresence(redis_client, server_id=str(uuid.uuid4()))
+        rate_limiter = RateLimiter.from_env(redis_client)
         logger.info("Redis pub/sub backbone enabled via %s", redis_url)
+        logger.info("Rate limiting enabled: %d messages/minute per client", rate_limiter.limit)
 
     notification_server = NotificationServer(
-        registry, transport=transport, broker=broker, presence=presence, store=store
+        registry,
+        transport=transport,
+        broker=broker,
+        presence=presence,
+        store=store,
+        rate_limiter=rate_limiter,
     )
+
+    expiry = MessageExpiry.from_env(store)
 
     soap_app = create_soap_app(registry, store=store)
     runner = web.AppRunner(soap_app)
@@ -86,11 +98,13 @@ async def run(
     logger.info("SOAP health API listening on http://%s:%s/health", soap_host, soap_port)
 
     await notification_server.start()
+    await expiry.start()
     try:
         async with notification_server.serve(ws_host, ws_port):
             logger.info("WebSocket server listening on ws://%s:%s", ws_host, ws_port)
             await asyncio.Future()  # run forever
     finally:
+        await expiry.stop()
         await notification_server.stop()
         if redis_client is not None:
             await redis_client.aclose()

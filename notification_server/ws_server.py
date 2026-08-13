@@ -6,6 +6,7 @@ import uuid
 
 from .broker import RedisBroker
 from .messages import InvalidMessage, error_message, make_message, parse_message
+from .rate_limit import RateLimiter
 from .redis_registry import RedisPresence
 from .registry import ClientRegistry
 from .store import MessageStore
@@ -24,12 +25,14 @@ class NotificationServer:
         broker: RedisBroker | None = None,
         presence: RedisPresence | None = None,
         store: MessageStore | None = None,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
         self.transport = transport or WebSocketTransport()
         self.broker = broker
         self.presence = presence
         self.store = store
+        self.rate_limiter = rate_limiter
 
     async def start(self) -> None:
         """Start the Redis subscriber worker, if a broker is configured.
@@ -64,6 +67,11 @@ class NotificationServer:
                 await self.presence.remove_client(client_id)
 
     async def _handle_raw(self, sender_id: str, raw: str) -> None:
+        if self.rate_limiter is not None and not await self.rate_limiter.allow(sender_id):
+            sender = self.registry.get(sender_id)
+            if sender is not None:
+                await self._send(sender, error_message("rate limit exceeded"))
+            return
         try:
             message = parse_message(raw)
         except InvalidMessage as exc:

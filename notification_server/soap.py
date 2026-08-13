@@ -10,6 +10,7 @@ clients that expect a proper SOAP RPC call instead of a GET.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from datetime import datetime
 
 from aiohttp import web
 
@@ -92,6 +93,27 @@ def create_soap_app(registry: ClientRegistry, store: MessageStore | None = None)
         messages = await store.alist_messages(limit=limit, offset=offset)
         return web.json_response({"messages": messages})
 
+    async def get_history(request: web.Request) -> web.Response:
+        channel = request.query.get("channel")
+        since = request.query.get("since")
+        try:
+            limit = int(request.query.get("limit", 50))
+        except ValueError:
+            return web.json_response({"error": "limit must be an integer"}, status=400)
+        if limit < 0:
+            return web.json_response({"error": "limit must be non-negative"}, status=400)
+        if since is not None:
+            try:
+                datetime.fromisoformat(since.replace("Z", "+00:00"))
+            except ValueError:
+                return web.json_response(
+                    {"error": "since must be an ISO timestamp"}, status=400
+                )
+        if store is None:
+            return web.json_response({"messages": [], "has_more": False})
+        messages, has_more = await store.alist_history(channel=channel, since=since, limit=limit)
+        return web.json_response({"messages": messages, "has_more": has_more})
+
     async def list_channels(request: web.Request) -> web.Response:
         channels = [
             {"name": name, "subscribers": count}
@@ -136,4 +158,5 @@ def create_soap_app(registry: ClientRegistry, store: MessageStore | None = None)
     app.router.add_get("/channels", list_channels)
     app.router.add_get("/channels/{name}/subscribers", get_channel_subscribers)
     app.router.add_get("/messages", list_messages)
+    app.router.add_get("/history", get_history)
     return app
