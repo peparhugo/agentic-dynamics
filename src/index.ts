@@ -1,7 +1,8 @@
-export { buildSite } from './core';
+export { buildSite, createBuildEngine } from './core';
 export { defineConfig } from './plugin';
 export type {
   BuildOptions,
+  BuildStats,
   Page,
   Plugin,
   PluginContext,

@@ -18,11 +18,15 @@ npm run build
 npx ssg build
 npx ssg build --content ./articles --output ./public
 npx ssg build --templates ./templates
+npx ssg build --incremental
+npx ssg build --incremental --clean
 npx ssg serve
 npx ssg serve --port 4000
 ```
 
 Markdown files are read recursively. Each becomes an HTML file at the matching relative path, and an `index.html` links to every generated page.
+
+Incremental builds store source and template hashes plus rendered page data in `dist/.ssg-cache.json`. Unchanged pages are skipped, template or partial changes invalidate rendered pages, and `--clean` removes prior output before rebuilding. The CLI reports pages built, pages skipped, and estimated time saved.
 
 `ssg serve` builds into `./dist`, serves it on `http://localhost:3000`, and watches `content/` and `templates/`. Successful rebuilds automatically reload connected browsers. The build directories and port can be changed with the same directory options as `build` and with `--port`.
 

@@ -4,12 +4,23 @@ export interface BuildOptions {
   templatesDir?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export interface ResolvedBuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir: string;
+  incremental: boolean;
+  clean: boolean;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  durationMs: number;
+  timeSavedMs: number;
 }
 
 export interface Page {
@@ -30,6 +41,7 @@ export interface PluginPage extends Page {
 export interface PluginContext {
   options: ResolvedBuildOptions;
   pages: PluginPage[];
+  stats: BuildStats;
   build(): Promise<Page[]>;
 }
 

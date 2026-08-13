@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { buildSite, startDevServer } from './index';
+import { createBuildEngine, startDevServer } from './index';
 
 interface CliOptions {
   content: string;
   output: string;
   templates: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 interface ServeCliOptions extends CliOptions {
@@ -31,13 +33,24 @@ program
   .option('--content <dir>', 'Markdown content directory', './content')
   .option('--output <dir>', 'generated site directory', './dist')
   .option('--templates <dir>', 'Handlebars template directory', './templates')
+  .option('--incremental', 'only rebuild changed pages')
+  .option('--clean', 'remove previous output and rebuild every page')
   .action(async (options: CliOptions) => {
-    const pages = await buildSite({
+    const engine = await createBuildEngine({
       contentDir: options.content,
       outputDir: options.output,
-      templatesDir: options.templates
+      templatesDir: options.templates,
+      incremental: options.incremental,
+      clean: options.clean
     });
-    process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${options.output}\n`);
+    try {
+      const pages = await engine.build();
+      const { pagesBuilt, pagesSkipped, durationMs, timeSavedMs } = engine.stats;
+      process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'} in ${options.output}\n`);
+      process.stdout.write(`Build stats: ${pagesBuilt} built, ${pagesSkipped} skipped, ${Math.round(durationMs)}ms elapsed, ${Math.round(timeSavedMs)}ms saved\n`);
+    } finally {
+      await engine.end();
+    }
   });
 
 program
