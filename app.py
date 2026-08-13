@@ -18,6 +18,7 @@ from transport import BaseTransport, WebSocketTransport
 Message = dict[str, Any]
 BROKER_CHANNEL = "notifications:messages"
 STATE_PREFIX = "notifications"
+RATE_LIMIT_PREFIX = f"{STATE_PREFIX}:rate-limit"
 
 
 class NotificationServer:
@@ -37,6 +38,9 @@ class NotificationServer:
         self._redis = redis_client
         self._pubsub: Any | None = None
         self._listener_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._rate_limit = self._config_int("RATE_LIMIT", 100, minimum=1)
+        self._message_ttl_days = self._config_int("MESSAGE_TTL_DAYS", 7, minimum=0)
         self._database = sqlite3.connect(self._database_path(database_url), check_same_thread=False)
         self._database.execute(
             """CREATE TABLE IF NOT EXISTS messages (
@@ -64,6 +68,19 @@ class NotificationServer:
         if value.startswith("sqlite://"):
             return value[len("sqlite://"):]
         return value
+
+    @staticmethod
+    def _config_int(name: str, default: int, minimum: int) -> int:
+        value = os.environ.get(name)
+        if value is None:
+            return default
+        try:
+            parsed = int(value)
+        except ValueError as error:
+            raise ValueError(f"{name} must be an integer") from error
+        if parsed < minimum:
+            raise ValueError(f"{name} must be at least {minimum}")
+        return parsed
 
     @property
     def connected_client_count(self) -> int:
@@ -93,6 +110,29 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.subscribe(BROKER_CHANNEL)
             self._listener_task = asyncio.create_task(self._listen_for_messages())
+
+    def start_background_tasks(self) -> None:
+        """Schedule maintenance that should run once when the server starts."""
+        if self._cleanup_task is None or self._cleanup_task.done():
+            self._cleanup_task = asyncio.create_task(self._cleanup_expired_messages())
+
+    async def _cleanup_expired_messages(self) -> None:
+        cutoff = datetime.now(timezone.utc).timestamp() - self._message_ttl_days * 86400
+        cutoff_timestamp = datetime.fromtimestamp(cutoff, timezone.utc).isoformat()
+        with self._database_lock:
+            self._database.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff_timestamp,))
+            self._database.commit()
+
+    async def _within_rate_limit(self, client_id: str) -> bool:
+        """Increment the client's current minute counter and report its allowance."""
+        if self._redis is None:
+            return True
+        window = int(datetime.now(timezone.utc).timestamp() // 60)
+        key = f"{RATE_LIMIT_PREFIX}:{client_id}:{window}"
+        count = await self._redis.incr(key)
+        if count == 1:
+            await self._redis.expire(key, 60)
+        return count <= self._rate_limit
 
     async def _listen_for_messages(self) -> None:
         assert self._pubsub is not None
@@ -217,6 +257,7 @@ class NotificationServer:
 
     async def handler(self, connection: ServerConnection) -> None:
         await self._ensure_broker()
+        self.start_background_tasks()
         client_id = await self._transport.on_connect(connection)
         with self._clients_lock:
             self._connected_clients.add(client_id)
@@ -229,6 +270,11 @@ class NotificationServer:
             await self._remove_client(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
+        if not await self._within_rate_limit(sender_id):
+            await self._transport.send_message(
+                sender_id, self._message("system", {"error": "rate limit exceeded"})
+            )
+            return
         try:
             message = json.loads(raw_message)
             message_type = message["type"]
@@ -278,6 +324,23 @@ class NotificationServer:
             for row in rows
         ]
 
+    def _history(self, channel: str, since: str, limit: int, offset: int) -> dict[str, Any]:
+        with self._database_lock:
+            rows = self._database.execute(
+                """SELECT id, channel, type, payload, timestamp FROM messages
+                   WHERE channel = ? AND timestamp >= ?
+                   ORDER BY timestamp ASC, id ASC LIMIT ? OFFSET ?""",
+                (channel, since, limit + 1, offset),
+            ).fetchall()
+        has_more = len(rows) > limit
+        return {
+            "messages": [
+                {"id": row[0], "channel": row[1], "type": row[2], "payload": json.loads(row[3]), "timestamp": row[4]}
+                for row in rows[:limit]
+            ],
+            "has_more": has_more,
+        }
+
     async def process_request(self, connection: ServerConnection, request: Any) -> Any:
         parsed = urlsplit(request.path)
         if parsed.path == "/health":
@@ -292,6 +355,26 @@ class NotificationServer:
             except ValueError:
                 return connection.respond(HTTPStatus.BAD_REQUEST, json.dumps({"error": "limit and offset must be non-negative integers"}))
             return connection.respond(HTTPStatus.OK, json.dumps(self._messages(limit, offset)))
+        if parsed.path == "/history":
+            query = parse_qs(parsed.query)
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            if not isinstance(channel, str) or not isinstance(since, str):
+                return connection.respond(HTTPStatus.BAD_REQUEST, json.dumps({"error": "channel and since are required"}))
+            try:
+                timestamp = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                if timestamp.tzinfo is None:
+                    raise ValueError
+                limit = int(query.get("limit", ["50"])[0])
+                offset = int(query.get("offset", ["0"])[0])
+                if limit < 1 or offset < 0:
+                    raise ValueError
+            except ValueError:
+                return connection.respond(
+                    HTTPStatus.BAD_REQUEST,
+                    json.dumps({"error": "since must be an ISO timestamp; limit must be positive and offset non-negative integers"}),
+                )
+            return connection.respond(HTTPStatus.OK, json.dumps(self._history(channel, timestamp.astimezone(timezone.utc).isoformat(), limit, offset)))
         if parsed.path == "/channels":
             return connection.respond(HTTPStatus.OK, json.dumps(await self._channel_details()))
         if parsed.path.startswith("/channels/") and parsed.path.endswith("/subscribers"):
@@ -304,6 +387,7 @@ class NotificationServer:
 async def start_server(host: str = "127.0.0.1", port: int = 8765) -> Any:
     """Create an unstarted-by-context-manager websockets server instance."""
     notification_server = NotificationServer()
+    notification_server.start_background_tasks()
     return await serve(notification_server.handler, host, port, process_request=notification_server.process_request)
 
 

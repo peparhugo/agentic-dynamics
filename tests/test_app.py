@@ -142,6 +142,42 @@ async def test_messages_endpoint_persists_and_paginates_messages(notification_se
 
 
 @pytest.mark.asyncio
+async def test_history_returns_channel_messages_chronologically_with_pagination(notification_server):
+    _, url = notification_server
+    async with connect(url) as client:
+        await receive_json(client)
+        await client.send(json.dumps({"type": "broadcast", "payload": {"number": 1}, "channel": "alerts"}))
+        await client.send(json.dumps({"type": "broadcast", "payload": {"number": 2}, "channel": "alerts"}))
+        await client.send(json.dumps({"type": "broadcast", "payload": {"number": 3}, "channel": "other"}))
+
+        response = await get_json(url, "/history?channel=alerts&since=1970-01-01T00:00:00%2B00:00&limit=1")
+        history = json.loads(response.split(b"\r\n\r\n", 1)[1])
+        assert history["messages"][0]["payload"] == {"number": 1}
+        assert history["has_more"] is True
+
+        response = await get_json(url, "/history?channel=alerts&since=1970-01-01T00:00:00%2B00:00&limit=1&offset=1")
+        history = json.loads(response.split(b"\r\n\r\n", 1)[1])
+        assert history["messages"][0]["payload"] == {"number": 2}
+        assert history["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_uses_redis_counter_and_returns_an_error(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    fake_redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    application = NotificationServer(redis_client=fake_redis)
+    async with serve(application.handler, "127.0.0.1", 0, process_request=application.process_request) as server:
+        url = f"ws://127.0.0.1:{server.sockets[0].getsockname()[1]}"
+        async with connect(url) as client:
+            await receive_json(client)
+            for number in range(2):
+                await client.send(json.dumps({"type": "system", "payload": {"number": number}}))
+                assert (await receive_json(client))["payload"] == {"number": number}
+            await client.send(json.dumps({"type": "system", "payload": {"number": 3}}))
+            assert (await receive_json(client))["payload"] == {"error": "rate limit exceeded"}
+
+
+@pytest.mark.asyncio
 async def test_redis_pubsub_delivers_between_server_instances_and_stores_client_state():
     fake_server = fakeredis.aioredis.FakeServer()
     first_app = NotificationServer(redis_client=fakeredis.aioredis.FakeRedis(server=fake_server, decode_responses=True))
