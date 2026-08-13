@@ -58,3 +58,43 @@ def normalize_task(experiment: str) -> str:
 import os as _os
 WORKTREE_ROOT = _os.environ.get("FINOPS_WORKTREE_ROOT", "/tmp")
 WORKTREE_GLOB = _os.path.join(WORKTREE_ROOT, "exp_*")
+
+
+def probe_session_schema(db_path: str, required_columns: tuple[str, ...]) -> None:
+    """Fail loudly if the opencode `session` table lacks the expected columns.
+
+    Downstream queries depend on ``json_extract(model,'$...')`` and specific
+    column names; a schema change otherwise yields zero sessions/tokens
+    silently (P1-3).
+    """
+    import sqlite3
+    conn = sqlite3.connect(db_path)
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(session)")}
+    except sqlite3.Error as exc:
+        raise RuntimeError(f"opencode session table probe failed: {exc}") from exc
+    finally:
+        conn.close()
+    missing = [c for c in required_columns if c not in cols]
+    if missing:
+        raise RuntimeError(
+            f"opencode session table missing columns {missing!r} — schema drift? "
+            f"Expected columns: {list(required_columns)!r}"
+        )
+
+
+def model_slug(model: str) -> str:
+    """Derive a short, queue-safe slug from a ``provider/model`` id.
+
+    Canonical slug shared by run_story.py and enqueue.py so result filenames
+    and cell ids never collide (P1-5).
+    """
+    base = model.split("/", 1)[-1]
+    slug = base.replace("-", "_").replace(".", "_").replace(" ", "_")
+    return slug or "model"
+
+
+# Single source of truth for per-session timeout (P1-5). worker.py derives its
+# per-cell kill timeout from these so they can't drift apart.
+SESSION_TIMEOUT = 1200
+STORY_SESSIONS = 5

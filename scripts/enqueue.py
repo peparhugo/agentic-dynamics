@@ -27,6 +27,8 @@ from typing import Any
 
 import redis
 
+from _constants import model_slug
+
 # ── Matrix Definition ──────────────────────────────────────────
 
 STORIES = ["task_manager_api", "static_site_gen", "notification_service"]
@@ -47,13 +49,6 @@ ROOT = Path(__file__).resolve().parent.parent
 RESULTS_DIR = ROOT / "experiments" / "results" / "stories"
 
 PROVIDER_PRIORITY = {"deepseek": 0, "anthropic": 1, "openai": 2}
-
-
-def model_slug(model: str) -> str:
-    """Derive a short, queue-safe slug from a ``provider/model`` id."""
-    base = model.split("/", 1)[-1]
-    slug = base.replace("-", "_").replace(".", "_").replace(" ", "_")
-    return slug or "model"
 
 
 def completed_cells(model: str) -> set[str]:

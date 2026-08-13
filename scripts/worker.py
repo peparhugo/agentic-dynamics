@@ -19,6 +19,8 @@ from typing import Any, Callable
 
 import redis
 
+from _constants import SESSION_TIMEOUT, STORY_SESSIONS
+
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
@@ -26,7 +28,7 @@ QUEUE_KEY = "story_jobs"
 STATUS_KEY = "story_status"
 WORKER_PREFIX = "worker"
 
-TIMEOUT_PER_CELL = 9000
+TIMEOUT_PER_CELL = STORY_SESSIONS * SESSION_TIMEOUT + 3000  # 5 sessions × 1200s + margin
 BLOCK_TIMEOUT = 10
 IDLE_POLLS_BEFORE_EXIT = 12  # 12 × 10s = 2 minutes idle → exit
 REDIS_MAX_RETRIES = 10
@@ -137,7 +139,7 @@ def main() -> None:
                     "--tier", cell["tier"],
                     "--codebase-quality", cell["quality"],
                     "--condition", cell["condition"],
-                    "--timeout", "900",
+                    "--timeout", str(SESSION_TIMEOUT),
                 ],
                 capture_output=True,
                 text=True,

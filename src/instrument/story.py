@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -663,11 +664,13 @@ def _run_session(
         and (backend or "").lower() not in ("claude_cli", "claude")
         and primary_session_id
     ):
-        opencode_bin = Path.home() / ".opencode/bin/opencode"
+        opencode_bin = os.environ.get(
+            "OPENCODE_BIN", str(Path.home() / ".opencode/bin/opencode")
+        )
         try:
             cont_result = subprocess.run(
                 [
-                    str(opencode_bin),
+                    opencode_bin,
                     "run",
                     "--session",
                     primary_session_id,
@@ -865,18 +868,24 @@ def _estimate_subagent_cost(parent_session_id: str) -> tuple[float, int]:
 
 
 def _git(worktree: Path, *args: str) -> str:
-    """Run a git command in the worktree. Returns stdout."""
-    try:
-        proc = subprocess.run(
-            ["git"] + list(args),
-            capture_output=True,
-            text=True,
-            cwd=str(worktree),
-            timeout=30,
+    """Run a git command in the worktree. Returns stdout. Raises on failure.
+
+    A git failure is fatal for the instrument — returning error text through a
+    value channel previously leaked "git error: …" into commit_hash and diff
+    counts (P1-2). Fail loudly instead.
+    """
+    proc = subprocess.run(
+        ["git"] + list(args),
+        capture_output=True,
+        text=True,
+        cwd=str(worktree),
+        timeout=30,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed (exit {proc.returncode}): {proc.stderr.strip()}"
         )
-        return proc.stdout
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        return f"git error: {e}"
+    return proc.stdout
 
 
 def _detect_or_use(worktree: Path, fallback: str) -> str:

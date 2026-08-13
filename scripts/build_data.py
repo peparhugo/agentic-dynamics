@@ -26,7 +26,7 @@ OUTPUT_PATH = ROOT / "firebase" / "public" / "data.js"
 
 DATA_DIR = ROOT / "experiments" / "data"
 
-from _constants import WORKTREE_ROOT, MODEL_LABELS, bootstrap_ci
+from _constants import WORKTREE_ROOT, MODEL_LABELS, bootstrap_ci, probe_session_schema
 
 from instrument.routing import compute_routing  # noqa: E402
 
@@ -143,6 +143,11 @@ def query_token_breakdown():
     if not DB_PATH.exists():
         print(f"WARNING: opencode DB not found at {DB_PATH}", file=sys.stderr)
         return {}
+    probe_session_schema(
+        str(DB_PATH),
+        ("model", "directory", "cost", "tokens_input", "tokens_output",
+         "tokens_reasoning", "tokens_cache_read", "tokens_cache_write"),
+    )
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute(

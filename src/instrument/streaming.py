@@ -8,6 +8,8 @@ recover partial output on timeout instead of discarding it.
 from __future__ import annotations
 
 import contextlib
+import os
+import signal
 import subprocess
 import threading
 from collections.abc import Callable
@@ -69,6 +71,7 @@ def stream_subprocess(
             text=True,
             cwd=workdir,
             stdin=subprocess.DEVNULL,
+            start_new_session=True,  # own process group so descendants can be killed
         )
     except OSError as e:
         return StreamResult(exit_code=-2, stdout="", stderr="", error=str(e))
@@ -87,11 +90,12 @@ def stream_subprocess(
         proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         timed_out = True
-        proc.kill()
-        proc.wait()
+        _terminate_process_group(proc)
 
-    out_thread.join(timeout=5)
-    err_thread.join(timeout=5)
+    # Reader threads end when the pipes close (all writers killed), so join
+    # without a fixed deadline rather than leaving dangling readers.
+    out_thread.join()
+    err_thread.join()
 
     with out_lock:
         stdout = "".join(out_chunks)
@@ -100,3 +104,20 @@ def stream_subprocess(
 
     exit_code = -1 if timed_out else (proc.returncode if proc.returncode is not None else -1)
     return StreamResult(exit_code=exit_code, stdout=stdout, stderr=stderr, timed_out=timed_out)
+
+
+def _terminate_process_group(proc: subprocess.Popen) -> None:
+    """Kill the process and all descendants (opencode spawns test runners).
+
+    A bare ``proc.kill()`` leaves spawned build/test tools orphaned; killing the
+    whole session group ensures the pipes close so reader threads can finish.
+    """
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        pass
+    try:
+        proc.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()

@@ -600,7 +600,11 @@ def analyze_story_worktree(worktree: Path, run_sonar: bool = False) -> StoryAnal
         StoryAnalysis with per-commit results.
     """
     # Get all commit hashes in chronological order (oldest first)
-    log = _run_git(worktree, "log", "--reverse", "--format=%H %s")
+    try:
+        log = _run_git(worktree, "log", "--reverse", "--format=%H %s")
+    except RuntimeError:
+        # No commits yet (empty repo) — git log exits non-zero.
+        return StoryAnalysis(story_name="unknown")
     commits = []
     for line in log.splitlines():
         parts = line.split(" ", 1)
@@ -818,14 +822,20 @@ def agentic_token_dicts(sessions) -> list[dict]:
 # ── Git Helpers ────────────────────────────────────────────────
 
 def _run_git(worktree: Path, *args: str) -> str:
-    try:
-        proc = subprocess.run(
-            ["git"] + list(args),
-            capture_output=True,
-            text=True,
-            cwd=str(worktree),
-            timeout=60,
+    """Run git in the worktree. Returns stdout. Raises on failure.
+
+    A silent "" was previously recorded as "no change" in diff counts (P1-2).
+    Fail loudly instead of emitting empty results through a value channel.
+    """
+    proc = subprocess.run(
+        ["git"] + list(args),
+        capture_output=True,
+        text=True,
+        cwd=str(worktree),
+        timeout=60,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed (exit {proc.returncode}): {proc.stderr.strip()}"
         )
-        return proc.stdout
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return ""
+    return proc.stdout

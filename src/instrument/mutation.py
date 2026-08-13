@@ -386,7 +386,7 @@ def apply_mutation(
     worktree_path: Path,
     *,
     spec_path: str | None = None,
-) -> None:
+) -> bool:
     """Apply a mutation artifact to a worktree.
 
     For specification mutations: writes ``mutated_spec`` to ``spec_path``
@@ -400,6 +400,10 @@ def apply_mutation(
         worktree_path: Root of the worktree to mutate.
         spec_path: Relative path within worktree to write mutated spec.
                    Default: "specification.txt"
+
+    Returns:
+        True if the mutation was applied, False otherwise (a failed patch is
+        no longer silently ignored — P1-2).
     """
     import subprocess as sp
     import tempfile
@@ -408,6 +412,7 @@ def apply_mutation(
         target = worktree_path / (spec_path or "specification.txt")
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(artifact.mutated_spec)
+        return True
 
     elif artifact.operator_class == "codebase" and artifact.codebase_patch:
         with tempfile.NamedTemporaryFile(
@@ -417,14 +422,17 @@ def apply_mutation(
             patch_file = f.name
 
         try:
-            sp.run(
+            proc = sp.run(
                 ["patch", "-p1", "-i", patch_file, "-d", str(worktree_path)],
                 capture_output=True,
                 text=True,
                 check=False,
             )
+            return proc.returncode == 0
         finally:
             try:
                 Path(patch_file).unlink()
             except OSError:
                 pass
+
+    return False

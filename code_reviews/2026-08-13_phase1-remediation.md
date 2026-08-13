@@ -50,3 +50,12 @@ Remaining in Phase 3: P0-8 (baseline contamination), P0-9 (convention rubric), P
 - Tests: `tests/test_commit_analysis.py` (Go + Rust counting), `tests/test_data_integrity.py` (baseline fallback + Go/Rust pattern guards).
 
 Phase 3 complete. Phase 4 (robustness P1-1…P1-5) and Phase 5 (cleanup P2-1…P2-6) remain.
+
+## Phase 4 (partial) — P1-1, P1-2, P1-3, P1-5 (done 2026-08-13)
+
+- **P1-1 process-group kill** — `stream_subprocess` uses `start_new_session=True` + `os.killpg` on timeout (kills spawned test runners, not just the child); reader threads join without a fixed deadline.
+- **P1-2 error-as-value** — `story._git` and `commit_analysis._run_git` now raise on non-zero exit (no more `"git error: …"` leaking into `commit_hash`); `apply_mutation` returns `bool` and checks the patch return code.
+- **P1-3 SQLite schema probe** — `probe_session_schema()` in `_constants.py`, called by `load_db_sessions` and `query_token_breakdown`, fails loudly on schema drift instead of returning zero sessions/tokens.
+- **P1-5 config unification** — `model_slug()` + `SESSION_TIMEOUT`/`STORY_SESSIONS` centralized in `_constants.py`; `run_story.py` exposes `late_degrade`; `worker.py` derives `TIMEOUT_PER_CELL` from the session timeout; `story.py` honors `OPENCODE_BIN`.
+
+P1-4 (pipeline watchdog/PID tracking) deferred. Phase 5 (P2) remains.

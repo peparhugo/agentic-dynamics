@@ -23,6 +23,8 @@ from instrument.story import (
 )
 from instrument.mutation import compile_mutation
 
+from _constants import model_slug, SESSION_TIMEOUT
+
 # Default codebase mappings for --codebase-quality shortcut
 _CODEBASE_MAP = {
     ("python", "tier1_minimal", "good"): "experiments/codebases/python/tier1_minimal/good",
@@ -75,12 +77,12 @@ def main():
     )
     parser.add_argument(
         "--condition",
-        choices=["clean", "bad_seed", "early_degrade"],
+        choices=["clean", "bad_seed", "early_degrade", "late_degrade"],
         default="clean",
         help="Perturbation condition",
     )
     parser.add_argument(
-        "--timeout", type=int, default=1200, help="Per-session timeout in seconds"
+        "--timeout", type=int, default=SESSION_TIMEOUT, help="Per-session timeout in seconds"
     )
     parser.add_argument(
         "--worktree-root", default="/tmp", help="Parent directory for worktrees"
@@ -164,8 +166,8 @@ def main():
     # Save results
     results_dir = Path(args.results_dir)
     results_dir.mkdir(parents=True, exist_ok=True)
-    model_slug = args.model.replace("/", "_").replace(" ", "_")
-    out_path = results_dir / f"{story.name}_{model_slug}_{condition.value}_{result.story_id}.json"
+    slug = model_slug(args.model)
+    out_path = results_dir / f"{story.name}_{slug}_{condition.value}_{result.story_id}.json"
     save_story_result(result, out_path)
 
     print(f"\n{'='*60}")

@@ -38,7 +38,7 @@ from instrument import (
     build_operators, perturbation_class_for,
 )
 
-from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci
+from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci, probe_session_schema
 
 OPENCODE_DB = Path.home() / ".local/share/opencode/opencode.db"
 RESULTS_DIR = PROJECT_ROOT / "experiments" / "results"
@@ -207,6 +207,12 @@ def load_db_sessions():
     if not OPENCODE_DB.exists():
         print("Error: opencode DB not found at", OPENCODE_DB)
         return []
+    probe_session_schema(
+        str(OPENCODE_DB),
+        ("id", "directory", "title", "cost", "tokens_input", "tokens_output",
+         "tokens_reasoning", "tokens_cache_read", "tokens_cache_write",
+         "model", "time_created"),
+    )
     db = sqlite3.connect(str(OPENCODE_DB))
     db.row_factory = sqlite3.Row
     rows = db.execute("""
