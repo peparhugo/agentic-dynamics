@@ -21,3 +21,15 @@ def client():
 
     os.close(db_fd)
     os.remove(db_path)
+
+
+@pytest.fixture
+def auth_token(client):
+    client.post("/auth/register", json={"username": "alice", "password": "hunter2"})
+    resp = client.post("/auth/login", json={"username": "alice", "password": "hunter2"})
+    return resp.get_json()["token"]
+
+
+@pytest.fixture
+def auth_headers(auth_token):
+    return {"Authorization": f"Bearer {auth_token}"}
