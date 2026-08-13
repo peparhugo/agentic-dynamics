@@ -3,28 +3,31 @@
 import asyncio
 import json
 import logging
+import os
 from typing import Optional
-import websockets
-from websockets.server import WebSocketServerProtocol
 from aiohttp import web
 
 from client_registry import ClientRegistry
 from message_handler import Message, MessageHandler
 from redis_broker import RedisBroker
 from message_persistence import MessagePersistence
+from transport import BaseTransport
+from websocket_transport import WebSocketTransport
+from polling_transport import PollingTransport
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class NotificationServer:
-    """Main WebSocket notification server."""
+    """Main notification server with pluggable transport."""
 
     def __init__(
         self,
         ws_host: str = 'localhost',
         ws_port: int = 8765,
-        rest_port: int = 8080
+        rest_port: int = 8080,
+        transport: Optional[BaseTransport] = None
     ):
         self.ws_host = ws_host
         self.ws_port = ws_port
@@ -34,9 +37,39 @@ class NotificationServer:
         self.message_persistence = MessagePersistence()
         self.rest_app = web.Application()
         self._setup_rest_routes()
-        self.ws_server: Optional[websockets.server.WebSocketServer] = None
         self._stop_event = asyncio.Event()
         self._redis_subscribe_task: Optional[asyncio.Task] = None
+
+        # Initialize transport
+        if transport is None:
+            transport = self._create_transport()
+        self.transport = transport
+        self._transport_task: Optional[asyncio.Task] = None
+
+    def _create_transport(self) -> BaseTransport:
+        """Create transport based on environment config."""
+        transport_type = os.getenv('TRANSPORT', 'websocket').lower()
+
+        if transport_type == 'websocket':
+            return WebSocketTransport(
+                host=self.ws_host,
+                port=self.ws_port,
+                on_client_connect=self._on_client_connect,
+                on_client_disconnect=self._on_client_disconnect,
+                on_client_message=self._handle_message,
+                client_registry=self.client_registry
+            )
+        elif transport_type == 'polling':
+            return PollingTransport(
+                host=self.ws_host,
+                port=self.ws_port,
+                on_client_connect=self._on_client_connect,
+                on_client_disconnect=self._on_client_disconnect,
+                on_client_message=self._handle_message,
+                client_registry=self.client_registry
+            )
+        else:
+            raise ValueError(f"Unknown transport type: {transport_type}")
 
     def _setup_rest_routes(self):
         """Setup REST API routes."""
@@ -95,34 +128,16 @@ class NotificationServer:
             'channel': channel
         })
 
-    async def handle_client(
-        self,
-        websocket: WebSocketServerProtocol,
-        path: str
-    ) -> None:
-        """Handle new WebSocket client connection."""
-        client_id = self.client_registry.register(websocket)
+    async def _on_client_connect(self, client_id: str) -> None:
+        """Handle new client connection."""
         logger.info(f"Client connected: {client_id}")
+        # Send client ID to the new client
+        client_msg = Message('system', {'client_id': client_id})
+        await self.transport.send_message(client_id, client_msg)
 
-        try:
-            # Send client ID to the new client
-            client_msg = Message('system', {'client_id': client_id})
-            await websocket.send(client_msg.to_json())
-
-            # Listen for messages from this client
-            async for message_data in websocket:
-                if MessageHandler.validate_message(message_data):
-                    message = Message.from_json(message_data)
-                    await self._handle_message(client_id, message)
-                else:
-                    logger.warning(f"Invalid message from {client_id}: {message_data}")
-
-        except websockets.exceptions.ConnectionClosed:
-            logger.info(f"Client disconnected: {client_id}")
-        except Exception as e:
-            logger.error(f"Error handling client {client_id}: {e}")
-        finally:
-            self.client_registry.unregister(client_id)
+    async def _on_client_disconnect(self, client_id: str) -> None:
+        """Handle client disconnection."""
+        logger.info(f"Client disconnected: {client_id}")
 
     async def _handle_message(self, sender_id: str, message: Message) -> None:
         """Route message to appropriate handler."""
@@ -186,23 +201,7 @@ class NotificationServer:
             timestamp=message.timestamp
         )
 
-        if channel:
-            clients = self.client_registry.get_clients_in_channel(channel)
-        else:
-            clients = self.client_registry.get_all_clients()
-
-        if not clients:
-            return
-
-        tasks = [
-            self._send_message(websocket, message)
-            for websocket in clients.values()
-        ]
-
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, Exception):
-                logger.error(f"Error sending broadcast: {result}")
+        await self.transport.broadcast(message, channel=channel)
 
     async def _direct_message(self, message: Message) -> None:
         """Send direct message to specific client."""
@@ -213,25 +212,12 @@ class NotificationServer:
 
         recipient = self.client_registry.get_client(recipient_id)
         if recipient:
-            await self._send_message(recipient, message)
+            await self.transport.send_message(recipient_id, message)
         else:
             logger.warning(f"Recipient not found: {recipient_id}")
 
-    async def _send_message(
-        self,
-        websocket: WebSocketServerProtocol,
-        message: Message
-    ) -> None:
-        """Send message to a specific WebSocket."""
-        try:
-            await websocket.send(message.to_json())
-        except websockets.exceptions.ConnectionClosed:
-            logger.debug("Target websocket already closed")
-        except Exception as e:
-            logger.error(f"Error sending message: {e}")
-
     async def run(self) -> None:
-        """Run both WebSocket and REST servers."""
+        """Run both transport and REST servers."""
         try:
             await self.redis_broker.connect()
         except Exception as e:
@@ -246,13 +232,8 @@ class NotificationServer:
                 )
             )
 
-        # Start WebSocket server
-        self.ws_server = await websockets.serve(
-            self.handle_client,
-            self.ws_host,
-            self.ws_port
-        )
-        logger.info(f"WebSocket server running on ws://{self.ws_host}:{self.ws_port}")
+        # Start transport server
+        self._transport_task = asyncio.create_task(self.transport.run())
 
         # Start REST server
         runner = web.AppRunner(self.rest_app)
@@ -268,9 +249,7 @@ class NotificationServer:
             logger.error(f"Server error: {e}")
         finally:
             await runner.cleanup()
-            if self.ws_server:
-                self.ws_server.close()
-                await self.ws_server.wait_closed()
+            await self.transport.stop()
             await self.redis_broker.disconnect()
             if self._redis_subscribe_task:
                 self._redis_subscribe_task.cancel()
@@ -278,6 +257,15 @@ class NotificationServer:
                     await self._redis_subscribe_task
                 except asyncio.CancelledError:
                     pass
+            if self._transport_task:
+                try:
+                    await asyncio.wait_for(self._transport_task, timeout=2)
+                except asyncio.TimeoutError:
+                    self._transport_task.cancel()
+                    try:
+                        await self._transport_task
+                    except asyncio.CancelledError:
+                        pass
             logger.info("Server shut down")
 
     async def stop(self) -> None:
