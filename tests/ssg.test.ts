@@ -4,6 +4,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { WebSocket } from 'ws';
 import { buildSite, parseMarkdown, renderPage, startDevServer } from '../src';
+import type { Plugin } from '../src';
 import { createProgram } from '../src/cli';
 
 describe('static site generator', () => {
@@ -147,6 +148,62 @@ describe('static site generator', () => {
       contentDir: content,
       outputDir: workspace,
     })).rejects.toThrow('Content and output directories must not overlap');
+  });
+
+  test('runs plugin hooks in order and renders onFile replacements', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'output');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Original');
+    const calls: string[] = [];
+    const plugin = (name: string): Plugin => ({
+      onStart: () => { calls.push(`${name}:start`); },
+      beforeBuild: () => { calls.push(`${name}:before`); },
+      onFile: (page) => {
+        calls.push(`${name}:file`);
+        return name === 'second' ? { ...page, title: 'Changed' } : undefined;
+      },
+      afterBuild: () => { calls.push(`${name}:after`); },
+      onEnd: () => { calls.push(`${name}:end`); },
+    });
+
+    const pages = await buildSite({ contentDir: content, outputDir: output, plugins: [plugin('first'), plugin('second')] });
+
+    expect(calls).toEqual([
+      'first:start', 'second:start', 'first:before', 'second:before',
+      'first:file', 'second:file', 'first:after', 'second:after', 'first:end', 'second:end',
+    ]);
+    expect(pages[0].title).toBe('Changed');
+    await expect(fs.readFile(path.join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>Changed</h1>');
+  });
+
+  test('loads plugins from a TypeScript config file', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'output');
+    const config = path.join(workspace, 'ssg.config.ts');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Original');
+    await fs.writeFile(config, `export default {
+      plugins: [{ onFile(page: any) { return { ...page, title: 'Configured' }; } }]
+    };`);
+
+    const pages = await buildSite({ contentDir: content, outputDir: output, configFile: config });
+
+    expect(pages[0].title).toBe('Configured');
+    await expect(fs.readFile(path.join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>Configured</h1>');
+  });
+
+  test('runs onEnd when a build hook fails', async () => {
+    const content = path.join(workspace, 'content');
+    await fs.mkdir(content);
+    let ended = false;
+
+    await expect(buildSite({
+      contentDir: content,
+      outputDir: path.join(workspace, 'output'),
+      plugins: [{ beforeBuild: () => { throw new Error('broken'); }, onEnd: () => { ended = true; } }],
+    })).rejects.toThrow('broken');
+    expect(ended).toBe(true);
   });
 
   test('CLI build honors content and output options', async () => {

@@ -50,6 +50,25 @@ Page templates receive frontmatter plus `title`, `date`, `tags`, `url`, and raw 
 
 Override the template directory with `npx ssg build --templates ./theme`. If no template directory exists, the built-in page renderer remains in use.
 
+## Plugins
+
+Add TypeScript plugin modules under `./plugins/` and load them from `ssg.config.ts`:
+
+```ts
+import type { Plugin } from 'ssg';
+
+const example: Plugin = {
+  name: 'example',
+  onFile(page) {
+    page.data = { ...page.data, generated: true };
+  },
+};
+
+export default { plugins: [example] };
+```
+
+Plugins can implement `onStart`, `beforeBuild`, `onFile`, `afterBuild`, and `onEnd`. Hooks may be synchronous or asynchronous and run in configuration order. `onFile` receives each parsed page and may mutate it or return a replacement. Markdown parsing and template rendering are built-in plugins around configured plugins; the development server is exposed as `DevServerPlugin` and through the compatible `startDevServer` API.
+
 ## Development server
 
 Build and serve `./dist` at `http://localhost:3000` with:
