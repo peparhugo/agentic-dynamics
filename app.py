@@ -13,6 +13,7 @@ from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
@@ -30,96 +31,36 @@ def get_db() -> sqlite3.Connection:
 
 def init_db() -> None:
     """Create tables and migrate existing task databases."""
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL,
-                email TEXT
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL,
-                owner_id INTEGER REFERENCES users(id)
-            )
-            """
-        )
-        columns = {row["name"] for row in connection.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            # Existing tasks remain valid, but have no owner and are not exposed.
-            connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
-        user_columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
-        if "email" not in user_columns:
-            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
+    users = UserRepository(get_db)
+    users.initialize()
+    TaskRepository(get_db).initialize()
 
 
 def create_task(title: str, owner_id: int) -> dict:
     created_at = datetime.now(timezone.utc).isoformat()
-    with get_db() as connection:
-        cursor = connection.execute(
-            "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-            (title, created_at, owner_id),
-        )
-        task_id = cursor.lastrowid
-    return get_task(task_id, owner_id)
+    return TaskRepository(get_db).create_task(title, created_at, owner_id)
 
 
 def get_tasks(owner_id: int) -> list[dict]:
-    with get_db() as connection:
-        rows = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-    return [dict(row) for row in rows]
+    return TaskRepository(get_db).list_for_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as connection:
-        row = connection.execute(
-            "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-    return dict(row) if row else None
+    return TaskRepository(get_db).get_for_owner(task_id, owner_id)
 
 
 def get_user_email(user_id: int) -> str | None:
     """Return the owner's email, falling back to their existing username."""
-    with get_db() as connection:
-        user = connection.execute(
-            "SELECT COALESCE(email, username) AS email FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-    return user["email"] if user else None
+    return UserRepository(get_db).get_email(user_id)
 
 
 def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    if get_task(task_id, owner_id) is None:
-        return None
-
-    updates = []
-    values = []
+    values = {}
     if title is not None:
-        updates.append("title = ?")
-        values.append(title)
+        values["title"] = title
     if status is not None:
-        updates.append("status = ?")
-        values.append(status)
-
-    if updates:
-        values.append(task_id)
-        with get_db() as connection:
-            connection.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?",
-                values + [owner_id],
-            )
-    return get_task(task_id, owner_id)
+        values["status"] = status
+    return TaskRepository(get_db).update_for_owner(task_id, owner_id, values)
 
 
 def error(message: str, status: int):
@@ -179,12 +120,9 @@ def register():
     if email is not None and (not isinstance(email, str) or not email.strip()):
         return error("email must be a non-empty string", 400)
     try:
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, generate_password_hash(data["password"]), email.strip() if email else None),
-            )
-            user_id = cursor.lastrowid
+        user_id = UserRepository(get_db).create_user(
+            username, generate_password_hash(data["password"]), email.strip() if email else None
+        )
     except sqlite3.IntegrityError:
         return error("username already exists", 409)
     return jsonify({"id": user_id, "username": username}), 201
@@ -195,8 +133,7 @@ def login():
     data = request.get_json(silent=True)
     if not isinstance(data, dict) or not isinstance(data.get("username"), str) or not isinstance(data.get("password"), str):
         return error("username and password are required", 400)
-    with get_db() as connection:
-        user = connection.execute("SELECT id, password_hash FROM users WHERE username = ?", (data["username"].strip(),)).fetchone()
+    user = UserRepository(get_db).get_by_username(data["username"].strip())
     if user is None or not check_password_hash(user["password_hash"], data["password"]):
         return error("invalid username or password", 401)
     return jsonify({"token": create_token(user["id"])})
