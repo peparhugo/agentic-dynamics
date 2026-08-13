@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import Mock
 
 import app as task_app
 import pytest
@@ -177,6 +178,47 @@ def test_update_task(client, auth_headers):
     assert response.status_code == 200
     assert response.get_json()["title"] == "New"
     assert response.get_json()["status"] == "done"
+
+
+def test_completing_task_enqueues_owner_notification(
+    client, auth_headers, monkeypatch
+):
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth_headers
+    ).get_json()
+    delay = Mock()
+    monkeypatch.setattr(task_app.send_notification_email, "delay", delay)
+
+    response = client.put(
+        f"/tasks/{task['id']}",
+        json={"status": "completed"},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice", "Ship release")
+
+
+def test_notification_only_enqueued_on_transition_to_completed(
+    client, auth_headers, monkeypatch
+):
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth_headers
+    ).get_json()
+    delay = Mock()
+    monkeypatch.setattr(task_app.send_notification_email, "delay", delay)
+
+    client.put(
+        f"/tasks/{task['id']}", json={"status": "pending"}, headers=auth_headers
+    )
+    client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers
+    )
+    client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=auth_headers
+    )
+
+    delay.assert_called_once_with("alice", "Ship release")
 
 
 @pytest.mark.parametrize("method", ["get", "put"])
