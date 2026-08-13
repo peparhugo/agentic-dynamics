@@ -1,8 +1,8 @@
-"""WebSocket notification server.
+"""Notification server with a pluggable transport layer.
 
-An asyncio-based server (built on the ``websockets`` library) that:
+An asyncio-based server that:
 
-* accepts WebSocket connections and assigns each client a unique id,
+* accepts connections and assigns each client a unique id,
 * broadcasts messages to every connected client,
 * delivers direct messages to a single client,
 * tracks connections in a thread-safe registry,
@@ -14,6 +14,11 @@ An asyncio-based server (built on the ``websockets`` library) that:
 * exposes ``GET /health``, ``GET /channels``,
   ``GET /channels/{name}/subscribers`` and ``GET /messages`` as plain
   HTTP endpoints.
+
+All client I/O goes through a pluggable :class:`transport.BaseTransport`.
+The default :class:`transport.WebSocketTransport` accepts WebSocket
+connections; other transports (SSE, polling, raw TCP, ...) can be swapped
+in without touching the core notification logic.
 
 Message format
 --------------
@@ -30,6 +35,7 @@ Supported ``type`` values:
 
 Configuration
 -------------
+* ``TRANSPORT``    - transport to use (default ``websocket``)
 * ``REDIS_URL``    - broker connection URL (default ``redis://localhost:6379/0``)
 * ``DATABASE_URL`` - SQLite database path (default ``messages.db``)
 """
@@ -37,36 +43,31 @@ Configuration
 import asyncio
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from urllib.parse import parse_qs, urlsplit
 
-import websockets
-from websockets.asyncio.server import Server, serve
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Headers, Request, Response
 
 from broker import ConnectionState, MessageBroker, MessageStore
 from registry import ClientRegistry
-
-
-def utc_now_iso() -> str:
-    """Return the current UTC time as an ISO-8601 string."""
-    return datetime.now(timezone.utc).isoformat()
-
-
-def make_message(msg_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Build a message dict following the required wire format."""
-    return {"type": msg_type, "payload": payload, "timestamp": utc_now_iso()}
-
-
-def dumps_message(msg_type: str, payload: Dict[str, Any]) -> str:
-    """Serialize a message dict to JSON for sending."""
-    return json.dumps(make_message(msg_type, payload))
+from transport import (
+    BaseTransport,
+    WebSocketTransport,
+    create_transport,
+    dumps_message,
+    make_message,
+    utc_now_iso,
+)
 
 
 class NotificationServer:
-    """WebSocket notification server with a REST health endpoint."""
+    """Notification server with a REST health endpoint.
+
+    The server is transport-agnostic: all client I/O is delegated to the
+    :attr:`transport` instance, which is selected by the ``TRANSPORT``
+    environment variable (``websocket`` by default).
+    """
 
     def __init__(
         self,
@@ -75,9 +76,9 @@ class NotificationServer:
         broker: Optional[MessageBroker] = None,
         store: Optional[MessageStore] = None,
         channel: Optional[str] = None,
+        transport: Optional[BaseTransport] = None,
     ):
         self.host = host
-        self.port = port
         self.registry = ClientRegistry()
         if broker is None:
             broker = MessageBroker(channel=channel or f"notifications:{uuid.uuid4().hex}")
@@ -85,61 +86,29 @@ class NotificationServer:
         self.store = store or MessageStore()
         self.state = ConnectionState(namespace=f"notif:{self.broker.channel}")
         self.instance_id = str(uuid.uuid4())
-        self._ws_server: Optional[Server] = None
+        self.transport = transport or create_transport(host=host, port=port)
+
+    @property
+    def port(self) -> int:
+        """The port the transport is actually bound to."""
+        return self.transport.port
 
     # ── lifecycle ────────────────────────────────────────────────────────
 
     async def start(self) -> "NotificationServer":
-        """Start serving WebSocket connections, HTTP endpoints and the broker."""
-        self._ws_server = await serve(
-            self.handle_connection,
-            self.host,
-            self.port,
-            process_request=self.process_request,
-        )
-        if self._ws_server.sockets:
-            self.port = self._ws_server.sockets[0].getsockname()[1]
+        """Start the transport and connect the broker."""
+        await self.transport.start(self)
         await self.broker.start(self._on_broker_message)
         return self
 
     async def stop(self) -> None:
-        """Shut the server down and wait for all handlers to finish."""
-        if self._ws_server is not None:
-            self._ws_server.close()
-            await self._ws_server.wait_closed()
-            self._ws_server = None
+        """Shut the transport down and disconnect the broker."""
+        await self.transport.stop()
         await self.broker.stop()
 
-    # ── websocket handling ───────────────────────────────────────────────
+    # ── message handling ─────────────────────────────────────────────────
 
-    async def handle_connection(self, connection) -> None:
-        """Assign a unique id and keep the client alive until it disconnects."""
-        client_id = str(uuid.uuid4())
-        self.registry.add(client_id, connection)
-        self.state.register(client_id)
-        self._restore_membership(client_id)
-        try:
-            message = make_message(
-                "system",
-                {
-                    "message": "connected",
-                    "client_id": client_id,
-                    "connected_clients": self.registry.count(),
-                },
-            )
-            await connection.send(json.dumps(message))
-            self.store.store_message(
-                None, "system", message["payload"], message["timestamp"]
-            )
-            async for raw in connection:
-                await self._on_message(connection, client_id, raw)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
-            self.state.unregister(client_id)
-
-    async def _on_message(self, connection, client_id: str, raw: str) -> None:
+    async def _on_message(self, client_id: str, raw: str) -> None:
         """Handle an inbound client message (broadcast / direct / channel requests)."""
         try:
             data = json.loads(raw)
@@ -257,14 +226,16 @@ class NotificationServer:
             else:
                 targets = self.registry.connections()
             if targets:
-                websockets.broadcast(targets, dumps_message("broadcast", payload))
+                self.transport.broadcast(targets, "broadcast", payload)
         elif msg_type == "direct":
             target = envelope.get("target")
             if target:
                 connection = self.registry.get(target)
                 if connection is not None:
                     try:
-                        await self._send(connection, "direct", payload)
+                        await self.transport.send_message(
+                            connection, "direct", payload
+                        )
                     except ConnectionClosed:
                         pass
 
@@ -320,13 +291,10 @@ class NotificationServer:
                 restored[client_id] = sorted(channels)
         return restored
 
-    async def _send(self, connection, msg_type: str, payload: Dict[str, Any]) -> None:
-        await connection.send(dumps_message(msg_type, payload))
-
     # ── REST endpoints ───────────────────────────────────────────────────
 
     async def process_request(self, connection, request: Request) -> Optional[Response]:
-        """Serve HTTP endpoints; everything else is treated as WebSocket."""
+        """Serve HTTP endpoints; everything else is treated as a connection."""
         parts = urlsplit(request.path)
         path = parts.path
         query = parse_qs(parts.query)
