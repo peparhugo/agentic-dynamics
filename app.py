@@ -1,17 +1,16 @@
 """
-Flask Task Management API with flat-file storage.
-Uses JSON files for persistence instead of databases.
+Flask Task Management API with repository pattern for data access.
+Uses JSON files for persistence via repository classes.
 """
 
 from flask import Flask, request, jsonify
 from datetime import datetime, timedelta
 from functools import wraps
-import json
 import os
-from pathlib import Path
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -22,102 +21,59 @@ DATA_DIR = os.environ.get("DATA_DIR", "data")
 TASKS_FILE = os.path.join(DATA_DIR, "tasks.json")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
 
-
-# ── Storage initialization ──────────────────────────────────────
-
-def get_data_dir():
-    """Get the data directory, supporting dynamic monkeypatch in tests."""
-    import app as app_module
-    return app_module.DATA_DIR
+# Initialize repositories
+_task_repository = None
+_user_repository = None
 
 
-def get_tasks_file():
-    """Get the tasks file path, supporting dynamic monkeypatch in tests."""
-    import app as app_module
-    return app_module.TASKS_FILE
+def get_task_repository():
+    """Get or create the task repository."""
+    global _task_repository
+    if _task_repository is None:
+        _task_repository = TaskRepository(TASKS_FILE)
+    return _task_repository
 
 
-def get_users_file():
-    """Get the users file path, supporting dynamic monkeypatch in tests."""
-    import app as app_module
-    return app_module.USERS_FILE
+def get_user_repository():
+    """Get or create the user repository."""
+    global _user_repository
+    if _user_repository is None:
+        _user_repository = UserRepository(USERS_FILE)
+    return _user_repository
 
 
-def ensure_data_dir():
-    data_dir = get_data_dir()
-    Path(data_dir).mkdir(exist_ok=True)
+def reset_repositories():
+    """Reset repository instances. Used for testing."""
+    global _task_repository, _user_repository
+    _task_repository = None
+    _user_repository = None
 
 
-def init_tasks_file():
-    ensure_data_dir()
-    tasks_file = get_tasks_file()
-    if not os.path.exists(tasks_file):
-        with open(tasks_file, "w") as f:
-            json.dump({"tasks": [], "next_id": 1}, f)
-
-
-def init_users_file():
-    ensure_data_dir()
-    users_file = get_users_file()
-    if not os.path.exists(users_file):
-        with open(users_file, "w") as f:
-            json.dump({"users": [], "next_id": 1}, f)
-
-
-def load_tasks():
-    init_tasks_file()
-    tasks_file = get_tasks_file()
-    with open(tasks_file, "r") as f:
-        data = json.load(f)
-    return data
-
-
-def save_tasks(data):
-    tasks_file = get_tasks_file()
-    with open(tasks_file, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def load_users():
-    init_users_file()
-    users_file = get_users_file()
-    with open(users_file, "r") as f:
-        data = json.load(f)
-    return data
-
-
-def save_users(data):
-    users_file = get_users_file()
-    with open(users_file, "w") as f:
-        json.dump(data, f, indent=2)
-
+# ── Initialization & Migrations ──────────────────────────────────
 
 def migrate_tasks_add_owner():
     """Add owner_id to existing tasks that don't have it."""
-    tasks_data = load_tasks()
-    users_data = load_users()
+    task_repo = get_task_repository()
+    user_repo = get_user_repository()
 
-    if users_data["users"]:
-        default_owner_id = users_data["users"][0]["id"]
+    all_users = user_repo.get_all()
+    if all_users:
+        default_owner_id = all_users[0]["id"]
+        all_tasks = task_repo.get_all()
         modified = False
-        for task in tasks_data["tasks"]:
+        for task in all_tasks:
             if "owner_id" not in task:
                 task["owner_id"] = default_owner_id
                 modified = True
         if modified:
-            save_tasks(tasks_data)
+            for task in all_tasks:
+                task_repo.save(task)
 
 
 def migrate_users_add_email():
     """Add email to existing users that don't have it."""
-    users_data = load_users()
-    modified = False
-    for user in users_data["users"]:
-        if "email" not in user:
-            user["email"] = f"user{user['id']}@example.com"
-            modified = True
-    if modified:
-        save_users(users_data)
+    user_repo = get_user_repository()
+    user_repo.migrate_add_emails()
 
 
 # ── Authentication ─────────────────────────────────────────────
@@ -179,25 +135,15 @@ def register():
     if not username or not password or not email:
         return jsonify({"error": "username, password, and email are required"}), 400
 
-    users_data = load_users()
+    user_repo = get_user_repository()
 
-    if any(u["username"] == username for u in users_data["users"]):
+    if user_repo.username_exists(username):
         return jsonify({"error": "username already exists"}), 409
 
-    user_id = users_data["next_id"]
-    new_user = {
-        "id": user_id,
-        "username": username,
-        "email": email,
-        "password_hash": generate_password_hash(password),
-        "created_at": datetime.utcnow().isoformat()
-    }
+    password_hash = generate_password_hash(password)
+    new_user = user_repo.create(username, email, password_hash)
 
-    users_data["users"].append(new_user)
-    users_data["next_id"] = user_id + 1
-    save_users(users_data)
-
-    return jsonify({"id": user_id, "username": username, "email": email}), 201
+    return jsonify({"id": new_user["id"], "username": new_user["username"], "email": new_user["email"]}), 201
 
 
 @app.route("/auth/login", methods=["POST"])
@@ -210,8 +156,8 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    users_data = load_users()
-    user = next((u for u in users_data["users"] if u["username"] == username), None)
+    user_repo = get_user_repository()
+    user = user_repo.get_by_username(username)
 
     if user is None or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "invalid username or password"}), 401
@@ -230,20 +176,8 @@ def create_task(user_id):
     if not title:
         return jsonify({"error": "title is required"}), 400
 
-    tasks_data = load_tasks()
-    task_id = tasks_data["next_id"]
-
-    new_task = {
-        "id": task_id,
-        "title": title,
-        "status": "pending",
-        "owner_id": user_id,
-        "created_at": datetime.utcnow().isoformat()
-    }
-
-    tasks_data["tasks"].append(new_task)
-    tasks_data["next_id"] = task_id + 1
-    save_tasks(tasks_data)
+    task_repo = get_task_repository()
+    new_task = task_repo.create(title, user_id)
 
     return jsonify(new_task), 201
 
@@ -252,8 +186,8 @@ def create_task(user_id):
 @token_required
 def list_tasks(user_id):
     """List all tasks for the current user, ordered by created_at descending."""
-    tasks_data = load_tasks()
-    user_tasks = [t for t in tasks_data["tasks"] if t.get("owner_id") == user_id]
+    task_repo = get_task_repository()
+    user_tasks = task_repo.get_by_owner_id(user_id)
     sorted_tasks = sorted(user_tasks, key=lambda t: t["created_at"], reverse=True)
     return jsonify(sorted_tasks), 200
 
@@ -262,8 +196,8 @@ def list_tasks(user_id):
 @token_required
 def get_task(user_id, task_id):
     """Get a single task by ID. User can only access their own tasks."""
-    tasks_data = load_tasks()
-    task = next((t for t in tasks_data["tasks"] if t["id"] == task_id), None)
+    task_repo = get_task_repository()
+    task = task_repo.get_by_id(task_id)
 
     if task is None:
         return jsonify({"error": "task not found"}), 404
@@ -279,9 +213,10 @@ def get_task(user_id, task_id):
 def update_task(user_id, task_id):
     """Update a task's title and/or status. User can only update their own tasks."""
     data = request.get_json(silent=True) or {}
-    tasks_data = load_tasks()
+    task_repo = get_task_repository()
+    user_repo = get_user_repository()
 
-    task = next((t for t in tasks_data["tasks"] if t["id"] == task_id), None)
+    task = task_repo.get_by_id(task_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
 
@@ -301,11 +236,10 @@ def update_task(user_id, task_id):
     if "status" in data:
         task["status"] = data["status"]
 
-    save_tasks(tasks_data)
+    task_repo.save(task)
 
     if "status" in data and data["status"] == "completed" and old_status != "completed":
-        users_data = load_users()
-        user = next((u for u in users_data["users"] if u["id"] == user_id), None)
+        user = user_repo.get_by_id(user_id)
         if user:
             send_notification_email.delay(user["email"], task["title"])
 
@@ -319,8 +253,6 @@ def health():
 
 
 if __name__ == "__main__":
-    init_tasks_file()
-    init_users_file()
     migrate_tasks_add_owner()
     migrate_users_add_email()
     app.run(debug=True)

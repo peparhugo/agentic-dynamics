@@ -24,6 +24,9 @@ def client(monkeypatch):
     monkeypatch.setattr(app_module, "TASKS_FILE", temp_tasks_file)
     monkeypatch.setattr(app_module, "USERS_FILE", temp_users_file)
 
+    # Reset repositories so they use the new paths
+    app_module.reset_repositories()
+
     with app.test_client() as client:
         yield client
 
