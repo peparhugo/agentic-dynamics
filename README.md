@@ -56,3 +56,21 @@ partials with standard Handlebars syntax such as `{{> header}}`.
 
 When `templates/default.hbs` is absent, pages retain the generator's built-in HTML
 output for compatibility.
+
+## Plugins
+
+Add TypeScript plugin modules under `plugins/` and list them in `ssg.config.ts`:
+
+```ts
+import type { Plugin, SsgConfig } from './src/index';
+import myPlugin from './plugins/my-plugin';
+
+const config: SsgConfig = { plugins: [myPlugin] };
+export default config;
+```
+
+A plugin can implement `onStart`, `beforeBuild`, `onFile(page)`, `afterBuild`, and
+`onEnd`. Hooks run in configuration order. Markdown parsing and template rendering
+are built-in plugins around configured file hooks; the development server and live
+reload are provided by `DevServerPlugin` while the existing `startDevServer` API
+remains available.

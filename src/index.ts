@@ -1,9 +1,14 @@
-import { promises as fs, type Dirent } from 'node:fs';
+import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import matter from 'gray-matter';
-import Handlebars from 'handlebars';
-import MarkdownIt from 'markdown-it';
-import { parse as parseYaml } from 'yaml';
+import { loadConfig } from './config.js';
+import type { Plugin } from './plugin.js';
+import { MarkdownPlugin, parseMarkdownPage } from './plugins/markdown.js';
+import { renderedPage, TemplatePlugin, type RenderedPage } from './plugins/template.js';
+
+export type { Plugin, PluginHook, SsgConfig } from './plugin.js';
+export { MarkdownPlugin } from './plugins/markdown.js';
+export { TemplatePlugin } from './plugins/template.js';
+export { DevServerPlugin } from './plugins/dev-server.js';
 
 export interface Frontmatter {
   title?: string;
@@ -24,61 +29,21 @@ export interface Page {
   template?: string;
   layout?: string | false;
   data?: Frontmatter;
+  /** Raw input available to file plugins until MarkdownPlugin processes it. */
+  source?: string;
 }
 
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
   templatesDir?: string;
+  configFile?: string;
+  plugins?: Plugin[];
 }
 
-const markdown = new MarkdownIt({ html: false });
-
-function renderMarkdown(source: string): string {
-  const embeddedHtml: string[] = [];
-  const codePattern = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`+[^`\n]*`+)/g;
-  const tokenized = source.split(codePattern).map((segment, index) => {
-    if (index % 2 === 1) return segment;
-    return segment.replace(/<!--[\s\S]*?-->|<\/?[A-Za-z][^>]*>/g, (tag) => {
-      const token = `SSGRAWHTMLTOKEN${embeddedHtml.length}ENDTOKEN`;
-      embeddedHtml.push(tag);
-      return token;
-    });
-  }).join('');
-  const rendered = markdown.render(tokenized);
-  return rendered.replace(/SSGRAWHTMLTOKEN(\d+)ENDTOKEN/g, (_token, index: string) =>
-    embeddedHtml[Number(index)] ?? '');
-}
-
-function parseFrontmatter(source: string): { content: string; data: Frontmatter } {
-  const parsed = matter(source, {
-    engines: {
-      yaml: (text: string): Record<string, unknown> =>
-        parseYaml(text, { schema: 'failsafe' }) as Record<string, unknown>,
-    },
-  });
-  const raw = parsed.data as Record<string, unknown>;
-  const tags = Array.isArray(raw.tags)
-    ? raw.tags.map(String)
-    : typeof raw.tags === 'string'
-      ? raw.tags.split(',').map((tag) => tag.trim()).filter(Boolean)
-      : [];
-
-  const data: Frontmatter = {
-    ...raw,
-    title: typeof raw.title === 'string' ? raw.title : undefined,
-    date: typeof raw.date === 'string' ? raw.date : undefined,
-    tags,
-    template: typeof raw.template === 'string' ? raw.template : undefined,
-    layout: raw.layout === false || raw.layout === 'false'
-      ? false
-      : typeof raw.layout === 'string' ? raw.layout : undefined,
-  };
-
-  return {
-    content: parsed.content,
-    data,
-  };
+export interface SsgEngine {
+  build(): Promise<Page[]>;
+  close(): Promise<void>;
 }
 
 function escapeHtml(value: string): string {
@@ -96,10 +61,7 @@ function formatDate(value: string | undefined): string | undefined {
   if (!match) return value;
   const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
   return new Intl.DateTimeFormat('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    timeZone: 'UTC',
+    year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
   }).format(date);
 }
 
@@ -119,98 +81,7 @@ ${body}
 }
 
 export function parsePage(source: string, sourcePath: string): Page {
-  const { content, data } = parseFrontmatter(source);
-  const baseName = path.basename(sourcePath, path.extname(sourcePath));
-  const title = data.title ?? baseName;
-  return {
-    title,
-    date: data.date,
-    tags: data.tags ?? [],
-    sourcePath,
-    outputName: `${baseName === 'index' ? 'index-page' : baseName}.html`,
-    html: renderMarkdown(content),
-    template: data.template,
-    layout: data.layout,
-    data: { ...data, title },
-  };
-}
-
-function templateContext(page: Page): Record<string, unknown> {
-  return {
-    ...(page.data ?? {}),
-    title: page.title,
-    date: page.date,
-    tags: page.tags,
-    content: page.html,
-    page,
-  };
-}
-
-function templatePath(directory: string, name: string): string {
-  const fileName = name.toLowerCase().endsWith('.hbs') ? name : `${name}.hbs`;
-  const resolved = path.resolve(directory, fileName);
-  const relative = path.relative(directory, resolved);
-  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-    throw new Error(`Template must be inside ${directory}: ${name}`);
-  }
-  return resolved;
-}
-
-async function readOptional(filePath: string): Promise<string | undefined> {
-  try {
-    return await fs.readFile(filePath, 'utf8');
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
-    throw error;
-  }
-}
-
-async function registerPartials(
-  handlebars: typeof Handlebars,
-  directory: string,
-  prefix = '',
-): Promise<void> {
-  let entries: Dirent[];
-  try {
-    entries = await fs.readdir(directory, { withFileTypes: true });
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return;
-    throw error;
-  }
-
-  await Promise.all(entries.map(async (entry) => {
-    const filePath = path.join(directory, entry.name);
-    if (entry.isDirectory()) {
-      await registerPartials(handlebars, filePath, `${prefix}${entry.name}/`);
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.hbs')) {
-      handlebars.registerPartial(`${prefix}${entry.name.slice(0, -4)}`, await fs.readFile(filePath, 'utf8'));
-    }
-  }));
-}
-
-async function renderTemplatePage(
-  page: Page,
-  templatesDir: string,
-  handlebars: typeof Handlebars,
-): Promise<string> {
-  const templateName = page.template ?? 'default';
-  const source = await readOptional(templatePath(templatesDir, templateName));
-  if (source === undefined) {
-    if (page.template) throw new Error(`Template not found: ${templateName}`);
-    return renderPage(page);
-  }
-
-  const context = templateContext(page);
-  const content = handlebars.compile(source)(context);
-  if (page.layout === false) return content;
-
-  const layoutName = page.layout ?? 'default';
-  const layout = await readOptional(templatePath(path.join(templatesDir, 'layouts'), layoutName));
-  if (layout === undefined) {
-    if (page.layout) throw new Error(`Layout not found: ${layoutName}`);
-    return content;
-  }
-  return handlebars.compile(layout)({ ...context, body: content });
+  return parseMarkdownPage(source, sourcePath);
 }
 
 export function renderPage(page: Page): string {
@@ -240,30 +111,72 @@ ${items}
 </main>`);
 }
 
-export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
+async function runHook(plugins: Plugin[], hook: keyof Plugin, page?: Page): Promise<void> {
+  for (const plugin of plugins) {
+    const handler = plugin[hook];
+    if (typeof handler === 'function') {
+      await (handler as (page?: Page) => void | Promise<void>).call(plugin, page);
+    }
+  }
+}
+
+export function createSsg(options: BuildOptions = {}): SsgEngine {
   const contentDir = path.resolve(options.contentDir ?? './content');
   const outputDir = path.resolve(options.outputDir ?? './dist');
   const templatesDir = path.resolve(options.templatesDir ?? './templates');
-  const entries = await fs.readdir(contentDir, { withFileTypes: true });
-  const markdownFiles = entries
-    .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))
-    .map((entry) => entry.name)
-    .sort();
+  const configured = options.plugins ?? loadConfig(options.configFile).plugins ?? [];
+  const plugins: Plugin[] = [new MarkdownPlugin(), ...configured, new TemplatePlugin(templatesDir)];
+  let started = false;
+  let closed = false;
 
-  const pages = await Promise.all(markdownFiles.map(async (fileName) => {
-    const sourcePath = path.join(contentDir, fileName);
-    return parsePage(await fs.readFile(sourcePath, 'utf8'), sourcePath);
-  }));
-  pages.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.title.localeCompare(b.title));
+  return {
+    async build(): Promise<Page[]> {
+      if (closed) throw new Error('SSG engine is closed');
+      if (!started) {
+        await runHook(plugins, 'onStart');
+        started = true;
+      }
+      await runHook(plugins, 'beforeBuild');
+      const entries = await fs.readdir(contentDir, { withFileTypes: true });
+      const markdownFiles = entries
+        .filter((entry) => entry.isFile() && /\.md$/i.test(entry.name))
+        .map((entry) => entry.name)
+        .sort();
+      const pages: Page[] = markdownFiles.map((fileName) => ({
+        title: path.basename(fileName, path.extname(fileName)),
+        tags: [],
+        sourcePath: path.join(contentDir, fileName),
+        outputName: '',
+        html: '',
+      }));
+      for (const page of pages) {
+        page.source = await fs.readFile(page.sourcePath, 'utf8');
+        await runHook(plugins, 'onFile', page);
+      }
+      pages.sort((a, b) => (b.date ?? '').localeCompare(a.date ?? '') || a.title.localeCompare(b.title));
+      await fs.mkdir(outputDir, { recursive: true });
+      await Promise.all(pages.map((page) => fs.writeFile(
+        path.join(outputDir, page.outputName),
+        (page as RenderedPage)[renderedPage] ?? renderPage(page),
+        'utf8',
+      )));
+      await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
+      await runHook(plugins, 'afterBuild');
+      return pages;
+    },
+    async close(): Promise<void> {
+      if (closed) return;
+      closed = true;
+      if (started) await runHook(plugins, 'onEnd');
+    },
+  };
+}
 
-  const handlebars = Handlebars.create();
-  await registerPartials(handlebars, path.join(templatesDir, 'partials'));
-  await fs.mkdir(outputDir, { recursive: true });
-  await Promise.all(pages.map(async (page) => fs.writeFile(
-    path.join(outputDir, page.outputName),
-    await renderTemplatePage(page, templatesDir, handlebars),
-    'utf8',
-  )));
-  await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
-  return pages;
+export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
+  const ssg = createSsg(options);
+  try {
+    return await ssg.build();
+  } finally {
+    await ssg.close();
+  }
 }
