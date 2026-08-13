@@ -127,6 +127,46 @@ def test_update_task_title_and_status(client):
     assert response.get_json() == {**task, "title": "Published", "status": "done"}
 
 
+def test_completing_a_task_enqueues_notification(client, monkeypatch):
+    client.post(
+        "/auth/register",
+        json={"username": "notify", "password": "secret", "email": "notify@example.com"},
+    )
+    notify_headers = client.post(
+        "/auth/login", json={"username": "notify", "password": "secret"}
+    ).get_json()
+    notify_headers = {"Authorization": f"Bearer {notify_headers['token']}"}
+    task = client.post("/tasks", json={"title": "Email me"}, headers=notify_headers).get_json()
+    calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    response = client.put(
+        f"/tasks/{task['id']}", json={"status": "completed"}, headers=notify_headers
+    )
+
+    assert response.status_code == 200
+    assert calls == [("notify@example.com", "Email me")]
+
+
+def test_notification_is_not_enqueued_without_a_completion_transition(client, monkeypatch):
+    client.post(
+        "/auth/register",
+        json={"username": "notify", "password": "secret", "email": "notify@example.com"},
+    )
+    login_response = client.post(
+        "/auth/login", json={"username": "notify", "password": "secret"}
+    ).get_json()
+    headers = {"Authorization": f"Bearer {login_response['token']}"}
+    task = client.post("/tasks", json={"title": "No duplicate"}, headers=headers).get_json()
+    calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert calls == [("notify@example.com", "No duplicate")]
+
+
 def test_update_missing_task_returns_json_404(client):
     response = client.put("/tasks/999", json={"status": "done"}, headers=auth_headers(client))
 
