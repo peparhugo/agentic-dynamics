@@ -32,10 +32,11 @@ Body`, '/content/entry.md');
 
 describe('CLI arguments', () => {
   it('reads build paths', () => {
-    expect(parseArgs(['build', '--content', 'posts', '--output', 'public'])).toEqual({
+    expect(parseArgs(['build', '--content', 'posts', '--output', 'public', '--templates', 'theme'])).toEqual({
       command: 'build',
       contentDir: 'posts',
       outputDir: 'public',
+      templatesDir: 'theme',
     });
   });
 
