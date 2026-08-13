@@ -39,6 +39,14 @@ async def wait_for_client_count(server, expected):
         await asyncio.sleep(0.01)
 
 
+async def fetch_json(port, path):
+    def fetch():
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}") as response:
+            return response.status, json.load(response)
+
+    return await asyncio.to_thread(fetch)
+
+
 @pytest.mark.asyncio
 async def test_connect_assigns_unique_ids_and_disconnects_cleanly(running_server):
     server, uri, _ = running_server
@@ -129,3 +137,103 @@ async def test_health_returns_connected_client_count(running_server):
     assert status == 200
     assert body == {"connected_clients": 1}
     await websocket.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_broadcast_only_reaches_subscribers(running_server):
+    _, uri, _ = running_server
+    sender, _ = await connect(uri)
+    alerts_client, _ = await connect(uri)
+    other_client, _ = await connect(uri)
+
+    await alerts_client.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+    await other_client.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+    await sender.send(
+        json.dumps(
+            {
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"text": "warning"},
+            }
+        )
+    )
+
+    message = json.loads(await alerts_client.recv())
+    assert message["type"] == "broadcast"
+    assert message["channel"] == "alerts"
+    assert message["payload"] == {"text": "warning"}
+    for websocket in (sender, other_client):
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(websocket.recv(), timeout=0.05)
+
+    await sender.close()
+    await alerts_client.close()
+    await other_client.close()
+
+
+@pytest.mark.asyncio
+async def test_unsubscribe_stops_channel_delivery(running_server):
+    _, uri, _ = running_server
+    sender, _ = await connect(uri)
+    subscriber, _ = await connect(uri)
+
+    await subscriber.send(json.dumps({"type": "subscribe", "channel": "system"}))
+    await subscriber.send(json.dumps({"type": "unsubscribe", "channel": "system"}))
+    await sender.send(
+        json.dumps(
+            {"type": "broadcast", "channel": "system", "payload": {"ok": True}}
+        )
+    )
+
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(subscriber.recv(), timeout=0.05)
+    await sender.close()
+    await subscriber.close()
+
+
+@pytest.mark.asyncio
+async def test_client_can_subscribe_to_multiple_channels(running_server):
+    _, uri, _ = running_server
+    sender, _ = await connect(uri)
+    subscriber, _ = await connect(uri)
+
+    for channel in ("alerts", "chat"):
+        await subscriber.send(json.dumps({"type": "subscribe", "channel": channel}))
+        await sender.send(
+            json.dumps(
+                {"type": "broadcast", "channel": channel, "payload": {"value": channel}}
+            )
+        )
+
+    messages = [json.loads(await subscriber.recv()) for _ in range(2)]
+    assert [message["channel"] for message in messages] == ["alerts", "chat"]
+    await sender.close()
+    await subscriber.close()
+
+
+@pytest.mark.asyncio
+async def test_channels_endpoints_and_disconnect_cleanup(running_server):
+    server, uri, port = running_server
+    first, first_welcome = await connect(uri)
+    second, second_welcome = await connect(uri)
+    for websocket in (first, second):
+        await websocket.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+    await second.send(json.dumps({"type": "subscribe", "channel": "chat"}))
+
+    status, channels = await fetch_json(port, "/channels")
+    assert status == 200
+    assert channels == {"channels": {"alerts": 2, "chat": 1}}
+    status, subscribers = await fetch_json(port, "/channels/alerts/subscribers")
+    assert status == 200
+    assert subscribers == {
+        "channel": "alerts",
+        "subscribers": sorted(
+            [first_welcome["payload"]["client_id"], second_welcome["payload"]["client_id"]]
+        ),
+    }
+
+    await second.close()
+    await wait_for_client_count(server, 1)
+    _, channels = await fetch_json(port, "/channels")
+    assert channels == {"channels": {"alerts": 1}}
+    await first.close()
