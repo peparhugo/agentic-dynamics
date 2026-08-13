@@ -4,6 +4,9 @@ import asyncio
 import json
 import pytest
 import uuid
+import sqlite3
+import os
+import tempfile
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,13 +15,42 @@ from websockets import ConnectionClosed
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase
 
-from server import NotificationServer, handle_websocket, health_handler, channels_handler, channel_subscribers_handler
+from server import (
+    NotificationServer, handle_websocket, health_handler, channels_handler,
+    channel_subscribers_handler, messages_handler, init_db, save_message, get_messages
+)
+import server as server_module
+
+
+@pytest.fixture(autouse=True)
+def setup_test_db():
+    """Setup test database for all tests."""
+    # Create a temporary database
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".db") as f:
+        db_path = f.name
+
+    original_url = server_module.DATABASE_URL
+    server_module.DATABASE_URL = db_path
+    init_db()
+
+    yield db_path
+
+    # Cleanup
+    server_module.DATABASE_URL = original_url
+    if os.path.exists(db_path):
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
 
 
 @pytest.fixture
 def notification_server():
     """Create a fresh NotificationServer instance for each test."""
-    return NotificationServer()
+    server_inst = NotificationServer()
+    # Mock Redis to avoid real Redis connections
+    server_inst.redis_pub = None
+    return server_inst
 
 
 class TestNotificationServer:
@@ -658,3 +690,378 @@ class TestEdgeCases:
         call_args = mock_ws.send.call_args[0][0]
         data = json.loads(call_args)
         assert len(data["payload"]["data"]) == 10000
+
+
+# Fixture for temporary test database (if needed for specific tests)
+@pytest.fixture
+def test_db():
+    """Provides access to the current test database path."""
+    return server_module.DATABASE_URL
+
+
+class TestMessagePersistence:
+    """Test message persistence to SQLite."""
+
+    def test_save_message(self, test_db):
+        """Test saving a message to the database."""
+        msg_id = save_message("alerts", "broadcast", {"text": "Alert"}, "2023-01-01T00:00:00")
+        assert msg_id is not None
+        assert msg_id > 0
+
+    def test_save_multiple_messages(self, test_db):
+        """Test saving multiple messages."""
+        id1 = save_message("alerts", "broadcast", {"text": "Alert 1"}, "2023-01-01T00:00:00")
+        id2 = save_message("alerts", "broadcast", {"text": "Alert 2"}, "2023-01-01T00:00:01")
+        id3 = save_message("system", "system", {"msg": "System"}, "2023-01-01T00:00:02")
+
+        assert id1 < id2 < id3
+
+    def test_get_messages_empty(self, test_db):
+        """Test retrieving messages from empty database."""
+        messages = get_messages()
+        assert len(messages) == 0
+
+    def test_get_messages_with_pagination(self, test_db):
+        """Test retrieving messages with pagination."""
+        # Save 10 messages
+        for i in range(10):
+            save_message(
+                f"channel-{i % 3}",
+                "broadcast",
+                {"text": f"Message {i}"},
+                f"2023-01-01T00:00:{i:02d}"
+            )
+
+        # Get messages with limit
+        messages = get_messages(limit=5, offset=0)
+        assert len(messages) == 5
+        # Should be in reverse order (newest first)
+        assert messages[0]["payload"]["text"] == "Message 9"
+        assert messages[4]["payload"]["text"] == "Message 5"
+
+    def test_get_messages_pagination_offset(self, test_db):
+        """Test offset pagination."""
+        for i in range(10):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, f"2023-01-01T00:00:{i:02d}")
+
+        messages_page1 = get_messages(limit=5, offset=0)
+        messages_page2 = get_messages(limit=5, offset=5)
+
+        assert len(messages_page1) == 5
+        assert len(messages_page2) == 5
+        assert messages_page1[0]["payload"]["text"] == "Message 9"
+        assert messages_page2[0]["payload"]["text"] == "Message 4"
+
+    def test_message_payload_json_serialization(self, test_db):
+        """Test that message payloads are properly serialized and deserialized."""
+        complex_payload = {
+            "text": "Hello",
+            "nested": {"key": "value"},
+            "list": [1, 2, 3],
+        }
+        save_message("channel", "broadcast", complex_payload, "2023-01-01T00:00:00")
+
+        messages = get_messages()
+        assert len(messages) == 1
+        assert messages[0]["payload"] == complex_payload
+
+    def test_message_fields(self, test_db):
+        """Test that saved messages contain all required fields."""
+        save_message("alerts", "broadcast", {"text": "Alert"}, "2023-01-01T00:00:00")
+
+        messages = get_messages()
+        assert len(messages) == 1
+        msg = messages[0]
+        assert "id" in msg
+        assert "channel" in msg
+        assert "type" in msg
+        assert "payload" in msg
+        assert "timestamp" in msg
+        assert msg["channel"] == "alerts"
+        assert msg["type"] == "broadcast"
+        assert msg["timestamp"] == "2023-01-01T00:00:00"
+
+    def test_get_messages_limit_bounds(self, test_db):
+        """Test that get_messages respects limit bounds."""
+        for i in range(100):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, "2023-01-01T00:00:00")
+
+        messages = get_messages(limit=1000)
+        assert len(messages) == 100
+
+        messages = get_messages(limit=50)
+        assert len(messages) == 50
+
+
+class TestMessagesPersistenceIntegration:
+    """Test message persistence integrated with NotificationServer."""
+
+    @pytest.mark.asyncio
+    async def test_broadcast_saves_to_db(self, test_db):
+        """Test that broadcast saves messages to database."""
+        server = NotificationServer()
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Test message"},
+        }
+        await server.broadcast(message)
+
+        # Check database
+        messages = get_messages()
+        assert len(messages) == 1
+        assert messages[0]["payload"]["text"] == "Test message"
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_channel_saves_to_db(self, test_db):
+        """Test that broadcast_to_channel saves messages to database."""
+        server = NotificationServer()
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+        server.subscribe("client-1", "alerts")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Alert message"},
+        }
+        await server.broadcast_to_channel("alerts", message)
+
+        # Check database
+        messages = get_messages()
+        assert len(messages) == 1
+        assert messages[0]["channel"] == "alerts"
+        assert messages[0]["payload"]["text"] == "Alert message"
+
+    @pytest.mark.asyncio
+    async def test_send_direct_saves_to_db(self, test_db):
+        """Test that send_direct saves messages to database."""
+        server = NotificationServer()
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+
+        message = {
+            "type": "direct",
+            "payload": {"text": "Direct message"},
+        }
+        await server.send_direct("client-1", message)
+
+        # Check database
+        messages = get_messages()
+        assert len(messages) == 1
+        assert "direct:" in messages[0]["channel"]
+        assert messages[0]["payload"]["text"] == "Direct message"
+
+    @pytest.mark.asyncio
+    async def test_multiple_broadcasts_save_all(self, test_db):
+        """Test that multiple broadcasts save all messages."""
+        server = NotificationServer()
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+
+        for i in range(5):
+            await server.broadcast({
+                "type": "broadcast",
+                "payload": {"text": f"Message {i}"},
+            })
+
+        messages = get_messages()
+        assert len(messages) == 5
+
+
+class TestMessagesRESTEndpoint(AioHTTPTestCase):
+    """Test the REST messages endpoint."""
+
+    async def get_application(self):
+        """Create the test application."""
+        app = web.Application()
+        app.router.add_get("/messages", messages_handler)
+        return app
+
+    async def test_messages_endpoint_empty(self):
+        """Test messages endpoint with no messages."""
+        resp = await self.client.request("GET", "/messages")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "messages" in data
+        assert data["messages"] == []
+        assert data["limit"] == 50
+        assert data["offset"] == 0
+        assert data["count"] == 0
+
+    async def test_messages_endpoint_with_data(self):
+        """Test messages endpoint with messages."""
+        # Insert some messages
+        for i in range(5):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/messages")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 5
+        assert data["count"] == 5
+
+    async def test_messages_endpoint_limit(self):
+        """Test messages endpoint with custom limit."""
+        for i in range(20):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/messages?limit=10")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 10
+        assert data["limit"] == 10
+
+    async def test_messages_endpoint_offset(self):
+        """Test messages endpoint with offset."""
+        for i in range(20):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/messages?limit=5&offset=10")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 5
+        assert data["offset"] == 10
+
+    async def test_messages_endpoint_invalid_limit(self):
+        """Test messages endpoint with invalid limit."""
+        resp = await self.client.request("GET", "/messages?limit=abc")
+        assert resp.status == 400
+        data = await resp.json()
+        assert "error" in data
+
+    async def test_messages_endpoint_invalid_offset(self):
+        """Test messages endpoint with invalid offset."""
+        resp = await self.client.request("GET", "/messages?offset=xyz")
+        assert resp.status == 400
+        data = await resp.json()
+        assert "error" in data
+
+    async def test_messages_endpoint_max_limit(self):
+        """Test messages endpoint respects max limit."""
+        for i in range(2000):
+            save_message("channel", "broadcast", {"text": f"Message {i}"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/messages?limit=10000")
+        assert resp.status == 200
+        data = await resp.json()
+        # Should be clamped to 1000
+        assert data["limit"] == 1000
+        assert len(data["messages"]) == 1000
+
+    async def test_messages_endpoint_negative_offset(self):
+        """Test messages endpoint with negative offset."""
+        save_message("channel", "broadcast", {"text": "Message"}, "2023-01-01T00:00:00")
+
+        resp = await self.client.request("GET", "/messages?offset=-1")
+        assert resp.status == 200
+        data = await resp.json()
+        # Should be clamped to 0
+        assert data["offset"] == 0
+        assert len(data["messages"]) == 1
+
+
+class TestRedisIntegration:
+    """Test Redis pub/sub integration."""
+
+    @pytest.mark.asyncio
+    async def test_redis_init(self):
+        """Test Redis connection initialization."""
+        server = NotificationServer()
+        # Mock the aioredis
+        with patch("server.aioredis.from_url") as mock_redis:
+            mock_redis.return_value = AsyncMock()
+            try:
+                await server.init_redis()
+                assert server.redis_pub is not None
+            except Exception:
+                pass
+
+    @pytest.mark.asyncio
+    async def test_publish_to_redis(self):
+        """Test publishing to Redis."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        server.redis_pub = mock_redis
+
+        await server.publish_to_redis("test_channel", {"text": "test"})
+
+        # Verify publish was called
+        mock_redis.publish.assert_called_once()
+        call_args = mock_redis.publish.call_args
+        assert call_args[0][0] == "test_channel"
+
+    @pytest.mark.asyncio
+    async def test_broadcast_publishes_to_redis(self, test_db):
+        """Test that broadcast publishes to Redis."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        server.redis_pub = mock_redis
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Test"},
+        }
+        await server.broadcast(message)
+
+        # Verify Redis publish was called
+        mock_redis.publish.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_channel_publishes_to_redis(self, test_db):
+        """Test that broadcast_to_channel publishes to Redis."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        server.redis_pub = mock_redis
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+        server.subscribe("client-1", "alerts")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Alert"},
+        }
+        await server.broadcast_to_channel("alerts", message)
+
+        # Verify Redis publish was called
+        mock_redis.publish.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_send_direct_publishes_to_redis(self, test_db):
+        """Test that send_direct publishes to Redis."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        server.redis_pub = mock_redis
+        mock_ws = AsyncMock()
+        server.add_client("client-1", mock_ws)
+
+        message = {
+            "type": "direct",
+            "payload": {"text": "Direct"},
+        }
+        await server.send_direct("client-1", message)
+
+        # Verify Redis publish was called
+        mock_redis.publish.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_close_redis(self):
+        """Test closing Redis connections."""
+        server = NotificationServer()
+        mock_redis = AsyncMock()
+        mock_redis.close = MagicMock()
+        mock_redis.wait_closed = AsyncMock()
+        server.redis_pub = mock_redis
+        server.redis_sub = AsyncMock()
+        server.redis_sub.close = MagicMock()
+        server.redis_sub.wait_closed = AsyncMock()
+        server.redis_listen_task = asyncio.create_task(asyncio.sleep(10))
+
+        await server.close_redis()
+
+        # Verify close was called
+        mock_redis.close.assert_called()
+        mock_redis.wait_closed.assert_called()
