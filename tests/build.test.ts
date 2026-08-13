@@ -74,4 +74,64 @@ describe('build', () => {
 
     expect(() => build({ contentDir, outputDir })).toThrow(/Duplicate page slug/);
   });
+
+  it('falls back to the built-in default templates when templatesDir does not exist', () => {
+    fs.writeFileSync(path.join(contentDir, 'only.md'), '---\ntitle: Only\n---\n\nOnly body.\n');
+
+    const result = build({
+      contentDir,
+      outputDir,
+      templatesDir: path.join(root, 'no-such-templates-dir'),
+    });
+
+    expect(result.pages).toHaveLength(1);
+    const html = fs.readFileSync(path.join(outputDir, 'only.html'), 'utf-8');
+    expect(html).toContain('<h1>Only</h1>');
+    expect(html).toContain('Only body.');
+  });
+
+  describe('with a custom templates directory', () => {
+    let templatesDir: string;
+
+    beforeEach(() => {
+      templatesDir = path.join(root, 'templates');
+      fs.mkdirSync(path.join(templatesDir, 'layouts'), { recursive: true });
+      fs.mkdirSync(path.join(templatesDir, 'partials'), { recursive: true });
+      fs.writeFileSync(
+        path.join(templatesDir, 'layouts', 'default.hbs'),
+        '<html><head><title>{{title}}</title></head><body>{{> nav}}{{{body}}}</body></html>'
+      );
+      fs.writeFileSync(path.join(templatesDir, 'partials', 'nav.hbs'), '<nav>site-nav</nav>');
+      fs.writeFileSync(
+        path.join(templatesDir, 'page.hbs'),
+        '<article>{{title}}: {{{content}}}</article>'
+      );
+      fs.writeFileSync(
+        path.join(templatesDir, 'post.hbs'),
+        '<article class="post">{{title}} (post): {{{content}}}</article>'
+      );
+    });
+
+    it('renders pages with the default template and includes registered partials', () => {
+      fs.writeFileSync(path.join(contentDir, 'default-page.md'), '---\ntitle: Default Page\n---\n\nHi.\n');
+
+      build({ contentDir, outputDir, templatesDir });
+
+      const html = fs.readFileSync(path.join(outputDir, 'default-page.html'), 'utf-8');
+      expect(html).toContain('<nav>site-nav</nav>');
+      expect(html).toContain('<article>Default Page:');
+    });
+
+    it('renders a page with the template named in its frontmatter', () => {
+      fs.writeFileSync(
+        path.join(contentDir, 'blog-post.md'),
+        '---\ntitle: Blog Post\ntemplate: post\n---\n\nHello.\n'
+      );
+
+      build({ contentDir, outputDir, templatesDir });
+
+      const html = fs.readFileSync(path.join(outputDir, 'blog-post.html'), 'utf-8');
+      expect(html).toContain('<article class="post">Blog Post (post):');
+    });
+  });
 });

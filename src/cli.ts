@@ -12,8 +12,9 @@ export function createProgram(): Command {
     .description('Generate the site from Markdown content')
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
-    .action((opts: { content: string; output: string }) => {
-      const result = build({ contentDir: opts.content, outputDir: opts.output });
+    .option('--templates <dir>', 'templates directory', './templates')
+    .action((opts: { content: string; output: string; templates: string }) => {
+      const result = build({ contentDir: opts.content, outputDir: opts.output, templatesDir: opts.templates });
       console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
     });
 

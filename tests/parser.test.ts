@@ -100,6 +100,26 @@ describe('parseMarkdownFile', () => {
     expect(page.tags).toEqual([]);
     expect(page.title).toBe('Bare');
   });
+
+  it('reads an explicit template and layout from frontmatter', () => {
+    const filePath = path.join(dir, 'styled.md');
+    fs.writeFileSync(filePath, '---\ntitle: Styled\ntemplate: post\nlayout: minimal\n---\n\nBody.\n');
+
+    const page = parseMarkdownFile(filePath, dir);
+
+    expect(page.template).toBe('post');
+    expect(page.layout).toBe('minimal');
+  });
+
+  it('leaves template and layout undefined when not specified', () => {
+    const filePath = path.join(dir, 'unstyled.md');
+    fs.writeFileSync(filePath, '---\ntitle: Unstyled\n---\n\nBody.\n');
+
+    const page = parseMarkdownFile(filePath, dir);
+
+    expect(page.template).toBeUndefined();
+    expect(page.layout).toBeUndefined();
+  });
 });
 
 describe('findMarkdownFiles', () => {

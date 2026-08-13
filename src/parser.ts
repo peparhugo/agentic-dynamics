@@ -58,6 +58,8 @@ export function parseMarkdownFile(filePath: string, contentDir: string): Page {
   const title = typeof data.title === 'string' && data.title.trim() ? data.title.trim() : titleFromSlug(slugify(fileName));
   const date = normalizeDate(data.date);
   const tags = normalizeTags(data.tags);
+  const template = typeof data.template === 'string' && data.template.trim() ? data.template.trim() : undefined;
+  const layout = typeof data.layout === 'string' && data.layout.trim() ? data.layout.trim() : undefined;
 
   const html = marked.parse(content, { async: false }) as string;
 
@@ -65,6 +67,8 @@ export function parseMarkdownFile(filePath: string, contentDir: string): Page {
     title,
     date,
     tags,
+    template,
+    layout,
     slug,
     sourcePath: filePath,
     outputPath: `${slug}.html`,

@@ -19,13 +19,17 @@ describe('cli', () => {
     logSpy.mockRestore();
   });
 
-  it('defaults to ./content and ./dist when no options are given', () => {
+  it('defaults to ./content, ./dist, and ./templates when no options are given', () => {
     createProgram().parse(['node', 'ssg', 'build']);
 
-    expect(mockedBuild).toHaveBeenCalledWith({ contentDir: './content', outputDir: './dist' });
+    expect(mockedBuild).toHaveBeenCalledWith({
+      contentDir: './content',
+      outputDir: './dist',
+      templatesDir: './templates',
+    });
   });
 
-  it('passes through custom --content and --output options', () => {
+  it('passes through custom --content, --output, and --templates options', () => {
     createProgram().parse([
       'node',
       'ssg',
@@ -34,11 +38,14 @@ describe('cli', () => {
       './my-content',
       '--output',
       './public',
+      '--templates',
+      './my-templates',
     ]);
 
     expect(mockedBuild).toHaveBeenCalledWith({
       contentDir: './my-content',
       outputDir: './public',
+      templatesDir: './my-templates',
     });
   });
 
