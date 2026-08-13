@@ -6,7 +6,8 @@ An asyncio notification server built directly on the `websockets` library.
 
 ```bash
 python3 -m pip install -r requirements.txt
-python3 app.py --host 127.0.0.1 --port 8765
+REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=sqlite:///messages.db \
+  python3 app.py --host 127.0.0.1 --port 8765
 ```
 
 Connect a WebSocket client to `ws://127.0.0.1:8765`. On connection, the server
@@ -46,6 +47,15 @@ client disconnects.
 `GET /channels` returns active channels and their subscriber counts. `GET
 /channels/{name}/subscribers` returns the channel name and its subscriber IDs;
 an inactive channel has an empty subscriber list.
+
+Messages are published through Redis so multiple server instances share one
+backbone. Client presence and channel subscriptions are also held in Redis for
+cross-instance routing. `REDIS_URL` selects the Redis connection and
+`DATABASE_URL` selects the SQLite database (either a path or a `sqlite:///` URL).
+
+Every broadcast and direct message is stored in SQLite. `GET
+/messages?limit=50&offset=0` returns newest messages first, including `id`,
+`channel`, `type`, `payload`, and `timestamp`.
 
 ## Test
 
