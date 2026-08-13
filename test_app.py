@@ -1132,3 +1132,58 @@ async def test_messages_json_payload():
             os.environ["DATABASE_URL"] = original_db_url
         elif "DATABASE_URL" in os.environ:
             del os.environ["DATABASE_URL"]
+
+
+@pytest.mark.asyncio
+async def test_transport_interface():
+    """Test that BaseTransport and WebSocketTransport are properly abstracted."""
+    from app import BaseTransport, WebSocketTransport, registry, get_transport
+
+    registry.clients.clear()
+
+    class MockWebSocket:
+        def __init__(self):
+            self.messages = []
+
+        async def send(self, msg):
+            self.messages.append(json.loads(msg))
+
+    transport = get_transport()
+    assert isinstance(transport, BaseTransport)
+    assert isinstance(transport, WebSocketTransport)
+
+    ws = MockWebSocket()
+    await registry.register("test-client", ws)
+
+    msg = create_message("broadcast", {"test": "data"})
+
+    await transport.send_message("test-client", msg)
+    assert len(ws.messages) == 1
+    assert ws.messages[0]["payload"]["test"] == "data"
+
+    await transport.broadcast(msg)
+    assert len(ws.messages) == 2
+
+    registry.clients.clear()
+
+
+@pytest.mark.asyncio
+async def test_transport_custom_env():
+    """Test that TRANSPORT env var selects the correct transport."""
+    import os
+    from app import get_transport, WebSocketTransport
+
+    original_transport = os.environ.get("TRANSPORT")
+    try:
+        os.environ["TRANSPORT"] = "websocket"
+        transport = get_transport()
+        assert isinstance(transport, WebSocketTransport)
+
+        os.environ["TRANSPORT"] = "WEBSOCKET"
+        transport = get_transport()
+        assert isinstance(transport, WebSocketTransport)
+    finally:
+        if original_transport:
+            os.environ["TRANSPORT"] = original_transport
+        elif "TRANSPORT" in os.environ:
+            del os.environ["TRANSPORT"]

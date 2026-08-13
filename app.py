@@ -6,6 +6,7 @@ import asyncio
 import json
 import uuid
 import os
+from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, Optional
 import websockets
@@ -120,6 +121,57 @@ class ClientRegistry:
                 await self.unregister(client_id)
 
 
+class BaseTransport(ABC):
+    """Abstract base class for transport mechanisms."""
+
+    @abstractmethod
+    async def on_connect(self, client_id: str):
+        """Called when a client connects."""
+        pass
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str):
+        """Called when a client disconnects."""
+        pass
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict):
+        """Send a message to a specific client."""
+        pass
+
+    @abstractmethod
+    async def broadcast(self, message: dict, channel: str = None):
+        """Broadcast a message to clients."""
+        pass
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket transport implementation."""
+
+    def __init__(self, registry: ClientRegistry):
+        self.registry = registry
+
+    async def on_connect(self, client_id: str):
+        """Called when a client connects."""
+        await self.registry.broadcast(
+            create_message("system", {"event": "client_joined", "client_id": client_id})
+        )
+
+    async def on_disconnect(self, client_id: str):
+        """Called when a client disconnects."""
+        await self.registry.broadcast(
+            create_message("system", {"event": "client_left", "client_id": client_id})
+        )
+
+    async def send_message(self, client_id: str, message: dict):
+        """Send a message to a specific client."""
+        await self.registry.send_direct(client_id, message)
+
+    async def broadcast(self, message: dict, channel: str = None):
+        """Broadcast a message to clients."""
+        await self.registry.broadcast(message, channel=channel)
+
+
 # Global registry
 registry = ClientRegistry()
 
@@ -135,6 +187,15 @@ def get_db_path() -> str:
 def get_redis_url() -> str:
     """Get the Redis URL from environment or use default."""
     return os.environ.get("REDIS_URL", "redis://localhost:6379")
+
+
+def get_transport() -> BaseTransport:
+    """Get the transport instance based on TRANSPORT env var."""
+    transport_type = os.environ.get("TRANSPORT", "websocket").lower()
+    if transport_type == "websocket":
+        return WebSocketTransport(registry)
+    else:
+        raise ValueError(f"Unknown transport type: {transport_type}")
 
 
 async def init_database():
@@ -241,14 +302,13 @@ async def redis_subscriber():
 async def websocket_handler(websocket):
     """Handle WebSocket connection."""
     client_id = str(uuid.uuid4())
+    transport = get_transport()
 
     # Register client
     await registry.register(client_id, websocket)
 
     # Notify all clients of new connection
-    await registry.broadcast(
-        create_message("system", {"event": "client_joined", "client_id": client_id})
-    )
+    await transport.on_connect(client_id)
 
     try:
         async for raw_message in websocket:
@@ -322,9 +382,7 @@ async def websocket_handler(websocket):
         # Unregister client
         await registry.unregister(client_id)
         # Notify all clients of disconnection
-        await registry.broadcast(
-            create_message("system", {"event": "client_left", "client_id": client_id})
-        )
+        await transport.on_disconnect(client_id)
 
 
 async def health_handler(request):
