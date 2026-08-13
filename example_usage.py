@@ -43,6 +43,28 @@ async def check_health():
             print(f"Server health: {data}")
 
 
+async def get_message_history():
+    """Retrieve message history from persistent storage."""
+    print("Retrieving message history...")
+    async with aiohttp.ClientSession() as session:
+        async with session.get('http://localhost:8080/messages?limit=10') as resp:
+            data = await resp.json()
+            print(f"Message history (total: {data['total']}):")
+            for msg in data['messages']:
+                print(f"  - [{msg['timestamp']}] {msg['channel']}: {msg['payload']}")
+
+
+async def get_channel_messages(channel: str):
+    """Retrieve messages for a specific channel."""
+    print(f"Retrieving messages for channel '{channel}'...")
+    async with aiohttp.ClientSession() as session:
+        async with session.get(f'http://localhost:8080/messages?channel={channel}') as resp:
+            data = await resp.json()
+            print(f"Messages in '{channel}' channel (total: {data['total']}):")
+            for msg in data['messages']:
+                print(f"  - {msg['payload']}")
+
+
 async def main():
     """Run example scenarios."""
     # Check server is running
@@ -54,7 +76,21 @@ async def main():
 
     # Run example client
     try:
-        await example_client()
+        print("\n--- WebSocket Client Example ---")
+        # Create a task for the client to run briefly
+        client_task = asyncio.create_task(example_client())
+        try:
+            await asyncio.wait_for(client_task, timeout=3)
+        except asyncio.TimeoutError:
+            client_task.cancel()
+
+        # Show message history features
+        print("\n--- Message History Example ---")
+        await get_message_history()
+
+        print("\n--- Channel Messages Example ---")
+        await get_channel_messages('broadcast')
+
     except Exception as e:
         print(f"Error: {e}")
 

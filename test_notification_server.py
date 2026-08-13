@@ -7,10 +7,15 @@ import pytest_asyncio
 import websockets
 from aiohttp import ClientSession
 import threading
+import tempfile
+import os
+from unittest.mock import patch, AsyncMock
 
 from client_registry import ClientRegistry
 from message_handler import Message, MessageHandler
 from notification_server import NotificationServer
+from message_persistence import MessagePersistence
+from redis_broker import RedisBroker
 
 
 # ── ClientRegistry Tests ──────────────────────────────────────
@@ -788,3 +793,283 @@ class TestChannelRESTEndpoints:
                 assert data['channel'] == 'nonexistent'
                 assert data['count'] == 0
                 assert data['subscribers'] == []
+
+
+# ── Message Persistence Tests ──────────────────────────────────────
+
+class TestMessagePersistence:
+    """Tests for message persistence with SQLite."""
+
+    def test_message_persistence_init(self):
+        """Test initializing message persistence."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+            assert persistence.db_path == db_path
+            assert os.path.exists(db_path)
+
+    def test_store_and_retrieve_message(self):
+        """Test storing and retrieving messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            msg_id = persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "hello"},
+                timestamp="2024-01-01T00:00:00"
+            )
+
+            assert msg_id > 0
+
+            messages = persistence.get_messages(channel="alerts")
+            assert len(messages) == 1
+            assert messages[0]["channel"] == "alerts"
+            assert messages[0]["type"] == "broadcast"
+            assert messages[0]["payload"]["text"] == "hello"
+
+    def test_store_multiple_messages(self):
+        """Test storing and retrieving multiple messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            for i in range(5):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"message {i}"},
+                    timestamp=f"2024-01-01T00:00:{i:02d}"
+                )
+
+            messages = persistence.get_messages(channel="alerts")
+            assert len(messages) == 5
+
+    def test_get_messages_with_limit(self):
+        """Test retrieving messages with limit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            for i in range(10):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"message {i}"},
+                    timestamp=f"2024-01-01T00:00:{i:02d}"
+                )
+
+            messages = persistence.get_messages(channel="alerts", limit=5)
+            assert len(messages) == 5
+
+    def test_get_messages_with_offset(self):
+        """Test retrieving messages with offset."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            for i in range(10):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"message {i}"},
+                    timestamp=f"2024-01-01T00:00:{i:02d}"
+                )
+
+            messages = persistence.get_messages(channel="alerts", limit=5, offset=5)
+            assert len(messages) == 5
+
+    def test_get_message_count(self):
+        """Test getting message count."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            for i in range(3):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"message {i}"},
+                    timestamp=f"2024-01-01T00:00:{i:02d}"
+                )
+
+            count = persistence.get_message_count(channel="alerts")
+            assert count == 3
+
+    def test_clear_messages_by_channel(self):
+        """Test clearing messages by channel."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "hello"},
+                timestamp="2024-01-01T00:00:00"
+            )
+
+            persistence.store_message(
+                channel="chat",
+                message_type="broadcast",
+                payload={"text": "hello"},
+                timestamp="2024-01-01T00:00:01"
+            )
+
+            persistence.clear_messages(channel="alerts")
+
+            assert persistence.get_message_count(channel="alerts") == 0
+            assert persistence.get_message_count(channel="chat") == 1
+
+    def test_get_all_messages(self):
+        """Test retrieving all messages across channels."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "alert"},
+                timestamp="2024-01-01T00:00:00"
+            )
+
+            persistence.store_message(
+                channel="chat",
+                message_type="broadcast",
+                payload={"text": "chat"},
+                timestamp="2024-01-01T00:00:01"
+            )
+
+            messages = persistence.get_messages()
+            assert len(messages) == 2
+            assert messages[0]["channel"] in ["alerts", "chat"]
+
+
+# ── Redis Broker Tests ─────────────────────────────────────────────
+
+class TestRedisBroker:
+    """Tests for Redis pub/sub broker."""
+
+    def test_broker_initialization(self):
+        """Test Redis broker initialization."""
+        broker = RedisBroker(redis_url="redis://localhost:6379")
+        assert broker.redis_url == "redis://localhost:6379"
+        assert broker.redis is None
+        assert broker.pubsub is None
+
+
+# ── REST Messages Endpoint Tests ───────────────────────────────────
+
+class TestMessagesRESTEndpoint:
+    """Tests for the /messages REST endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint(self, server):
+        """Test the /messages endpoint."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            broadcast_msg = json.dumps({
+                'type': 'broadcast',
+                'payload': {'text': 'test message'},
+                'timestamp': '2024-01-01T00:00:00'
+            })
+            await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/messages') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert 'messages' in data
+                assert 'count' in data
+                assert 'total' in data
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_with_limit(self, server):
+        """Test /messages endpoint with limit parameter."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(5):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'text': f'message {i}'},
+                    'timestamp': '2024-01-01T00:00:00'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/messages?limit=2') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['count'] <= 2
+                assert data['limit'] == 2
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_with_offset(self, server):
+        """Test /messages endpoint with offset parameter."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(5):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'text': f'message {i}'},
+                    'timestamp': '2024-01-01T00:00:00'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/messages?limit=10&offset=2') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['offset'] == 2
+
+    @pytest.mark.asyncio
+    async def test_messages_endpoint_by_channel(self, server):
+        """Test /messages endpoint filtering by channel."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            broadcast_msg = json.dumps({
+                'type': 'broadcast',
+                'payload': {'channel': 'alerts', 'text': 'alert'},
+                'timestamp': '2024-01-01T00:00:00'
+            })
+            await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/messages?channel=alerts') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['channel'] == 'alerts'

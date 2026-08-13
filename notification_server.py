@@ -10,6 +10,8 @@ from aiohttp import web
 
 from client_registry import ClientRegistry
 from message_handler import Message, MessageHandler
+from redis_broker import RedisBroker
+from message_persistence import MessagePersistence
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -28,16 +30,20 @@ class NotificationServer:
         self.ws_port = ws_port
         self.rest_port = rest_port
         self.client_registry = ClientRegistry()
+        self.redis_broker = RedisBroker()
+        self.message_persistence = MessagePersistence()
         self.rest_app = web.Application()
         self._setup_rest_routes()
         self.ws_server: Optional[websockets.server.WebSocketServer] = None
         self._stop_event = asyncio.Event()
+        self._redis_subscribe_task: Optional[asyncio.Task] = None
 
     def _setup_rest_routes(self):
         """Setup REST API routes."""
         self.rest_app.router.add_get('/health', self._health_handler)
         self.rest_app.router.add_get('/channels', self._channels_handler)
         self.rest_app.router.add_get('/channels/{name}/subscribers', self._channel_subscribers_handler)
+        self.rest_app.router.add_get('/messages', self._messages_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Handle health check endpoint."""
@@ -63,6 +69,30 @@ class NotificationServer:
             'channel': channel_name,
             'subscribers': subscribers,
             'count': len(subscribers)
+        })
+
+    async def _messages_handler(self, request: web.Request) -> web.Response:
+        """Handle GET /messages endpoint for message history."""
+        limit = int(request.query.get('limit', 50))
+        offset = int(request.query.get('offset', 0))
+        channel = request.query.get('channel')
+
+        limit = min(limit, 1000)
+
+        messages = self.message_persistence.get_messages(
+            channel=channel,
+            limit=limit,
+            offset=offset
+        )
+        total_count = self.message_persistence.get_message_count(channel=channel)
+
+        return web.json_response({
+            'messages': messages,
+            'count': len(messages),
+            'total': total_count,
+            'limit': limit,
+            'offset': offset,
+            'channel': channel
         })
 
     async def handle_client(
@@ -97,7 +127,7 @@ class NotificationServer:
     async def _handle_message(self, sender_id: str, message: Message) -> None:
         """Route message to appropriate handler."""
         if message.type == 'broadcast':
-            await self._broadcast_message(message)
+            await self._broadcast_message(message, from_redis=False)
         elif message.type == 'direct':
             await self._direct_message(message)
         elif message.type == 'subscribe':
@@ -106,6 +136,17 @@ class NotificationServer:
             await self._handle_unsubscribe(sender_id, message)
         elif message.type == 'system':
             logger.info(f"System message from {sender_id}: {message.payload}")
+
+    async def _handle_redis_message(self, channel: str, data: str) -> None:
+        """Handle messages received from Redis pub/sub."""
+        try:
+            message = Message.from_json(data)
+            if message.type == 'broadcast':
+                await self._broadcast_message(message, from_redis=True)
+            elif message.type == 'direct':
+                await self._direct_message(message)
+        except Exception as e:
+            logger.error(f"Error handling Redis message: {e}")
 
     async def _handle_subscribe(self, sender_id: str, message: Message) -> None:
         """Handle client subscribing to a channel."""
@@ -125,9 +166,25 @@ class NotificationServer:
         self.client_registry.unsubscribe(sender_id, channel)
         logger.info(f"Client {sender_id} unsubscribed from channel '{channel}'")
 
-    async def _broadcast_message(self, message: Message) -> None:
+    async def _broadcast_message(self, message: Message, from_redis: bool = False) -> None:
         """Broadcast message to all connected clients or to channel subscribers."""
         channel = message.payload.get('channel')
+
+        if not from_redis:
+            try:
+                await self.redis_broker.publish(
+                    f"notifications:{channel}" if channel else "notifications:broadcast",
+                    message.to_json()
+                )
+            except Exception as e:
+                logger.warning(f"Failed to publish to Redis: {e}")
+
+        self.message_persistence.store_message(
+            channel=channel or "broadcast",
+            message_type=message.type,
+            payload=message.payload,
+            timestamp=message.timestamp
+        )
 
         if channel:
             clients = self.client_registry.get_clients_in_channel(channel)
@@ -175,6 +232,20 @@ class NotificationServer:
 
     async def run(self) -> None:
         """Run both WebSocket and REST servers."""
+        try:
+            await self.redis_broker.connect()
+        except Exception as e:
+            logger.warning(f"Redis not available, continuing without pub/sub: {e}")
+
+        # Start Redis subscription in background
+        if self.redis_broker.redis:
+            self._redis_subscribe_task = asyncio.create_task(
+                self.redis_broker.subscribe(
+                    ["notifications:broadcast", "notifications:*"],
+                    self._handle_redis_message
+                )
+            )
+
         # Start WebSocket server
         self.ws_server = await websockets.serve(
             self.handle_client,
@@ -200,6 +271,13 @@ class NotificationServer:
             if self.ws_server:
                 self.ws_server.close()
                 await self.ws_server.wait_closed()
+            await self.redis_broker.disconnect()
+            if self._redis_subscribe_task:
+                self._redis_subscribe_task.cancel()
+                try:
+                    await self._redis_subscribe_task
+                except asyncio.CancelledError:
+                    pass
             logger.info("Server shut down")
 
     async def stop(self) -> None:
