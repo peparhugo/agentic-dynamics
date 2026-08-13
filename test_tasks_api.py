@@ -3,6 +3,7 @@ import sqlite3
 import time
 from unittest.mock import patch
 
+import fakeredis
 import pytest
 
 from tasks_api import create_app, init_db
@@ -11,7 +12,10 @@ from tasks_api import create_app, init_db
 @pytest.fixture
 def client(tmp_path):
     db_path = os.path.join(tmp_path, "test_tasks.db")
-    app = create_app(db_path=db_path, secret_key="test-secret-key")
+    # In-memory rate-limit storage keeps each test isolated from the others
+    # (and from needing a real Redis server); the Redis backend itself is
+    # exercised separately in the rate limiting tests below.
+    app = create_app(db_path=db_path, secret_key="test-secret-key", storage_uri="memory://")
     app.config["TESTING"] = True
     with app.test_client() as client:
         yield client
@@ -85,7 +89,7 @@ def test_ids_increment_manually(auth_client):
 def test_list_tasks_empty(auth_client):
     resp = auth_client.get("/tasks")
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc(auth_client):
@@ -97,8 +101,11 @@ def test_list_tasks_ordered_desc(auth_client):
 
     resp = auth_client.get("/tasks")
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["Third", "Second", "First"]
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
 
 
 def test_get_task_success(auth_client):
@@ -212,7 +219,7 @@ def test_password_is_hashed_in_db(client, tmp_path):
     db_path = os.path.join(tmp_path, "test_tasks.db")
     # The fixture already created the DB at a different path; create our own
     # app/db pairing so we can inspect the stored row directly.
-    app = create_app(db_path=db_path, secret_key="test-secret-key")
+    app = create_app(db_path=db_path, secret_key="test-secret-key", storage_uri="memory://")
     with app.test_client() as c:
         c.post("/auth/register", json={"username": "carol", "password": "supersecret"})
 
@@ -314,12 +321,12 @@ def test_user_sees_only_own_tasks(client):
     create_task(client, "Bob task 1")
 
     resp = client.get("/tasks")
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert titles == ["Bob task 1"]
 
     client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
     resp = client.get("/tasks")
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert sorted(titles) == ["Alice task 1", "Alice task 2"]
 
 
@@ -391,7 +398,7 @@ def test_migration_adds_owner_id_without_losing_data(tmp_path):
     conn.close()
 
     # The app should still start cleanly against the migrated database.
-    app = create_app(db_path=db_path, secret_key="test-secret-key")
+    app = create_app(db_path=db_path, secret_key="test-secret-key", storage_uri="memory://")
     with app.test_client() as c:
         token = make_auth_client(c, "newowner", "password123")
         c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
@@ -399,7 +406,7 @@ def test_migration_adds_owner_id_without_losing_data(tmp_path):
         assert resp.status_code == 200
         # Legacy task has no owner, so the new user doesn't see it, but it's
         # still present in the database untouched.
-        assert resp.get_json() == []
+        assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 # ── Registration: email ───────────────────────────────────────────────
@@ -502,3 +509,193 @@ def test_completing_other_users_task_is_not_possible_and_does_not_notify(client)
 
     assert resp.status_code == 404
     mock_delay.assert_not_called()
+
+
+# ── Pagination ─────────────────────────────────────────────────────
+
+
+def make_app(tmp_path, name="test_tasks.db", **kwargs):
+    db_path = os.path.join(tmp_path, name)
+    kwargs.setdefault("storage_uri", "memory://")
+    return create_app(db_path=db_path, secret_key="test-secret-key", **kwargs)
+
+
+def test_list_tasks_default_page_size(tmp_path):
+    # 25 tasks need a bumped-up per-test rate limit; the default 100/minute
+    # is fine in production but this test alone would eat most of it.
+    app = make_app(tmp_path, rate_limit="1000 per minute")
+    with app.test_client() as c:
+        token = make_auth_client(c, "alice", "password123")
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        for i in range(25):
+            create_task(c, f"Task {i}")
+
+        resp = c.get("/tasks")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 20
+        assert body["total"] == 25
+        assert body["next_cursor"] is not None
+        # Newest first.
+        assert body["data"][0]["title"] == "Task 24"
+
+
+def test_list_tasks_pagination_follows_cursor(tmp_path):
+    app = make_app(tmp_path, rate_limit="1000 per minute")
+    with app.test_client() as c:
+        token = make_auth_client(c, "alice", "password123")
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        for i in range(25):
+            create_task(c, f"Task {i}")
+
+        page1 = c.get("/tasks").get_json()
+        assert len(page1["data"]) == 20
+        assert page1["next_cursor"] is not None
+
+        page2 = c.get(f"/tasks?cursor={page1['next_cursor']}").get_json()
+        assert len(page2["data"]) == 5
+        assert page2["next_cursor"] is None
+        assert page2["total"] == 25
+
+        page1_ids = {t["id"] for t in page1["data"]}
+        page2_ids = {t["id"] for t in page2["data"]}
+        assert page1_ids.isdisjoint(page2_ids)
+        assert len(page1_ids | page2_ids) == 25
+
+
+def test_list_tasks_custom_limit(auth_client):
+    for i in range(5):
+        create_task(auth_client, f"Task {i}")
+
+    resp = auth_client.get("/tasks?limit=2")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 2
+    assert body["total"] == 5
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_limit_clamped_to_max(tmp_path):
+    app = make_app(tmp_path, rate_limit="1000 per minute")
+    with app.test_client() as c:
+        token = make_auth_client(c, "alice", "password123")
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        for i in range(105):
+            create_task(c, f"Task {i}")
+
+        resp = c.get("/tasks?limit=1000")
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) == 100
+        assert body["total"] == 105
+
+
+def test_list_tasks_invalid_cursor(auth_client):
+    resp = auth_client.get("/tasks?cursor=not-a-number")
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_list_tasks_invalid_limit_not_a_number(auth_client):
+    resp = auth_client.get("/tasks?limit=not-a-number")
+    assert resp.status_code == 400
+
+
+def test_list_tasks_invalid_limit_zero(auth_client):
+    resp = auth_client.get("/tasks?limit=0")
+    assert resp.status_code == 400
+
+
+def test_list_tasks_invalid_limit_negative(auth_client):
+    resp = auth_client.get("/tasks?limit=-1")
+    assert resp.status_code == 400
+
+
+def test_list_tasks_without_cursor_returns_first_page(auth_client):
+    create_task(auth_client, "Only task")
+    resp = auth_client.get("/tasks")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert len(body["data"]) == 1
+    assert body["next_cursor"] is None
+
+
+# ── Rate limiting ─────────────────────────────────────────────────
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(tmp_path):
+    app = make_app(tmp_path, rate_limit="3 per minute")
+    with app.test_client() as c:
+        token = make_auth_client(c, "alice", "password123")
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+
+        for _ in range(3):
+            resp = c.get("/tasks")
+            assert resp.status_code == 200
+
+        resp = c.get("/tasks")
+        assert resp.status_code == 429
+        assert "error" in resp.get_json()
+        assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_applies_to_auth_endpoints(tmp_path):
+    app = make_app(tmp_path, rate_limit="2 per minute")
+    with app.test_client() as c:
+        resp = c.post("/auth/register", json={"username": "alice", "password": "password123"})
+        assert resp.status_code == 201
+
+        resp = c.post("/auth/login", json={"username": "alice", "password": "password123"})
+        assert resp.status_code == 200
+
+        resp = c.post("/auth/login", json={"username": "alice", "password": "wrong"})
+        assert resp.status_code == 429
+        assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_is_isolated_per_authenticated_user(tmp_path):
+    app = make_app(tmp_path, rate_limit="2 per minute")
+    with app.test_client() as c:
+        # Distinct source IPs keep registration/login (unauthenticated,
+        # IP-keyed) from sharing a bucket with each other or with the
+        # authenticated, user-keyed requests checked below.
+        c.environ_base["REMOTE_ADDR"] = "10.0.0.1"
+        alice_token = make_auth_client(c, "alice", "password123")
+
+        c.environ_base["REMOTE_ADDR"] = "10.0.0.2"
+        bob_token = make_auth_client(c, "bob", "password123")
+
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {alice_token}"
+        assert c.get("/tasks").status_code == 200
+        assert c.get("/tasks").status_code == 200
+        assert c.get("/tasks").status_code == 429
+
+        c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {bob_token}"
+        resp = c.get("/tasks")
+        assert resp.status_code == 200
+
+
+def test_rate_limiting_uses_redis_storage_backend(tmp_path):
+    """The production storage backend is Redis; verify that code path works
+    end-to-end using fakeredis in place of a live Redis server."""
+    fake_redis = fakeredis.FakeStrictRedis()
+    with patch("redis.from_url", return_value=fake_redis):
+        app = make_app(
+            tmp_path, storage_uri="redis://localhost:6379/2", rate_limit="2 per minute"
+        )
+        with app.test_client() as c:
+            token = make_auth_client(c, "alice", "password123")
+            c.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+
+            assert c.get("/tasks").status_code == 200
+            assert c.get("/tasks").status_code == 200
+            resp = c.get("/tasks")
+            assert resp.status_code == 429
+            assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_storage_defaults_to_redis(tmp_path):
+    db_path = os.path.join(tmp_path, "test_tasks.db")
+    with patch("redis.from_url", return_value=fakeredis.FakeStrictRedis()):
+        app = create_app(db_path=db_path, secret_key="test-secret-key")
+    assert app.config["RATELIMIT_STORAGE_URI"].startswith("redis://")

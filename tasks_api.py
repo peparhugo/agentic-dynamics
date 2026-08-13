@@ -16,6 +16,8 @@ from functools import wraps
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notifications import send_notification_email
@@ -27,6 +29,12 @@ DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "task
 JWT_ALGORITHM = "HS256"
 JWT_EXP_SECONDS = 3600
 MIN_PASSWORD_LENGTH = 6
+
+DEFAULT_RATE_LIMIT = "100 per minute"
+DEFAULT_RATELIMIT_STORAGE_URI = "redis://localhost:6379/2"
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
 
 
 def init_db(db_path):
@@ -113,7 +121,7 @@ def _generate_token(user_id, secret_key):
     return jwt.encode(payload, secret_key, algorithm=JWT_ALGORITHM)
 
 
-def create_app(db_path=None, secret_key=None):
+def create_app(db_path=None, secret_key=None, storage_uri=None, rate_limit=None):
     app = Flask(__name__)
     app.config["DB_PATH"] = db_path or DEFAULT_DB_PATH
     app.config["SECRET_KEY"] = secret_key or os.environ.get("SECRET_KEY") or secrets.token_hex(32)
@@ -132,6 +140,36 @@ def create_app(db_path=None, secret_key=None):
         if db is not None:
             db.close()
 
+    def rate_limit_key():
+        # Rate limiting runs before the view (and before require_auth), so the
+        # JWT is decoded independently here rather than reusing g.current_user.
+        # A missing/invalid token falls back to limiting by IP, which still
+        # covers unauthenticated endpoints like /auth/login and /auth/register.
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer "):].strip()
+            if token:
+                try:
+                    payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=[JWT_ALGORITHM])
+                    return f"user:{payload.get('sub')}"
+                except jwt.PyJWTError:
+                    pass
+        return f"ip:{get_remote_address()}"
+
+    app.config["RATELIMIT_STORAGE_URI"] = (
+        storage_uri or os.environ.get("RATELIMIT_STORAGE_URI") or DEFAULT_RATELIMIT_STORAGE_URI
+    )
+    Limiter(
+        key_func=rate_limit_key,
+        app=app,
+        storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+        # application_limits (rather than default_limits) share a single
+        # counter per key across every route, so a user's 100/minute budget
+        # is a total across all endpoints rather than 100 per endpoint.
+        application_limits=[rate_limit or DEFAULT_RATE_LIMIT],
+        headers_enabled=True,
+    )
+
     @app.errorhandler(404)
     def handle_404(e):
         return jsonify({"error": "Not found"}), 404
@@ -139,6 +177,10 @@ def create_app(db_path=None, secret_key=None):
     @app.errorhandler(405)
     def handle_405(e):
         return jsonify({"error": "Method not allowed"}), 405
+
+    @app.errorhandler(429)
+    def handle_429(e):
+        return jsonify({"error": "rate limit exceeded"}), 429
 
     def require_auth(view):
         @wraps(view)
@@ -227,9 +269,38 @@ def create_app(db_path=None, secret_key=None):
     @app.get("/tasks")
     @require_auth
     def list_tasks():
+        cursor_param = request.args.get("cursor")
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit = DEFAULT_PAGE_LIMIT
+        limit_param = request.args.get("limit")
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+            if limit < 1:
+                return jsonify({"error": "limit must be a positive integer"}), 400
+            limit = min(limit, MAX_PAGE_LIMIT)
+
         task_repo = TaskRepository(get_db())
-        rows = task_repo.list_by_owner(g.current_user["id"])
-        return jsonify([_task_to_dict(r) for r in rows]), 200
+        rows = task_repo.list_by_owner_page(g.current_user["id"], cursor, limit + 1)
+        has_more = len(rows) > limit
+        rows = rows[:limit]
+        total = task_repo.count_by_owner(g.current_user["id"])
+
+        return jsonify(
+            {
+                "data": [_task_to_dict(r) for r in rows],
+                "next_cursor": str(rows[-1]["id"]) if has_more else None,
+                "total": total,
+            }
+        ), 200
 
     @app.get("/tasks/<int:task_id>")
     @require_auth

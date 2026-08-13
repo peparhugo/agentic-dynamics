@@ -28,11 +28,28 @@ class TaskRepository(BaseRepository):
         self.db.commit()
         return self.get_by_id(task_id)
 
-    def list_by_owner(self, owner_id):
+    def list_by_owner_page(self, owner_id, cursor, limit):
+        """Return up to `limit` tasks for `owner_id`, newest first.
+
+        Ordering by id DESC (rather than created_at DESC) is equivalent here
+        since ids are assigned sequentially at creation time, and it lets the
+        cursor be a simple id comparison instead of a compound key.
+        """
+        if cursor is None:
+            return self.db.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                (owner_id, limit),
+            ).fetchall()
         return self.db.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (owner_id,),
+            "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+            (owner_id, cursor, limit),
         ).fetchall()
+
+    def count_by_owner(self, owner_id):
+        row = self.db.execute(
+            "SELECT COUNT(*) AS count FROM tasks WHERE owner_id = ?", (owner_id,)
+        ).fetchone()
+        return row["count"]
 
     def get_by_id_and_owner(self, task_id, owner_id):
         return self.db.execute(
