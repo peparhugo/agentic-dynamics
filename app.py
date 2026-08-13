@@ -7,6 +7,7 @@ import os
 from functools import wraps
 from celery_config import celery_app
 from tasks import send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 db_path = os.path.join(os.path.dirname(__file__), 'tasks.db')
@@ -58,6 +59,10 @@ class Task(db.Model):
         }
 
 
+user_repo = UserRepository(User, db)
+task_repo = TaskRepository(Task, db)
+
+
 @app.before_request
 def init_db():
     if not hasattr(app, 'db_initialized'):
@@ -88,7 +93,7 @@ def token_required(f):
         except jwt.InvalidTokenError:
             return jsonify({'error': 'Invalid token'}), 401
 
-        user = User.query.get(user_id)
+        user = user_repo.get_by_id(user_id)
         if not user:
             return jsonify({'error': 'User not found'}), 401
 
@@ -107,15 +112,11 @@ def register():
     if not data['username'] or not data['password']:
         return jsonify({'error': 'Username and password cannot be empty'}), 400
 
-    if User.query.filter_by(username=data['username']).first():
+    if user_repo.get_by_username(data['username']):
         return jsonify({'error': 'Username already exists'}), 409
 
-    user = User(username=data['username'])
-    user.set_password(data['password'])
-    if 'email' in data:
-        user.email = data['email']
-    db.session.add(user)
-    db.session.commit()
+    password_hash = generate_password_hash(data['password'])
+    user = user_repo.create_user(data['username'], password_hash, data.get('email'))
 
     return jsonify({
         'id': user.id,
@@ -131,7 +132,7 @@ def login():
     if not data or 'username' not in data or 'password' not in data:
         return jsonify({'error': 'Missing username or password'}), 400
 
-    user = User.query.filter_by(username=data['username']).first()
+    user = user_repo.get_by_username(data['username'])
 
     if not user or not user.check_password(data['password']):
         return jsonify({'error': 'Invalid username or password'}), 401
@@ -148,9 +149,7 @@ def create_task(user_id):
     if not data or 'title' not in data or not data['title']:
         return jsonify({'error': 'Missing or empty title'}), 400
 
-    task = Task(title=data['title'], owner_id=user_id)
-    db.session.add(task)
-    db.session.commit()
+    task = task_repo.create_task(data['title'], user_id)
 
     return jsonify(task.to_dict()), 201
 
@@ -158,14 +157,14 @@ def create_task(user_id):
 @app.route('/tasks', methods=['GET'])
 @token_required
 def list_tasks(user_id):
-    tasks = Task.query.filter_by(owner_id=user_id).order_by(Task.created_at.desc()).all()
+    tasks = task_repo.get_tasks_by_owner(user_id)
     return jsonify([task.to_dict() for task in tasks]), 200
 
 
 @app.route('/tasks/<int:task_id>', methods=['GET'])
 @token_required
 def get_task(task_id, user_id):
-    task = Task.query.get(task_id)
+    task = task_repo.get_by_id(task_id)
 
     if not task or task.owner_id != user_id:
         return jsonify({'error': 'Task not found'}), 404
@@ -176,7 +175,7 @@ def get_task(task_id, user_id):
 @app.route('/tasks/<int:task_id>', methods=['PUT'])
 @token_required
 def update_task(task_id, user_id):
-    task = Task.query.get(task_id)
+    task = task_repo.get_by_id(task_id)
 
     if not task or task.owner_id != user_id:
         return jsonify({'error': 'Task not found'}), 404
@@ -184,16 +183,13 @@ def update_task(task_id, user_id):
     data = request.get_json(silent=True) or {}
     old_status = task.status
 
-    if 'title' in data and data['title']:
-        task.title = data['title']
+    title = data.get('title') if 'title' in data and data['title'] else None
+    status = data.get('status') if 'status' in data and data['status'] else None
 
-    if 'status' in data and data['status']:
-        task.status = data['status']
-
-    db.session.commit()
+    task = task_repo.update_task(task_id, title=title, status=status)
 
     if old_status != 'completed' and task.status == 'completed':
-        user = User.query.get(user_id)
+        user = user_repo.get_by_id(user_id)
         if user:
             send_notification_email.delay(user.email, task.title)
 
