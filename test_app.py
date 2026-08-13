@@ -1,6 +1,8 @@
 import sqlite3
 
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import FixedWindowRateLimiter
 from werkzeug.security import check_password_hash
 
 import app as task_app
@@ -13,6 +15,11 @@ def client(tmp_path, monkeypatch):
         TESTING=True,
         JWT_SECRET_KEY="test-secret",
         JWT_EXPIRATION_SECONDS=3600,
+    )
+    storage = MemoryStorage()
+    monkeypatch.setattr(task_app.limiter, "_storage", storage)
+    monkeypatch.setattr(
+        task_app.limiter, "_limiter", FixedWindowRateLimiter(storage)
     )
     task_app.init_db()
     return task_app.app.test_client()
@@ -142,10 +149,86 @@ def test_list_tasks_newest_first(client):
     first = client.post("/tasks", json={"title": "First"}, headers=headers).get_json()
     second = client.post("/tasks", json={"title": "Second"}, headers=headers).get_json()
 
-    assert [task["id"] for task in client.get("/tasks", headers=headers).get_json()] == [
+    response = client.get("/tasks", headers=headers).get_json()
+    assert [task["id"] for task in response["data"]] == [
         second["id"],
         first["id"],
     ]
+    assert response["next_cursor"] is None
+    assert response["total"] == 2
+
+
+def test_list_tasks_uses_default_cursor_pagination(client):
+    headers = auth_headers(client)
+    created = [
+        client.post("/tasks", json={"title": f"Task {index}"}, headers=headers).get_json()
+        for index in range(25)
+    ]
+
+    first_page = client.get("/tasks", headers=headers).get_json()
+    second_page = client.get(
+        "/tasks", query_string={"cursor": first_page["next_cursor"]}, headers=headers
+    ).get_json()
+
+    assert [task["id"] for task in first_page["data"]] == [
+        task["id"] for task in reversed(created[5:])
+    ]
+    assert first_page["next_cursor"] == str(created[5]["id"])
+    assert [task["id"] for task in second_page["data"]] == [
+        task["id"] for task in reversed(created[:5])
+    ]
+    assert second_page["next_cursor"] is None
+    assert first_page["total"] == second_page["total"] == 25
+
+
+def test_list_tasks_accepts_custom_limit(client):
+    headers = auth_headers(client)
+    created = [
+        client.post("/tasks", json={"title": f"Task {index}"}, headers=headers).get_json()
+        for index in range(3)
+    ]
+
+    response = client.get("/tasks?limit=2", headers=headers).get_json()
+
+    assert [task["id"] for task in response["data"]] == [
+        created[2]["id"],
+        created[1]["id"],
+    ]
+    assert response["next_cursor"] == str(created[1]["id"])
+    assert response["total"] == 3
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["limit=0", "limit=101", "limit=invalid", "cursor=0", "cursor=invalid"],
+)
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks?{query}", headers=auth_headers(client))
+
+    assert response.status_code == 400
+    assert "error" in response.get_json()
+
+
+def test_authenticated_user_is_rate_limited(client):
+    headers = auth_headers(client)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
+
+
+def test_auth_endpoint_is_rate_limited(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 401
+
+    response = client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
 
 
 def test_update_task(client):
@@ -236,8 +319,8 @@ def test_users_only_see_and_update_their_own_tasks(client):
         "/tasks", json={"title": "Bob task"}, headers=bob_headers
     ).get_json()
 
-    assert client.get("/tasks", headers=alice_headers).get_json() == [alice_task]
-    assert client.get("/tasks", headers=bob_headers).get_json() == [bob_task]
+    assert client.get("/tasks", headers=alice_headers).get_json()["data"] == [alice_task]
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"] == [bob_task]
     assert client.get(f"/tasks/{alice_task['id']}", headers=bob_headers).status_code == 404
     assert client.put(
         f"/tasks/{alice_task['id']}",
