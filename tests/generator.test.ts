@@ -27,7 +27,8 @@ describe('static site generator', () => {
 
   it('parses build CLI options and rejects invalid commands', () => {
     expect(parseArguments(['build', '--content', 'posts', '--output', 'public', '--templates', 'theme'])).toEqual({ contentDir: 'posts', outputDir: 'public', templatesDir: 'theme' });
-    expect(() => parseArguments(['serve'])).toThrow('Usage:');
+    expect(parseArguments(['serve', '--content', 'posts', '--templates', 'theme', '--port', '4000'])).toEqual({ contentDir: 'posts', templatesDir: 'theme', port: 4000 });
+    expect(() => parseArguments(['invalid'])).toThrow('Usage:');
   });
 
   it('renders a page template within the default layout and includes partials', async () => {
