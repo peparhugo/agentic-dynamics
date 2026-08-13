@@ -1,10 +1,12 @@
 import asyncio
 import json
 
+import fakeredis.aioredis
 import pytest
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
 
+import app
 from app import NotificationServer
 
 
@@ -192,3 +194,70 @@ async def test_channel_endpoints_list_active_channels_and_subscribers(notificati
     assert channels == {"channels": [{"name": "alerts", "subscriber_count": 2}]}
     assert b"200 OK" in subscriber_status
     assert subscribers == {"subscribers": sorted([first_id, second_id])}
+
+
+async def test_messages_endpoint_persists_message_history(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'messages.db'}"
+    server = NotificationServer(database_url=database_url)
+    async with serve(
+        server.websocket_handler,
+        "127.0.0.1",
+        0,
+        process_request=server.health_response,
+    ) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "stored"},
+            "timestamp": "2026-01-01T00:00:00+00:00",
+        }
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            await websocket.send(json.dumps(message))
+            assert await receive_json(websocket) == message
+        status, body = await get_json(port, "/messages?limit=50&offset=0")
+
+    await server.close()
+    assert b"200 OK" in status
+    assert body == {
+        "messages": [
+            {
+                "id": 1,
+                "channel": None,
+                "type": "broadcast",
+                "payload": {"text": "stored"},
+                "timestamp": "2026-01-01T00:00:00+00:00",
+            }
+        ]
+    }
+
+
+async def test_redis_pubsub_delivers_between_server_instances(monkeypatch, tmp_path):
+    redis_server = fakeredis.aioredis.FakeServer()
+    monkeypatch.setattr(
+        app.redis_async,
+        "from_url",
+        lambda *args, **kwargs: fakeredis.aioredis.FakeRedis(server=redis_server, decode_responses=True),
+    )
+    first = NotificationServer("redis://broker", f"sqlite:///{tmp_path / 'first.db'}")
+    second = NotificationServer("redis://broker", f"sqlite:///{tmp_path / 'second.db'}")
+    async with serve(first.websocket_handler, "127.0.0.1", 0) as first_ws, serve(
+        second.websocket_handler, "127.0.0.1", 0
+    ) as second_ws:
+        first_port = first_ws.sockets[0].getsockname()[1]
+        second_port = second_ws.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{first_port}") as sender, connect(
+            f"ws://127.0.0.1:{second_port}"
+        ) as recipient:
+            await receive_json(sender)
+            recipient_id = (await receive_json(recipient))["payload"]["client_id"]
+            message = {
+                "type": "direct",
+                "payload": {"client_id": recipient_id, "text": "cross-instance"},
+                "timestamp": "2026-01-01T00:00:00+00:00",
+            }
+            await sender.send(json.dumps(message))
+            assert await asyncio.wait_for(receive_json(recipient), timeout=1) == message
+
+    await first.close()
+    await second.close()
