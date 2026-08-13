@@ -1,6 +1,8 @@
 import asyncio
 import json
 import urllib.request
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import fakeredis.aioredis
 import pytest
@@ -334,3 +336,90 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
         {"value": 2},
     ]
     await reopened.close()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_and_keeps_connection_open(tmp_path):
+    redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    app = NotificationServer(
+        redis_client=redis,
+        database_url=str(tmp_path / "rate-limit.db"),
+        rate_limit=2,
+    )
+    websocket_server, uri, _ = await start_server(app)
+    websocket, _ = await connect(uri)
+
+    try:
+        for value in (1, 2):
+            await websocket.send(
+                json.dumps({"type": "broadcast", "payload": {"value": value}})
+            )
+            assert json.loads(await websocket.recv())["payload"] == {"value": value}
+
+        await websocket.send(
+            json.dumps({"type": "broadcast", "payload": {"value": 3}})
+        )
+        error = json.loads(await websocket.recv())
+        assert error["type"] == "system"
+        assert error["payload"] == {"error": "rate limit exceeded"}
+        assert websocket.state.name == "OPEN"
+    finally:
+        await websocket.close()
+        websocket_server.close()
+        await websocket_server.wait_closed()
+        await app.close()
+        await close_async_resource(redis)
+
+
+@pytest.mark.asyncio
+async def test_history_filters_orders_and_paginates(tmp_path):
+    app = NotificationServer(database_url=str(tmp_path / "history.db"))
+    websocket_server, _, port = await start_server(app)
+    now = datetime.now(timezone.utc)
+    timestamps = [
+        (now - timedelta(minutes=3)).isoformat(),
+        (now - timedelta(minutes=2)).isoformat(),
+        (now - timedelta(minutes=1)).isoformat(),
+    ]
+    app.messages.add(
+        {
+            "type": "broadcast",
+            "channel": "other",
+            "payload": {"value": 0},
+            "timestamp": timestamps[0],
+        }
+    )
+    for value, timestamp in zip((1, 2, 3), timestamps):
+        app.messages.add(
+            {
+                "type": "broadcast",
+                "channel": "alerts",
+                "payload": {"value": value},
+                "timestamp": timestamp,
+            }
+        )
+
+    try:
+        since = quote((now - timedelta(minutes=2, seconds=30)).isoformat())
+        status, first_page = await fetch_json(
+            port, f"/history?channel=alerts&since={since}&limit=1"
+        )
+        assert status == 200
+        assert [message["payload"] for message in first_page["messages"]] == [
+            {"value": 2}
+        ]
+        assert first_page["has_more"] is True
+
+        status, full_page = await fetch_json(
+            port, f"/history?channel=alerts&since={since}&limit=50"
+        )
+        assert status == 200
+        assert [message["payload"] for message in full_page["messages"]] == [
+            {"value": 2},
+            {"value": 3},
+        ]
+        assert full_page["has_more"] is False
+    finally:
+        websocket_server.close()
+        await websocket_server.wait_closed()
+        await app.close()

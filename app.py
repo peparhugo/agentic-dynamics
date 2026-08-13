@@ -11,7 +11,7 @@ import sqlite3
 import threading
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http import HTTPStatus
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlsplit
@@ -26,6 +26,7 @@ SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 REDIS_MESSAGE_CHANNEL = "notifications:messages"
 REDIS_CLIENTS_KEY = "notifications:clients"
 REDIS_CHANNELS_KEY = "notifications:channels"
+REDIS_RATE_LIMIT_PREFIX = "notifications:rate-limit"
 
 
 async def close_async_resource(resource: Any) -> None:
@@ -96,6 +97,41 @@ class MessageStore:
             }
             for row in rows
         ]
+
+    def history(
+        self, channel: str, since: str, limit: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ? AND timestamp >= ?
+                ORDER BY timestamp ASC, id ASC LIMIT ?
+                """,
+                (channel, since, limit + 1),
+            ).fetchall()
+        has_more = len(rows) > limit
+        return (
+            [
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                }
+                for row in rows[:limit]
+            ],
+            has_more,
+        )
+
+    def delete_older_than(self, timestamp: str) -> int:
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                "DELETE FROM messages WHERE timestamp < ?", (timestamp,)
+            )
+            return cursor.rowcount
 
     def close(self) -> None:
         with self._lock:
@@ -272,6 +308,8 @@ class NotificationServer:
         database_url: str | None = None,
         redis_client: Any | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: int | None = None,
     ) -> None:
         if transport is None:
             transport_name = os.getenv("TRANSPORT", "websocket").strip().lower()
@@ -295,6 +333,25 @@ class NotificationServer:
         self._subscriber_task: asyncio.Task[Any] | None = None
         self._subscriber_ready = asyncio.Event()
         self._lifecycle_lock = asyncio.Lock()
+        self.rate_limit = self._positive_int_setting(
+            "RATE_LIMIT", 100, rate_limit
+        )
+        self.message_ttl_days = self._positive_int_setting(
+            "MESSAGE_TTL_DAYS", 7, message_ttl_days
+        )
+        self._cleanup_task: asyncio.Task[Any] | None = None
+        self._cleanup_stop = asyncio.Event()
+
+    @staticmethod
+    def _positive_int_setting(name: str, default: int, value: int | None) -> int:
+        configured = os.getenv(name, str(default)) if value is None else value
+        try:
+            parsed = int(configured)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"{name} must be a positive integer") from error
+        if parsed < 1:
+            raise ValueError(f"{name} must be a positive integer")
+        return parsed
 
     @staticmethod
     def message(
@@ -329,6 +386,36 @@ class NotificationServer:
     @staticmethod
     def _channel_clients_key(channel: str) -> str:
         return f"notifications:channel:{channel}:clients"
+
+    async def start(self) -> None:
+        if self._cleanup_task is None:
+            async with self._lifecycle_lock:
+                if self._cleanup_task is None:
+                    self._cleanup_stop.clear()
+                    self._cleanup_task = asyncio.create_task(self._cleanup_worker())
+
+    async def _cleanup_worker(self) -> None:
+        try:
+            while True:
+                cutoff = datetime.now(timezone.utc) - timedelta(
+                    days=self.message_ttl_days
+                )
+                self.messages.delete_older_than(cutoff.isoformat())
+                try:
+                    await asyncio.wait_for(self._cleanup_stop.wait(), timeout=86400)
+                    return
+                except asyncio.TimeoutError:
+                    pass
+        except asyncio.CancelledError:
+            pass
+
+    async def _stop_cleanup(self) -> None:
+        if self._cleanup_task is None:
+            return
+        self._cleanup_stop.set()
+        task = self._cleanup_task
+        self._cleanup_task = None
+        await task
 
     async def _start_subscriber(self) -> None:
         if self.redis is None or self._subscriber_task is not None:
@@ -387,6 +474,7 @@ class NotificationServer:
         )
 
     async def _add_client(self, connection: Any) -> str:
+        await self.start()
         await self._start_subscriber()
         client_id = await self.transport.on_connect(connection)
         if self.redis is not None:
@@ -456,6 +544,9 @@ class NotificationServer:
         return True
 
     async def handle_message(self, websocket: Any, client_id: str, raw: str) -> None:
+        if not await self._within_rate_limit(client_id):
+            await self.send(websocket, "system", {"error": "rate limit exceeded"})
+            return
         try:
             message = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -520,6 +611,16 @@ class NotificationServer:
                 {"error": "system messages are generated by the server"},
             )
 
+    async def _within_rate_limit(self, client_id: str) -> bool:
+        if self.redis is None:
+            return True
+        minute = int(datetime.now(timezone.utc).timestamp() // 60)
+        key = f"{REDIS_RATE_LIMIT_PREFIX}:{client_id}:{minute}"
+        count = int(await self.redis.incr(key))
+        if count == 1:
+            await self.redis.expire(key, 120)
+        return count <= self.rate_limit
+
     async def handler(self, websocket: Any) -> None:
         handler = getattr(self.transport, "handler", None)
         if handler is None:
@@ -574,6 +675,33 @@ class NotificationServer:
                     modern_api,
                 )
             response = {"messages": self.messages.list(limit, offset)}
+        elif request_path == "/history":
+            query = parse_qs(parsed.query)
+            channel = query.get("channel", [None])[0]
+            since = query.get("since", [None])[0]
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+                if not isinstance(channel, str) or not channel or since is None:
+                    raise ValueError
+                parsed_since = datetime.fromisoformat(since.replace("Z", "+00:00"))
+                if parsed_since.tzinfo is None or not 1 <= limit <= 1000:
+                    raise ValueError
+            except (TypeError, ValueError):
+                return self._json_response(
+                    {
+                        "error": (
+                            "channel and timezone-aware ISO since are required; "
+                            "limit must be 1-1000"
+                        )
+                    },
+                    HTTPStatus.BAD_REQUEST,
+                    modern_api,
+                )
+            normalized_since = parsed_since.astimezone(timezone.utc).isoformat()
+            messages, has_more = self.messages.history(
+                channel, normalized_since, limit
+            )
+            response = {"messages": messages, "has_more": has_more}
         else:
             return None
         return self._json_response(response, modern_api=modern_api)
@@ -595,6 +723,7 @@ class NotificationServer:
         )
 
     async def close(self) -> None:
+        await self._stop_cleanup()
         await self._stop_subscriber()
         if self._owns_redis and self.redis is not None:
             await close_async_resource(self.redis)
@@ -604,6 +733,7 @@ class NotificationServer:
 async def serve(host: str = "127.0.0.1", port: int = 8765) -> None:
     server = NotificationServer()
     try:
+        await server.start()
         async with websockets.serve(
             server.handler,
             host,
