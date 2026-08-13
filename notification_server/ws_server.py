@@ -7,19 +7,48 @@ import uuid
 
 import websockets
 
+from .broker import RedisBroker
 from .messages import InvalidMessage, dumps, error_message, make_message, parse_message
+from .redis_registry import RedisPresence
 from .registry import ClientRegistry
+from .store import MessageStore
 
 logger = logging.getLogger(__name__)
 
 
 class NotificationServer:
-    def __init__(self, registry: ClientRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: ClientRegistry | None = None,
+        *,
+        broker: RedisBroker | None = None,
+        presence: RedisPresence | None = None,
+        store: MessageStore | None = None,
+    ) -> None:
         self.registry = registry or ClientRegistry()
+        self.broker = broker
+        self.presence = presence
+        self.store = store
+
+    async def start(self) -> None:
+        """Start the Redis subscriber worker, if a broker is configured.
+
+        No-op when `broker` wasn't passed in, so plain in-process usage
+        (the default) needs no lifecycle management at all.
+        """
+        if self.broker is not None:
+            await self.broker.start(self._deliver_envelope)
+
+    async def stop(self) -> None:
+        """Stop the Redis subscriber worker, if a broker is configured."""
+        if self.broker is not None:
+            await self.broker.stop()
 
     async def handler(self, websocket) -> None:
         client_id = str(uuid.uuid4())
         self.registry.add(client_id, websocket)
+        if self.presence is not None:
+            await self.presence.add_client(client_id)
         try:
             await self._send(
                 websocket, make_message("system", {"event": "connected", "client_id": client_id})
@@ -30,6 +59,8 @@ class NotificationServer:
             pass
         finally:
             self.registry.remove(client_id)
+            if self.presence is not None:
+                await self.presence.remove_client(client_id)
 
     async def _handle_raw(self, sender_id: str, raw: str) -> None:
         try:
@@ -61,6 +92,13 @@ class NotificationServer:
     async def _broadcast(self, sender_id: str, message: dict) -> None:
         outgoing = dict(message, sender_id=sender_id)
         channel = message.get("channel")
+        await self._persist(outgoing)
+        if self.broker is not None:
+            await self.broker.publish(dict(outgoing, _route="broadcast"))
+            return
+        await self._deliver_broadcast(outgoing, channel)
+
+    async def _deliver_broadcast(self, outgoing: dict, channel: str | None) -> None:
         targets = (
             self.registry.connections_for_channel(channel)
             if channel
@@ -78,6 +116,8 @@ class NotificationServer:
                 await self._send(sender, error_message("subscribe requires a 'channel' field"))
             return
         self.registry.subscribe(sender_id, channel)
+        if self.presence is not None:
+            await self.presence.subscribe(sender_id, channel)
         if sender is not None:
             await self._send(
                 sender, make_message("system", {"event": "subscribed", "channel": channel})
@@ -91,6 +131,8 @@ class NotificationServer:
                 await self._send(sender, error_message("unsubscribe requires a 'channel' field"))
             return
         self.registry.unsubscribe(sender_id, channel)
+        if self.presence is not None:
+            await self.presence.unsubscribe(sender_id, channel)
         if sender is not None:
             await self._send(
                 sender, make_message("system", {"event": "unsubscribed", "channel": channel})
@@ -98,6 +140,23 @@ class NotificationServer:
 
     async def _direct(self, sender_id: str, message: dict) -> None:
         target_id = message["payload"].get("target_id")
+        outgoing = dict(message, sender_id=sender_id)
+
+        if self.broker is not None and self.presence is not None:
+            connected = target_id is not None and (
+                target_id in self.registry or await self.presence.is_connected(target_id)
+            )
+            if not connected:
+                sender = self.registry.get(sender_id)
+                if sender is not None:
+                    await self._send(
+                        sender, error_message(f"target_id {target_id!r} is not connected")
+                    )
+                return
+            await self._persist(outgoing)
+            await self.broker.publish(dict(outgoing, _route="direct", _target_id=target_id))
+            return
+
         target = self.registry.get(target_id) if target_id else None
         if target is None:
             sender = self.registry.get(sender_id)
@@ -106,8 +165,30 @@ class NotificationServer:
                     sender, error_message(f"target_id {target_id!r} is not connected")
                 )
             return
-        outgoing = dict(message, sender_id=sender_id)
+        await self._persist(outgoing)
         await self._send(target, outgoing)
+
+    async def _deliver_envelope(self, envelope: dict) -> None:
+        """Handle an envelope received from the Redis broker's subscriber.
+
+        Runs on every server instance (including the publisher) and matches
+        the envelope against this instance's own local registry only.
+        """
+        route = envelope.pop("_route", None)
+        if route == "broadcast":
+            await self._deliver_broadcast(envelope, envelope.get("channel"))
+        elif route == "direct":
+            target_id = envelope.pop("_target_id", None)
+            target = self.registry.get(target_id) if target_id else None
+            if target is not None:
+                await self._send(target, envelope)
+
+    async def _persist(self, outgoing: dict) -> None:
+        if self.store is None:
+            return
+        await self.store.arecord(
+            outgoing["type"], outgoing["payload"], outgoing["timestamp"], outgoing.get("channel")
+        )
 
     @staticmethod
     async def _send(websocket, message: dict) -> None:

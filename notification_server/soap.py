@@ -14,6 +14,7 @@ import xml.etree.ElementTree as ET
 from aiohttp import web
 
 from .registry import ClientRegistry
+from .store import MessageStore
 
 SOAP_NS = "http://schemas.xmlsoap.org/soap/envelope/"
 TNS = "urn:notification-server"
@@ -73,7 +74,24 @@ def build_fault(message: str, code: str = "soap:Client") -> str:
     )
 
 
-def create_soap_app(registry: ClientRegistry) -> web.Application:
+def create_soap_app(registry: ClientRegistry, store: MessageStore | None = None) -> web.Application:
+    async def list_messages(request: web.Request) -> web.Response:
+        try:
+            limit = int(request.query.get("limit", 50))
+            offset = int(request.query.get("offset", 0))
+        except ValueError:
+            return web.json_response(
+                {"error": "limit and offset must be integers"}, status=400
+            )
+        if limit < 0 or offset < 0:
+            return web.json_response(
+                {"error": "limit and offset must be non-negative"}, status=400
+            )
+        if store is None:
+            return web.json_response({"messages": []})
+        messages = await store.alist_messages(limit=limit, offset=offset)
+        return web.json_response({"messages": messages})
+
     async def list_channels(request: web.Request) -> web.Response:
         channels = [
             {"name": name, "subscribers": count}
@@ -117,4 +135,5 @@ def create_soap_app(registry: ClientRegistry) -> web.Application:
     app.router.add_post("/health", post_health)
     app.router.add_get("/channels", list_channels)
     app.router.add_get("/channels/{name}/subscribers", get_channel_subscribers)
+    app.router.add_get("/messages", list_messages)
     return app
