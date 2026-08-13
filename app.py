@@ -13,10 +13,11 @@ from aiohttp import web
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected WebSocket clients."""
+    """Thread-safe registry of connected WebSocket clients with channel support."""
 
     def __init__(self):
         self.clients: Dict[str, object] = {}
+        self.channels: Dict[str, set] = {}
         self.lock = asyncio.Lock()
 
     async def register(self, client_id: str, websocket: object):
@@ -26,20 +27,60 @@ class ClientRegistry:
     async def unregister(self, client_id: str):
         async with self.lock:
             self.clients.pop(client_id, None)
+            for channel_subscribers in self.channels.values():
+                channel_subscribers.discard(client_id)
+            self.channels = {ch: subs for ch, subs in self.channels.items() if subs}
+
+    async def subscribe(self, client_id: str, channel: str):
+        """Subscribe client to a channel."""
+        async with self.lock:
+            if client_id in self.clients:
+                if channel not in self.channels:
+                    self.channels[channel] = set()
+                self.channels[channel].add(client_id)
+                return True
+        return False
+
+    async def unsubscribe(self, client_id: str, channel: str):
+        """Unsubscribe client from a channel."""
+        async with self.lock:
+            if channel in self.channels:
+                self.channels[channel].discard(client_id)
+                if not self.channels[channel]:
+                    del self.channels[channel]
+                return True
+        return False
+
+    async def get_channels(self) -> dict:
+        """Get all channels with subscriber counts."""
+        async with self.lock:
+            return {ch: len(subs) for ch, subs in self.channels.items()}
+
+    async def get_channel_subscribers(self, channel: str) -> list:
+        """Get subscriber IDs for a specific channel."""
+        async with self.lock:
+            return list(self.channels.get(channel, set()))
 
     async def get_client_count(self) -> int:
         async with self.lock:
             return len(self.clients)
 
-    async def broadcast(self, message: dict):
-        """Send message to all connected clients."""
+    async def broadcast(self, message: dict, channel: str = None):
+        """Send message to clients. If channel is specified, only to that channel's subscribers."""
         async with self.lock:
+            if channel:
+                client_ids = self.channels.get(channel, set()).copy()
+            else:
+                client_ids = set(self.clients.keys())
+
             disconnected = set()
-            for client_id, websocket in self.clients.items():
-                try:
-                    await websocket.send(json.dumps(message))
-                except (ConnectionClosed, Exception):
-                    disconnected.add(client_id)
+            for client_id in client_ids:
+                websocket = self.clients.get(client_id)
+                if websocket:
+                    try:
+                        await websocket.send(json.dumps(message))
+                    except (ConnectionClosed, Exception):
+                        disconnected.add(client_id)
 
         for client_id in disconnected:
             await self.unregister(client_id)
@@ -88,8 +129,10 @@ async def websocket_handler(websocket):
                 msg_type = message.get("type")
 
                 if msg_type == "broadcast":
+                    channel = message.get("channel")
                     await registry.broadcast(
-                        create_message("broadcast", message.get("payload", {}))
+                        create_message("broadcast", message.get("payload", {})),
+                        channel=channel
                     )
                 elif msg_type == "direct":
                     target_client_id = message.get("target_client_id")
@@ -97,6 +140,44 @@ async def websocket_handler(websocket):
                         await registry.send_direct(
                             target_client_id,
                             create_message("direct", message.get("payload", {})),
+                        )
+                elif msg_type == "subscribe":
+                    channel = message.get("channel")
+                    if channel:
+                        success = await registry.subscribe(client_id, channel)
+                        await websocket.send(
+                            json.dumps(
+                                create_message("system", {
+                                    "event": "subscribed",
+                                    "channel": channel,
+                                    "success": success
+                                })
+                            )
+                        )
+                    else:
+                        await websocket.send(
+                            json.dumps(
+                                create_message("system", {"error": "Channel name required for subscribe"})
+                            )
+                        )
+                elif msg_type == "unsubscribe":
+                    channel = message.get("channel")
+                    if channel:
+                        success = await registry.unsubscribe(client_id, channel)
+                        await websocket.send(
+                            json.dumps(
+                                create_message("system", {
+                                    "event": "unsubscribed",
+                                    "channel": channel,
+                                    "success": success
+                                })
+                            )
+                        )
+                    else:
+                        await websocket.send(
+                            json.dumps(
+                                create_message("system", {"error": "Channel name required for unsubscribe"})
+                            )
                         )
                 else:
                     await websocket.send(
@@ -125,11 +206,26 @@ async def health_handler(request):
     return web.json_response({"status": "ok", "connected_clients": count})
 
 
+async def channels_handler(request):
+    """List all active channels with subscriber counts."""
+    channels = await registry.get_channels()
+    return web.json_response(channels)
+
+
+async def channel_subscribers_handler(request):
+    """List subscriber IDs for a specific channel."""
+    channel_name = request.match_info["name"]
+    subscribers = await registry.get_channel_subscribers(channel_name)
+    return web.json_response({"channel": channel_name, "subscribers": subscribers})
+
+
 async def start_servers():
     """Start both WebSocket and REST servers."""
     async with websockets.serve(websocket_handler, "localhost", 8765):
         app = web.Application()
         app.router.add_get("/health", health_handler)
+        app.router.add_get("/channels", channels_handler)
+        app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
         runner = web.AppRunner(app)
         await runner.setup()
         site = web.TCPSite(runner, "localhost", 8766)
