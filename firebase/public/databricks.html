@@ -150,7 +150,7 @@ article{max-width:1120px;margin:0 auto;padding:7rem 2rem 4rem}
   <p><strong>Explanation Tax:</strong> Claude flails on 11% of sessions (zero code, narration only) vs DeepSeek 8%. When models succeed, DeepSeek carries negligible narration overhead (0.0% penalty), Claude carries 8.5%. <strong>Cache Tax:</strong> $3.75/Mtok writes vs $0.14/Mtok reads — <strong>26.8&times; pricing asymmetry.</strong> Claude writes 20.0K cache tokens/session at premium rates. DeepSeek reads 223K at negligible cost. Exact same insight. Calibrated measurements.</p>
 </div>
 </div>
-<div class="gap-box"><strong>Where they complement each other:</strong> Their surveys and experiments identified that token overhead exists. Our stress tests measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation — making it actionable at the model selection level as well as the harness tuning level. If you're tuning a harness to reduce verbosity, you're working against the model's training distribution. Routing to a model with lower narrative overhead may be more cost-effective.</div>
+<div class="gap-box"><strong>Where they complement each other:</strong> Their surveys and experiments identified that token overhead exists. Our stress tests measured <em>why</em> it happens — the model's architectural default to conversational mode under perturbation — making it actionable at the model selection level as well as the tool tuning level. If you're tuning your tools to reduce verbosity, you're working against the model's training distribution. Routing to a model with lower narrative overhead may be more cost-effective.</div>
 
 <!-- Where Each Adds Unique Insight -->
 <div class="section-hd amber"><h2>Where Each Adds Unique Insight</h2></div>

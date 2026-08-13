@@ -114,7 +114,7 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </ul>
 </div>
 
-<p>We observe materially different recovery and output behavior across provider families. Differences may be explained by model architecture, post-training, provider-side optimizations, harness interaction, or some combination. This experiment does not identify the causal mechanism.</p>
+<p>We observe materially different recovery and output behavior across provider families. Differences may be explained by model architecture, post-training, provider-side optimizations, tooling interaction, or some combination. This experiment does not identify the causal mechanism.</p>
 
 <p>One hypothesis is that DeepSeek's GRPO reinforcement learning approach may contribute to its lower reasoning-token overhead, while SFT-trained models may produce more billed reasoning tokens under perturbation. But this remains a hypothesis — the experiment measures outcomes and cost, not training architecture internals.</p>
 
@@ -150,6 +150,27 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 </div>
 
 <p>What I didn't expect: when I first published this instrument, I thought the story was 'DeepSeek uses fewer tokens.' It doesn't. The story was subtler — the multi-session pipeline revealed that what you actually buy with a more expensive model is <em>verification</em>. Luna writes 7 tests per story for $0.09. Sonnet 5 writes 73 for $2.32. Both codebases pass their tests. Only one is actually tested. That's the durable-value gap this whole instrument exists to measure.</p>
+
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 4 &middot; Instrumentation, Not Benchmarks</div>
+
+<h2>What I built is instrumentation.</h2>
+
+<p>Not a benchmark. Instrumentation that runs async CLI sessions at scale — a queue you fill, workers that drain it, isolation so the sessions can't delete the lab, per-session cost capture. The instrument doesn't judge code. It runs thousands of sessions and records what each one cost.</p>
+
+<p><strong>Because the outcome of one session is the starting point of the next.</strong> Five sessions chain into a story — greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting — each committing onto the last. The output becomes the next codebase. That's where it compounds: every session grows the codebase, and every new line inflates the cost of the next one. The Snowball Rule. The N&sup2; term isn't an equation I invented — it's the chained sessions, measured.</p>
+
+<p><strong>On top of that sits a separate module — the one I'm focused on now — that runs the routing experiments.</strong> Fine-tuning which toolchain a session gets routed to, and measuring the implication of that routing. DeepSeek through opencode. Sonnet through the Claude CLI. Luna through opencode. Same chained sessions, same passing tests — but Sonnet writes 73 tests for $2.32 while Luna writes 7 for $0.09. Which toolchain do you route the session to? The cheapest capable one. And "capable" is the thing you only learn by running the chained sessions through different toolchains and reading the cost back.</p>
+
+<div class="callout">
+<div class="icon">&#9888;</div>
+<p><strong>Running sessions at scale is itself a cost-management problem.</strong> The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and have to be resumable. Every session's cost — tokens, dollars, even the subagent calls — has to be captured per model. None of it is the science. All of it is <em>required</em> to run the sessions.</p>
+</div>
+
+<p><strong>The payoff: the cost becomes visible.</strong> Over 2,000 sessions — 1,097 story-building runs across 221 cells and seven models, plus 911 independent reviews — for roughly the price of a lunch in Rome. Once the sessions run themselves, each toolchain's cost comes into view, and the routing choice stops being a guess.</p>
+
+<blockquote>
+"The outcome of one session is the starting point of the next. Route it wrong and the cost compounds."
+</blockquote>
 
 <h2>Why I was the person who could build this.</h2>
 
