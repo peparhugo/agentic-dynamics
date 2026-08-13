@@ -136,8 +136,8 @@ def test_users_only_see_their_own_tasks(client):
     create_task(client, alice_auth, "Alice's task")
     create_task(client, bob_auth, "Bob's task")
 
-    alice_titles = [t["title"] for t in client.get("/tasks", headers=alice_auth).get_json()]
-    bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_auth).get_json()]
+    alice_titles = [t["title"] for t in client.get("/tasks", headers=alice_auth).get_json()["data"]]
+    bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_auth).get_json()["data"]]
     assert alice_titles == ["Alice's task"]
     assert bob_titles == ["Bob's task"]
 
@@ -208,7 +208,7 @@ def test_create_task_non_string_title_returns_400(client, auth):
 def test_list_tasks_empty(client, auth):
     resp = client.get("/tasks", headers=auth)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_by_created_at_desc(client, auth):
@@ -218,8 +218,11 @@ def test_list_tasks_ordered_by_created_at_desc(client, auth):
 
     resp = client.get("/tasks", headers=auth)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["Newest", "Middle", "Oldest"]
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
 
 
 # ── GET /tasks/{id} ─────────────────────────────────────────────

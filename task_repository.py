@@ -54,10 +54,25 @@ class TaskRepository(BaseRepository):
             self._write(data)
             return task
 
-    def list_all(self, owner_id: int) -> list:
+    def list_page(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> dict | None:
+        # Cursor is the id of the last item the caller already has; ordering
+        # matches the previous list_all behavior (newest first), with id as
+        # a tiebreaker for created_at collisions.
         data = self._read()
         tasks = [t for t in data["tasks"] if t["owner_id"] == owner_id]
-        return sorted(tasks, key=lambda t: t["created_at"], reverse=True)
+        tasks.sort(key=lambda t: (t["created_at"], t["id"]), reverse=True)
+        total = len(tasks)
+
+        start = 0
+        if cursor is not None:
+            index = next((i for i, t in enumerate(tasks) if t["id"] == cursor), None)
+            if index is None:
+                return None
+            start = index + 1
+
+        page = tasks[start:start + limit]
+        next_cursor = page[-1]["id"] if start + len(page) < total else None
+        return {"data": page, "next_cursor": next_cursor, "total": total}
 
     def get(self, task_id: int, owner_id: int) -> dict | None:
         data = self._read()

@@ -11,29 +11,65 @@ import os
 import secrets
 
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
-from auth import create_token, hash_password, require_auth, verify_password
+from auth import create_token, decode_token, hash_password, require_auth, verify_password
 from celery_tasks import send_notification_email
 from task_repository import TaskRepository
 from user_repository import UserRepository
 
 DEFAULT_STORAGE_PATH = os.environ.get("TASKS_STORAGE_PATH", "tasks.json")
 DEFAULT_USERS_STORAGE_PATH = os.environ.get("USERS_STORAGE_PATH", "users.json")
+DEFAULT_RATE_LIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/2")
+DEFAULT_RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+PAGINATION_DEFAULT_LIMIT = 20
+PAGINATION_MAX_LIMIT = 100
 
 
 def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
-                users_storage_path: str = DEFAULT_USERS_STORAGE_PATH) -> Flask:
+                users_storage_path: str = DEFAULT_USERS_STORAGE_PATH,
+                rate_limit_storage_uri: str = DEFAULT_RATE_LIMIT_STORAGE_URI,
+                rate_limit: str = DEFAULT_RATE_LIMIT) -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
     app.task_repository = TaskRepository(storage_path)
     app.user_repository = UserRepository(users_storage_path)
     auth_required = require_auth(app)
 
+    def rate_limit_key() -> str:
+        # Authenticated requests are limited per user; requests without a
+        # valid token (e.g. login/register) fall back to per-IP limiting.
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header.split(" ", 1)[1]
+            payload = decode_token(token, app.config["SECRET_KEY"])
+            if payload is not None:
+                return f"user:{payload['sub']}"
+        return get_remote_address()
+
+    app.limiter = Limiter(
+        app=app,
+        key_func=rate_limit_key,
+        storage_uri=rate_limit_storage_uri,
+        headers_enabled=True,
+    )
+    # A single shared bucket per key (user, or IP when unauthenticated) so
+    # the limit is "N requests per minute" across the whole API, not N per
+    # individual endpoint.
+    limited = app.limiter.shared_limit(rate_limit, scope="global")
+
     @app.errorhandler(404)
     def not_found(_e):
         return jsonify({"error": "not found"}), 404
 
+    @app.errorhandler(429)
+    def rate_limit_exceeded(_e):
+        return jsonify({"error": "rate limit exceeded"}), 429
+
     @app.post("/auth/register")
+    @limited
     def register():
         data = request.get_json(silent=True) or {}
         username = data.get("username")
@@ -53,6 +89,7 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         return jsonify({"id": user["id"], "username": user["username"], "email": user["email"]}), 201
 
     @app.post("/auth/login")
+    @limited
     def login():
         data = request.get_json(silent=True) or {}
         username = data.get("username")
@@ -66,6 +103,7 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         return jsonify({"token": token}), 200
 
     @app.post("/tasks")
+    @limited
     @auth_required
     def create_task(user):
         data = request.get_json(silent=True) or {}
@@ -76,11 +114,35 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         return jsonify(task), 201
 
     @app.get("/tasks")
+    @limited
     @auth_required
     def list_tasks(user):
-        return jsonify(app.task_repository.list_all(owner_id=user["id"])), 200
+        cursor_param = request.args.get("cursor")
+        limit_param = request.args.get("limit")
+
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit = PAGINATION_DEFAULT_LIMIT
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+        if limit < 1 or limit > PAGINATION_MAX_LIMIT:
+            return jsonify({"error": f"limit must be between 1 and {PAGINATION_MAX_LIMIT}"}), 400
+
+        page = app.task_repository.list_page(owner_id=user["id"], cursor=cursor, limit=limit)
+        if page is None:
+            return jsonify({"error": "invalid cursor"}), 400
+        return jsonify(page), 200
 
     @app.get("/tasks/<int:task_id>")
+    @limited
     @auth_required
     def get_task(user, task_id):
         task = app.task_repository.get(task_id, owner_id=user["id"])
@@ -89,6 +151,7 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         return jsonify(task), 200
 
     @app.put("/tasks/<int:task_id>")
+    @limited
     @auth_required
     def update_task(user, task_id):
         data = request.get_json(silent=True) or {}
