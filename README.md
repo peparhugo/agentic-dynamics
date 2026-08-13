@@ -39,3 +39,18 @@ layout: main
 ```
 
 `templates/default.hbs` is used when `template` is omitted. Layouts live in `templates/layouts/` and insert the rendered page with `{{{body}}}`; `layouts/default.hbs` is used when `layout` is omitted. Reusable partials live in `templates/partials/` and can be included with `{{> header}}`. Templates receive all frontmatter fields plus normalized `title`, `date`, `tags`, `outputPath`, and rendered Markdown as `content` and `body`.
+
+## Plugins
+
+Add TypeScript plugins in `plugins/` and load them from `ssg.config.ts`:
+
+```ts
+import { defineConfig, type Plugin } from 'flat-file-ssg';
+import addFooter from './plugins/add-footer';
+
+export default defineConfig({
+  plugins: [addFooter]
+});
+```
+
+A plugin can implement `onStart`, `beforeBuild`, `onFile`, `afterBuild`, and `onEnd`. Hooks run in plugin order and may be asynchronous. `onFile(page, context)` can inspect or modify each page, including its rendered `html`. Markdown parsing, Handlebars templates, and the live-reload development server use the same plugin pipeline as project plugins.

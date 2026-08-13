@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src';
+import { buildSite, type Plugin } from '../src';
 
 describe('buildSite', () => {
   let root: string;
@@ -170,5 +170,63 @@ This is **rendered**.
     await fs.writeFile(path.join(contentDir, 'bad.md'), '---\ntemplate: missing\n---\nText');
 
     await expect(buildSite({ contentDir, outputDir, templatesDir })).rejects.toThrow('Template not found');
+  });
+
+  test('runs plugin lifecycle hooks in order and allows page transforms', async () => {
+    const contentDir = path.join(root, 'content');
+    const outputDir = path.join(root, 'dist');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Plugin page');
+    const calls: string[] = [];
+    const first: Plugin = {
+      onStart: () => { calls.push('first:start'); },
+      beforeBuild: () => { calls.push('first:before'); },
+      onFile: (page) => {
+        calls.push('first:file');
+        page.html += '<footer>extended</footer>';
+      },
+      afterBuild: () => { calls.push('first:after'); },
+      onEnd: () => { calls.push('first:end'); }
+    };
+    const second: Plugin = {
+      onStart: () => { calls.push('second:start'); },
+      beforeBuild: () => { calls.push('second:before'); },
+      onFile: (page) => {
+        calls.push(page.html.includes('extended') ? 'second:file:extended' : 'second:file');
+      },
+      afterBuild: () => { calls.push('second:after'); },
+      onEnd: () => { calls.push('second:end'); }
+    };
+
+    await buildSite({ contentDir, outputDir, plugins: [first, second] });
+
+    await expect(fs.readFile(path.join(outputDir, 'page.html'), 'utf8')).resolves.toContain('<footer>extended</footer>');
+    expect(calls).toEqual([
+      'first:start', 'second:start',
+      'first:before', 'second:before',
+      'first:file', 'second:file:extended',
+      'first:after', 'second:after',
+      'first:end', 'second:end'
+    ]);
+  });
+
+  test('loads plugins and directories from ssg.config.ts', async () => {
+    const contentDir = path.join(root, 'articles');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(path.join(root, 'plugins'));
+    await fs.writeFile(path.join(contentDir, 'configured.md'), '# Configured');
+    await fs.writeFile(path.join(root, 'plugins', 'suffix.ts'), `
+      export default {
+        onFile(page: { html: string }) { page.html += '<p>from config</p>'; }
+      };
+    `);
+    await fs.writeFile(path.join(root, 'ssg.config.ts'), `
+      import suffix from './plugins/suffix';
+      export default { contentDir: './articles', outputDir: './public', plugins: [suffix] };
+    `);
+
+    await buildSite({ configFile: path.join(root, 'ssg.config.ts') });
+
+    await expect(fs.readFile(path.join(root, 'public', 'configured.html'), 'utf8')).resolves.toContain('<p>from config</p>');
   });
 });
