@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timezone
 from typing import Any
 
-VALID_TYPES = {"broadcast", "direct", "system"}
+VALID_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 class InvalidMessage(ValueError):

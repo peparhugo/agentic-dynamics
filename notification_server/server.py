@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from typing import Any
+from urllib.parse import unquote
 
 import websockets
 from websockets.asyncio.server import ServerConnection
@@ -23,6 +25,8 @@ from .registry import ClientRegistry
 logger = logging.getLogger("notification_server")
 
 HEALTH_PATH = "/health"
+CHANNELS_PATH = "/channels"
+CHANNEL_SUBSCRIBERS_RE = re.compile(r"^/channels/([^/]+)/subscribers$")
 
 
 class NotificationServer:
@@ -30,10 +34,34 @@ class NotificationServer:
         self.registry = ClientRegistry()
 
     async def process_request(self, connection: ServerConnection, request: Request) -> Response | None:
-        if request.path.split("?", 1)[0] != HEALTH_PATH:
-            return None
-        body = json.dumps({"connected_clients": await self.registry.count()})
-        response = connection.respond(200, body)
+        path = request.path.split("?", 1)[0]
+
+        if path == HEALTH_PATH:
+            body = json.dumps({"connected_clients": await self.registry.count()})
+            return self._json_response(connection, 200, body)
+
+        if path == CHANNELS_PATH:
+            channels = await self.registry.channels_snapshot()
+            body = json.dumps({
+                "channels": [
+                    {"name": name, "subscribers": count}
+                    for name, count in sorted(channels.items())
+                ],
+            })
+            return self._json_response(connection, 200, body)
+
+        match = CHANNEL_SUBSCRIBERS_RE.match(path)
+        if match:
+            name = unquote(match.group(1))
+            subscribers = await self.registry.subscribers(name)
+            body = json.dumps({"channel": name, "subscribers": subscribers})
+            return self._json_response(connection, 200, body)
+
+        return None
+
+    @staticmethod
+    def _json_response(connection: ServerConnection, status: int, body: str) -> Response:
+        response = connection.respond(status, body)
         response.headers["Content-Type"] = "application/json"
         return response
 
@@ -82,17 +110,53 @@ class NotificationServer:
         payload = message["payload"]
 
         if msg_type == "broadcast":
-            await self.registry.broadcast(encode(build_message(
-                "broadcast",
-                {**payload, "from": client_id},
-            )))
+            channel = payload.get("channel")
+            envelope = encode(build_message("broadcast", {**payload, "from": client_id}))
+            if channel:
+                await self.registry.broadcast_channel(envelope, channel)
+            else:
+                await self.registry.broadcast(envelope)
         elif msg_type == "direct":
             await self._handle_direct(client_id, payload)
+        elif msg_type == "subscribe":
+            await self._handle_subscribe(client_id, websocket, payload)
+        elif msg_type == "unsubscribe":
+            await self._handle_unsubscribe(client_id, websocket, payload)
         else:  # "system" — reserved for server-originated messages
             await self._send(websocket, build_message("system", {
                 "event": "error",
                 "detail": "clients may not send system messages",
             }))
+
+    async def _handle_subscribe(self, client_id: str, websocket: Any, payload: dict) -> None:
+        channel = payload.get("channel")
+        if not isinstance(channel, str) or not channel:
+            await self._send(websocket, build_message("system", {
+                "event": "error",
+                "detail": "subscribe requires a non-empty 'channel' string",
+            }))
+            return
+        await self.registry.subscribe(client_id, channel)
+        await self._send(websocket, build_message("system", {
+            "event": "subscribed",
+            "channel": channel,
+            "client_id": client_id,
+        }))
+
+    async def _handle_unsubscribe(self, client_id: str, websocket: Any, payload: dict) -> None:
+        channel = payload.get("channel")
+        if not isinstance(channel, str) or not channel:
+            await self._send(websocket, build_message("system", {
+                "event": "error",
+                "detail": "unsubscribe requires a non-empty 'channel' string",
+            }))
+            return
+        await self.registry.unsubscribe(client_id, channel)
+        await self._send(websocket, build_message("system", {
+            "event": "unsubscribed",
+            "channel": channel,
+            "client_id": client_id,
+        }))
 
     async def _handle_direct(self, sender_id: str, payload: dict) -> None:
         target_id = payload.get("target")

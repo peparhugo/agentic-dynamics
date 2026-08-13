@@ -155,6 +155,201 @@ async def test_client_sending_system_message_gets_rejected(running_server):
         assert err["payload"]["event"] == "error"
 
 
+async def test_subscribe_confirms_and_updates_channels_endpoint(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        client_id = await _connected(client)
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        ack = json.loads(await client.recv())
+        assert ack["type"] == "system"
+        assert ack["payload"]["event"] == "subscribed"
+        assert ack["payload"]["channel"] == "alerts"
+        assert ack["payload"]["client_id"] == client_id
+
+        status, body = await loop.run_in_executor(None, fetch, "/channels")
+        assert status == 200
+        assert body == {"channels": [{"name": "alerts", "subscribers": 1}]}
+
+        status, body = await loop.run_in_executor(None, fetch, "/channels/alerts/subscribers")
+        assert status == 200
+        assert body == {"channel": "alerts", "subscribers": [client_id]}
+
+
+async def test_unsubscribe_confirms_and_removes_from_channel(running_server):
+    _, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await client.recv()  # subscribed ack
+
+        await client.send(json.dumps({
+            "type": "unsubscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        ack = json.loads(await client.recv())
+        assert ack["type"] == "system"
+        assert ack["payload"]["event"] == "unsubscribed"
+        assert ack["payload"]["channel"] == "alerts"
+
+        status, body = await loop.run_in_executor(None, fetch, "/channels")
+        assert status == 200
+        assert body == {"channels": []}
+
+
+async def test_subscribe_without_channel_gets_error(running_server):
+    _, ws_url, _ = running_server
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        err = json.loads(await client.recv())
+        assert err["type"] == "system"
+        assert err["payload"]["event"] == "error"
+
+
+async def test_channel_message_reaches_only_subscribers(running_server):
+    _, ws_url, _ = running_server
+    async with websockets.connect(ws_url) as c1, websockets.connect(ws_url) as c2, \
+            websockets.connect(ws_url) as c3:
+        c1_id = await _connected(c1)
+        await _connected(c2)
+        await _connected(c3)
+
+        # drain "client_joined" events seen by earlier connections
+        await c1.recv()  # c2 joined
+        await c1.recv()  # c3 joined
+        await c2.recv()  # c3 joined
+
+        await c1.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await c1.recv()  # subscribed ack
+
+        await c2.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await c2.recv()  # subscribed ack
+
+        await c1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"channel": "alerts", "text": "fire!"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+
+        msg_on_c1 = json.loads(await c1.recv())
+        msg_on_c2 = json.loads(await c2.recv())
+        assert msg_on_c1 == msg_on_c2
+        assert msg_on_c1["payload"]["channel"] == "alerts"
+        assert msg_on_c1["payload"]["text"] == "fire!"
+        assert msg_on_c1["payload"]["from"] == c1_id
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(c3.recv(), timeout=0.2)
+
+
+async def test_broadcast_without_channel_still_reaches_everyone(running_server):
+    _, ws_url, _ = running_server
+    async with websockets.connect(ws_url) as c1, websockets.connect(ws_url) as c2:
+        await _connected(c1)
+        await _connected(c2)
+        await c1.recv()  # client_joined for c2
+
+        await c1.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await c1.recv()  # subscribed ack
+
+        await c1.send(json.dumps({
+            "type": "broadcast",
+            "payload": {"text": "no channel here"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+
+        msg_on_c1 = json.loads(await c1.recv())
+        msg_on_c2 = json.loads(await c2.recv())
+        assert msg_on_c1 == msg_on_c2
+        assert msg_on_c1["payload"]["text"] == "no channel here"
+
+
+async def test_disconnect_removes_client_from_channels(running_server):
+    app, ws_url, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch(path):
+        with urlopen(f"{http_url}{path}", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    async with websockets.connect(ws_url) as client:
+        await _connected(client)
+        await client.send(json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+            "timestamp": "2026-08-13T00:00:00+00:00",
+        }))
+        await client.recv()  # subscribed ack
+
+    await asyncio.sleep(0.05)
+    status, body = await loop.run_in_executor(None, fetch, "/channels")
+    assert status == 200
+    assert body == {"channels": []}
+
+
+async def test_channels_endpoint_empty_when_no_subscriptions(running_server):
+    _, _, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch():
+        with urlopen(f"{http_url}/channels", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    status, body = await loop.run_in_executor(None, fetch)
+    assert status == 200
+    assert body == {"channels": []}
+
+
+async def test_subscribers_endpoint_empty_for_unknown_channel(running_server):
+    _, _, http_url = running_server
+    loop = asyncio.get_running_loop()
+
+    def fetch():
+        with urlopen(f"{http_url}/channels/does-not-exist/subscribers", timeout=2) as resp:
+            return resp.status, json.loads(resp.read())
+
+    status, body = await loop.run_in_executor(None, fetch)
+    assert status == 200
+    assert body == {"channel": "does-not-exist", "subscribers": []}
+
+
 async def test_health_endpoint_reports_connected_client_count(running_server):
     _, ws_url, http_url = running_server
     loop = asyncio.get_running_loop()
