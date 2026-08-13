@@ -1,4 +1,9 @@
+import asyncio
 import json
+import urllib.error
+import urllib.parse
+import urllib.request
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import pytest_asyncio
@@ -481,3 +486,215 @@ async def test_redis_client_state_saved_without_backend_is_noop(ws_server, clien
     await ws.send(json.dumps({"type": "subscribe", "payload": {"channel": "alerts"}}))
     await recv_message(ws)
     assert ws_server["server"].store.list(50, 0) == []
+
+
+@pytest_asyncio.fixture
+async def redis_server(tmp_path):
+    """A server with a fake Redis backend and an HTTP listener."""
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    db = str(tmp_path / "history.db")
+    server = app.NotificationServer(redis_client=fake, database_url=db)
+    await server.start_backend()
+    ws = await app.start_ws_server(server)
+    httpd = app.start_health_server(server)
+    url = f"http://127.0.0.1:{httpd.server_address[1]}"
+    ws_url = f"ws://127.0.0.1:{ws.sockets[0].getsockname()[1]}"
+    yield {
+        "server": server,
+        "redis": fake,
+        "ws": ws,
+        "httpd": httpd,
+        "health_url": url,
+        "ws_url": ws_url,
+    }
+    ws.close()
+    app.stop_health_server(httpd)
+    await server.stop_backend()
+    await fake.close()
+
+
+async def test_rate_limit_allows_messages_under_limit(redis_server):
+    cws = await connect(redis_server["ws_url"])
+    greeting = await recv_message(cws)
+    client_id = greeting["payload"]["client_id"]
+
+    await cws.send(json.dumps({"type": "broadcast", "payload": {"text": "ok"}}))
+    resp = await recv_message(cws)
+    assert resp["type"] == "broadcast"
+    assert resp["payload"] == {"text": "ok"}
+
+    window = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    key = f"notifications:ratelimit:{client_id}:{window}"
+    assert await redis_server["redis"].get(key) == "1"
+    await cws.close()
+
+
+async def test_rate_limit_returns_error_when_exceeded():
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    server = app.NotificationServer(redis_client=fake, rate_limit=3)
+    await server.start_backend()
+    ws = await app.start_ws_server(server)
+    ws_url = f"ws://127.0.0.1:{ws.sockets[0].getsockname()[1]}"
+
+    cws = await connect(ws_url)
+    greeting = await recv_message(cws)
+    client_id = greeting["payload"]["client_id"]
+
+    for i in range(3):
+        await cws.send(json.dumps({"type": "broadcast", "payload": {"text": f"m{i}"}}))
+        resp = await recv_message(cws)
+        assert resp["type"] == "broadcast"
+
+    await cws.send(json.dumps({"type": "broadcast", "payload": {"text": "boom"}}))
+    err = await recv_message(cws)
+    assert err["type"] == "system"
+    assert err["payload"]["action"] == "error"
+    assert "rate limit" in err["payload"]["message"].lower()
+
+    window = datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
+    key = f"notifications:ratelimit:{client_id}:{window}"
+    assert await fake.get(key) == "4"
+
+    await cws.close()
+    ws.close()
+    await server.stop_backend()
+    await fake.close()
+
+
+async def test_rate_limit_without_redis_is_noop(ws_server, client):
+    ws, _ = client
+    for i in range(3):
+        await ws.send(json.dumps({"type": "broadcast", "payload": {"text": f"m{i}"}}))
+        resp = await recv_message(ws)
+        assert resp["type"] == "broadcast"
+    assert ws_server["server"].store.list(50, 0) == []
+
+
+async def test_history_returns_channel_messages_chronologically(redis_server):
+    cws = await connect(redis_server["ws_url"])
+    await recv_message(cws)
+    await cws.send(json.dumps({"type": "subscribe", "payload": {"channel": "news"}}))
+    await recv_message(cws)
+    for text in ["alpha", "beta", "gamma"]:
+        await cws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "news", "text": text}})
+        )
+        await recv_message(cws)
+    await cws.send(json.dumps({"type": "broadcast", "payload": {"text": "global"}}))
+    await recv_message(cws)
+
+    with urllib.request.urlopen(redis_server["health_url"] + "/history?channel=news&limit=50") as resp:
+        body = json.loads(resp.read())
+    assert body["channel"] == "news"
+    assert body["has_more"] is False
+    texts = [m["payload"]["text"] for m in body["messages"]]
+    assert texts == ["alpha", "beta", "gamma"]
+    assert all(m["channel"] == "news" for m in body["messages"])
+    timestamps = [m["timestamp"] for m in body["messages"]]
+    assert timestamps == sorted(timestamps)
+    await cws.close()
+
+
+async def test_history_pagination_and_since(redis_server):
+    cws = await connect(redis_server["ws_url"])
+    await recv_message(cws)
+    await cws.send(json.dumps({"type": "subscribe", "payload": {"channel": "news"}}))
+    await recv_message(cws)
+    for text in ["a", "b", "c"]:
+        await cws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "news", "text": text}})
+        )
+        await recv_message(cws)
+
+    page_url = redis_server["health_url"] + "/history?channel=news&limit=2"
+    with urllib.request.urlopen(page_url) as resp:
+        page1 = json.loads(resp.read())
+    assert page1["has_more"] is True
+    assert len(page1["messages"]) == 2
+    assert [m["payload"]["text"] for m in page1["messages"]] == ["a", "b"]
+
+    since = urllib.parse.quote(page1["messages"][-1]["timestamp"])
+    with urllib.request.urlopen(
+        redis_server["health_url"] + f"/history?channel=news&since={since}&limit=2"
+    ) as resp:
+        page2 = json.loads(resp.read())
+    assert page2["has_more"] is False
+    assert [m["payload"]["text"] for m in page2["messages"]] == ["c"]
+    await cws.close()
+
+
+async def test_history_since_filter_excludes_earlier_messages(redis_server):
+    cws = await connect(redis_server["ws_url"])
+    await recv_message(cws)
+    await cws.send(json.dumps({"type": "subscribe", "payload": {"channel": "news"}}))
+    await recv_message(cws)
+    for text in ["a", "b", "c"]:
+        await cws.send(
+            json.dumps({"type": "broadcast", "payload": {"channel": "news", "text": text}})
+        )
+        await recv_message(cws)
+
+    marker = redis_server["server"].store.list(50, 0)[1]["timestamp"]
+    since = urllib.parse.quote(marker)
+    with urllib.request.urlopen(
+        redis_server["health_url"] + f"/history?channel=news&since={since}"
+    ) as resp:
+        body = json.loads(resp.read())
+    assert [m["payload"]["text"] for m in body["messages"]] == ["c"]
+    assert body["has_more"] is False
+    await cws.close()
+
+
+async def test_history_missing_channel_returns_400(redis_server):
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(redis_server["health_url"] + "/history")
+    assert exc.value.code == 400
+
+
+async def test_history_invalid_since_returns_400(redis_server):
+    with pytest.raises(urllib.error.HTTPError) as exc:
+        urllib.request.urlopen(redis_server["health_url"] + "/history?channel=news&since=not-a-date")
+    assert exc.value.code == 400
+
+
+async def test_history_unknown_channel_is_empty(redis_server):
+    with urllib.request.urlopen(redis_server["health_url"] + "/history?channel=nope&limit=5") as resp:
+        body = json.loads(resp.read())
+    assert body["messages"] == []
+    assert body["has_more"] is False
+
+
+async def test_message_expiry_removes_old_messages(tmp_path):
+    db = str(tmp_path / "expiry.db")
+    server = app.NotificationServer(database_url=db, message_ttl_days=7)
+    await server.start_backend()
+
+    now = datetime.now(timezone.utc)
+    server.store.add("news", "broadcast", {"text": "old"}, (now - timedelta(days=8)).isoformat())
+    server.store.add("news", "broadcast", {"text": "older"}, (now - timedelta(days=30)).isoformat())
+    server.store.add("news", "broadcast", {"text": "new"}, now.isoformat())
+
+    removed = await server.expire_old_messages()
+    assert removed == 2
+    remaining = server.store.list(100, 0)
+    assert [m["payload"]["text"] for m in remaining] == ["new"]
+    await server.stop_backend()
+
+
+async def test_message_expiry_background_task_runs_on_startup(tmp_path):
+    db = str(tmp_path / "expiry2.db")
+    server = app.NotificationServer(database_url=db, message_ttl_days=7)
+    server.store.open()
+    now = datetime.now(timezone.utc)
+    server.store.add("news", "broadcast", {"text": "old"}, (now - timedelta(days=8)).isoformat())
+    server.store.add("news", "broadcast", {"text": "new"}, now.isoformat())
+
+    await server.start_backend()
+    for _ in range(50):
+        remaining = server.store.list(100, 0)
+        if len(remaining) == 1 and remaining[0]["payload"]["text"] == "new":
+            break
+        await asyncio.sleep(0.05)
+    remaining = server.store.list(100, 0)
+    assert [m["payload"]["text"] for m in remaining] == ["new"]
+    await server.stop_backend()
