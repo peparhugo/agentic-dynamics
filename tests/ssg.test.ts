@@ -1,8 +1,10 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { WebSocket } from 'ws';
 import { runCli } from '../src/cli';
 import { buildSite } from '../src';
+import { startDevServer } from '../src/server';
 
 describe('static site generator', () => {
   let root: string;
@@ -195,5 +197,72 @@ This is **important**.
     await expect(runCli([], { stdout, stderr })).resolves.toBe(1);
     await expect(runCli(['build', '--other'], { stdout, stderr })).resolves.toBe(1);
     expect(stderr.write).toHaveBeenCalledTimes(2);
+  });
+
+  test('rejects an invalid serve port', async () => {
+    const stdout = { write: jest.fn(() => true) };
+    const stderr = { write: jest.fn(() => true) };
+
+    await expect(runCli(['serve', '--port', '70000'], { stdout, stderr })).resolves.toBe(1);
+    expect(stderr.write).toHaveBeenCalledWith('Invalid port: 70000\n');
+  });
+
+  test('serves generated pages with the live reload client', async () => {
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Original');
+    const server = await startDevServer({
+      contentDir,
+      outputDir,
+      templatesDir,
+      host: '127.0.0.1',
+      port: 0
+    });
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${server.port}/page.html`);
+      const html = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      expect(html).toContain('<h1>Original</h1>');
+      expect(html).toContain('/__ssg_reload');
+      expect(html.indexOf('/__ssg_reload')).toBeLessThan(html.indexOf('</body>'));
+    } finally {
+      await server.close();
+    }
+  });
+
+  test('rebuilds and broadcasts reload when content changes', async () => {
+    await fs.writeFile(path.join(contentDir, 'page.md'), '# Before');
+    const server = await startDevServer({
+      contentDir,
+      outputDir,
+      templatesDir,
+      host: '127.0.0.1',
+      port: 0
+    });
+    const socket = new WebSocket(`ws://127.0.0.1:${server.port}/__ssg_reload`);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        socket.once('open', resolve);
+        socket.once('error', reject);
+      });
+      const reload = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for reload')), 5000);
+        socket.once('message', message => {
+          clearTimeout(timeout);
+          expect(message.toString()).toBe('reload');
+          resolve();
+        });
+      });
+
+      await fs.writeFile(path.join(contentDir, 'page.md'), '# After');
+      await reload;
+      await expect(fs.readFile(path.join(outputDir, 'page.html'), 'utf8'))
+        .resolves.toContain('<h1>After</h1>');
+    } finally {
+      socket.terminate();
+      await server.close();
+    }
   });
 });

@@ -10,6 +10,14 @@ npm run build
 npx ssg build
 ```
 
+For development, build and serve the site with live reload. Changes under
+`content` or `templates` trigger a rebuild and refresh connected browsers:
+
+```sh
+npx ssg serve
+npx ssg serve --port 4000
+```
+
 By default, Markdown is read from `./content`, Handlebars templates from
 `./templates`, and HTML is written to `./dist`. Use the directory options to
 select different locations:
