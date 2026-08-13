@@ -9,6 +9,7 @@ import os
 import jwt
 
 from celery_app import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 DATABASE = os.environ.get("TASKS_DATABASE", "tasks.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-secret-change-me")
@@ -32,6 +33,12 @@ def create_app(database=None):
         db = g.pop("db", None)
         if db is not None:
             db.close()
+
+    def get_user_repo():
+        return UserRepository(get_db())
+
+    def get_task_repo():
+        return TaskRepository(get_db())
 
     def init_db():
         conn = sqlite3.connect(app.config["DATABASE"])
@@ -83,11 +90,7 @@ def create_app(database=None):
             )
         except jwt.PyJWTError:
             return None
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM users WHERE id = ?", (payload.get("sub"),)
-        ).fetchone()
-        return row
+        return get_user_repo().get_by_id(payload.get("sub"))
 
     def require_auth(f):
         @wraps(f)
@@ -123,20 +126,14 @@ def create_app(database=None):
             return jsonify({"error": "password is required"}), 400
         username = username.strip()
 
-        db = get_db()
-        existing = db.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        user_repo = get_user_repo()
+        existing = user_repo.get_by_username(username)
         if existing is not None:
             return jsonify({"error": "username already taken"}), 409
 
         password_hash = generate_password_hash(password)
-        cursor = db.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
-        )
-        db.commit()
-        return jsonify({"id": cursor.lastrowid, "username": username}), 201
+        user = user_repo.create_user(username, password_hash)
+        return jsonify({"id": user["id"], "username": user["username"]}), 201
 
     @app.route("/auth/login", methods=["POST"])
     def login():
@@ -149,10 +146,7 @@ def create_app(database=None):
             return jsonify({"error": "password is required"}), 400
         username = username.strip()
 
-        db = get_db()
-        user = db.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
+        user = get_user_repo().get_by_username(username)
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "invalid username or password"}), 401
 
@@ -168,34 +162,20 @@ def create_app(database=None):
             return jsonify({"error": "title is required"}), 400
 
         now = datetime.utcnow().isoformat()
-        db = get_db()
-        cursor = db.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, ?, ?, ?)",
-            (title.strip(), "pending", now, user["id"]),
-        )
-        db.commit()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)
-        ).fetchone()
+        task_repo = get_task_repo()
+        row = task_repo.create_task(title.strip(), "pending", now, user["id"])
         return jsonify(dict(row)), 201
 
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks(user):
-        db = get_db()
-        rows = db.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
+        rows = get_task_repo().list_by_owner(user["id"])
         return jsonify([dict(r) for r in rows])
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth
     def get_task(user, task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, user["id"])
-        ).fetchone()
+        row = get_task_repo().get_by_id_and_owner(task_id, user["id"])
         if row is None:
             return jsonify({"error": "task not found"}), 404
         return jsonify(dict(row))
@@ -203,10 +183,8 @@ def create_app(database=None):
     @app.route("/tasks/<int:task_id>", methods=["PUT"])
     @require_auth
     def update_task(user, task_id):
-        db = get_db()
-        row = db.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, user["id"])
-        ).fetchone()
+        task_repo = get_task_repo()
+        row = task_repo.get_by_id_and_owner(task_id, user["id"])
         if row is None:
             return jsonify({"error": "task not found"}), 404
 
@@ -231,12 +209,7 @@ def create_app(database=None):
 
         just_completed = status == "completed" and row["status"] != "completed"
 
-        db.execute(
-            "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
-            (title, status, task_id),
-        )
-        db.commit()
-        updated = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+        updated = task_repo.update_task(task_id, title, status)
 
         if just_completed:
             # Fire-and-forget: a broker outage shouldn't fail the API response.
