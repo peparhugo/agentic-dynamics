@@ -1,5 +1,4 @@
 import os
-import sqlite3
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
@@ -8,49 +7,27 @@ from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import (
+    BaseRepository,
+    DuplicateUsernameError,
+    TaskRepository,
+    UserRepository,
+)
 
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 
 
-def get_db() -> sqlite3.Connection:
-    connection = sqlite3.connect(DATABASE)
-    connection.row_factory = sqlite3.Row
-    return connection
+def get_db():
+    return BaseRepository.connect(DATABASE)
 
 
 def init_db() -> None:
-    with get_db() as connection:
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
-            )
-            """
-        )
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS tasks (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                title TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'pending',
-                created_at TEXT NOT NULL
-            )
-            """
-        )
-        columns = {
-            column["name"]
-            for column in connection.execute("PRAGMA table_info(tasks)").fetchall()
-        }
-        if "owner_id" not in columns:
-            connection.execute(
-                "ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)"
-            )
+    UserRepository(DATABASE).initialize_schema()
+    TaskRepository(DATABASE).initialize_schema()
 
 
-def task_to_dict(task: sqlite3.Row) -> dict:
+def task_to_dict(task) -> dict:
     return {
         "id": task["id"],
         "title": task["title"],
@@ -77,6 +54,9 @@ def create_app(config: dict | None = None) -> Flask:
         if config.get("DATABASE"):
             DATABASE = config["DATABASE"]
 
+    user_repository = UserRepository(DATABASE)
+    task_repository = TaskRepository(DATABASE)
+
     def token_required(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
@@ -95,10 +75,7 @@ def create_app(config: dict | None = None) -> Flask:
             except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
                 return jsonify({"error": "invalid token"}), 401
 
-            with get_db() as connection:
-                user = connection.execute(
-                    "SELECT id, username FROM users WHERE id = ?", (user_id,)
-                ).fetchone()
+            user = user_repository.get_by_id(user_id)
             if user is None:
                 return jsonify({"error": "invalid token"}), 401
 
@@ -119,15 +96,13 @@ def create_app(config: dict | None = None) -> Flask:
             return jsonify({"error": "password is required"}), 400
 
         try:
-            with get_db() as connection:
-                cursor = connection.execute(
-                    "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                    (username.strip(), generate_password_hash(password)),
-                )
-        except sqlite3.IntegrityError:
+            user = user_repository.create_user(
+                username.strip(), generate_password_hash(password)
+            )
+        except DuplicateUsernameError:
             return jsonify({"error": "username already exists"}), 409
 
-        return jsonify({"id": cursor.lastrowid, "username": username.strip()}), 201
+        return jsonify({"id": user["id"], "username": username.strip()}), 201
 
     @application.post("/auth/login")
     def login():
@@ -137,10 +112,7 @@ def create_app(config: dict | None = None) -> Flask:
         if not isinstance(username, str) or not isinstance(password, str):
             return jsonify({"error": "username and password are required"}), 400
 
-        with get_db() as connection:
-            user = connection.execute(
-                "SELECT * FROM users WHERE username = ?", (username.strip(),)
-            ).fetchone()
+        user = user_repository.get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify({"error": "invalid credentials"}), 401
 
@@ -167,36 +139,20 @@ def create_app(config: dict | None = None) -> Flask:
 
         title = title.strip()
         created_at = datetime.now(timezone.utc).isoformat()
-        with get_db() as connection:
-            cursor = connection.execute(
-                "INSERT INTO tasks (title, created_at, owner_id) VALUES (?, ?, ?)",
-                (title, created_at, g.user_id),
-            )
-            task = connection.execute(
-                "SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)
-            ).fetchone()
+        task = task_repository.create_task(title, created_at, g.user_id)
 
         return jsonify(task_to_dict(task)), 201
 
     @application.get("/tasks")
     @token_required
     def list_tasks():
-        with get_db() as connection:
-            tasks = connection.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? "
-                "ORDER BY created_at DESC, id DESC",
-                (g.user_id,),
-            ).fetchall()
+        tasks = task_repository.list_for_owner(g.user_id)
         return jsonify([task_to_dict(task) for task in tasks])
 
     @application.get("/tasks/<int:task_id>")
     @token_required
     def get_task(task_id: int):
-        with get_db() as connection:
-            task = connection.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, g.user_id),
-            ).fetchone()
+        task = task_repository.get_for_owner(task_id, g.user_id)
         if task is None:
             return jsonify({"error": "task not found"}), 404
         return jsonify(task_to_dict(task))
@@ -208,39 +164,23 @@ def create_app(config: dict | None = None) -> Flask:
         if data is None:
             return jsonify({"error": "JSON object is required"}), 400
 
-        updates = []
-        values = []
+        updates = {}
         if "title" in data:
             if not isinstance(data["title"], str) or not data["title"].strip():
                 return jsonify({"error": "title must be a non-empty string"}), 400
-            updates.append("title = ?")
-            values.append(data["title"].strip())
+            updates["title"] = data["title"].strip()
         if "status" in data:
             if not isinstance(data["status"], str) or not data["status"].strip():
                 return jsonify({"error": "status must be a non-empty string"}), 400
-            updates.append("status = ?")
-            values.append(data["status"].strip())
+            updates["status"] = data["status"].strip()
         if not updates:
             return jsonify({"error": "title or status is required"}), 400
 
-        with get_db() as connection:
-            existing = connection.execute(
-                "SELECT id, status FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, g.user_id),
-            ).fetchone()
-            if existing is None:
-                return jsonify({"error": "task not found"}), 404
+        existing = task_repository.get_for_owner(task_id, g.user_id)
+        if existing is None:
+            return jsonify({"error": "task not found"}), 404
 
-            values.extend((task_id, g.user_id))
-            connection.execute(
-                f"UPDATE tasks SET {', '.join(updates)} "
-                "WHERE id = ? AND owner_id = ?",
-                values,
-            )
-            task = connection.execute(
-                "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-                (task_id, g.user_id),
-            ).fetchone()
+        task = task_repository.update_for_owner(task_id, g.user_id, updates)
 
         if existing["status"] != "completed" and task["status"] == "completed":
             send_notification_email.delay(g.username, task["title"])
