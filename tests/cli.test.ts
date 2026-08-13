@@ -13,9 +13,18 @@ describe('CLI arguments', () => {
     expect(parseArgs(['build'])).toEqual({});
   });
 
+  it('parses serve options and a custom port', () => {
+    expect(parseArgs(['serve', '--port', '4321', '--content', 'pages'])).toEqual({
+      port: 4321,
+      contentDir: 'pages'
+    });
+  });
+
   it('rejects unsupported commands and incomplete options', () => {
-    expect(() => parseArgs(['serve'])).toThrow('Usage:');
+    expect(() => parseArgs(['preview'])).toThrow('Usage:');
     expect(() => parseArgs(['build', '--content'])).toThrow('Invalid option: --content');
     expect(() => parseArgs(['build', '--unknown', 'value'])).toThrow('Invalid option: --unknown');
+    expect(() => parseArgs(['build', '--port', '4000'])).toThrow('Invalid option: --port');
+    expect(() => parseArgs(['serve', '--port', 'invalid'])).toThrow('Invalid port: invalid');
   });
 });

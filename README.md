@@ -10,7 +10,14 @@ npm run build
 npx ssg build
 npx ssg build --content ./posts --output ./public
 npx ssg build --templates ./templates
+npx ssg serve
+npx ssg serve --port 4000
 ```
+
+`ssg serve` builds into `./dist`, serves it at `http://localhost:3000`, and
+reloads open pages whenever files under `content/` or `templates/` change.
+The build directory and watched directories can also be changed with the same
+options accepted by `ssg build`.
 
 Markdown files may include `title`, `date`, and `tags` frontmatter:
 

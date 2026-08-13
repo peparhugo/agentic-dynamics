@@ -1,12 +1,16 @@
 #!/usr/bin/env node
-import { buildSite, BuildOptions } from './generator';
+import { buildSite } from './generator';
+import { serveSite, ServeOptions } from './server';
 
-export function parseArgs(args: string[]): BuildOptions {
-  if (args[0] !== 'build') {
-    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+const usage = 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+
+export function parseArgs(args: string[]): ServeOptions {
+  const command = args[0];
+  if (command !== 'build' && command !== 'serve') {
+    throw new Error(usage);
   }
 
-  const options: BuildOptions = {};
+  const options: ServeOptions = {};
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
@@ -17,6 +21,15 @@ export function parseArgs(args: string[]): BuildOptions {
       index += 1;
       continue;
     }
+    if (command === 'serve' && option === '--port' && value && !value.startsWith('--')) {
+      const port = Number(value);
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        throw new Error(`Invalid port: ${value}`);
+      }
+      options.port = port;
+      index += 1;
+      continue;
+    }
     throw new Error(`Invalid option: ${option}`);
   }
   return options;
@@ -24,6 +37,10 @@ export function parseArgs(args: string[]): BuildOptions {
 
 export async function run(args: string[]): Promise<void> {
   const options = parseArgs(args);
+  if (args[0] === 'serve') {
+    await serveSite(options);
+    return;
+  }
   const pages = await buildSite(options);
   process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
 }
