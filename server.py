@@ -1,8 +1,8 @@
 """
-WebSocket-based notification server with REST health endpoint.
+Pluggable notification server with pluggable transport layer.
 
 Features:
-- WebSocket connections with unique client IDs
+- Pluggable transport layer (WebSocket, SSE, polling, raw TCP)
 - Broadcast messages to all connected clients
 - Direct messages to specific clients
 - System messages
@@ -17,6 +17,7 @@ import json
 import uuid
 import sqlite3
 import os
+from abc import ABC, abstractmethod
 from datetime import datetime
 from threading import Lock
 from typing import Dict, Set, Any
@@ -29,6 +30,7 @@ import aioredis
 # Configuration
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379")
 DATABASE_URL = os.environ.get("DATABASE_URL", "messages.db")
+TRANSPORT = os.environ.get("TRANSPORT", "websocket")
 
 
 def init_db():
@@ -86,37 +88,214 @@ def get_messages(limit: int = 50, offset: int = 0) -> list:
     return messages
 
 
-class NotificationServer:
-    """Thread-safe WebSocket notification server with Redis pub/sub."""
+class BaseTransport(ABC):
+    """Abstract base class for transport mechanisms."""
+
+    @abstractmethod
+    def add_client(self, client_id: str, connection: Any) -> None:
+        """Add a client connection."""
+        pass
+
+    @abstractmethod
+    def remove_client(self, client_id: str) -> None:
+        """Remove a client connection."""
+        pass
+
+    @abstractmethod
+    def get_client_count(self) -> int:
+        """Get the number of connected clients."""
+        pass
+
+    @abstractmethod
+    def get_all_clients(self) -> Dict[str, Any]:
+        """Get a snapshot of all client connections."""
+        pass
+
+    @abstractmethod
+    async def send_to_client(self, client_id: str, message: str) -> bool:
+        """Send a message to a specific client. Returns True if successful."""
+        pass
+
+    @abstractmethod
+    async def broadcast(self, message: str) -> None:
+        """Broadcast a message to all connected clients."""
+        pass
+
+    @abstractmethod
+    async def broadcast_to_subscribers(self, subscriber_ids: Set[str], message: str) -> None:
+        """Broadcast a message to specific subscribers."""
+        pass
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket transport implementation.
+
+    Manages client connections using WebSocket protocol.
+    Provides full-duplex communication with connected clients.
+    """
 
     def __init__(self):
         self.clients: Dict[str, Any] = {}
         self.lock = Lock()
+
+    def add_client(self, client_id: str, connection: Any) -> None:
+        """Add a WebSocket client."""
+        with self.lock:
+            self.clients[client_id] = connection
+
+    def remove_client(self, client_id: str) -> None:
+        """Remove a WebSocket client."""
+        with self.lock:
+            self.clients.pop(client_id, None)
+
+    def get_client_count(self) -> int:
+        """Get the number of connected WebSocket clients."""
+        with self.lock:
+            return len(self.clients)
+
+    def get_all_clients(self) -> Dict[str, Any]:
+        """Get a snapshot of all WebSocket clients."""
+        with self.lock:
+            return self.clients.copy()
+
+    async def send_to_client(self, client_id: str, message: str) -> bool:
+        """Send a message to a specific WebSocket client."""
+        clients = self.get_all_clients()
+        if client_id not in clients:
+            return False
+
+        try:
+            await clients[client_id].send(message)
+            return True
+        except Exception:
+            return False
+
+    async def broadcast(self, message: str) -> None:
+        """Broadcast a message to all WebSocket clients."""
+        clients = self.get_all_clients()
+        tasks = [self._send_safe(ws, message) for ws in clients.values()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def broadcast_to_subscribers(self, subscriber_ids: Set[str], message: str) -> None:
+        """Broadcast a message to specific WebSocket client subscribers."""
+        clients = self.get_all_clients()
+        tasks = [self._send_safe(clients[sub_id], message) for sub_id in subscriber_ids if sub_id in clients]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _send_safe(self, websocket, message: str) -> None:
+        """Send a message to a WebSocket client, silently skip if send fails."""
+        try:
+            await websocket.send(message)
+        except Exception:
+            pass
+
+
+class SSETransport(BaseTransport):
+    """Server-Sent Events transport implementation.
+
+    Alternative transport using HTTP Server-Sent Events (SSE).
+    Provides one-way push notifications from server to client.
+
+    Example of how to extend the transport layer for different protocols.
+    This is a placeholder showing the interface contract.
+    """
+
+    def __init__(self):
+        self.clients: Dict[str, Any] = {}
+        self.lock = Lock()
+
+    def add_client(self, client_id: str, connection: Any) -> None:
+        """Add an SSE client response object."""
+        with self.lock:
+            self.clients[client_id] = connection
+
+    def remove_client(self, client_id: str) -> None:
+        """Remove an SSE client."""
+        with self.lock:
+            self.clients.pop(client_id, None)
+
+    def get_client_count(self) -> int:
+        """Get the number of connected SSE clients."""
+        with self.lock:
+            return len(self.clients)
+
+    def get_all_clients(self) -> Dict[str, Any]:
+        """Get a snapshot of all SSE clients."""
+        with self.lock:
+            return self.clients.copy()
+
+    async def send_to_client(self, client_id: str, message: str) -> bool:
+        """Send a message to a specific SSE client."""
+        clients = self.get_all_clients()
+        if client_id not in clients:
+            return False
+
+        try:
+            response = clients[client_id]
+            await response.write(f"data: {message}\n\n")
+            return True
+        except Exception:
+            return False
+
+    async def broadcast(self, message: str) -> None:
+        """Broadcast a message to all SSE clients."""
+        clients = self.get_all_clients()
+        tasks = [self._send_safe(response, message) for response in clients.values()]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def broadcast_to_subscribers(self, subscriber_ids: Set[str], message: str) -> None:
+        """Broadcast a message to specific SSE client subscribers."""
+        clients = self.get_all_clients()
+        tasks = [self._send_safe(clients[sub_id], message) for sub_id in subscriber_ids if sub_id in clients]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def _send_safe(self, response, message: str) -> None:
+        """Send a message to an SSE client, silently skip if send fails."""
+        try:
+            await response.write(f"data: {message}\n\n")
+        except Exception:
+            pass
+
+
+class NotificationServer:
+    """Notification server with pluggable transport layer and Redis pub/sub."""
+
+    def __init__(self, transport: BaseTransport = None):
+        if transport is None:
+            transport = WebSocketTransport()
+        self.transport = transport
         self.channels: Dict[str, Set[str]] = {}
         self.channel_lock = Lock()
         self.redis_pub = None
         self.redis_sub = None
         self.redis_listen_task = None
 
+    @property
+    def clients(self) -> Dict[str, Any]:
+        """Access transport's clients for backward compatibility."""
+        if isinstance(self.transport, WebSocketTransport):
+            return self.transport.clients
+        return {}
+
     def add_client(self, client_id: str, websocket) -> None:
-        """Add a client to the registry."""
-        with self.lock:
-            self.clients[client_id] = websocket
+        """Add a client to the registry via transport."""
+        self.transport.add_client(client_id, websocket)
 
     def remove_client(self, client_id: str) -> None:
-        """Remove a client from the registry."""
-        with self.lock:
-            self.clients.pop(client_id, None)
+        """Remove a client from the registry via transport."""
+        self.transport.remove_client(client_id)
 
     def get_client_count(self) -> int:
-        """Get the number of connected clients."""
-        with self.lock:
-            return len(self.clients)
+        """Get the number of connected clients from transport."""
+        return self.transport.get_client_count()
 
     def get_all_clients(self) -> Dict[str, Any]:
-        """Get a snapshot of all clients."""
-        with self.lock:
-            return self.clients.copy()
+        """Get a snapshot of all clients from transport."""
+        return self.transport.get_all_clients()
 
     def subscribe(self, client_id: str, channel: str) -> bool:
         """Subscribe a client to a channel. Returns True if new subscription."""
@@ -171,12 +350,7 @@ class NotificationServer:
         await self.publish_to_redis(channel, message)
 
         msg_json = json.dumps(message)
-        clients = self.get_all_clients()
-
-        # Create tasks for all sends
-        tasks = [self._send_to_client(ws, msg_json) for ws in clients.values()]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
+        await self.transport.broadcast(msg_json)
 
     async def broadcast_to_channel(self, channel: str, message: dict) -> None:
         """Broadcast a message to subscribers of a specific channel and publish to Redis."""
@@ -191,19 +365,7 @@ class NotificationServer:
 
         msg_json = json.dumps(message)
         subscribers = self.get_channel_subscribers(channel)
-        clients = self.get_all_clients()
-
-        # Create tasks for all subscribers
-        tasks = [self._send_to_client(clients[sub_id], msg_json) for sub_id in subscribers if sub_id in clients]
-        if tasks:
-            await asyncio.gather(*tasks, return_exceptions=True)
-
-    async def _send_to_client(self, websocket, message: str) -> None:
-        """Send a message to a client, silently skip if send fails."""
-        try:
-            await websocket.send(message)
-        except Exception:
-            pass
+        await self.transport.broadcast_to_subscribers(subscribers, msg_json)
 
     async def init_redis(self) -> None:
         """Initialize Redis publisher connection."""
@@ -259,19 +421,39 @@ class NotificationServer:
         # Publish to Redis
         await self.publish_to_redis(channel, message)
 
-        clients = self.get_all_clients()
-        if client_id not in clients:
-            return False
+        msg_json = json.dumps(message)
+        return await self.transport.send_to_client(client_id, msg_json)
 
-        try:
-            await clients[client_id].send(json.dumps(message))
-            return True
-        except Exception:
-            return False
+
+def create_transport(transport_type: str = None) -> BaseTransport:
+    """Factory function to create transport instance based on configuration.
+
+    Supported transport types:
+    - "websocket" (default): WebSocket transport for full-duplex communication
+    - "sse": Server-Sent Events transport for one-way server-to-client messaging
+
+    Args:
+        transport_type: Transport type name. If None, uses TRANSPORT env var.
+
+    Returns:
+        Instance of BaseTransport subclass.
+
+    Raises:
+        ValueError: If transport type is unknown.
+    """
+    if transport_type is None:
+        transport_type = TRANSPORT
+
+    if transport_type == "websocket":
+        return WebSocketTransport()
+    elif transport_type == "sse":
+        return SSETransport()
+    else:
+        raise ValueError(f"Unknown transport type: {transport_type}. Supported: websocket, sse")
 
 
 # Global server instance
-server = NotificationServer()
+server = NotificationServer(transport=create_transport())
 
 
 async def handle_websocket(websocket, path):
