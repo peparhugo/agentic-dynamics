@@ -12,6 +12,8 @@ from functools import wraps
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -34,7 +36,8 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             )
             """
         )
@@ -53,6 +56,9 @@ def init_db() -> None:
         if "owner_id" not in columns:
             # Existing tasks remain valid, but have no owner and are not exposed.
             connection.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+        user_columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            connection.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def create_task(title: str, owner_id: int) -> dict:
@@ -82,6 +88,15 @@ def get_task(task_id: int, owner_id: int) -> dict | None:
             (task_id, owner_id),
         ).fetchone()
     return dict(row) if row else None
+
+
+def get_user_email(user_id: int) -> str | None:
+    """Return the owner's email, falling back to their existing username."""
+    with get_db() as connection:
+        user = connection.execute(
+            "SELECT COALESCE(email, username) AS email FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    return user["email"] if user else None
 
 
 def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
@@ -158,13 +173,16 @@ def register():
     if not isinstance(data, dict) or not isinstance(data.get("username"), str) or not isinstance(data.get("password"), str):
         return error("username and password are required", 400)
     username = data["username"].strip()
+    email = data.get("email")
     if not username or not data["password"]:
         return error("username and password are required", 400)
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return error("email must be a non-empty string", 400)
     try:
         with get_db() as connection:
             cursor = connection.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, generate_password_hash(data["password"])),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, generate_password_hash(data["password"]), email.strip() if email else None),
             )
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -228,9 +246,17 @@ def edit_task(user_id: int, task_id: int):
     if title is None and status is None:
         return error("title or status is required", 400)
 
+    previous_task = get_task(task_id, user_id)
+    if previous_task is None:
+        return error("task not found", 404)
+
     task = update_task(task_id, user_id, title.strip() if title is not None else None, status)
     if task is None:
         return error("task not found", 404)
+    if status == "completed" and previous_task["status"] != "completed":
+        user_email = get_user_email(user_id)
+        if user_email:
+            send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
 
 

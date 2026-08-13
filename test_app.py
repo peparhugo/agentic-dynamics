@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import patch
 
 import pytest
 
@@ -75,6 +76,29 @@ def test_update_task_title_and_status(client):
 
     assert response.status_code == 200
     assert response.get_json() == {**task, "title": "Published", "status": "done"}
+
+
+def test_completing_task_queues_notification_email(client):
+    headers = auth_header(client, "alice", "secret")
+    task = client.post("/tasks", json={"title": "Notify me"}, headers=headers).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice", "Notify me")
+
+
+def test_notification_only_queues_for_completion_transition(client):
+    headers = auth_header(client, "alice", "secret")
+    task = client.post("/tasks", json={"title": "Already done"}, headers=headers).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=headers)
+        client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+        client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    delay.assert_called_once_with("alice", "Already done")
 
 
 def test_update_missing_task_returns_json_error(client):
