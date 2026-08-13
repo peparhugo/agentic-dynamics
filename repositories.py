@@ -86,11 +86,40 @@ class TaskRepository(BaseRepository):
             "owner_id": owner_id,
         }
 
-    def list_for_owner(self, owner_id: int) -> list:
+    def count_for_owner(self, owner_id: int) -> int:
         with self._get_db() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()
+            return row["c"]
+
+    def list_for_owner(
+        self, owner_id: int, cursor: int | None = None, limit: int = 20
+    ) -> list:
+        """Return up to `limit` tasks ordered created_at DESC, id DESC (newest first).
+
+        `cursor`, when given, is the id of the last item seen on the previous
+        page; results start immediately after it in that same ordering. The
+        (created_at, id) tuple comparison mirrors the ORDER BY so ties on
+        created_at are still paginated deterministically.
+        """
+        with self._get_db() as conn:
+            where = "owner_id = ?"
+            params = [owner_id]
+            if cursor is not None:
+                cursor_row = conn.execute(
+                    "SELECT created_at, id FROM tasks WHERE id = ? AND owner_id = ?",
+                    (cursor, owner_id),
+                ).fetchone()
+                if cursor_row is None:
+                    return []
+                where += " AND (created_at, id) < (?, ?)"
+                params += [cursor_row["created_at"], cursor_row["id"]]
+            params.append(limit)
             rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
+                f"SELECT * FROM tasks WHERE {where} "
+                "ORDER BY created_at DESC, id DESC LIMIT ?",
+                params,
             ).fetchall()
             return [dict(r) for r in rows]
 

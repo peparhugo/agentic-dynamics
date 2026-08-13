@@ -3,8 +3,19 @@ import time
 from unittest.mock import patch
 
 import pytest
+import redis
 
 import app as app_module
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_storage():
+    """Rate limit counters live in Redis, outside the per-test sqlite db, so
+    they must be cleared between tests to keep tests independent."""
+    store = redis.Redis.from_url(app_module.RATELIMIT_STORAGE_URI)
+    store.flushdb()
+    yield
+    store.flushdb()
 
 
 @pytest.fixture()
@@ -144,7 +155,7 @@ def test_create_task_persists(client):
     headers = _auth_headers(client)
     _create(client, "Persisted task", headers=headers)
     resp = client.get("/tasks", headers=headers)
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert "Persisted task" in titles
 
 
@@ -177,7 +188,8 @@ def test_list_tasks_empty(client):
     headers = _auth_headers(client)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    body = resp.get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc_by_created_at(client):
@@ -189,8 +201,11 @@ def test_list_tasks_ordered_desc_by_created_at(client):
     _create(client, "third", headers=headers)
 
     resp = client.get("/tasks", headers=headers)
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["third", "second", "first"]
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
 
 
 def test_list_tasks_only_shows_own_tasks(client):
@@ -200,11 +215,97 @@ def test_list_tasks_only_shows_own_tasks(client):
     _create(client, "alice task", headers=alice_headers)
     _create(client, "bob task", headers=bob_headers)
 
-    alice_titles = [t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()]
-    bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()]
+    alice_titles = [
+        t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()["data"]
+    ]
+    bob_titles = [
+        t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()["data"]
+    ]
 
     assert alice_titles == ["alice task"]
     assert bob_titles == ["bob task"]
+
+
+# ── GET /tasks pagination ─────────────────────────────────────
+
+
+def test_list_tasks_default_limit_is_20(client):
+    headers = _auth_headers(client)
+    for i in range(25):
+        _create(client, f"task {i}", headers=headers)
+
+    resp = client.get("/tasks", headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 20
+    assert body["total"] == 25
+    assert body["next_cursor"] == body["data"][-1]["id"]
+
+
+def test_list_tasks_second_page_via_cursor(client):
+    headers = _auth_headers(client)
+    for i in range(25):
+        _create(client, f"task {i}", headers=headers)
+
+    first_page = client.get("/tasks", headers=headers).get_json()
+    second_page = client.get(
+        f"/tasks?cursor={first_page['next_cursor']}", headers=headers
+    ).get_json()
+
+    assert len(second_page["data"]) == 5
+    assert second_page["next_cursor"] is None
+    assert second_page["total"] == 25
+
+    first_ids = {t["id"] for t in first_page["data"]}
+    second_ids = {t["id"] for t in second_page["data"]}
+    assert first_ids.isdisjoint(second_ids)
+
+
+def test_list_tasks_custom_limit(client):
+    headers = _auth_headers(client)
+    for i in range(5):
+        _create(client, f"task {i}", headers=headers)
+
+    resp = client.get("/tasks?limit=2", headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 2
+    assert body["next_cursor"] == body["data"][-1]["id"]
+    assert body["total"] == 5
+
+
+def test_list_tasks_limit_capped_at_100(client):
+    headers = _auth_headers(client)
+    for i in range(3):
+        _create(client, f"task {i}", headers=headers)
+
+    resp = client.get("/tasks?limit=1000", headers=headers)
+    body = resp.get_json()
+    assert len(body["data"]) == 3
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_invalid_cursor_returns_400(client):
+    headers = _auth_headers(client)
+    resp = client.get("/tasks?cursor=not-an-int", headers=headers)
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_list_tasks_invalid_limit_returns_400(client):
+    headers = _auth_headers(client)
+    resp = client.get("/tasks?limit=not-an-int", headers=headers)
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_list_tasks_cursor_from_other_users_task_returns_empty(client):
+    alice_headers = _auth_headers(client, "alice", "pw1")
+    bob_headers = _auth_headers(client, "bob", "pw2")
+    alice_task = _create(client, "alice task", headers=alice_headers).get_json()
+
+    resp = client.get(f"/tasks?cursor={alice_task['id']}", headers=bob_headers)
+    body = resp.get_json()
+    assert resp.status_code == 200
+    assert body["data"] == []
 
 
 # ── GET /tasks/{id} ──────────────────────────────────────────
@@ -420,3 +521,63 @@ def test_migration_adds_owner_id_to_legacy_table(tmp_path):
     conn.close()
     assert row is not None
     assert row["owner_id"] is None
+
+
+# ── Rate limiting ─────────────────────────────────────────────
+
+RATE_LIMIT_COUNT = int(app_module.RATE_LIMIT.split(" ")[0])
+
+
+def test_requests_within_limit_all_succeed(client):
+    headers = _auth_headers(client)
+    for _ in range(RATE_LIMIT_COUNT):
+        resp = client.get("/tasks", headers=headers)
+        assert resp.status_code == 200
+
+
+def test_exceeding_limit_returns_429_with_retry_after(client):
+    headers = _auth_headers(client)
+    for _ in range(RATE_LIMIT_COUNT):
+        client.get("/tasks", headers=headers)
+
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 429
+    assert "error" in resp.get_json()
+    assert "Retry-After" in resp.headers
+    assert int(resp.headers["Retry-After"]) >= 0
+
+
+def test_rate_limit_is_scoped_per_user(client):
+    alice_headers = _auth_headers(client, "alice", "pw1")
+    bob_headers = _auth_headers(client, "bob", "pw2")
+
+    for _ in range(RATE_LIMIT_COUNT):
+        client.get("/tasks", headers=alice_headers)
+    alice_resp = client.get("/tasks", headers=alice_headers)
+    bob_resp = client.get("/tasks", headers=bob_headers)
+
+    assert alice_resp.status_code == 429
+    assert bob_resp.status_code == 200
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(RATE_LIMIT_COUNT):
+        resp = client.post(
+            "/auth/login", json={"username": "nobody", "password": "wrong"}
+        )
+        assert resp.status_code == 401
+
+    resp = client.post("/auth/login", json={"username": "nobody", "password": "wrong"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_exempt_endpoints_do_not_share_bucket_with_auth(client):
+    """Login attempts (keyed by IP) and task requests (keyed by user) draw from
+    separate buckets, so exhausting one must not lock out the other."""
+    headers = _auth_headers(client)
+    for _ in range(RATE_LIMIT_COUNT):
+        client.post("/auth/login", json={"username": "nobody", "password": "wrong"})
+
+    resp = client.get("/tasks", headers=headers)
+    assert resp.status_code == 200

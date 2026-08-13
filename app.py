@@ -9,6 +9,8 @@ from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 import jwt
@@ -22,6 +24,44 @@ DATABASE = os.environ.get("DATABASE", "todos.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 JWT_ALGORITHM = "HS256"
 JWT_EXP_MINUTES = 60
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1")
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+
+def rate_limit_key() -> str:
+    """Key by authenticated user when possible, else fall back to IP.
+
+    Runs ahead of `login_required`, so it decodes the token itself rather
+    than reading `g.user_id` — this lets rate limiting apply uniformly to
+    unauthenticated endpoints like /auth/login too.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):]
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            return f"user:{payload.get('sub')}"
+        except jwt.PyJWTError:
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    default_limits=[RATE_LIMIT],
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def handle_rate_limit_exceeded(e):
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 def get_db():
@@ -101,8 +141,13 @@ def create_task(title: str, owner_id: int) -> dict:
     return task_repository.create(title, owner_id, now)
 
 
-def get_tasks(owner_id: int):
-    return task_repository.list_for_owner(owner_id)
+def get_tasks(owner_id: int, cursor: int | None = None, limit: int = DEFAULT_PAGE_LIMIT):
+    tasks = task_repository.list_for_owner(owner_id, cursor=cursor, limit=limit + 1)
+    has_more = len(tasks) > limit
+    tasks = tasks[:limit]
+    next_cursor = tasks[-1]["id"] if has_more else None
+    total = task_repository.count_for_owner(owner_id)
+    return tasks, next_cursor, total
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
@@ -183,7 +228,26 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @login_required
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    cursor_param = request.args.get("cursor")
+    limit_param = request.args.get("limit")
+
+    cursor = None
+    if cursor_param is not None:
+        try:
+            cursor = int(cursor_param)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    limit = DEFAULT_PAGE_LIMIT
+    if limit_param is not None:
+        try:
+            limit = int(limit_param)
+        except ValueError:
+            return jsonify({"error": "limit must be an integer"}), 400
+    limit = max(1, min(limit, MAX_PAGE_LIMIT))
+
+    tasks, next_cursor, total = get_tasks(g.user_id, cursor=cursor, limit=limit)
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.route("/tasks", methods=["POST"])

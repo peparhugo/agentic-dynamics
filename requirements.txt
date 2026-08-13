@@ -3,3 +3,4 @@ pytest
 pyjwt
 celery
 redis
+flask-limiter
