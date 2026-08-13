@@ -19,20 +19,26 @@ app = Flask(__name__)
 # holding it: a slow client must not block connects, disconnects, or health.
 clients_lock = threading.Lock()
 clients: dict[str, ServerConnection] = {}
+channels: dict[str, set[str]] = {}
 
-SUPPORTED_TYPES = {"broadcast", "direct", "system"}
+SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
 
 
 def utc_timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def make_message(message_type: str, payload: dict[str, Any]) -> dict[str, Any]:
-    return {
+def make_message(
+    message_type: str, payload: dict[str, Any], channel: str | None = None
+) -> dict[str, Any]:
+    message = {
         "type": message_type,
         "payload": payload,
         "timestamp": utc_timestamp(),
     }
+    if channel is not None:
+        message["channel"] = channel
+    return message
 
 
 def encode_message(message: dict[str, Any]) -> str:
@@ -42,14 +48,22 @@ def encode_message(message: dict[str, Any]) -> str:
 def validate_message(value: Any) -> str | None:
     if not isinstance(value, dict):
         return "message must be a JSON object"
-    if set(value) != {"type", "payload", "timestamp"}:
-        return "message must contain only type, payload, and timestamp"
+    required_fields = {"type", "payload", "timestamp"}
+    allowed_fields = required_fields | {"channel"}
+    if not required_fields.issubset(value) or not set(value).issubset(allowed_fields):
+        return "message must contain type, payload, timestamp, and optionally channel"
     if value["type"] not in SUPPORTED_TYPES:
         return "unsupported message type"
     if not isinstance(value["payload"], dict):
         return "payload must be an object"
     if not isinstance(value["timestamp"], str):
         return "timestamp must be a string"
+    if "channel" in value and (
+        not isinstance(value["channel"], str) or not value["channel"]
+    ):
+        return "channel must be a non-empty string"
+    if value["type"] in {"subscribe", "unsubscribe"} and "channel" not in value:
+        return f'{value["type"]} message requires channel'
     return None
 
 
@@ -67,6 +81,10 @@ def _remove_client(client_id: str, websocket: ServerConnection) -> None:
     with clients_lock:
         if clients.get(client_id) is websocket:
             del clients[client_id]
+            for channel in list(channels):
+                channels[channel].discard(client_id)
+                if not channels[channel]:
+                    del channels[channel]
 
 
 def _client_snapshot() -> list[tuple[str, ServerConnection]]:
@@ -74,17 +92,37 @@ def _client_snapshot() -> list[tuple[str, ServerConnection]]:
         return list(clients.items())
 
 
+def _channel_snapshot(channel: str) -> list[tuple[str, ServerConnection]]:
+    with clients_lock:
+        return [
+            (client_id, clients[client_id])
+            for client_id in channels.get(channel, set())
+            if client_id in clients
+        ]
+
+
+def _set_subscription(client_id: str, channel: str, subscribed: bool) -> None:
+    with clients_lock:
+        if subscribed:
+            channels.setdefault(channel, set()).add(client_id)
+        elif channel in channels:
+            channels[channel].discard(client_id)
+            if not channels[channel]:
+                del channels[channel]
+
+
 async def _send(websocket: ServerConnection, message: dict[str, Any]) -> None:
     await websocket.send(encode_message(message))
 
 
 async def broadcast(message: dict[str, Any]) -> None:
-    """Send a valid message to a lock-protected snapshot of all clients."""
+    """Send a valid message to all clients, or one channel's subscribers."""
     error = validate_message(message)
     if error:
         raise ValueError(error)
 
-    snapshot = _client_snapshot()
+    channel = message.get("channel")
+    snapshot = _channel_snapshot(channel) if channel is not None else _client_snapshot()
     if not snapshot:
         return
 
@@ -101,8 +139,12 @@ async def send_direct(client_id: str, message: dict[str, Any]) -> bool:
     """Send to one client, taking the socket reference under the registry lock."""
     with clients_lock:
         websocket = clients.get(client_id)
+        channel = message.get("channel")
+        is_subscribed = channel is None or client_id in channels.get(channel, set())
     if websocket is None:
         return False
+    if not is_subscribed:
+        return True
     try:
         await _send(websocket, message)
     except Exception:
@@ -135,7 +177,11 @@ async def websocket_handler(websocket: ServerConnection) -> None:
                 await _send_error(websocket, error)
                 continue
 
-            if message["type"] == "broadcast":
+            if message["type"] == "subscribe":
+                _set_subscription(client_id, message["channel"], True)
+            elif message["type"] == "unsubscribe":
+                _set_subscription(client_id, message["channel"], False)
+            elif message["type"] == "broadcast":
                 await broadcast(message)
             elif message["type"] == "direct":
                 recipient = message["payload"].get("client_id")
@@ -152,6 +198,23 @@ async def websocket_handler(websocket: ServerConnection) -> None:
 @app.get("/health")
 def health():
     return jsonify({"connected_clients": client_count()})
+
+
+@app.get("/channels")
+def list_channels():
+    with clients_lock:
+        result = [
+            {"name": name, "subscriber_count": len(subscribers)}
+            for name, subscribers in sorted(channels.items())
+        ]
+    return jsonify({"channels": result})
+
+
+@app.get("/channels/<name>/subscribers")
+def list_channel_subscribers(name: str):
+    with clients_lock:
+        subscribers = sorted(channels.get(name, set()))
+    return jsonify({"channel": name, "subscribers": subscribers})
 
 
 class NotificationServer:
@@ -223,11 +286,16 @@ class NotificationServer:
         if self._thread.is_alive():
             raise TimeoutError("WebSocket server did not stop")
 
-    def broadcast(self, payload: dict[str, Any], timeout: float = 5.0) -> None:
+    def broadcast(
+        self,
+        payload: dict[str, Any],
+        timeout: float = 5.0,
+        channel: str | None = None,
+    ) -> None:
         if self.loop is None or not self.loop.is_running():
             raise RuntimeError("WebSocket server is not running")
         future = asyncio.run_coroutine_threadsafe(
-            broadcast(make_message("broadcast", payload)), self.loop
+            broadcast(make_message("broadcast", payload, channel)), self.loop
         )
         future.result(timeout)
 

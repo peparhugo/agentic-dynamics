@@ -5,7 +5,7 @@ import threading
 import pytest
 from websockets.asyncio.client import connect
 
-from app import NotificationServer, app, clients, clients_lock
+from app import NotificationServer, app, channels, clients, clients_lock
 
 
 @pytest.fixture
@@ -16,6 +16,7 @@ def server():
     instance.stop()
     with clients_lock:
         clients.clear()
+        channels.clear()
 
 
 def url(server):
@@ -110,3 +111,141 @@ def test_websocket_loop_uses_daemon_thread(server):
     assert server._thread is not threading.main_thread()
     assert server._thread.daemon is True
     assert server._thread.is_alive()
+
+
+def channel_message(message_type, channel):
+    return {
+        "type": message_type,
+        "payload": {},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": channel,
+    }
+
+
+@pytest.mark.asyncio
+async def test_channel_messages_only_reach_subscribers(server):
+    alerts_client, _ = await connect_client(server)
+    chat_client, _ = await connect_client(server)
+    unsubscribed_client, _ = await connect_client(server)
+    await alerts_client.send(json.dumps(channel_message("subscribe", "alerts")))
+    await chat_client.send(json.dumps(channel_message("subscribe", "chat")))
+
+    message = {
+        "type": "broadcast",
+        "payload": {"text": "warning"},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": "alerts",
+    }
+    await alerts_client.send(json.dumps(message))
+
+    assert await receive_json(alerts_client) == message
+    for websocket in (chat_client, unsubscribed_client):
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(websocket.recv(), timeout=0.05)
+    await alerts_client.close()
+    await chat_client.close()
+    await unsubscribed_client.close()
+
+
+@pytest.mark.asyncio
+async def test_client_can_subscribe_to_multiple_channels_and_unsubscribe(server):
+    client, _ = await connect_client(server)
+    sender, _ = await connect_client(server)
+    await client.send(json.dumps(channel_message("subscribe", "alerts")))
+    await client.send(json.dumps(channel_message("subscribe", "chat")))
+
+    for name in ("alerts", "chat"):
+        message = {
+            "type": "broadcast",
+            "payload": {"channel": name},
+            "timestamp": "2026-08-13T12:00:00+00:00",
+            "channel": name,
+        }
+        await sender.send(json.dumps(message))
+        assert await receive_json(client) == message
+
+    await client.send(json.dumps(channel_message("unsubscribe", "alerts")))
+    await client.send(json.dumps(channel_message("subscribe", "sync")))
+    sync_message = {
+        "type": "broadcast",
+        "payload": {},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": "sync",
+    }
+    await client.send(json.dumps(sync_message))
+    assert await receive_json(client) == sync_message
+    assert "alerts" not in channels
+    assert len(channels["chat"]) == 1
+
+    await client.close()
+    await sender.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_direct_message_requires_recipient_subscription(server):
+    sender, _ = await connect_client(server)
+    recipient, recipient_id = await connect_client(server)
+    message = {
+        "type": "direct",
+        "payload": {"client_id": recipient_id, "text": "private alert"},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": "alerts",
+    }
+    await sender.send(json.dumps(message))
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(recipient.recv(), timeout=0.05)
+
+    await recipient.send(json.dumps(channel_message("subscribe", "alerts")))
+    await recipient.send(json.dumps(channel_message("subscribe", "ready")))
+    ready_message = {
+        "type": "broadcast",
+        "payload": {},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": "ready",
+    }
+    await recipient.send(json.dumps(ready_message))
+    assert await receive_json(recipient) == ready_message
+    await sender.send(json.dumps(message))
+    assert await receive_json(recipient) == message
+    await sender.close()
+    await recipient.close()
+
+
+@pytest.mark.asyncio
+async def test_channel_rest_endpoints_and_disconnect_cleanup(server):
+    first, first_id = await connect_client(server)
+    second, second_id = await connect_client(server)
+    await first.send(json.dumps(channel_message("subscribe", "alerts")))
+    await second.send(json.dumps(channel_message("subscribe", "alerts")))
+    await second.send(json.dumps(channel_message("subscribe", "chat")))
+    await second.send(json.dumps(channel_message("subscribe", "ready")))
+    await second.send(json.dumps({
+        "type": "broadcast",
+        "payload": {},
+        "timestamp": "2026-08-13T12:00:00+00:00",
+        "channel": "ready",
+    }))
+    await receive_json(second)
+
+    client = app.test_client()
+    assert client.get("/channels").get_json() == {
+        "channels": [
+            {"name": "alerts", "subscriber_count": 2},
+            {"name": "chat", "subscriber_count": 1},
+            {"name": "ready", "subscriber_count": 1},
+        ]
+    }
+    assert client.get("/channels/alerts/subscribers").get_json() == {
+        "channel": "alerts",
+        "subscribers": sorted([first_id, second_id]),
+    }
+
+    await second.close()
+    for _ in range(50):
+        if "chat" not in channels:
+            break
+        await asyncio.sleep(0.01)
+    assert client.get("/channels").get_json() == {
+        "channels": [{"name": "alerts", "subscriber_count": 1}]
+    }
+    await first.close()
