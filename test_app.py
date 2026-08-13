@@ -5,6 +5,8 @@ Comprehensive tests for the Task Management API with JWT authentication.
 import pytest
 from datetime import datetime
 from app import app, db, Task, User, generate_token, init_db
+from tasks import celery
+from unittest.mock import patch, MagicMock
 
 
 @pytest.fixture
@@ -12,6 +14,8 @@ def client():
     """Create a test client with a fresh database."""
     app.config["TESTING"] = True
     app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
+
+    celery.conf.update(task_always_eager=True, task_eager_propagates=True)
 
     with app.app_context():
         db.create_all()
@@ -595,3 +599,138 @@ class TestDataIntegrity:
             datetime.fromisoformat(created_at)
         except ValueError:
             pytest.fail(f"created_at is not in ISO format: {created_at}")
+
+
+class TestNotificationTrigger:
+    """Tests for async email notification trigger."""
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_sent_when_status_changes_to_completed(self, mock_task, client, auth_headers):
+        """Should trigger email notification when status changes to completed."""
+        create_resp = client.post("/tasks", json={"title": "Test Task"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_called_once()
+        call_args = mock_task.call_args[0]
+        assert call_args[1] == "Test Task"
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_not_sent_for_other_status_changes(self, mock_task, client, auth_headers):
+        """Should not trigger notification when status changes to non-completed status."""
+        create_resp = client.post("/tasks", json={"title": "Test Task"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "in_progress"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_not_called()
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_not_sent_if_already_completed(self, mock_task, client, auth_headers):
+        """Should not trigger notification if task status is already completed."""
+        create_resp = client.post("/tasks", json={"title": "Test Task"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+        mock_task.reset_mock()
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_not_called()
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_with_user_email(self, mock_task, client):
+        """Should send notification with user email address."""
+        register_resp = client.post(
+            "/auth/register",
+            json={"username": "emailuser", "password": "pass123", "email": "user@example.com"},
+            content_type="application/json",
+        )
+        token = register_resp.get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        create_resp = client.post("/tasks", json={"title": "Test Task"}, headers=headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            content_type="application/json",
+            headers=headers,
+        )
+
+        mock_task.assert_called_once()
+        call_args = mock_task.call_args[0]
+        assert call_args[0] == "user@example.com"
+        assert call_args[1] == "Test Task"
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_with_default_email(self, mock_task, client, auth_headers):
+        """Should use default email format when no email provided."""
+        create_resp = client.post("/tasks", json={"title": "Test Task"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"status": "completed"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_called_once()
+        call_args = mock_task.call_args[0]
+        assert "testuser@example.com" == call_args[0] or "testuser" == call_args[0]
+        assert call_args[1] == "Test Task"
+
+    @patch("tasks.send_notification_email.delay")
+    def test_update_title_does_not_trigger_notification(self, mock_task, client, auth_headers):
+        """Should not trigger notification when only title is updated."""
+        create_resp = client.post("/tasks", json={"title": "Original Title"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"title": "Updated Title"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_not_called()
+
+    @patch("tasks.send_notification_email.delay")
+    def test_notification_sent_with_title_and_status_update(self, mock_task, client, auth_headers):
+        """Should trigger notification when both title and status change to completed."""
+        create_resp = client.post("/tasks", json={"title": "Original Title"}, headers=auth_headers)
+        task_id = create_resp.get_json()["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            json={"title": "Updated Title", "status": "completed"},
+            content_type="application/json",
+            headers=auth_headers,
+        )
+
+        mock_task.assert_called_once()
+        call_args = mock_task.call_args[0]
+        assert call_args[1] == "Updated Title"

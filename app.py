@@ -1,6 +1,6 @@
 """
 Flask Task Management API with SQLAlchemy and SQLite storage.
-Features proper connection pooling, error handling, and JWT authentication.
+Features proper connection pooling, error handling, JWT authentication, and async email notifications.
 """
 
 from flask import Flask, request, jsonify
@@ -12,6 +12,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import jwt
 import os
 from functools import wraps
+from tasks import celery, send_notification_email
 
 app = Flask(__name__)
 
@@ -36,6 +37,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     username = db.Column(db.String(255), nullable=False, unique=True)
     password_hash = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False, default="")
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -122,7 +124,7 @@ def migrate_existing_tasks():
 
         default_user = User.query.filter_by(username="admin").first()
         if default_user is None:
-            default_user = User(username="admin")
+            default_user = User(username="admin", email="admin@example.com")
             default_user.set_password("admin")
             db.session.add(default_user)
             db.session.commit()
@@ -140,6 +142,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip() if data.get("username") else ""
     password = data.get("password", "").strip() if data.get("password") else ""
+    email = data.get("email", "").strip() if data.get("email") else ""
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
@@ -147,7 +150,7 @@ def register():
     if User.query.filter_by(username=username).first():
         return jsonify({"error": "username already exists"}), 400
 
-    user = User(username=username)
+    user = User(username=username, email=email or f"{username}@example.com")
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -212,6 +215,7 @@ def edit_task(task_id: int, user):
         return jsonify({"error": "task not found"}), 404
 
     data = request.get_json(silent=True) or {}
+    old_status = task.status
 
     if "title" in data and data["title"]:
         task.title = data["title"].strip()
@@ -220,6 +224,10 @@ def edit_task(task_id: int, user):
         task.status = data["status"]
 
     db.session.commit()
+
+    if old_status != "completed" and task.status == "completed":
+        send_notification_email.delay(user.email or user.username, task.title)
+
     return jsonify(task.to_dict())
 
 
