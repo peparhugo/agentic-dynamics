@@ -7,7 +7,9 @@ import json
 import os
 import tempfile
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 import app as app_module
+from tasks_celery import celery_app
 
 
 @pytest.fixture
@@ -19,6 +21,12 @@ def client():
 
     # Set the database to the test database
     app_module.DATABASE = db_path
+
+    # Configure Celery for testing (synchronous execution)
+    celery_app.conf.update(
+        task_always_eager=True,
+        task_eager_propagates=True,
+    )
 
     # Initialize app with test database
     with app_module.app.app_context():
@@ -37,12 +45,21 @@ def auth_user(client):
     """Register and return a user with a valid JWT token."""
     response = client.post(
         "/auth/register",
-        data=json.dumps({"username": "testuser", "password": "password123"}),
+        data=json.dumps({
+            "username": "testuser",
+            "password": "password123",
+            "email": "testuser@example.com"
+        }),
         content_type="application/json",
     )
     assert response.status_code == 201
     token = response.get_json()["token"]
-    return {"username": "testuser", "token": token, "headers": {"Authorization": f"Bearer {token}"}}
+    return {
+        "username": "testuser",
+        "email": "testuser@example.com",
+        "token": token,
+        "headers": {"Authorization": f"Bearer {token}"}
+    }
 
 
 class TestAuth:
@@ -749,3 +766,161 @@ class TestIntegration:
         verified_task = get_response_2.get_json()
         assert verified_task["title"] == "Updated Task 1"
         assert verified_task["status"] == "completed"
+
+
+class TestNotificationTrigger:
+    """Tests for the email notification trigger logic."""
+
+    def test_notification_triggered_on_completion(self, client, auth_user):
+        """Test that a notification is triggered when status changes to 'completed'."""
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Important Task"}),
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Mock the send_notification_email task
+        with patch("app.send_notification_email") as mock_task:
+            # Update task to completed
+            response = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"status": "completed"}),
+                content_type="application/json",
+                headers=auth_user["headers"],
+            )
+            assert response.status_code == 200
+
+            # Verify the task was triggered
+            mock_task.delay.assert_called_once_with(
+                "testuser@example.com",
+                "Important Task"
+            )
+
+    def test_notification_not_triggered_without_email(self, client):
+        """Test that a notification is not triggered if user has no email."""
+        # Register user without email
+        register_response = client.post(
+            "/auth/register",
+            data=json.dumps({
+                "username": "noemaul",
+                "password": "password123"
+            }),
+            content_type="application/json",
+        )
+        token = register_response.get_json()["token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task without email"}),
+            content_type="application/json",
+            headers=headers,
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Mock the send_notification_email task
+        with patch("app.send_notification_email") as mock_task:
+            # Update task to completed
+            response = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"status": "completed"}),
+                content_type="application/json",
+                headers=headers,
+            )
+            assert response.status_code == 200
+
+            # Verify the task was NOT triggered (because user has no email)
+            mock_task.delay.assert_not_called()
+
+    def test_notification_not_triggered_for_other_status_changes(self, client, auth_user):
+        """Test that a notification is not triggered for non-completed status changes."""
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Test Task"}),
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Mock the send_notification_email task
+        with patch("app.send_notification_email") as mock_task:
+            # Update task to in_progress
+            response = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"status": "in_progress"}),
+                content_type="application/json",
+                headers=auth_user["headers"],
+            )
+            assert response.status_code == 200
+
+            # Verify the task was NOT triggered
+            mock_task.delay.assert_not_called()
+
+    def test_notification_only_on_transition_to_completed(self, client, auth_user):
+        """Test that a notification is only triggered when transitioning TO completed."""
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Test Task"}),
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Mock the send_notification_email task
+        with patch("app.send_notification_email") as mock_task:
+            # First update: pending -> completed (should trigger)
+            response1 = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"status": "completed"}),
+                content_type="application/json",
+                headers=auth_user["headers"],
+            )
+            assert response1.status_code == 200
+            assert mock_task.delay.call_count == 1
+
+            # Reset mock
+            mock_task.reset_mock()
+
+            # Second update: completed -> completed (should NOT trigger)
+            response2 = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"status": "completed"}),
+                content_type="application/json",
+                headers=auth_user["headers"],
+            )
+            assert response2.status_code == 200
+            mock_task.delay.assert_not_called()
+
+    def test_notification_with_title_change_and_completion(self, client, auth_user):
+        """Test that notification is triggered when updating title and status to completed."""
+        # Create a task
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Old Title"}),
+            content_type="application/json",
+            headers=auth_user["headers"],
+        )
+        task_id = create_response.get_json()["id"]
+
+        # Mock the send_notification_email task
+        with patch("app.send_notification_email") as mock_task:
+            # Update both title and status to completed
+            response = client.put(
+                f"/tasks/{task_id}",
+                data=json.dumps({"title": "New Title", "status": "completed"}),
+                content_type="application/json",
+                headers=auth_user["headers"],
+            )
+            assert response.status_code == 200
+
+            # Verify the task was triggered with the NEW title
+            mock_task.delay.assert_called_once_with(
+                "testuser@example.com",
+                "New Title"
+            )

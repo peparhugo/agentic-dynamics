@@ -11,8 +11,20 @@ import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from tasks_celery import celery_app, send_notification_email
 
 app = Flask(__name__)
+app.config["CELERY_BROKER_URL"] = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+app.config["CELERY_RESULT_BACKEND"] = os.environ.get("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+
+celery_app.conf.update(app.config)
+
+class ContextTask(celery_app.Task):
+    def __call__(self, *args, **kwargs):
+        with app.app_context():
+            return self.run(*args, **kwargs)
+
+celery_app.Task = ContextTask
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -32,7 +44,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
@@ -85,6 +98,16 @@ def require_auth(f):
 
 # ── Helper Functions ────────────────────────────────────────────
 
+def get_user_email(user_id):
+    """Get the email address for a user, return None if not found."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    return row["email"] if row else None
+
+
 def task_to_dict(row):
     """Convert a database row to a dictionary."""
     return {
@@ -103,6 +126,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
+    email = data.get("email", "").strip() if "email" in data else None
 
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
@@ -115,8 +139,8 @@ def register():
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash),
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email),
             )
             conn.commit()
             user_id = cursor.lastrowid
@@ -229,11 +253,17 @@ def update_task(user_id, task_id):
         if "title" in data and not title:
             return jsonify({"error": "title cannot be empty"}), 400
 
+        old_status = row["status"]
         conn.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
             (title, status, task_id),
         )
         conn.commit()
+
+    if status == "completed" and old_status != "completed":
+        user_email = get_user_email(user_id)
+        if user_email:
+            send_notification_email.delay(user_email, title)
 
     return jsonify({
         "id": task_id,
