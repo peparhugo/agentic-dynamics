@@ -10,11 +10,12 @@ npm run build
 npx ssg build
 ```
 
-By default, Markdown is read from `./content` and HTML is written to `./dist`.
-Use `--content` and `--output` to select different directories:
+By default, Markdown is read from `./content`, Handlebars templates from
+`./templates`, and HTML is written to `./dist`. Use the directory options to
+select different locations:
 
 ```sh
-npx ssg build --content posts --output public
+npx ssg build --content posts --output public --templates theme
 ```
 
 Markdown files can include YAML frontmatter:
@@ -28,3 +29,31 @@ tags: [news, example]
 
 # Hello
 ```
+
+## Templates
+
+Put page templates in `templates`, layouts in `templates/layouts`, and reusable
+partials in `templates/partials`. A page can select both a template and layout:
+
+```markdown
+---
+title: Hello
+template: post
+layout: site
+---
+
+Hello **world**.
+```
+
+`templates/post.hbs` receives all frontmatter plus `title`, `date`, `tags`,
+`url`, and rendered Markdown as `content`:
+
+```hbs
+{{> header}}
+<article><h1>{{title}}</h1>{{{content}}}</article>
+{{> footer}}
+```
+
+Use `{{{body}}}` where page output belongs in `templates/layouts/site.hbs`.
+When frontmatter omits `template` or `layout`, `default.hbs` is used when that
+file exists. Without templates, the original built-in page output is retained.

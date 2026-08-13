@@ -8,7 +8,7 @@ export interface CliIO {
 }
 
 function usage(): string {
-  return 'Usage: ssg build [--content <dir>] [--output <dir>]\n';
+  return 'Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]\n';
 }
 
 function valueAfter(args: string[], index: number, option: string): string {
@@ -37,6 +37,9 @@ export async function runCli(
         index += 1;
       } else if (argument === '--output') {
         options.outputDir = valueAfter(args, index, argument);
+        index += 1;
+      } else if (argument === '--templates') {
+        options.templatesDir = valueAfter(args, index, argument);
         index += 1;
       } else {
         throw new Error(`Unknown option: ${argument}`);
