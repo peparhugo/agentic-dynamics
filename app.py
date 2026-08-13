@@ -14,6 +14,7 @@ import hmac
 import json
 import os
 from celery import Celery
+from flask_limiter import Limiter
 from werkzeug.security import check_password_hash, generate_password_hash
 from repositories import TaskRepository, UserRepository
 
@@ -22,6 +23,7 @@ app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "todos.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "development-only-secret")
 JWT_EXPIRATION_HOURS = 24
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/1")
 celery = Celery("task_notifications")
 celery.config_from_object("celery_config")
 
@@ -75,6 +77,33 @@ def verify_token(token: str) -> int | None:
         return None
 
 
+def rate_limit_key() -> str:
+    """Use a stable user identity when a valid bearer token is supplied."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    user_id = verify_token(token) if scheme == "Bearer" and token else None
+    return f"user:{user_id}" if user_id is not None else request.remote_addr or "anonymous"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=RATELIMIT_STORAGE_URI,
+    headers_enabled=True,
+    # Keep local development and tests usable when the configured Redis service is unavailable.
+    in_memory_fallback_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    response.headers["Retry-After"] = str(getattr(error, "retry_after", None) or 60)
+    return response
+
+
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -121,7 +150,25 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(TaskRepository(DATABASE).list_for_owner(g.user_id))
+    cursor = request.args.get("cursor")
+    try:
+        cursor_id = int(cursor) if cursor is not None else None
+        if cursor_id is not None and cursor_id < 1:
+            raise ValueError
+        limit = int(request.args.get("limit", 20))
+        if limit < 1:
+            raise ValueError
+    except ValueError:
+        return jsonify({"error": "cursor and limit must be positive integers"}), 400
+
+    tasks, total, has_more = TaskRepository(DATABASE).list_page_for_owner(
+        g.user_id, cursor_id, min(limit, 100)
+    )
+    return jsonify({
+        "data": tasks,
+        "next_cursor": str(tasks[-1]["id"]) if has_more else None,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
