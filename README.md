@@ -55,3 +55,20 @@ tags: [news, example]
 
 # Hello
 ```
+
+## Plugins
+
+Add TypeScript plugin modules under `plugins/` and load them from `ssg.config.ts`:
+
+```ts
+import { defineConfig, type Plugin } from 'ssg';
+import audit from './plugins/audit';
+
+export default defineConfig({ plugins: [audit] });
+```
+
+Plugins may implement `onStart`, `beforeBuild`, `onFile`, `afterBuild`, and `onEnd`.
+Hooks run in configuration order. `onFile(page, context)` can inspect or change each
+page after the built-in Markdown plugin and before the built-in template plugin.
+`MarkdownPlugin`, `TemplatePlugin`, and `DevServerPlugin` are also exported for
+custom engine pipelines.
