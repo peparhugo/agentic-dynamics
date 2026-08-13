@@ -12,6 +12,8 @@ import sqlite3
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -34,6 +36,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                email TEXT,
                 password_hash TEXT NOT NULL
             )
             """
@@ -52,6 +55,9 @@ def init_db() -> None:
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def encode_token(user_id: int) -> str:
@@ -116,16 +122,19 @@ def task_not_found():
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
+    email = data.get("email")
     password = data.get("password")
     if not isinstance(username, str) or not username.strip():
         return jsonify({"error": "username is required"}), 400
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a non-empty string"}), 400
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username.strip(), generate_password_hash(password)),
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username.strip(), email.strip() if email else username.strip(), generate_password_hash(password)),
             )
             user_id = cursor.lastrowid
     except sqlite3.IntegrityError:
@@ -221,7 +230,12 @@ def update_task(task_id: int):
 
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?", (task_id, g.user_id)
+            """
+            SELECT tasks.id, tasks.status, tasks.title, users.email
+            FROM tasks JOIN users ON users.id = tasks.owner_id
+            WHERE tasks.id = ? AND tasks.owner_id = ?
+            """,
+            (task_id, g.user_id),
         ).fetchone()
         if row is None:
             return task_not_found()
@@ -234,6 +248,8 @@ def update_task(task_id: int):
             "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
             (task_id, g.user_id),
         ).fetchone()
+    if data.get("status") == "completed" and row["status"] != "completed":
+        send_notification_email.delay(row["email"], task["title"])
     return jsonify(dict(task))
 
 

@@ -63,6 +63,33 @@ def test_get_and_update_task(monkeypatch, tmp_path):
     assert fetched.get_json() == update.get_json()
 
 
+def test_completing_task_queues_notification(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+    headers = auth_header(client)
+    task_id = client.post("/tasks", json={"title": "Notify me"}, headers=headers).get_json()["id"]
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    response = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Notify me")]
+
+
+def test_recompleting_task_does_not_queue_duplicate_notification(monkeypatch, tmp_path):
+    client = configure_database(monkeypatch, tmp_path)
+    headers = auth_header(client)
+    task_id = client.post("/tasks", json={"title": "Notify once"}, headers=headers).get_json()["id"]
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+    response = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Notify once")]
+
+
 def test_missing_task_returns_json_404(monkeypatch, tmp_path):
     client = configure_database(monkeypatch, tmp_path)
 
