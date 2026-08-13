@@ -96,3 +96,61 @@ async def test_health_reports_connected_client_count(notification_server):
     assert "200 OK" in response
     assert json.loads(response.split("\r\n\r\n", 1)[1]) == {"connected_clients": 1}
     await client.close()
+
+
+async def get_json(host_and_port: str, path: str) -> tuple[str, object]:
+    host, port = host_and_port.split(":")
+    reader, writer = await asyncio.open_connection(host, int(port))
+    writer.write(f"GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".encode())
+    await writer.drain()
+    response = (await reader.read()).decode()
+    writer.close()
+    await writer.wait_closed()
+    status, body = response.split("\r\n\r\n", 1)
+    return status, json.loads(body)
+
+
+async def test_channel_messages_reach_only_subscribers(notification_server):
+    _, uri = notification_server
+    alerts_client, _ = await connected_client(uri)
+    system_client, _ = await connected_client(uri)
+    unsubscribed_client, _ = await connected_client(uri)
+
+    await alerts_client.send(json.dumps({"type": "subscribe", "channel": "alerts", "payload": {}, "timestamp": "client-time"}))
+    await system_client.send(json.dumps({"type": "subscribe", "channel": "system", "payload": {}, "timestamp": "client-time"}))
+    await alerts_client.send(json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "warning"}, "timestamp": "client-time"}))
+
+    assert json.loads(await alerts_client.recv())["payload"] == {"text": "warning"}
+    for client in (system_client, unsubscribed_client):
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(client.recv(), timeout=0.05)
+    await alerts_client.close()
+    await system_client.close()
+    await unsubscribed_client.close()
+
+
+async def test_unsubscribe_removes_channel_and_channel_endpoints_report_subscribers(notification_server):
+    _, uri = notification_server
+    host_and_port = uri.removeprefix("ws://")
+    first, first_id = await connected_client(uri)
+    second, second_id = await connected_client(uri)
+
+    for client in (first, second):
+        await client.send(json.dumps({"type": "subscribe", "channel": "chat", "payload": {}, "timestamp": "client-time"}))
+    status, channels = await get_json(host_and_port, "/channels")
+    assert "200 OK" in status
+    assert channels == {"chat": 2}
+    _, subscribers = await get_json(host_and_port, "/channels/chat/subscribers")
+    assert subscribers == sorted([first_id, second_id])
+
+    await first.send(json.dumps({"type": "unsubscribe", "channel": "chat", "payload": {}, "timestamp": "client-time"}))
+    _, subscribers = await get_json(host_and_port, "/channels/chat/subscribers")
+    assert subscribers == [second_id]
+    await second.close()
+    for _ in range(10):
+        _, channels = await get_json(host_and_port, "/channels")
+        if channels == {}:
+            break
+        await asyncio.sleep(0.01)
+    assert channels == {}
+    await first.close()
