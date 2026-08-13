@@ -4,6 +4,8 @@ WebSocket notification server with async support.
 Features:
 - Accept WebSocket connections from clients with unique IDs
 - Broadcast messages to all connected clients
+- Redis pub/sub for distributed message delivery
+- SQLite message persistence with REST history endpoint
 - REST health endpoint: GET /health
 - Thread-safe client registry using asyncio locks
 """
@@ -16,6 +18,8 @@ from typing import Dict, Set
 from aiohttp import web
 import websockets
 import logging
+from database import MessageDatabase
+from redis_broker import RedisBroker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -134,9 +138,28 @@ class ClientRegistry:
         for client_id in failed_clients:
             await self.unregister(client_id)
 
+    async def broadcast_and_store(self, message: dict, channel: str = None):
+        """Broadcast message, store in database, and publish to Redis."""
+        await self.broadcast(message, channel)
+
+        # Store message in database
+        msg_type = message.get('type', 'unknown')
+        payload = message.get('payload', {})
+        timestamp = message.get('timestamp', datetime.utcnow().isoformat())
+        ch = channel or 'broadcast'
+        database.store_message(ch, msg_type, payload, timestamp)
+
+        # Publish to Redis if broker is connected
+        if await broker.is_connected():
+            await broker.publish(ch, message)
+
 
 # Global client registry
 registry = ClientRegistry()
+
+# Global database and broker
+database = MessageDatabase()
+broker = RedisBroker()
 
 
 def create_message(msg_type: str, payload: dict) -> dict:
@@ -152,12 +175,13 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol, path:
     """Handle WebSocket connections."""
     client_id = str(uuid.uuid4())
     await registry.register(client_id, websocket)
+    await broker.store_client_connection(client_id)
 
     connect_message = create_message("system", {
         "event": "client_connected",
         "client_id": client_id
     })
-    await registry.broadcast(connect_message)
+    await registry.broadcast_and_store(connect_message)
 
     try:
         async for message_str in websocket:
@@ -173,7 +197,7 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol, path:
 
                 if msg_type == "broadcast":
                     channel = payload.get("channel")
-                    await registry.broadcast(formatted_message, channel=channel)
+                    await registry.broadcast_and_store(formatted_message, channel=channel)
                 elif msg_type == "direct":
                     target_client = payload.get("to_client")
                     if target_client:
@@ -181,12 +205,14 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol, path:
                         if target_client in clients:
                             try:
                                 await clients[target_client].send(json.dumps(formatted_message))
+                                database.store_message("direct", msg_type, formatted_message.get("payload", {}), formatted_message.get("timestamp", ""))
                             except websockets.exceptions.ConnectionClosed:
                                 await registry.unregister(target_client)
                 elif msg_type == "subscribe":
                     channel = payload.get("channel")
                     if channel:
                         await registry.subscribe(client_id, channel)
+                        await broker.store_client_connection(client_id, channel)
                         response = create_message("system", {
                             "event": "subscribed",
                             "channel": channel
@@ -217,11 +243,12 @@ async def websocket_handler(websocket: websockets.WebSocketServerProtocol, path:
         pass
     finally:
         await registry.unregister(client_id)
+        await broker.remove_client_connection(client_id)
         disconnect_message = create_message("system", {
             "event": "client_disconnected",
             "client_id": client_id
         })
-        await registry.broadcast(disconnect_message)
+        await registry.broadcast_and_store(disconnect_message)
 
 
 async def health_handler(request):
@@ -255,6 +282,32 @@ async def channel_subscribers_handler(request):
     })
 
 
+async def messages_handler(request):
+    """REST endpoint: GET /messages - retrieve message history."""
+    limit = int(request.query.get('limit', 50))
+    offset = int(request.query.get('offset', 0))
+    channel = request.query.get('channel', None)
+
+    limit = min(limit, 500)  # Cap at 500
+    offset = max(offset, 0)
+
+    if channel:
+        messages = database.get_messages_by_channel(channel, limit=limit, offset=offset)
+    else:
+        messages = database.get_messages(limit=limit, offset=offset)
+
+    total_count = database.get_message_count()
+
+    return web.json_response({
+        "messages": messages,
+        "count": len(messages),
+        "total": total_count,
+        "limit": limit,
+        "offset": offset,
+        "timestamp": datetime.utcnow().isoformat()
+    })
+
+
 async def start_websocket_server(host="0.0.0.0", ws_port=8765):
     """Start WebSocket server."""
     async with websockets.serve(websocket_handler, host, ws_port):
@@ -268,6 +321,7 @@ async def start_rest_server(host="0.0.0.0", rest_port=8080):
     app.router.add_get('/health', health_handler)
     app.router.add_get('/channels', channels_handler)
     app.router.add_get('/channels/{name}/subscribers', channel_subscribers_handler)
+    app.router.add_get('/messages', messages_handler)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -285,6 +339,12 @@ async def main():
     rest_host = "0.0.0.0"
     rest_port = 8080
 
+    # Try to connect to Redis (graceful degradation if not available)
+    try:
+        await broker.connect()
+    except Exception as e:
+        logger.warning(f"Redis broker not available: {e}. Running without Redis pub/sub.")
+
     ws_task = asyncio.create_task(start_websocket_server(ws_host, ws_port))
     rest_runner = await start_rest_server(rest_host, rest_port)
 
@@ -293,6 +353,7 @@ async def main():
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         await rest_runner.cleanup()
+        await broker.disconnect()
 
 
 if __name__ == "__main__":
