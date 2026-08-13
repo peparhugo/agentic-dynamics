@@ -17,11 +17,12 @@ import json
 import uuid
 import sqlite3
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from threading import Lock
 from typing import Set, Dict, Any
 import logging
 from abc import ABC, abstractmethod
+from urllib.parse import parse_qs, urlencode
 
 import websockets
 from websockets.asyncio.server import serve, ServerConnection
@@ -29,6 +30,52 @@ import redis.asyncio as aioredis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class RateLimiter:
+    """Redis-based rate limiter for per-client message throttling."""
+
+    def __init__(self, redis_client=None, limit: int = None):
+        self.redis = redis_client
+        self.limit = limit or int(os.environ.get("RATE_LIMIT", "100"))
+        self.window_seconds = 60
+        self._memory_counters: Dict[str, int] = {}
+        self._memory_lock = Lock()
+
+    async def is_allowed(self, client_id: str) -> bool:
+        """Check if client is allowed to send a message. Returns True if allowed."""
+        if self.redis:
+            try:
+                key = f"rate_limit:{client_id}"
+                current = await self.redis.incr(key)
+
+                if current == 1:
+                    await self.redis.expire(key, self.window_seconds)
+
+                return current <= self.limit
+            except Exception as e:
+                logger.error(f"Rate limiter error: {e}")
+                return True
+        else:
+            with self._memory_lock:
+                current = self._memory_counters.get(client_id, 0) + 1
+                self._memory_counters[client_id] = current
+                return current <= self.limit
+
+    async def get_remaining(self, client_id: str) -> int:
+        """Get remaining message quota for client in current window."""
+        if self.redis:
+            try:
+                key = f"rate_limit:{client_id}"
+                current = await self.redis.get(key)
+                current_val = int(current) if current else 0
+                return max(0, self.limit - current_val)
+            except Exception:
+                return self.limit
+        else:
+            with self._memory_lock:
+                current = self._memory_counters.get(client_id, 0)
+                return max(0, self.limit - current)
 
 
 class BaseTransport(ABC):
@@ -176,6 +223,9 @@ class MessagePersistence:
                 "  timestamp TEXT NOT NULL"
                 ")"
             )
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_channel_timestamp ON messages(channel, timestamp DESC)"
+            )
             conn.commit()
 
     def get_connection(self):
@@ -219,6 +269,54 @@ class MessagePersistence:
         with self.get_connection() as conn:
             row = conn.execute("SELECT COUNT(*) as count FROM messages").fetchone()
             return row["count"]
+
+    def get_messages_by_channel(self, channel: str, since: str = None, limit: int = 50) -> tuple:
+        """Get messages for a specific channel, optionally filtered by timestamp.
+
+        Returns (messages, has_more) tuple.
+        """
+        with self.get_connection() as conn:
+            query = (
+                "SELECT id, channel, type, payload, timestamp FROM messages "
+                "WHERE channel = ?"
+            )
+            params = [channel]
+
+            if since:
+                query += " AND timestamp > ?"
+                params.append(since)
+
+            query += " ORDER BY timestamp ASC LIMIT ?"
+            params.append(limit + 1)
+
+            rows = conn.execute(query, params).fetchall()
+
+            has_more = len(rows) > limit
+            messages = [
+                {
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"],
+                }
+                for row in rows[:limit]
+            ]
+            return messages, has_more
+
+    def cleanup_old_messages(self, days: int = None) -> int:
+        """Delete messages older than specified days. Returns count deleted."""
+        days = days or int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        cutoff_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+
+        with self.lock:
+            with self.get_connection() as conn:
+                cursor = conn.execute(
+                    "DELETE FROM messages WHERE timestamp < ?",
+                    (cutoff_date,)
+                )
+                conn.commit()
+                return cursor.rowcount
 
 
 class ClientRegistry:
@@ -353,6 +451,7 @@ class NotificationServer:
         self.redis = redis_client
         self.persistence = MessagePersistence(db_path)
         self.clients = ClientRegistry(redis_client=redis_client)
+        self.rate_limiter = RateLimiter(redis_client=redis_client)
         self.loop = None
         self.pubsub = None
 
@@ -376,6 +475,15 @@ class NotificationServer:
 
             async for message in websocket:
                 try:
+                    # Check rate limit
+                    if not await self.rate_limiter.is_allowed(client_id):
+                        error_msg = NotificationMessage(
+                            "system",
+                            {"action": "rate_limit_exceeded", "message": "Too many messages. Limit: 100 per minute"}
+                        )
+                        await websocket.send(error_msg.to_json())
+                        continue
+
                     msg = NotificationMessage.from_json(message)
                     logger.info(f"Received from {client_id}: {msg.type}")
 
@@ -573,6 +681,51 @@ class NotificationServer:
                 f"{response_body}"
             )
             writer.write(response.encode())
+        elif method == "GET" and path == "/history":
+            channel = None
+            since = None
+            limit = 50
+
+            if query_string:
+                for param in query_string.split("&"):
+                    if "=" in param:
+                        key, value = param.split("=", 1)
+                        if key == "channel":
+                            channel = value
+                        elif key == "since":
+                            since = value
+                        elif key == "limit":
+                            try:
+                                limit = int(value)
+                            except ValueError:
+                                pass
+
+            if not channel:
+                response = (
+                    "HTTP/1.1 400 Bad Request\r\n"
+                    "Content-Type: application/json\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    '{"error": "channel parameter is required"}'
+                )
+                writer.write(response.encode())
+            else:
+                messages, has_more = self.persistence.get_messages_by_channel(channel, since=since, limit=limit)
+                response_body = json.dumps({
+                    "channel": channel,
+                    "messages": messages,
+                    "has_more": has_more,
+                    "count": len(messages),
+                })
+                response = (
+                    "HTTP/1.1 200 OK\r\n"
+                    "Content-Type: application/json\r\n"
+                    f"Content-Length: {len(response_body)}\r\n"
+                    "Connection: close\r\n"
+                    "\r\n"
+                    f"{response_body}"
+                )
+                writer.write(response.encode())
         else:
             response = (
                 "HTTP/1.1 404 Not Found\r\n"
@@ -654,6 +807,15 @@ class NotificationServer:
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
+    async def cleanup_expired_messages(self) -> None:
+        """Clean up messages older than TTL on startup."""
+        try:
+            deleted_count = self.persistence.cleanup_old_messages()
+            if deleted_count > 0:
+                logger.info(f"Cleaned up {deleted_count} expired messages")
+        except Exception as e:
+            logger.error(f"Error cleaning up expired messages: {e}")
+
     async def http_server(self) -> None:
         """Start HTTP server for health checks."""
         server = await asyncio.start_server(
@@ -677,10 +839,14 @@ class NotificationServer:
             try:
                 self.redis = await aioredis.from_url(self.redis_url, decode_responses=True)
                 self.clients.redis = self.redis
+                self.rate_limiter.redis = self.redis
                 logger.info(f"Connected to Redis at {self.redis_url}")
             except Exception as e:
                 logger.warning(f"Failed to connect to Redis: {e}. Continuing without Redis.")
                 self.redis = None
+
+        # Clean up expired messages on startup
+        await self.cleanup_expired_messages()
 
         tasks = [
             self.ws_server(),

@@ -23,12 +23,14 @@ from threading import Thread, Event
 import time
 import tempfile
 import os
+from datetime import datetime, timezone, timedelta
 
 from notification_server import (
     NotificationServer,
     NotificationMessage,
     ClientRegistry,
     MessagePersistence,
+    RateLimiter,
     create_server,
 )
 
@@ -190,6 +192,142 @@ class TestMessagePersistence:
 
             messages = persistence.get_messages(limit=3, offset=3)
             assert len(messages) == 3
+
+    def test_get_messages_by_channel(self):
+        """Test retrieving messages for a specific channel."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            persistence.store_message("alerts", "alert", {"data": "msg1"}, "2026-08-13T10:00:00Z")
+            persistence.store_message("chat", "message", {"data": "msg2"}, "2026-08-13T10:01:00Z")
+            persistence.store_message("alerts", "alert", {"data": "msg3"}, "2026-08-13T10:02:00Z")
+
+            messages, has_more = persistence.get_messages_by_channel("alerts")
+            assert len(messages) == 2
+            assert all(m["channel"] == "alerts" for m in messages)
+
+    def test_get_messages_by_channel_with_since_filter(self):
+        """Test retrieving messages by channel with timestamp filter."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            persistence.store_message("alerts", "alert", {"data": "msg1"}, "2026-08-13T10:00:00Z")
+            persistence.store_message("alerts", "alert", {"data": "msg2"}, "2026-08-13T10:05:00Z")
+            persistence.store_message("alerts", "alert", {"data": "msg3"}, "2026-08-13T10:10:00Z")
+
+            messages, has_more = persistence.get_messages_by_channel("alerts", since="2026-08-13T10:02:00Z")
+            assert len(messages) == 2
+            assert messages[0]["payload"]["data"] == "msg2"
+            assert messages[1]["payload"]["data"] == "msg3"
+
+    def test_get_messages_by_channel_pagination(self):
+        """Test message pagination for channel queries."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            for i in range(5):
+                persistence.store_message("alerts", "alert", {"data": f"msg{i}"}, f"2026-08-13T10:{i:02d}:00Z")
+
+            messages, has_more = persistence.get_messages_by_channel("alerts", limit=2)
+            assert len(messages) == 2
+            assert has_more is True
+
+            messages, has_more = persistence.get_messages_by_channel("alerts", limit=10)
+            assert len(messages) == 5
+            assert has_more is False
+
+    def test_cleanup_old_messages(self):
+        """Test cleaning up messages older than TTL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            persistence = MessagePersistence(db_path=db_path)
+
+            # Store old message (8 days ago)
+            old_timestamp = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+            persistence.store_message("alerts", "alert", {"data": "old"}, old_timestamp)
+
+            # Store recent message
+            new_timestamp = datetime.now(timezone.utc).isoformat()
+            persistence.store_message("alerts", "alert", {"data": "new"}, new_timestamp)
+
+            assert persistence.get_message_count() == 2
+
+            deleted = persistence.cleanup_old_messages(days=7)
+            assert deleted == 1
+            assert persistence.get_message_count() == 1
+
+
+# ── RateLimiter Tests ────────────────────────
+
+class TestRateLimiter:
+    """Tests for RateLimiter class."""
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_allows_under_limit(self):
+        """Test rate limiter allows messages under the limit."""
+        limiter = RateLimiter(limit=3)
+
+        for i in range(3):
+            allowed = await limiter.is_allowed("client_1")
+            assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_rejects_over_limit(self):
+        """Test rate limiter rejects messages over the limit."""
+        limiter = RateLimiter(limit=2)
+
+        allowed1 = await limiter.is_allowed("client_1")
+        allowed2 = await limiter.is_allowed("client_1")
+        allowed3 = await limiter.is_allowed("client_1")
+
+        assert allowed1 is True
+        assert allowed2 is True
+        assert allowed3 is False
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_per_client(self):
+        """Test rate limiter is per-client."""
+        limiter = RateLimiter(limit=2)
+
+        # Client 1 uses 2 messages
+        await limiter.is_allowed("client_1")
+        await limiter.is_allowed("client_1")
+
+        # Client 2 should still be able to send
+        allowed = await limiter.is_allowed("client_2")
+        assert allowed is True
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_without_redis(self):
+        """Test rate limiter works without Redis using in-memory fallback."""
+        limiter = RateLimiter(redis_client=None, limit=5)
+
+        # Should enforce limit even without Redis (in-memory fallback)
+        for i in range(5):
+            allowed = await limiter.is_allowed("client_1")
+            assert allowed is True
+
+        # 6th message should be rejected
+        allowed = await limiter.is_allowed("client_1")
+        assert allowed is False
+
+    @pytest.mark.asyncio
+    async def test_get_remaining(self):
+        """Test getting remaining message quota."""
+        limiter = RateLimiter(limit=5)
+
+        remaining = await limiter.get_remaining("client_1")
+        assert remaining == 5
+
+        # Use 2 messages
+        await limiter.is_allowed("client_1")
+        await limiter.is_allowed("client_1")
+
+        remaining = await limiter.get_remaining("client_1")
+        assert remaining == 3
 
 
 # ── ClientRegistry Tests ────────────────────────────
@@ -694,6 +832,112 @@ async def test_http_messages_endpoint_with_offset():
         assert data["limit"] == 2
 
 
+@pytest.mark.asyncio
+async def test_http_history_endpoint():
+    """Test HTTP GET /history endpoint returns messages for a channel."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        srv.persistence.store_message("alerts", "alert", {"data": "test1"}, "2026-08-13T10:00:00Z")
+        srv.persistence.store_message("chat", "message", {"data": "test2"}, "2026-08-13T10:01:00Z")
+        srv.persistence.store_message("alerts", "alert", {"data": "test3"}, "2026-08-13T10:02:00Z")
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /history?channel=alerts HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "200 OK" in response
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert data["channel"] == "alerts"
+        assert len(data["messages"]) == 2
+        assert all(m["channel"] == "alerts" for m in data["messages"])
+
+
+@pytest.mark.asyncio
+async def test_http_history_endpoint_requires_channel():
+    """Test HTTP /history endpoint requires channel parameter."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /history HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        assert "400 Bad Request" in response
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert "channel" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_http_history_endpoint_with_since_filter():
+    """Test HTTP /history endpoint with since timestamp filter."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        srv.persistence.store_message("alerts", "alert", {"data": "msg1"}, "2026-08-13T10:00:00Z")
+        srv.persistence.store_message("alerts", "alert", {"data": "msg2"}, "2026-08-13T10:05:00Z")
+        srv.persistence.store_message("alerts", "alert", {"data": "msg3"}, "2026-08-13T10:10:00Z")
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /history?channel=alerts&since=2026-08-13T10:02:00Z HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert len(data["messages"]) == 2
+        assert data["messages"][0]["payload"]["data"] == "msg2"
+
+
+@pytest.mark.asyncio
+async def test_http_history_endpoint_pagination():
+    """Test HTTP /history endpoint with pagination."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        for i in range(5):
+            srv.persistence.store_message("alerts", "alert", {"data": f"msg{i}"}, f"2026-08-13T10:{i:02d}:00Z")
+
+        reader = AsyncMock()
+        writer = Mock()
+        writer.drain = AsyncMock()
+
+        reader.readline = AsyncMock(return_value=b"GET /history?channel=alerts&limit=2 HTTP/1.1\r\n")
+
+        await srv.http_health(reader, writer)
+
+        assert writer.write.called
+        response = writer.write.call_args[0][0].decode()
+        body = response.split("\r\n\r\n")[1]
+        data = json.loads(body)
+        assert len(data["messages"]) == 2
+        assert data["has_more"] is True
+        assert data["count"] == 2
+
+
 # ── Integration Tests ──────────────────────────────
 
 
@@ -1083,3 +1327,66 @@ async def test_channel_subscribers_endpoint_integration(running_server):
             assert len(data["subscribers"]) == 2
             assert client1_id in data["subscribers"]
             assert client2_id in data["subscribers"]
+
+
+@pytest.mark.asyncio
+async def test_rate_limiting_on_server(server):
+    """Test rate limiting enforces during message handling."""
+    # Create a rate limiter with very low limit
+    server.rate_limiter = RateLimiter(redis_client=None, limit=1)
+
+    # Verify first message is allowed
+    allowed = await server.rate_limiter.is_allowed("test_client")
+    assert allowed is True
+
+    # Verify second message is rejected
+    allowed = await server.rate_limiter.is_allowed("test_client")
+    assert allowed is False
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_with_server(server):
+    """Test /history HTTP endpoint returns correct data."""
+    # Store some test messages
+    server.persistence.store_message("alerts", "alert", {"data": "test1"}, "2026-08-13T10:00:00Z")
+    server.persistence.store_message("alerts", "alert", {"data": "test2"}, "2026-08-13T10:05:00Z")
+    server.persistence.store_message("chat", "message", {"data": "test3"}, "2026-08-13T10:10:00Z")
+
+    reader = AsyncMock()
+    writer = Mock()
+    writer.drain = AsyncMock()
+
+    reader.readline = AsyncMock(return_value=b"GET /history?channel=alerts HTTP/1.1\r\n")
+
+    await server.http_health(reader, writer)
+
+    assert writer.write.called
+    response = writer.write.call_args[0][0].decode()
+    assert "200 OK" in response
+    body = response.split("\r\n\r\n")[1]
+    data = json.loads(body)
+    assert data["channel"] == "alerts"
+    assert len(data["messages"]) == 2
+    assert data["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_message_expiry_on_startup():
+    """Test message cleanup on startup."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test.db")
+        srv = create_server(host="127.0.0.1", ws_port=9765, http_port=9081, db_path=db_path)
+
+        # Manually store old messages before startup
+        old_timestamp = (datetime.now(timezone.utc) - timedelta(days=8)).isoformat()
+        new_timestamp = datetime.now(timezone.utc).isoformat()
+        srv.persistence.store_message("alerts", "alert", {"data": "old"}, old_timestamp)
+        srv.persistence.store_message("alerts", "alert", {"data": "new"}, new_timestamp)
+
+        assert srv.persistence.get_message_count() == 2
+
+        # Call cleanup
+        await srv.cleanup_expired_messages()
+
+        # Old message should be deleted
+        assert srv.persistence.get_message_count() == 1
