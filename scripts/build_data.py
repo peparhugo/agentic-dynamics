@@ -693,6 +693,29 @@ def _load_analysis_data() -> dict:
     }
 
 
+def _load_labs() -> dict:
+    """Load the story-era lab book outputs for the evidence page.
+
+    Each lab writes experiments/results/lab_<name>.json. Absent labs are skipped
+    so build_data never hard-fails on a missing analysis artifact.
+    """
+    lab_names = [
+        "verification_frontier", "story_arc", "condition_effects",
+        "verification_value", "cache_economics", "quality_frontier",
+    ]
+    labs = {}
+    results_dir = ROOT / "experiments" / "results"
+    for name in lab_names:
+        p = results_dir / f"lab_{name}.json"
+        if not p.exists():
+            continue
+        try:
+            labs[name] = json.loads(p.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+    return labs
+
+
 def _short_model_label(model_id: str) -> str:
     mapping = {
         "deepseek-v4-pro": "DeepSeek v4 Pro",
@@ -829,7 +852,8 @@ def compute_story_models() -> list[dict]:
                count(distinct cell_key) as unique_cells,
                sum(session_count) as sessions,
                round(sum(total_cost), 6) as total_cost,
-               round(avg(total_cost), 6) as avg_cost,
+               round(avg(total_cost) FILTER (WHERE cost_captured), 6) as avg_cost,
+               sum(case when cost_captured then 1 else 0 end) as cost_cells,
                round(avg(cache_hit_rate), 3) as avg_cache_hit,
                round(avg(test_count), 1) as avg_tests,
                round(avg(test_code_ratio), 3) as avg_test_code_ratio,
@@ -854,20 +878,21 @@ def compute_story_models() -> list[dict]:
             "sessions": row[3],
             "total_cost": row[4],
             "avg_cost": row[5],
-            "avg_cache_hit": row[6],
-            "avg_tests": row[7],
-            "avg_test_code_ratio": row[8],
-            "avg_tok_per_session": row[9],
-            "avg_duration_s": row[10],
-            "avg_code_lines": row[11],
-            "tests_total": row[12],
-            "tests_passed": row[12],  # all stories passed
+            "cost_cells": row[6],
+            "avg_cache_hit": row[7],
+            "avg_tests": row[8],
+            "avg_test_code_ratio": row[9],
+            "avg_tok_per_session": row[10],
+            "avg_duration_s": row[11],
+            "avg_code_lines": row[12],
+            "tests_total": row[13],
+            "tests_passed": row[13],  # all stories passed
             # keep legacy keys populated for existing charts
             "avg_cost_per_session": round(row[5] / max(row[3] / max(total_runs, 1), 1), 6),
-            "pass_rate": f"100% ({row[12]}/{row[12]})",
+            "pass_rate": f"100% ({row[13]}/{row[13]})",
             "narration_rate": 0,
             "avg_narration_penalty": 0.0,
-            "avg_loc": row[11],
+            "avg_loc": row[12],
             "avg_energy_j": 0.0,
             "avg_energy_j_per_loc": 0.0,
             "strategy_cons": 0, "strategy_expl": 0,
@@ -1054,6 +1079,7 @@ def build():
         "stories": _load_story_data(),
         "reviews": _load_review_data(),
         "analysis": _load_analysis_data(),
+        "labs": _load_labs(),
     }
 
     import math

@@ -75,6 +75,7 @@ STORY_SCHEMA = pa.schema([
     pa.field("total_context_tokens", pa.int64()),
     pa.field("cache_hit_rate", pa.float64()),
     pa.field("total_cost", pa.float64()),
+    pa.field("cost_captured", pa.bool_()),
     pa.field("total_duration", pa.float64()),
     pa.field("all_successful", pa.bool_()),
     pa.field("cascade_recovery", pa.bool_()),
@@ -103,6 +104,28 @@ def _extract_condition(d: dict, filename: str) -> str:
     return ""
 
 
+def _load_analysis_loc() -> dict[str, int]:
+    """Map story_id -> final lines_of_code from analysis/*.json deep.solution.
+
+    The summary.code_lines field is populated by _count_tests(worktree), which
+    returns 0 once the /tmp worktree is cleaned. The analysis files persist
+    deep.solution.lines_of_code for every story, so it is the reliable fallback.
+    """
+    analysis_dir = Path(__file__).resolve().parent.parent / "experiments" / "results" / "analysis"
+    loc: dict[str, int] = {}
+    for f in analysis_dir.glob("*.json"):
+        try:
+            d = json.loads(f.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        sid = d.get("story_id", "") or f.stem.replace("analysis_", "")
+        sol = (d.get("deep", {}) or {}).get("solution", {}) or {}
+        n = sol.get("lines_of_code", 0)
+        if sid and n:
+            loc[sid] = int(n)
+    return loc
+
+
 def sync() -> dict[str, int]:
     """Sync all story results to parquet. Returns row counts."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,6 +136,7 @@ def sync() -> dict[str, int]:
     story_rows: list[dict[str, Any]] = []
 
     cell_counts: Counter[str] = Counter()
+    analysis_loc = _load_analysis_loc()
 
     for f in sorted(RESULTS_DIR.glob("*.json")):
         if "dvs" in f.name or "log" in f.name:
@@ -129,6 +153,20 @@ def sync() -> dict[str, int]:
         condition = _extract_condition(d, f.name)
         summary = d.get("summary", {})
         worktree = d.get("worktree", "")
+        story_id = d.get("story_id", "")
+
+        # Recover test counts that summary.test_count dropped (worktree cleaned).
+        # agentic.tests_total is measured in-session and survives worktree cleanup;
+        # use the peak across sessions as the floor for "tests written".
+        sessions = d.get("sessions", [])
+        agentic_test_floor = max(
+            [(s.get("agentic", {}) or {}).get("tests_total", 0) or 0 for s in sessions]
+            + [0]
+        )
+        recovered_tests = summary.get("test_count", 0) or agentic_test_floor
+        recovered_loc = summary.get("code_lines", 0) or analysis_loc.get(story_id, 0)
+        story_cost = summary.get("total_cost", 0) or 0
+        cost_captured = story_cost > 0
 
         # Cell identity: story × model × tier × quality × condition.
         # Re-runs of the same cell share cell_key but get an increasing
@@ -152,13 +190,14 @@ def sync() -> dict[str, int]:
             "total_context_tokens": summary.get("total_context_tokens", 0),
             "cache_hit_rate": summary.get("cache_hit_rate", 0.0),
             "total_cost": summary.get("total_cost", 0.0),
+            "cost_captured": cost_captured,
             "total_duration": summary.get("total_duration", 0.0),
             "all_successful": summary.get("all_successful", False),
             "cascade_recovery": summary.get("cascade_recovery", False),
             "worktree": worktree,
-            "test_count": summary.get("test_count", 0) or 0,
+            "test_count": recovered_tests,
             "test_lines": summary.get("test_lines", 0) or 0,
-            "code_lines": summary.get("code_lines", 0) or 0,
+            "code_lines": recovered_loc,
             "test_code_ratio": summary.get("test_code_ratio", 0.0) or 0.0,
         })
 

@@ -1,0 +1,276 @@
+{
+  "experiment_id": "lab_verification_value",
+  "generated_at": "2026-08-13T21:12:55.967813",
+  "summary": {
+    "correlation_tests_vs_worse_rate": -0.226,
+    "cells": 38
+  },
+  "rows": [
+    {
+      "model": "claude-sonnet-5",
+      "tests": 70,
+      "reviews": 5,
+      "better_rate": 0.6,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "claude-sonnet-5",
+      "tests": 76,
+      "reviews": 5,
+      "better_rate": 1.0,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "claude-sonnet-5",
+      "tests": 165,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 0,
+      "reviews": 6,
+      "better_rate": 0.333,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 1,
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 2,
+      "reviews": 5,
+      "better_rate": 0.6,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 3,
+      "reviews": 12,
+      "better_rate": 0.417,
+      "worse_rate": 0.083
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 4,
+      "reviews": 10,
+      "better_rate": 0.2,
+      "worse_rate": 0.5
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 6,
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 17,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 32,
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 36,
+      "reviews": 4,
+      "better_rate": 1.0,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 38,
+      "reviews": 10,
+      "better_rate": 0.6,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 39,
+      "reviews": 7,
+      "better_rate": 0.714,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 40,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 43,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 45,
+      "reviews": 10,
+      "better_rate": 0.5,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 46,
+      "reviews": 10,
+      "better_rate": 0.8,
+      "worse_rate": 0.1
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 47,
+      "reviews": 15,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 49,
+      "reviews": 10,
+      "better_rate": 0.9,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 50,
+      "reviews": 5,
+      "better_rate": 1.0,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 53,
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 56,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 61,
+      "reviews": 10,
+      "better_rate": 0.6,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 72,
+      "reviews": 5,
+      "better_rate": 0.4,
+      "worse_rate": 0.2
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "tests": 82,
+      "reviews": 5,
+      "better_rate": 0.6,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 0,
+      "reviews": 50,
+      "better_rate": 0.6,
+      "worse_rate": 0.14
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 6,
+      "reviews": 5,
+      "better_rate": 0.6,
+      "worse_rate": 0.4
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 7,
+      "reviews": 10,
+      "better_rate": 0.7,
+      "worse_rate": 0.1
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 8,
+      "reviews": 15,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 9,
+      "reviews": 25,
+      "better_rate": 0.8,
+      "worse_rate": 0.04
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 10,
+      "reviews": 25,
+      "better_rate": 0.88,
+      "worse_rate": 0.08
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 11,
+      "reviews": 10,
+      "better_rate": 0.7,
+      "worse_rate": 0.1
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 13,
+      "reviews": 10,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 14,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 15,
+      "reviews": 5,
+      "better_rate": 1.0,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 16,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.0
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "tests": 17,
+      "reviews": 5,
+      "better_rate": 0.8,
+      "worse_rate": 0.2
+    }
+  ]
+}

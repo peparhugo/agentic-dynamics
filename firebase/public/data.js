@@ -1,8 +1,8 @@
-/* Generated 2026-08-13 18:25:38 UTC by build_data.py */
+/* Generated 2026-08-13 19:21:52 UTC by build_data.py */
 /* DO NOT EDIT — regenerate with: python scripts/build_data.py */
 window.DYNAMICS_DATA = {
   "_meta": {
-    "generated_at": "2026-08-13T18:25:38.036413+00:00",
+    "generated_at": "2026-08-13T19:21:52.236010+00:00",
     "provenance_note": "All values tagged [M]easured, [C]omputed, [H]euristic, or e[X]ternal. See methodology.html."
   },
   "summary": {
@@ -44,19 +44,20 @@ window.DYNAMICS_DATA = {
       "sessions": 150,
       "total_cost": 2.044974,
       "avg_cost": 0.068166,
+      "cost_cells": 30,
       "avg_cache_hit": 0.964,
-      "avg_tests": 31.2,
+      "avg_tests": 33.5,
       "avg_test_code_ratio": 0.658,
       "avg_tok_per_session": 46576.0,
       "avg_duration_s": 1386.0,
-      "avg_code_lines": 616.0,
-      "tests_total": 937,
-      "tests_passed": 937,
+      "avg_code_lines": 2294.0,
+      "tests_total": 1006,
+      "tests_passed": 1006,
       "avg_cost_per_session": 0.013633,
-      "pass_rate": "100% (937/937)",
+      "pass_rate": "100% (1006/1006)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 616.0,
+      "avg_loc": 2294.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -77,19 +78,20 @@ window.DYNAMICS_DATA = {
       "sessions": 170,
       "total_cost": 3.085027,
       "avg_cost": 0.090736,
+      "cost_cells": 34,
       "avg_cache_hit": 0.975,
       "avg_tests": 7.3,
       "avg_test_code_ratio": 0.275,
       "avg_tok_per_session": 6324.0,
       "avg_duration_s": 528.0,
-      "avg_code_lines": 380.0,
+      "avg_code_lines": 714.0,
       "tests_total": 249,
       "tests_passed": 249,
       "avg_cost_per_session": 0.018147,
       "pass_rate": "100% (249/249)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 380.0,
+      "avg_loc": 714.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -110,19 +112,20 @@ window.DYNAMICS_DATA = {
       "sessions": 167,
       "total_cost": 4.822804,
       "avg_cost": 0.137794,
+      "cost_cells": 35,
       "avg_cache_hit": 0.778,
-      "avg_tests": 33.7,
+      "avg_tests": 34.4,
       "avg_test_code_ratio": 1.087,
       "avg_tok_per_session": 34702.0,
       "avg_duration_s": 1675.0,
-      "avg_code_lines": 373.0,
-      "tests_total": 1178,
-      "tests_passed": 1178,
+      "avg_code_lines": 1384.0,
+      "tests_total": 1204,
+      "tests_passed": 1204,
       "avg_cost_per_session": 0.028879,
-      "pass_rate": "100% (1178/1178)",
+      "pass_rate": "100% (1204/1204)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 373.0,
+      "avg_loc": 1384.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -131,39 +134,6 @@ window.DYNAMICS_DATA = {
       "strategy_efficient": 0,
       "reports": 35,
       "reports_valid": 35,
-      "reports_narrated": 0
-    },
-    {
-      "id": "anthropic/claude-haiku-4-5",
-      "label": "anthropic/claude-haiku-4-5",
-      "provider": "anthropic",
-      "cells": 31,
-      "unique_cells": 30,
-      "re_runs": 1,
-      "sessions": 155,
-      "total_cost": 30.216397,
-      "avg_cost": 0.974722,
-      "avg_cache_hit": 0.606,
-      "avg_tests": 117.4,
-      "avg_test_code_ratio": 1.022,
-      "avg_tok_per_session": 10082.0,
-      "avg_duration_s": 632.0,
-      "avg_code_lines": 1520.0,
-      "tests_total": 3638,
-      "tests_passed": 3638,
-      "avg_cost_per_session": 0.194944,
-      "pass_rate": "100% (3638/3638)",
-      "narration_rate": 0,
-      "avg_narration_penalty": 0.0,
-      "avg_loc": 1520.0,
-      "avg_energy_j": 0.0,
-      "avg_energy_j_per_loc": 0.0,
-      "strategy_cons": 0,
-      "strategy_expl": 0,
-      "strategy_waste": 0,
-      "strategy_efficient": 0,
-      "reports": 31,
-      "reports_valid": 31,
       "reports_narrated": 0
     },
     {
@@ -176,19 +146,20 @@ window.DYNAMICS_DATA = {
       "sessions": 150,
       "total_cost": 30.640397,
       "avg_cost": 1.021347,
+      "cost_cells": 30,
       "avg_cache_hit": 0.819,
       "avg_tests": 8.8,
       "avg_test_code_ratio": 0.331,
       "avg_tok_per_session": 33004.0,
       "avg_duration_s": 775.0,
-      "avg_code_lines": 316.0,
+      "avg_code_lines": 708.0,
       "tests_total": 265,
       "tests_passed": 265,
       "avg_cost_per_session": 0.204269,
       "pass_rate": "100% (265/265)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 316.0,
+      "avg_loc": 708.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -200,28 +171,29 @@ window.DYNAMICS_DATA = {
       "reports_narrated": 0
     },
     {
-      "id": "anthropic/claude-sonnet-5",
-      "label": "Claude Sonnet 5",
+      "id": "anthropic/claude-haiku-4-5",
+      "label": "anthropic/claude-haiku-4-5",
       "provider": "anthropic",
       "cells": 31,
       "unique_cells": 30,
       "re_runs": 1,
       "sessions": 155,
-      "total_cost": 105.418795,
-      "avg_cost": 3.400606,
-      "avg_cache_hit": 0.731,
-      "avg_tests": 122.1,
-      "avg_test_code_ratio": 0.647,
-      "avg_tok_per_session": 14312.0,
-      "avg_duration_s": 844.0,
-      "avg_code_lines": 1794.0,
-      "tests_total": 3786,
-      "tests_passed": 3786,
-      "avg_cost_per_session": 0.680121,
-      "pass_rate": "100% (3786/3786)",
+      "total_cost": 30.216397,
+      "avg_cost": 1.590337,
+      "cost_cells": 19,
+      "avg_cache_hit": 0.606,
+      "avg_tests": 117.4,
+      "avg_test_code_ratio": 1.022,
+      "avg_tok_per_session": 10082.0,
+      "avg_duration_s": 632.0,
+      "avg_code_lines": 1862.0,
+      "tests_total": 3638,
+      "tests_passed": 3638,
+      "avg_cost_per_session": 0.318067,
+      "pass_rate": "100% (3638/3638)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 1794.0,
+      "avg_loc": 1862.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -242,19 +214,20 @@ window.DYNAMICS_DATA = {
       "sessions": 150,
       "total_cost": 112.46246,
       "avg_cost": 3.748749,
+      "cost_cells": 30,
       "avg_cache_hit": 0.843,
-      "avg_tests": 12.0,
+      "avg_tests": 12.9,
       "avg_test_code_ratio": 0.423,
       "avg_tok_per_session": 46888.0,
       "avg_duration_s": 1203.0,
-      "avg_code_lines": 426.0,
-      "tests_total": 359,
-      "tests_passed": 359,
+      "avg_code_lines": 1166.0,
+      "tests_total": 387,
+      "tests_passed": 387,
       "avg_cost_per_session": 0.74975,
-      "pass_rate": "100% (359/359)",
+      "pass_rate": "100% (387/387)",
       "narration_rate": 0,
       "avg_narration_penalty": 0.0,
-      "avg_loc": 426.0,
+      "avg_loc": 1166.0,
       "avg_energy_j": 0.0,
       "avg_energy_j_per_loc": 0.0,
       "strategy_cons": 0,
@@ -264,6 +237,40 @@ window.DYNAMICS_DATA = {
       "reports": 30,
       "reports_valid": 30,
       "reports_narrated": 0
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "label": "Claude Sonnet 5",
+      "provider": "anthropic",
+      "cells": 31,
+      "unique_cells": 30,
+      "re_runs": 1,
+      "sessions": 155,
+      "total_cost": 105.418795,
+      "avg_cost": 4.583426,
+      "cost_cells": 23,
+      "avg_cache_hit": 0.731,
+      "avg_tests": 122.1,
+      "avg_test_code_ratio": 0.647,
+      "avg_tok_per_session": 14312.0,
+      "avg_duration_s": 844.0,
+      "avg_code_lines": 2129.0,
+      "tests_total": 3786,
+      "tests_passed": 3786,
+      "avg_cost_per_session": 0.916685,
+      "pass_rate": "100% (3786/3786)",
+      "narration_rate": 0,
+      "avg_narration_penalty": 0.0,
+      "avg_loc": 2129.0,
+      "avg_energy_j": 0.0,
+      "avg_energy_j_per_loc": 0.0,
+      "strategy_cons": 0,
+      "strategy_expl": 0,
+      "strategy_waste": 0,
+      "strategy_efficient": 0,
+      "reports": 31,
+      "reports_valid": 31,
+      "reports_narrated": 0
     }
   ],
   "charts": {
@@ -271,19 +278,19 @@ window.DYNAMICS_DATA = {
       "DeepSeek v4 Flash",
       "GPT-5.6 Luna",
       "DeepSeek v4 Pro",
-      "anthropic/claude-haiku-4-5",
       "openai/gpt-5.6-terra",
-      "Claude Sonnet 5",
-      "openai/gpt-5.6-sol"
+      "anthropic/claude-haiku-4-5",
+      "openai/gpt-5.6-sol",
+      "Claude Sonnet 5"
     ],
     "costData": [
       0.068166,
       0.090736,
       0.137794,
-      0.974722,
       1.021347,
-      3.400606,
-      3.748749
+      1.590337,
+      3.748749,
+      4.583426
     ],
     "narrData": [
       0,
@@ -295,31 +302,31 @@ window.DYNAMICS_DATA = {
       0
     ],
     "locData": [
-      616.0,
-      380.0,
-      373.0,
-      1520.0,
-      316.0,
-      1794.0,
-      426.0
+      2294.0,
+      714.0,
+      1384.0,
+      708.0,
+      1862.0,
+      1166.0,
+      2129.0
     ],
     "costY": [
       0.068166,
       0.090736,
       0.137794,
-      0.974722,
       1.021347,
-      3.400606,
-      3.748749
+      1.590337,
+      3.748749,
+      4.583426
     ],
     "reports": [
       30,
       34,
       35,
-      31,
       30,
       31,
-      30
+      30,
+      31
     ]
   },
   "calculator": {
@@ -340,23 +347,23 @@ window.DYNAMICS_DATA = {
         "p": 1.0
       },
       {
-        "n": "anthropic/claude-haiku-4-5",
-        "c": 0.974722,
-        "p": 1.0
-      },
-      {
         "n": "openai/gpt-5.6-terra",
         "c": 1.021347,
         "p": 1.0
       },
       {
-        "n": "Claude Sonnet 5",
-        "c": 3.400606,
+        "n": "anthropic/claude-haiku-4-5",
+        "c": 1.590337,
         "p": 1.0
       },
       {
         "n": "openai/gpt-5.6-sol",
         "c": 3.748749,
+        "p": 1.0
+      },
+      {
+        "n": "Claude Sonnet 5",
+        "c": 4.583426,
         "p": 1.0
       }
     ],
@@ -370,20 +377,20 @@ window.DYNAMICS_DATA = {
         "e": 2.0
       },
       {
-        "m": "DS\u2192anthropic/claude-haiku-4-5",
-        "e": 14.3
-      },
-      {
         "m": "DS\u2192openai/gpt-5.6-terra",
         "e": 15.0
       },
       {
-        "m": "DS\u21925",
-        "e": 49.9
+        "m": "DS\u2192anthropic/claude-haiku-4-5",
+        "e": 23.3
       },
       {
         "m": "DS\u2192openai/gpt-5.6-sol",
         "e": 55.0
+      },
+      {
+        "m": "DS\u21925",
+        "e": 67.2
       },
       {
         "m": "\u2192Human ($5/job)",
@@ -394,11 +401,11 @@ window.DYNAMICS_DATA = {
     "woc_ratio": 1.0
   },
   "derived": {
-    "cost_gap": "14\u00d7",
-    "cost_gap_computation": "$0.974722 / $0.068166 = 14.3\u00d7",
-    "overall_pass_rate": "100.0% (10412/10412) [tests]",
-    "total_tests_passed": 10412,
-    "total_tests_run": 10412,
+    "cost_gap": "23\u00d7",
+    "cost_gap_computation": "$1.590337 / $0.068166 = 23.3\u00d7",
+    "overall_pass_rate": "100.0% (10535/10535) [tests]",
+    "total_tests_passed": 10535,
+    "total_tests_run": 10535,
     "total_cost_all_models": 288.6909,
     "total_cost_deepseek": 6.8678,
     "total_cost_claude": 135.6352,
@@ -3518,7 +3525,7 @@ window.DYNAMICS_DATA = {
       "successful": 976,
       "failed": 121
     },
-    "generated_at": "2026-08-13T18:25:38.073009+00:00"
+    "generated_at": "2026-08-13T19:21:52.266609+00:00"
   },
   "reviews": {
     "models": [
@@ -3832,5 +3839,673 @@ window.DYNAMICS_DATA = {
     "stories_analyzed": 221,
     "commits_analyzed": 1098,
     "sonar_commits_available": 1085
+  },
+  "labs": {
+    "verification_frontier": {
+      "experiment_id": "lab_verification_frontier",
+      "generated_at": "2026-08-13T21:21:51.439198",
+      "summary": {
+        "models": 7,
+        "cheapest": "deepseek-v4-flash",
+        "most_verified": "claude-sonnet-5",
+        "pareto_frontier": [
+          "deepseek-v4-flash",
+          "deepseek-v4-pro",
+          "claude-haiku-4-5",
+          "claude-sonnet-5"
+        ]
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 30,
+          "cost_cells": 30,
+          "avg_cost": 0.068,
+          "avg_tests": 33.533,
+          "total_cost": 2.045,
+          "total_tests": 1006
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 34,
+          "cost_cells": 34,
+          "avg_cost": 0.091,
+          "avg_tests": 7.324,
+          "total_cost": 3.085,
+          "total_tests": 249
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 35,
+          "cost_cells": 35,
+          "avg_cost": 0.138,
+          "avg_tests": 34.4,
+          "total_cost": 4.8228,
+          "total_tests": 1204
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 30,
+          "cost_cells": 30,
+          "avg_cost": 1.021,
+          "avg_tests": 8.833,
+          "total_cost": 30.6404,
+          "total_tests": 265
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 31,
+          "cost_cells": 19,
+          "avg_cost": 1.59,
+          "avg_tests": 117.355,
+          "total_cost": 30.2164,
+          "total_tests": 3638
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 30,
+          "cost_cells": 30,
+          "avg_cost": 3.749,
+          "avg_tests": 12.9,
+          "total_cost": 112.4625,
+          "total_tests": 387
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 31,
+          "cost_cells": 23,
+          "avg_cost": 4.583,
+          "avg_tests": 122.129,
+          "total_cost": 105.4188,
+          "total_tests": 3786
+        }
+      ]
+    },
+    "story_arc": {
+      "experiment_id": "lab_story_arc",
+      "generated_at": "2026-08-13T21:12:55.849893",
+      "summary": {
+        "snowball_factor": 2.13,
+        "session1_cost": 0.1594,
+        "session5_cost": 0.3391
+      },
+      "sessions": [
+        {
+          "session_number": 1,
+          "task_type": "greenfield",
+          "n": 221,
+          "avg_cost": 0.1594,
+          "avg_tokens": 19307.0,
+          "avg_tests": 4.4
+        },
+        {
+          "session_number": 2,
+          "task_type": "feature",
+          "n": 221,
+          "avg_cost": 0.2101,
+          "avg_tokens": 24312.0,
+          "avg_tests": 8.4
+        },
+        {
+          "session_number": 3,
+          "task_type": "integration",
+          "n": 221,
+          "avg_cost": 0.3194,
+          "avg_tokens": 30588.0,
+          "avg_tests": 10.6
+        },
+        {
+          "session_number": 4,
+          "task_type": "refactor",
+          "n": 217,
+          "avg_cost": 0.2896,
+          "avg_tokens": 30235.0,
+          "avg_tests": 10.9
+        },
+        {
+          "session_number": 5,
+          "task_type": "cross_cutting",
+          "n": 217,
+          "avg_cost": 0.3391,
+          "avg_tokens": 35490.0,
+          "avg_tests": 14.8
+        }
+      ],
+      "by_condition": {
+        "bad_seed_s1": 0.1928,
+        "bad_seed_s2": 0.2459,
+        "bad_seed_s3": 0.3771,
+        "bad_seed_s4": 0.2936,
+        "bad_seed_s5": 0.372,
+        "clean_s1": 0.1374,
+        "clean_s2": 0.1975,
+        "clean_s3": 0.3206,
+        "clean_s4": 0.2699,
+        "clean_s5": 0.3519,
+        "early_degrade_s1": 0.1686,
+        "early_degrade_s2": 0.2075,
+        "early_degrade_s3": 0.2909,
+        "early_degrade_s4": 0.3091,
+        "early_degrade_s5": 0.3097
+      },
+      "by_model": {
+        "claude-haiku-4-5": {
+          "1": 0.1312,
+          "2": 0.1695,
+          "3": 0.2035,
+          "4": 0.1705,
+          "5": 0.3001
+        },
+        "claude-sonnet-5": {
+          "1": 0.3773,
+          "2": 0.4972,
+          "3": 0.9467,
+          "4": 0.6161,
+          "5": 0.9633
+        },
+        "deepseek-v4-flash": {
+          "1": 0.006,
+          "2": 0.0097,
+          "3": 0.016,
+          "4": 0.0147,
+          "5": 0.0218
+        },
+        "deepseek-v4-pro": {
+          "1": 0.0179,
+          "2": 0.0228,
+          "3": 0.0311,
+          "4": 0.028,
+          "5": 0.0464
+        },
+        "gpt-5.6-luna": {
+          "1": 0.013,
+          "2": 0.0164,
+          "3": 0.0195,
+          "4": 0.02,
+          "5": 0.0218
+        },
+        "gpt-5.6-sol": {
+          "1": 0.4671,
+          "2": 0.6464,
+          "3": 0.8765,
+          "4": 0.9728,
+          "5": 0.7859
+        },
+        "gpt-5.6-terra": {
+          "1": 0.1404,
+          "2": 0.1574,
+          "3": 0.2136,
+          "4": 0.2431,
+          "5": 0.267
+        }
+      }
+    },
+    "condition_effects": {
+      "experiment_id": "lab_condition_effects",
+      "generated_at": "2026-08-13T21:12:55.899760",
+      "summary": {
+        "conditions": 3
+      },
+      "conditions": [
+        {
+          "condition": "bad_seed",
+          "cells": 40,
+          "success_rate": 0.875,
+          "cascade_rate": 0.025,
+          "avg_cost": 1.4815,
+          "total_cost": 59.2605
+        },
+        {
+          "condition": "clean",
+          "cells": 96,
+          "success_rate": 0.906,
+          "cascade_rate": 0.0,
+          "avg_cost": 1.2514,
+          "total_cost": 120.1318
+        },
+        {
+          "condition": "early_degrade",
+          "cells": 85,
+          "success_rate": 0.847,
+          "cascade_rate": 0.035,
+          "avg_cost": 1.2859,
+          "total_cost": 109.2986
+        }
+      ]
+    },
+    "verification_value": {
+      "experiment_id": "lab_verification_value",
+      "generated_at": "2026-08-13T21:12:55.967813",
+      "summary": {
+        "correlation_tests_vs_worse_rate": -0.226,
+        "cells": 38
+      },
+      "rows": [
+        {
+          "model": "claude-sonnet-5",
+          "tests": 70,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 76,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "tests": 165,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 0,
+          "reviews": 6,
+          "better_rate": 0.333,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 1,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 2,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 3,
+          "reviews": 12,
+          "better_rate": 0.417,
+          "worse_rate": 0.083
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 4,
+          "reviews": 10,
+          "better_rate": 0.2,
+          "worse_rate": 0.5
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 6,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 17,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 32,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 36,
+          "reviews": 4,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 38,
+          "reviews": 10,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 39,
+          "reviews": 7,
+          "better_rate": 0.714,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 40,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 43,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 45,
+          "reviews": 10,
+          "better_rate": 0.5,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 46,
+          "reviews": 10,
+          "better_rate": 0.8,
+          "worse_rate": 0.1
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 47,
+          "reviews": 15,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 49,
+          "reviews": 10,
+          "better_rate": 0.9,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 50,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 53,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 56,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 61,
+          "reviews": 10,
+          "better_rate": 0.6,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 72,
+          "reviews": 5,
+          "better_rate": 0.4,
+          "worse_rate": 0.2
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "tests": 82,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 0,
+          "reviews": 50,
+          "better_rate": 0.6,
+          "worse_rate": 0.14
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 6,
+          "reviews": 5,
+          "better_rate": 0.6,
+          "worse_rate": 0.4
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 7,
+          "reviews": 10,
+          "better_rate": 0.7,
+          "worse_rate": 0.1
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 8,
+          "reviews": 15,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 9,
+          "reviews": 25,
+          "better_rate": 0.8,
+          "worse_rate": 0.04
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 10,
+          "reviews": 25,
+          "better_rate": 0.88,
+          "worse_rate": 0.08
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 11,
+          "reviews": 10,
+          "better_rate": 0.7,
+          "worse_rate": 0.1
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 13,
+          "reviews": 10,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 14,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 15,
+          "reviews": 5,
+          "better_rate": 1.0,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 16,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "tests": 17,
+          "reviews": 5,
+          "better_rate": 0.8,
+          "worse_rate": 0.2
+        }
+      ]
+    },
+    "cache_economics": {
+      "experiment_id": "lab_cache_economics",
+      "generated_at": "2026-08-13T21:21:51.489397",
+      "summary": {
+        "models": 7
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 30,
+          "avg_cost": 0.068,
+          "avg_cache_hit": 0.964,
+          "cache_reads": 202925952,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 6997079.0,
+          "avg_tokens_per_cell": 232880.0
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 34,
+          "avg_cost": 0.091,
+          "avg_cache_hit": 0.975,
+          "cache_reads": 43900353,
+          "cache_writes": 3703149,
+          "read_write_ratio": 11.9,
+          "avg_context_per_cell": 1322806.0,
+          "avg_tokens_per_cell": 31620.0
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 35,
+          "avg_cost": 0.138,
+          "avg_cache_hit": 0.778,
+          "cache_reads": 105729792,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 3194362.0,
+          "avg_tokens_per_cell": 173510.0
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 30,
+          "avg_cost": 1.021,
+          "avg_cache_hit": 0.819,
+          "cache_reads": 22476288,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 914229.0,
+          "avg_tokens_per_cell": 165020.0
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 31,
+          "avg_cost": 1.59,
+          "avg_cache_hit": 0.606,
+          "cache_reads": 144011879,
+          "cache_writes": 3862280,
+          "read_write_ratio": 37.3,
+          "avg_context_per_cell": 4695957.0,
+          "avg_tokens_per_cell": 50412.0
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 30,
+          "avg_cost": 3.749,
+          "avg_cache_hit": 0.843,
+          "cache_reads": 41913344,
+          "cache_writes": 0,
+          "read_write_ratio": null,
+          "avg_context_per_cell": 1631549.0,
+          "avg_tokens_per_cell": 234438.0
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 31,
+          "avg_cost": 4.583,
+          "avg_cache_hit": 0.731,
+          "cache_reads": 154894492,
+          "cache_writes": 4809267,
+          "read_write_ratio": 32.2,
+          "avg_context_per_cell": 5068158.0,
+          "avg_tokens_per_cell": 71561.0
+        }
+      ]
+    },
+    "quality_frontier": {
+      "experiment_id": "lab_quality_frontier",
+      "generated_at": "2026-08-13T21:21:51.567150",
+      "summary": {
+        "models": 7
+      },
+      "models": [
+        {
+          "model": "deepseek-v4-flash",
+          "cells": 30,
+          "avg_cost": 0.068,
+          "lsp_errors_per_cell": 13.467,
+          "code_quality_score": 0.035,
+          "cyclomatic_complexity": 481.4,
+          "novelty_score": 0.877
+        },
+        {
+          "model": "gpt-5.6-luna",
+          "cells": 34,
+          "avg_cost": 0.091,
+          "lsp_errors_per_cell": 5.118,
+          "code_quality_score": 0.086,
+          "cyclomatic_complexity": 262.647,
+          "novelty_score": 0.88
+        },
+        {
+          "model": "deepseek-v4-pro",
+          "cells": 35,
+          "avg_cost": 0.138,
+          "lsp_errors_per_cell": 11.343,
+          "code_quality_score": 0.048,
+          "cyclomatic_complexity": 261.514,
+          "novelty_score": 0.815
+        },
+        {
+          "model": "gpt-5.6-terra",
+          "cells": 30,
+          "avg_cost": 1.021,
+          "lsp_errors_per_cell": 13.7,
+          "code_quality_score": 0.088,
+          "cyclomatic_complexity": 232.133,
+          "novelty_score": 0.905
+        },
+        {
+          "model": "claude-haiku-4-5",
+          "cells": 19,
+          "avg_cost": 1.59,
+          "lsp_errors_per_cell": 9.0,
+          "code_quality_score": 0.167,
+          "cyclomatic_complexity": 282.484,
+          "novelty_score": 0.521
+        },
+        {
+          "model": "gpt-5.6-sol",
+          "cells": 30,
+          "avg_cost": 3.749,
+          "lsp_errors_per_cell": 9.233,
+          "code_quality_score": 0.056,
+          "cyclomatic_complexity": 298.067,
+          "novelty_score": 0.912
+        },
+        {
+          "model": "claude-sonnet-5",
+          "cells": 23,
+          "avg_cost": 4.583,
+          "lsp_errors_per_cell": 9.419,
+          "code_quality_score": 0.125,
+          "cyclomatic_complexity": 289.194,
+          "novelty_score": 0.59
+        }
+      ]
+    }
   }
 };

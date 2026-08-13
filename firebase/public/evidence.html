@@ -62,12 +62,12 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
 <h1>The Evidence</h1>
-<p class="lead" style="font-size:1rem;color:var(--t)"><span data-stat="stories_total">71</span> multi-session stories across <span data-stat="story_sessions">347</span> sessions and 3 model families. Each story is a 5-session greenfield build — CRUD API, static site generator, or notification service — with a full code-quality stack: AST diffs, SonarQube, convention scoring, and a second-model review agent. Numbers are tagged by provenance: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external.</p>
+<p class="lead" style="font-size:1rem;color:var(--t)"><span data-stat="stories_total">221</span> multi-session stories across <span data-stat="story_sessions">1,097</span> sessions and <span data-stat="variants">7</span> models. Each story is a 5-session greenfield build — CRUD API, static site generator, or notification service — read through five facets: <strong style="color:var(--ac)">verification</strong>, <strong style="color:var(--am)">quality</strong>, <strong style="color:var(--cy)">behavior</strong>, and the <strong>5-session arc</strong> where cost compounds. Numbers are tagged by provenance: [M] measured &middot; [C] computed &middot; [H] heuristic &middot; [X] external.</p>
 <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-<div class="card" style="text-align:center"><div class="cval" data-stat="stories_total">71</div><div class="cdesc" style="text-align:center">Multi-session stories</div></div>
-<div class="card" style="text-align:center"><div class="cval" data-stat="story_sessions">347</div><div class="cdesc" style="text-align:center">Sessions</div></div>
-<div class="card" style="text-align:center"><div class="cval" data-stat="variants">3</div><div class="cdesc" style="text-align:center">Model families</div></div>
-<div class="card" style="text-align:center" title="[M] Sum of story session costs, verified against provider pricing"><div class="cval">$<span data-stat="story_total_cost">12.54</span></div><div class="cdesc" style="text-align:center">Total story cost</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="stories_total">221</div><div class="cdesc" style="text-align:center">Multi-session stories</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="story_sessions">1,097</div><div class="cdesc" style="text-align:center">Sessions</div></div>
+<div class="card" style="text-align:center"><div class="cval" data-stat="variants">7</div><div class="cdesc" style="text-align:center">Models</div></div>
+<div class="card" style="text-align:center" title="[M] Sum of story session costs, verified against provider pricing"><div class="cval">$<span data-stat="story_total_cost">288.69</span></div><div class="cdesc" style="text-align:center">Total story cost</div></div>
 </div>
 </section>
 
@@ -75,36 +75,44 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence shows</summary>
 <div style="padding:0 1.2rem 1.2rem;font-size:0.85rem;color:var(--t2);line-height:1.7">
-<p><strong style="color:var(--t)">Verification scales with cost.</strong> Three models built the same 30-cell matrix — 5-session greenfield stories under three perturbation conditions. All three pass their own tests at ~100%. But the tests themselves differ by an order of magnitude: Luna writes 7 per story, DeepSeek 34, Sonnet 5 73. Test:code ratio rises from <strong style="color:var(--am)">0.28 to 1.63</strong> across a <strong style="color:var(--ac)">26× cost range</strong>. The cheap model ships code that works; the expensive model ships code that's verified. Below, the full cross-model comparison, followed by the earlier single-session perturbation experiments (search dynamics under degraded input).</p>
+<p><strong style="color:var(--t)">Verification is a vendor behavior, not a price point.</strong> Across 7 models the test count does not rise with cost. OpenAI's cheapest (Luna, $0.09) and most expensive (Sol, $3.75) models both write ~10 tests per story; Claude's cheapest (Haiku, $1.59) and most expensive (Sonnet 5, $4.58) both write ~120. The 10× gap in verification sits <em>between</em> vendors, not between price tiers. Meanwhile every story's cost roughly <strong style="color:var(--am)">doubles across its 5 sessions</strong> as the codebase — and the context — compounds. Below, the four facets of the story pipeline, followed by the earlier single-session perturbation experiments.</p>
 </div>
 </details>
 
 <section class="sec alt">
-<h2 id="story-models">Test Thoroughness Scales With Cost</h2>
-<p class="lead">Three models built the same 30-cell matrix — 3 stories × 2 tiers × 5 perturbation conditions, 5 sessions each. All three pass their tests. But how many tests they write — and whether they verify edge cases — differs by an order of magnitude. The cheap model ships code that works. The expensive model ships code that's actually <em>verified</em>.</p>
+<h2 id="story-models">What Verification Costs — Tests vs Price</h2>
+<p class="lead">Seven models built the same story matrix — 3 stories × 2 tiers × 3 perturbation conditions, 5 sessions each, ~30 cells per model. All seven pass their own tests at ~100%. But how many tests they write — and whether they verify edge cases — differs by an order of magnitude, and <em>not</em> along the price axis.</p>
 
 <div class="tbl"><table>
-<thead><tr><th>Model</th><th>Cost/cell</th><th>Tests/cell</th><th>Test:Code ratio</th><th>Cache hit</th><th>Tokens/session</th></tr></thead>
+<thead><tr><th>Model</th><th>Cost/story</th><th>Tests/story</th><th>Test:Code ratio</th><th>Cache hit</th><th>Tokens/session</th></tr></thead>
 <tbody>
-<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">$0.09</td><td class="mono amber">7.3</td><td class="mono amber">0.28</td><td class="mono green">97.5%</td><td class="mono">6,324</td></tr>
-<tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">$0.14</td><td class="mono green">33.7</td><td class="mono green">1.09</td><td class="mono amber">77.8%</td><td class="mono amber">34,702</td></tr>
-<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono amber">$2.32</td><td class="mono green">73.0</td><td class="mono green">1.63</td><td class="mono green">98.2%</td><td class="mono green">17,293</td></tr>
+<tr><td><strong style="color:var(--ac)">DeepSeek v4 Flash</strong></td><td class="mono green">$0.07</td><td class="mono">33.5</td><td class="mono">0.66</td><td class="mono green">96.4%</td><td class="mono amber">46.6K</td></tr>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">$0.09</td><td class="mono amber">7.3</td><td class="mono amber">0.28</td><td class="mono green">97.5%</td><td class="mono green">6.3K</td></tr>
+<tr><td><strong style="color:var(--ac)">DeepSeek v4 Pro</strong></td><td class="mono green">$0.14</td><td class="mono">34.4</td><td class="mono green">1.09</td><td class="mono amber">77.8%</td><td class="mono amber">34.7K</td></tr>
+<tr><td><strong style="color:var(--am)">Claude Haiku 4.5</strong></td><td class="mono amber">$1.59</td><td class="mono green">117.4</td><td class="mono green">1.02</td><td class="mono amber">60.6%</td><td class="mono green">10.1K</td></tr>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Terra</strong></td><td class="mono amber">$1.02</td><td class="mono amber">8.8</td><td class="mono amber">0.33</td><td class="mono">81.9%</td><td class="mono">33.0K</td></tr>
+<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono amber">$4.58</td><td class="mono green">122.1</td><td class="mono green">0.65</td><td class="mono">73.1%</td><td class="mono">14.3K</td></tr>
+<tr><td><strong style="color:var(--ac)">GPT-5.6 Sol</strong></td><td class="mono red">$3.75</td><td class="mono amber">12.9</td><td class="mono amber">0.42</td><td class="mono">84.3%</td><td class="mono amber">46.9K</td></tr>
 </tbody></table></div>
 
-<div class="insight"><strong>Key insight:</strong> Test:code ratio rises from <strong style="color:var(--am)">0.28 to 1.63</strong> across a <strong>26× cost range</strong>. Luna writes 7 tests per story — it ships working code but barely checks it. Sonnet 5 writes 73 tests — 10× more verification for 26× the price. DeepSeek sits between: 34 tests, but at a 78% cache hit rate it pays for re-reading the codebase every session (35K tokens/session vs Luna's 6K). The FinOps question is not "which model is cheapest" but "what does verification cost at each price point."</div>
+<div class="insight"><strong>Key insight:</strong> test thoroughness is a <em>vendor behavior, not a price point</em>. OpenAI spans a <strong>41× price range</strong> ($0.09 → $3.75) while tests barely move (7 → 13). Claude spans a <strong>2.9× range</strong> ($1.59 → $4.58) while tests stay flat (~120). The 10× verification gap sits <em>between</em> the two vendors. DeepSeek lands in the middle (~34). You don't buy verification with a pricier model in the same family — you buy it by switching vendors.</div>
 
-<div class="insight" style="border-left-color:var(--cy)"><strong style="color:var(--cy)">Cache is a hidden cost lever:</strong> DeepSeek reuses 78% of its context; Luna and Sonnet reuse 97-98%. A model that trusts its cache sends 6K new tokens per session; a model that re-reads the codebase sends 35K. Same output, 5× the token economics — purely through provider caching policy, not capability.</div>
+<div class="insight" style="border-left-color:var(--cy)"><strong style="color:var(--cy)">Cache is the hidden cost lever:</strong> the cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens/session — but Flash does it at $0.07 and Sol at $3.75. Claude Haiku sends just 10K tokens/session and still writes 117 tests. Token volume, cache policy, and test thoroughness are three independent knobs — none predicts the other two.</div>
+
+<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Verification frontier:</strong> the Pareto set — models no cheaper model beats on tests — is <strong>Flash, DeepSeek Pro, Haiku, and Sonnet 5</strong>. Luna, Terra, and Sol are dominated: a cheaper model writes at least as many tests. And verification value is weak but real: test count correlates <strong>−0.23</strong> with reviewer "worse" commits — more tests slightly reduce regressions, but verification does not substitute for architecture quality.</div>
+
+<p style="font-size:0.78rem;color:var(--t3)">Cost is averaged over cells with a captured cost record — <strong>19/31</strong> for Claude Haiku and <strong>23/31</strong> for Sonnet 5. The subscription CLI is not per-token metered, so the remaining cells have no cost record (excluded from the average, not counted as $0).</p>
 </section>
 
 <!-- ==================== REVIEW AGENT: CODE QUALITY ==================== -->
 <section class="sec">
 <h2 id="reviews">The Review Agent — What a Second Model Sees</h2>
-<p class="lead">Every commit and every story was reviewed by a second model (DeepSeek v4 Flash). <strong style="color:var(--ac)">332 commit reviews</strong> plus <strong style="color:var(--ac)">71 story reviews</strong>, each scoring architectural fit, convention adherence, and multi-session coherence. This is the qualitative half of the instrument — the part that answers "is the code actually good, or does it just pass its own tests?"</p>
+<p class="lead">Every commit and every story was reviewed by a second model (DeepSeek v4 Flash). <strong style="color:var(--ac)">349 commit reviews</strong> plus <strong style="color:var(--ac)">72 story reviews</strong>, each scoring architectural fit, convention adherence, and multi-session coherence. This is the qualitative half of the instrument — the part that answers "is the code actually good, or does it just pass its own tests?"</p>
 
 <div class="tbl"><table>
 <thead><tr><th>Model (reviewed)</th><th>Coherence</th><th>Arch fit</th><th>Convention</th><th>Commits "better"</th><th>"worse"</th></tr></thead>
 <tbody>
-<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong> <span class="mono" style="color:var(--t3)">(n=2)</span></td><td class="mono green">0.92</td><td class="mono green">0.86</td><td class="mono green">0.79</td><td class="mono green">80%</td><td class="mono green">0%</td></tr>
+<tr><td><strong style="color:var(--am)">Claude Sonnet 5</strong> <span class="mono" style="color:var(--t3)">(n=3)</span></td><td class="mono green">0.92</td><td class="mono green">0.86</td><td class="mono green">0.79</td><td class="mono green">80%</td><td class="mono green">0%</td></tr>
 <tr><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono green">0.90</td><td class="mono green">0.77</td><td class="mono green">0.75</td><td class="mono green">74%</td><td class="mono green">8%</td></tr>
 <tr><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono green">0.88</td><td class="mono green">0.74</td><td class="mono green">0.72</td><td class="mono amber">70%</td><td class="mono amber">12%</td></tr>
 </tbody></table></div>
@@ -132,17 +140,115 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="tbl"><table>
 <thead><tr><th>Model</th><th>Commits</th><th>Lines added</th><th>Functions added</th><th>Sonar smells Δ</th><th>Sonar complexity Δ</th><th>Convention</th></tr></thead>
 <tbody>
-<tr data-anal-model="deepseek-v4-pro"><td><strong style="color:var(--t)">DeepSeek v4 Pro</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="deepseek-v4-flash"><td><strong style="color:var(--ac)">DeepSeek v4 Flash</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
 <tr data-anal-model="gpt-5.6-luna"><td><strong style="color:var(--ac)">GPT-5.6 Luna</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="deepseek-v4-pro"><td><strong style="color:var(--ac)">DeepSeek v4 Pro</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="claude-haiku-4-5"><td><strong style="color:var(--am)">Claude Haiku 4.5</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="gpt-5.6-terra"><td><strong style="color:var(--ac)">GPT-5.6 Terra</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
 <tr data-anal-model="claude-sonnet-5"><td><strong style="color:var(--am)">Claude Sonnet 5</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
+<tr data-anal-model="gpt-5.6-sol"><td><strong style="color:var(--ac)">GPT-5.6 Sol</strong></td><td class="mono" data-anal="commits">0</td><td class="mono" data-anal="lines_added">0</td><td class="mono" data-anal="functions_added">0</td><td class="mono" data-anal="sonar_smells_delta">0</td><td class="mono" data-anal="sonar_complexity_delta">0</td><td class="mono" data-anal="avg_convention">—</td></tr>
 </tbody></table></div>
 <p style="font-size:0.78rem;color:var(--t3)">Convention score is the reviewer-scored convention adherence (0-1). SonarQube deltas are summed across a model's commits (Δ = child − parent per commit). Populated by <code>scripts/analyze_stories.py</code> with <code>run_sonar=True</code>.</p>
 </section>
 
+<!-- ==================== FACET: BEHAVIOR / DYNAMICS ==================== -->
+<section class="sec">
+<h2 id="dynamics">How Models Behave — Solution, Basin &amp; Strategy</h2>
+<p class="lead">Every story cell is scored across five behavioral axes: <strong style="color:var(--ac)">solution quality</strong> (correctness, constraint satisfaction, code quality, novelty vs. the seed), <strong style="color:var(--am)">basin escape</strong> (how far the final code diverged from the seed's attractor), and a <strong style="color:var(--cy)">strategy archetype</strong> — plus live LSP diagnostics (pyright / tsc) on every final codebase.</p>
+
+<div class="tbl"><table><thead><tr>
+<th>Model</th><th>Correctness</th><th>Constraints</th><th>Code Quality</th><th>Novelty</th><th>Basin Escape</th><th>LSP Errors / story</th><th>Strategy Archetype</th>
+</tr></thead><tbody>
+<tr data-anal-model="gpt-5.6-sol"><td>GPT-5.6 Sol</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="gpt-5.6-terra"><td>GPT-5.6 Terra</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="deepseek-v4-flash"><td>DeepSeek v4 Flash</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
+<tr data-anal-model="gpt-5.6-luna"><td>GPT-5.6 Luna</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>34 exploratory</td></tr>
+<tr data-anal-model="deepseek-v4-pro"><td>DeepSeek v4 Pro</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>35 exploratory</td></tr>
+<tr data-anal-model="claude-sonnet-5"><td>Claude Sonnet 5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>8 cons · 18 expl · 5 waste</td></tr>
+<tr data-anal-model="claude-haiku-4-5"><td>Claude Haiku 4.5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>12 cons · 17 expl · 2 waste</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Finding:</strong> Two clean behavioral regimes. DeepSeek and OpenAI are uniformly <strong style="color:var(--ac)">EXPLORATORY</strong> — 100% correctness, ~all constraints met, high novelty (0.82–0.91), and basin escape of 0.68–0.78: they leave the seed and find new solutions. Claude is <strong style="color:var(--am)">MIXED</strong> — conservative, exploratory, or wasteful depending on the story — with lower escape (0.44–0.48) and novelty (0.52–0.59), but ~3× higher code quality (0.13–0.17 vs 0.04–0.09) and the cleanest LSP output. The Claude correctness gap (0.55–0.58) is the subscription CLI's session-timeout limit, not a capability gap. And the <strong style="color:var(--cy)">EFFICIENT</strong> archetype is empty — no model is simultaneously cheap, reliable, clean, and basin-stable.</div>
+
+<div class="insight" style="border-left-color:var(--success)"><strong style="color:var(--success)">Cleanliness is decoupled from cost too:</strong> the cheapest model (Flash) has the most LSP errors (13.5/story) and the lowest code-quality score (0.035), while the next-cheapest (Luna) has the cleanest LSP (5.1). Claude Haiku ($1.59) scores 0.167 on code quality — ~5× Flash's. Paying more buys neither fewer diagnostics nor higher cleanliness; these signals move independently of price.</div>
+</section>
+
+<!-- ==================== FACET: THE ARC ==================== -->
+<section class="sec alt">
+<h2 id="arc">The 5-Session Arc — Cost Compounds</h2>
+<p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> ($0.16 → $0.34), tokens rise from 18.7K to 34.9K, and tests accumulate from 4.4 to 14.8 as the surface area to verify expands.</p>
+
+<div class="tbl"><table>
+<thead><tr><th>Session</th><th>Task type</th><th>Avg cost</th><th>Avg tokens</th><th>Avg tests</th></tr></thead>
+<tbody>
+<tr><td class="mono">1</td><td>greenfield</td><td class="mono green">$0.16</td><td class="mono">18.7K</td><td class="mono">4.4</td></tr>
+<tr><td class="mono">2</td><td>feature</td><td class="mono green">$0.21</td><td class="mono">23.5K</td><td class="mono">8.4</td></tr>
+<tr><td class="mono">3</td><td>integration</td><td class="mono amber">$0.32</td><td class="mono">29.4K</td><td class="mono">10.6</td></tr>
+<tr><td class="mono">4</td><td>refactor</td><td class="mono amber">$0.29</td><td class="mono">30.0K</td><td class="mono">10.9</td></tr>
+<tr><td class="mono">5</td><td>cross-cutting</td><td class="mono red">$0.34</td><td class="mono">34.9K</td><td class="mono">14.8</td></tr>
+</tbody></table></div>
+
+<div class="insight"><strong>Key insight:</strong> the N² term isn't an equation — it's the chained sessions. Every session grows the codebase, and every new line inflates the cost of the next one. This is why per-session cost is the wrong unit: the <em>marginal</em> cost of a change is a function of everything that came before it. A FinOps model that prices session 5 like session 1 systematically under-budgets maintenance work by ~2×.</div>
+
+<div class="chart-wrap" style="max-width:750px;margin:1.5rem auto"><canvas id="snowballChart"></canvas></div>
+<p style="font-size:0.72rem;color:var(--t3);text-align:center">Avg cost per session across all 221 stories ([M] measured). Source: <code>D.labs.story_arc</code>.</p>
+
+<h3 style="margin-top:2rem;color:var(--ac)">Does perturbing the seed change the whole arc?</h3>
+<div class="tbl"><table>
+<thead><tr><th>Condition</th><th>Cells</th><th>Success</th><th>Cascade recovery</th><th>Avg cost</th></tr></thead>
+<tbody>
+<tr><td>clean</td><td class="mono">96</td><td class="mono green">91%</td><td class="mono">0%</td><td class="mono">$1.25</td></tr>
+<tr><td>bad_seed</td><td class="mono">40</td><td class="mono">88%</td><td class="mono">2%</td><td class="mono">$1.48</td></tr>
+<tr><td>early_degrade</td><td class="mono">85</td><td class="mono amber">85%</td><td class="mono amber">4%</td><td class="mono">$1.29</td></tr>
+</tbody></table></div>
+<div class="insight" style="border-left-color:var(--am)"><strong style="color:var(--am)">Condition effects are modest but monotonic:</strong> corrupting the session-1 spec (<code>early_degrade</code>) drops success to 85% and doubles the cascade rate — the degraded spec leaks, but ~85% of cells still recover to passing. A pre-degraded seed (<code>bad_seed</code>) costs the most ($1.48/story) but succeeds 88% of the time. Degradation raises cost and cascades slightly; it does not dominate the outcome.</div>
+</section>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var D = window.DYNAMICS_DATA;
+  var ctx = document.getElementById('snowballChart');
+  if (!D || !ctx) return;
+  var arc = D.labs && D.labs.story_arc && D.labs.story_arc.sessions;
+  if (!arc || !arc.length) return;
+  var labels = arc.map(function (s) { return 'S' + s.session_number + ' · ' + s.task_type; });
+  var costs = arc.map(function (s) { return s.avg_cost; });
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Avg cost / session ($)',
+        data: costs,
+        borderColor: 'rgba(34,211,238,1)',
+        backgroundColor: 'rgba(34,211,238,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 5,
+        pointBackgroundColor: 'rgba(34,211,238,1)',
+        borderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: {
+        title: { display: true, text: 'The Snowball — Cost Compounding Across the Arc', color: '#e4e4e7', font: { size: 15, family: "'JetBrains Mono',monospace", weight: '600' }, padding: { bottom: 16 } },
+        legend: { display: false }
+      },
+      scales: {
+        x: { ticks: { color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace", size: 10 } }, grid: { color: 'rgba(161,161,170,0.12)' } },
+        y: { title: { display: true, text: 'USD', color: '#a1a1aa', font: { family: "'JetBrains Mono',monospace" } }, ticks: { color: '#a1a1aa', callback: function (v) { return '$' + v; } }, grid: { color: 'rgba(161,161,170,0.12)' }, beginAtZero: true }
+      }
+    }
+  });
+});
+</script>
+
 <!-- ==================== LEGACY PERTURBATION PIPELINE ==================== -->
 <section class="sec" style="padding-top:4rem">
-<h2 id="perturbation">Single-Session Perturbation Experiments</h2>
-<p class="lead" style="font-size:0.9rem;color:var(--t3)">The sections below report the <em>earlier</em> perturbation pipeline — single-session experiments measuring search dynamics (basin escape, grit, recovery cost) under controlled specification degradation. This is a distinct measurement from the multi-session story pipeline above. Both remain valid; they measure different things.</p>
+<h2 id="perturbation">Legacy — Single-Session Perturbation Experiments</h2>
+<p class="lead" style="font-size:0.9rem;color:var(--t3)">The sections below report the <em>earlier</em> perturbation pipeline — single-session experiments measuring search dynamics (basin escape, grit, recovery cost) under controlled specification degradation. These 227 runs generated the operators and recovery signals the story instrument now reuses, but they are a <strong>distinct, historical measurement</strong> from the multi-session story pipeline above. The story evidence is the current instrument; the perturbation results remain here for provenance. <a href="#story-models" style="color:var(--ac)">↑ Back to the story evidence.</a></p>
 </section>
 
 <section class="sec" style="padding-top:0">
@@ -153,6 +259,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <p><strong style="color:var(--t)">Grit = Ground-Truth Integrity.</strong> How well does a model maintain correctness when given degraded input? Every LLM defaults to being a chatbot. When we give it degraded instructions — wrong specs, missing requirements, contradictory constraints — some maintain integrity. Most don't. We tested across <strong style="color:var(--ac)">227 single-session experiments with 10 stress tests</strong>. Both DeepSeek and Claude generate ~11,000 tokens per session. <strong style="color:var(--am)" title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; different cost</strong> — an artifact of this earlier experiment's model set (Claude Fable 5 vs DeepSeek) and per-session pricing. The tables below present that full data — AST analysis, token economics, perturbation response, and constraint verification.</p>
 </div>
 </details>
+</section>
 
 <!-- ==================== THE GRIT SPECTRUM ==================== -->
 <div class="provenance-legend note" style="max-width:960px;margin:0 auto 1.5rem;padding:0.5rem 1rem;font-size:0.72rem;color:var(--t3);border-left:3px solid var(--b)">
@@ -253,26 +360,6 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </tbody></table></div>
 
 <div class="insight"><strong>Finding:</strong> All 8 models produce maintainable code (SonarQube A rating). 198/198 quality gates pass. GPT-5 has the worst code hygiene at 19.0 smells/kLOC — 4× the industry average for production Python. DeepSeek produces the most code (678 LOC/worktree) with clean quality (0.18 bugs/kLOC). One FastAPI maintenance worktree was excluded from DeepSeek's averages — it contained 97K LOC of framework source, not generated code.</div>
-</section>
-
-<!-- Deep Metrics — Solution, Basin & Strategy -->
-<section class="sec">
-<h2 id="deep-metrics">Solution, Basin &amp; Strategy — The Deep Metrics</h2>
-<p class="lead">All 221 story cells are scored across five axes beyond static analysis: <strong style="color:var(--ac)">solution quality</strong> (correctness, constraint satisfaction, code quality, novelty vs. the seed), <strong style="color:var(--am)">basin escape</strong> (how far the final code diverged from the seed's attractor), and a <strong style="color:var(--cy)">strategy archetype</strong> — plus live LSP diagnostics (pyright / tsc) on every final codebase.</p>
-
-<div class="tbl"><table><thead><tr>
-<th>Model</th><th>Correctness</th><th>Constraints</th><th>Code Quality</th><th>Novelty</th><th>Basin Escape</th><th>LSP Errors / story</th><th>Strategy Archetype</th>
-</tr></thead><tbody>
-<tr data-anal-model="gpt-5.6-sol"><td>GPT-5.6 Sol</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
-<tr data-anal-model="gpt-5.6-terra"><td>GPT-5.6 Terra</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
-<tr data-anal-model="deepseek-v4-flash"><td>DeepSeek v4 Flash</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>30 exploratory</td></tr>
-<tr data-anal-model="gpt-5.6-luna"><td>GPT-5.6 Luna</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>34 exploratory</td></tr>
-<tr data-anal-model="deepseek-v4-pro"><td>DeepSeek v4 Pro</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>35 exploratory</td></tr>
-<tr data-anal-model="claude-sonnet-5"><td>Claude Sonnet 5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>8 cons · 18 expl · 5 waste</td></tr>
-<tr data-anal-model="claude-haiku-4-5"><td>Claude Haiku 4.5</td><td data-anal="solution_correctness"></td><td data-anal="solution_constraints"></td><td data-anal="solution_quality"></td><td data-anal="solution_novelty"></td><td data-anal="basin_escape"></td><td data-anal="lsp_errors_per_cell"></td><td>12 cons · 17 expl · 2 waste</td></tr>
-</tbody></table></div>
-
-<div class="insight"><strong>Finding:</strong> Two clean behavioral regimes. DeepSeek and OpenAI are uniformly <strong style="color:var(--ac)">EXPLORATORY</strong> — 100% correctness, ~all constraints met, high novelty (0.82–0.91), and basin escape of 0.68–0.78: they leave the seed and find new solutions. Claude is <strong style="color:var(--am)">MIXED</strong> — conservative, exploratory, or wasteful depending on the story — with lower escape (0.44–0.48) and novelty (0.52–0.59), but ~3× higher code quality (0.13–0.17 vs 0.04–0.09) and the cleanest LSP output. The Claude correctness gap (0.55–0.58) is the subscription CLI's session-timeout limit, not a capability gap. And the <strong style="color:var(--cy)">EFFICIENT</strong> archetype is empty — no model is simultaneously cheap, reliable, clean, and basin-stable.</div>
 </section>
 
 <!-- Constraint Detection — DeepSeek vs Claude -->
@@ -785,7 +872,7 @@ All cost values measured directly from provider API responses via the openCode d
 
 <footer>
 <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
+<span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
 <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>

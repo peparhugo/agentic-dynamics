@@ -27,13 +27,25 @@ in their respective lab book files.
 | 12 | `lab_basin_topology_neo4j.md` | What is basin topology via graph analysis? | Neo4j validates attractor basin framework |
 | 13 | `lab_opencode_meta_analysis.md` | What patterns exist in opencode experiments? | Models analyzing themselves reveal self-consistency limits |
 
+### Story-era labs (multi-session story corpus, added 2026-08-13)
+
+| # | File | Question | Hypothesis |
+|---|------|----------|------------|
+| 14 | `lab_story_review.md` | What review patterns emerge across stories? | Review quality is condition-independent |
+| 15 | `lab_verification_frontier.md` | Does test thoroughness track cost? | Verification is a vendor behavior, not a price point |
+| 16 | `lab_story_arc.md` | Does cost compound across the 5-session arc? | Snowball Rule: session cost doubles across the arc |
+| 17 | `lab_condition_effects.md` | Does perturbing the seed change the whole arc? | early_degrade lowers success and raises cascades |
+| 18 | `lab_verification_value.md` | Does writing more tests predict reviewer outcomes? | Tests weakly correlate with fewer "worse" commits |
+| 19 | `lab_cache_economics.md` | Is cache policy the hidden cost driver? | Cache hit rate, tokens, and cost are independent knobs |
+| 20 | `lab_quality_frontier.md` | Is code cleanliness decoupled from cost? | Cleanliness moves independently of price |
+
 ## Execution
 
 Each lab book corresponds to a script in `scripts/` (e.g., `lab_claude_audit.py`). Scripts:
 
-1. Read from `experiments/results/_results_summary.json` and/or `_trajectory_aggregate.json`
+1. Read from `experiments/results/_results_summary.json`, `_trajectory_aggregate.json`, `stories/*.json`, `analysis/*.json`, and/or `reviews/*.json`
 2. Perform the analysis steps described in the lab book
 3. Write results to `experiments/results/lab_<name>.json`
-4. Results feed into the data pipeline via `scripts/build_data.py` (for `lab_grit_matrix.json`) or are standalone analysis artifacts.
+4. Results feed into the data pipeline via `scripts/build_data.py` (the story-era labs under `D.labs` in `data.js`) or are standalone analysis artifacts.
 
 The lab books are designed to be self-contained — any researcher can pick one up, understand the methodology, and implement the analysis script without additional context.
