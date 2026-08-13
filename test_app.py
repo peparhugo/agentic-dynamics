@@ -1,5 +1,6 @@
 import app as task_app
 import pytest
+from unittest.mock import patch
 
 
 @pytest.fixture()
@@ -103,6 +104,51 @@ def test_task_crud_is_scoped_to_owner(client):
     assert response.status_code == 200
     assert response.get_json()["status"] == "done"
     assert len(client.get("/tasks", headers=auth(alice_token)).get_json()) == 1
+
+
+def test_completing_task_enqueues_owner_notification(client):
+    register(client, "alice@example.com")
+    token = token_for(client, "alice@example.com")
+    task = client.post(
+        "/tasks", json={"title": "Ship release"}, headers=auth(token)
+    ).get_json()
+
+    with patch.object(task_app.send_notification_email, "delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice@example.com", "Ship release")
+
+
+def test_notification_only_enqueued_on_transition_to_completed(client):
+    register(client)
+    token = token_for(client)
+    task = client.post(
+        "/tasks", json={"title": "One notification"}, headers=auth(token)
+    ).get_json()
+
+    with patch.object(task_app.send_notification_email, "delay") as delay:
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "in_progress"},
+            headers=auth(token),
+        )
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+        client.put(
+            f"/tasks/{task['id']}",
+            json={"status": "completed"},
+            headers=auth(token),
+        )
+
+    delay.assert_called_once_with("alice", "One notification")
 
 
 def test_migration_preserves_legacy_tasks():
