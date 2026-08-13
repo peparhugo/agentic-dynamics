@@ -6,6 +6,7 @@ import pytest
 import json
 import os
 import sqlite3
+from unittest.mock import patch, MagicMock
 import app as app_module
 
 
@@ -25,11 +26,23 @@ def client(tmp_path, monkeypatch):
     yield app.test_client()
 
 
-def register_user(client, username, password):
+@pytest.fixture
+def mock_celery_task(monkeypatch):
+    """Mock the Celery send_notification_email task."""
+    mock_task = MagicMock()
+    mock_task.delay = MagicMock(return_value=None)
+    monkeypatch.setattr(app_module, "send_notification_email", mock_task)
+    return mock_task
+
+
+def register_user(client, username, password, email=None):
     """Helper to register a user and return the token."""
+    payload = {"username": username, "password": password}
+    if email:
+        payload["email"] = email
     response = client.post(
         "/auth/register",
-        data=json.dumps({"username": username, "password": password}),
+        data=json.dumps(payload),
         content_type="application/json"
     )
     data = json.loads(response.data)
@@ -570,3 +583,137 @@ class TestHealthEndpoint:
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data["status"] == "ok"
+
+
+class TestNotificationTrigger:
+    """Tests for email notification trigger on task completion"""
+
+    def test_notification_triggered_on_completion(self, client, mock_celery_task):
+        """Email notification is triggered when task status changes to completed."""
+        token, _ = register_user(client, "alice", "secret123", "alice@example.com")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Important task"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        mock_celery_task.delay.assert_called_once_with("alice@example.com", "Important task")
+
+    def test_notification_not_triggered_on_other_status(self, client, mock_celery_task):
+        """Email notification is NOT triggered when status changes to non-completed."""
+        token, _ = register_user(client, "alice", "secret123", "alice@example.com")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "in_progress"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        mock_celery_task.delay.assert_not_called()
+
+    def test_notification_not_triggered_if_already_completed(self, client, mock_celery_task):
+        """Email notification is NOT triggered if task is already completed."""
+        token, _ = register_user(client, "alice", "secret123", "alice@example.com")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        # First set to completed
+        client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        mock_celery_task.delay.reset_mock()
+
+        # Try to update again while already completed
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        mock_celery_task.delay.assert_not_called()
+
+    def test_notification_contains_correct_task_title(self, client, mock_celery_task):
+        """Notification is sent with correct task title."""
+        token, _ = register_user(client, "alice", "secret123", "alice@example.com")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Buy birthday gift for mom"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        mock_celery_task.delay.assert_called_once()
+        call_args = mock_celery_task.delay.call_args
+        assert call_args[0][1] == "Buy birthday gift for mom"
+
+    def test_notification_not_triggered_without_email(self, client, mock_celery_task):
+        """Email notification is NOT triggered if user has no email set."""
+        token, _ = register_user(client, "alice", "secret123")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Task"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        response = client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        assert response.status_code == 200
+        mock_celery_task.delay.assert_not_called()
+
+    def test_notification_title_updated_when_completing(self, client, mock_celery_task):
+        """Notification is sent with the title at time of completion."""
+        token, _ = register_user(client, "alice", "secret123", "alice@example.com")
+        create_response = client.post(
+            "/tasks",
+            data=json.dumps({"title": "Original title"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        task_id = json.loads(create_response.data)["id"]
+
+        client.put(
+            f"/tasks/{task_id}",
+            data=json.dumps({"title": "Updated title", "status": "completed"}),
+            content_type="application/json",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        mock_celery_task.delay.assert_called_once_with("alice@example.com", "Updated title")

@@ -11,6 +11,7 @@ import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from celery_tasks import celery, send_notification_email
 
 app = Flask(__name__)
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -31,7 +32,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             )
         """)
         conn.execute("""
@@ -70,6 +72,16 @@ def verify_token(token):
         return None
 
 
+def get_user_email(user_id):
+    """Get user email by user_id."""
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT email FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+    return dict(row)["email"] if row else None
+
+
 def auth_required(f):
     """Decorator to protect endpoints with JWT authentication."""
     @wraps(f)
@@ -96,6 +108,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip()
 
     if not username:
         return jsonify({"error": "username is required"}), 400
@@ -108,8 +121,8 @@ def register():
     with get_db() as conn:
         try:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash)
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email)
             )
             conn.commit()
             user_id = cursor.lastrowid
@@ -225,6 +238,7 @@ def update_task(user_id, task_id):
             return jsonify({"error": "task not found"}), 404
 
         task = dict(row)
+        old_status = task["status"]
 
         # Update title only if provided and not empty
         if "title" in data:
@@ -246,6 +260,12 @@ def update_task(user_id, task_id):
 
         task["title"] = title
         task["status"] = status
+
+    # Trigger async email notification if status changed to completed
+    if old_status != "completed" and status == "completed":
+        user_email = get_user_email(user_id)
+        if user_email:
+            send_notification_email.delay(user_email, title)
 
     return jsonify(task)
 
