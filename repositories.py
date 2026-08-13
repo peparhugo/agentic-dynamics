@@ -82,10 +82,37 @@ class TaskRepository(BaseRepository):
         with self.connection_factory() as connection:
             rows = connection.execute(
                 "SELECT id, title, status, created_at FROM tasks "
-                "WHERE owner_id = ? ORDER BY created_at DESC",
+                "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
                 (owner_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def list_page_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict[str, Any]], int]:
+        """Return a keyset page and the owner's total task count."""
+        with self.connection_factory() as connection:
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+            params: list[Any] = [owner_id]
+            where = "WHERE owner_id = ?"
+            if cursor is not None:
+                cursor_row = connection.execute(
+                    "SELECT created_at FROM tasks WHERE id = ? AND owner_id = ?",
+                    (cursor, owner_id),
+                ).fetchone()
+                if cursor_row is None:
+                    return [], total
+                where += " AND (created_at < ? OR (created_at = ? AND id < ?))"
+                params.extend([cursor_row["created_at"], cursor_row["created_at"], cursor])
+            params.append(limit + 1)
+            rows = connection.execute(
+                "SELECT id, title, status, created_at FROM tasks "
+                f"{where} ORDER BY created_at DESC, id DESC LIMIT ?",
+                params,
+            ).fetchall()
+        return [dict(row) for row in rows], total
 
     def get_notification_details(self, task_id: int, owner_id: int) -> dict[str, Any] | None:
         with self.connection_factory() as connection:

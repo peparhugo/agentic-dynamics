@@ -9,7 +9,9 @@ import os
 import sqlite3
 from functools import wraps
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -20,6 +22,9 @@ app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "todos.db")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 app.config["JWT_EXPIRATION_HOURS"] = 24
+app.config["RATELIMIT_STORAGE_URI"] = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0")
+app.config["RATELIMIT_DEFAULT"] = "100 per minute"
+app.config["RATELIMIT_HEADERS_ENABLED"] = True
 
 
 def get_db() -> sqlite3.Connection:
@@ -80,12 +85,26 @@ def decode_token(token: str) -> int | None:
         return None
 
 
+@app.before_request
+def identify_rate_limit_client() -> None:
+    """Use a token's subject when available, otherwise isolate anonymous requests by IP."""
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    g.authenticated_user_id = decode_token(token) if scheme == "Bearer" and token else None
+
+
+def rate_limit_key() -> str:
+    user_id = g.get("authenticated_user_id")
+    return f"user:{user_id}" if user_id is not None else f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(key_func=rate_limit_key, app=app)
+
+
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
-        authorization = request.headers.get("Authorization", "")
-        scheme, _, token = authorization.partition(" ")
-        user_id = decode_token(token) if scheme == "Bearer" and token else None
+        user_id = g.authenticated_user_id
         if user_id is None:
             return jsonify(error="authentication required"), 401
         return view(user_id, *args, **kwargs)
@@ -113,6 +132,29 @@ def validate_credentials(data: object) -> tuple[str, str, str | None] | None:
     if email is not None and (not isinstance(email, str) or not email.strip()):
         return None
     return username.strip(), password, email.strip() if email else None
+
+
+def parse_pagination() -> tuple[int | None, int] | None:
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+    except ValueError:
+        return None
+    if (cursor is not None and cursor < 1) or not 1 <= limit <= 100:
+        return None
+    return cursor, limit
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(error):
+    response = jsonify(error="rate limit exceeded")
+    response.status_code = 429
+    retry_after = getattr(error, "retry_after", None)
+    if retry_after is not None:
+        response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 @app.post("/auth/register")
@@ -163,7 +205,14 @@ def create_task(user_id: int):
 @app.get("/tasks")
 @require_auth
 def list_tasks(user_id: int):
-    return jsonify(task_repository.list_for_owner(user_id))
+    pagination = parse_pagination()
+    if pagination is None:
+        return jsonify(error="cursor and limit must be positive integers; limit cannot exceed 100"), 400
+    cursor, limit = pagination
+    tasks, total = task_repository.list_page_for_owner(user_id, cursor, limit)
+    has_more = len(tasks) > limit
+    data = tasks[:limit]
+    return jsonify(data=data, next_cursor=str(data[-1]["id"]) if has_more else None, total=total)
 
 
 @app.get("/tasks/<int:task_id>")

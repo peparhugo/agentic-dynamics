@@ -2,8 +2,10 @@ import sqlite3
 from unittest.mock import patch
 
 import pytest
+from limits.storage import MemoryStorage
+from limits.strategies import FixedWindowRateLimiter
 
-from app import app, init_db
+from app import app, init_db, limiter
 
 
 @pytest.fixture()
@@ -12,7 +14,10 @@ def client(tmp_path):
         TESTING=True,
         DATABASE=str(tmp_path / "tasks.db"),
         JWT_SECRET="test-secret",
+        RATELIMIT_STORAGE_URI="memory://",
     )
+    limiter._storage = MemoryStorage()
+    limiter._limiter = FixedWindowRateLimiter(limiter._storage)
     init_db()
     return app.test_client()
 
@@ -56,7 +61,9 @@ def test_list_tasks_is_newest_first(client):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [newer["id"], older["id"]]
+    body = response.get_json()
+    assert [task["id"] for task in body["data"]] == [newer["id"], older["id"]]
+    assert body == {"data": body["data"], "next_cursor": None, "total": 2}
 
 
 def test_get_and_update_task(client):
@@ -146,7 +153,7 @@ def test_users_only_see_and_modify_their_own_tasks(client):
     bob_headers = register_and_login(client, "bob")
     create(client, "Bob task", bob_headers)
 
-    assert [task["title"] for task in client.get("/tasks", headers=bob_headers).get_json()] == ["Bob task"]
+    assert [task["title"] for task in client.get("/tasks", headers=bob_headers).get_json()["data"]] == ["Bob task"]
     assert client.get(f"/tasks/{alice_task['id']}", headers=bob_headers).status_code == 404
     assert client.put(f"/tasks/{alice_task['id']}", json={"status": "done"}, headers=bob_headers).status_code == 404
 
@@ -167,3 +174,37 @@ def test_existing_task_database_is_migrated_without_losing_rows(tmp_path):
         task = connection.execute("SELECT title, owner_id FROM tasks").fetchone()
     assert "owner_id" in columns
     assert task == ("Legacy", None)
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = register_and_login(client)
+    tasks = [create(client, f"Task {index}", headers) for index in range(3)]
+
+    first_page = client.get("/tasks?limit=2", headers=headers)
+
+    assert first_page.status_code == 200
+    assert first_page.get_json()["data"] == [tasks[2], tasks[1]]
+    assert first_page.get_json()["next_cursor"] == str(tasks[1]["id"])
+    assert first_page.get_json()["total"] == 3
+
+    second_page = client.get(f"/tasks?limit=2&cursor={tasks[1]['id']}", headers=headers)
+
+    assert second_page.get_json() == {"data": [tasks[0]], "next_cursor": None, "total": 3}
+
+
+@pytest.mark.parametrize("query", ["?limit=0", "?limit=101", "?limit=bad", "?cursor=0"])
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks{query}", headers=register_and_login(client))
+
+    assert response.status_code == 400
+
+
+def test_rate_limit_is_enforced_per_authenticated_user(client):
+    headers = register_and_login(client)
+
+    for _ in range(100):
+        assert client.get("/tasks", headers=headers).status_code == 200
+    response = client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert response.headers["Retry-After"]
