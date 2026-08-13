@@ -1,13 +1,13 @@
 # WebSocket Notification Server
 
-An asyncio notification server using `websockets`, with a WebSocket endpoint and
-HTTP status endpoints on the same port. Current client state is stored in
-`clients.json`; delivered messages and connection events are appended to
-`messages.jsonl`.
+An asyncio notification server using `websockets`, with Redis pub/sub as its
+cross-instance message backbone and SQLite message history. Connected clients
+and channel subscriptions are tracked in Redis.
 
 ```bash
 python -m pip install -r requirements.txt
-python app.py --host 127.0.0.1 --port 8765 --data-dir data
+REDIS_URL=redis://127.0.0.1:6379/0 DATABASE_URL=sqlite:///data/messages.db \
+  python app.py --host 127.0.0.1 --port 8765 --data-dir data
 ```
 
 Connect to `ws://127.0.0.1:8765`. Messages use this shape:
@@ -39,4 +39,5 @@ original broadcast or direct behavior.
 
 `GET /health` reports the connected client count. `GET /channels` lists active
 channels and subscriber counts, while `GET /channels/{name}/subscribers` lists
-the subscriber IDs for a channel.
+the subscriber IDs for a channel. `GET /messages?limit=50&offset=0` returns
+persisted messages in insertion order.

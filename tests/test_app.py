@@ -3,6 +3,8 @@ import json
 import urllib.request
 
 import pytest
+from fakeredis import FakeServer
+from fakeredis.aioredis import FakeRedis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -10,7 +12,9 @@ from app import NotificationServer
 
 @pytest.fixture
 async def running_server(tmp_path):
-    notification_server = NotificationServer(tmp_path)
+    notification_server = NotificationServer(
+        tmp_path, redis_client=FakeRedis(server=FakeServer(), decode_responses=True)
+    )
     async with notification_server.run(port=0) as websocket_server:
         port = websocket_server.sockets[0].getsockname()[1]
         yield notification_server, port, tmp_path
@@ -228,3 +232,77 @@ async def test_invalid_channel_control_messages_return_errors(running_server):
         assert (await receive_json(websocket))["payload"] == {
             "error": "channel must be a non-empty string"
         }
+
+
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    fake_server = FakeServer()
+    first_server = NotificationServer(
+        tmp_path / "first",
+        redis_client=FakeRedis(server=fake_server, decode_responses=True),
+    )
+    second_server = NotificationServer(
+        tmp_path / "second",
+        redis_client=FakeRedis(server=fake_server, decode_responses=True),
+    )
+    async with first_server.run(port=0) as first_http, second_server.run(
+        port=0
+    ) as second_http:
+        first_port = first_http.sockets[0].getsockname()[1]
+        second_port = second_http.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{first_port}") as publisher, connect(
+            f"ws://127.0.0.1:{second_port}"
+        ) as subscriber:
+            await receive_json(publisher)
+            await receive_json(subscriber)
+            await publisher.send(
+                json.dumps({"type": "broadcast", "payload": {"text": "shared"}})
+            )
+
+            assert (await receive_json(publisher))["payload"] == {"text": "shared"}
+            assert (await receive_json(subscriber))["payload"] == {"text": "shared"}
+            assert await first_server.connected_count() == 2
+            assert await second_server.connected_count() == 2
+
+
+async def test_messages_endpoint_reads_sqlite_history(running_server):
+    _, port, data_dir = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as websocket:
+        await receive_json(websocket)
+        await websocket.send(json.dumps({"type": "subscribe", "channel": "news"}))
+        await websocket.send(
+            json.dumps(
+                {"type": "broadcast", "channel": "news", "payload": {"number": 1}}
+            )
+        )
+        await receive_json(websocket)
+
+        def request_messages():
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/messages?limit=1&offset=1"
+            ) as response:
+                return response.status, json.load(response)
+
+        status, body = await asyncio.to_thread(request_messages)
+
+    assert status == 200
+    assert body["messages"] == [
+        {
+            "id": 2,
+            "channel": "news",
+            "type": "broadcast",
+            "payload": {"number": 1},
+            "timestamp": body["messages"][0]["timestamp"],
+        }
+    ]
+    assert (data_dir / "messages.db").exists()
+
+
+async def test_database_url_selects_sqlite_path(tmp_path, monkeypatch):
+    database_path = tmp_path / "configured" / "history.sqlite3"
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database_path}")
+    server = NotificationServer(
+        tmp_path / "data",
+        redis_client=FakeRedis(server=FakeServer(), decode_responses=True),
+    )
+    async with server.run(port=0):
+        assert database_path.exists()
