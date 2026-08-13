@@ -3,7 +3,8 @@
 Unlike the old genotype mutation system (which changed *what* the model
 was asked to build), these operators perturb the *reasoning context*
 while holding the task constant. This lets us measure how reasoning
-policies respond to being pushed off their typical manifold.
+policies respond to specification corruption, objective mutation, and
+process perturbation.
 
 Each operator is a named function that takes a prompt context and
 returns a perturbed version. Operators are pure functions with a
@@ -70,6 +71,16 @@ ALIEN_VOCABULARIES: dict[str, list[str]] = {
 }
 
 
+# ── Perturbation class taxonomy ──
+# Single source of truth for the three-way operator classification
+# (BLUEPRINT §4.2): which aspect of the task the perturbation attacks.
+PERTURBATION_CLASSES: tuple[str, ...] = (
+    "specification_corruption",  # spec corrupted: false premise, contradiction, removed constraint, phantom success
+    "objective_mutation",        # objective changed: invert constraint, competing goal
+    "process_perturbation",      # reasoning process perturbed: vocab, framing, causality, abandonment
+)
+
+
 @dataclass
 class Perturbation:
     """A calibrated perturbation applied to a reasoning context.
@@ -84,7 +95,7 @@ class Perturbation:
 
     operator: str
     strength: float = 0.0
-    perturbation_class: str = "semantic"  # "semantic" (in-manifold) or "manifold" (off-manifold)
+    perturbation_class: str = ""  # one of PERTURBATION_CLASSES, or "" when unset
     vocab_domain: str = ""
     injected_tokens: list[str] = field(default_factory=list)
     description: str = ""
@@ -99,13 +110,13 @@ class PerturbationOperator:
         name: Operator name (e.g. "inject_alien_vocab", "invert_constraint").
         description: What this operator does.
         apply_fn: Pure function (prompt, strength, rng) -> perturbed_prompt.
-        perturbation_class: "semantic" (tests reasoning quality) or "manifold" (tests search dynamics).
+        perturbation_class: one of PERTURBATION_CLASSES (which aspect of the task is perturbed).
     """
 
     name: str
     description: str
     apply_fn: Callable[[str, float, random.Random], str]
-    perturbation_class: str = "semantic"
+    perturbation_class: str = ""
 
 
 # ── Operator implementations ──
@@ -114,9 +125,9 @@ class PerturbationOperator:
 def _inject_alien_vocab(prompt: str, strength: float, rng: random.Random) -> tuple[str, list[str], str]:
     """Replace domain terminology with cross-domain vocabulary as directional noise.
 
-    Alien words act as latent-space navigation hints — they push the
-    model's embedding off the typical linguistic manifold, forcing
-    exploration of boundary states.
+    Alien words act as directional noise — they substitute unfamiliar
+    cross-domain terms for domain terminology, forcing the model to
+    re-derive meaning under lexical disruption.
 
     At low strength (0.2): 2-3 domain terms replaced.
     At high strength (0.8): 6-8 domain terms replaced.
@@ -602,7 +613,7 @@ def build_operators() -> dict[str, PerturbationOperator]:
         "inject_alien_vocab": PerturbationOperator(
             name="inject_alien_vocab",
             perturbation_class="process_perturbation",
-            description="Inject cross-domain vocabulary as directional noise to push the model off its typical linguistic manifold",
+            description="Inject cross-domain vocabulary as directional noise to disrupt lexical grounding",
             apply_fn=_inject_alien_vocab,
         ),
         "inject_false_premise": PerturbationOperator(
@@ -660,6 +671,19 @@ def build_operators() -> dict[str, PerturbationOperator]:
             apply_fn=_force_abandonment,
         ),
     }
+
+
+def perturbation_class_for(operator: str) -> str:
+    """Return the canonical perturbation class for an operator name.
+
+    Reads from the operator registry so there is a single source of
+    truth for operator → class. Unknown operators map to "" (unset)
+    rather than silently mislabeling.
+    """
+    op = build_operators().get(operator)
+    if op is not None:
+        return op.perturbation_class
+    return ""
 
 
 def perturb_prompt(

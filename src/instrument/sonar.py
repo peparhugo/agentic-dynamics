@@ -162,6 +162,11 @@ def run_sonar_analysis(
 ) -> SonarMetrics:
     """Run sonar-scanner on a worktree and extract quality measures.
 
+    Fetch-first: if the project was already analyzed (server retains
+    analyses indefinitely), the cached measures are fetched directly and
+    the scanner is skipped. Otherwise the scanner runs, then measures are
+    fetched from the API.
+
     Args:
         worktree_path: Path to the generated code directory.
         project_key: Unique SonarQube project key (defaults to worktree dir name).
@@ -172,23 +177,28 @@ def run_sonar_analysis(
 
     Returns:
         SonarMetrics with extracted measures. ``analyzed`` is False if
-        sonar-scanner is unavailable or the server is unreachable.
+        the server is unreachable and no cached analysis exists.
     """
     wt = Path(worktree_path)
     if not wt.exists():
         return SonarMetrics(project_key=project_key, error="worktree not found")
 
-    scanner = _find_sonar_scanner()
-    if not scanner:
-        return SonarMetrics(project_key=project_key, error="sonar-scanner not on PATH")
-
     if not project_key:
-        project_key = f"exp_{wt.name}"
+        project_key = wt.name if wt.name.startswith(("exp_", "story_")) else f"exp_{wt.name}"
 
     if project_key in _SONAR_CACHE:
         return _SONAR_CACHE[project_key]
 
-    metrics = SonarMetrics(project_key=project_key)
+    # Fetch-first: reuse a cached server-side analysis instead of re-running
+    # the (expensive) scanner. Returns None only when no analysis exists yet.
+    existing = _fetch_once(project_key, sonar_url, sonar_user, sonar_password)
+    if existing is not None:
+        _SONAR_CACHE[project_key] = existing
+        return existing
+
+    scanner = _find_sonar_scanner()
+    if not scanner:
+        return SonarMetrics(project_key=project_key, error="sonar-scanner not on PATH")
 
     props_path = wt / "sonar-project.properties"
     props_content = f"""sonar.projectKey={project_key}
@@ -236,10 +246,74 @@ sonar.scm.disabled=true
     if remaining < 2:
         return SonarMetrics(project_key=project_key, error="no time remaining for API fetch")
 
-    result = _fetch_measures(project_key, sonar_url, sonar_user, sonar_password, metrics, remaining)
+    result = _fetch_measures(project_key, sonar_url, sonar_user, sonar_password, remaining)
     if result.analyzed:
         _SONAR_CACHE[project_key] = result
     return result
+
+
+def _parse_measures(project_key: str, measures: dict) -> SonarMetrics:
+    """Populate a SonarMetrics from a raw measures dict (keys are metric names)."""
+    metrics = SonarMetrics(project_key=project_key, analyzed=True)
+    metrics.bugs = _int_val(measures, "bugs")
+    metrics.vulnerabilities = _int_val(measures, "vulnerabilities")
+    metrics.code_smells = _int_val(measures, "code_smells")
+    metrics.cognitive_complexity = _int_val(measures, "cognitive_complexity")
+    metrics.complexity = _int_val(measures, "complexity")
+    metrics.duplicated_lines_density = _float_val(measures, "duplicated_lines_density")
+    metrics.ncloc = _int_val(measures, "ncloc")
+    metrics.comment_lines_density = _float_val(measures, "comment_lines_density")
+    metrics.classes = _int_val(measures, "classes")
+    metrics.functions = _int_val(measures, "functions")
+    metrics.files = _int_val(measures, "files")
+    metrics.maintainability_rating = _rating_label(measures.get("sqale_rating", ""))
+    metrics.reliability_rating = _rating_label(measures.get("reliability_rating", ""))
+    metrics.security_rating = _rating_label(measures.get("security_rating", ""))
+    metrics.quality_gate = measures.get("alert_status", "")
+    metrics.sqale_index = _int_val(measures, "sqale_index")
+    metrics.sqale_debt_ratio = _float_val(measures, "sqale_debt_ratio")
+    return metrics
+
+
+_METRIC_KEYS = (
+    "bugs,vulnerabilities,code_smells,cognitive_complexity,complexity,"
+    "duplicated_lines_density,ncloc,comment_lines_density,classes,"
+    "functions,files,sqale_rating,reliability_rating,security_rating,"
+    "alert_status,sqale_index,sqale_debt_ratio"
+)
+
+
+def _fetch_once(
+    project_key: str,
+    sonar_url: str,
+    sonar_user: str,
+    sonar_password: str,
+) -> SonarMetrics | None:
+    """Single-attempt fetch of cached measures for a project.
+
+    Returns a populated SonarMetrics if the project has an analysis,
+    else None (no analysis yet / unreachable). Does not retry.
+    """
+    import urllib.request
+    from base64 import b64encode
+
+    url = f"{sonar_url}/api/measures/component?component={project_key}&metricKeys={_METRIC_KEYS}"
+    auth_header = b64encode(f"{sonar_user}:{sonar_password}".encode()).decode()
+    try:
+        req = urllib.request.Request(url)
+        req.add_header("Authorization", f"Basic {auth_header}")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode())
+    except Exception:
+        return None
+
+    component = data.get("component")
+    if not component:
+        return None
+    measures = {m["metric"]: m.get("value", "") for m in component.get("measures", [])}
+    if not measures:
+        return None
+    return _parse_measures(project_key, measures)
 
 
 def _fetch_measures(
@@ -247,72 +321,18 @@ def _fetch_measures(
     sonar_url: str,
     sonar_user: str,
     sonar_password: str,
-    metrics: SonarMetrics,
     timeout_sec: float,
 ) -> SonarMetrics:
-    import urllib.request
-    from base64 import b64encode
-
-    metric_keys = (
-        "bugs,vulnerabilities,code_smells,cognitive_complexity,complexity,"
-        "duplicated_lines_density,ncloc,comment_lines_density,classes,"
-        "functions,files,sqale_rating,reliability_rating,security_rating,"
-        "alert_status,sqale_index,sqale_debt_ratio"
-    )
-    url = f"{sonar_url}/api/measures/component?component={project_key}&metricKeys={metric_keys}"
-
-    auth_header = b64encode(f"{sonar_user}:{sonar_password}".encode()).decode()
-
+    """Fetch measures with retries, waiting for a just-submitted analysis."""
     deadline = time.monotonic() + min(timeout_sec, 120)
     last_error = ""
 
     while time.monotonic() < deadline:
-        try:
-            req = urllib.request.Request(url)
-            req.add_header("Authorization", f"Basic {auth_header}")
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode())
-        except urllib.error.HTTPError as e:
-            if e.code == 404:
-                time.sleep(2)
-                last_error = f"project {project_key} not ready yet"
-                continue
-            return SonarMetrics(project_key=project_key, error=f"HTTP {e.code}: {e.reason}")
-        except Exception as e:
-            time.sleep(2)
-            last_error = str(e)[:100]
-            continue
-
-        component = data.get("component")
-        if not component:
-            time.sleep(2)
-            continue
-
-        measures = {m["metric"]: m.get("value", "") for m in component.get("measures", [])}
-
-        if not measures:
-            time.sleep(2)
-            continue
-
-        metrics.analyzed = True
-        metrics.bugs = _int_val(measures, "bugs")
-        metrics.vulnerabilities = _int_val(measures, "vulnerabilities")
-        metrics.code_smells = _int_val(measures, "code_smells")
-        metrics.cognitive_complexity = _int_val(measures, "cognitive_complexity")
-        metrics.complexity = _int_val(measures, "complexity")
-        metrics.duplicated_lines_density = _float_val(measures, "duplicated_lines_density")
-        metrics.ncloc = _int_val(measures, "ncloc")
-        metrics.comment_lines_density = _float_val(measures, "comment_lines_density")
-        metrics.classes = _int_val(measures, "classes")
-        metrics.functions = _int_val(measures, "functions")
-        metrics.files = _int_val(measures, "files")
-        metrics.maintainability_rating = _rating_label(measures.get("sqale_rating", ""))
-        metrics.reliability_rating = _rating_label(measures.get("reliability_rating", ""))
-        metrics.security_rating = _rating_label(measures.get("security_rating", ""))
-        metrics.quality_gate = measures.get("alert_status", "")
-        metrics.sqale_index = _int_val(measures, "sqale_index")
-        metrics.sqale_debt_ratio = _float_val(measures, "sqale_debt_ratio")
-        return metrics
+        fetched = _fetch_once(project_key, sonar_url, sonar_user, sonar_password)
+        if fetched is not None:
+            return fetched
+        time.sleep(2)
+        last_error = f"project {project_key} not ready yet"
 
     return SonarMetrics(project_key=project_key, error=f"API timeout: {last_error}")
 

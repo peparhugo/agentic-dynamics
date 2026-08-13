@@ -298,9 +298,9 @@ def _print_summary(runs, name, model_label):
               f"{r['iteration_depth']:>6} {qpd:>8.0f} {r['strategy']:>13}")
 
     # Per-class averages
-    by_cls = {"manifold": [], "semantic": []}
+    by_cls: dict[str, list] = {}
     for r in perturbed:
-        by_cls[r["perturbation_class"]].append(r)
+        by_cls.setdefault(r["perturbation_class"], []).append(r)
     print(f"\nPer-class (avg, n={len(perturbed)} runs):")
     for cls, items in sorted(by_cls.items()):
         if items:

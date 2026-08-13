@@ -23,6 +23,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from instrument.embeddings import ChromaStore, extract_session_steps
+from instrument.perturb import perturbation_class_for
 
 SUMMARY_PATH = PROJECT_ROOT / "experiments" / "results" / "_results_summary.json"
 
@@ -32,14 +33,10 @@ KNOWN_OPERATORS = {
     "inject_competing_goal", "inject_false_premises", "inject_recursion",
 }
 
-MANIFOLD_OPERATORS = {
-    "inject_alien_vocab", "shift_framing", "swap_modality", "parse_structural_shift",
-}
-
 
 def _extract_operator_detail(experiment_name: str) -> dict:
     """Extract granular operator name from experiment field.
-    E.g. 'inject_alien_vocab_s0.5' → {operator: 'inject_alien_vocab', class: 'manifold'}
+    E.g. 'inject_alien_vocab_s0.5' → {operator: 'inject_alien_vocab', class: 'process_perturbation'}
     """
     if not experiment_name:
         return {}
@@ -51,7 +48,7 @@ def _extract_operator_detail(experiment_name: str) -> dict:
     if base in KNOWN_OPERATORS:
         return {
             "operator": base,
-            "perturbation_class": "manifold" if base in MANIFOLD_OPERATORS else "semantic",
+            "perturbation_class": perturbation_class_for(base),
         }
     if experiment_name.startswith("exp_"):
         return {}

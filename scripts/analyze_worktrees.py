@@ -35,6 +35,7 @@ from instrument import (
     classify_strategy, GameReport, SolutionMetrics, EfficiencyMetrics, BasinMetrics,
     StrategyReport, analyze_ast,
     run_sonar_analysis, compute_sonar_diff, sonar_quality_score,
+    build_operators, perturbation_class_for,
 )
 
 from _constants import EXPERIMENT_SESSION_PATTERNS, bootstrap_ci
@@ -539,21 +540,17 @@ def analyze_worktree(worktree_path: str, session: dict = None, baseline_code: st
 
     # ── Perturbation class detection ──
     exp_name = info.get("experiment", "") or ""
-    spec_corruption = any(k in exp_name for k in
-        ["inject_false_premise", "inject_phantom_success",
-         "remove_critical_constraint", "insert_contradiction"])
-    obj_mutation = any(k in exp_name for k in
-        ["invert_constraint", "inject_competing_goal"])
-    process_pert = any(k in exp_name for k in
-        ["alien_vocab", "shift_framing", "reverse_causality", "force_abandonment"])
-    if spec_corruption:
-        pert_class = "specification_corruption"
-    elif obj_mutation:
-        pert_class = "objective_mutation"
-    elif process_pert:
-        pert_class = "process_perturbation"
+    op_name = ""
+    for name in build_operators():
+        if name in exp_name:
+            op_name = name
+            break
+    if op_name:
+        pert_class = perturbation_class_for(op_name)
+    elif info.get("operator") == "baseline":
+        pert_class = "baseline"
     else:
-        pert_class = "specification_corruption"
+        pert_class = "unknown"
 
     # ── AST Profiling ──
     ast_profile = ast_profile_worktree(worktree_path)

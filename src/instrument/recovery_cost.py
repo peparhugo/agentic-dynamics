@@ -109,7 +109,7 @@ def compute_recovery_cost(
     perturbed_cost_usd: float = 0.0,
     perturbed_correctness: float = 0.0,
     operator: str = "",
-    perturbation_class: str = "semantic",
+    perturbation_class: str = "",
     strength: float = 0.0,
     energy_per_token: float = 0.1,  # conservative J/tok from TokenPowerBench
 ) -> RecoveryCost:

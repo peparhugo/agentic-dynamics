@@ -28,7 +28,7 @@ Prompt ──→ perturb.py ──→ adapter.py ──→ [LLM] ──→ traje
 
 | Module | Lines | Purpose | Key Exports |
 |--------|-------|---------|-------------|
-| `perturb.py` | 697 | 10 perturbation operators (4 manifold + 6 semantic) | `Perturbation`, `PerturbationOperator`, `build_operators()`, `perturb_prompt()` |
+| `perturb.py` | 697 | 10 perturbation operators (4 process + 4 specification + 2 objective) | `Perturbation`, `PerturbationOperator`, `build_operators()`, `perturb_prompt()`, `PERTURBATION_CLASSES`, `perturbation_class_for()` |
 | `adapter.py` | 142 | Wraps LLM calls to capture trajectory steps | `InstrumentedAdapter` |
 | `opencode.py` | 421 | Spawns real opencode sessions (think/write/test loop) | `run_opencode_agentic()` |
 | `experiment.py` | 302 | Orchestrates full experiment: perturb → invoke → evaluate | `ExperimentConfig`, `run_experiment()` |

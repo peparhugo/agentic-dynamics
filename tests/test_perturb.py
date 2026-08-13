@@ -1,6 +1,11 @@
 import pytest
 import random
-from instrument.perturb import build_operators
+from instrument.perturb import (
+    build_operators,
+    PERTURBATION_CLASSES,
+    perturbation_class_for,
+)
+from instrument.basin import BasinMetrics
 
 
 def test_remove_critical_constraint_removes_constraint():
@@ -49,3 +54,35 @@ def test_remove_critical_constraint_no_constraints_returns_same():
     prompt = "Build something simple."
     result = ops["remove_critical_constraint"].apply_fn(prompt, 0.8, rng)
     assert result == prompt or abs(len(result) - len(prompt)) < 10
+
+
+def test_operator_classes_are_canonical():
+    ops = build_operators()
+    assert len(ops) == 10
+    for name, op in ops.items():
+        assert op.perturbation_class in PERTURBATION_CLASSES, (
+            f"operator {name!r} has non-canonical class {op.perturbation_class!r}"
+        )
+
+
+def test_perturbation_class_for_known_operator():
+    assert perturbation_class_for("inject_alien_vocab") == "process_perturbation"
+    assert perturbation_class_for("invert_constraint") == "objective_mutation"
+    assert perturbation_class_for("remove_critical_constraint") == "specification_corruption"
+
+
+def test_perturbation_class_for_unknown_returns_empty():
+    assert perturbation_class_for("nonexistent_operator") == ""
+
+
+@pytest.mark.parametrize("cls", PERTURBATION_CLASSES)
+def test_basin_verdict_handles_every_class(cls):
+    for escape in (0.9, 0.4, 0.0):
+        m = BasinMetrics(perturbation_class=cls, escape_score=escape)
+        verdict = m.get_verdict()
+        assert verdict, "verdict must be non-empty"
+
+
+def test_basin_verdict_unknown_class_does_not_crash():
+    m = BasinMetrics(perturbation_class="", escape_score=0.9)
+    assert m.get_verdict()

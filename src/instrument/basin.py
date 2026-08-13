@@ -27,7 +27,7 @@ class BasinMetrics:
 
     perturbation_strength: float = 0.0
     perturbation_operator: str = ""
-    perturbation_class: str = "semantic"
+    perturbation_class: str = ""
 
     # Solution divergence (output-based, not text-based)
     architecture_divergence: float = 0.0   # different tech choices?
@@ -79,15 +79,23 @@ class BasinMetrics:
     def get_verdict(self) -> str:
         c = self.perturbation_class
         if self.escape_score > 0.5:
-            if c == "semantic":
-                return "diverged — semantic perturbation caused unnecessary output variance"
-            return "escaped — model produced genuinely novel solution (expected for manifold class)"
+            if c == "specification_corruption":
+                return "diverged — spec corruption caused unnecessary output variance"
+            if c == "objective_mutation":
+                return "escaped — model followed the mutated objective to a novel solution"
+            if c == "process_perturbation":
+                return "escaped — process perturbation pushed the model off its default solution"
+            return "escaped — model produced a structurally different solution"
         elif self.escape_score > 0.2:
             return "partial — slight output divergence, approach similar to baseline"
         else:
-            if c == "semantic":
-                return "stable — semantic perturbation handled correctly, output matches baseline"
-            return "captured — model returned to baseline output despite unfamiliar perturbation"
+            if c == "specification_corruption":
+                return "stable — corruption rejected, output matches baseline"
+            if c == "objective_mutation":
+                return "captured — model did not follow the mutated objective"
+            if c == "process_perturbation":
+                return "stable — process perturbation absorbed, output matches baseline"
+            return "stable — output matches baseline"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -146,7 +154,7 @@ def measure_basin_escape(
     reasoning_tokens: int = 0,
     perturbation_strength: float = 0.5,
     perturbation_operator: str = "",
-    perturbation_class: str = "semantic",
+    perturbation_class: str = "",
     model: str = "",
     task: str = "",
     run_id: str = "",
@@ -175,7 +183,7 @@ def measure_basin_escape(
         reasoning_tokens: Hidden reasoning tokens.
         perturbation_strength: Perturbation magnitude.
         perturbation_operator: Which operator was applied.
-        perturbation_class: "manifold" or "semantic".
+        perturbation_class: one of "specification_corruption", "objective_mutation", "process_perturbation".
         model: Model identifier.
         task: Task description.
         run_id: Run identifier.

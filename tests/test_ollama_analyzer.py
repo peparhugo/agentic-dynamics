@@ -29,7 +29,7 @@ class TestOllamaAnalyzer:
             "model": "test-model",
             "experiment": "typescript_ssg",
             "operator": "baseline",
-            "perturbation_class": "semantic",
+            "perturbation_class": "baseline",
             "cost": 0.015,
             "correctness": 0.92,
             "strategy": "conservative",
@@ -58,7 +58,7 @@ class TestOllamaAnalyzer:
         perturbed = {
             "model": "deepseek/deepseek-v4-pro",
             "operator": "inject_alien_vocab",
-            "perturbation_class": "manifold",
+            "perturbation_class": "process_perturbation",
             "cost": 0.02,
             "correctness": 0.70,
             "escape": 0.45,

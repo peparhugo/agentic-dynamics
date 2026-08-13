@@ -98,7 +98,7 @@ def classify_strategy(
     reasoning: BasinMetrics,
     solution: SolutionMetrics,
     efficiency: EfficiencyMetrics,
-    perturbation_class: str = "semantic",
+    perturbation_class: str = "",
 ) -> StrategyReport:
     """Classify the model's strategy from multi-dimensional metrics.
 
@@ -111,10 +111,10 @@ def classify_strategy(
 
     EXPLORATORY receives an exploration_premium: the model found a
     genuinely novel approach that works. This is the ideal outcome
-    for manifold perturbations.
+    for objective-mutation and process perturbations.
 
     EFFICIENT receives high thermal_efficiency: maximum correctness
-    per joule. This is the ideal outcome for semantic perturbations.
+    per joule. This is the ideal outcome for specification corruption.
     """
     r = StrategyReport()
     r.reasoning = reasoning
@@ -176,7 +176,7 @@ def classify_strategy(
             f"CONSERVATIVE — model maintained sound reasoning "
             f"(correctness={correctness:.0%}, quality={quality:.2f}) "
             f"with moderate resource use (${cost:.4f}, ~{energy:.0f}J). "
-            f"Attractor basin held. Perturbation was handled in-manifold."
+            f"Model absorbed the perturbation without divergence."
         )
         r.recommendation = "Reliable but not novel. Good for production, not for exploration."
 

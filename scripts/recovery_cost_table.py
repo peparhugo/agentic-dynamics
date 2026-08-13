@@ -9,6 +9,7 @@ from pathlib import Path
 from collections import defaultdict
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+from instrument.perturb import perturbation_class_for
 
 DB = Path.home() / ".local/share/opencode/opencode.db"
 
@@ -55,9 +56,8 @@ def main():
     print("| Perturbation | Class | DeepSeek Baseline | DeepSeek Perturbed | Recovery $ | Claude Baseline | Claude Perturbed | Recovery $ | Factor |")
     print("|-------------|-------|-----------------|-------------------|------------|----------------|------------------|------------|--------|")
 
-    ops = build_operators()
     for op_name in sorted(perturbed.keys()):
-        cls = ops.get(op_name, type('x',(),{'perturbation_class':'semantic'})).perturbation_class
+        cls = perturbation_class_for(op_name)
         ds_base = sum(baselines["deepseek"]) / max(len(baselines["deepseek"]), 1)
         cl_base = sum(baselines["anthropic"]) / max(len(baselines["anthropic"]), 1)
 
@@ -81,18 +81,6 @@ def main():
         print(f"| {op_name} | {cls} | ${ds_base:.4f} | ${ds_pert:.4f} | ${ds_rec:.4f} | ${cl_base:.4f} | ${cl_pert:.4f} | ${cl_rec:.4f} | {factor:.0f}× |")
 
     conn.close()
-
-
-def build_operators():
-    return {
-        "remove_critical_constraint": type('x',(),{'perturbation_class':'semantic'}),
-        "inject_false_premise": type('x',(),{'perturbation_class':'semantic'}),
-        "invert_constraint": type('x',(),{'perturbation_class':'semantic'}),
-        "inject_phantom_success": type('x',(),{'perturbation_class':'semantic'}),
-        "inject_competing_goal": type('x',(),{'perturbation_class':'semantic'}),
-        "inject_alien_vocab": type('x',(),{'perturbation_class':'manifold'}),
-        "shift_framing": type('x',(),{'perturbation_class':'manifold'}),
-    }
 
 
 if __name__ == "__main__":
