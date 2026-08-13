@@ -39,10 +39,19 @@ Every published message is stored in a SQLite ``messages`` table
 (``id``, ``channel``, ``type``, ``payload``, ``timestamp``) and is
 retrievable through the REST endpoint ``GET /messages?limit=50&offset=0``.
 
+Transport layer
+---------------
+All wire-protocol concerns live behind the :class:`BaseTransport`
+interface. ``WebSocketTransport`` (the default) implements it with the
+``websockets`` library. The transport is selected by ``TRANSPORT``; other
+mechanisms (SSE, polling, raw TCP) can be added by subclassing
+``BaseTransport`` without touching the core notification logic.
+
 Configuration
 -------------
 * ``REDIS_URL`` - Redis connection URL (default ``redis://localhost:6379/0``)
 * ``DATABASE_URL`` - SQLite database path/URL (default ``sqlite:///notifications.db``)
+* ``TRANSPORT`` - transport name (default ``websocket``)
 
 REST endpoints
 --------------
@@ -64,6 +73,7 @@ import sqlite3
 import threading
 import urllib.parse
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 
 import redis
@@ -77,6 +87,7 @@ HTTP_PORT = 8080
 
 REDIS_URL_DEFAULT = "redis://localhost:6379/0"
 DATABASE_URL_DEFAULT = "sqlite:///notifications.db"
+TRANSPORT_DEFAULT = "websocket"
 
 # Redis channel used as the pub/sub message backbone.
 NOTIFICATIONS_CHANNEL = "ntf:notifications"
@@ -123,6 +134,13 @@ def resolve_db_path(explicit=None) -> str:
     if value.startswith("sqlite://"):
         return value[len("sqlite://"):]
     return value
+
+
+def resolve_transport(explicit=None) -> str:
+    """Resolve the transport name from an explicit value or ``TRANSPORT``."""
+    if explicit:
+        return explicit
+    return os.environ.get("TRANSPORT") or TRANSPORT_DEFAULT
 
 
 def _channels_key(client_id: str) -> str:
@@ -348,10 +366,15 @@ class ClientRegistry:
         self._client_channels: dict[str, set[str]] = {}
         self._lock = threading.Lock()
         self._state = state_store
+        self._transport = None
 
     @property
     def state_store(self):
         return self._state
+
+    def set_transport(self, transport) -> None:
+        """Attach the :class:`BaseTransport` used for outbound delivery."""
+        self._transport = transport
 
     def add(self, ws: object) -> str:
         """Register a connection and return its unique client id."""
@@ -472,6 +495,8 @@ class ClientRegistry:
         Returns the number of clients that successfully received it.
         Failing connections are removed cleanly.
         """
+        if self._transport is not None:
+            return await self._transport.broadcast_to_channel(channel, message)
         sent = 0
         dead = []
         for client_id in self.channel_subscribers(channel):
@@ -494,6 +519,8 @@ class ClientRegistry:
         Returns the number of clients that successfully received it.
         Failing connections are removed cleanly.
         """
+        if self._transport is not None:
+            return await self._transport.broadcast(message)
         sent = 0
         dead = []
         for client_id, ws in self.snapshot().items():
@@ -508,6 +535,8 @@ class ClientRegistry:
 
     async def send_to(self, client_id: str, message: dict) -> bool:
         """Send ``message`` to one client. ``False`` if unknown/dead."""
+        if self._transport is not None:
+            return await self._transport.send_message(client_id, message)
         ws = self.get(client_id)
         if ws is None:
             return False
@@ -627,27 +656,176 @@ class RedisBroker:
                     await asyncio.sleep(0.5)
 
 
-async def ws_handler(ws, registry: ClientRegistry, broker: RedisBroker = None) -> None:
-    """Handle a single WebSocket connection lifecycle."""
-    client_id = registry.add(ws)
+class BaseTransport(ABC):
+    """Pluggable transport layer for the notification server.
+
+    A transport owns the wire protocol: how connections are accepted, how
+    individual messages are read from and written to a connection, and how
+    broadcasts fan out to connected clients. The core notification logic
+    (message framing, channel routing, direct delivery) only talks to this
+    interface, so new mechanisms (SSE, polling, raw TCP) can be added
+    without touching the server core.
+    """
+
+    def __init__(self, registry: ClientRegistry = None) -> None:
+        self._registry = registry
+
+    @property
+    def registry(self) -> ClientRegistry:
+        return self._registry
+
+    @registry.setter
+    def registry(self, registry: ClientRegistry) -> None:
+        self._registry = registry
+
+    @abstractmethod
+    def on_connect(self, connection) -> str:
+        """Register a newly connected client and return its client id."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def on_disconnect(self, client_id: str) -> None:
+        """Unregister a disconnected client."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict) -> bool:
+        """Deliver ``message`` to a single client.
+
+        Returns ``False`` (and deregisters the client) when the connection
+        is gone.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def broadcast(self, message: dict) -> int:
+        """Deliver ``message`` to every connected client.
+
+        Returns the number of clients that successfully received it.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def receive(self, connection):
+        """Return the next raw message from ``connection``, or ``None`` on close."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def serve(self, host: str, port: int, handler) -> object:
+        """Start listening for client connections.
+
+        ``handler`` is called with each accepted connection.
+        Returns the listening server object.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def close(self, server) -> None:
+        """Stop and close a listening server."""
+        raise NotImplementedError
+
+    async def broadcast_to_channel(self, channel: str, message: dict) -> int:
+        """Deliver ``message`` to every client subscribed to ``channel``."""
+        sent = 0
+        if self._registry is None:
+            return sent
+        for client_id in self._registry.channel_subscribers(channel):
+            if await self.send_message(client_id, message):
+                sent += 1
+        return sent
+
+
+class WebSocketTransport(BaseTransport):
+    """Default transport built on the ``websockets`` library."""
+
+    def on_connect(self, connection) -> str:
+        if self._registry is None:
+            raise RuntimeError("WebSocketTransport has no registry")
+        return self._registry.add(connection)
+
+    def on_disconnect(self, client_id: str) -> None:
+        if self._registry is not None:
+            self._registry.remove(client_id)
+
+    async def send_message(self, client_id: str, message: dict) -> bool:
+        if self._registry is None:
+            return False
+        connection = self._registry.get(client_id)
+        if connection is None:
+            return False
+        try:
+            await connection.send(json.dumps(message))
+            return True
+        except Exception:
+            self._registry.remove(client_id)
+            return False
+
+    async def broadcast(self, message: dict) -> int:
+        sent = 0
+        dead = []
+        if self._registry is not None:
+            for client_id, connection in self._registry.snapshot().items():
+                try:
+                    await connection.send(json.dumps(message))
+                    sent += 1
+                except Exception:
+                    dead.append(client_id)
+            for client_id in dead:
+                self._registry.remove(client_id)
+        return sent
+
+    async def receive(self, connection):
+        try:
+            return await connection.recv()
+        except websockets.exceptions.ConnectionClosed:
+            return None
+
+    async def serve(self, host: str, port: int, handler) -> object:
+        return await websockets.serve(
+            lambda connection: handler(connection), host, port
+        )
+
+    async def close(self, server) -> None:
+        server.close()
+        await server.wait_closed()
+
+
+def get_transport(name=None, registry: ClientRegistry = None) -> BaseTransport:
+    """Build a transport instance selected by ``name`` or ``TRANSPORT``."""
+    resolved = resolve_transport(name).strip().lower()
+    if resolved in ("websocket", "ws"):
+        return WebSocketTransport(registry=registry)
+    raise ValueError(f"unknown transport: {resolved!r}")
+
+
+async def ws_handler(connection, transport: BaseTransport, broker: RedisBroker = None) -> None:
+    """Handle a single client connection lifecycle.
+
+    Protocol handling is transport-agnostic: the transport owns how
+    messages are read from and written to ``connection``.
+    """
+    registry = transport.registry
+    client_id = transport.on_connect(connection)
     try:
         welcome = build_message(
             "system", {"event": "connected", "client_id": client_id}
         )
-        await ws.send(json.dumps(welcome))
-        async for raw in ws:
+        await transport.send_message(client_id, welcome)
+        while True:
+            raw = await transport.receive(connection)
+            if raw is None:
+                break
             try:
                 data = json.loads(raw)
             except (json.JSONDecodeError, TypeError):
-                await ws.send(
-                    json.dumps(build_message("system", {"error": "invalid JSON"}))
+                await transport.send_message(
+                    client_id, build_message("system", {"error": "invalid JSON"})
                 )
                 continue
             if not isinstance(data, dict):
-                await ws.send(
-                    json.dumps(
-                        build_message("system", {"error": "message must be a JSON object"})
-                    )
+                await transport.send_message(
+                    client_id,
+                    build_message("system", {"error": "message must be a JSON object"}),
                 )
                 continue
             msg_type = data.get("type")
@@ -671,92 +849,83 @@ async def ws_handler(ws, registry: ClientRegistry, broker: RedisBroker = None) -
                     await registry.broadcast(message)
             elif msg_type == "subscribe":
                 if not channel:
-                    await ws.send(
-                        json.dumps(
-                            build_message(
-                                "system",
-                                {"error": "subscribe message requires a channel"},
-                            )
-                        )
+                    await transport.send_message(
+                        client_id,
+                        build_message(
+                            "system",
+                            {"error": "subscribe message requires a channel"},
+                        ),
                     )
                     continue
                 registry.subscribe(client_id, channel)
-                await ws.send(
-                    json.dumps(
-                        build_message(
-                            "system", {"event": "subscribed", "channel": channel}
-                        )
-                    )
+                await transport.send_message(
+                    client_id,
+                    build_message(
+                        "system", {"event": "subscribed", "channel": channel}
+                    ),
                 )
             elif msg_type == "unsubscribe":
                 if not channel:
-                    await ws.send(
-                        json.dumps(
-                            build_message(
-                                "system",
-                                {"error": "unsubscribe message requires a channel"},
-                            )
-                        )
+                    await transport.send_message(
+                        client_id,
+                        build_message(
+                            "system",
+                            {"error": "unsubscribe message requires a channel"},
+                        ),
                     )
                     continue
                 registry.unsubscribe(client_id, channel)
-                await ws.send(
-                    json.dumps(
-                        build_message(
-                            "system", {"event": "unsubscribed", "channel": channel}
-                        )
-                    )
+                await transport.send_message(
+                    client_id,
+                    build_message(
+                        "system", {"event": "unsubscribed", "channel": channel}
+                    ),
                 )
             elif msg_type == "direct":
                 target = payload.get("to")
                 if not target:
-                    await ws.send(
-                        json.dumps(
-                            build_message(
-                                "system", {"error": "direct message missing payload.to"}
-                            )
-                        )
+                    await transport.send_message(
+                        client_id,
+                        build_message(
+                            "system",
+                            {"error": "direct message missing payload.to"},
+                        ),
                     )
                     continue
                 message = build_message("direct", payload)
                 if broker is not None and broker.available:
                     known = registry.client_exists(target)
                     if known is False:
-                        await ws.send(
-                            json.dumps(
-                                build_message(
-                                    "system", {"error": f"no client with id {target}"}
-                                )
-                            )
+                        await transport.send_message(
+                            client_id,
+                            build_message(
+                                "system", {"error": f"no client with id {target}"}
+                            ),
                         )
                         continue
                     await broker.publish(message)
                 else:
                     if not await registry.send_to(target, message):
-                        await ws.send(
-                            json.dumps(
-                                build_message(
-                                    "system", {"error": f"no client with id {target}"}
-                                )
-                            )
+                        await transport.send_message(
+                            client_id,
+                            build_message(
+                                "system", {"error": f"no client with id {target}"}
+                            ),
                         )
             elif msg_type == "system":
-                await ws.send(
-                    json.dumps(build_message("system", {"echo": payload}))
+                await transport.send_message(
+                    client_id, build_message("system", {"echo": payload})
                 )
             else:
-                await ws.send(
-                    json.dumps(
-                        build_message(
-                            "system",
-                            {"error": f"unsupported message type: {msg_type!r}"},
-                        )
-                    )
+                await transport.send_message(
+                    client_id,
+                    build_message(
+                        "system",
+                        {"error": f"unsupported message type: {msg_type!r}"},
+                    ),
                 )
-    except websockets.exceptions.ConnectionClosed:
-        pass
     finally:
-        registry.remove(client_id)
+        transport.on_disconnect(client_id)
 
 
 class HealthHandler(http.server.BaseHTTPRequestHandler):
@@ -837,13 +1006,16 @@ async def make_server(
     http_port: int = 0,
     redis_url: str = None,
     db_path: str = None,
+    transport: str = None,
 ) -> dict:
     """Create a running notification server for programmatic use/tests.
 
-    Returns a dict with the shared ``registry`` plus the actual bound
-    ports (the default port ``0`` means "pick a free port"), along with
-    the ``store`` (SQLite), ``broker`` (Redis pub/sub) and the background
-    ``subscriber_task`` used to deliver backbone messages.
+    ``transport`` selects the transport by name (defaults to ``TRANSPORT``
+    or ``websocket``). Returns a dict with the shared ``registry`` plus the
+    actual bound ports (the default port ``0`` means "pick a free port"),
+    along with the ``store`` (SQLite), ``broker`` (Redis pub/sub), the
+    ``transport`` and the background ``subscriber_task`` used to deliver
+    backbone messages.
     """
     store = MessageStore(db_path)
     state_store = ClientStateStore(redis_url)
@@ -856,8 +1028,10 @@ async def make_server(
     if broker.available:
         subscriber_task = asyncio.get_event_loop().create_task(broker.subscribe_loop())
     httpd = start_health_server(registry, store=store, host=http_host, port=http_port)
-    ws_server = await websockets.serve(
-        lambda ws: ws_handler(ws, registry, broker), ws_host, ws_port
+    transport_obj = get_transport(transport, registry=registry)
+    registry.set_transport(transport_obj)
+    ws_server = await transport_obj.serve(
+        ws_host, ws_port, lambda connection: ws_handler(connection, transport_obj, broker)
     )
     return {
         "registry": registry,
@@ -869,6 +1043,7 @@ async def make_server(
         "broker": broker,
         "state_store": state_store,
         "subscriber_task": subscriber_task,
+        "transport": transport_obj,
     }
 
 
@@ -885,8 +1060,12 @@ async def close_server(server: dict) -> None:
     if broker is not None:
         broker.stop()
         await broker.close()
-    server["ws_server"].close()
-    await server["ws_server"].wait_closed()
+    transport = server.get("transport")
+    if transport is not None:
+        await transport.close(server["ws_server"])
+    else:
+        server["ws_server"].close()
+        await server["ws_server"].wait_closed()
     server["httpd"].shutdown()
     server["httpd"].server_close()
     store = server.get("store")
