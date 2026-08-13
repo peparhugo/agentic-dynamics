@@ -1,5 +1,7 @@
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -175,6 +177,46 @@ async def test_messages_rest_endpoint_persists_message_history(notification_serv
     assert messages[0]["payload"] == {"text": "saved"}
     assert "timestamp" in messages[0]
     await socket.close()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_connection():
+    app = NotificationServer(rate_limit=1)
+    websocket_server = await websockets.serve(app.websocket_handler, "127.0.0.1", 0)
+    try:
+        port = websocket_server.sockets[0].getsockname()[1]
+        socket, _ = await connect(port)
+        await socket.send(json.dumps({"type": "broadcast", "payload": {"text": "first"}}))
+        assert json.loads(await socket.recv())["payload"] == {"text": "first"}
+        await socket.send(json.dumps({"type": "broadcast", "payload": {"text": "second"}}))
+        error = json.loads(await socket.recv())
+        assert error["type"] == "system"
+        assert error["payload"] == {"event": "error", "message": "rate limit exceeded"}
+        await socket.close()
+    finally:
+        websocket_server.close()
+        await websocket_server.wait_closed()
+        await app.close()
+
+
+@pytest.mark.asyncio
+async def test_history_endpoint_filters_orders_and_paginates(notification_server):
+    app, _, soap_port = notification_server
+    now = datetime.now(timezone.utc)
+    await app.store.add("alerts", "broadcast", {"text": "old"}, (now - timedelta(minutes=2)).isoformat())
+    await app.store.add("alerts", "broadcast", {"text": "first"}, (now - timedelta(minutes=1)).isoformat())
+    await app.store.add("alerts", "broadcast", {"text": "second"}, now.isoformat())
+    await app.store.add("chat", "broadcast", {"text": "other"}, now.isoformat())
+    since = (now - timedelta(minutes=1, seconds=1)).isoformat()
+    status, history = await get_json(soap_port, f"/history?channel=alerts&since={quote(since)}&limit=2")
+    assert status == b"HTTP/1.1 200 OK"
+    assert [message["payload"] for message in history["messages"]] == [{"text": "first"}, {"text": "second"}]
+    assert [message["timestamp"] for message in history["messages"]] == sorted(message["timestamp"] for message in history["messages"])
+    assert history["has_more"] is False
+    status, history = await get_json(soap_port, "/history?channel=alerts&limit=2")
+    assert status == b"HTTP/1.1 200 OK"
+    assert [message["payload"] for message in history["messages"]] == [{"text": "old"}, {"text": "first"}]
+    assert history["has_more"] is True
 
 
 @pytest.mark.asyncio
