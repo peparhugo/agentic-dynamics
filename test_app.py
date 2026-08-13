@@ -4,19 +4,27 @@ from datetime import datetime
 from xml.etree import ElementTree
 
 import pytest
+from fakeredis import FakeAsyncRedis, FakeServer
 from websockets.asyncio.client import connect
 
 from app import NotificationServer, SOAP_ENV, SERVICE_NS
 
 
 @pytest.fixture
-async def server():
-    instance = NotificationServer(websocket_port=0, soap_port=0)
+async def server(tmp_path):
+    redis_client = FakeAsyncRedis(server=FakeServer())
+    instance = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=redis_client,
+        database_url=str(tmp_path / "messages.db"),
+    )
     await instance.start()
     try:
         yield instance
     finally:
         await instance.stop()
+        await redis_client.aclose()
 
 
 async def receive_json(websocket):
@@ -266,3 +274,77 @@ async def test_health_is_soap_only_and_faults_on_wrong_operation(server):
     assert headers.startswith(b"HTTP/1.1 200 OK")
     root = ElementTree.fromstring(body)
     assert root.find(f".//{{{SOAP_ENV}}}Fault") is not None
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances(tmp_path):
+    redis_server = FakeServer()
+    first_redis = FakeAsyncRedis(server=redis_server)
+    second_redis = FakeAsyncRedis(server=redis_server)
+    first = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=first_redis,
+        database_url=str(tmp_path / "first.db"),
+    )
+    second = NotificationServer(
+        websocket_port=0,
+        soap_port=0,
+        redis_client=second_redis,
+        database_url=str(tmp_path / "second.db"),
+    )
+    await asyncio.gather(first.start(), second.start())
+    try:
+        async with (
+            connect(f"ws://{first.host}:{first.websocket_port}") as sender,
+            connect(f"ws://{second.host}:{second.websocket_port}") as recipient,
+        ):
+            sender_id = (await receive_json(sender))["payload"]["client_id"]
+            await receive_json(recipient)
+            await sender.send(json.dumps({
+                "type": "broadcast", "payload": {"text": "distributed"}
+            }))
+
+            sender_message, recipient_message = await asyncio.gather(
+                receive_json(sender), receive_json(recipient)
+            )
+            assert sender_message == recipient_message
+            assert recipient_message["payload"] == {
+                "text": "distributed", "sender_id": sender_id
+            }
+            assert await first.state.count() == 2
+            assert await second.state.count() == 2
+    finally:
+        await asyncio.gather(first.stop(), second.stop())
+        await asyncio.gather(first_redis.aclose(), second_redis.aclose())
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(server):
+    uri = f"ws://{server.host}:{server.websocket_port}"
+    async with connect(uri) as websocket:
+        await receive_json(websocket)
+        for text in ("first", "second"):
+            await websocket.send(json.dumps({
+                "type": "broadcast", "payload": {"text": text}
+            }))
+            assert (await receive_json(websocket))["payload"]["text"] == text
+
+    headers, body = await rest_get(server, "/messages?limit=1&offset=0")
+    assert headers.startswith(b"HTTP/1.1 200 OK")
+    history = json.loads(body)["messages"]
+    assert len(history) == 1
+    assert set(history[0]) == {"id", "channel", "type", "payload", "timestamp"}
+    assert history[0]["channel"] is None
+    assert history[0]["type"] == "broadcast"
+    assert history[0]["payload"]["text"] == "second"
+
+    _, body = await rest_get(server, "/messages?limit=1&offset=1")
+    assert json.loads(body)["messages"][0]["payload"]["text"] == "first"
+
+
+@pytest.mark.asyncio
+async def test_message_query_rejects_invalid_pagination(server):
+    headers, body = await rest_get(server, "/messages?limit=0&offset=-1")
+    assert headers.startswith(b"HTTP/1.1 400 Bad Request")
+    assert "error" in json.loads(body)

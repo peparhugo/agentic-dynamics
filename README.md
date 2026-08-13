@@ -10,6 +10,11 @@ Install `requirements.txt`, then start both listeners:
 python3 app.py --websocket-port 8765 --soap-port 8080
 ```
 
+Set `REDIS_URL` to the shared Redis broker (default `redis://127.0.0.1:6379/0`)
+and `DATABASE_URL` to a SQLite URL or path (default `sqlite:///messages.db`).
+Messages are persisted before being published to Redis, and each server instance
+subscribes to Redis to deliver messages to its locally connected clients.
+
 WebSocket clients connect to `ws://127.0.0.1:8765`. On connection, each client
 receives a `system` message containing its unique `payload.client_id`.
 
@@ -29,6 +34,11 @@ no channel continue to reach every connected client.
 The HTTP service on port 8080 also provides `GET /channels`, which returns all
 active channels and their subscriber counts, and
 `GET /channels/{name}/subscribers`, which returns the channel's subscriber IDs.
+Connection and subscription state is shared in Redis, so these endpoints include
+clients attached to every server instance.
+
+`GET /messages?limit=50&offset=0` returns persisted messages newest first. `limit`
+may be between 1 and 1000, and `offset` must be non-negative.
 
 ## SOAP health API
 
