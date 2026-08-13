@@ -5,7 +5,7 @@ A single-file Flask app with clean structure: models, routes, error handling.
 Designed as a baseline for multi-session stories.
 """
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from datetime import datetime
 import sqlite3
 import os
@@ -28,7 +28,7 @@ def init_db():
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
             "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL"
+            "  created_at DATETIME NOT NULL"
             ")"
         )
 
@@ -37,7 +37,7 @@ def init_db():
 
 def create_task(title: str) -> dict:
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = datetime.utcnow()
         cursor = conn.execute(
             "INSERT INTO tasks (title, status, created_at) VALUES (?, 'pending', ?)",
             (title, now),
@@ -47,20 +47,23 @@ def create_task(title: str) -> dict:
             "id": cursor.lastrowid,
             "title": title,
             "status": "pending",
-            "created_at": now,
+            "created_at": now.isoformat(sep=" "),
         }
 
 
 def get_tasks():
     with get_db() as conn:
-        rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
+        rows = conn.execute(
+            "SELECT * FROM tasks "
+            "ORDER BY CAST(strftime('%s', created_at) AS INTEGER) DESC, id DESC"
+        ).fetchall()
         return [dict(r) for r in rows]
 
 
 def get_task(task_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        return dict(row) if row else None
+        return serialize_task(row) if row else None
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
@@ -85,6 +88,14 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
     return get_task(task_id)
 
 
+def serialize_task(row: sqlite3.Row) -> dict:
+    task = dict(row)
+    created_at = task["created_at"]
+    if isinstance(created_at, datetime):
+        task["created_at"] = created_at.isoformat(sep=" ")
+    return task
+
+
 # ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/tasks", methods=["GET"])
@@ -95,10 +106,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
@@ -113,16 +124,24 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    title = data.get("title")
+    status = data.get("status")
+    if title is not None and not isinstance(title, str):
+        return jsonify({"error": "title must be a string"}), 400
+    if status is not None and not isinstance(status, str):
+        return jsonify({"error": "status must be a string"}), 400
     task = update_task(
         task_id,
-        title=data.get("title"),
-        status=data.get("status"),
+        title=title.strip() if title is not None else None,
+        status=status,
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
 
 
+init_db()
+
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
