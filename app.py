@@ -13,6 +13,7 @@ import jwt
 import os
 from functools import wraps
 from tasks import celery, send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 
@@ -64,6 +65,12 @@ class Task(db.Model):
         }
 
 
+# ── Repository Initialization ─────────────────────────────────
+
+user_repository = UserRepository(db, User)
+task_repository = TaskRepository(db, Task)
+
+
 # ── JWT Utilities ─────────────────────────────────────────────
 
 def generate_token(user_id):
@@ -94,7 +101,7 @@ def get_current_user():
         user_id = verify_token(token)
         if user_id is None:
             return None
-        return db.session.get(User, user_id)
+        return user_repository.get_by_id(user_id)
     except (ValueError, IndexError):
         return None
 
@@ -118,19 +125,21 @@ def init_db():
 def migrate_existing_tasks():
     """Migrate existing tasks without owner_id to a default user."""
     try:
-        tasks_without_owner = Task.query.filter(Task.owner_id.is_(None)).first()
+        tasks_without_owner = task_repository.find_tasks_without_owner()
         if tasks_without_owner is None:
             return
 
-        default_user = User.query.filter_by(username="admin").first()
+        default_user = user_repository.find_by_username("admin")
         if default_user is None:
-            default_user = User(username="admin", email="admin@example.com")
+            default_user = user_repository.create(
+                username="admin",
+                email="admin@example.com",
+                password_hash=generate_password_hash("admin")
+            )
+        else:
             default_user.set_password("admin")
-            db.session.add(default_user)
-            db.session.commit()
 
-        Task.query.filter(Task.owner_id.is_(None)).update({Task.owner_id: default_user.id})
-        db.session.commit()
+        task_repository.update_tasks_without_owner(default_user.id)
     except Exception:
         pass
 
@@ -147,13 +156,14 @@ def register():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    if User.query.filter_by(username=username).first():
+    if user_repository.find_by_username(username):
         return jsonify({"error": "username already exists"}), 400
 
-    user = User(username=username, email=email or f"{username}@example.com")
-    user.set_password(password)
-    db.session.add(user)
-    db.session.commit()
+    user = user_repository.create(
+        username=username,
+        email=email or f"{username}@example.com",
+        password_hash=generate_password_hash(password)
+    )
 
     token = generate_token(user.id)
     return jsonify({"token": token, "user_id": user.id}), 201
@@ -168,7 +178,7 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = User.query.filter_by(username=username).first()
+    user = user_repository.find_by_username(username)
     if not user or not user.check_password(password):
         return jsonify({"error": "invalid credentials"}), 401
 
@@ -178,7 +188,7 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks(user):
-    tasks = Task.query.filter_by(owner_id=user.id).order_by(Task.created_at.desc()).all()
+    tasks = task_repository.find_by_owner(user.id)
     return jsonify([task.to_dict() for task in tasks])
 
 
@@ -191,9 +201,7 @@ def add_task(user):
     if not title:
         return jsonify({"error": "title is required"}), 400
 
-    task = Task(title=title, status="pending", owner_id=user.id)
-    db.session.add(task)
-    db.session.commit()
+    task = task_repository.create(title=title, status="pending", owner_id=user.id)
 
     return jsonify(task.to_dict()), 201
 
@@ -201,7 +209,7 @@ def add_task(user):
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
 def show_task(task_id: int, user):
-    task = db.session.get(Task, task_id)
+    task = task_repository.get_by_id(task_id)
     if task is None or task.owner_id != user.id:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task.to_dict())
@@ -210,20 +218,22 @@ def show_task(task_id: int, user):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @require_auth
 def edit_task(task_id: int, user):
-    task = db.session.get(Task, task_id)
+    task = task_repository.get_by_id(task_id)
     if task is None or task.owner_id != user.id:
         return jsonify({"error": "task not found"}), 404
 
     data = request.get_json(silent=True) or {}
     old_status = task.status
+    updates = {}
 
     if "title" in data and data["title"]:
-        task.title = data["title"].strip()
+        updates["title"] = data["title"].strip()
 
     if "status" in data and data["status"]:
-        task.status = data["status"]
+        updates["status"] = data["status"]
 
-    db.session.commit()
+    if updates:
+        task = task_repository.update(task, **updates)
 
     if old_status != "completed" and task.status == "completed":
         send_notification_email.delay(user.email or user.username, task.title)
