@@ -1,5 +1,6 @@
 import asyncio
 import json
+import urllib.parse
 import urllib.request
 
 import pytest
@@ -306,3 +307,81 @@ async def test_database_url_selects_sqlite_path(tmp_path, monkeypatch):
     )
     async with server.run(port=0):
         assert database_path.exists()
+
+
+async def test_rate_limit_returns_error_without_publishing_message(tmp_path):
+    server = NotificationServer(
+        tmp_path,
+        redis_client=FakeRedis(server=FakeServer(), decode_responses=True),
+        rate_limit=2,
+    )
+    async with server.run(port=0) as websocket_server:
+        port = websocket_server.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{port}") as websocket:
+            await receive_json(websocket)
+            for number in (1, 2):
+                await websocket.send(
+                    json.dumps({"type": "broadcast", "payload": {"number": number}})
+                )
+                assert (await receive_json(websocket))["payload"] == {"number": number}
+
+            await websocket.send(
+                json.dumps({"type": "broadcast", "payload": {"number": 3}})
+            )
+            assert (await receive_json(websocket))["payload"] == {
+                "error": "rate limit exceeded"
+            }
+
+        messages = await server.store.messages(50, 0)
+        assert [message["payload"].get("number") for message in messages] == [
+            None,
+            1,
+            2,
+        ]
+
+
+async def test_history_filters_channel_and_paginates_chronologically(running_server):
+    server, port, _ = running_server
+    async with connect(f"ws://127.0.0.1:{port}") as websocket:
+        await receive_json(websocket)
+        for channel, number in (("news", 1), ("other", 99), ("news", 2), ("news", 3)):
+            await websocket.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": channel,
+                        "payload": {"number": number},
+                    }
+                )
+            )
+        for _ in range(20):
+            if len(await server.store.messages(50, 0)) == 5:
+                break
+            await asyncio.sleep(0.01)
+
+        query = urllib.parse.urlencode(
+            {
+                "channel": "news",
+                "since": "2000-01-01T00:00:00Z",
+                "limit": 2,
+            }
+        )
+
+        def request_history():
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/history?{query}"
+            ) as response:
+                return response.status, json.load(response)
+
+        status, body = await asyncio.to_thread(request_history)
+
+    assert status == 200
+    assert body["has_more"] is True
+    assert [message["payload"] for message in body["messages"]] == [
+        {"number": 1},
+        {"number": 2},
+    ]
+    assert all(message["channel"] == "news" for message in body["messages"])
+    assert [message["timestamp"] for message in body["messages"]] == sorted(
+        message["timestamp"] for message in body["messages"]
+    )

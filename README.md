@@ -44,3 +44,10 @@ original broadcast or direct behavior.
 channels and subscriber counts, while `GET /channels/{name}/subscribers` lists
 the subscriber IDs for a channel. `GET /messages?limit=50&offset=0` returns
 persisted messages in insertion order.
+
+`GET /history?channel=alerts&since=2026-01-01T00:00:00Z&limit=50` returns
+channel messages in chronological order and includes a `has_more` pagination
+flag. Client input is limited to 100 messages per minute with Redis counters.
+Set `RATE_LIMIT` to change that limit. Messages older than seven days are
+removed by a background cleanup task; set `MESSAGE_TTL_DAYS` to change the
+retention period.
