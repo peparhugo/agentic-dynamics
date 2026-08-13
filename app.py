@@ -14,6 +14,7 @@ import os
 import jwt
 
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 
@@ -55,6 +56,15 @@ def init_db():
         conn.commit()
 
 
+# Repositories are handed the ``get_db`` function itself (not a live
+# connection) so a connection is opened fresh — against whatever DATABASE
+# currently points at — on every call. This is what lets tests repoint
+# app.DATABASE at a temp file per-test without repositories caching a stale
+# path or connection.
+task_repo = TaskRepository(get_db)
+user_repo = UserRepository(get_db)
+
+
 # ── Models ────────────────────────────────────────────────────
 
 
@@ -68,27 +78,10 @@ def _notify_admin(task_id, action):
     print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
 
 
-def create_user(username: str, password: str) -> dict:
-    password_hash = generate_password_hash(password)
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username}
-
-
 def get_user_by_username(username: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
-        return dict(row) if row else None
-
-
-def get_user_by_id(user_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
-        return dict(row) if row else None
+    """Kept as a module-level function for backward compatibility with
+    existing callers; delegates to UserRepository."""
+    return user_repo.get_by_username(username)
 
 
 def generate_token(user_id: int, username: str) -> str:
@@ -98,69 +91,6 @@ def generate_token(user_id: int, username: str) -> str:
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXP_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
-
-
-def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
-
-
-def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)
-        ).fetchone()
-        return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int, owner_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id, owner_id)
-
-
-
-def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            params.append(owner_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
 
 
 # ── Auth ──────────────────────────────────────────────────────
@@ -196,7 +126,7 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already exists"}), 409
-    user = create_user(username, password)
+    user = user_repo.create(username, generate_password_hash(password))
     return jsonify(user), 201
 
 
@@ -217,7 +147,7 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    return jsonify(task_repo.get_all(g.user_id))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -227,14 +157,14 @@ def add_task():
     title = data.get("title", "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title, g.user_id)
+    task = task_repo.create(title, g.user_id)
     return jsonify(task), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @require_auth
 def show_task(task_id: int):
-    task = get_task(task_id, g.user_id)
+    task = task_repo.get_by_id(task_id, g.user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -244,8 +174,8 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
-    previous = get_task(task_id, g.user_id)
-    task = update_task(
+    previous = task_repo.get_by_id(task_id, g.user_id)
+    task = task_repo.update(
         task_id,
         g.user_id,
         title=data.get("title"),
@@ -258,7 +188,7 @@ def edit_task(task_id: int):
         and previous is not None
         and previous["status"] != "completed"
     ):
-        owner = get_user_by_id(task["owner_id"])
+        owner = user_repo.get_by_id(task["owner_id"])
         if owner is not None:
             user_email = f"{owner['username']}@example.com"
             send_notification_email.delay(user_email, task["title"])
