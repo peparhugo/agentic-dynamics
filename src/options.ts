@@ -3,13 +3,17 @@ export interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseOptions(args: string[], includePort = false): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
-    if (value === '--content' || value === '--output' || value === '--templates' || (includePort && value === '--port')) {
+    if (!includePort && (value === '--incremental' || value === '--clean')) {
+      options[value.slice(2) as 'incremental' | 'clean'] = true;
+    } else if (value === '--content' || value === '--output' || value === '--templates' || (includePort && value === '--port')) {
       const path = args[++index];
       if (!path) throw new Error(`Missing value for ${value}`);
       if (value === '--content') options.contentDir = path;

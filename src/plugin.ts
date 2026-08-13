@@ -3,6 +3,8 @@ import type { Page, ResolvedBuildOptions } from './generator.js';
 export interface BuildContext {
   options: ResolvedBuildOptions;
   pages: Page[];
+  incremental: boolean;
+  changedSlugs: Set<string>;
 }
 
 export interface Plugin {

@@ -2,6 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { basename, extname, join, relative } from 'node:path';
 import matter from 'gray-matter';
 import { marked } from 'marked';
+import { createHash } from 'node:crypto';
 import type { Page } from '../generator.js';
 import type { BuildContext, Plugin } from '../plugin.js';
 
@@ -35,15 +36,25 @@ function pageFromSource(source: string, file: string, contentDir: string): Page 
     html: marked.parse(parsed.content) as string,
     template: typeof metadata.template === 'string' ? metadata.template : undefined,
     layout: typeof metadata.layout === 'string' ? metadata.layout : undefined,
+    sourcePath: file,
+    sourceHash: createHash('sha256').update(source).digest('hex'),
   };
 }
 
 export class MarkdownPlugin implements Plugin {
+  private static parsedPages = new Map<string, { hash: string; page: Page }>();
+
   async beforeBuild(context: BuildContext): Promise<void> {
     const files = await markdownFiles(context.options.contentDir);
-    context.pages.push(...await Promise.all(files.map(async (file) => pageFromSource(
-      await readFile(file, 'utf8'), file, context.options.contentDir,
-    ))));
+    context.pages.push(...await Promise.all(files.map(async (file) => {
+      const source = await readFile(file, 'utf8');
+      const hash = createHash('sha256').update(source).digest('hex');
+      const cached = MarkdownPlugin.parsedPages.get(file);
+      if (cached?.hash === hash) return { ...cached.page };
+      const page = pageFromSource(source, file, context.options.contentDir);
+      MarkdownPlugin.parsedPages.set(file, { hash, page });
+      return page;
+    })));
     context.pages.sort((left, right) => left.title.localeCompare(right.title));
   }
 }

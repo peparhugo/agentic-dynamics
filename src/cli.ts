@@ -1,17 +1,17 @@
 #!/usr/bin/env node
-import { buildSite } from './generator.js';
+import { buildSiteWithStats } from './generator.js';
 import { parseBuildOptions, parseServeOptions } from './options.js';
 import { startDevServer } from './server.js';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <port>]';
 }
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
   if (command === 'build') {
-    const pages = await buildSite(parseBuildOptions(args));
-    process.stdout.write(`Generated ${pages.length} page(s).\n`);
+    const { pages, stats } = await buildSiteWithStats(parseBuildOptions(args));
+    process.stdout.write(`Generated ${pages.length} page(s). Built ${stats.pagesBuilt}, skipped ${stats.pagesSkipped}, time saved ${stats.timeSavedMs}ms.\n`);
     return;
   }
   if (command === 'serve') {

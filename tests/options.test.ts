@@ -9,6 +9,10 @@ describe('parseBuildOptions', () => {
     });
   });
 
+  it('accepts incremental and clean build flags', () => {
+    expect(parseBuildOptions(['--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
+  });
+
   it('rejects incomplete and unknown options', () => {
     expect(() => parseBuildOptions(['--content'])).toThrow('Missing value for --content');
     expect(() => parseBuildOptions(['--unknown'])).toThrow('Unknown option: --unknown');
