@@ -10,9 +10,16 @@ import sqlite3
 import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from celery import Celery
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+celery_app = Celery(
+    app.import_name,
+    broker=os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
+    backend=os.environ.get('CELERY_RESULT_BACKEND', 'redis://localhost:6379/0')
+)
 
 
 def get_db():
@@ -28,7 +35,8 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL
+                password_hash TEXT NOT NULL,
+                email TEXT
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
@@ -94,6 +102,7 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "")
+    email = data.get("email", "").strip()
 
     if not username:
         return jsonify({"error": "username is required"}), 400
@@ -109,8 +118,8 @@ def register():
     try:
         with get_db() as conn:
             cursor = conn.execute(
-                "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-                (username, password_hash)
+                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+                (username, password_hash, email if email else None)
             )
             conn.commit()
             user_id = cursor.lastrowid
@@ -209,6 +218,8 @@ def get_task(current_user_id, current_username, task_id):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @token_required
 def update_task(current_user_id, current_username, task_id):
+    from celery_tasks import send_notification_email
+
     data = request.get_json(silent=True) or {}
 
     with get_db() as conn:
@@ -223,6 +234,7 @@ def update_task(current_user_id, current_username, task_id):
         if row['owner_id'] != current_user_id:
             return jsonify({"error": "unauthorized"}), 403
 
+        old_status = row['status']
         title = data.get("title")
         status = data.get("status")
 
@@ -254,6 +266,18 @@ def update_task(current_user_id, current_username, task_id):
             "SELECT id, title, status, created_at, owner_id FROM tasks WHERE id = ?",
             (task_id,)
         ).fetchone()
+
+    new_status = row['status']
+    task_title = row['title']
+
+    if old_status != 'completed' and new_status == 'completed':
+        with get_db() as conn:
+            user = conn.execute(
+                "SELECT email FROM users WHERE id = ?",
+                (current_user_id,)
+            ).fetchone()
+            if user and user['email']:
+                send_notification_email.delay(user['email'], task_title)
 
     return jsonify(dict(row))
 

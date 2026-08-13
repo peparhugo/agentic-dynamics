@@ -6,7 +6,8 @@ import pytest
 import sqlite3
 import os
 from datetime import datetime
-from app import app, init_db
+from unittest.mock import patch, MagicMock
+from app import app, init_db, celery_app
 
 
 @pytest.fixture(scope="function")
@@ -36,11 +37,19 @@ def client():
 
 
 @pytest.fixture
+def mock_celery_task():
+    """Mock Celery task to prevent actual task execution"""
+    with patch('celery_tasks.send_notification_email') as mock_task:
+        mock_task.delay = MagicMock(return_value=MagicMock(id='test-task-id'))
+        yield mock_task
+
+
+@pytest.fixture
 def auth_user(client):
     """Register and return auth token for a test user"""
     response = client.post(
         "/auth/register",
-        json={"username": "testuser", "password": "testpass123"},
+        json={"username": "testuser", "password": "testpass123", "email": "testuser@example.com"},
         content_type="application/json"
     )
     data = response.get_json()
@@ -62,7 +71,7 @@ def second_user(client):
     """Register and return a second test user"""
     response = client.post(
         "/auth/register",
-        json={"username": "seconduser", "password": "testpass123"},
+        json={"username": "seconduser", "password": "testpass123", "email": "seconduser@example.com"},
         content_type="application/json"
     )
     data = response.get_json()
@@ -593,6 +602,132 @@ class TestUpdateTask:
         assert response.status_code == 403
         data = response.get_json()
         assert data["error"] == "unauthorized"
+
+
+class TestNotificationTrigger:
+    def test_notification_sent_on_task_completion(self, client, auth_headers):
+        """Test that notification is sent when task status changes to completed"""
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Test Task"},
+            headers=auth_headers,
+            content_type="application/json"
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch('celery_tasks.send_notification_email.delay') as mock_delay:
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "completed"
+        mock_delay.assert_called_once_with("testuser@example.com", "Test Task")
+
+    def test_notification_not_sent_for_non_completed_status(self, client, auth_headers):
+        """Test that notification is not sent for non-completed status changes"""
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Test Task"},
+            headers=auth_headers,
+            content_type="application/json"
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch('celery_tasks.send_notification_email.delay') as mock_delay:
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "in_progress"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["status"] == "in_progress"
+        mock_delay.assert_not_called()
+
+    def test_notification_not_sent_when_already_completed(self, client, auth_headers):
+        """Test that notification is not sent if task is already completed"""
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Test Task"},
+            headers=auth_headers,
+            content_type="application/json"
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch('celery_tasks.send_notification_email.delay') as mock_delay:
+            client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+            mock_delay.reset_mock()
+
+            client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+
+        mock_delay.assert_not_called()
+
+    def test_notification_with_user_without_email(self, client):
+        """Test that notification is skipped for users without email"""
+        response = client.post(
+            "/auth/register",
+            json={"username": "noemail", "password": "testpass123"},
+            content_type="application/json"
+        )
+        user_id = response.get_json()["id"]
+        token = response.get_json()["token"]
+        auth_headers = {"Authorization": f"Bearer {token}"}
+
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Test Task"},
+            headers=auth_headers,
+            content_type="application/json"
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch('celery_tasks.send_notification_email.delay') as mock_delay:
+            response = client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+
+        assert response.status_code == 200
+        mock_delay.assert_not_called()
+
+    def test_notification_sent_with_correct_title(self, client, auth_headers):
+        """Test that notification is sent with the correct task title"""
+        create_resp = client.post(
+            "/tasks",
+            json={"title": "Important Project Deadline"},
+            headers=auth_headers,
+            content_type="application/json"
+        )
+        task_id = create_resp.get_json()["id"]
+
+        with patch('celery_tasks.send_notification_email.delay') as mock_delay:
+            client.put(
+                f"/tasks/{task_id}",
+                json={"status": "completed"},
+                headers=auth_headers,
+                content_type="application/json"
+            )
+
+        mock_delay.assert_called_once_with("testuser@example.com", "Important Project Deadline")
 
 
 class TestIntegration:
