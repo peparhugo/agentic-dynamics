@@ -107,6 +107,43 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def get_paginated_by_owner(self, owner_id: int, cursor: int | None = None, limit: int = 20) -> tuple:
+        """Get paginated tasks for a user, ordered by creation date descending.
+
+        Returns (tasks, total_count, next_cursor).
+        Cursor is the ID to start after; if None, starts from the beginning.
+        """
+        with self._get_db() as conn:
+            # Get total count
+            total_result = conn.execute(
+                "SELECT COUNT(*) as count FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+            total_count = total_result["count"] if total_result else 0
+
+            # Build query
+            if cursor is not None:
+                query = "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?"
+                params = (owner_id, cursor, limit + 1)
+            else:
+                query = "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?"
+                params = (owner_id, limit + 1)
+
+            rows = conn.execute(query, params).fetchall()
+            tasks = [dict(r) for r in rows]
+
+            # Determine if there's a next page
+            next_cursor = None
+            if len(tasks) > limit:
+                tasks = tasks[:limit]
+                next_cursor = tasks[-1]["id"] if tasks else None
+            elif len(tasks) == 0:
+                next_cursor = None
+            else:
+                next_cursor = None
+
+            return tasks, total_count, next_cursor
+
     def update(self, task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
         """Update a task."""
         task = self.get_by_id(task_id, owner_id)

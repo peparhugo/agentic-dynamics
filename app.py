@@ -14,11 +14,44 @@ import os
 from celery_config import celery_app
 from tasks import send_notification_email
 from repositories import UserRepository, TaskRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from redis import Redis
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
+
+redis_client = None
+if not app.config.get("TESTING", False):
+    try:
+        redis_client = Redis(host=os.environ.get("REDIS_HOST", "localhost"), port=int(os.environ.get("REDIS_PORT", 6379)), decode_responses=True, socket_connect_timeout=1)
+        redis_client.ping()
+    except Exception:
+        redis_client = None
+
+
+def get_rate_limit_key():
+    """Get the rate limit key: user_id for authenticated requests, IP for others."""
+    if "Authorization" in request.headers:
+        auth_header = request.headers["Authorization"]
+        try:
+            token = auth_header.split(" ")[1]
+            data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{data['user_id']}"
+        except (IndexError, jwt.InvalidTokenError):
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    app=app,
+    key_func=get_rate_limit_key,
+    storage_uri="memory://" if (app.config.get("TESTING", False) or redis_client is None) else "redis://localhost:6379",
+    default_limits=["100 per minute"],
+    enabled=not app.config.get("TESTING", False),
+)
 
 
 def get_repositories():
@@ -107,6 +140,7 @@ def generate_token(user_id: int) -> str:
 # Auth endpoints
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -125,6 +159,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -150,13 +185,29 @@ def login():
 # Task endpoints (protected)
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def list_tasks(current_user_id):
     _, task_repo = get_repositories()
-    return jsonify(task_repo.get_all_by_owner(current_user_id))
+    cursor = request.args.get("cursor", type=int)
+    limit = request.args.get("limit", default=20, type=int)
+
+    # Validate limit
+    if limit < 1:
+        limit = 1
+    if limit > 100:
+        limit = 100
+
+    tasks, total_count, next_cursor = task_repo.get_paginated_by_owner(current_user_id, cursor, limit)
+    return jsonify({
+        "data": tasks,
+        "next_cursor": next_cursor,
+        "total": total_count,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100 per minute")
 @token_required
 def add_task(current_user_id):
     data = request.get_json(silent=True) or {}
@@ -169,6 +220,7 @@ def add_task(current_user_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def show_task(current_user_id, task_id: int):
     _, task_repo = get_repositories()
@@ -179,6 +231,7 @@ def show_task(current_user_id, task_id: int):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100 per minute")
 @token_required
 def edit_task(current_user_id, task_id: int):
     data = request.get_json(silent=True) or {}
