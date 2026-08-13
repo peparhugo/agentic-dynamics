@@ -1,7 +1,7 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, stat, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite } from '../src/generator.js';
+import { buildSite, buildSiteWithStats } from '../src/generator.js';
 
 describe('buildSite', () => {
   it('renders markdown pages and an index from frontmatter', async () => {
@@ -71,5 +71,37 @@ About us.`);
     const about = await readFile(path.join(output, 'about.html'), 'utf8');
     expect(about).toContain('<section class="feature"><header>Featured</header><p>About</p><p>A template value</p><p>About us.</p>');
     expect(about).toContain('<footer>Footer</footer>');
+  });
+
+  it('skips unchanged pages and invalidates cached pages when source or templates change', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'ssg-incremental-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'public');
+    await Promise.all([mkdir(content), mkdir(path.join(templates, 'layouts'), { recursive: true })]);
+    await writeFile(path.join(content, 'one.md'), '# One');
+    await writeFile(path.join(content, 'two.md'), '# Two');
+    await writeFile(path.join(templates, 'default.hbs'), '<article>{{{html}}}</article>');
+    await writeFile(path.join(templates, 'layouts', 'default.hbs'), '<body>{{{body}}}</body>');
+
+    const first = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(stat(path.join(root, '.ssg-cache.json'))).resolves.toBeDefined();
+
+    const unchanged = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(unchanged.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await writeFile(path.join(content, 'one.md'), '# Updated one');
+    const sourceChanged = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(sourceChanged.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(readFile(path.join(output, 'one.html'), 'utf8')).resolves.toContain('Updated one');
+
+    await writeFile(path.join(templates, 'default.hbs'), '<section>{{{html}}}</section>');
+    const templateChanged = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(templateChanged.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(readFile(path.join(output, 'two.html'), 'utf8')).resolves.toContain('<section><h1>Two</h1>');
+
+    const clean = await buildSiteWithStats({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true, clean: true });
+    expect(clean.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
   });
 });

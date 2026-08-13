@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import Handlebars from 'handlebars';
 import type { Page } from '../generator.js';
@@ -57,7 +57,7 @@ export class TemplatePlugin implements Plugin {
         }));
       }
     }
-    await rm(context.options.outputDir, { recursive: true, force: true });
+    if (context.cleanBuild) await rm(context.options.outputDir, { recursive: true, force: true });
     await mkdir(context.options.outputDir, { recursive: true });
   }
 
@@ -70,6 +70,11 @@ export class TemplatePlugin implements Plugin {
 
   async afterBuild(context: BuildContext): Promise<void> {
     await writeFile(path.join(context.options.outputDir, 'index.html'), indexDocument(context.pages));
+    for (const slug of Object.keys(context.previousCache)) {
+      if (!context.pages.some((page) => page.slug === slug)) await unlink(path.join(context.options.outputDir, `${slug}.html`)).catch((error: unknown) => {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      });
+    }
   }
 
   private async renderWithTemplates(page: Page, templatesDir: string): Promise<string> {

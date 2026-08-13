@@ -40,7 +40,7 @@ export class DevServerPlugin implements Plugin {
     const contentDir = path.resolve(options.contentDir ?? 'content');
     const templatesDir = path.resolve(options.templatesDir ?? 'templates');
     const outputDir = path.resolve(options.outputDir ?? 'dist');
-    const buildOptions = { contentDir, templatesDir, outputDir };
+    const buildOptions = { contentDir, templatesDir, outputDir, incremental: true };
     await buildSite(buildOptions);
     this.server = createServer((request, response) => { void this.serve(request.url, outputDir, response); });
     this.sockets = new WebSocketServer({ server: this.server });

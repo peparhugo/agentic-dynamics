@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import matter from 'gray-matter';
@@ -25,14 +26,20 @@ function toTemplateName(value: unknown): string | undefined {
 }
 
 export class MarkdownPlugin implements Plugin {
+  private static readonly parsedPages = new Map<string, Page>();
+
   async beforeBuild(context: BuildContext): Promise<void> {
     const entries = await readdir(context.options.contentDir, { withFileTypes: true });
     const markdownFiles = entries.filter((entry) => entry.isFile() && /\.md$/i.test(entry.name));
     context.pages = await Promise.all(markdownFiles.map(async (entry): Promise<Page> => {
       const source = await readFile(path.join(context.options.contentDir, entry.name), 'utf8');
-      const parsed = matter(source);
       const slug = entry.name.replace(/\.md$/i, '');
-      return {
+      const sourcePath = path.join(context.options.contentDir, entry.name);
+      const sourceHash = createHash('sha256').update(source).digest('hex');
+      const cached = MarkdownPlugin.parsedPages.get(sourcePath);
+      if (cached?.sourceHash === sourceHash) return { ...cached, data: { ...cached.data } };
+      const parsed = matter(source);
+      const page: Page = {
         slug,
         title: typeof parsed.data.title === 'string' && parsed.data.title.trim() ? parsed.data.title : slug,
         date: toDateString(parsed.data.date),
@@ -40,8 +47,12 @@ export class MarkdownPlugin implements Plugin {
         html: await marked.parse(parsed.content),
         template: toTemplateName(parsed.data.template),
         layout: toTemplateName(parsed.data.layout),
-        data: parsed.data
+        data: parsed.data,
+        sourcePath,
+        sourceHash
       };
+      MarkdownPlugin.parsedPages.set(sourcePath, page);
+      return { ...page, data: { ...page.data } };
     }));
     context.pages.sort((left, right) => (right.date ?? '').localeCompare(left.date ?? ''));
   }

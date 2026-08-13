@@ -1,16 +1,18 @@
 #!/usr/bin/env node
-import { buildSite } from './generator.js';
+import { buildSiteWithStats } from './generator.js';
 import { serveSite } from './server.js';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean] [--port <number>]';
 }
 
-function parseArguments(arguments_: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } {
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
+function parseArguments(arguments_: string[]): { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } {
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 0; index < arguments_.length; index += 1) {
     const argument = arguments_[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
+    if (argument === '--incremental' || argument === '--clean') {
+      options[argument.slice(2) as 'incremental' | 'clean'] = true;
+    } else if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
       const value = arguments_[index + 1];
       if (!value || value.startsWith('--')) throw new Error(`Missing value for ${argument}`);
       if (argument === '--content') options.contentDir = value;
@@ -37,8 +39,8 @@ async function main(): Promise<void> {
     await serveSite(options);
     return;
   }
-  const pages = await buildSite(options);
-  process.stdout.write(`Built ${pages.length} page(s).\n`);
+  const { pages, stats } = await buildSiteWithStats(options);
+  process.stdout.write(`Built ${pages.length} page(s): ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${Math.round(stats.timeSavedMs)}ms saved.\n`);
 }
 
 main().catch((error: unknown) => {
