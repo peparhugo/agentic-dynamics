@@ -1,9 +1,13 @@
 """
-WebSocket-based notification server with a Redis pub/sub message backbone.
+Notification server with a Redis pub/sub message backbone and a pluggable
+transport layer.
 
-Accepts WebSocket connections, assigns each client a unique ID, broadcasts
-messages to all connected clients, handles clean disconnects, and exposes REST
-endpoints for health, channels, and message history.
+Accepts client connections through a configurable transport, assigns each
+client a unique ID, broadcasts messages to all connected clients, handles
+clean disconnects, and exposes REST endpoints for health, channels, and
+message history. The WebSocket transport is the default; other transports
+(SSE, polling, raw TCP) can be added by subclassing ``BaseTransport`` without
+touching the core notification logic.
 
 Message backbone
 ----------------
@@ -23,9 +27,11 @@ Every broadcast and direct message is stored in SQLite so a history can be
 served back through ``GET /messages``.
 
 Configuration
--------------
+------------
 ``REDIS_URL``    optional Redis connection URL for the pub/sub backbone.
 ``DATABASE_URL`` optional SQLite path (or ``sqlite:///...`` URL) for history.
+``TRANSPORT``    transport name to use for client connections (default
+                 ``"websocket"``).
 
 Clients can subscribe to named channels (e.g. ``"alerts"``, ``"system"``,
 ``"chat"``). Messages that carry a ``channel`` field are delivered only to the
@@ -47,6 +53,7 @@ REST endpoints::
     GET /messages?limit=50&offset=0      persisted message history
 """
 
+import abc
 import asyncio
 import json
 import os
@@ -409,7 +416,7 @@ class ConnectionStore:
 
 class ClientRegistry:
     """
-    Thread-safe registry mapping client IDs to their WebSocket connections.
+    Thread-safe registry mapping client IDs to their transport connections.
 
     All operations are protected by a reentrant lock so the registry can be
     mutated from the asyncio event loop or from plain threads (e.g. the
@@ -483,10 +490,113 @@ class ChannelRegistry:
             return {name: len(members) for name, members in self._channels.items()}
 
 
+# ── Transport layer ────────────────────────────────────────────────
+
+class BaseTransport(abc.ABC):
+    """
+    Abstract transport interface for client connections.
+
+    Concrete transports (WebSocket, SSE, polling, raw TCP) plug the
+    connection-level mechanics into the :class:`NotificationServer` so the core
+    logic never depends on how messages reach a client. A transport owns each
+    client's connection object; the server keeps track of client identity,
+    channel subscriptions and message routing.
+
+    Implementations are registered with a name (``__init_subclass__``) and
+    selected through the ``TRANSPORT`` environment variable, defaulting to
+    ``"websocket"``.
+    """
+
+    _factories: dict[str, type["BaseTransport"]] = {}
+
+    def __init_subclass__(
+        cls, transport_name: str | None = None, **kwargs
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+        if transport_name:
+            cls._factories[transport_name] = cls
+
+    def __init__(self, server: "NotificationServer") -> None:
+        self.server = server
+
+    @abc.abstractmethod
+    async def on_connect(self, connection) -> None:
+        """Drive the full lifecycle of a single client connection."""
+
+    @abc.abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Clean up server state after a client disconnects."""
+
+    @abc.abstractmethod
+    async def send_message(self, client_id: str, message: str) -> bool:
+        """Deliver a serialized message. Return False if the client is gone."""
+
+    @abc.abstractmethod
+    async def broadcast(self, message: str) -> None:
+        """Deliver a serialized message to every connected client."""
+
+
+class WebSocketTransport(BaseTransport, transport_name="websocket"):
+    """Transport built on the ``websockets`` library (the default)."""
+
+    async def on_connect(self, websocket) -> None:
+        server = self.server
+        await server._ensure_listener()
+        client_id = server._new_client_id()
+        server.registry.add(client_id, websocket)
+        await server.connection_store.register(client_id)
+        welcome = make_message(
+            "system",
+            {"client_id": client_id, "message": "connected"},
+        )
+        try:
+            await websocket.send(json.dumps(welcome))
+            async for raw in websocket:
+                await server._handle_message(client_id, raw)
+        except ConnectionClosed:
+            pass
+        finally:
+            await self.on_disconnect(client_id)
+
+    async def on_disconnect(self, client_id: str) -> None:
+        server = self.server
+        server.registry.remove(client_id)
+        server.channels.remove_client(client_id)
+        await server._sync_channel_subscriptions()
+        await server.connection_store.unregister(client_id)
+
+    async def send_message(self, client_id: str, message: str) -> bool:
+        websocket = self.server.registry.get(client_id)
+        if websocket is None:
+            return False
+        try:
+            await websocket.send(message)
+        except ConnectionClosed:
+            return False
+        return True
+
+    async def broadcast(self, message: str) -> None:
+        for client_id, _ in list(self.server.registry.all()):
+            await self.send_message(client_id, message)
+
+
+def _make_transport(server: "NotificationServer") -> BaseTransport:
+    """Build the transport named by the ``TRANSPORT`` env var (default websocket)."""
+    name = os.environ.get("TRANSPORT", "websocket").strip().lower()
+    try:
+        factory = BaseTransport._factories[name]
+    except KeyError:
+        raise ValueError(
+            f"unknown transport: {name!r}; available: "
+            + ", ".join(sorted(BaseTransport._factories))
+        )
+    return factory(server)
+
+
 # ── Server ──────────────────────────────────────────────────────────
 
 class NotificationServer:
-    """WebSocket notification server built on the ``websockets`` library."""
+    """Notification server whose client delivery is provided by a transport."""
 
     def __init__(
         self,
@@ -495,12 +605,14 @@ class NotificationServer:
         broker: Broker | None = None,
         message_store: MessageStore | None = None,
         connection_store: ConnectionStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.registry = registry or ClientRegistry()
         self.channels = channels or ChannelRegistry()
         self.broker = broker or _make_default_broker()
         self.message_store = message_store or MessageStore()
         self.connection_store = connection_store or ConnectionStore()
+        self.transport = transport or _make_transport(self)
         self._listener_task: asyncio.Task | None = None
         self._listener_started = False
 
@@ -550,27 +662,9 @@ class NotificationServer:
             self._listener_task.cancel()
         self._listener_task = None
 
-    async def handler(self, websocket) -> None:
-        """Handle a single WebSocket connection lifecycle."""
-        await self._ensure_listener()
-        client_id = self._new_client_id()
-        self.registry.add(client_id, websocket)
-        await self.connection_store.register(client_id)
-        welcome = make_message(
-            "system",
-            {"client_id": client_id, "message": "connected"},
-        )
-        try:
-            await websocket.send(json.dumps(welcome))
-            async for raw in websocket:
-                await self._handle_message(client_id, websocket, raw)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.registry.remove(client_id)
-            self.channels.remove_client(client_id)
-            await self._sync_channel_subscriptions()
-            await self.connection_store.unregister(client_id)
+    async def handler(self, connection) -> None:
+        """Handle a single client connection lifecycle via the transport."""
+        await self.transport.on_connect(connection)
 
     def _new_client_id(self) -> str:
         while True:
@@ -578,15 +672,15 @@ class NotificationServer:
             if self.registry.get(candidate) is None:
                 return candidate
 
-    async def _handle_message(self, sender_id: str, websocket, raw: str) -> None:
+    async def _handle_message(self, sender_id: str, raw: str) -> None:
         try:
             message = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
-            await self._send_error(websocket, "message must be valid JSON")
+            await self._send_error(sender_id, "message must be valid JSON")
             return
 
         if not isinstance(message, dict):
-            await self._send_error(websocket, "message must be a JSON object")
+            await self._send_error(sender_id, "message must be a JSON object")
             return
 
         msg_type = message.get("type")
@@ -594,96 +688,94 @@ class NotificationServer:
         timestamp = message.get("timestamp") or now_iso()
 
         if msg_type not in MESSAGE_TYPES:
-            await self._send_error(websocket, f"unsupported message type: {msg_type!r}")
+            await self._send_error(sender_id, f"unsupported message type: {msg_type!r}")
             return
         if not isinstance(payload, dict):
-            await self._send_error(websocket, "payload must be an object")
+            await self._send_error(sender_id, "payload must be an object")
             return
 
         if msg_type == "subscribe":
-            await self._handle_subscribe(sender_id, websocket, payload)
+            await self._handle_subscribe(sender_id, payload)
         elif msg_type == "unsubscribe":
-            await self._handle_unsubscribe(sender_id, websocket, payload)
+            await self._handle_unsubscribe(sender_id, payload)
         elif msg_type == "broadcast":
             channel = message.get("channel") or payload.get("channel")
             await self.broadcast(msg_type, payload, timestamp, channel)
         elif msg_type == "direct":
-            await self._handle_direct(sender_id, websocket, payload, timestamp)
+            await self._handle_direct(sender_id, payload, timestamp)
         elif msg_type == "system":
-            await websocket.send(
+            await self.transport.send_message(
+                sender_id,
                 json.dumps(
                     make_message(
                         "system",
                         {"message": "ack", "echo": payload},
                         timestamp,
                     )
-                )
+                ),
             )
 
-    async def _handle_subscribe(self, sender_id: str, websocket, payload: dict) -> None:
+    async def _handle_subscribe(self, sender_id: str, payload: dict) -> None:
         channel = payload.get("channel")
         if not channel or not isinstance(channel, str):
-            await self._send_error(websocket, "subscribe requires payload.channel")
+            await self._send_error(sender_id, "subscribe requires payload.channel")
             return
         self.channels.subscribe(channel, sender_id)
         await self.connection_store.add_channel(sender_id, channel)
         await self._sync_channel_subscriptions()
-        await websocket.send(
+        await self.transport.send_message(
+            sender_id,
             json.dumps(
                 make_message(
                     "system",
                     {"message": "subscribed", "channel": channel},
                 )
-            )
+            ),
         )
 
-    async def _handle_unsubscribe(self, sender_id: str, websocket, payload: dict) -> None:
+    async def _handle_unsubscribe(self, sender_id: str, payload: dict) -> None:
         channel = payload.get("channel")
         if not channel or not isinstance(channel, str):
-            await self._send_error(websocket, "unsubscribe requires payload.channel")
+            await self._send_error(sender_id, "unsubscribe requires payload.channel")
             return
         self.channels.unsubscribe(channel, sender_id)
         await self.connection_store.remove_channel(sender_id, channel)
         await self._sync_channel_subscriptions()
-        await websocket.send(
+        await self.transport.send_message(
+            sender_id,
             json.dumps(
                 make_message(
                     "system",
                     {"message": "unsubscribed", "channel": channel},
                 )
-            )
+            ),
         )
 
     async def _handle_direct(
         self,
         sender_id: str,
-        sender_ws,
         payload: dict,
         timestamp: str,
     ) -> None:
         target = payload.get("to")
         if not target:
-            await self._send_error(sender_ws, "direct message requires payload.to")
+            await self._send_error(sender_id, "direct message requires payload.to")
             return
         if not await self.direct(target, payload, timestamp):
-            await self._send_error(sender_ws, f"unknown target client: {target}")
+            await self._send_error(sender_id, f"unknown target client: {target}")
 
-    async def _send_error(self, websocket, message: str) -> None:
-        await websocket.send(
+    async def _send_error(self, client_id: str, message: str) -> None:
+        await self.transport.send_message(
+            client_id,
             json.dumps(
                 make_message("system", {"message": "error", "error": message})
-            )
+            ),
         )
 
     async def _deliver(self, msg: str, client_ids: list[str]) -> None:
         dead: list[str] = []
         for client_id in client_ids:
-            ws = self.registry.get(client_id)
-            if ws is None:
-                continue
-            try:
-                await ws.send(msg)
-            except ConnectionClosed:
+            if not await self.transport.send_message(client_id, msg):
                 dead.append(client_id)
         for client_id in dead:
             self.registry.remove(client_id)
@@ -714,12 +806,11 @@ class NotificationServer:
 
     async def direct(self, target_id: str, payload: dict, timestamp: str | None = None) -> bool:
         """Send a message to a single client. Returns True if delivered."""
-        target_ws = self.registry.get(target_id)
-        if target_ws is None:
+        if self.registry.get(target_id) is None:
             return False
         message = make_message("direct", payload, timestamp)
         self.message_store.save(message, None)
-        await target_ws.send(json.dumps(message))
+        await self.transport.send_message(target_id, json.dumps(message))
         return True
 
     async def process_request(
