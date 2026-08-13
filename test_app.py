@@ -13,7 +13,11 @@ TASK_NS = "urn:task-service"
 def client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "test.db"))
     task_app.init_db()
-    task_app.app.config.update(TESTING=True, JWT_SECRET_KEY="test-secret")
+    task_app.app.config.update(
+        TESTING=True,
+        JWT_SECRET_KEY="test-secret",
+    )
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -149,7 +153,11 @@ def test_users_only_access_their_own_tasks(client, auth):
     ).get_json()["token"]
     bob_auth = {"Authorization": f"Bearer {token}"}
 
-    assert client.get("/tasks", headers=bob_auth).get_json() == []
+    assert client.get("/tasks", headers=bob_auth).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{task_id}", headers=bob_auth).status_code == 404
     assert client.patch(
         f"/tasks/{task_id}", json={"status": "done"}, headers=bob_auth
@@ -211,3 +219,54 @@ def test_migration_preserves_existing_tasks(tmp_path, monkeypatch):
         row = connection.execute("SELECT * FROM tasks WHERE id = 1").fetchone()
     assert row["title"] == "Legacy"
     assert row["owner_id"] is None
+
+
+def test_tasks_are_paginated_with_cursor(client, auth):
+    for number in range(5):
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=auth)
+
+    first = client.get("/tasks?limit=2", headers=auth).get_json()
+    assert [task["title"] for task in first["data"]] == ["Task 4", "Task 3"]
+    assert first["next_cursor"] == str(first["data"][-1]["id"])
+    assert first["total"] == 5
+
+    second = client.get(
+        f"/tasks?limit=2&cursor={first['next_cursor']}", headers=auth
+    ).get_json()
+    assert [task["title"] for task in second["data"]] == ["Task 2", "Task 1"]
+    assert second["next_cursor"] == str(second["data"][-1]["id"])
+    assert second["total"] == 5
+
+    last = client.get(
+        f"/tasks?limit=2&cursor={second['next_cursor']}", headers=auth
+    ).get_json()
+    assert [task["title"] for task in last["data"]] == ["Task 0"]
+    assert last["next_cursor"] is None
+    assert last["total"] == 5
+
+
+@pytest.mark.parametrize(
+    "query", ["limit=0", "limit=101", "limit=nope", "cursor=0", "cursor=nope"]
+)
+def test_pagination_rejects_invalid_parameters(client, auth, query):
+    assert client.get(f"/tasks?{query}", headers=auth).status_code == 400
+
+
+def test_authenticated_user_is_rate_limited_with_retry_after(client, auth):
+    for _ in range(100):
+        assert client.get("/tasks", headers=auth).status_code == 200
+
+    response = client.get("/tasks", headers=auth)
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    for _ in range(100):
+        client.post("/auth/login", json={"username": "missing", "password": "wrong"})
+
+    response = client.post(
+        "/auth/login", json={"username": "missing", "password": "wrong"}
+    )
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0

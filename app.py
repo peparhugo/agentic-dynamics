@@ -10,6 +10,8 @@ import os
 from xml.etree import ElementTree as ET
 
 from flask import Flask, Response, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -32,7 +34,19 @@ app = Flask(__name__)
 app.config.update(
     JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "development-secret-change-me"),
     JWT_EXPIRES_SECONDS=3600,
+    RATELIMIT_STORAGE_URI=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    RATELIMIT_HEADERS_ENABLED=True,
 )
+
+
+def rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    user_id = decode_token(token) if scheme.lower() == "bearer" and token else None
+    return f"user:{user_id}" if user_id is not None else get_remote_address()
+
+
+limiter = Limiter(rate_limit_key, app=app, default_limits=["100 per minute"])
 
 
 def get_db():
@@ -132,6 +146,12 @@ def get_tasks(owner_id: int) -> list[dict]:
     return task_repository().list_for_owner(owner_id)
 
 
+def get_task_page(
+    owner_id: int, cursor: int | None, limit: int
+) -> tuple[list[dict], int, bool]:
+    return task_repository().page_for_owner(owner_id, cursor, limit)
+
+
 def get_task(task_id: int, owner_id: int) -> dict | None:
     return task_repository().get_for_owner(task_id, owner_id)
 
@@ -181,7 +201,20 @@ def login():
 @require_auth
 def tasks_collection():
     if request.method == "GET":
-        return jsonify(get_tasks(g.user["id"]))
+        cursor_value = request.args.get("cursor")
+        limit_value = request.args.get("limit", "20")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(limit_value)
+        except ValueError:
+            return jsonify(error="cursor and limit must be integers"), 400
+        if cursor is not None and cursor < 1:
+            return jsonify(error="cursor must be a positive integer"), 400
+        if limit < 1 or limit > 100:
+            return jsonify(error="limit must be between 1 and 100"), 400
+        tasks, total, has_more = get_task_page(g.user["id"], cursor, limit)
+        next_cursor = str(tasks[-1]["id"]) if has_more else None
+        return jsonify(data=tasks, next_cursor=next_cursor, total=total)
     data = request.get_json(silent=True) or {}
     title = data.get("title")
     if not isinstance(title, str) or not title.strip():

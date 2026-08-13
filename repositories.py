@@ -141,6 +141,25 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def page_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> tuple[list[dict], int, bool]:
+        parameters: tuple[int, ...] = (owner_id,)
+        cursor_clause = ""
+        if cursor is not None:
+            cursor_clause = "AND id < ? "
+            parameters += (cursor,)
+        with self.connection_factory() as connection:
+            rows = connection.execute(
+                "SELECT * FROM tasks WHERE owner_id = ? "
+                f"{cursor_clause}ORDER BY id DESC LIMIT ?",
+                parameters + (limit + 1,),
+            ).fetchall()
+            total = connection.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+        return [dict(row) for row in rows[:limit]], total, len(rows) > limit
+
     def get_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         with self.connection_factory() as connection:
             row = connection.execute(
