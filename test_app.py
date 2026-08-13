@@ -35,8 +35,11 @@ def fault_text(response):
     return xml(response).findtext(f".//{{{SOAP}}}Fault/faultstring")
 
 
-def register(client, username="alice", password="password"):
-    return client.post("/auth/register", json={"username": username, "password": password})
+def register(client, username="alice", password="password", email=None):
+    data = {"username": username, "password": password}
+    if email is not None:
+        data["email"] = email
+    return client.post("/auth/register", json=data)
 
 
 def token(client, username="alice", password="password"):
@@ -139,6 +142,39 @@ def test_update_task_allows_partial_updates(client):
 
     assert task_values(response)["title"] == "Draft"
     assert task_values(response)["status"] == "complete"
+
+
+def test_completing_task_enqueues_notification(client, monkeypatch):
+    register(client, email="alice@example.com")
+    access_token = client.post("/auth/login", json={"username": "alice", "password": "password"}).get_json()["token"]
+    created = client.post("/soap", data=soap_request("CreateTask", "<title>Ship feature</title>"), headers=auth(access_token))
+    identifier = task_values(created)["id"]
+    calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: calls.append(args))
+
+    response = client.post(
+        "/soap",
+        data=soap_request("UpdateTask", f"<id>{identifier}</id><status>completed</status>"),
+        headers=auth(access_token),
+    )
+
+    assert response.status_code == 200
+    assert calls == [("alice@example.com", "Ship feature")]
+
+
+def test_notification_is_not_enqueued_when_task_is_already_completed(client, monkeypatch):
+    register(client, email="alice@example.com")
+    access_token = client.post("/auth/login", json={"username": "alice", "password": "password"}).get_json()["token"]
+    created = client.post("/soap", data=soap_request("CreateTask", "<title>Ship feature</title>"), headers=auth(access_token))
+    identifier = task_values(created)["id"]
+    calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: calls.append(args))
+    body = soap_request("UpdateTask", f"<id>{identifier}</id><status>completed</status>")
+
+    client.post("/soap", data=body, headers=auth(access_token))
+    client.post("/soap", data=body, headers=auth(access_token))
+
+    assert calls == [("alice@example.com", "Ship feature")]
 
 
 def test_rejects_invalid_soap_requests(client):

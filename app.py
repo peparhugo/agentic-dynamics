@@ -14,6 +14,8 @@ from xml.etree import ElementTree as ET
 from flask import Flask, Response, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 SOAP_NAMESPACE = "http://schemas.xmlsoap.org/soap/envelope/"
 TASK_NAMESPACE = "urn:tasks"
@@ -38,6 +40,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
+                email TEXT,
                 password_hash TEXT NOT NULL
             )
             """
@@ -56,6 +59,9 @@ def init_db():
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+        user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+        if "email" not in user_columns:
+            conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
 
 
 def encode_jwt(user_id):
@@ -183,8 +189,12 @@ def update_task(operation, owner_id):
         task = conn.execute("SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (identifier, owner_id)).fetchone()
         if task is None:
             return soap_fault("task not found", 404)
+        previous_status = task["status"]
         conn.execute("UPDATE tasks SET title = ?, status = ? WHERE id = ?", (title if title is not None else task["title"], status if status is not None else task["status"], identifier))
         task = conn.execute("SELECT * FROM tasks WHERE id = ?", (identifier,)).fetchone()
+        user = conn.execute("SELECT email FROM users WHERE id = ?", (owner_id,)).fetchone()
+    if status == "completed" and previous_status != "completed" and user["email"]:
+        send_notification_email.delay(user["email"], task["title"])
     return soap_response("UpdateTask", lambda response: task_element(response, task))
 
 
@@ -194,12 +204,17 @@ OPERATIONS = {"CreateTask": create_task, "ListTasks": list_tasks, "GetTask": get
 @app.post("/auth/register")
 def register():
     data = request.get_json(silent=True) or {}
-    username, password = data.get("username"), data.get("password")
+    username, password, email = data.get("username"), data.get("password"), data.get("email")
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify(error="username and password are required"), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify(error="email must be a non-empty string"), 400
     try:
         with get_db() as conn:
-            cursor = conn.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username.strip(), generate_password_hash(password)))
+            cursor = conn.execute(
+                "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+                (username.strip(), email.strip() if email else None, generate_password_hash(password)),
+            )
         return jsonify(id=cursor.lastrowid, username=username.strip()), 201
     except sqlite3.IntegrityError:
         return jsonify(error="username already exists"), 409
