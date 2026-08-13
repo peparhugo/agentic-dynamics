@@ -93,4 +93,62 @@ Body
     );
     await expect(fs.readFile(path.join(content, 'keep.md'), 'utf8')).resolves.toBe('Do not delete');
   });
+
+  it('renders the default template, layout, and partials', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'));
+    await fs.writeFile(path.join(templates, 'default.hbs'), `{{> header}}
+<article data-kind="{{kind}}">{{{content}}}</article>
+{{> footer}}`);
+    await fs.writeFile(path.join(templates, 'layouts', 'default.hbs'), '<html><body>{{> nav}}{{{body}}}</body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+    await fs.writeFile(path.join(templates, 'partials', 'nav.hbs'), '<nav>Navigation</nav>');
+    await fs.writeFile(path.join(content, 'post.md'), `---
+title: '<Default>'
+kind: guide
+---
+Hello **templates**.
+`);
+
+    await buildSite({ content, output, templates });
+    const generated = await fs.readFile(path.join(output, 'post.html'), 'utf8');
+
+    expect(generated).toBe(`<html><body><nav>Navigation</nav><header>&lt;Default&gt;</header>
+<article data-kind="guide"><p>Hello <strong>templates</strong>.</p>
+</article>
+<footer>Footer</footer></body></html>`);
+  });
+
+  it('supports per-page templates and layouts', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.writeFile(path.join(templates, 'article.hbs'), '<section><h1>{{title}}</h1>{{{content}}}</section>');
+    await fs.writeFile(path.join(templates, 'layouts', 'wide.hbs'), '<div class="wide">{{{body}}}</div>');
+    await fs.writeFile(path.join(content, 'post.md'), `---
+title: Custom page
+template: article
+layout: wide.hbs
+---
+Page body.
+`);
+
+    await buildSite({ content, output, templates });
+
+    expect(await fs.readFile(path.join(output, 'post.html'), 'utf8')).toBe(
+      '<div class="wide"><section><h1>Custom page</h1><p>Page body.</p>\n</section></div>',
+    );
+  });
+
+  it('reports missing named templates and unknown partials', async () => {
+    const templates = path.join(root, 'templates');
+    await fs.mkdir(templates);
+    await fs.writeFile(path.join(content, 'missing.md'), '---\ntemplate: absent\n---\nBody');
+
+    await expect(buildSite({ content, output, templates })).rejects.toThrow('Template not found: absent');
+
+    await fs.writeFile(path.join(templates, 'absent.hbs'), '{{> unknown}}');
+    await expect(buildSite({ content, output, templates })).rejects.toThrow('partial unknown');
+  });
 });
