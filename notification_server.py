@@ -5,12 +5,14 @@ import json
 import logging
 import os
 from typing import Optional
+from datetime import datetime
 from aiohttp import web
 
 from client_registry import ClientRegistry
 from message_handler import Message, MessageHandler
 from redis_broker import RedisBroker
 from message_persistence import MessagePersistence
+from rate_limiter import RateLimiter
 from transport import BaseTransport
 from websocket_transport import WebSocketTransport
 from polling_transport import PollingTransport
@@ -35,10 +37,12 @@ class NotificationServer:
         self.client_registry = ClientRegistry()
         self.redis_broker = RedisBroker()
         self.message_persistence = MessagePersistence()
+        self.rate_limiter = RateLimiter()
         self.rest_app = web.Application()
         self._setup_rest_routes()
         self._stop_event = asyncio.Event()
         self._redis_subscribe_task: Optional[asyncio.Task] = None
+        self._cleanup_task: Optional[asyncio.Task] = None
 
         # Initialize transport
         if transport is None:
@@ -77,6 +81,7 @@ class NotificationServer:
         self.rest_app.router.add_get('/channels', self._channels_handler)
         self.rest_app.router.add_get('/channels/{name}/subscribers', self._channel_subscribers_handler)
         self.rest_app.router.add_get('/messages', self._messages_handler)
+        self.rest_app.router.add_get('/history', self._history_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Handle health check endpoint."""
@@ -128,6 +133,49 @@ class NotificationServer:
             'channel': channel
         })
 
+    async def _history_handler(self, request: web.Request) -> web.Response:
+        """Handle GET /history endpoint for paginated message history by channel and time range."""
+        channel = request.query.get('channel')
+        since = request.query.get('since')
+        limit = int(request.query.get('limit', 50))
+        offset = int(request.query.get('offset', 0))
+
+        if not channel:
+            return web.json_response({'error': 'channel parameter is required'}, status=400)
+
+        limit = min(limit, 1000)
+
+        if since:
+            messages = self.message_persistence.get_messages_since(
+                channel=channel,
+                since=since,
+                limit=limit + 1,
+                offset=offset
+            )
+            total_count = self.message_persistence.get_messages_count_since(channel=channel, since=since)
+        else:
+            messages = self.message_persistence.get_messages_chronological(
+                channel=channel,
+                limit=limit + 1,
+                offset=offset
+            )
+            total_count = self.message_persistence.get_message_count(channel=channel)
+
+        has_more = len(messages) > limit
+        if has_more:
+            messages = messages[:limit]
+
+        return web.json_response({
+            'channel': channel,
+            'messages': messages,
+            'count': len(messages),
+            'total': total_count,
+            'limit': limit,
+            'offset': offset,
+            'has_more': has_more,
+            'since': since
+        })
+
     async def _on_client_connect(self, client_id: str) -> None:
         """Handle new client connection."""
         logger.info(f"Client connected: {client_id}")
@@ -141,6 +189,16 @@ class NotificationServer:
 
     async def _handle_message(self, sender_id: str, message: Message) -> None:
         """Route message to appropriate handler."""
+        is_allowed, remaining = await self.rate_limiter.check_rate_limit(sender_id)
+        if not is_allowed:
+            logger.warning(f"Rate limit exceeded for client {sender_id}")
+            error_msg = Message('system', {
+                'error': 'rate_limit_exceeded',
+                'message': f'Rate limit of {self.rate_limiter.limit} messages per minute exceeded. Remaining: {remaining}'
+            })
+            await self.transport.send_message(sender_id, error_msg)
+            return
+
         if message.type == 'broadcast':
             await self._broadcast_message(message, from_redis=False)
         elif message.type == 'direct':
@@ -216,12 +274,36 @@ class NotificationServer:
         else:
             logger.warning(f"Recipient not found: {recipient_id}")
 
+    async def _cleanup_old_messages_loop(self) -> None:
+        """Periodically clean up old messages."""
+        ttl_days = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        cleanup_interval = 3600
+
+        try:
+            while True:
+                await asyncio.sleep(cleanup_interval)
+                deleted = self.message_persistence.cleanup_old_messages(ttl_days=ttl_days)
+                if deleted > 0:
+                    logger.info(f"Cleaned up {deleted} messages older than {ttl_days} days")
+        except asyncio.CancelledError:
+            logger.info("Message cleanup task cancelled")
+        except Exception as e:
+            logger.error(f"Error in message cleanup loop: {e}")
+
     async def run(self) -> None:
         """Run both transport and REST servers."""
         try:
             await self.redis_broker.connect()
         except Exception as e:
             logger.warning(f"Redis not available, continuing without pub/sub: {e}")
+
+        try:
+            await self.rate_limiter.connect()
+        except Exception as e:
+            logger.warning(f"Rate limiter Redis connection failed, rate limiting disabled: {e}")
+
+        initial_cleanup_ttl = int(os.environ.get("MESSAGE_TTL_DAYS", "7"))
+        self.message_persistence.cleanup_old_messages(ttl_days=initial_cleanup_ttl)
 
         # Start Redis subscription in background
         if self.redis_broker.redis:
@@ -231,6 +313,9 @@ class NotificationServer:
                     self._handle_redis_message
                 )
             )
+
+        # Start message cleanup task
+        self._cleanup_task = asyncio.create_task(self._cleanup_old_messages_loop())
 
         # Start transport server
         self._transport_task = asyncio.create_task(self.transport.run())
@@ -250,11 +335,18 @@ class NotificationServer:
         finally:
             await runner.cleanup()
             await self.transport.stop()
+            await self.rate_limiter.disconnect()
             await self.redis_broker.disconnect()
             if self._redis_subscribe_task:
                 self._redis_subscribe_task.cancel()
                 try:
                     await self._redis_subscribe_task
+                except asyncio.CancelledError:
+                    pass
+            if self._cleanup_task:
+                self._cleanup_task.cancel()
+                try:
+                    await self._cleanup_task
                 except asyncio.CancelledError:
                     pass
             if self._transport_task:

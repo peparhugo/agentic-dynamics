@@ -4,7 +4,7 @@ import json
 import logging
 import os
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 
 logger = logging.getLogger(__name__)
@@ -133,6 +133,55 @@ class MessagePersistence:
             logger.error(f"Error retrieving messages: {e}")
             return []
 
+    def get_messages_chronological(
+        self,
+        channel: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[dict]:
+        """Retrieve messages in chronological order (oldest first)."""
+        try:
+            conn = self._get_connection()
+
+            if channel:
+                cursor = conn.execute(
+                    """
+                    SELECT id, channel, type, payload, timestamp
+                    FROM messages
+                    WHERE channel = ?
+                    ORDER BY timestamp ASC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (channel, limit, offset)
+                )
+            else:
+                cursor = conn.execute(
+                    """
+                    SELECT id, channel, type, payload, timestamp
+                    FROM messages
+                    ORDER BY timestamp ASC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (limit, offset)
+                )
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            messages = []
+            for row in rows:
+                messages.append({
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"]
+                })
+            return messages
+        except Exception as e:
+            logger.error(f"Error retrieving messages: {e}")
+            return []
+
     def get_message_count(self, channel: Optional[str] = None) -> int:
         """Get total count of messages."""
         try:
@@ -163,3 +212,73 @@ class MessagePersistence:
             conn.close()
         except Exception as e:
             logger.error(f"Error clearing messages: {e}")
+
+    def get_messages_since(
+        self,
+        channel: str,
+        since: str,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[dict]:
+        """Retrieve messages since a specific timestamp in chronological order."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages
+                WHERE channel = ? AND timestamp >= ?
+                ORDER BY timestamp ASC
+                LIMIT ? OFFSET ?
+                """,
+                (channel, since, limit, offset)
+            )
+            rows = cursor.fetchall()
+            conn.close()
+
+            messages = []
+            for row in rows:
+                messages.append({
+                    "id": row["id"],
+                    "channel": row["channel"],
+                    "type": row["type"],
+                    "payload": json.loads(row["payload"]),
+                    "timestamp": row["timestamp"]
+                })
+            return messages
+        except Exception as e:
+            logger.error(f"Error retrieving messages since {since}: {e}")
+            return []
+
+    def get_messages_count_since(self, channel: str, since: str) -> int:
+        """Get count of messages since a specific timestamp."""
+        try:
+            conn = self._get_connection()
+            cursor = conn.execute(
+                "SELECT COUNT(*) as count FROM messages WHERE channel = ? AND timestamp >= ?",
+                (channel, since)
+            )
+            count = cursor.fetchone()["count"]
+            conn.close()
+            return count
+        except Exception as e:
+            logger.error(f"Error getting message count since {since}: {e}")
+            return 0
+
+    def cleanup_old_messages(self, ttl_days: int = 7) -> int:
+        """Delete messages older than ttl_days. Returns count of deleted messages."""
+        try:
+            conn = self._get_connection()
+            cutoff_date = (datetime.utcnow() - timedelta(days=ttl_days)).isoformat()
+            cursor = conn.execute(
+                "DELETE FROM messages WHERE timestamp < ?",
+                (cutoff_date,)
+            )
+            conn.commit()
+            deleted_count = cursor.rowcount
+            conn.close()
+            logger.info(f"Cleaned up {deleted_count} messages older than {ttl_days} days")
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Error cleaning up old messages: {e}")
+            return 0

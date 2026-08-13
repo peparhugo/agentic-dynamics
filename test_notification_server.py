@@ -10,11 +10,13 @@ import threading
 import tempfile
 import os
 from unittest.mock import patch, AsyncMock
+from datetime import datetime, timedelta
 
 from client_registry import ClientRegistry
 from message_handler import Message, MessageHandler
 from notification_server import NotificationServer
 from message_persistence import MessagePersistence
+from rate_limiter import RateLimiter
 from redis_broker import RedisBroker
 
 
@@ -1073,3 +1075,467 @@ class TestMessagesRESTEndpoint:
                 assert resp.status == 200
                 data = await resp.json()
                 assert data['channel'] == 'alerts'
+
+
+# ── Rate Limiter Tests ─────────────────────────────────────────
+
+class TestRateLimiter:
+    """Tests for rate limiting functionality."""
+
+    def test_rate_limiter_initialization(self):
+        """Test rate limiter initialization."""
+        limiter = RateLimiter(limit=100)
+        assert limiter.limit == 100
+        assert limiter.window_seconds == 60
+
+    def test_rate_limiter_with_custom_limit(self):
+        """Test rate limiter with custom limit."""
+        limiter = RateLimiter(limit=50)
+        assert limiter.limit == 50
+
+    @pytest.mark.asyncio
+    async def test_rate_limiter_no_redis(self):
+        """Test rate limiter without Redis (should allow all)."""
+        limiter = RateLimiter(limit=5)
+        is_allowed, remaining = await limiter.check_rate_limit("test-client")
+        assert is_allowed is True
+        assert remaining == 5
+
+
+class TestHistoryEndpoint:
+    """Tests for the /history REST endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_requires_channel(self, server):
+        """Test that /history endpoint requires channel parameter."""
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history') as resp:
+                assert resp.status == 400
+                data = await resp.json()
+                assert 'error' in data
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_single_message(self, server):
+        """Test /history endpoint with a single message."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            broadcast_msg = json.dumps({
+                'type': 'broadcast',
+                'payload': {'channel': 'alerts', 'text': 'alert message'},
+                'timestamp': '2024-01-01T10:00:00'
+            })
+            await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['channel'] == 'alerts'
+                assert len(data['messages']) > 0
+                assert data['has_more'] is False
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_multiple_messages(self, server):
+        """Test /history endpoint with multiple messages."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(5):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'channel': 'alerts', 'text': f'message {i}'},
+                    'timestamp': f'2024-01-01T10:00:{i:02d}'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['channel'] == 'alerts'
+                assert len(data['messages']) > 0
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_with_limit(self, server):
+        """Test /history endpoint with limit parameter."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(10):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'channel': 'alerts', 'text': f'message {i}'},
+                    'timestamp': f'2024-01-01T10:00:{i:02d}'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts&limit=3') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['limit'] == 3
+                assert len(data['messages']) <= 3
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_with_since(self, server):
+        """Test /history endpoint with since parameter for time filtering."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            broadcast_msg = json.dumps({
+                'type': 'broadcast',
+                'payload': {'channel': 'alerts', 'text': 'message before'},
+                'timestamp': '2024-01-01T09:00:00'
+            })
+            await ws.send(broadcast_msg)
+
+            broadcast_msg = json.dumps({
+                'type': 'broadcast',
+                'payload': {'channel': 'alerts', 'text': 'message after'},
+                'timestamp': '2024-01-01T11:00:00'
+            })
+            await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts&since=2024-01-01T10:00:00') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['since'] == '2024-01-01T10:00:00'
+                assert len(data['messages']) >= 1
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_pagination(self, server):
+        """Test /history endpoint with pagination (offset)."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(5):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'channel': 'alerts', 'text': f'message {i}'},
+                    'timestamp': f'2024-01-01T10:00:{i:02d}'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts&limit=2&offset=0') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['offset'] == 0
+                assert len(data['messages']) <= 2
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_chronological_order(self, server):
+        """Test that /history returns messages in chronological order."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            timestamps = ['2024-01-01T10:00:00', '2024-01-01T10:00:01', '2024-01-01T10:00:02']
+            for i, ts in enumerate(timestamps):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'channel': 'timeline', 'text': f'message {i}'},
+                    'timestamp': ts
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=timeline') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert len(data['messages']) >= 3
+                for i in range(len(data['messages']) - 1):
+                    assert data['messages'][i]['timestamp'] <= data['messages'][i + 1]['timestamp']
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_has_more_flag(self, server):
+        """Test that has_more flag is set correctly."""
+        await asyncio.sleep(0.2)
+
+        async with websockets.connect('ws://localhost:8765') as ws:
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            for i in range(5):
+                broadcast_msg = json.dumps({
+                    'type': 'broadcast',
+                    'payload': {'channel': 'alerts', 'text': f'message {i}'},
+                    'timestamp': f'2024-01-01T10:00:{i:02d}'
+                })
+                await ws.send(broadcast_msg)
+            await asyncio.sleep(0.1)
+
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=alerts&limit=2') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert 'has_more' in data
+                if data['total'] > data['limit']:
+                    assert data['has_more'] is True
+
+    @pytest.mark.asyncio
+    async def test_history_endpoint_empty_channel(self, server):
+        """Test /history endpoint with channel that has no messages."""
+        await asyncio.sleep(0.2)
+
+        async with ClientSession() as session:
+            async with session.get('http://localhost:8080/history?channel=empty') as resp:
+                assert resp.status == 200
+                data = await resp.json()
+                assert data['channel'] == 'empty'
+                assert len(data['messages']) == 0
+                assert data['has_more'] is False
+
+
+# ── Message Cleanup Tests ──────────────────────────────────────
+
+class TestMessageCleanup:
+    """Tests for message cleanup functionality."""
+
+    def test_cleanup_old_messages(self):
+        """Test cleaning up messages older than TTL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            old_date = (datetime.utcnow() - timedelta(days=8)).isoformat()
+            recent_date = datetime.utcnow().isoformat()
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "old message"},
+                timestamp=old_date
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "recent message"},
+                timestamp=recent_date
+            )
+
+            deleted = persistence.cleanup_old_messages(ttl_days=7)
+            assert deleted == 1
+
+            remaining = persistence.get_message_count(channel="alerts")
+            assert remaining == 1
+
+    def test_cleanup_multiple_old_messages(self):
+        """Test cleaning up multiple old messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            old_date = (datetime.utcnow() - timedelta(days=10)).isoformat()
+            recent_date = datetime.utcnow().isoformat()
+
+            for i in range(3):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"old message {i}"},
+                    timestamp=old_date
+                )
+
+            for i in range(2):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"recent message {i}"},
+                    timestamp=recent_date
+                )
+
+            deleted = persistence.cleanup_old_messages(ttl_days=7)
+            assert deleted == 3
+
+            remaining = persistence.get_message_count(channel="alerts")
+            assert remaining == 2
+
+    def test_cleanup_with_custom_ttl(self):
+        """Test cleanup with custom TTL."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            old_date = (datetime.utcnow() - timedelta(days=15)).isoformat()
+            somewhat_old = (datetime.utcnow() - timedelta(days=8)).isoformat()
+            recent = datetime.utcnow().isoformat()
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "very old"},
+                timestamp=old_date
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "somewhat old"},
+                timestamp=somewhat_old
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "recent"},
+                timestamp=recent
+            )
+
+            deleted = persistence.cleanup_old_messages(ttl_days=10)
+            assert deleted == 1
+
+            remaining = persistence.get_message_count(channel="alerts")
+            assert remaining == 2
+
+    def test_cleanup_no_old_messages(self):
+        """Test cleanup when there are no old messages."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            recent = datetime.utcnow().isoformat()
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "recent"},
+                timestamp=recent
+            )
+
+            deleted = persistence.cleanup_old_messages(ttl_days=7)
+            assert deleted == 0
+
+            remaining = persistence.get_message_count(channel="alerts")
+            assert remaining == 1
+
+
+# ── Message Persistence Time Range Tests ──────────────────────
+
+class TestMessagePersistenceTimeRange:
+    """Tests for time-based message querying."""
+
+    def test_get_messages_since(self):
+        """Test retrieving messages since a specific timestamp."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "old"},
+                timestamp="2024-01-01T09:00:00"
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "new"},
+                timestamp="2024-01-01T11:00:00"
+            )
+
+            messages = persistence.get_messages_since(
+                channel="alerts",
+                since="2024-01-01T10:00:00"
+            )
+
+            assert len(messages) == 1
+            assert messages[0]["payload"]["text"] == "new"
+
+    def test_get_messages_since_with_limit(self):
+        """Test retrieving messages since timestamp with limit."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            for i in range(5):
+                persistence.store_message(
+                    channel="alerts",
+                    message_type="broadcast",
+                    payload={"text": f"message {i}"},
+                    timestamp=f"2024-01-01T10:00:{i:02d}"
+                )
+
+            messages = persistence.get_messages_since(
+                channel="alerts",
+                since="2024-01-01T09:00:00",
+                limit=2
+            )
+
+            assert len(messages) <= 2
+
+    def test_get_messages_count_since(self):
+        """Test getting count of messages since a timestamp."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "test.db")
+            db_url = f"sqlite:///{db_path}"
+            persistence = MessagePersistence(db_url)
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "old"},
+                timestamp="2024-01-01T09:00:00"
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "new1"},
+                timestamp="2024-01-01T11:00:00"
+            )
+
+            persistence.store_message(
+                channel="alerts",
+                message_type="broadcast",
+                payload={"text": "new2"},
+                timestamp="2024-01-01T12:00:00"
+            )
+
+            count = persistence.get_messages_count_since(
+                channel="alerts",
+                since="2024-01-01T10:00:00"
+            )
+
+            assert count == 2
