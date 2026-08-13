@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from abc import ABC, abstractmethod
 import json
 import os
 import sqlite3
@@ -393,8 +394,147 @@ def list_messages():
     return jsonify({"messages": get_message_store().list(limit, offset)})
 
 
+class BaseTransport(ABC):
+    """Connection and delivery boundary used by the notification server."""
+
+    def __init__(self) -> None:
+        self.notification_server: NotificationServer | None = None
+
+    def bind(self, server: NotificationServer) -> None:
+        self.notification_server = server
+
+    async def start(self, host: str, port: int) -> int:
+        """Start accepting clients and return the bound port."""
+        raise NotImplementedError
+
+    async def stop(self) -> None:
+        """Stop accepting clients and close transport resources."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def on_connect(self, connection: Any) -> str:
+        """Register a connection and return its client identifier."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str, connection: Any) -> None:
+        """Remove a connection and its transport state."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict[str, Any]) -> bool:
+        """Send a message to one connected client."""
+
+    @abstractmethod
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        """Send a message to all applicable connected clients."""
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Record transport-specific channel membership when needed."""
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Remove transport-specific channel membership when needed."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport contract."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.clients: dict[str, ServerConnection] = {}
+        self.channels: dict[str, set[str]] = {}
+        self.server: Server | None = None
+
+    async def start(self, host: str, port: int) -> int:
+        self.server = await serve(self._handler, host, port)
+        sockets = self.server.sockets
+        return sockets[0].getsockname()[1] if sockets else port
+
+    async def stop(self) -> None:
+        if self.server is None:
+            return
+        self.server.close()
+        await self.server.wait_closed()
+        self.server = None
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        client_id = str(uuid.uuid4())
+        self.clients[client_id] = connection
+        _add_client(client_id, connection)
+        return client_id
+
+    async def on_disconnect(
+        self, client_id: str, connection: ServerConnection
+    ) -> None:
+        _remove_client(client_id, connection)
+        if self.clients.get(client_id) is connection:
+            del self.clients[client_id]
+            for channel in list(self.channels):
+                self.channels[channel].discard(client_id)
+                if not self.channels[channel]:
+                    del self.channels[channel]
+
+    async def send_message(self, client_id: str, message: dict[str, Any]) -> bool:
+        connection = self.clients.get(client_id)
+        if connection is None:
+            return False
+        channel = message.get("channel")
+        if channel is not None and client_id not in self.channels.get(channel, set()):
+            return True
+        try:
+            await _send(connection, message)
+        except Exception:
+            await self.on_disconnect(client_id, connection)
+            return False
+        return True
+
+    async def broadcast(self, message: dict[str, Any]) -> None:
+        channel = message.get("channel")
+        client_ids = (
+            list(self.clients)
+            if channel is None
+            else list(self.channels.get(channel, set()))
+        )
+        if client_ids:
+            await asyncio.gather(
+                *(self.send_message(client_id, message) for client_id in client_ids)
+            )
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        self.channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        if channel not in self.channels:
+            return
+        self.channels[channel].discard(client_id)
+        if not self.channels[channel]:
+            del self.channels[channel]
+
+    async def _handler(self, connection: ServerConnection) -> None:
+        if self.notification_server is None:
+            raise RuntimeError("transport is not bound to a notification server")
+        client_id = await self.on_connect(connection)
+        await self.notification_server._on_connect(client_id)
+        try:
+            await self.send_message(
+                client_id,
+                make_message("system", {"event": "connected", "client_id": client_id}),
+            )
+            async for raw_message in connection:
+                await self.notification_server._on_message(client_id, raw_message)
+        finally:
+            await self.on_disconnect(client_id, connection)
+            await self.notification_server._on_disconnect(client_id)
+
+
+def create_transport(name: str | None = None) -> BaseTransport:
+    """Create the configured transport, defaulting to WebSockets."""
+    transport_name = (name or os.getenv("TRANSPORT", "websocket")).strip().lower()
+    if transport_name in {"websocket", "websockets", "ws"}:
+        return WebSocketTransport()
+    raise ValueError(f"unsupported transport: {transport_name}")
+
+
 class NotificationServer:
-    """Run the asyncio WebSocket loop in a dedicated daemon thread."""
+    """Run transport-independent notification logic in a daemon thread."""
 
     def __init__(
         self,
@@ -404,6 +544,7 @@ class NotificationServer:
         redis_url: str | None = None,
         redis_client: redis.Redis | None = None,
         message_store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -419,8 +560,10 @@ class NotificationServer:
             RedisConnectionState(self.broker.client) if self.broker is not None else None
         )
         self.message_store = message_store
+        self.transport = transport or create_transport()
+        self.transport.bind(self)
         self.server_id = str(uuid.uuid4())
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients = getattr(self.transport, "clients", {})
         self._channels: dict[str, set[str]] = {}
         self.loop: asyncio.AbstractEventLoop | None = None
         self._server: Server | None = None
@@ -456,13 +599,11 @@ class NotificationServer:
                 self._pubsub = self.broker.pubsub()
                 self._pubsub.subscribe(REDIS_MESSAGE_CHANNEL)
                 self._subscriber_task = asyncio.create_task(self._subscriber_worker())
-            return await serve(self._websocket_handler, self.host, self.port)
+            self.port = await self.transport.start(self.host, self.port)
+            return getattr(self.transport, "server", None)
 
         try:
             self._server = self.loop.run_until_complete(start_server())
-            sockets = self._server.sockets
-            if sockets:
-                self.port = sockets[0].getsockname()[1]
         except BaseException as exc:
             self._startup_error = exc
             self._ready.set()
@@ -473,8 +614,7 @@ class NotificationServer:
         try:
             self.loop.run_forever()
         finally:
-            self._server.close()
-            self.loop.run_until_complete(self._server.wait_closed())
+            self.loop.run_until_complete(self.transport.stop())
             pending = asyncio.all_tasks(self.loop)
             for task in pending:
                 task.cancel()
@@ -509,50 +649,12 @@ class NotificationServer:
         (self.message_store or get_message_store()).save(message)
 
     async def _broadcast_local(self, message: dict[str, Any]) -> None:
-        channel = message.get("channel")
-        if channel is None:
-            snapshot = list(self._clients.items())
-        else:
-            snapshot = [
-                (client_id, self._clients[client_id])
-                for client_id in self._channels.get(channel, set())
-                if client_id in self._clients
-            ]
-        if not snapshot:
-            return
-        results = await asyncio.gather(
-            *(_send(websocket, message) for _, websocket in snapshot),
-            return_exceptions=True,
-        )
-        for (client_id, websocket), result in zip(snapshot, results):
-            if isinstance(result, BaseException):
-                self._remove_local_client(client_id, websocket)
+        await self.transport.broadcast(message)
 
     async def _send_direct_local(
         self, client_id: str, message: dict[str, Any]
     ) -> bool:
-        websocket = self._clients.get(client_id)
-        channel = message.get("channel")
-        if websocket is None:
-            return False
-        if channel is not None and client_id not in self._channels.get(channel, set()):
-            return True
-        try:
-            await _send(websocket, message)
-        except Exception:
-            self._remove_local_client(client_id, websocket)
-            return False
-        return True
-
-    def _remove_local_client(
-        self, client_id: str, websocket: ServerConnection
-    ) -> None:
-        if self._clients.get(client_id) is websocket:
-            del self._clients[client_id]
-            for channel in list(self._channels):
-                self._channels[channel].discard(client_id)
-                if not self._channels[channel]:
-                    del self._channels[channel]
+        return await self.transport.send_message(client_id, message)
 
     async def _distribute(
         self, message: dict[str, Any], recipient: str | None = None
@@ -570,67 +672,64 @@ class NotificationServer:
         await self._broadcast_local(message)
         return True
 
-    async def _websocket_handler(self, websocket: ServerConnection) -> None:
-        client_id = str(uuid.uuid4())
-        _add_client(client_id, websocket)
-        self._clients[client_id] = websocket
+    async def _on_connect(self, client_id: str) -> None:
         if self.connection_state is not None:
             await asyncio.to_thread(
                 self.connection_state.connect, client_id, self.server_id
             )
+
+    async def _on_message(self, client_id: str, raw_message: Any) -> None:
         try:
-            await _send(
-                websocket,
-                make_message("system", {"event": "connected", "client_id": client_id}),
-            )
-            async for raw_message in websocket:
-                try:
-                    message = json.loads(raw_message)
-                except (json.JSONDecodeError, TypeError):
-                    await _send_error(websocket, "invalid JSON")
-                    continue
+            message = json.loads(raw_message)
+        except (json.JSONDecodeError, TypeError):
+            await self._send_error(client_id, "invalid JSON")
+            return
 
-                error = validate_message(message)
-                if error:
-                    await _send_error(websocket, error)
-                    continue
-
-                if message["type"] == "subscribe":
-                    _set_subscription(client_id, message["channel"], True)
-                    self._channels.setdefault(message["channel"], set()).add(client_id)
-                    if self.connection_state is not None:
-                        await asyncio.to_thread(
-                            self.connection_state.subscribe,
-                            client_id,
-                            message["channel"],
-                        )
-                elif message["type"] == "unsubscribe":
-                    _set_subscription(client_id, message["channel"], False)
-                    if message["channel"] in self._channels:
-                        self._channels[message["channel"]].discard(client_id)
-                        if not self._channels[message["channel"]]:
-                            del self._channels[message["channel"]]
-                    if self.connection_state is not None:
-                        await asyncio.to_thread(
-                            self.connection_state.unsubscribe,
-                            client_id,
-                            message["channel"],
-                        )
-                elif message["type"] == "broadcast":
-                    await self._distribute(message)
-                elif message["type"] == "direct":
-                    recipient = message["payload"].get("client_id")
-                    if not isinstance(recipient, str) or not recipient:
-                        await _send_error(websocket, "direct payload requires client_id")
-                    elif not await self._distribute(message, recipient):
-                        await _send_error(websocket, "client not found")
-                else:
-                    await _send_error(websocket, "system messages are server-only")
-        finally:
-            _remove_client(client_id, websocket)
-            self._remove_local_client(client_id, websocket)
+        error = validate_message(message)
+        if error:
+            await self._send_error(client_id, error)
+        elif message["type"] == "subscribe":
+            _set_subscription(client_id, message["channel"], True)
+            self._channels.setdefault(message["channel"], set()).add(client_id)
+            self.transport.subscribe(client_id, message["channel"])
             if self.connection_state is not None:
-                await asyncio.to_thread(self.connection_state.disconnect, client_id)
+                await asyncio.to_thread(
+                    self.connection_state.subscribe, client_id, message["channel"]
+                )
+        elif message["type"] == "unsubscribe":
+            _set_subscription(client_id, message["channel"], False)
+            if message["channel"] in self._channels:
+                self._channels[message["channel"]].discard(client_id)
+                if not self._channels[message["channel"]]:
+                    del self._channels[message["channel"]]
+            self.transport.unsubscribe(client_id, message["channel"])
+            if self.connection_state is not None:
+                await asyncio.to_thread(
+                    self.connection_state.unsubscribe, client_id, message["channel"]
+                )
+        elif message["type"] == "broadcast":
+            await self._distribute(message)
+        elif message["type"] == "direct":
+            recipient = message["payload"].get("client_id")
+            if not isinstance(recipient, str) or not recipient:
+                await self._send_error(client_id, "direct payload requires client_id")
+            elif not await self._distribute(message, recipient):
+                await self._send_error(client_id, "client not found")
+        else:
+            await self._send_error(client_id, "system messages are server-only")
+
+    async def _send_error(self, client_id: str, detail: str) -> None:
+        await self.transport.send_message(
+            client_id, make_message("system", {"error": detail})
+        )
+
+    async def _on_disconnect(self, client_id: str) -> None:
+        for channel in list(self._channels):
+            self._channels[channel].discard(client_id)
+            if not self._channels[channel]:
+                del self._channels[channel]
+        if self.connection_state is not None:
+            await asyncio.to_thread(self.connection_state.disconnect, client_id)
 
     def stop(self, timeout: float = 5.0) -> None:
         if self.loop is None or self._thread is None or not self._thread.is_alive():
