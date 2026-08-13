@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import sqlite3
 import threading
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
+import redis
 from websockets.asyncio.server import Server, ServerConnection, serve
 
 
@@ -22,6 +27,165 @@ clients: dict[str, ServerConnection] = {}
 channels: dict[str, set[str]] = {}
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
+REDIS_MESSAGE_CHANNEL = "notifications:messages"
+REDIS_CLIENTS_KEY = "notifications:clients"
+REDIS_CHANNELS_KEY = "notifications:channels"
+
+
+def database_path(database_url: str | None = None) -> str:
+    url = database_url or os.getenv("DATABASE_URL", "sqlite:///messages.db")
+    if url == "sqlite:///:memory:":
+        return ":memory:"
+    parsed = urlparse(url)
+    if parsed.scheme != "sqlite":
+        raise ValueError("DATABASE_URL must be a SQLite URL")
+    if parsed.netloc:
+        return unquote(f"//{parsed.netloc}{parsed.path}")
+    path = unquote(parsed.path)
+    if path.startswith("//"):
+        return path[1:]
+    return path.lstrip("/")
+
+
+class MessageStore:
+    """SQLite-backed message history, safe to use from multiple threads."""
+
+    def __init__(self, database_url: str | None = None) -> None:
+        self.path = database_path(database_url)
+        if self.path != ":memory:":
+            Path(self.path).parent.mkdir(parents=True, exist_ok=True)
+        self._connection = sqlite3.connect(self.path, check_same_thread=False)
+        self._connection.row_factory = sqlite3.Row
+        self._lock = threading.Lock()
+        with self._connection:
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    channel TEXT,
+                    type TEXT NOT NULL,
+                    payload TEXT NOT NULL,
+                    timestamp TEXT NOT NULL
+                )
+                """
+            )
+
+    def save(self, message: dict[str, Any]) -> int:
+        with self._lock, self._connection:
+            cursor = self._connection.execute(
+                """
+                INSERT INTO messages (channel, type, payload, timestamp)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    message.get("channel"),
+                    message["type"],
+                    json.dumps(message["payload"], separators=(",", ":")),
+                    message["timestamp"],
+                ),
+            )
+            return int(cursor.lastrowid)
+
+    def list(self, limit: int, offset: int) -> list[dict[str, Any]]:
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                SELECT id, channel, type, payload, timestamp
+                FROM messages ORDER BY id DESC LIMIT ? OFFSET ?
+                """,
+                (limit, offset),
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "channel": row["channel"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]),
+                "timestamp": row["timestamp"],
+            }
+            for row in rows
+        ]
+
+    def close(self) -> None:
+        with self._lock:
+            self._connection.close()
+
+
+class RedisConnectionState:
+    """Persistent connection metadata shared by all server instances."""
+
+    def __init__(self, client: redis.Redis) -> None:
+        self.client = client
+
+    def connect(self, client_id: str, server_id: str) -> None:
+        self.client.hset(REDIS_CLIENTS_KEY, client_id, server_id)
+
+    def disconnect(self, client_id: str) -> None:
+        channel_names = self.client.smembers(REDIS_CHANNELS_KEY)
+        pipeline = self.client.pipeline()
+        pipeline.hdel(REDIS_CLIENTS_KEY, client_id)
+        for channel in channel_names:
+            pipeline.srem(self._channel_key(channel), client_id)
+        pipeline.execute()
+        for channel in channel_names:
+            key = self._channel_key(channel)
+            if not self.client.exists(key):
+                self.client.srem(REDIS_CHANNELS_KEY, channel)
+
+    def subscribe(self, client_id: str, channel: str) -> None:
+        pipeline = self.client.pipeline()
+        pipeline.sadd(REDIS_CHANNELS_KEY, channel)
+        pipeline.sadd(self._channel_key(channel), client_id)
+        pipeline.execute()
+
+    def has_client(self, client_id: str) -> bool:
+        return bool(self.client.hexists(REDIS_CLIENTS_KEY, client_id))
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        key = self._channel_key(channel)
+        self.client.srem(key, client_id)
+        if not self.client.exists(key):
+            self.client.srem(REDIS_CHANNELS_KEY, channel)
+
+    @staticmethod
+    def _channel_key(channel: str | bytes) -> str:
+        if isinstance(channel, bytes):
+            channel = channel.decode()
+        return f"notifications:channel:{channel}:clients"
+
+
+class RedisBroker:
+    """Redis publisher and pub/sub consumer used as the delivery backbone."""
+
+    def __init__(self, client: redis.Redis) -> None:
+        self.client = client
+
+    @classmethod
+    def from_url(cls, url: str) -> "RedisBroker":
+        return cls(redis.Redis.from_url(url, decode_responses=True))
+
+    def publish(self, envelope: dict[str, Any]) -> None:
+        self.client.publish(REDIS_MESSAGE_CHANNEL, encode_message(envelope))
+
+    def pubsub(self):
+        return self.client.pubsub(ignore_subscribe_messages=True)
+
+
+_message_store: MessageStore | None = None
+_message_store_url: str | None = None
+_message_store_lock = threading.Lock()
+
+
+def get_message_store() -> MessageStore:
+    global _message_store, _message_store_url
+    url = os.getenv("DATABASE_URL", "sqlite:///messages.db")
+    with _message_store_lock:
+        if _message_store is None or _message_store_url != url:
+            if _message_store is not None:
+                _message_store.close()
+            _message_store = MessageStore(url)
+            _message_store_url = url
+        return _message_store
 
 
 def utc_timestamp() -> str:
@@ -217,14 +381,51 @@ def list_channel_subscribers(name: str):
     return jsonify({"channel": name, "subscribers": subscribers})
 
 
+@app.get("/messages")
+def list_messages():
+    try:
+        limit = int(request.args.get("limit", 50))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be integers"}), 400
+    if not 1 <= limit <= 1000 or offset < 0:
+        return jsonify({"error": "limit must be 1-1000 and offset must be non-negative"}), 400
+    return jsonify({"messages": get_message_store().list(limit, offset)})
+
+
 class NotificationServer:
     """Run the asyncio WebSocket loop in a dedicated daemon thread."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765) -> None:
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        *,
+        redis_url: str | None = None,
+        redis_client: redis.Redis | None = None,
+        message_store: MessageStore | None = None,
+    ) -> None:
         self.host = host
         self.port = port
+        configured_redis_url = redis_url or os.getenv("REDIS_URL")
+        self.broker = (
+            RedisBroker(redis_client)
+            if redis_client is not None
+            else RedisBroker.from_url(configured_redis_url)
+            if configured_redis_url
+            else None
+        )
+        self.connection_state = (
+            RedisConnectionState(self.broker.client) if self.broker is not None else None
+        )
+        self.message_store = message_store
+        self.server_id = str(uuid.uuid4())
+        self._clients: dict[str, ServerConnection] = {}
+        self._channels: dict[str, set[str]] = {}
         self.loop: asyncio.AbstractEventLoop | None = None
         self._server: Server | None = None
+        self._subscriber_task: asyncio.Task[None] | None = None
+        self._pubsub = None
         self._thread: threading.Thread | None = None
         self._ready = threading.Event()
         self._startup_error: BaseException | None = None
@@ -250,7 +451,12 @@ class NotificationServer:
         asyncio.set_event_loop(self.loop)
 
         async def start_server() -> Server:
-            return await serve(websocket_handler, self.host, self.port)
+            if self.broker is not None:
+                self.broker.client.ping()
+                self._pubsub = self.broker.pubsub()
+                self._pubsub.subscribe(REDIS_MESSAGE_CHANNEL)
+                self._subscriber_task = asyncio.create_task(self._subscriber_worker())
+            return await serve(self._websocket_handler, self.host, self.port)
 
         try:
             self._server = self.loop.run_until_complete(start_server())
@@ -276,7 +482,155 @@ class NotificationServer:
                 self.loop.run_until_complete(
                     asyncio.gather(*pending, return_exceptions=True)
                 )
+            if self._pubsub is not None:
+                self._pubsub.close()
             self.loop.close()
+
+    async def _subscriber_worker(self) -> None:
+        while True:
+            event = await asyncio.to_thread(
+                self._pubsub.get_message, ignore_subscribe_messages=True, timeout=0.1
+            )
+            if event is None:
+                await asyncio.sleep(0)
+                continue
+            try:
+                envelope = json.loads(event["data"])
+                message = envelope["message"]
+                recipient = envelope.get("recipient")
+                if recipient is None:
+                    await self._broadcast_local(message)
+                else:
+                    await self._send_direct_local(recipient, message)
+            except (KeyError, TypeError, json.JSONDecodeError, ValueError):
+                continue
+
+    def _store(self, message: dict[str, Any]) -> None:
+        (self.message_store or get_message_store()).save(message)
+
+    async def _broadcast_local(self, message: dict[str, Any]) -> None:
+        channel = message.get("channel")
+        if channel is None:
+            snapshot = list(self._clients.items())
+        else:
+            snapshot = [
+                (client_id, self._clients[client_id])
+                for client_id in self._channels.get(channel, set())
+                if client_id in self._clients
+            ]
+        if not snapshot:
+            return
+        results = await asyncio.gather(
+            *(_send(websocket, message) for _, websocket in snapshot),
+            return_exceptions=True,
+        )
+        for (client_id, websocket), result in zip(snapshot, results):
+            if isinstance(result, BaseException):
+                self._remove_local_client(client_id, websocket)
+
+    async def _send_direct_local(
+        self, client_id: str, message: dict[str, Any]
+    ) -> bool:
+        websocket = self._clients.get(client_id)
+        channel = message.get("channel")
+        if websocket is None:
+            return False
+        if channel is not None and client_id not in self._channels.get(channel, set()):
+            return True
+        try:
+            await _send(websocket, message)
+        except Exception:
+            self._remove_local_client(client_id, websocket)
+            return False
+        return True
+
+    def _remove_local_client(
+        self, client_id: str, websocket: ServerConnection
+    ) -> None:
+        if self._clients.get(client_id) is websocket:
+            del self._clients[client_id]
+            for channel in list(self._channels):
+                self._channels[channel].discard(client_id)
+                if not self._channels[channel]:
+                    del self._channels[channel]
+
+    async def _distribute(
+        self, message: dict[str, Any], recipient: str | None = None
+    ) -> bool:
+        self._store(message)
+        if self.broker is not None:
+            if recipient is not None and not self.connection_state.has_client(recipient):
+                return False
+            await asyncio.to_thread(
+                self.broker.publish, {"message": message, "recipient": recipient}
+            )
+            return True
+        if recipient is not None:
+            return await self._send_direct_local(recipient, message)
+        await self._broadcast_local(message)
+        return True
+
+    async def _websocket_handler(self, websocket: ServerConnection) -> None:
+        client_id = str(uuid.uuid4())
+        _add_client(client_id, websocket)
+        self._clients[client_id] = websocket
+        if self.connection_state is not None:
+            await asyncio.to_thread(
+                self.connection_state.connect, client_id, self.server_id
+            )
+        try:
+            await _send(
+                websocket,
+                make_message("system", {"event": "connected", "client_id": client_id}),
+            )
+            async for raw_message in websocket:
+                try:
+                    message = json.loads(raw_message)
+                except (json.JSONDecodeError, TypeError):
+                    await _send_error(websocket, "invalid JSON")
+                    continue
+
+                error = validate_message(message)
+                if error:
+                    await _send_error(websocket, error)
+                    continue
+
+                if message["type"] == "subscribe":
+                    _set_subscription(client_id, message["channel"], True)
+                    self._channels.setdefault(message["channel"], set()).add(client_id)
+                    if self.connection_state is not None:
+                        await asyncio.to_thread(
+                            self.connection_state.subscribe,
+                            client_id,
+                            message["channel"],
+                        )
+                elif message["type"] == "unsubscribe":
+                    _set_subscription(client_id, message["channel"], False)
+                    if message["channel"] in self._channels:
+                        self._channels[message["channel"]].discard(client_id)
+                        if not self._channels[message["channel"]]:
+                            del self._channels[message["channel"]]
+                    if self.connection_state is not None:
+                        await asyncio.to_thread(
+                            self.connection_state.unsubscribe,
+                            client_id,
+                            message["channel"],
+                        )
+                elif message["type"] == "broadcast":
+                    await self._distribute(message)
+                elif message["type"] == "direct":
+                    recipient = message["payload"].get("client_id")
+                    if not isinstance(recipient, str) or not recipient:
+                        await _send_error(websocket, "direct payload requires client_id")
+                    elif not await self._distribute(message, recipient):
+                        await _send_error(websocket, "client not found")
+                else:
+                    await _send_error(websocket, "system messages are server-only")
+        finally:
+            _remove_client(client_id, websocket)
+            self._remove_local_client(client_id, websocket)
+            if self.connection_state is not None:
+                await asyncio.to_thread(self.connection_state.disconnect, client_id)
 
     def stop(self, timeout: float = 5.0) -> None:
         if self.loop is None or self._thread is None or not self._thread.is_alive():
@@ -295,7 +649,7 @@ class NotificationServer:
         if self.loop is None or not self.loop.is_running():
             raise RuntimeError("WebSocket server is not running")
         future = asyncio.run_coroutine_threadsafe(
-            broadcast(make_message("broadcast", payload, channel)), self.loop
+            self._distribute(make_message("broadcast", payload, channel)), self.loop
         )
         future.result(timeout)
 
