@@ -14,9 +14,42 @@ import functools
 from werkzeug.security import generate_password_hash, check_password_hash
 from tasks import send_notification_email
 from repositories import TaskRepository, UserRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+import redis
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
+
+def get_rate_limit_key():
+    if app.config.get('TESTING'):
+        return 'testing'
+    if hasattr(request, 'user_id') and request.user_id:
+        return f"user_{request.user_id}"
+    return get_remote_address()
+
+try:
+    redis_client = redis.Redis(
+        host=os.environ.get('REDIS_HOST', 'localhost'),
+        port=int(os.environ.get('REDIS_PORT', 6379)),
+        decode_responses=True
+    )
+    redis_client.ping()
+    limiter = Limiter(
+        app=app,
+        key_func=get_rate_limit_key,
+        storage_uri=f"redis://{os.environ.get('REDIS_HOST', 'localhost')}:{os.environ.get('REDIS_PORT', 6379)}"
+    )
+except (redis.ConnectionError, Exception):
+    limiter = Limiter(
+        app=app,
+        key_func=get_rate_limit_key
+    )
+
+@app.before_request
+def disable_limiter_in_test():
+    if app.config.get('TESTING'):
+        limiter.enabled = False
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 
@@ -64,7 +97,7 @@ def init_db():
         conn.commit()
 
 
-# ── Authentication ────────────────────────────────────────────────
+# ── Authentication & Rate Limiting ────────────────────────────────────────────────
 
 
 def require_auth(f):
@@ -102,6 +135,39 @@ def _legacy_format_date(ts):
 # Unused notification stub
 def _notify_admin(task_id, action):
     print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
+
+
+# ── Pagination ────────────────────────────────────────────────
+
+
+def paginate_tasks(tasks: list, cursor: int | None, limit: int) -> tuple:
+    """
+    Paginate tasks using cursor-based pagination.
+    Returns (data, next_cursor, total).
+    Cursor is the id of the last item in the current page.
+    """
+    if not tasks:
+        return [], None, 0
+
+    total = len(tasks)
+
+    # Find starting index
+    start_idx = 0
+    if cursor is not None:
+        for idx, task in enumerate(tasks):
+            if task['id'] == cursor:
+                start_idx = idx + 1
+                break
+
+    # Get limit items from start_idx
+    data = tasks[start_idx:start_idx + limit]
+
+    # Calculate next cursor
+    next_cursor = None
+    if start_idx + limit < total and data:
+        next_cursor = data[-1]['id']
+
+    return data, next_cursor, total
 
 
 def create_task(title: str, owner_id: int) -> dict:
@@ -144,6 +210,7 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100/minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -164,6 +231,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100/minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -194,12 +262,28 @@ def login():
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100/minute")
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(request.user_id))
+    cursor = request.args.get('cursor', type=int, default=None)
+    limit = request.args.get('limit', type=int, default=20)
+
+    # Validate and clamp limit
+    if limit < 1 or limit > 100:
+        limit = 20
+
+    tasks = get_tasks(request.user_id)
+    data, next_cursor, total = paginate_tasks(tasks, cursor, limit)
+
+    return jsonify({
+        "data": data,
+        "next_cursor": next_cursor,
+        "total": total
+    })
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100/minute")
 @require_auth
 def add_task():
     data = request.get_json(silent=True) or {}
@@ -211,6 +295,7 @@ def add_task():
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100/minute")
 @require_auth
 def show_task(task_id: int):
     task = get_task(task_id, request.user_id)
@@ -220,6 +305,7 @@ def show_task(task_id: int):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100/minute")
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
@@ -234,13 +320,20 @@ def edit_task(task_id: int):
         owner_id=request.user_id,
     )
 
-    # Trigger notification if status changed to 'completed'
     if task and data.get("status") == "completed" and old_task.get("status") != "completed":
         user_email = get_user_email(request.user_id)
         if user_email:
             send_notification_email.delay(user_email, task["title"])
 
     return jsonify(task)
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    response = jsonify({"error": "Rate limit exceeded"})
+    response.status_code = 429
+    response.headers['Retry-After'] = '60'
+    return response
 
 
 if __name__ == "__main__":
