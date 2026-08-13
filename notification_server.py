@@ -65,8 +65,10 @@ import abc
 import asyncio
 import json
 import os
+import time
 import uuid
-from datetime import datetime, timezone
+from collections import deque
+from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlparse
 
 from websockets.asyncio.server import ServerConnection, serve
@@ -86,6 +88,17 @@ def now_iso() -> str:
 def build_message(msg_type: str, payload: dict) -> dict:
     """Build a message conforming to the shared JSON schema."""
     return {"type": msg_type, "payload": payload, "timestamp": now_iso()}
+
+
+def int_env(name: str, default: int) -> int:
+    """Read an integer environment variable, falling back to *default*."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
 
 
 # ── Transport layer ─────────────────────────────────────────────────────
@@ -266,6 +279,10 @@ class WebSocketTransport(BaseTransport):
             return await self._json_response(
                 200, await self.server._rest_messages(query)
             )
+        if path == "/history":
+            return await self._json_response(
+                200, await self.server._rest_history(query)
+            )
         return None
 
 
@@ -292,6 +309,79 @@ def get_transport(
             f"available transports: {sorted(TRANSPORTS)}"
         ) from None
     return cls(server=server)
+
+
+class RateLimiter:
+    """Per-client sliding-window rate limit backed by Redis counters.
+
+    Every incoming client message is checked through :meth:`allow`.  When the
+    client has already used its quota the message is rejected and the caller
+    replies with an error instead of dropping the connection.
+
+    Enforcement is local-first for speed: an in-process sliding window per
+    client answers the common case with no network round trip, while every
+    allowed request is mirrored into a Redis counter (per client ID) in the
+    background so limits are shared across server instances.  When the local
+    window is full the authoritative Redis counter is consulted before
+    rejecting.  Without a Redis backend the limiter is a no-op (there are no
+    shared counters to enforce against).
+    """
+
+    def __init__(
+        self,
+        backend: RedisBackend | None,
+        limit: int,
+        window: int = 60,
+    ) -> None:
+        self.backend = backend
+        self.limit = max(1, int(limit))
+        self.window = max(1, int(window))
+        self._local: dict[str, deque[float]] = {}
+        self._sync_tasks: set[asyncio.Task] = set()
+
+    def _queue(self, client_id: str) -> deque[float]:
+        now = time.monotonic()
+        queue = self._local.get(client_id)
+        if queue is None:
+            queue = self._local[client_id] = deque()
+        while queue and now - queue[0] >= self.window:
+            queue.popleft()
+        return queue
+
+    async def allow(self, client_id: str) -> bool:
+        if self.backend is None:
+            return True
+        queue = self._queue(client_id)
+        if len(queue) < self.limit:
+            queue.append(time.monotonic())
+            self._mirror(client_id)
+            return True
+        # Local window is full: the shared Redis counter has the final say.
+        try:
+            return await self.backend.rate_limit_allow(
+                client_id, self.limit, self.window
+            )
+        except Exception:
+            # Fail open: a Redis hiccup must not break message delivery.
+            return True
+
+    def _mirror(self, client_id: str) -> None:
+        task = asyncio.create_task(self._sync_counter(client_id))
+        self._sync_tasks.add(task)
+        task.add_done_callback(self._sync_tasks.discard)
+
+    async def _sync_counter(self, client_id: str) -> None:
+        try:
+            await self.backend.rate_limit_record(client_id, self.window)
+        except Exception:
+            pass
+
+    async def close(self) -> None:
+        for task in list(self._sync_tasks):
+            task.cancel()
+        if self._sync_tasks:
+            await asyncio.gather(*self._sync_tasks, return_exceptions=True)
+        self._sync_tasks.clear()
 
 
 class ClientRegistry:
@@ -411,6 +501,10 @@ class NotificationServer:
         store: MessageStore | None = None,
         server_id: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        rate_limit_window: int = 60,
+        message_ttl_days: int | None = None,
+        cleanup_interval: float | None = None,
     ) -> None:
         self.server_id = server_id or uuid.uuid4().hex
         self.backend = backend
@@ -424,6 +518,18 @@ class NotificationServer:
         self._id_lock = asyncio.Lock()
         self._broker_task: asyncio.Task | None = None
         self._pubsub = None
+        limit = int_env("RATE_LIMIT", 100) if rate_limit is None else rate_limit
+        if limit and limit > 0:
+            self._rate_limiter = RateLimiter(backend, limit, rate_limit_window)
+        else:
+            self._rate_limiter = None
+        self._message_ttl_days = (
+            int_env("MESSAGE_TTL_DAYS", 7)
+            if message_ttl_days is None
+            else message_ttl_days
+        )
+        self._cleanup_interval = cleanup_interval or 3600.0
+        self._cleanup_task: asyncio.Task | None = None
 
     # ── Redis backbone lifecycle ────────────────────────────────────
 
@@ -478,6 +584,45 @@ class NotificationServer:
         elif kind == "direct":
             await self._deliver_direct_local(envelope.get("target_id"), message)
 
+    # ── Message expiry maintenance ──────────────────────────────────
+
+    async def start_maintenance(self) -> None:
+        """Start the background task that expires messages older than the TTL."""
+        if self.store is None or self._cleanup_task is not None:
+            return
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
+
+    async def stop_maintenance(self) -> None:
+        """Stop the background cleanup task."""
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+        if self._rate_limiter is not None:
+            await self._rate_limiter.close()
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            try:
+                await self._run_cleanup()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+            await asyncio.sleep(self._cleanup_interval)
+
+    async def _run_cleanup(self) -> None:
+        """Delete messages older than ``MESSAGE_TTL_DAYS`` days."""
+        if self.store is None:
+            return
+        cutoff = datetime.now(timezone.utc) - timedelta(
+            days=self._message_ttl_days
+        )
+        await self.store.delete_older_than(cutoff.isoformat())
+
     # ── Session lifecycle ───────────────────────────────────────────
 
     async def _assign_id(self) -> str:
@@ -523,6 +668,12 @@ class NotificationServer:
             pass
 
     async def _dispatch(self, sender_id: str, connection: object, raw) -> None:
+        if self._rate_limiter is not None:
+            allowed = await self._rate_limiter.allow(sender_id)
+            if not allowed:
+                await self._send_error(sender_id, "rate limit exceeded")
+                return
+
         try:
             data = json.loads(raw)
         except (json.JSONDecodeError, TypeError):
@@ -701,6 +852,41 @@ class NotificationServer:
         total = await self.store.count()
         return {"messages": messages, "total": total}
 
+    async def _rest_history(self, query: dict) -> dict:
+        """Handle GET /history?channel=X&since=ISO_TIMESTAMP&limit=N&offset=N."""
+        channel = (query.get("channel") or [""])[0]
+        since = (query.get("since") or [None])[0]
+        try:
+            limit = int(query.get("limit", ["50"])[0])
+        except (TypeError, ValueError):
+            limit = 50
+        try:
+            offset = int(query.get("offset", ["0"])[0])
+        except (TypeError, ValueError):
+            offset = 0
+        limit = max(0, min(limit, 1000))
+        offset = max(0, offset)
+        if self.store is None:
+            return {
+                "channel": channel,
+                "since": since,
+                "limit": limit,
+                "offset": offset,
+                "messages": [],
+                "has_more": False,
+            }
+        messages, has_more = await self.store.query_history(
+            channel=channel, since=since or None, limit=limit, offset=offset
+        )
+        return {
+            "channel": channel,
+            "since": since,
+            "limit": limit,
+            "offset": offset,
+            "messages": messages,
+            "has_more": has_more,
+        }
+
 
 class NotificationApp:
     """Wraps a transport server bound to a host/port for easy (test) control."""
@@ -713,6 +899,10 @@ class NotificationApp:
         backend: RedisBackend | None = None,
         store: MessageStore | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        rate_limit_window: int = 60,
+        message_ttl_days: int | None = None,
+        cleanup_interval: float | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -720,7 +910,13 @@ class NotificationApp:
         self.store = store
         if notifier is None:
             notifier = NotificationServer(
-                backend=backend, store=store, transport=transport
+                backend=backend,
+                store=store,
+                transport=transport,
+                rate_limit=rate_limit,
+                rate_limit_window=rate_limit_window,
+                message_ttl_days=message_ttl_days,
+                cleanup_interval=cleanup_interval,
             )
         self.notifier = notifier
         self.server = None
@@ -728,6 +924,7 @@ class NotificationApp:
     async def start(self) -> "NotificationApp":
         if self.backend is not None:
             await self.notifier.start_backend()
+        await self.notifier.start_maintenance()
         transport = self.notifier.transport
         await transport.start(self.host, self.port)
         self.host = transport.host
@@ -740,6 +937,7 @@ class NotificationApp:
 
     async def stop(self) -> None:
         await self.notifier.transport.stop()
+        await self.notifier.stop_maintenance()
         if self.backend is not None:
             await self.notifier.stop_backend()
 
@@ -766,12 +964,14 @@ async def main(host: str = "0.0.0.0", port: int = 8765) -> None:
     try:
         if backend is not None:
             await notifier.start_backend()
+        await notifier.start_maintenance()
         await notifier.transport.start(host, port)
         try:
             await notifier.transport.serve_forever()
         finally:
             await notifier.transport.stop()
     finally:
+        await notifier.stop_maintenance()
         if backend is not None:
             await notifier.stop_backend()
             await backend.close()

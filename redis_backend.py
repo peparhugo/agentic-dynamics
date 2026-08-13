@@ -17,6 +17,7 @@ Connection string comes from the ``REDIS_URL`` environment variable.
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 
 import redis.asyncio as aioredis
@@ -73,6 +74,9 @@ class RedisBackend:
 
     def _channel_key(self, channel: str) -> str:
         return f"{self.namespace}:channel:{channel}"
+
+    def _ratelimit_key(self, client_id: str) -> str:
+        return f"{self.namespace}:ratelimit:{client_id}"
 
     @property
     def _clients_set(self) -> str:
@@ -138,3 +142,41 @@ class RedisBackend:
             pipe.delete(self._channel_key(channel))
             pipe.srem(self._channels_set, channel)
             await pipe.execute()
+
+    # ── Rate limiting ─────────────────────────────────────────────────
+
+    async def rate_limit_allow(
+        self, client_id: str, limit: int, window: int = 60
+    ) -> bool:
+        """Sliding-window per-client rate limit check.
+
+        Returns ``True`` when *client_id* has sent fewer than *limit* messages
+        in the last *window* seconds.  Request timestamps are kept in a sorted
+        set per client, so the counters are shared across server instances.
+        A rejected request does not consume quota; once the window has rolled
+        over the client is allowed again.
+        """
+        if self._redis is None:
+            raise RuntimeError("RedisBackend is not connected")
+        key = self._ratelimit_key(client_id)
+        now = time.time()
+        # Single round trip: prune the window, record the current request,
+        # refresh the TTL and read back the resulting count.
+        pipe = self._redis.pipeline()
+        pipe.zremrangebyscore(key, 0, now - window)
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, int(window))
+        pipe.zcard(key)
+        results = await pipe.execute()
+        return int(results[3]) <= limit
+
+    async def rate_limit_record(self, client_id: str, window: int = 60) -> None:
+        """Record one request from *client_id* into its Redis counter."""
+        if self._redis is None:
+            raise RuntimeError("RedisBackend is not connected")
+        key = self._ratelimit_key(client_id)
+        now = time.time()
+        pipe = self._redis.pipeline()
+        pipe.zadd(key, {str(now): now})
+        pipe.expire(key, int(window))
+        await pipe.execute()

@@ -19,6 +19,7 @@ either as a plain filesystem path or as a ``sqlite:///...`` URL.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 import aiosqlite
 
@@ -82,6 +83,32 @@ class MessageStore:
         await cur.close()
         return int(row["c"])
 
+    @staticmethod
+    def _row_to_dict(row) -> dict:
+        return {
+            "id": row["id"],
+            "channel": row["channel"],
+            "type": row["type"],
+            "payload": json.loads(row["payload"]),
+            "timestamp": row["timestamp"],
+        }
+
+    @staticmethod
+    def _normalize_timestamp(value: str) -> str | None:
+        """Normalize an ISO timestamp to the format used by ``now_iso``.
+
+        Returns ``None`` when *value* is not a parseable ISO timestamp so
+        callers can treat a malformed ``since`` as "no time filter".
+        """
+        text = value.strip().replace("Z", "+00:00")
+        try:
+            dt = datetime.fromisoformat(text)
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc).isoformat()
+
     async def list_messages(self, limit: int = 50, offset: int = 0) -> list[dict]:
         """Return messages newest-first with pagination."""
         cur = await self._conn.execute(
@@ -95,13 +122,48 @@ class MessageStore:
         )
         rows = await cur.fetchall()
         await cur.close()
-        return [
-            {
-                "id": row["id"],
-                "channel": row["channel"],
-                "type": row["type"],
-                "payload": json.loads(row["payload"]),
-                "timestamp": row["timestamp"],
-            }
-            for row in rows
-        ]
+        return [self._row_to_dict(row) for row in rows]
+
+    async def query_history(
+        self,
+        channel: str,
+        since: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[dict], bool]:
+        """Return messages for a channel in chronological order.
+
+        Filters by an exact *channel* and, when *since* is given, only returns
+        messages with a timestamp at or after *since*.  Pages through the
+        result with *limit*/*offset* and reports whether more rows exist via
+        the returned ``has_more`` flag.
+        """
+        where = ["channel = ?"]
+        params: list = [channel]
+        if since:
+            normalized = self._normalize_timestamp(since)
+            if normalized is not None:
+                where.append("timestamp >= ?")
+                params.append(normalized)
+        cur = await self._conn.execute(
+            f"""
+            SELECT id, channel, type, payload, timestamp
+            FROM messages
+            WHERE {' AND '.join(where)}
+            ORDER BY timestamp ASC, id ASC
+            LIMIT ? OFFSET ?
+            """,
+            (*params, limit + 1, offset),
+        )
+        rows = await cur.fetchall()
+        await cur.close()
+        has_more = len(rows) > limit
+        return [self._row_to_dict(row) for row in rows[:limit]], has_more
+
+    async def delete_older_than(self, cutoff_timestamp: str) -> int:
+        """Delete messages older than *cutoff_timestamp*; return rows removed."""
+        cur = await self._conn.execute(
+            "DELETE FROM messages WHERE timestamp < ?", (cutoff_timestamp,)
+        )
+        await self._conn.commit()
+        return int(cur.rowcount)
