@@ -9,6 +9,7 @@ Features:
 - Client state stored in Redis (survives server restart)
 - REST endpoint: GET /messages?limit=50&offset=0
 - Multiple server instances share the same Redis backbone
+- Pluggable transport layer (WebSocket by default)
 """
 
 import asyncio
@@ -20,6 +21,7 @@ from datetime import datetime, timezone
 from threading import Lock
 from typing import Set, Dict, Any
 import logging
+from abc import ABC, abstractmethod
 
 import websockets
 from websockets.asyncio.server import serve, ServerConnection
@@ -27,6 +29,131 @@ import redis.asyncio as aioredis
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+class BaseTransport(ABC):
+    """Abstract base class for transport implementations."""
+
+    @abstractmethod
+    async def on_connect(self, client_id: str) -> None:
+        """Called when a client connects."""
+        pass
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Called when a client disconnects."""
+        pass
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> None:
+        """Send a message to a specific client."""
+        pass
+
+    @abstractmethod
+    async def broadcast(self, message: str, client_ids: Set[str] | None = None) -> None:
+        """Broadcast a message to all clients or to specific clients."""
+        pass
+
+    @abstractmethod
+    async def start(self, host: str, port: int) -> None:
+        """Start the transport server."""
+        pass
+
+    @abstractmethod
+    async def shutdown(self) -> None:
+        """Shutdown the transport server."""
+        pass
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket-based transport implementation."""
+
+    def __init__(self, message_handler=None):
+        self.message_handler = message_handler
+        self._clients: Dict[str, ServerConnection] = {}
+        self._lock = Lock()
+        self.server = None
+
+    async def on_connect(self, client_id: str) -> None:
+        """Called when a client connects."""
+        logger.info(f"Client {client_id} connected via WebSocket")
+
+    async def on_disconnect(self, client_id: str) -> None:
+        """Called when a client disconnects."""
+        with self._lock:
+            self._clients.pop(client_id, None)
+        logger.info(f"Client {client_id} disconnected from WebSocket")
+
+    async def register_connection(self, client_id: str, connection: ServerConnection) -> None:
+        """Register a WebSocket connection for a client."""
+        with self._lock:
+            self._clients[client_id] = connection
+
+    async def unregister_connection(self, client_id: str) -> None:
+        """Unregister a WebSocket connection for a client."""
+        with self._lock:
+            self._clients.pop(client_id, None)
+
+    async def send_message(self, client_id: str, message: str) -> None:
+        """Send a message to a specific client."""
+        connection = None
+        with self._lock:
+            connection = self._clients.get(client_id)
+
+        if connection:
+            try:
+                await connection.send(message)
+            except (websockets.exceptions.ConnectionClosed, asyncio.CancelledError):
+                logger.debug(f"Failed to send to {client_id} (disconnected)")
+            except Exception as e:
+                logger.error(f"Error sending to {client_id}: {e}")
+        else:
+            logger.debug(f"Client {client_id} not found for send_message")
+
+    async def broadcast(self, message: str, client_ids: Set[str] | None = None) -> None:
+        """Broadcast a message to all clients or to specific clients."""
+        with self._lock:
+            clients_to_send = dict(self._clients)
+
+        if client_ids:
+            clients_to_send = {
+                cid: conn for cid, conn in clients_to_send.items()
+                if cid in client_ids
+            }
+
+        if not clients_to_send:
+            logger.debug("No clients to broadcast to")
+            return
+
+        tasks = []
+        for client_id, connection in clients_to_send.items():
+            tasks.append(self.send_message(client_id, message))
+
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    async def handle_client(self, websocket: ServerConnection) -> None:
+        """Handle a connected WebSocket client."""
+        client_id = str(uuid.uuid4())
+        await self.register_connection(client_id, websocket)
+        await self.on_connect(client_id)
+
+        try:
+            if self.message_handler:
+                await self.message_handler(client_id, websocket)
+        finally:
+            await self.unregister_connection(client_id)
+            await self.on_disconnect(client_id)
+
+    async def start(self, host: str, port: int) -> None:
+        """Start WebSocket server."""
+        async with serve(self.handle_client, host, port):
+            logger.info(f"WebSocket server listening on ws://{host}:{port}")
+            await asyncio.Future()  # Run forever
+
+    async def shutdown(self) -> None:
+        """Shutdown the transport server."""
+        pass
 
 
 class MessagePersistence:
@@ -217,6 +344,7 @@ class NotificationServer:
         redis_url: str = None,
         db_path: str = None,
         redis_client=None,
+        transport: BaseTransport = None,
     ):
         self.host = host
         self.ws_port = ws_port
@@ -228,9 +356,13 @@ class NotificationServer:
         self.loop = None
         self.pubsub = None
 
-    async def handle_client(self, websocket: ServerConnection) -> None:
+        if transport is None:
+            transport = WebSocketTransport(message_handler=self.handle_client)
+        self.transport = transport
+        self.transport.message_handler = self.handle_client
+
+    async def handle_client(self, client_id: str, websocket: ServerConnection) -> None:
         """Handle a connected WebSocket client."""
-        client_id = str(uuid.uuid4())
         await self.clients.add(client_id, websocket)
 
         logger.info(f"Client {client_id} connected. Total clients: {self.clients.count()}")
@@ -534,10 +666,8 @@ class NotificationServer:
             await server.serve_forever()
 
     async def ws_server(self) -> None:
-        """Start WebSocket server."""
-        async with serve(self.handle_client, self.host, self.ws_port):
-            logger.info(f"WebSocket server listening on ws://{self.host}:{self.ws_port}")
-            await asyncio.Future()  # Run forever
+        """Start WebSocket server via transport."""
+        await self.transport.start(self.host, self.ws_port)
 
     async def start(self) -> None:
         """Start WebSocket server, HTTP server, and Redis subscription."""
@@ -570,8 +700,20 @@ def create_server(
     redis_url: str = None,
     db_path: str = None,
     redis_client=None,
+    transport: BaseTransport = None,
 ) -> NotificationServer:
-    """Factory function to create a NotificationServer."""
+    """Factory function to create a NotificationServer.
+
+    Transport can be selected via the TRANSPORT environment variable.
+    Supported values: 'websocket' (default)
+    """
+    if transport is None:
+        transport_type = os.environ.get("TRANSPORT", "websocket").lower()
+        if transport_type == "websocket":
+            transport = WebSocketTransport()
+        else:
+            raise ValueError(f"Unknown transport type: {transport_type}")
+
     return NotificationServer(
         host=host,
         ws_port=ws_port,
@@ -579,6 +721,7 @@ def create_server(
         redis_url=redis_url,
         db_path=db_path,
         redis_client=redis_client,
+        transport=transport,
     )
 
 
