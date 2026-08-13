@@ -2,9 +2,10 @@ import { parseArgs } from '../src/cli';
 
 describe('CLI arguments', () => {
   it('parses custom directories', () => {
-    expect(parseArgs(['build', '--content', 'posts', '--output', 'public'])).toEqual({
+    expect(parseArgs(['build', '--content', 'posts', '--output', 'public', '--templates', 'views'])).toEqual({
       contentDir: 'posts',
-      outputDir: 'public'
+      outputDir: 'public',
+      templatesDir: 'views'
     });
   });
 

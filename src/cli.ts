@@ -3,16 +3,17 @@ import { buildSite, BuildOptions } from './generator';
 
 export function parseArgs(args: string[]): BuildOptions {
   if (args[0] !== 'build') {
-    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>]');
+    throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
   }
 
   const options: BuildOptions = {};
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
-    if ((option === '--content' || option === '--output') && value && !value.startsWith('--')) {
+    if ((option === '--content' || option === '--output' || option === '--templates') && value && !value.startsWith('--')) {
       if (option === '--content') options.contentDir = value;
       if (option === '--output') options.outputDir = value;
+      if (option === '--templates') options.templatesDir = value;
       index += 1;
       continue;
     }
