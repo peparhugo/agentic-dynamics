@@ -133,13 +133,25 @@ class TaskRepository(BaseRepository):
         finally:
             connection.close()
 
-    def list_for_owner(self, owner_id):
+    def list_page_for_owner(self, owner_id, cursor, limit):
         with self._connect() as connection:
-            return connection.execute(
-                "SELECT id, title, status, created_at FROM tasks "
-                "WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
+            total = connection.execute(
+                "SELECT COUNT(*) AS total FROM tasks WHERE owner_id = ?",
                 (owner_id,),
-            ).fetchall()
+            ).fetchone()["total"]
+            if cursor is None:
+                rows = connection.execute(
+                    "SELECT id, title, status, created_at FROM tasks "
+                    "WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id, title, status, created_at FROM tasks "
+                    "WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            return rows, total
 
     def get_for_owner(self, task_id, owner_id):
         with self._connect() as connection:

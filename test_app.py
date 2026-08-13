@@ -1,6 +1,9 @@
+import os
 import sqlite3
 
 import pytest
+
+os.environ.setdefault("RATELIMIT_STORAGE_URI", "memory://")
 
 import app as task_app
 
@@ -10,7 +13,8 @@ def anonymous_client(tmp_path, monkeypatch):
     monkeypatch.setattr(task_app, "DATABASE", str(tmp_path / "test.db"))
     monkeypatch.setattr(task_app, "JWT_SECRET", "test-secret")
     task_app.init_db()
-    task_app.app.config.update(TESTING=True)
+    task_app.app.config.update(TESTING=True, RATELIMIT_ENABLED=False)
+    task_app.limiter.reset()
     return task_app.app.test_client()
 
 
@@ -157,7 +161,57 @@ def test_list_tasks_newest_first(client):
     response = client.get("/tasks")
 
     assert response.status_code == 200
-    assert [task["id"] for task in response.get_json()] == [second["id"], first["id"]]
+    assert response.get_json() == {
+        "data": [second, first],
+        "next_cursor": None,
+        "total": 2,
+    }
+
+
+def test_list_tasks_uses_default_page_size(client):
+    for number in range(21):
+        client.post("/tasks", json={"title": f"Task {number}"})
+
+    response = client.get("/tasks")
+
+    body = response.get_json()
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] == str(body["data"][-1]["id"])
+    assert body["total"] == 21
+
+
+def test_list_tasks_follows_cursor_without_duplicates(client):
+    created = [
+        client.post("/tasks", json={"title": f"Task {number}"}).get_json()
+        for number in range(5)
+    ]
+
+    first_page = client.get("/tasks?limit=2").get_json()
+    second_page = client.get(
+        f"/tasks?limit=2&cursor={first_page['next_cursor']}"
+    ).get_json()
+    third_page = client.get(
+        f"/tasks?limit=2&cursor={second_page['next_cursor']}"
+    ).get_json()
+
+    ids = [
+        task["id"]
+        for page in (first_page, second_page, third_page)
+        for task in page["data"]
+    ]
+    assert ids == [task["id"] for task in reversed(created)]
+    assert second_page["total"] == 5
+    assert third_page["next_cursor"] is None
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["limit=0", "limit=101", "limit=nope", "cursor=0", "cursor=nope"],
+)
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks?{query}")
+
+    assert response.status_code == 400
 
 
 def test_get_task(client):
@@ -266,7 +320,11 @@ def test_users_only_see_and_modify_their_own_tasks(client):
     )
     bob_headers = {"Authorization": f"Bearer {login.get_json()['token']}"}
 
-    assert client.get("/tasks", headers=bob_headers).get_json() == []
+    assert client.get("/tasks", headers=bob_headers).get_json() == {
+        "data": [],
+        "next_cursor": None,
+        "total": 0,
+    }
     assert client.get(f"/tasks/{alice_task['id']}", headers=bob_headers).status_code == 404
     assert (
         client.put(
@@ -305,3 +363,25 @@ def test_init_db_migrates_existing_tasks_without_data_loss(tmp_path, monkeypatch
         ).fetchone()
     assert "owner_id" in columns
     assert task == ("Legacy", None)
+
+
+def test_rate_limit_applies_to_authenticated_user(client):
+    task_app.app.config["RATELIMIT_ENABLED"] = True
+
+    responses = [client.get("/tasks") for _ in range(101)]
+
+    assert all(response.status_code == 200 for response in responses[:100])
+    assert responses[100].status_code == 429
+    assert int(responses[100].headers["Retry-After"]) > 0
+
+
+def test_rate_limit_applies_to_auth_endpoints(anonymous_client):
+    task_app.app.config["RATELIMIT_ENABLED"] = True
+
+    responses = [
+        anonymous_client.post("/auth/login", json={}) for _ in range(101)
+    ]
+
+    assert all(response.status_code == 400 for response in responses[:100])
+    assert responses[100].status_code == 429
+    assert int(responses[100].headers["Retry-After"]) > 0
