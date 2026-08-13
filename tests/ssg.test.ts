@@ -1,7 +1,9 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, parseMarkdown, renderPage } from '../src';
+import http from 'node:http';
+import { WebSocket } from 'ws';
+import { buildSite, parseMarkdown, renderPage, startDevServer } from '../src';
 import { createProgram } from '../src/cli';
 
 describe('static site generator', () => {
@@ -159,5 +161,48 @@ describe('static site generator', () => {
     await expect(fs.readFile(path.join(output, 'page.html'), 'utf8')).resolves.toContain('<h1>CLI page</h1>');
     expect(write).toHaveBeenCalledWith(`Generated 1 page in ${output}\n`);
     write.mockRestore();
+  });
+
+  test('serves dist with live reload and rebuilds changed content', async () => {
+    const content = path.join(workspace, 'content');
+    const output = path.join(workspace, 'dist');
+    await fs.mkdir(content);
+    await fs.writeFile(path.join(content, 'page.md'), '# Before');
+    const server = await startDevServer({ contentDir: content, outputDir: output, port: 0 });
+
+    const request = (pathname: string): Promise<string> => new Promise((resolve, reject) => {
+      http.get({ hostname: server.host, port: server.port, path: pathname }, (response) => {
+        const chunks: Buffer[] = [];
+        response.on('data', (chunk: Buffer) => chunks.push(chunk));
+        response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      }).on('error', reject);
+    });
+
+    try {
+      const initial = await request('/page.html');
+      expect(initial).toContain('<h1>Before</h1>');
+      expect(initial).toContain("new WebSocket");
+
+      const socket = new WebSocket(`ws://${server.host}:${server.port}/__ssg_reload`);
+      await new Promise<void>((resolve, reject) => {
+        socket.once('open', resolve);
+        socket.once('error', reject);
+      });
+      const reloaded = new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Timed out waiting for reload')), 5000);
+        socket.once('message', (message) => {
+          clearTimeout(timeout);
+          expect(message.toString()).toBe('reload');
+          resolve();
+        });
+      });
+
+      await fs.writeFile(path.join(content, 'page.md'), '# After');
+      await reloaded;
+      await expect(request('/page.html')).resolves.toContain('<h1>After</h1>');
+      socket.close();
+    } finally {
+      await server.close();
+    }
   });
 });

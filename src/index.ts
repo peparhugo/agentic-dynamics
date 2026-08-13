@@ -219,3 +219,5 @@ export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
   return pages;
 }
+
+export { startDevServer, type DevServer, type ServeOptions } from './server';

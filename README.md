@@ -50,4 +50,14 @@ Page templates receive frontmatter plus `title`, `date`, `tags`, `url`, and raw 
 
 Override the template directory with `npx ssg build --templates ./theme`. If no template directory exists, the built-in page renderer remains in use.
 
+## Development server
+
+Build and serve `./dist` at `http://localhost:3000` with:
+
+```sh
+npx ssg serve
+```
+
+Changes under `content/` or `templates/` rebuild the site and reload connected browsers. Use `--port <number>` to select another port. The `--content`, `--output`, and `--templates` options are also supported by `serve`.
+
 Run tests with `npm test`.
