@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import jwt
 import os
 from functools import wraps
+from celery_config import celery_app
+from tasks import send_notification_email
 
 app = Flask(__name__)
 db_path = os.path.join(os.path.dirname(__file__), 'tasks.db')
@@ -20,6 +22,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     def set_password(self, password):
@@ -109,6 +112,8 @@ def register():
 
     user = User(username=data['username'])
     user.set_password(data['password'])
+    if 'email' in data:
+        user.email = data['email']
     db.session.add(user)
     db.session.commit()
 
@@ -177,6 +182,7 @@ def update_task(task_id, user_id):
         return jsonify({'error': 'Task not found'}), 404
 
     data = request.get_json(silent=True) or {}
+    old_status = task.status
 
     if 'title' in data and data['title']:
         task.title = data['title']
@@ -185,6 +191,11 @@ def update_task(task_id, user_id):
         task.status = data['status']
 
     db.session.commit()
+
+    if old_status != 'completed' and task.status == 'completed':
+        user = User.query.get(user_id)
+        if user:
+            send_notification_email.delay(user.email, task.title)
 
     return jsonify(task.to_dict()), 200
 

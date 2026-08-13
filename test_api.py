@@ -2,6 +2,7 @@ import pytest
 import json
 import os
 from datetime import datetime
+from unittest import mock
 from app import app, db, Task, User
 
 
@@ -576,6 +577,134 @@ class TestUpdateTask:
         assert response.status_code == 404
         data = response.get_json()
         assert 'error' in data
+
+    def _register_and_login(self, client):
+        register_user(client, 'testuser', 'password123')
+        return 'testuser', 'password123'
+
+
+class TestNotificationTrigger:
+    @mock.patch('app.send_notification_email.delay')
+    def test_notification_triggered_on_status_change_to_completed(self, mock_send_email, client):
+        token = login_user(client, *self._register_and_login(client))
+        create_response = client.post(
+            '/tasks',
+            data=json.dumps({'title': 'Test task'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        task_id = create_response.get_json()['id']
+
+        response = client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        mock_send_email.assert_called_once()
+        call_args = mock_send_email.call_args
+        assert call_args[0][0] is None
+        assert call_args[0][1] == 'Test task'
+
+    @mock.patch('app.send_notification_email.delay')
+    def test_notification_triggered_with_user_email(self, mock_send_email, client):
+        register_response = client.post(
+            '/auth/register',
+            data=json.dumps({'username': 'testuser', 'password': 'password123', 'email': 'test@example.com'}),
+            content_type='application/json'
+        )
+        token = login_user(client, 'testuser', 'password123')
+
+        create_response = client.post(
+            '/tasks',
+            data=json.dumps({'title': 'Important task'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        task_id = create_response.get_json()['id']
+
+        response = client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        mock_send_email.assert_called_once()
+        call_args = mock_send_email.call_args
+        assert call_args[0][0] == 'test@example.com'
+        assert call_args[0][1] == 'Important task'
+
+    @mock.patch('app.send_notification_email.delay')
+    def test_notification_not_triggered_on_other_status_changes(self, mock_send_email, client):
+        token = login_user(client, *self._register_and_login(client))
+        create_response = client.post(
+            '/tasks',
+            data=json.dumps({'title': 'Test task'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        task_id = create_response.get_json()['id']
+
+        response = client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'status': 'in_progress'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        mock_send_email.assert_not_called()
+
+    @mock.patch('app.send_notification_email.delay')
+    def test_notification_not_triggered_when_already_completed(self, mock_send_email, client):
+        token = login_user(client, *self._register_and_login(client))
+        create_response = client.post(
+            '/tasks',
+            data=json.dumps({'title': 'Test task'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        task_id = create_response.get_json()['id']
+
+        client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        mock_send_email.reset_mock()
+
+        response = client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'status': 'completed'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        mock_send_email.assert_not_called()
+
+    @mock.patch('app.send_notification_email.delay')
+    def test_notification_triggered_when_updating_title_and_status_to_completed(self, mock_send_email, client):
+        token = login_user(client, *self._register_and_login(client))
+        create_response = client.post(
+            '/tasks',
+            data=json.dumps({'title': 'Original title'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        task_id = create_response.get_json()['id']
+
+        response = client.put(
+            f'/tasks/{task_id}',
+            data=json.dumps({'title': 'Updated title', 'status': 'completed'}),
+            content_type='application/json',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200
+        mock_send_email.assert_called_once()
+        call_args = mock_send_email.call_args
+        assert call_args[0][1] == 'Updated title'
 
     def _register_and_login(self, client):
         register_user(client, 'testuser', 'password123')
