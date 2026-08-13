@@ -15,8 +15,14 @@ Task endpoints (require "Authorization: Bearer <token>"):
     GET    /tasks       list the current user's tasks, ordered by created_at desc
     GET    /tasks/<id>  get a single task owned by the current user
     PUT    /tasks/<id>  update task title and/or status (must be owned by the current user)
+
+Notifications:
+    When PUT /tasks/<id> transitions a task's status to 'completed', a
+    send_notification_email Celery task is queued asynchronously (via Redis)
+    to notify the task owner; it never blocks or fails the API response.
 """
 
+import logging
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
@@ -25,6 +31,10 @@ from functools import wraps
 import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
+
+from celery_app import send_notification_email
+
+logger = logging.getLogger(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
@@ -35,7 +45,8 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    password_hash TEXT NOT NULL
+    password_hash TEXT NOT NULL,
+    email TEXT
 );
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,11 +81,20 @@ def _migrate_add_owner_id(conn):
         conn.commit()
 
 
+def _migrate_add_email(conn):
+    """Add users.email to databases created before notifications existed."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "email" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+
+
 def init_db(database_path):
     conn = sqlite3.connect(database_path)
     conn.executescript(SCHEMA)
     conn.commit()
     _migrate_add_owner_id(conn)
+    _migrate_add_email(conn)
     conn.close()
 
 
@@ -175,10 +195,16 @@ def create_app(database_path=None):
         if existing is not None:
             return jsonify(error="username already taken"), 409
 
+        email = data.get("email")
+        if not isinstance(email, str) or not email.strip():
+            email = f"{username}@example.com"
+        else:
+            email = email.strip()
+
         password_hash = generate_password_hash(password)
         cur = db.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         db.commit()
         return jsonify(id=cur.lastrowid, username=username), 201
@@ -278,12 +304,26 @@ def create_app(database_path=None):
                 return jsonify(error=f"status must be one of {sorted(VALID_STATUSES)}"), 400
             status = new_status
 
+        status_became_completed = status == "completed" and row["status"] != "completed"
+
         db.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
             (title, status, task_id),
         )
         db.commit()
         updated = db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+
+        if status_became_completed:
+            owner = db.execute(
+                "SELECT email, username FROM users WHERE id = ?", (g.current_user_id,)
+            ).fetchone()
+            if owner is not None:
+                owner_email = owner["email"] or owner["username"]
+                try:
+                    send_notification_email.delay(owner_email, updated["title"])
+                except Exception:
+                    logger.exception("Failed to queue completion notification for task %s", task_id)
+
         return jsonify(task_to_dict(updated)), 200
 
     return app

@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+import task_api
 from task_api import create_app
 
 
@@ -468,3 +469,109 @@ def test_persists_across_requests(client, headers):
     resp = client.get(f"/tasks/{created['id']}", headers=headers)
     assert resp.status_code == 200
     assert resp.get_json()["title"] == "Persisted"
+
+
+# ── Completion notification trigger ───────────────────────────────
+
+
+@pytest.fixture
+def notify_mock(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        task_api.send_notification_email, "delay", lambda *args, **kwargs: calls.append(args)
+    )
+    return calls
+
+
+def test_status_transition_to_completed_triggers_notification(client, headers, notify_mock):
+    created = create_task(client, headers, title="Ship feature").get_json()
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"status": "completed"}),
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert len(notify_mock) == 1
+    user_email, task_title = notify_mock[0]
+    assert user_email == "alice@example.com"
+    assert task_title == "Ship feature"
+
+
+def test_status_transition_to_non_completed_does_not_trigger_notification(client, headers, notify_mock):
+    created = create_task(client, headers, title="Task").get_json()
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"status": "in_progress"}),
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert notify_mock == []
+
+
+def test_title_only_update_does_not_trigger_notification(client, headers, notify_mock):
+    created = create_task(client, headers, title="Task").get_json()
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"title": "Renamed"}),
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert notify_mock == []
+
+
+def test_already_completed_task_does_not_retrigger_notification(client, headers, notify_mock):
+    created = create_task(client, headers, title="Task", status="completed").get_json()
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"status": "completed"}),
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert notify_mock == []
+
+
+def test_notification_uses_registered_email_when_provided(client, notify_mock):
+    client.post(
+        "/auth/register",
+        data=json.dumps(
+            {"username": "carol", "password": "password123", "email": "carol@work.example"}
+        ),
+        content_type="application/json",
+    )
+    resp = client.post(
+        "/auth/login",
+        data=json.dumps({"username": "carol", "password": "password123"}),
+        content_type="application/json",
+    )
+    carol_headers = auth_header(resp.get_json()["token"])
+    created = create_task(client, carol_headers, title="Review PR").get_json()
+
+    client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"status": "completed"}),
+        content_type="application/json",
+        headers=carol_headers,
+    )
+    assert len(notify_mock) == 1
+    assert notify_mock[0][0] == "carol@work.example"
+
+
+def test_notification_failure_does_not_break_api_response(client, headers, monkeypatch):
+    def raise_error(*args, **kwargs):
+        raise ConnectionError("broker unavailable")
+
+    monkeypatch.setattr(task_api.send_notification_email, "delay", raise_error)
+
+    created = create_task(client, headers, title="Task").get_json()
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        data=json.dumps({"status": "completed"}),
+        content_type="application/json",
+        headers=headers,
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
