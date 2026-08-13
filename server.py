@@ -1,14 +1,19 @@
 """WebSocket notification server.
 
-A single asyncio-based server (built on the ``websockets`` library) that:
+An asyncio-based server (built on the ``websockets`` library) that:
 
 * accepts WebSocket connections and assigns each client a unique id,
 * broadcasts messages to every connected client,
 * delivers direct messages to a single client,
 * tracks connections in a thread-safe registry,
 * supports named channels that clients can subscribe/unsubscribe to,
-* exposes ``GET /health``, ``GET /channels`` and
-  ``GET /channels/{name}/subscribers`` as plain HTTP endpoints.
+* routes every message through a Redis pub/sub backbone so multiple
+  server instances can share the same delivery network,
+* mirrors client connection state into Redis so it survives restarts,
+* persists every message to a SQLite history database,
+* exposes ``GET /health``, ``GET /channels``,
+  ``GET /channels/{name}/subscribers`` and ``GET /messages`` as plain
+  HTTP endpoints.
 
 Message format
 --------------
@@ -22,19 +27,26 @@ Supported ``type`` values:
 * ``"subscribe"``   - subscribe the sender to a named ``channel``,
 * ``"unsubscribe"`` - unsubscribe the sender from a named ``channel``,
 * ``"system"``      - server lifecycle notices (e.g. the connect welcome).
+
+Configuration
+-------------
+* ``REDIS_URL``    - broker connection URL (default ``redis://localhost:6379/0``)
+* ``DATABASE_URL`` - SQLite database path (default ``messages.db``)
 """
 
 import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import parse_qs, urlsplit
 
 import websockets
 from websockets.asyncio.server import Server, serve
 from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Headers, Request, Response
 
+from broker import ConnectionState, MessageBroker, MessageStore
 from registry import ClientRegistry
 
 
@@ -56,16 +68,29 @@ def dumps_message(msg_type: str, payload: Dict[str, Any]) -> str:
 class NotificationServer:
     """WebSocket notification server with a REST health endpoint."""
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 8765):
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 8765,
+        broker: Optional[MessageBroker] = None,
+        store: Optional[MessageStore] = None,
+        channel: Optional[str] = None,
+    ):
         self.host = host
         self.port = port
         self.registry = ClientRegistry()
+        if broker is None:
+            broker = MessageBroker(channel=channel or f"notifications:{uuid.uuid4().hex}")
+        self.broker = broker
+        self.store = store or MessageStore()
+        self.state = ConnectionState(namespace=f"notif:{self.broker.channel}")
+        self.instance_id = str(uuid.uuid4())
         self._ws_server: Optional[Server] = None
 
     # ── lifecycle ────────────────────────────────────────────────────────
 
     async def start(self) -> "NotificationServer":
-        """Start serving WebSocket connections and the health endpoint."""
+        """Start serving WebSocket connections, HTTP endpoints and the broker."""
         self._ws_server = await serve(
             self.handle_connection,
             self.host,
@@ -74,15 +99,16 @@ class NotificationServer:
         )
         if self._ws_server.sockets:
             self.port = self._ws_server.sockets[0].getsockname()[1]
+        await self.broker.start(self._on_broker_message)
         return self
 
     async def stop(self) -> None:
         """Shut the server down and wait for all handlers to finish."""
-        if self._ws_server is None:
-            return
-        self._ws_server.close()
-        await self._ws_server.wait_closed()
-        self._ws_server = None
+        if self._ws_server is not None:
+            self._ws_server.close()
+            await self._ws_server.wait_closed()
+            self._ws_server = None
+        await self.broker.stop()
 
     # ── websocket handling ───────────────────────────────────────────────
 
@@ -90,9 +116,10 @@ class NotificationServer:
         """Assign a unique id and keep the client alive until it disconnects."""
         client_id = str(uuid.uuid4())
         self.registry.add(client_id, connection)
+        self.state.register(client_id)
+        self._restore_membership(client_id)
         try:
-            await self._send(
-                connection,
+            message = make_message(
                 "system",
                 {
                     "message": "connected",
@@ -100,12 +127,17 @@ class NotificationServer:
                     "connected_clients": self.registry.count(),
                 },
             )
+            await connection.send(json.dumps(message))
+            self.store.store_message(
+                None, "system", message["payload"], message["timestamp"]
+            )
             async for raw in connection:
                 await self._on_message(connection, client_id, raw)
         except ConnectionClosed:
             pass
         finally:
             self.registry.remove(client_id)
+            self.state.unregister(client_id)
 
     async def _on_message(self, connection, client_id: str, raw: str) -> None:
         """Handle an inbound client message (broadcast / direct / channel requests)."""
@@ -154,25 +186,87 @@ class NotificationServer:
         When ``channel`` is given (or present as a ``"channel"`` key inside
         ``payload``) the message is delivered only to the subscribers of that
         channel. Otherwise it goes to every connected client.
+
+        The message is published to the Redis backbone and persisted to the
+        history database; delivery to local clients happens in the broker
+        subscriber task so every instance behaves identically.
         """
         if channel is None and isinstance(payload, dict):
             channel = payload.get("channel")
-        if channel:
-            targets = self.registry.connections_for_channel(channel)
-        else:
-            targets = self.registry.connections()
-        websockets.broadcast(targets, dumps_message("broadcast", payload))
+        message = make_message("broadcast", payload)
+        envelope = self._envelope(
+            "broadcast", channel=channel, payload=payload, timestamp=message["timestamp"]
+        )
+        self._persist_envelope(envelope)
+        self.broker.publish(envelope)
 
     async def direct(self, client_id: str, payload: Dict[str, Any]) -> bool:
         """Send a ``"direct"`` message to one client.
 
-        Returns True when the client exists, False otherwise.
+        The message is published to the Redis backbone so any instance
+        holding the client can deliver it. Returns True when the client is
+        connected to this instance, False otherwise.
         """
-        connection = self.registry.get(client_id)
-        if connection is None:
-            return False
-        await self._send(connection, "direct", payload)
-        return True
+        local = self.registry.get(client_id) is not None
+        message = make_message("direct", payload)
+        envelope = self._envelope(
+            "direct",
+            channel=None,
+            payload=payload,
+            target=client_id,
+            timestamp=message["timestamp"],
+        )
+        self._persist_envelope(envelope)
+        self.broker.publish(envelope)
+        return local
+
+    def _envelope(
+        self,
+        msg_type: str,
+        channel: Optional[str],
+        payload: Dict[str, Any],
+        target: Optional[str] = None,
+        timestamp: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build the wire envelope published to the Redis backbone."""
+        return {
+            "type": msg_type,
+            "channel": channel,
+            "target": target,
+            "payload": payload,
+            "timestamp": timestamp or utc_now_iso(),
+            "sender": self.instance_id,
+        }
+
+    def _persist_envelope(self, envelope: Dict[str, Any]) -> None:
+        self.store.store_message(
+            envelope.get("channel"),
+            envelope.get("type"),
+            envelope.get("payload") or {},
+            envelope.get("timestamp"),
+        )
+
+    async def _on_broker_message(self, envelope: Dict[str, Any]) -> None:
+        """Deliver an envelope received from the Redis backbone locally."""
+        msg_type = envelope.get("type")
+        payload = envelope.get("payload") or {}
+        if msg_type == "broadcast":
+            channel = envelope.get("channel")
+            if channel:
+                targets = self.registry.connections_for_channel(channel)
+            else:
+                targets = self.registry.connections()
+            if targets:
+                websockets.broadcast(targets, dumps_message("broadcast", payload))
+        elif msg_type == "direct":
+            target = envelope.get("target")
+            if target:
+                connection = self.registry.get(target)
+                if connection is not None:
+                    try:
+                        await self._send(connection, "direct", payload)
+                    except ConnectionClosed:
+                        pass
 
     # ── channel API ──────────────────────────────────────────────────────
 
@@ -181,14 +275,20 @@ class NotificationServer:
 
         Returns False when ``client_id`` is not a connected client.
         """
-        return self.registry.subscribe(client_id, channel)
+        ok = self.registry.subscribe(client_id, channel)
+        if ok:
+            self.state.subscribe(client_id, channel)
+        return ok
 
     def unsubscribe(self, client_id: str, channel: str) -> bool:
         """Unsubscribe ``client_id`` from ``channel``.
 
         Returns False when ``client_id`` was not subscribed to ``channel``.
         """
-        return self.registry.unsubscribe(client_id, channel)
+        ok = self.registry.unsubscribe(client_id, channel)
+        if ok:
+            self.state.unsubscribe(client_id, channel)
+        return ok
 
     def channels(self) -> Dict[str, int]:
         """Return a mapping of channel name -> subscriber count."""
@@ -198,6 +298,28 @@ class NotificationServer:
         """Return the ids of clients subscribed to ``channel``."""
         return self.registry.subscribers(channel)
 
+    # ── connection state (Redis) ─────────────────────────────────────────
+
+    def _restore_membership(self, client_id: str) -> None:
+        """Re-apply Redis-persisted channel memberships for ``client_id``."""
+        for channel in self.state.channels_of(client_id):
+            self.registry.subscribe(client_id, channel)
+
+    def restore_state(self) -> Dict[str, List[str]]:
+        """Re-hydrate in-memory channel membership from Redis state.
+
+        Returns a mapping of ``client_id`` -> restored channel list for every
+        currently registered client that had persisted memberships.
+        """
+        restored: Dict[str, List[str]] = {}
+        for client_id in self.registry.ids():
+            channels = self.state.channels_of(client_id)
+            for channel in channels:
+                self.registry.subscribe(client_id, channel)
+            if channels:
+                restored[client_id] = sorted(channels)
+        return restored
+
     async def _send(self, connection, msg_type: str, payload: Dict[str, Any]) -> None:
         await connection.send(dumps_message(msg_type, payload))
 
@@ -205,7 +327,9 @@ class NotificationServer:
 
     async def process_request(self, connection, request: Request) -> Optional[Response]:
         """Serve HTTP endpoints; everything else is treated as WebSocket."""
-        path = request.path
+        parts = urlsplit(request.path)
+        path = parts.path
+        query = parse_qs(parts.query)
         if path == "/health":
             body = json.dumps(
                 {"connected_clients": self.registry.count()}
@@ -221,6 +345,20 @@ class NotificationServer:
             body = json.dumps(
                 {"channel": name, "subscribers": self.registry.subscribers(name)}
             ).encode("utf-8")
+        elif path == "/messages":
+            try:
+                limit = int(query.get("limit", ["50"])[0])
+            except (TypeError, ValueError):
+                limit = 50
+            try:
+                offset = int(query.get("offset", ["0"])[0])
+            except (TypeError, ValueError):
+                offset = 0
+            limit = max(0, min(limit, 500))
+            offset = max(0, offset)
+            body = json.dumps(
+                {"messages": self.store.list_messages(limit=limit, offset=offset)}
+            ).encode("utf-8")
         else:
             return None
         headers = Headers(
@@ -234,7 +372,9 @@ class NotificationServer:
 
 def run(host: str = "127.0.0.1", port: int = 8765) -> None:
     """Run the notification server until interrupted."""
-    server = NotificationServer(host=host, port=port)
+    server = NotificationServer(
+        host=host, port=port, channel=MessageBroker.DEFAULT_CHANNEL
+    )
 
     async def _run() -> None:
         await server.start()

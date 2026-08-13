@@ -9,6 +9,7 @@ import pytest
 import pytest_asyncio
 from websockets.asyncio.client import connect
 
+from broker import MessageStore
 from registry import ClientRegistry
 from server import NotificationServer, make_message
 
@@ -33,8 +34,10 @@ async def wait_for(predicate, timeout: float = 2.0) -> bool:
 
 
 @pytest_asyncio.fixture
-async def server():
-    srv = NotificationServer(port=0)
+async def server(tmp_path):
+    srv = NotificationServer(
+        port=0, store=MessageStore(path=str(tmp_path / "messages.db"))
+    )
     await srv.start()
     yield srv
     await srv.stop()
