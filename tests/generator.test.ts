@@ -49,6 +49,29 @@ This is **Markdown**.`);
     await expect(readFile(join(outputDir, 'index.html'), 'utf8')).resolves.toContain('<ul></ul>');
     await expect(readFile(join(outputDir, 'stale.html'), 'utf8')).rejects.toThrow();
   });
+
+  it('renders page templates in layouts with partials and uses the default template', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-'));
+    const contentDir = join(root, 'content');
+    const outputDir = join(root, 'public');
+    const templatesDir = join(root, 'templates');
+    await mkdir(join(templatesDir, 'layouts'), { recursive: true });
+    await mkdir(join(templatesDir, 'partials'), { recursive: true });
+    await writeFile(join(templatesDir, 'default.hbs'), '<article>{{> header}}<h1>{{title}}</h1>{{{content}}}{{> footer}}</article>');
+    await writeFile(join(templatesDir, 'post.hbs'), '<section class="post"><h2>{{title}}</h2>{{{content}}}</section>');
+    await writeFile(join(templatesDir, 'layouts', 'default.hbs'), '<!doctype html><body>{{{body}}}</body>');
+    await writeFile(join(templatesDir, 'layouts', 'minimal.hbs'), '<main>{{{body}}}</main>');
+    await writeFile(join(templatesDir, 'partials', 'header.hbs'), '<header>{{siteName}}</header>');
+    await writeFile(join(templatesDir, 'partials', 'footer.hbs'), '<footer>Copyright</footer>');
+    await mkdir(contentDir);
+    await writeFile(join(contentDir, 'default.md'), '---\ntitle: Default\nsiteName: Example\n---\nHello **world**');
+    await writeFile(join(contentDir, 'custom.md'), '---\ntitle: Custom\ntemplate: post\nlayout: minimal\n---\nCustom content');
+
+    await buildSite({ contentDir, outputDir, templatesDir });
+
+    await expect(readFile(join(outputDir, 'default.html'), 'utf8')).resolves.toBe('<!doctype html><body><article><header>Example</header><h1>Default</h1><p>Hello <strong>world</strong></p>\n<footer>Copyright</footer></article></body>');
+    await expect(readFile(join(outputDir, 'custom.html'), 'utf8')).resolves.toBe('<main><section class="post"><h2>Custom</h2><p>Custom content</p>\n</section></main>');
+  });
 });
 
 describe('CLI', () => {

@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { relative, resolve, sep } from 'node:path';
+import { relative, resolve, sep, extname } from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface Page {
@@ -15,6 +16,16 @@ export interface Page {
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
+}
+
+interface PageData {
+  title?: unknown;
+  date?: unknown;
+  tags?: unknown;
+  template?: unknown;
+  layout?: unknown;
+  [key: string]: unknown;
 }
 
 function escapeHtml(value: string): string {
@@ -35,6 +46,21 @@ async function markdownFiles(directory: string): Promise<string[]> {
     return entry.isFile() && /\.md$/i.test(entry.name) ? [path] : [];
   }));
   return paths.flat();
+}
+
+async function templateFiles(directory: string): Promise<string[]> {
+  try {
+    const entries = await readdir(directory, { withFileTypes: true });
+    const paths = await Promise.all(entries.map(async (entry) => {
+      const path = resolve(directory, entry.name);
+      if (entry.isDirectory()) return templateFiles(path);
+      return entry.isFile() && extname(entry.name) === '.hbs' ? [path] : [];
+    }));
+    return paths.flat();
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+    throw error;
+  }
 }
 
 function outputPathFor(sourcePath: string, contentDir: string): string {
@@ -84,34 +110,88 @@ function indexDocument(pages: Page[]): string {
 `;
 }
 
+function templatePath(templatesDir: string, directory: string, name: string): string {
+  const filename = name.endsWith('.hbs') ? name : `${name}.hbs`;
+  return resolve(templatesDir, directory, filename);
+}
+
+async function readTemplate(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch (error: unknown) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined;
+    throw error;
+  }
+}
+
+async function renderPage(
+  page: Page,
+  data: PageData,
+  templatesDir: string
+): Promise<string> {
+  const engine = Handlebars.create();
+  const partialsDir = resolve(templatesDir, 'partials');
+  const partials = await templateFiles(partialsDir);
+  await Promise.all(partials.map(async (path) => {
+    const name = relative(partialsDir, path).replace(/\\/g, '/').replace(/\.hbs$/, '');
+    engine.registerPartial(name, await readFile(path, 'utf8'));
+  }));
+
+  const templateName = typeof data.template === 'string' && data.template.trim()
+    ? data.template
+    : 'default';
+  const template = await readTemplate(templatePath(templatesDir, '', templateName));
+  if (!template) {
+    if (templateName === 'default') return pageDocument(page);
+    throw new Error(`Template not found: ${templateName}`);
+  }
+
+  const context = { ...data, ...page, content: page.html };
+  let document = engine.compile(template)(context);
+  const layoutName = typeof data.layout === 'string' && data.layout.trim()
+    ? data.layout
+    : 'default';
+  const layout = await readTemplate(templatePath(templatesDir, 'layouts', layoutName));
+  if (!layout) {
+    if (layoutName === 'default') return document;
+    throw new Error(`Layout not found: ${layoutName}`);
+  }
+  document = engine.compile(layout)({ ...context, body: new Handlebars.SafeString(document) });
+  return document;
+}
+
 export async function buildSite(options: BuildOptions = {}): Promise<Page[]> {
   const contentDir = resolve(options.contentDir ?? 'content');
   const outputDir = resolve(options.outputDir ?? 'dist');
+  const templatesDir = resolve(options.templatesDir ?? 'templates');
   const files = await markdownFiles(contentDir);
-  const pages = await Promise.all(files.map(async (sourcePath) => {
+  const sourcePages = await Promise.all(files.map(async (sourcePath) => {
     const parsed = matter(await readFile(sourcePath, 'utf8'));
+    const data = parsed.data as PageData;
     const relativeOutput = outputPathFor(sourcePath, contentDir);
-    const title = typeof parsed.data.title === 'string' && parsed.data.title.trim()
-      ? parsed.data.title
+    const title = typeof data.title === 'string' && data.title.trim()
+      ? data.title
       : relativeOutput.replace(/\.html$/i, '');
-    const tags = Array.isArray(parsed.data.tags) ? parsed.data.tags.map(String) : [];
-    return {
+    const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
+    const page: Page = {
       sourcePath,
       outputPath: relativeOutput,
       title,
-      date: dateValue(parsed.data.date),
+      date: dateValue(data.date),
       tags,
       html: await marked.parse(parsed.content)
     };
+    return { page, data };
   }));
 
+  const pages = sourcePages.map(({ page }) => page);
   pages.sort((a, b) => a.title.localeCompare(b.title));
   await rm(outputDir, { recursive: true, force: true });
   await mkdir(outputDir, { recursive: true });
-  await Promise.all(pages.map(async (page) => {
+  await Promise.all(sourcePages.map(async ({ page, data }) => {
     const destination = resolve(outputDir, page.outputPath);
     await mkdir(resolve(destination, '..'), { recursive: true });
-    await writeFile(destination, pageDocument(page));
+    await writeFile(destination, await renderPage(page, data, templatesDir));
   }));
   await writeFile(resolve(outputDir, 'index.html'), indexDocument(pages));
   return pages;
