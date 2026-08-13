@@ -12,7 +12,7 @@ from websockets import ConnectionClosed
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase
 
-from server import NotificationServer, handle_websocket, health_handler
+from server import NotificationServer, handle_websocket, health_handler, channels_handler, channel_subscribers_handler
 
 
 @pytest.fixture
@@ -303,6 +303,7 @@ class TestWebSocketHandling:
             assert notification_server.get_client_count() == 0
 
 
+
 class TestHealthEndpoint(AioHTTPTestCase):
     """Test the REST health endpoint."""
 
@@ -329,6 +330,220 @@ class TestHealthEndpoint(AioHTTPTestCase):
         data = await resp.json()
         assert data["status"] == "ok"
         assert isinstance(data["connected_clients"], int)
+
+
+class TestChannelSubscriptions:
+    """Test channel subscription functionality."""
+
+    def test_subscribe_client(self, notification_server):
+        """Test subscribing a client to a channel."""
+        is_new = notification_server.subscribe("client-1", "alerts")
+        assert is_new is True
+        assert "alerts" in notification_server.channels
+        assert "client-1" in notification_server.channels["alerts"]
+
+    def test_subscribe_same_channel_twice(self, notification_server):
+        """Test subscribing to the same channel twice."""
+        is_new1 = notification_server.subscribe("client-1", "alerts")
+        is_new2 = notification_server.subscribe("client-1", "alerts")
+        assert is_new1 is True
+        assert is_new2 is False
+
+    def test_unsubscribe_client(self, notification_server):
+        """Test unsubscribing a client from a channel."""
+        notification_server.subscribe("client-1", "alerts")
+        was_subscribed = notification_server.unsubscribe("client-1", "alerts")
+        assert was_subscribed is True
+        assert "alerts" not in notification_server.channels
+
+    def test_unsubscribe_non_existent(self, notification_server):
+        """Test unsubscribing from a non-existent channel."""
+        was_subscribed = notification_server.unsubscribe("client-1", "alerts")
+        assert was_subscribed is False
+
+    def test_multiple_clients_same_channel(self, notification_server):
+        """Test multiple clients subscribing to same channel."""
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-2", "alerts")
+        notification_server.subscribe("client-3", "alerts")
+
+        subscribers = notification_server.get_channel_subscribers("alerts")
+        assert len(subscribers) == 3
+        assert "client-1" in subscribers
+        assert "client-2" in subscribers
+        assert "client-3" in subscribers
+
+    def test_client_multiple_channels(self, notification_server):
+        """Test a client subscribing to multiple channels."""
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-1", "system")
+        notification_server.subscribe("client-1", "chat")
+
+        assert len(notification_server.channels) == 3
+        assert "client-1" in notification_server.channels["alerts"]
+        assert "client-1" in notification_server.channels["system"]
+        assert "client-1" in notification_server.channels["chat"]
+
+    def test_get_channel_subscribers(self, notification_server):
+        """Test getting subscribers for a channel."""
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-2", "alerts")
+
+        subscribers = notification_server.get_channel_subscribers("alerts")
+        assert len(subscribers) == 2
+        assert "client-1" in subscribers
+        assert "client-2" in subscribers
+
+    def test_get_channel_subscribers_empty(self, notification_server):
+        """Test getting subscribers for a non-existent channel."""
+        subscribers = notification_server.get_channel_subscribers("alerts")
+        assert len(subscribers) == 0
+
+    def test_get_all_channels(self, notification_server):
+        """Test getting all channels with subscriber counts."""
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-2", "alerts")
+        notification_server.subscribe("client-3", "system")
+
+        channels = notification_server.get_all_channels()
+        assert len(channels) == 2
+        assert channels["alerts"] == 2
+        assert channels["system"] == 1
+
+    def test_unsubscribe_from_all(self, notification_server):
+        """Test unsubscribing a client from all channels."""
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-1", "system")
+        notification_server.subscribe("client-1", "chat")
+        notification_server.subscribe("client-2", "alerts")
+
+        notification_server.unsubscribe_from_all("client-1")
+
+        assert "client-1" not in notification_server.get_channel_subscribers("alerts")
+        assert "client-1" not in notification_server.get_channel_subscribers("system")
+        assert "client-1" not in notification_server.get_channel_subscribers("chat")
+        assert "client-2" in notification_server.get_channel_subscribers("alerts")
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_channel(self, notification_server):
+        """Test broadcasting to a specific channel."""
+        mock_ws1 = AsyncMock()
+        mock_ws2 = AsyncMock()
+        mock_ws3 = AsyncMock()
+
+        notification_server.add_client("client-1", mock_ws1)
+        notification_server.add_client("client-2", mock_ws2)
+        notification_server.add_client("client-3", mock_ws3)
+
+        notification_server.subscribe("client-1", "alerts")
+        notification_server.subscribe("client-2", "alerts")
+        notification_server.subscribe("client-3", "system")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Alert message"},
+            "channel": "alerts",
+        }
+        await notification_server.broadcast_to_channel("alerts", message)
+
+        # Only clients 1 and 2 should receive
+        assert mock_ws1.send.call_count == 1
+        assert mock_ws2.send.call_count == 1
+        assert mock_ws3.send.call_count == 0
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_channel_with_timestamp(self, notification_server):
+        """Test that broadcast_to_channel adds timestamp."""
+        mock_ws = AsyncMock()
+        notification_server.add_client("client-1", mock_ws)
+        notification_server.subscribe("client-1", "alerts")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Alert"},
+        }
+        await notification_server.broadcast_to_channel("alerts", message)
+
+        call_args = mock_ws.send.call_args[0][0]
+        data = json.loads(call_args)
+        assert "timestamp" in data
+
+    @pytest.mark.asyncio
+    async def test_broadcast_to_empty_channel(self, notification_server):
+        """Test broadcasting to a channel with no subscribers."""
+        message = {
+            "type": "broadcast",
+            "payload": {"text": "Alert"},
+        }
+        # Should not raise an error
+        await notification_server.broadcast_to_channel("alerts", message)
+
+
+class TestChannelsRESTEndpoint(AioHTTPTestCase):
+    """Test the REST channels endpoints."""
+
+    async def get_application(self):
+        """Create the test application."""
+        app = web.Application()
+        app.router.add_get("/channels", channels_handler)
+        app.router.add_get("/channels/{name}/subscribers", channel_subscribers_handler)
+        return app
+
+    async def test_channels_endpoint_empty(self):
+        """Test channels endpoint with no channels."""
+        resp = await self.client.request("GET", "/channels")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "channels" in data
+        assert data["channels"] == {}
+
+    async def test_channels_endpoint_with_channels(self):
+        """Test channels endpoint with channels."""
+        from server import server as global_server
+        global_server.subscribe("client-1", "alerts")
+        global_server.subscribe("client-2", "alerts")
+        global_server.subscribe("client-3", "system")
+
+        resp = await self.client.request("GET", "/channels")
+        assert resp.status == 200
+        data = await resp.json()
+        assert "channels" in data
+        assert "alerts" in data["channels"]
+        assert "system" in data["channels"]
+        assert data["channels"]["alerts"] == 2
+        assert data["channels"]["system"] == 1
+
+        # Clean up
+        global_server.unsubscribe("client-1", "alerts")
+        global_server.unsubscribe("client-2", "alerts")
+        global_server.unsubscribe("client-3", "system")
+
+    async def test_channel_subscribers_endpoint(self):
+        """Test channel subscribers endpoint."""
+        from server import server as global_server
+        global_server.subscribe("client-1", "alerts")
+        global_server.subscribe("client-2", "alerts")
+
+        resp = await self.client.request("GET", "/channels/alerts/subscribers")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "alerts"
+        assert "subscribers" in data
+        assert len(data["subscribers"]) == 2
+        assert data["count"] == 2
+
+        # Clean up
+        global_server.unsubscribe("client-1", "alerts")
+        global_server.unsubscribe("client-2", "alerts")
+
+    async def test_channel_subscribers_endpoint_empty(self):
+        """Test channel subscribers endpoint for non-existent channel."""
+        resp = await self.client.request("GET", "/channels/nonexistent/subscribers")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "nonexistent"
+        assert data["subscribers"] == []
+        assert data["count"] == 0
 
 
 class TestMessageFormat:
