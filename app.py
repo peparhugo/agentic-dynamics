@@ -33,6 +33,9 @@ def init_db():
         )
 
 
+init_db()
+
+
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str) -> dict:
@@ -95,9 +98,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
+    title = title.strip()
     task = create_task(title)
     return jsonify(task), 201
 
@@ -113,9 +117,13 @@ def show_task(task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    title = data.get("title")
+    if title is not None and (not isinstance(title, str) or not title.strip()):
+        return jsonify({"error": "title must be a non-empty string"}), 400
+
     task = update_task(
         task_id,
-        title=data.get("title"),
+        title=title.strip() if title is not None else None,
         status=data.get("status"),
     )
     if task is None:
@@ -124,5 +132,4 @@ def edit_task(task_id: int):
 
 
 if __name__ == "__main__":
-    init_db()
     app.run(debug=True)
