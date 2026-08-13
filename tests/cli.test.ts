@@ -54,3 +54,11 @@ test('CLI accepts a custom template directory', async () => {
     await fs.rm(root, { recursive: true, force: true });
   }
 });
+
+test('CLI documents the serve command and port option', async () => {
+  const result = await execFileAsync(process.execPath, [path.resolve('lib/cli.js'), 'serve', '--help']);
+
+  expect(result.stdout).toContain('--port <number>');
+  expect(result.stdout).toContain('--content <dir>');
+  expect(result.stdout).toContain('--templates <dir>');
+});
