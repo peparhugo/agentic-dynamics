@@ -88,6 +88,97 @@ class TestClientRegistry:
         assert registry.get_count() == 50
         assert counter["value"] == 50
 
+    def test_subscribe_client_to_channel(self):
+        """Test subscribing a client to a channel."""
+        registry = ClientRegistry()
+        client_id = "client-1"
+        registry.register(client_id, object())
+
+        registry.subscribe(client_id, "alerts")
+        subscribers = registry.get_channel_subscribers("alerts")
+        assert client_id in subscribers
+
+    def test_unsubscribe_client_from_channel(self):
+        """Test unsubscribing a client from a channel."""
+        registry = ClientRegistry()
+        client_id = "client-1"
+        registry.register(client_id, object())
+
+        registry.subscribe(client_id, "alerts")
+        registry.unsubscribe(client_id, "alerts")
+        subscribers = registry.get_channel_subscribers("alerts")
+        assert client_id not in subscribers
+
+    def test_multiple_subscribers_to_channel(self):
+        """Test multiple clients subscribing to the same channel."""
+        registry = ClientRegistry()
+
+        for i in range(3):
+            client_id = f"client-{i}"
+            registry.register(client_id, object())
+            registry.subscribe(client_id, "alerts")
+
+        subscribers = registry.get_channel_subscribers("alerts")
+        assert len(subscribers) == 3
+        assert all(f"client-{i}" in subscribers for i in range(3))
+
+    def test_client_multiple_channels(self):
+        """Test a client subscribing to multiple channels."""
+        registry = ClientRegistry()
+        client_id = "client-1"
+        registry.register(client_id, object())
+
+        registry.subscribe(client_id, "alerts")
+        registry.subscribe(client_id, "system")
+        registry.subscribe(client_id, "chat")
+
+        assert client_id in registry.get_channel_subscribers("alerts")
+        assert client_id in registry.get_channel_subscribers("system")
+        assert client_id in registry.get_channel_subscribers("chat")
+
+    def test_get_active_channels(self):
+        """Test getting active channels and subscriber counts."""
+        registry = ClientRegistry()
+
+        for i in range(3):
+            client_id = f"client-{i}"
+            registry.register(client_id, object())
+
+        for i in range(2):
+            client_id = f"client-{i}"
+            registry.subscribe(client_id, "alerts")
+
+        for i in range(3):
+            client_id = f"client-{i}"
+            registry.subscribe(client_id, "system")
+
+        channels = registry.get_active_channels()
+        assert channels["alerts"] == 2
+        assert channels["system"] == 3
+
+    def test_get_active_channels_empty(self):
+        """Test getting active channels when none exist."""
+        registry = ClientRegistry()
+        registry.register("client-1", object())
+
+        channels = registry.get_active_channels()
+        assert len(channels) == 0
+
+    def test_unsubscribe_nonexistent_channel(self):
+        """Test unsubscribing from a non-existent channel."""
+        registry = ClientRegistry()
+        client_id = "client-1"
+        registry.register(client_id, object())
+
+        registry.unsubscribe(client_id, "nonexistent")
+
+    def test_get_channel_subscribers_empty(self):
+        """Test getting subscribers for a channel with no subscribers."""
+        registry = ClientRegistry()
+
+        subscribers = registry.get_channel_subscribers("empty-channel")
+        assert len(subscribers) == 0
+
 
 @pytest.mark.asyncio
 class TestNotificationServer:
@@ -239,6 +330,129 @@ class TestNotificationServer:
 
         await server.broadcast(message)
 
+    async def test_handle_subscribe_message(self, server):
+        """Test handling a subscribe message from a client."""
+        ws = AsyncMockWebSocket()
+        server.registry.register("client-1", ws)
+
+        raw_message = json.dumps({
+            "type": "subscribe",
+            "payload": {"channel": "alerts"},
+        })
+
+        await server._handle_message("client-1", raw_message)
+
+        subscribers = server.registry.get_channel_subscribers("alerts")
+        assert "client-1" in subscribers
+
+    async def test_handle_unsubscribe_message(self, server):
+        """Test handling an unsubscribe message from a client."""
+        ws = AsyncMockWebSocket()
+        server.registry.register("client-1", ws)
+        server.registry.subscribe("client-1", "alerts")
+
+        raw_message = json.dumps({
+            "type": "unsubscribe",
+            "payload": {"channel": "alerts"},
+        })
+
+        await server._handle_message("client-1", raw_message)
+
+        subscribers = server.registry.get_channel_subscribers("alerts")
+        assert "client-1" not in subscribers
+
+    async def test_broadcast_to_channel(self, server):
+        """Test broadcasting a message to a specific channel."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+        ws3 = AsyncMockWebSocket()
+
+        server.registry.register("client-1", ws1)
+        server.registry.register("client-2", ws2)
+        server.registry.register("client-3", ws3)
+
+        server.registry.subscribe("client-1", "alerts")
+        server.registry.subscribe("client-2", "alerts")
+        server.registry.subscribe("client-3", "system")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"content": "alert"},
+            "timestamp": "2024-01-01T00:00:00+00:00",
+        }
+
+        await server.broadcast(message, channel="alerts")
+
+        assert len(ws1.sent_messages) == 1
+        assert len(ws2.sent_messages) == 1
+        assert len(ws3.sent_messages) == 0
+
+    async def test_broadcast_without_channel(self, server):
+        """Test broadcasting to all clients (no channel specified)."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+
+        server.registry.register("client-1", ws1)
+        server.registry.register("client-2", ws2)
+
+        server.registry.subscribe("client-1", "alerts")
+        server.registry.subscribe("client-2", "system")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"content": "hello"},
+            "timestamp": "2024-01-01T00:00:00+00:00",
+        }
+
+        await server.broadcast(message, channel=None)
+
+        assert len(ws1.sent_messages) == 1
+        assert len(ws2.sent_messages) == 1
+
+    async def test_broadcast_to_channel_with_exclude(self, server):
+        """Test broadcasting to a channel with sender exclusion."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+
+        server.registry.register("client-1", ws1)
+        server.registry.register("client-2", ws2)
+
+        server.registry.subscribe("client-1", "alerts")
+        server.registry.subscribe("client-2", "alerts")
+
+        message = {
+            "type": "broadcast",
+            "payload": {"content": "alert"},
+            "timestamp": "2024-01-01T00:00:00+00:00",
+        }
+
+        await server.broadcast(message, channel="alerts", exclude="client-1")
+
+        assert len(ws1.sent_messages) == 0
+        assert len(ws2.sent_messages) == 1
+
+    async def test_handle_message_broadcast_with_channel(self, server):
+        """Test handling a broadcast message with channel field."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+
+        server.registry.register("client-1", ws1)
+        server.registry.register("client-2", ws2)
+
+        server.registry.subscribe("client-1", "alerts")
+        server.registry.subscribe("client-2", "system")
+
+        raw_message = json.dumps({
+            "type": "broadcast",
+            "channel": "alerts",
+            "payload": {"content": "alert message"},
+        })
+
+        await server._handle_message("client-1", raw_message)
+
+        assert len(ws1.sent_messages) == 0
+        assert len(ws2.sent_messages) == 0
+
 
 class TestNotificationServerHTTP(AioHTTPTestCase):
     """Tests for the HTTP endpoints."""
@@ -274,6 +488,63 @@ class TestNotificationServerHTTP(AioHTTPTestCase):
         data = await resp.json()
         assert data["status"] == "healthy"
         assert data["connected_clients"] == 2
+
+    async def test_channels_endpoint_empty(self):
+        """Test channels endpoint with no active channels."""
+        resp = await self.client.request("GET", "/channels")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channels"] == {}
+        assert "timestamp" in data
+
+    async def test_channels_endpoint_with_channels(self):
+        """Test channels endpoint with active channels."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+        ws3 = AsyncMockWebSocket()
+
+        self.notification_server.registry.register("client-1", ws1)
+        self.notification_server.registry.register("client-2", ws2)
+        self.notification_server.registry.register("client-3", ws3)
+
+        self.notification_server.registry.subscribe("client-1", "alerts")
+        self.notification_server.registry.subscribe("client-2", "alerts")
+        self.notification_server.registry.subscribe("client-3", "system")
+
+        resp = await self.client.request("GET", "/channels")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channels"]["alerts"] == 2
+        assert data["channels"]["system"] == 1
+
+    async def test_channel_subscribers_endpoint(self):
+        """Test channel subscribers endpoint."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+
+        self.notification_server.registry.register("client-1", ws1)
+        self.notification_server.registry.register("client-2", ws2)
+
+        self.notification_server.registry.subscribe("client-1", "alerts")
+        self.notification_server.registry.subscribe("client-2", "alerts")
+
+        resp = await self.client.request("GET", "/channels/alerts/subscribers")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "alerts"
+        assert len(data["subscribers"]) == 2
+        assert data["count"] == 2
+        assert "client-1" in data["subscribers"]
+        assert "client-2" in data["subscribers"]
+
+    async def test_channel_subscribers_endpoint_no_subscribers(self):
+        """Test channel subscribers endpoint for non-existent channel."""
+        resp = await self.client.request("GET", "/channels/nonexistent/subscribers")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["channel"] == "nonexistent"
+        assert data["subscribers"] == []
+        assert data["count"] == 0
 
 
 class AsyncMockWebSocket:

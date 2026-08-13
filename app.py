@@ -26,17 +26,20 @@ class ClientRegistry:
 
     def __init__(self):
         self._clients: Dict[str, Any] = {}
+        self._subscriptions: Dict[str, set] = {}
         self._lock = threading.RLock()
 
     def register(self, client_id: str, websocket: Any) -> None:
         """Register a new client."""
         with self._lock:
             self._clients[client_id] = websocket
+            self._subscriptions[client_id] = set()
 
     def unregister(self, client_id: str) -> None:
         """Unregister a client."""
         with self._lock:
             self._clients.pop(client_id, None)
+            self._subscriptions.pop(client_id, None)
 
     def get_client(self, client_id: str) -> Any | None:
         """Get a specific client."""
@@ -53,6 +56,35 @@ class ClientRegistry:
         with self._lock:
             return len(self._clients)
 
+    def subscribe(self, client_id: str, channel: str) -> None:
+        """Subscribe a client to a channel."""
+        with self._lock:
+            if client_id in self._subscriptions:
+                self._subscriptions[client_id].add(channel)
+
+    def unsubscribe(self, client_id: str, channel: str) -> None:
+        """Unsubscribe a client from a channel."""
+        with self._lock:
+            if client_id in self._subscriptions:
+                self._subscriptions[client_id].discard(channel)
+
+    def get_channel_subscribers(self, channel: str) -> list:
+        """Get all clients subscribed to a channel."""
+        with self._lock:
+            return [
+                client_id for client_id, channels in self._subscriptions.items()
+                if channel in channels
+            ]
+
+    def get_active_channels(self) -> Dict[str, int]:
+        """Get all active channels and their subscriber counts."""
+        with self._lock:
+            channel_counts = {}
+            for channels in self._subscriptions.values():
+                for channel in channels:
+                    channel_counts[channel] = channel_counts.get(channel, 0) + 1
+            return channel_counts
+
 
 class NotificationServer:
     """WebSocket notification server."""
@@ -68,12 +100,33 @@ class NotificationServer:
     def _setup_http_routes(self) -> None:
         """Setup HTTP REST routes."""
         self.http_app.router.add_get("/health", self._health_handler)
+        self.http_app.router.add_get("/channels", self._channels_handler)
+        self.http_app.router.add_get("/channels/{name}/subscribers", self._channel_subscribers_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Health check endpoint."""
         return web.json_response({
             "status": "healthy",
             "connected_clients": self.registry.get_count(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def _channels_handler(self, request: web.Request) -> web.Response:
+        """List active channels and subscriber counts."""
+        channels = self.registry.get_active_channels()
+        return web.json_response({
+            "channels": channels,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
+    async def _channel_subscribers_handler(self, request: web.Request) -> web.Response:
+        """List subscriber IDs for a specific channel."""
+        channel_name = request.match_info["name"]
+        subscribers = self.registry.get_channel_subscribers(channel_name)
+        return web.json_response({
+            "channel": channel_name,
+            "subscribers": subscribers,
+            "count": len(subscribers),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
@@ -129,12 +182,23 @@ class NotificationServer:
             message = json.loads(raw_message)
             msg_type = message.get("type")
 
-            if msg_type == "broadcast":
+            if msg_type == "subscribe":
+                channel = message.get("payload", {}).get("channel")
+                if channel:
+                    self.registry.subscribe(client_id, channel)
+
+            elif msg_type == "unsubscribe":
+                channel = message.get("payload", {}).get("channel")
+                if channel:
+                    self.registry.unsubscribe(client_id, channel)
+
+            elif msg_type == "broadcast":
+                channel = message.get("channel")
                 await self.broadcast({
                     "type": "broadcast",
                     "payload": message.get("payload", {}),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
-                }, exclude=client_id)
+                }, exclude=client_id, channel=channel)
 
             elif msg_type == "direct":
                 target_id = message.get("payload", {}).get("target_id")
@@ -151,16 +215,27 @@ class NotificationServer:
         except json.JSONDecodeError:
             pass
 
-    async def broadcast(self, message: dict, exclude: str | None = None) -> None:
-        """Broadcast a message to all connected clients."""
-        clients = self.registry.get_all_clients()
-        if not clients:
+    async def broadcast(self, message: dict, exclude: str | None = None, channel: str | None = None) -> None:
+        """Broadcast a message to all connected clients or to a specific channel."""
+        if channel:
+            # Send only to subscribers of the channel
+            subscribers = self.registry.get_channel_subscribers(channel)
+            target_clients = {
+                client_id: self.registry.get_client(client_id)
+                for client_id in subscribers
+                if self.registry.get_client(client_id) is not None
+            }
+        else:
+            # Broadcast to all clients
+            target_clients = self.registry.get_all_clients()
+
+        if not target_clients:
             return
 
         message_json = json.dumps(message)
         tasks = []
 
-        for client_id, websocket in clients.items():
+        for client_id, websocket in target_clients.items():
             if exclude and client_id == exclude:
                 continue
             tasks.append(self._send_safe(websocket, message_json))
