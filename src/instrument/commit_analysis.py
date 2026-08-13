@@ -11,6 +11,7 @@ Layers:
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import tempfile
@@ -405,7 +406,7 @@ def compute_sonar_delta(
     parent_commit: str,
     child_commit: str,
     *,
-    sonar_url: str = "http://127.0.0.1:9000",
+    sonar_url: str = os.environ.get("SONAR_URL", "http://127.0.0.1:9000"),
     sonar_token: str = "",
 ) -> dict[str, Any]:
     """Compute SonarQube metric deltas between two commits.
@@ -439,19 +440,25 @@ def compute_sonar_delta(
         _run_git(worktree, "worktree", "add", "--detach", str(child_path), child_commit)
 
         try:
+            # Unique project keys per story+commit — concurrent stories must not
+            # collide on the default exp_{dirname} key ("parent"/"child").
+            parent_key = f"exp_{worktree.name}_{parent_commit[:12]}"
+            child_key = f"exp_{worktree.name}_{child_commit[:12]}"
             if sonar_token:
                 parent_sm = run_sonar_analysis(
                     parent_path, sonar_url=sonar_url,
                     sonar_user=sonar_token, sonar_password="",
+                    project_key=parent_key,
                 )
                 child_sm = run_sonar_analysis(
                     child_path, sonar_url=sonar_url,
                     sonar_user=sonar_token, sonar_password="",
+                    project_key=child_key,
                 )
             else:
                 # Use default local-dev credentials (admin/admin)
-                parent_sm = run_sonar_analysis(parent_path, sonar_url=sonar_url)
-                child_sm = run_sonar_analysis(child_path, sonar_url=sonar_url)
+                parent_sm = run_sonar_analysis(parent_path, sonar_url=sonar_url, project_key=parent_key)
+                child_sm = run_sonar_analysis(child_path, sonar_url=sonar_url, project_key=child_key)
 
             if parent_sm and child_sm and parent_sm.analyzed and child_sm.analyzed:
                 return {

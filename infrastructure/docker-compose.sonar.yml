@@ -1,26 +1,68 @@
 version: '3.8'
 
+x-sonarqube-base: &sonarqube-base
+  image: sonarqube:10.7-community
+  restart: unless-stopped
+  environment:
+    - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    - SONAR_FORCEAUTHENTICATION=false
+  networks:
+    - sonar-net
+
 services:
   sonarqube:
-    image: sonarqube:10.7-community
+    <<: *sonarqube-base
     container_name: sonarqube
-    restart: unless-stopped
     ports:
       - "127.0.0.1:9000:9000"
-    environment:
-      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
-      - SONAR_FORCEAUTHENTICATION=false
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_logs:/opt/sonarqube/logs
       - sonarqube_extensions:/opt/sonarqube/extensions
-    networks:
-      - sonar-net
+
+  sonarqube-9001:
+    <<: *sonarqube-base
+    container_name: sonarqube-9001
+    ports:
+      - "127.0.0.1:9001:9000"
+    volumes:
+      - sonarqube_9001_data:/opt/sonarqube/data
+      - sonarqube_9001_logs:/opt/sonarqube/logs
+      - sonarqube_9001_extensions:/opt/sonarqube/extensions
+
+  sonarqube-9002:
+    <<: *sonarqube-base
+    container_name: sonarqube-9002
+    ports:
+      - "127.0.0.1:9002:9000"
+    volumes:
+      - sonarqube_9002_data:/opt/sonarqube/data
+      - sonarqube_9002_logs:/opt/sonarqube/logs
+      - sonarqube_9002_extensions:/opt/sonarqube/extensions
+
+  sonarqube-9003:
+    <<: *sonarqube-base
+    container_name: sonarqube-9003
+    ports:
+      - "127.0.0.1:9003:9000"
+    volumes:
+      - sonarqube_9003_data:/opt/sonarqube/data
+      - sonarqube_9003_logs:/opt/sonarqube/logs
+      - sonarqube_9003_extensions:/opt/sonarqube/extensions
 
 volumes:
   sonarqube_data:
   sonarqube_logs:
   sonarqube_extensions:
+  sonarqube_9001_data:
+  sonarqube_9001_logs:
+  sonarqube_9001_extensions:
+  sonarqube_9002_data:
+  sonarqube_9002_logs:
+  sonarqube_9002_extensions:
+  sonarqube_9003_data:
+  sonarqube_9003_logs:
+  sonarqube_9003_extensions:
 
 networks:
   sonar-net:
