@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 import websockets
 
-from app import NotificationServer, SOAP_NS
+from app import MemoryBroker, NotificationServer, SOAP_NS
 
 
 @pytest_asyncio.fixture
@@ -21,6 +21,7 @@ async def notification_server():
     await websocket_server.wait_closed()
     soap_server.close()
     await soap_server.wait_closed()
+    await app.close()
 
 
 async def connect(port):
@@ -159,3 +160,44 @@ async def test_soap_health_returns_client_count(notification_server):
     writer.close()
     await writer.wait_closed()
     await socket.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_rest_endpoint_persists_message_history(notification_server):
+    _, websocket_port, soap_port = notification_server
+    socket, _ = await connect(websocket_port)
+    await socket.send(json.dumps({"type": "broadcast", "payload": {"text": "saved"}}))
+    assert json.loads(await socket.recv())["payload"] == {"text": "saved"}
+    status, messages = await get_json(soap_port, "/messages?limit=50&offset=0")
+    assert status == b"HTTP/1.1 200 OK"
+    assert messages[0]["channel"] is None
+    assert messages[0]["type"] == "broadcast"
+    assert messages[0]["payload"] == {"text": "saved"}
+    assert "timestamp" in messages[0]
+    await socket.close()
+
+
+@pytest.mark.asyncio
+async def test_shared_broker_delivers_messages_between_server_instances():
+    broker = MemoryBroker()
+    first_app = NotificationServer(broker=broker)
+    second_app = NotificationServer(broker=broker)
+    first_server = await websockets.serve(first_app.websocket_handler, "127.0.0.1", 0)
+    second_server = await websockets.serve(second_app.websocket_handler, "127.0.0.1", 0)
+    try:
+        first_port = first_server.sockets[0].getsockname()[1]
+        second_port = second_server.sockets[0].getsockname()[1]
+        sender, _ = await connect(first_port)
+        recipient, _ = await connect(second_port)
+        await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "cross-instance"}}))
+        assert json.loads(await sender.recv())["payload"] == {"text": "cross-instance"}
+        assert json.loads(await recipient.recv())["payload"] == {"text": "cross-instance"}
+        await sender.close()
+        await recipient.close()
+    finally:
+        first_server.close()
+        second_server.close()
+        await first_server.wait_closed()
+        await second_server.wait_closed()
+        await first_app.close()
+        await second_app.close()
