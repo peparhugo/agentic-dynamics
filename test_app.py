@@ -1,4 +1,5 @@
 import sqlite3
+from unittest.mock import patch
 
 from app import create_app
 
@@ -99,6 +100,35 @@ def test_get_and_update_task(tmp_path):
     assert update.get_json()["title"] == "New title"
     assert update.get_json()["status"] == "done"
     assert retrieved.get_json() == update.get_json()
+
+
+def test_completing_task_queues_owner_notification(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+    task = client.post("/tasks", json={"title": "Email owner"}, headers=headers).get_json()
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    assert response.status_code == 200
+    delay.assert_called_once_with("alice", "Email owner")
+
+
+def test_completed_task_does_not_send_duplicate_notification(tmp_path):
+    client = make_client(tmp_path)
+    headers = register_and_login(client)
+    task = client.post("/tasks", json={"title": "Already complete"}, headers=headers).get_json()
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    with patch("app.send_notification_email.delay") as delay:
+        response = client.put(
+            f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers
+        )
+
+    assert response.status_code == 200
+    delay.assert_not_called()
 
 
 def test_users_only_see_and_change_their_own_tasks(tmp_path):

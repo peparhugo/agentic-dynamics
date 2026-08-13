@@ -13,6 +13,8 @@ from functools import wraps
 from flask import Flask, current_app, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 
 def create_app(database: str | None = None) -> Flask:
     app = Flask(__name__)
@@ -104,10 +106,21 @@ def create_app(database: str | None = None) -> Flask:
     def task_or_404(task_id: int) -> sqlite3.Row | None:
         with get_db() as connection:
             task = connection.execute(
-                "SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?",
+                """
+                SELECT tasks.id, tasks.title, tasks.status, tasks.created_at, users.username AS owner_email
+                FROM tasks JOIN users ON users.id = tasks.owner_id
+                WHERE tasks.id = ? AND tasks.owner_id = ?
+                """,
                 (task_id, g.user_id),
             ).fetchone()
         return task
+
+    def task_response(task: sqlite3.Row, updates: dict | None = None) -> dict:
+        response = dict(task)
+        response.pop("owner_email", None)
+        if updates:
+            response.update(updates)
+        return response
 
     @app.post("/auth/register")
     def register():
@@ -179,7 +192,7 @@ def create_app(database: str | None = None) -> Flask:
         task = task_or_404(task_id)
         if task is None:
             return jsonify({"error": "task not found"}), 404
-        return jsonify(dict(task))
+        return jsonify(task_response(task))
 
     @app.put("/tasks/<int:task_id>")
     @require_auth
@@ -208,7 +221,9 @@ def create_app(database: str | None = None) -> Flask:
                 f"UPDATE tasks SET {assignments} WHERE id = ? AND owner_id = ?",
                 (*updates.values(), task_id, g.user_id),
             )
-        return jsonify({**dict(task), **updates})
+        if task["status"] != "completed" and updates.get("status") == "completed":
+            send_notification_email.delay(task["owner_email"], updates.get("title", task["title"]))
+        return jsonify(task_response(task, updates))
 
     with app.app_context():
         init_db()
