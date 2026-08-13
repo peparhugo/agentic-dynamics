@@ -14,6 +14,10 @@ function normalizeDate(value: unknown): string | undefined {
   return undefined;
 }
 
+function normalizeOptionalString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 function normalizeTags(value: unknown): string[] {
   if (Array.isArray(value)) {
     return value.map((tag) => String(tag).trim()).filter((tag) => tag.length > 0);
@@ -40,6 +44,8 @@ export function parseMarkdown(raw: string, fallbackTitle: string): ParsedMarkdow
     title: typeof data.title === 'string' && data.title.trim().length > 0 ? data.title.trim() : fallbackTitle,
     date: normalizeDate(data.date),
     tags: normalizeTags(data.tags),
+    template: normalizeOptionalString(data.template),
+    layout: normalizeOptionalString(data.layout),
   };
 
   const contentHtml = marked.parse(content, { async: false }) as string;

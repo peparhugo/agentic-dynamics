@@ -27,6 +27,19 @@ describe('parseArgs', () => {
   it('throws on an unknown flag', () => {
     expect(() => parseArgs(['build', '--bogus'])).toThrow(/Unknown argument/);
   });
+
+  it('parses a --templates override', () => {
+    expect(parseArgs(['build', '--templates', './my-templates'])).toEqual({
+      command: 'build',
+      contentDir: './content',
+      outputDir: './dist',
+      templatesDir: './my-templates',
+    });
+  });
+
+  it('throws when --templates is missing its value', () => {
+    expect(() => parseArgs(['build', '--templates'])).toThrow(/--templates requires/);
+  });
 });
 
 describe('run', () => {

@@ -94,4 +94,66 @@ describe('build', () => {
     build({ contentDir, outputDir });
     expect(fs.existsSync(path.join(outputDir, 'style.css'))).toBe(true);
   });
+
+  it('renders pages through the default repo templates, including layout and partials', () => {
+    fs.writeFileSync(path.join(contentDir, 'page.md'), '---\ntitle: Page\n---\nContent');
+    build({ contentDir, outputDir, siteTitle: 'Default Template Site' });
+
+    const pageHtml = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(pageHtml).toContain('<header>');
+    expect(pageHtml).toContain('<nav>');
+    expect(pageHtml).toContain('<footer>');
+    expect(pageHtml).toContain('Default Template Site');
+  });
+});
+
+describe('build with a custom templates directory', () => {
+  let contentDir: string;
+  let outputDir: string;
+  let templatesDir: string;
+
+  function writeFile(filePath: string, content: string): void {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf-8');
+  }
+
+  beforeEach(() => {
+    contentDir = makeTempDir('ssg-content-');
+    outputDir = makeTempDir('ssg-output-');
+    templatesDir = makeTempDir('ssg-templates-');
+
+    writeFile(path.join(templatesDir, 'page.hbs'), '<article data-template="page">{{{content}}}</article>');
+    writeFile(path.join(templatesDir, 'post.hbs'), '<article data-template="post">{{{content}}}</article>');
+    writeFile(path.join(templatesDir, 'index.hbs'), '<ul>{{#each pages}}<li>{{{title}}}</li>{{/each}}</ul>');
+    writeFile(
+      path.join(templatesDir, 'layouts', 'default.hbs'),
+      '<html><body>{{> header}}{{{body}}}{{> footer}}</body></html>'
+    );
+    writeFile(path.join(templatesDir, 'partials', 'header.hbs'), '<header>{{{siteTitle}}}</header>');
+    writeFile(path.join(templatesDir, 'partials', 'footer.hbs'), '<footer>done</footer>');
+  });
+
+  afterEach(() => {
+    fs.rmSync(contentDir, { recursive: true, force: true });
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    fs.rmSync(templatesDir, { recursive: true, force: true });
+  });
+
+  it('uses the custom templates directory and respects a per-page template override', () => {
+    fs.writeFileSync(path.join(contentDir, 'default.md'), '---\ntitle: Default Page\n---\nBody');
+    fs.writeFileSync(path.join(contentDir, 'post.md'), '---\ntitle: A Post\ntemplate: post\n---\nBody');
+
+    build({ contentDir, outputDir, siteTitle: 'Custom Site', templatesDir });
+
+    const defaultHtml = fs.readFileSync(path.join(outputDir, 'default.html'), 'utf-8');
+    expect(defaultHtml).toContain('data-template="page"');
+    expect(defaultHtml).toContain('<header>Custom Site</header>');
+
+    const postHtml = fs.readFileSync(path.join(outputDir, 'post.html'), 'utf-8');
+    expect(postHtml).toContain('data-template="post"');
+
+    const indexHtml = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf-8');
+    expect(indexHtml).toContain('<li>Default Page</li>');
+    expect(indexHtml).toContain('<li>A Post</li>');
+  });
 });

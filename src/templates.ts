@@ -1,15 +1,28 @@
+import * as path from 'path';
 import { Page } from './types';
+import { escapeHtml, TemplateEngine } from './templateEngine';
 
-export function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+export { escapeHtml };
+
+const DEFAULT_TEMPLATES_DIR = './templates';
+
+const engineCache = new Map<string, TemplateEngine>();
+
+function getEngine(templatesDir: string): TemplateEngine {
+  const resolved = path.resolve(templatesDir);
+  let engine = engineCache.get(resolved);
+  if (!engine) {
+    engine = new TemplateEngine(templatesDir);
+    engineCache.set(resolved, engine);
+  }
+  return engine;
 }
 
-function renderMeta(page: Page): string {
+function basePathFor(slug: string): string {
+  return '../'.repeat(slug.split('/').length - 1);
+}
+
+function metaHtml(page: Page): string {
   const parts: string[] = [];
   if (page.frontmatter.date) {
     parts.push(`<time datetime="${escapeHtml(page.frontmatter.date)}">${escapeHtml(page.frontmatter.date)}</time>`);
@@ -21,70 +34,60 @@ function renderMeta(page: Page): string {
   return parts.length > 0 ? `<p class="meta">${parts.join(' &middot; ')}</p>` : '';
 }
 
-export function renderPageHtml(page: Page): string {
-  const title = escapeHtml(page.frontmatter.title);
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${title}</title>
-  <link rel="stylesheet" href="${'../'.repeat(page.slug.split('/').length - 1)}style.css">
-</head>
-<body>
-  <header>
-    <a href="${'../'.repeat(page.slug.split('/').length - 1)}index.html">&larr; Back to index</a>
-  </header>
-  <main>
-    <article>
-      <h1>${title}</h1>
-      ${renderMeta(page)}
-      ${page.contentHtml}
-    </article>
-  </main>
-</body>
-</html>
-`;
+export interface RenderPageOptions {
+  /** Directory holding page/index templates, layouts/, and partials/. Defaults to './templates'. */
+  templatesDir?: string;
+  /** Site-wide title shown in the header/footer partials. Defaults to the page's own title. */
+  siteTitle?: string;
 }
 
-export function renderIndexHtml(pages: Page[], siteTitle: string): string {
-  const items = pages
-    .map((page) => {
-      const title = escapeHtml(page.frontmatter.title);
-      const href = `${page.slug}.html`;
-      return `      <li>
-        <a href="${escapeHtml(href)}">${title}</a>
-        ${renderMeta(page)}
-      </li>`;
-    })
-    .join('\n');
+export interface RenderIndexOptions {
+  /** Directory holding page/index templates, layouts/, and partials/. Defaults to './templates'. */
+  templatesDir?: string;
+}
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(siteTitle)}</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body>
-  <header>
-    <h1>${escapeHtml(siteTitle)}</h1>
-  </header>
-  <main>
-    <ul class="page-list">
-${items}
-    </ul>
-  </main>
-</body>
-</html>
-`;
+/** Renders a single content page using its frontmatter-selected template and layout (or the defaults). */
+export function renderPageHtml(page: Page, options: RenderPageOptions = {}): string {
+  const engine = getEngine(options.templatesDir ?? DEFAULT_TEMPLATES_DIR);
+  const basePath = basePathFor(page.slug);
+  const title = escapeHtml(page.frontmatter.title);
+  const siteTitle = escapeHtml(options.siteTitle ?? page.frontmatter.title);
+
+  return engine.render(
+    page.frontmatter.template ?? 'page',
+    page.frontmatter.layout ?? 'default',
+    { title, meta: metaHtml(page), content: page.contentHtml, basePath },
+    { title, siteTitle, basePath }
+  );
+}
+
+/** Renders the site index listing using the 'index' template wrapped in the default layout. */
+export function renderIndexHtml(pages: Page[], siteTitle: string, options: RenderIndexOptions = {}): string {
+  const engine = getEngine(options.templatesDir ?? DEFAULT_TEMPLATES_DIR);
+  const escapedSiteTitle = escapeHtml(siteTitle);
+  const items = pages.map((page) => ({
+    title: escapeHtml(page.frontmatter.title),
+    href: escapeHtml(`${page.slug}.html`),
+    meta: metaHtml(page),
+  }));
+
+  return engine.render(
+    'index',
+    'default',
+    { pages: items, siteTitle: escapedSiteTitle },
+    { title: escapedSiteTitle, siteTitle: escapedSiteTitle, basePath: '' }
+  );
 }
 
 export const DEFAULT_STYLESHEET = `body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 40rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a1a1a; }
 a { color: #0b5fff; }
+header h1 { font-size: 1.25rem; }
+header h1 a { text-decoration: none; color: inherit; }
+nav { margin-bottom: 1.5rem; font-size: 0.875rem; }
+footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; color: #666; font-size: 0.8rem; }
 .page-list { list-style: none; padding: 0; }
 .page-list li { margin-bottom: 1.25rem; }
 .meta { color: #666; font-size: 0.875rem; margin: 0.25rem 0; }
 .tag { background: #eee; border-radius: 0.25rem; padding: 0.1rem 0.4rem; font-size: 0.75rem; }
+.post-label { text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.75rem; color: #0b5fff; margin: 0; }
 `;

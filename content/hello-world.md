@@ -2,6 +2,7 @@
 title: Hello World
 date: 2026-01-05
 tags: [intro, meta]
+template: post
 ---
 
 # Welcome

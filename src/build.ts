@@ -49,6 +49,7 @@ function comparePages(a: Page, b: Page): number {
 export function build(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
   const siteTitle = options.siteTitle ?? 'My Site';
+  const templatesDir = options.templatesDir ?? './templates';
 
   if (!fs.existsSync(contentDir) || !fs.statSync(contentDir).isDirectory()) {
     throw new Error(`Content directory not found: ${contentDir}`);
@@ -73,12 +74,12 @@ export function build(options: BuildOptions): BuildResult {
   for (const page of pages) {
     const outputPath = path.join(outputDir, `${page.slug}.html`);
     fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-    fs.writeFileSync(outputPath, renderPageHtml(page), 'utf-8');
+    fs.writeFileSync(outputPath, renderPageHtml(page, { templatesDir, siteTitle }), 'utf-8');
     outputFiles.push(outputPath);
   }
 
   const indexPath = path.join(outputDir, 'index.html');
-  fs.writeFileSync(indexPath, renderIndexHtml(pages, siteTitle), 'utf-8');
+  fs.writeFileSync(indexPath, renderIndexHtml(pages, siteTitle, { templatesDir }), 'utf-8');
   outputFiles.push(indexPath);
 
   const stylesheetPath = path.join(outputDir, 'style.css');

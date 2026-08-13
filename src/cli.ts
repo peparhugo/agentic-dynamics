@@ -4,6 +4,7 @@ export interface CliArgs {
   command: string;
   contentDir: string;
   outputDir: string;
+  templatesDir?: string;
 }
 
 const DEFAULT_CONTENT_DIR = './content';
@@ -13,6 +14,7 @@ export function parseArgs(argv: string[]): CliArgs {
   const [command = 'build', ...rest] = argv;
   let contentDir = DEFAULT_CONTENT_DIR;
   let outputDir = DEFAULT_OUTPUT_DIR;
+  let templatesDir: string | undefined;
 
   for (let i = 0; i < rest.length; i++) {
     const arg = rest[i];
@@ -26,12 +28,17 @@ export function parseArgs(argv: string[]): CliArgs {
       if (!value) throw new Error('--output requires a directory argument');
       outputDir = value;
       i++;
+    } else if (arg === '--templates') {
+      const value = rest[i + 1];
+      if (!value) throw new Error('--templates requires a directory argument');
+      templatesDir = value;
+      i++;
     } else {
       throw new Error(`Unknown argument: ${arg}`);
     }
   }
 
-  return { command, contentDir, outputDir };
+  return { command, contentDir, outputDir, ...(templatesDir !== undefined ? { templatesDir } : {}) };
 }
 
 export function run(argv: string[]): void {
@@ -41,7 +48,7 @@ export function run(argv: string[]): void {
     throw new Error(`Unknown command: ${args.command}. Supported commands: build`);
   }
 
-  const result = build({ contentDir: args.contentDir, outputDir: args.outputDir });
+  const result = build({ contentDir: args.contentDir, outputDir: args.outputDir, templatesDir: args.templatesDir });
   // eslint-disable-next-line no-console
   console.log(`Built ${result.pages.length} page(s) from ${args.contentDir} to ${args.outputDir}`);
 }
