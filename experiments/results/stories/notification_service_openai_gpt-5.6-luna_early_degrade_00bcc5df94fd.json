@@ -23,8 +23,8 @@
     "cascade_recovery": false,
     "test_count": 8,
     "test_lines": 238,
-    "code_lines": 485,
-    "test_code_ratio": 0.491
+    "code_lines": 871,
+    "test_code_ratio": 0.273
   },
   "sessions": [
     {
@@ -186,7 +186,7 @@
       },
       "test_count": 8,
       "test_lines": 238,
-      "code_lines": 485
+      "code_lines": 871
     }
   ]
 }

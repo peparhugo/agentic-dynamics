@@ -1,0 +1,375 @@
+{
+  "story_name": "notification_service",
+  "story_id": "5840e9783c6a",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 2446,
+    "total_lines_removed": 62,
+    "net_lines": 2384,
+    "average_convention_score": 0.879
+  },
+  "commits": [
+    {
+      "commit_hash": "3ff0243c045e35ab25ee332f86e2ad3cedc5fdaf",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 4,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 6,
+        "functions_removed": 0,
+        "classes_added": 6,
+        "classes_removed": 0,
+        "imports_added": 21,
+        "imports_removed": 0,
+        "lines_added": 754,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 8,
+        "complexity_delta": 24,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "dc6dcec1a3bbae6dfb8388b57605eef6e7ca867a",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 1,
+        "files_modified": 2,
+        "files_deleted": 0,
+        "functions_added": 2,
+        "functions_removed": 0,
+        "classes_added": 2,
+        "classes_removed": 0,
+        "imports_added": 1,
+        "imports_removed": 1,
+        "lines_added": 430,
+        "lines_removed": 7
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "7de3bc6b4f14d61bfe6cbef2e00b0c3b6dfc4ab9",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 3,
+        "files_deleted": 0,
+        "functions_added": 6,
+        "functions_removed": 0,
+        "classes_added": 4,
+        "classes_removed": 0,
+        "imports_added": 8,
+        "imports_removed": 1,
+        "lines_added": 582,
+        "lines_removed": 8
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 29,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "b7858c78cfec43f09b74d8174c672e55d780eb5f",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 1,
+        "functions_removed": 0,
+        "classes_added": 4,
+        "classes_removed": 1,
+        "imports_added": 1,
+        "imports_removed": 0,
+        "lines_added": 225,
+        "lines_removed": 43
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 11,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "eb83a65d127d727ed57d657450c23609d77f4f2d",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 2,
+        "files_deleted": 0,
+        "functions_added": 4,
+        "functions_removed": 0,
+        "classes_added": 4,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 455,
+        "lines_removed": 4
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 5,
+        "complexity_delta": 16,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.879,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "test_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ],
+  "deep": {
+    "lsp": {
+      "available": true,
+      "tool": "pyright",
+      "errors": 10,
+      "warnings": 0
+    },
+    "solution": {
+      "tests_passed": 1,
+      "tests_total": 1,
+      "correctness_score": 1.0,
+      "evaluator_source": "unavailable",
+      "evaluator_independent": false,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "constraint_score": 1.0,
+      "lines_of_code": 3740,
+      "cyclomatic_complexity": 485.0,
+      "code_quality_score": 0.0267,
+      "novelty_score": 0.7794,
+      "composite_score": 0.7723,
+      "sonar_analyzed": false,
+      "sonar_bugs": 0,
+      "sonar_vulnerabilities": 0,
+      "sonar_code_smells": 0,
+      "sonar_cognitive_complexity": 0,
+      "sonar_duplicated_lines_density": 0.0,
+      "sonar_ncloc": 0,
+      "sonar_maintainability_rating": "",
+      "sonar_reliability_rating": "",
+      "sonar_security_rating": "",
+      "sonar_quality_gate": "",
+      "sonar_quality_score": 0.5
+    },
+    "basin": {
+      "perturbation_strength": 0.5,
+      "perturbation_operator": "",
+      "perturbation_class": "",
+      "architecture_divergence": 0.5,
+      "structure_divergence": 0.879,
+      "novelty_score": 0.7793,
+      "escape_score": 0.6975,
+      "total_tokens": 0,
+      "reasoning_tokens": 0,
+      "thinking_ratio": 0.0,
+      "cost_usd": 0.0,
+      "estimated_energy_j": 0.0,
+      "correctness": 1.0,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "lines_of_code": 2393,
+      "quality_per_dollar": 1000000.0,
+      "quality_per_joule": 100.0,
+      "sonar_analyzed": false,
+      "sonar_bugs_delta": 0,
+      "sonar_vulnerabilities_delta": 0,
+      "sonar_code_smells_delta": 0,
+      "sonar_cognitive_complexity_delta": 0,
+      "sonar_complexity_delta": 0,
+      "sonar_duplication_delta": 0.0,
+      "sonar_maintainability_delta": 0,
+      "sonar_reliability_delta": 0,
+      "sonar_security_delta": 0,
+      "sonar_baseline_bugs": 0,
+      "sonar_baseline_smells": 0,
+      "sonar_perturbed_bugs": 0,
+      "sonar_perturbed_smells": 0,
+      "converged_back": false,
+      "verdict": "escaped \u2014 model produced a structurally different solution",
+      "model": "anthropic/claude-haiku-4-5",
+      "task": "notification_service",
+      "run_id": ""
+    },
+    "strategy": {
+      "strategy": "exploratory",
+      "strategy_score": 0.8169,
+      "exploration_premium": 0.5023,
+      "thermal_efficiency": 0.0,
+      "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.70) and found a novel correct solution (novelty=0.78, correctness=100%). Cost: $1.5517, ~0J.",
+      "recommendation": "Promote this operator. The perturbation succeeded.",
+      "operator": "",
+      "perturbation_class": "",
+      "model": "anthropic/claude-haiku-4-5",
+      "run_id": "",
+      "reasoning": {
+        "perturbation_strength": 0.5,
+        "perturbation_operator": "",
+        "perturbation_class": "",
+        "architecture_divergence": 0.5,
+        "structure_divergence": 0.879,
+        "novelty_score": 0.7793,
+        "escape_score": 0.6975,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "thinking_ratio": 0.0,
+        "cost_usd": 0.0,
+        "estimated_energy_j": 0.0,
+        "correctness": 1.0,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "lines_of_code": 2393,
+        "quality_per_dollar": 1000000.0,
+        "quality_per_joule": 100.0,
+        "sonar_analyzed": false,
+        "sonar_bugs_delta": 0,
+        "sonar_vulnerabilities_delta": 0,
+        "sonar_code_smells_delta": 0,
+        "sonar_cognitive_complexity_delta": 0,
+        "sonar_complexity_delta": 0,
+        "sonar_duplication_delta": 0.0,
+        "sonar_maintainability_delta": 0,
+        "sonar_reliability_delta": 0,
+        "sonar_security_delta": 0,
+        "sonar_baseline_bugs": 0,
+        "sonar_baseline_smells": 0,
+        "sonar_perturbed_bugs": 0,
+        "sonar_perturbed_smells": 0,
+        "converged_back": false,
+        "verdict": "escaped \u2014 model produced a structurally different solution",
+        "model": "anthropic/claude-haiku-4-5",
+        "task": "notification_service",
+        "run_id": ""
+      },
+      "solution": {
+        "tests_passed": 1,
+        "tests_total": 1,
+        "correctness_score": 1.0,
+        "evaluator_source": "unavailable",
+        "evaluator_independent": false,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "constraint_score": 1.0,
+        "lines_of_code": 3740,
+        "cyclomatic_complexity": 485.0,
+        "code_quality_score": 0.0267,
+        "novelty_score": 0.7794,
+        "composite_score": 0.7723,
+        "sonar_analyzed": false,
+        "sonar_bugs": 0,
+        "sonar_vulnerabilities": 0,
+        "sonar_code_smells": 0,
+        "sonar_cognitive_complexity": 0,
+        "sonar_duplicated_lines_density": 0.0,
+        "sonar_ncloc": 0,
+        "sonar_maintainability_rating": "",
+        "sonar_reliability_rating": "",
+        "sonar_security_rating": "",
+        "sonar_quality_gate": "",
+        "sonar_quality_score": 0.5
+      },
+      "efficiency": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "thinking_ratio": 0.0,
+        "output_efficiency": 0.0,
+        "cost_input_usd": 0.0,
+        "cost_output_usd": 0.0,
+        "cost_reasoning_usd": 0.0,
+        "cost_cache_usd": 0.0,
+        "total_cost_usd": 1.551722,
+        "cost_is_estimated": true,
+        "energy_input_j": 0.0,
+        "energy_output_j": 0.0,
+        "energy_reasoning_j": 0.0,
+        "total_energy_j": 0.0,
+        "solution_density": 0.0,
+        "correctness_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "efficiency_score": 0.0
+      }
+    }
+  }
+}

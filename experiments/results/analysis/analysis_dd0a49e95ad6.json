@@ -1,0 +1,390 @@
+{
+  "story_name": "notification_service",
+  "story_id": "dd0a49e95ad6",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 1334,
+    "total_lines_removed": 9,
+    "net_lines": 1325,
+    "average_convention_score": 0.773
+  },
+  "commits": [
+    {
+      "commit_hash": "0f184c237986c48390e1337ef68235fd99846da0",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 5,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 8,
+        "functions_removed": 0,
+        "classes_added": 4,
+        "classes_removed": 0,
+        "imports_added": 20,
+        "imports_removed": 0,
+        "lines_added": 878,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 9,
+        "complexity_delta": 32,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "example_client.py: Classes should use PascalCase",
+          "example_client.py: Module-level constants should be UPPER_CASE",
+          "test_websocket_server.py: Module-level constants should be UPPER_CASE",
+          "websocket_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "0030aced55071f56b12026365b36e973b4ad1911",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 2,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 1,
+        "imports_removed": 1,
+        "lines_added": 456,
+        "lines_removed": 9
+      },
+      "sonar": {
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "example_client.py: Classes should use PascalCase",
+          "example_client.py: Module-level constants should be UPPER_CASE",
+          "test_websocket_server.py: Module-level constants should be UPPER_CASE",
+          "websocket_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "bcb4f14b4fc7c9ba9f590f193d81379ef42e0ba2",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "example_client.py: Classes should use PascalCase",
+          "example_client.py: Module-level constants should be UPPER_CASE",
+          "test_websocket_server.py: Module-level constants should be UPPER_CASE",
+          "websocket_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "188c0db41de7a6784e86bc3d7ccf31e0c96f8bd3",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "example_client.py: Classes should use PascalCase",
+          "example_client.py: Module-level constants should be UPPER_CASE",
+          "test_websocket_server.py: Module-level constants should be UPPER_CASE",
+          "websocket_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "86c48c500735afcec871baf347b72ee7649edc84",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.773,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "example_client.py: Classes should use PascalCase",
+          "example_client.py: Module-level constants should be UPPER_CASE",
+          "test_websocket_server.py: Module-level constants should be UPPER_CASE",
+          "websocket_server.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ],
+  "deep": {
+    "lsp": {
+      "available": true,
+      "tool": "pyright",
+      "errors": 0,
+      "warnings": 0
+    },
+    "solution": {
+      "tests_passed": 0,
+      "tests_total": 1,
+      "correctness_score": 0.0,
+      "evaluator_source": "unavailable",
+      "evaluator_independent": false,
+      "constraints_met": 2,
+      "constraints_total": 3,
+      "constraint_score": 0.6667,
+      "lines_of_code": 2172,
+      "cyclomatic_complexity": 265.0,
+      "code_quality_score": 0.046,
+      "novelty_score": 0.6473,
+      "composite_score": 0.3063,
+      "sonar_analyzed": false,
+      "sonar_bugs": 0,
+      "sonar_vulnerabilities": 0,
+      "sonar_code_smells": 0,
+      "sonar_cognitive_complexity": 0,
+      "sonar_duplicated_lines_density": 0.0,
+      "sonar_ncloc": 0,
+      "sonar_maintainability_rating": "",
+      "sonar_reliability_rating": "",
+      "sonar_security_rating": "",
+      "sonar_quality_gate": "",
+      "sonar_quality_score": 0.5
+    },
+    "basin": {
+      "perturbation_strength": 0.5,
+      "perturbation_operator": "",
+      "perturbation_class": "",
+      "architecture_divergence": 0.4286,
+      "structure_divergence": 0.7131,
+      "novelty_score": 0.6471,
+      "escape_score": 0.5795,
+      "total_tokens": 0,
+      "reasoning_tokens": 0,
+      "thinking_ratio": 0.0,
+      "cost_usd": 0.0,
+      "estimated_energy_j": 0.0,
+      "correctness": 0.0,
+      "constraints_met": 2,
+      "constraints_total": 3,
+      "lines_of_code": 1387,
+      "quality_per_dollar": 0.0,
+      "quality_per_joule": 0.0,
+      "sonar_analyzed": false,
+      "sonar_bugs_delta": 0,
+      "sonar_vulnerabilities_delta": 0,
+      "sonar_code_smells_delta": 0,
+      "sonar_cognitive_complexity_delta": 0,
+      "sonar_complexity_delta": 0,
+      "sonar_duplication_delta": 0.0,
+      "sonar_maintainability_delta": 0,
+      "sonar_reliability_delta": 0,
+      "sonar_security_delta": 0,
+      "sonar_baseline_bugs": 0,
+      "sonar_baseline_smells": 0,
+      "sonar_perturbed_bugs": 0,
+      "sonar_perturbed_smells": 0,
+      "converged_back": false,
+      "verdict": "escaped \u2014 model produced a structurally different solution",
+      "model": "anthropic/claude-haiku-4-5",
+      "task": "notification_service",
+      "run_id": ""
+    },
+    "strategy": {
+      "strategy": "wasteful",
+      "strategy_score": 0.2971,
+      "exploration_premium": 0.0,
+      "thermal_efficiency": 0.0,
+      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($0.3752, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
+      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "operator": "",
+      "perturbation_class": "",
+      "model": "anthropic/claude-haiku-4-5",
+      "run_id": "",
+      "reasoning": {
+        "perturbation_strength": 0.5,
+        "perturbation_operator": "",
+        "perturbation_class": "",
+        "architecture_divergence": 0.4286,
+        "structure_divergence": 0.7131,
+        "novelty_score": 0.6471,
+        "escape_score": 0.5795,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "thinking_ratio": 0.0,
+        "cost_usd": 0.0,
+        "estimated_energy_j": 0.0,
+        "correctness": 0.0,
+        "constraints_met": 2,
+        "constraints_total": 3,
+        "lines_of_code": 1387,
+        "quality_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "sonar_analyzed": false,
+        "sonar_bugs_delta": 0,
+        "sonar_vulnerabilities_delta": 0,
+        "sonar_code_smells_delta": 0,
+        "sonar_cognitive_complexity_delta": 0,
+        "sonar_complexity_delta": 0,
+        "sonar_duplication_delta": 0.0,
+        "sonar_maintainability_delta": 0,
+        "sonar_reliability_delta": 0,
+        "sonar_security_delta": 0,
+        "sonar_baseline_bugs": 0,
+        "sonar_baseline_smells": 0,
+        "sonar_perturbed_bugs": 0,
+        "sonar_perturbed_smells": 0,
+        "converged_back": false,
+        "verdict": "escaped \u2014 model produced a structurally different solution",
+        "model": "anthropic/claude-haiku-4-5",
+        "task": "notification_service",
+        "run_id": ""
+      },
+      "solution": {
+        "tests_passed": 0,
+        "tests_total": 1,
+        "correctness_score": 0.0,
+        "evaluator_source": "unavailable",
+        "evaluator_independent": false,
+        "constraints_met": 2,
+        "constraints_total": 3,
+        "constraint_score": 0.6667,
+        "lines_of_code": 2172,
+        "cyclomatic_complexity": 265.0,
+        "code_quality_score": 0.046,
+        "novelty_score": 0.6473,
+        "composite_score": 0.3063,
+        "sonar_analyzed": false,
+        "sonar_bugs": 0,
+        "sonar_vulnerabilities": 0,
+        "sonar_code_smells": 0,
+        "sonar_cognitive_complexity": 0,
+        "sonar_duplicated_lines_density": 0.0,
+        "sonar_ncloc": 0,
+        "sonar_maintainability_rating": "",
+        "sonar_reliability_rating": "",
+        "sonar_security_rating": "",
+        "sonar_quality_gate": "",
+        "sonar_quality_score": 0.5
+      },
+      "efficiency": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "thinking_ratio": 0.0,
+        "output_efficiency": 0.0,
+        "cost_input_usd": 0.0,
+        "cost_output_usd": 0.0,
+        "cost_reasoning_usd": 0.0,
+        "cost_cache_usd": 0.0,
+        "total_cost_usd": 0.375229,
+        "cost_is_estimated": true,
+        "energy_input_j": 0.0,
+        "energy_output_j": 0.0,
+        "energy_reasoning_j": 0.0,
+        "total_energy_j": 0.0,
+        "solution_density": 0.0,
+        "correctness_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "efficiency_score": 0.0
+      }
+    }
+  }
+}

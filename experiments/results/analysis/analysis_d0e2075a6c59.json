@@ -1,0 +1,410 @@
+{
+  "story_name": "task_manager_api",
+  "story_id": "d0e2075a6c59",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 1513,
+    "total_lines_removed": 113,
+    "net_lines": 1400,
+    "average_convention_score": 0.727
+  },
+  "commits": [
+    {
+      "commit_hash": "f54cb0e42e69c9aeff43108e94d88f813eb98754",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 3,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 27,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 7,
+        "imports_removed": 0,
+        "lines_added": 370,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 33,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.727,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_app.py: Classes should use PascalCase",
+          "celery_app.py: Module-level constants should be UPPER_CASE",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "celery_config.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "task_api.py: Classes should use PascalCase",
+          "test_task_api.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "63a7c2d6ba6f9f81ebb59edcafa66f8e2267d083",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 3,
+        "files_deleted": 0,
+        "functions_added": 52,
+        "functions_removed": 21,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 4,
+        "imports_removed": 1,
+        "lines_added": 458,
+        "lines_removed": 60
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 26,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.727,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_app.py: Classes should use PascalCase",
+          "celery_app.py: Module-level constants should be UPPER_CASE",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "celery_config.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "task_api.py: Classes should use PascalCase",
+          "test_task_api.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "0635ff7bca9df92a83c09b154eaab6c61ca8de02",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 2,
+        "files_modified": 3,
+        "files_deleted": 0,
+        "functions_added": 9,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 7,
+        "imports_removed": 0,
+        "lines_added": 199,
+        "lines_removed": 3
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 16,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.727,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_app.py: Classes should use PascalCase",
+          "celery_app.py: Module-level constants should be UPPER_CASE",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "celery_config.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "task_api.py: Classes should use PascalCase",
+          "test_task_api.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "aa3a5c31cad21c03bb5a6fb5394479d345dd3666",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 1,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 3,
+        "classes_removed": 0,
+        "imports_added": 2,
+        "imports_removed": 0,
+        "lines_added": 101,
+        "lines_removed": 39
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.727,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_app.py: Classes should use PascalCase",
+          "celery_app.py: Module-level constants should be UPPER_CASE",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "celery_config.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "task_api.py: Classes should use PascalCase",
+          "test_task_api.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "cec3e2399feb6c6d28d71e7d94a64eed4b0e108c",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 4,
+        "files_deleted": 0,
+        "functions_added": 26,
+        "functions_removed": 2,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 4,
+        "imports_removed": 0,
+        "lines_added": 385,
+        "lines_removed": 11
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 1,
+        "complexity_delta": 41,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.727,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "celery_app.py: Classes should use PascalCase",
+          "celery_app.py: Module-level constants should be UPPER_CASE",
+          "celery_config.py: Functions should use snake_case",
+          "celery_config.py: Classes should use PascalCase",
+          "celery_config.py: Module-level constants should be UPPER_CASE",
+          "repositories.py: Module-level constants should be UPPER_CASE",
+          "task_api.py: Classes should use PascalCase",
+          "test_task_api.py: Classes should use PascalCase"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ],
+  "deep": {
+    "lsp": {
+      "available": true,
+      "tool": "pyright",
+      "errors": 6,
+      "warnings": 0
+    },
+    "solution": {
+      "tests_passed": 1,
+      "tests_total": 1,
+      "correctness_score": 1.0,
+      "evaluator_source": "unavailable",
+      "evaluator_independent": false,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "constraint_score": 1.0,
+      "lines_of_code": 2496,
+      "cyclomatic_complexity": 353.0,
+      "code_quality_score": 0.0401,
+      "novelty_score": 0.7638,
+      "composite_score": 0.7726,
+      "sonar_analyzed": false,
+      "sonar_bugs": 0,
+      "sonar_vulnerabilities": 0,
+      "sonar_code_smells": 0,
+      "sonar_cognitive_complexity": 0,
+      "sonar_duplicated_lines_density": 0.0,
+      "sonar_ncloc": 0,
+      "sonar_maintainability_rating": "",
+      "sonar_reliability_rating": "",
+      "sonar_security_rating": "",
+      "sonar_quality_gate": "",
+      "sonar_quality_score": 0.5
+    },
+    "basin": {
+      "perturbation_strength": 0.5,
+      "perturbation_operator": "",
+      "perturbation_class": "",
+      "architecture_divergence": 0.4286,
+      "structure_divergence": 0.8606,
+      "novelty_score": 0.7636,
+      "escape_score": 0.6587,
+      "total_tokens": 0,
+      "reasoning_tokens": 0,
+      "thinking_ratio": 0.0,
+      "cost_usd": 0.0,
+      "estimated_energy_j": 0.0,
+      "correctness": 1.0,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "lines_of_code": 1662,
+      "quality_per_dollar": 1000000.0,
+      "quality_per_joule": 100.0,
+      "sonar_analyzed": false,
+      "sonar_bugs_delta": 0,
+      "sonar_vulnerabilities_delta": 0,
+      "sonar_code_smells_delta": 0,
+      "sonar_cognitive_complexity_delta": 0,
+      "sonar_complexity_delta": 0,
+      "sonar_duplication_delta": 0.0,
+      "sonar_maintainability_delta": 0,
+      "sonar_reliability_delta": 0,
+      "sonar_security_delta": 0,
+      "sonar_baseline_bugs": 0,
+      "sonar_baseline_smells": 0,
+      "sonar_perturbed_bugs": 0,
+      "sonar_perturbed_smells": 0,
+      "converged_back": false,
+      "verdict": "escaped \u2014 model produced a structurally different solution",
+      "model": "anthropic/claude-sonnet-5",
+      "task": "task_manager_api",
+      "run_id": ""
+    },
+    "strategy": {
+      "strategy": "exploratory",
+      "strategy_score": 0.8146,
+      "exploration_premium": 0.1605,
+      "thermal_efficiency": 0.0,
+      "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.66) and found a novel correct solution (novelty=0.76, correctness=100%). Cost: $4.7574, ~0J.",
+      "recommendation": "Promote this operator. The perturbation succeeded.",
+      "operator": "",
+      "perturbation_class": "",
+      "model": "anthropic/claude-sonnet-5",
+      "run_id": "",
+      "reasoning": {
+        "perturbation_strength": 0.5,
+        "perturbation_operator": "",
+        "perturbation_class": "",
+        "architecture_divergence": 0.4286,
+        "structure_divergence": 0.8606,
+        "novelty_score": 0.7636,
+        "escape_score": 0.6587,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "thinking_ratio": 0.0,
+        "cost_usd": 0.0,
+        "estimated_energy_j": 0.0,
+        "correctness": 1.0,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "lines_of_code": 1662,
+        "quality_per_dollar": 1000000.0,
+        "quality_per_joule": 100.0,
+        "sonar_analyzed": false,
+        "sonar_bugs_delta": 0,
+        "sonar_vulnerabilities_delta": 0,
+        "sonar_code_smells_delta": 0,
+        "sonar_cognitive_complexity_delta": 0,
+        "sonar_complexity_delta": 0,
+        "sonar_duplication_delta": 0.0,
+        "sonar_maintainability_delta": 0,
+        "sonar_reliability_delta": 0,
+        "sonar_security_delta": 0,
+        "sonar_baseline_bugs": 0,
+        "sonar_baseline_smells": 0,
+        "sonar_perturbed_bugs": 0,
+        "sonar_perturbed_smells": 0,
+        "converged_back": false,
+        "verdict": "escaped \u2014 model produced a structurally different solution",
+        "model": "anthropic/claude-sonnet-5",
+        "task": "task_manager_api",
+        "run_id": ""
+      },
+      "solution": {
+        "tests_passed": 1,
+        "tests_total": 1,
+        "correctness_score": 1.0,
+        "evaluator_source": "unavailable",
+        "evaluator_independent": false,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "constraint_score": 1.0,
+        "lines_of_code": 2496,
+        "cyclomatic_complexity": 353.0,
+        "code_quality_score": 0.0401,
+        "novelty_score": 0.7638,
+        "composite_score": 0.7726,
+        "sonar_analyzed": false,
+        "sonar_bugs": 0,
+        "sonar_vulnerabilities": 0,
+        "sonar_code_smells": 0,
+        "sonar_cognitive_complexity": 0,
+        "sonar_duplicated_lines_density": 0.0,
+        "sonar_ncloc": 0,
+        "sonar_maintainability_rating": "",
+        "sonar_reliability_rating": "",
+        "sonar_security_rating": "",
+        "sonar_quality_gate": "",
+        "sonar_quality_score": 0.5
+      },
+      "efficiency": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "thinking_ratio": 0.0,
+        "output_efficiency": 0.0,
+        "cost_input_usd": 0.0,
+        "cost_output_usd": 0.0,
+        "cost_reasoning_usd": 0.0,
+        "cost_cache_usd": 0.0,
+        "total_cost_usd": 4.757383,
+        "cost_is_estimated": true,
+        "energy_input_j": 0.0,
+        "energy_output_j": 0.0,
+        "energy_reasoning_j": 0.0,
+        "total_energy_j": 0.0,
+        "solution_density": 0.0,
+        "correctness_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "efficiency_score": 0.0
+      }
+    }
+  }
+}

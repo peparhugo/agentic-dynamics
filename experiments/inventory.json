@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-08-12T19:25:03.289506+00:00",
+  "generated_at": "2026-08-13T17:37:33.026070+00:00",
   "counts": {
-    "db_sessions_total": 1537,
-    "db_sessions_experiments": 490,
-    "worktrees_total": 61,
+    "db_sessions_total": 3206,
+    "db_sessions_experiments": 1049,
+    "worktrees_total": 80,
     "worktrees_experiments": 13,
-    "worktrees_other": 48,
+    "worktrees_other": 67,
     "result_files": 26,
     "config_files": 35
   },
   "costs": {
-    "total_all_sessions": 214.3436,
-    "total_experiment_sessions": 13.6586,
-    "tokens_all_sessions": 53125309,
-    "tokens_experiment_sessions": 10841184
+    "total_all_sessions": 224.6905,
+    "total_experiment_sessions": 16.2937,
+    "tokens_all_sessions": 95477382,
+    "tokens_experiment_sessions": 32469641
   },
   "model_breakdown": {
     "deepseek/deepseek-v4-pro": {
@@ -32,9 +32,19 @@
       "tokens": 1075066
     },
     "deepseek/deepseek-v4-flash": {
-      "sessions": 109,
-      "cost": 0.1925,
-      "tokens": 899733
+      "sessions": 364,
+      "cost": 2.8275,
+      "tokens": 10401607
+    },
+    "openai/gpt-5.6-sol": {
+      "sessions": 154,
+      "cost": 0.0,
+      "tokens": 7175998
+    },
+    "openai/gpt-5.6-terra": {
+      "sessions": 150,
+      "cost": 0.0,
+      "tokens": 4950585
     }
   },
   "results": [
@@ -225,13 +235,13 @@
       "num_runs": 7,
       "total_cost": 0.8173,
       "operators": [
-        "inject_competing_goal",
         "shift_framing",
-        "inject_alien_vocab",
+        "baseline",
         "invert_constraint",
         "inject_phantom_success",
+        "inject_competing_goal",
         "remove_critical_constraint",
-        "baseline"
+        "inject_alien_vocab"
       ]
     },
     {
@@ -241,13 +251,13 @@
       "num_runs": 7,
       "total_cost": 0.0039,
       "operators": [
-        "inject_competing_goal",
         "shift_framing",
-        "inject_alien_vocab",
+        "baseline",
         "invert_constraint",
         "inject_phantom_success",
+        "inject_competing_goal",
         "remove_critical_constraint",
-        "baseline"
+        "inject_alien_vocab"
       ]
     },
     {
@@ -257,13 +267,13 @@
       "num_runs": 7,
       "total_cost": 0.1044,
       "operators": [
-        "inject_competing_goal",
         "shift_framing",
-        "inject_alien_vocab",
+        "baseline",
         "invert_constraint",
         "inject_phantom_success",
+        "inject_competing_goal",
         "remove_critical_constraint",
-        "baseline"
+        "inject_alien_vocab"
       ]
     }
   ],
@@ -851,8 +861,8 @@
     {
       "path": "/tmp/exp_hp4jj9q5",
       "name": "exp_hp4jj9q5",
-      "mtime": "2026-08-12T00:18:25.111312+00:00",
-      "total_files": 22,
+      "mtime": "2026-08-13T17:33:28.722674+00:00",
+      "total_files": 24,
       "py_files": 0,
       "session": {
         "id": "ses_00caa89e0ffesDtsKjlhOamnWL",
@@ -1137,10 +1147,24 @@
       }
     },
     {
+      "path": "/tmp/exp_0ez6iulf",
+      "name": "exp_0ez6iulf",
+      "mtime": "2026-08-12T21:07:19.402773+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_17opyi2u",
+      "name": "exp_17opyi2u",
+      "mtime": "2026-08-13T14:03:13.012002+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_18y_54mq",
       "name": "exp_18y_54mq",
-      "mtime": "2026-08-10T02:22:38.802445+00:00",
-      "total_files": 22,
+      "mtime": "2026-08-13T17:34:50.753417+00:00",
+      "total_files": 24,
       "py_files": 0,
       "session": {
         "id": "ses_01685b8edffeVPuF65Oj8Mt0xC",
@@ -1159,11 +1183,47 @@
       }
     },
     {
+      "path": "/tmp/exp_1iiw8yu_",
+      "name": "exp_1iiw8yu_",
+      "mtime": "2026-08-13T17:16:25.016331+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_304grfxa",
       "name": "exp_304grfxa",
       "mtime": "2026-08-12T18:16:52.304766+00:00",
       "total_files": 1,
       "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_5oghbmfp",
+      "name": "exp_5oghbmfp",
+      "mtime": "2026-08-13T17:21:10.925130+00:00",
+      "total_files": 20,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7eb8xtbf",
+      "name": "exp_7eb8xtbf",
+      "mtime": "2026-08-13T17:21:16.021067+00:00",
+      "total_files": 20,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003db82b8ffe8lWl65chH3Rq3J",
+        "directory": "/tmp/exp_7eb8xtbf",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_172116",
+        "cost": 0.0017162488000000001,
+        "tokens_input": 8485,
+        "tokens_output": 99,
+        "tokens_reasoning": 1651,
+        "tokens_cache_read": 13696,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641677639,
+        "time_updated": 1786641698939
+      }
     },
     {
       "path": "/tmp/exp_7kyy8e0d",
@@ -1255,8 +1315,8 @@
     {
       "path": "/tmp/exp_akuk_b2u",
       "name": "exp_akuk_b2u",
-      "mtime": "2026-08-12T18:16:52.236767+00:00",
-      "total_files": 0,
+      "mtime": "2026-08-13T17:34:22.505851+00:00",
+      "total_files": 2,
       "py_files": 0
     },
     {
@@ -1406,10 +1466,31 @@
       }
     },
     {
+      "path": "/tmp/exp_e4jmpad7",
+      "name": "exp_e4jmpad7",
+      "mtime": "2026-08-13T13:04:20.745008+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_e5um6dba",
+      "name": "exp_e5um6dba",
+      "mtime": "2026-08-13T17:16:25.084331+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_e9iolnvx",
       "name": "exp_e9iolnvx",
       "mtime": "2026-08-12T16:30:55.995761+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ednbsc4d",
+      "name": "exp_ednbsc4d",
+      "mtime": "2026-08-13T13:04:20.677010+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -1432,6 +1513,72 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786328506761,
         "time_updated": 1786328531296
+      }
+    },
+    {
+      "path": "/tmp/exp_fj4_44r4",
+      "name": "exp_fj4_44r4",
+      "mtime": "2026-08-13T17:20:43.157473+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003dc7b8dffeeeoAz6NQR3i0wC",
+        "directory": "/tmp/exp_fj4_44r4",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_172012",
+        "cost": 0.0019706232,
+        "tokens_input": 8483,
+        "tokens_output": 1185,
+        "tokens_reasoning": 1358,
+        "tokens_cache_read": 25344,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641613938,
+        "time_updated": 1786641643034
+      }
+    },
+    {
+      "path": "/tmp/exp_h6rhoo_u",
+      "name": "exp_h6rhoo_u",
+      "mtime": "2026-08-13T17:19:46.330156+00:00",
+      "total_files": 20,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003dce0bdffeA6aajghi7nj9tg",
+        "directory": "/tmp/exp_h6rhoo_u",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260813_171946",
+        "cost": 0.0013626032,
+        "tokens_input": 8836,
+        "tokens_output": 170,
+        "tokens_reasoning": 153,
+        "tokens_cache_read": 12544,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641588034,
+        "time_updated": 1786641594709
+      }
+    },
+    {
+      "path": "/tmp/exp_hbbb27ir",
+      "name": "exp_hbbb27ir",
+      "mtime": "2026-08-13T17:21:10.921130+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003dc02efffelL7rUgdI2rIDEm",
+        "directory": "/tmp/exp_hbbb27ir",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_172043",
+        "cost": 0.0019269432,
+        "tokens_input": 8615,
+        "tokens_output": 1287,
+        "tokens_reasoning": 1034,
+        "tokens_cache_read": 25344,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641644817,
+        "time_updated": 1786641670806
       }
     },
     {
@@ -1486,6 +1633,13 @@
       }
     },
     {
+      "path": "/tmp/exp_i1fmdeuv",
+      "name": "exp_i1fmdeuv",
+      "mtime": "2026-08-13T13:06:30.850758+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_i_2mwam7",
       "name": "exp_i_2mwam7",
       "mtime": "2026-08-10T04:40:23.248838+00:00",
@@ -1527,6 +1681,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786550377180,
         "time_updated": 1786550418932
+      }
+    },
+    {
+      "path": "/tmp/exp_iiq7j7oy",
+      "name": "exp_iiq7j7oy",
+      "mtime": "2026-08-13T17:22:51.711842+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003da92d0ffeo8EjWbMsZsTtjy",
+        "directory": "/tmp/exp_iiq7j7oy",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_172217",
+        "cost": 0.0024180744000000002,
+        "tokens_input": 10731,
+        "tokens_output": 1412,
+        "tokens_reasoning": 1518,
+        "tokens_cache_read": 34048,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641739055,
+        "time_updated": 1786641771545
       }
     },
     {
@@ -1595,6 +1771,28 @@
       }
     },
     {
+      "path": "/tmp/exp_l8xloo4l",
+      "name": "exp_l8xloo4l",
+      "mtime": "2026-08-13T17:33:56.710246+00:00",
+      "total_files": 24,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003de043fffeaUpUghaoWYtUyX",
+        "directory": "/tmp/exp_l8xloo4l",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_171831",
+        "cost": 0.002183944,
+        "tokens_input": 8536,
+        "tokens_output": 1373,
+        "tokens_reasoning": 1794,
+        "tokens_cache_read": 36480,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641513408,
+        "time_updated": 1786641548245
+      }
+    },
+    {
       "path": "/tmp/exp_m80_wobp",
       "name": "exp_m80_wobp",
       "mtime": "2026-08-10T13:55:47.266837+00:00",
@@ -1636,6 +1834,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786493906548,
         "time_updated": 1786493920570
+      }
+    },
+    {
+      "path": "/tmp/exp_n8q39mth",
+      "name": "exp_n8q39mth",
+      "mtime": "2026-08-13T17:19:46.326156+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003dd7552ffe5IndXub9oK4ngG",
+        "directory": "/tmp/exp_n8q39mth",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_171908",
+        "cost": 0.0022832431999999995,
+        "tokens_input": 8632,
+        "tokens_output": 1529,
+        "tokens_reasoning": 1928,
+        "tokens_cache_read": 38144,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641549998,
+        "time_updated": 1786641586197
       }
     },
     {
@@ -1685,8 +1905,8 @@
     {
       "path": "/tmp/exp_qkc3lf50",
       "name": "exp_qkc3lf50",
-      "mtime": "2026-08-10T01:08:10.630502+00:00",
-      "total_files": 22,
+      "mtime": "2026-08-13T17:35:07.181165+00:00",
+      "total_files": 23,
       "py_files": 0,
       "session": {
         "id": "ses_016c9d6f1ffenXqWE3TkHnRh0w",
@@ -1800,6 +2020,28 @@
       }
     },
     {
+      "path": "/tmp/exp_u_dkhfc9",
+      "name": "exp_u_dkhfc9",
+      "mtime": "2026-08-13T17:22:51.711842+00:00",
+      "total_files": 20,
+      "py_files": 0,
+      "session": {
+        "id": "ses_003da0cf7ffe7M0tmVyL3Q0gDu",
+        "directory": "/tmp/exp_u_dkhfc9",
+        "title": "meta_analyze_exp_0s36_d3n_20260813_172251",
+        "cost": 0.0015085336,
+        "tokens_input": 9135,
+        "tokens_output": 354,
+        "tokens_reasoning": 237,
+        "tokens_cache_read": 22912,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786641773320,
+        "time_updated": 1786641783113
+      }
+    },
+    {
       "path": "/tmp/exp_ue5poll1",
       "name": "exp_ue5poll1",
       "mtime": "2026-08-10T13:56:11.638413+00:00",
@@ -1866,6 +2108,20 @@
       }
     },
     {
+      "path": "/tmp/exp_xhtgrn13",
+      "name": "exp_xhtgrn13",
+      "mtime": "2026-08-13T13:06:30.918756+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_xwv606md",
+      "name": "exp_xwv606md",
+      "mtime": "2026-08-12T21:07:19.470772+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_y9xp6l1k",
       "name": "exp_y9xp6l1k",
       "mtime": "2026-08-12T00:17:54.019722+00:00",
@@ -1915,6 +2171,13 @@
         "time_created": 1786324105001,
         "time_updated": 1786324117562
       }
+    },
+    {
+      "path": "/tmp/exp_zpmx2c_l",
+      "name": "exp_zpmx2c_l",
+      "mtime": "2026-08-13T14:03:13.080001+00:00",
+      "total_files": 1,
+      "py_files": 0
     }
   ],
   "experiment_session_titles": [
@@ -5347,6 +5610,3919 @@
       "model_id": "deepseek-v4-flash",
       "cost": 0.007048507199999999,
       "tokens_output": 3255
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0027397216,
+      "tokens_output": 1746
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0013846,
+      "tokens_output": 932
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0025175696,
+      "tokens_output": 1723
+    },
+    {
+      "title": "Task manager API commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0044871904,
+      "tokens_output": 2359
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0055557096,
+      "tokens_output": 2906
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007064327200000001,
+      "tokens_output": 2014
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0062626424,
+      "tokens_output": 2598
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003773056,
+      "tokens_output": 1501
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0078636264,
+      "tokens_output": 3943
+    },
+    {
+      "title": "API spec mutation: false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 6.51728e-05,
+      "tokens_output": 14
+    },
+    {
+      "title": "Reviewing notification_service multi-session story",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0027982416,
+      "tokens_output": 1930
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0020620263999999995,
+      "tokens_output": 1710
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0019919984,
+      "tokens_output": 1740
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0020574175999999995,
+      "tokens_output": 1995
+    },
+    {
+      "title": "Mutation compiler spec: inject false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0016095744,
+      "tokens_output": 193
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0022253280000000004,
+      "tokens_output": 2097
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0055581232,
+      "tokens_output": 5142
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0037036607999999995,
+      "tokens_output": 5098
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0032912264000000005,
+      "tokens_output": 5012
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0035186144000000003,
+      "tokens_output": 5194
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005688328799999999,
+      "tokens_output": 4809
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004252707200000001,
+      "tokens_output": 3693
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0059926944,
+      "tokens_output": 5283
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004884017599999999,
+      "tokens_output": 4996
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0049772576,
+      "tokens_output": 5251
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005983034399999999,
+      "tokens_output": 4297
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004097900799999999,
+      "tokens_output": 3493
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005198328799999999,
+      "tokens_output": 3749
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.03845947279999999,
+      "tokens_output": 21015
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.027622767199999995,
+      "tokens_output": 14525
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.020944503999999992,
+      "tokens_output": 10243
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.020408919999999994,
+      "tokens_output": 11716
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting (fork #1)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.04035699919999999,
+      "tokens_output": 15209
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0026441296,
+      "tokens_output": 2853
+    },
+    {
+      "title": "Mutated Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.00247478,
+      "tokens_output": 322
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0021926743999999996,
+      "tokens_output": 2241
+    },
+    {
+      "title": "Flask API task mutation spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001732696,
+      "tokens_output": 204
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0035325191999999997,
+      "tokens_output": 3543
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.002728684,
+      "tokens_output": 2143
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0046400928000000004,
+      "tokens_output": 6281
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003454808,
+      "tokens_output": 4397
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0033201056,
+      "tokens_output": 5100
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003669792,
+      "tokens_output": 3535
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0064526952000000005,
+      "tokens_output": 2896
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005589690400000001,
+      "tokens_output": 3740
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0044698528,
+      "tokens_output": 3902
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0066316208,
+      "tokens_output": 4776
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0055035848,
+      "tokens_output": 4139
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.015340225600000002,
+      "tokens_output": 10307
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0353395392,
+      "tokens_output": 14603
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.018946267200000005,
+      "tokens_output": 11380
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0038482024000000004,
+      "tokens_output": 6468
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006434999200000001,
+      "tokens_output": 3848
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006442771999999999,
+      "tokens_output": 4555
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0022413496000000003,
+      "tokens_output": 1988
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006184774399999999,
+      "tokens_output": 4980
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004800639199999999,
+      "tokens_output": 4322
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.024722594400000006,
+      "tokens_output": 12330
+    },
+    {
+      "title": "Mutation compiler: false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000614768,
+      "tokens_output": 220
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007262779999999999,
+      "tokens_output": 3974
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0042794192000000005,
+      "tokens_output": 2571
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007590743999999999,
+      "tokens_output": 8658
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.016330070399999997,
+      "tokens_output": 10511
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003966967200000001,
+      "tokens_output": 5809
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008455608,
+      "tokens_output": 8426
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0209503224,
+      "tokens_output": 14412
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008443948800000002,
+      "tokens_output": 5192
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005219429599999999,
+      "tokens_output": 7297
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0092132488,
+      "tokens_output": 11340
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0181887216,
+      "tokens_output": 9417
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009543486399999999,
+      "tokens_output": 5637
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006704264,
+      "tokens_output": 2327
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0060307688,
+      "tokens_output": 1902
+    },
+    {
+      "title": "Mutation compiler: false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000172648,
+      "tokens_output": 197
+    },
+    {
+      "title": "Inject false premise into SSG spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000239848,
+      "tokens_output": 179
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007695777600000002,
+      "tokens_output": 8910
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008560899200000003,
+      "tokens_output": 10081
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0040783736,
+      "tokens_output": 2981
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.012358645600000003,
+      "tokens_output": 12907
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0035455224,
+      "tokens_output": 6161
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0076965112,
+      "tokens_output": 3866
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0198568496,
+      "tokens_output": 13536
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0226466128,
+      "tokens_output": 14086
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005731207999999999,
+      "tokens_output": 4262
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013623657599999995,
+      "tokens_output": 13277
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0189069216,
+      "tokens_output": 10868
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.016190400799999997,
+      "tokens_output": 14272
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011926376000000002,
+      "tokens_output": 9900
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0324505888,
+      "tokens_output": 25202
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0056325416000000015,
+      "tokens_output": 8364
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.028625727199999996,
+      "tokens_output": 12303
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0108118024,
+      "tokens_output": 10147
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.020647199999999997,
+      "tokens_output": 11561
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0187700856,
+      "tokens_output": 15036
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.022808856000000006,
+      "tokens_output": 12570
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006992277599999998,
+      "tokens_output": 9308
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration (fork #1)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0661645936,
+      "tokens_output": 35352
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0232304072,
+      "tokens_output": 12056
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013420013599999999,
+      "tokens_output": 11282
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.022880928000000002,
+      "tokens_output": 15889
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0208989032,
+      "tokens_output": 14734
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.015644238400000003,
+      "tokens_output": 11915
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.031628100000000006,
+      "tokens_output": 17221
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007580988800000001,
+      "tokens_output": 8689
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0300629,
+      "tokens_output": 15447
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009562587999999999,
+      "tokens_output": 10200
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.018216828,
+      "tokens_output": 15245
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.020299249600000003,
+      "tokens_output": 17478
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.023514355200000007,
+      "tokens_output": 16293
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013502899199999998,
+      "tokens_output": 11532
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.015924160000000003,
+      "tokens_output": 14414
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.014537538399999998,
+      "tokens_output": 12189
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0257282592,
+      "tokens_output": 11846
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005693777600000001,
+      "tokens_output": 8011
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009681347199999999,
+      "tokens_output": 10560
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.023382755199999997,
+      "tokens_output": 11338
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0158820368,
+      "tokens_output": 13388
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013900269600000001,
+      "tokens_output": 11002
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.013739163200000001,
+      "tokens_output": 12531
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.021770313599999997,
+      "tokens_output": 16209
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.018901836800000005,
+      "tokens_output": 14338
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0235834536,
+      "tokens_output": 18278
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.03285717120000001,
+      "tokens_output": 18763
+    },
+    {
+      "title": "Mutated SSG spec: false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000160048,
+      "tokens_output": 210
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005005588,
+      "tokens_output": 5128
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009362348800000002,
+      "tokens_output": 10748
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005700996000000001,
+      "tokens_output": 5969
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010859363199999998,
+      "tokens_output": 11458
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.015525423200000001,
+      "tokens_output": 12595
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010730299999999998,
+      "tokens_output": 6726
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0209811616,
+      "tokens_output": 15474
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.019465997600000003,
+      "tokens_output": 11512
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.019434307199999997,
+      "tokens_output": 14466
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.012569900000000004,
+      "tokens_output": 11467
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011384066399999997,
+      "tokens_output": 11509
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0191485336,
+      "tokens_output": 14850
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008828528799999999,
+      "tokens_output": 6703
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010213498400000002,
+      "tokens_output": 8847
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007801724000000002,
+      "tokens_output": 7554
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0247309216,
+      "tokens_output": 12203
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007852672799999998,
+      "tokens_output": 6217
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.03392534319999999,
+      "tokens_output": 27800
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.02153538800000001,
+      "tokens_output": 13262
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0082421976,
+      "tokens_output": 7556
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0159475008,
+      "tokens_output": 13839
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009280992,
+      "tokens_output": 6347
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.026135200000000004,
+      "tokens_output": 17938
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.012419002399999997,
+      "tokens_output": 10571
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0157948392,
+      "tokens_output": 11783
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.027647832799999994,
+      "tokens_output": 15072
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.014180107200000003,
+      "tokens_output": 8932
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000282968,
+      "tokens_output": 314
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0037493847999999995,
+      "tokens_output": 3941
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005579380799999999,
+      "tokens_output": 4941
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005186876800000001,
+      "tokens_output": 6063
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009383124800000002,
+      "tokens_output": 9129
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.018112175200000004,
+      "tokens_output": 14698
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.028656633600000002,
+      "tokens_output": 20889
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.034223554399999995,
+      "tokens_output": 21976
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006499634400000002,
+      "tokens_output": 6027
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011622671200000002,
+      "tokens_output": 8947
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.000384048,
+      "tokens_output": 208
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005603875199999999,
+      "tokens_output": 5126
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0050515584,
+      "tokens_output": 5151
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.025519871999999996,
+      "tokens_output": 17320
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0245800296,
+      "tokens_output": 15969
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0097757576,
+      "tokens_output": 6600
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0151508896,
+      "tokens_output": 11317
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011366633600000002,
+      "tokens_output": 6742
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0114288664,
+      "tokens_output": 9882
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.02590907759999999,
+      "tokens_output": 16064
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.016304455999999995,
+      "tokens_output": 12179
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009895659200000002,
+      "tokens_output": 9759
+    },
+    {
+      "title": "[notification_service] Session 3: integration (fork #1)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.05293814960000002,
+      "tokens_output": 20498
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2322
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.011984431199999998,
+      "tokens_output": 6984
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6850
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0231182056,
+      "tokens_output": 14852
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2679
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5527
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3494
+    },
+    {
+      "title": "Explore Flask API structure (@explore subagent)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3608
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.016253328,
+      "tokens_output": 12289
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.014871180800000003,
+      "tokens_output": 9043
+    },
+    {
+      "title": "API spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0024591952,
+      "tokens_output": 166
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.041354174400000006,
+      "tokens_output": 22480
+    },
+    {
+      "title": "Mutation compiler false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001004248,
+      "tokens_output": 25
+    },
+    {
+      "title": "Mutation compiler false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001458464,
+      "tokens_output": 30
+    },
+    {
+      "title": "Mutation compiler false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0009766623999999998,
+      "tokens_output": 164
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 1898
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4699
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0153440224,
+      "tokens_output": 13687
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2298
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4293
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3509
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2861
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0062142863999999996,
+      "tokens_output": 5629
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6698
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009731215199999999,
+      "tokens_output": 9348
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2909
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.027761703199999994,
+      "tokens_output": 23835
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4292
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3920
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2758
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.012367459999999999,
+      "tokens_output": 6442
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4307
+    },
+    {
+      "title": "Mutated Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0002820664,
+      "tokens_output": 208
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2557
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.016446304000000005,
+      "tokens_output": 11264
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3948
+    },
+    {
+      "title": "Mutated Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0008264984,
+      "tokens_output": 343
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4264
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3377
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7185
+    },
+    {
+      "title": "Mutating Flask API spec with false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010242344,
+      "tokens_output": 322
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 1950
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4549
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2534
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2233
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5769
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4146
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3327
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5080
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2705
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6815
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2514
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3022
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4603
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2352
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4619
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4109
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3514
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4373
+    },
+    {
+      "title": "Map Flask API (@explore subagent)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2112
+    },
+    {
+      "title": "Mutating Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0004057032,
+      "tokens_output": 223
+    },
+    {
+      "title": "Mutation compiler spec: inject false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0004090632,
+      "tokens_output": 217
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2000
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6008
+    },
+    {
+      "title": "Mutating Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010727191999999998,
+      "tokens_output": 333
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2473
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2255
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5649
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4878
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2349
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4040
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4965
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3268
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3534
+    },
+    {
+      "title": "Mutation compiler specification perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0007386232,
+      "tokens_output": 200
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2589
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6402
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4889
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2726
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 1997
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3881
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4669
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4312
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3731
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3145
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5581
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2164
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4218
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2427
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4319
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5039
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2105
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0008052352,
+      "tokens_output": 355
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3531
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3109
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3122
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0013699952,
+      "tokens_output": 399
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5246
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2823
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4579
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3291
+    },
+    {
+      "title": "Mutated Flask task API spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0008609552,
+      "tokens_output": 342
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3677
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5802
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2884
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3059
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6586
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3446
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3419
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3623
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2789
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4817
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5001
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3945
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3132
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4086
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0004611432,
+      "tokens_output": 198
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3550
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3985
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5681
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 2969
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4958
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2529
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 3503
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4273
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6408
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2472
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4149
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7786
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3869
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8207
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11766
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3329
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6220
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3251
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4560
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6413
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3648
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8012
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6846
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3541
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5646
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4522
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4954
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7886
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 10057
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 10333
+    },
+    {
+      "title": "Mutation compiler for spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001791832,
+      "tokens_output": 189
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4762
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4417
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4824
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4728
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7320
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6725
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6041
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8763
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6255
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5564
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3873
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8093
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7971
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4245
+    },
+    {
+      "title": "Inject false premise into SSG spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0003749032,
+      "tokens_output": 201
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7819
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4195
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 10011
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 7333
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11881
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5767
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6971
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6001
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9278
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7057
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7338
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4006
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 10962
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4033
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8012
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3957
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3843
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 7112
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3823
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8582
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 13777
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3703
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4795
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 7197
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7842
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4375
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3515
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5015
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 10293
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5195
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7725
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6314
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6608
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7071
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9251
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5600
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5449
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8131
+    },
+    {
+      "title": "Mutation compiler: inject false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0003046232,
+      "tokens_output": 218
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3511
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7653
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11097
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3735
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4440
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11406
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7009
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 7485
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7802
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7036
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5098
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7820
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 10233
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3524
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3972
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3881
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6786
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7904
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6416
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5628
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5870
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8145
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11698
+    },
+    {
+      "title": "Mutation compiler: false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001705032,
+      "tokens_output": 201
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4631
+    },
+    {
+      "title": "[static_site_gen] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3423
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9554
+    },
+    {
+      "title": "[static_site_gen] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4354
+    },
+    {
+      "title": "[static_site_gen] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6564
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5106
+    },
+    {
+      "title": "[static_site_gen] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5262
+    },
+    {
+      "title": "WebSocket notification server mutation spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0016945208,
+      "tokens_output": 357
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4884
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3396
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9843
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3053
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6518
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4203
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5260
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3074
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4350
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4182
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5516
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9199
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3374
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3083
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6544
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4989
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5510
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3205
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3335
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6745
+    },
+    {
+      "title": "WebSocket notification server mutation spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0007625016,
+      "tokens_output": 345
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5900
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3857
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7045
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4364
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5779
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6943
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5061
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4618
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4723
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2224
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9045
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3719
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3861
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4446
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6924
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4111
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3389
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4261
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3604
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5438
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4528
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3288
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3306
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7668
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5658
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 583
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3997
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3711
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4787
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4990
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6442
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001990632,
+      "tokens_output": 273
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4475
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3620
+    },
+    {
+      "title": "[notification_service] Session 4: refactor (fork #1)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7155
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3652
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4772
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5003
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 6513
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3040
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4218
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3716
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4646
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3244
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6620
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8479
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3013
+    },
+    {
+      "title": "WebSocket notification server mutation spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0007707616,
+      "tokens_output": 328
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3307
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5010
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5846
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3286
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5102
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5953
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 7007
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2819
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5056
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3938
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4559
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3567
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5972
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4245
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5803
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5159
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3607
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0008690919999999999,
+      "tokens_output": 340
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3151
+    },
+    {
+      "title": "WebSocket notification server spec mutation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001317176,
+      "tokens_output": 318
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5280
+    },
+    {
+      "title": "[notification_service] Session 1: greenfield",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3426
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5538
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6559
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4845
+    },
+    {
+      "title": "[notification_service] Session 2: feature_addition",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2796
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 5922
+    },
+    {
+      "title": "[notification_service] Session 3: integration",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 8189
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4324
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 2867
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3640
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 3971
+    },
+    {
+      "title": "[notification_service] Session 4: refactor",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4562
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-terra",
+      "cost": 0.0,
+      "tokens_output": 4822
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 489
+    },
+    {
+      "title": "Mutation compiler: false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011784976,
+      "tokens_output": 322
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 4658
+    },
+    {
+      "title": "[notification_service] Session 5: cross_cutting (fork #1)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 9762
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001074864,
+      "tokens_output": 11
+    },
+    {
+      "title": "Inject false premise into to-do app spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001123864,
+      "tokens_output": 40
+    },
+    {
+      "title": "Mutation compiler: inject false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001371048,
+      "tokens_output": 49
+    },
+    {
+      "title": "Notification service commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008203803999999999,
+      "tokens_output": 3996
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008595232799999998,
+      "tokens_output": 3724
+    },
+    {
+      "title": "Notification service multi-session build review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0025557055999999995,
+      "tokens_output": 1430
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005968032,
+      "tokens_output": 3137
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0090700736,
+      "tokens_output": 2799
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.005185224800000001,
+      "tokens_output": 1846
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.008488278399999999,
+      "tokens_output": 5138
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.009513924,
+      "tokens_output": 4119
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007767636799999999,
+      "tokens_output": 3378
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010405724000000002,
+      "tokens_output": 4671
+    },
+    {
+      "title": "Notification service commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0067853464,
+      "tokens_output": 3667
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0127908424,
+      "tokens_output": 4881
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0118974744,
+      "tokens_output": 7393
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007686520800000001,
+      "tokens_output": 2688
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.003756340000000001,
+      "tokens_output": 3681
+    },
+    {
+      "title": "Notification service multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.010807568799999999,
+      "tokens_output": 4374
+    },
+    {
+      "title": "AI commit review: task completion email",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0012620664,
+      "tokens_output": 669
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0077353584,
+      "tokens_output": 2568
+    },
+    {
+      "title": "Find task_manager_api story baseline (@explore subagent)",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.022336165599999992,
+      "tokens_output": 9539
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0057405376,
+      "tokens_output": 2214
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0036885912,
+      "tokens_output": 2202
+    },
+    {
+      "title": "Celery email notification commit review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010520664,
+      "tokens_output": 539
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006383064799999999,
+      "tokens_output": 2208
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0045827656,
+      "tokens_output": 2581
+    },
+    {
+      "title": "AI commit review: auth & task scoping",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0041255872,
+      "tokens_output": 1500
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006319404,
+      "tokens_output": 3534
+    },
+    {
+      "title": "Task manager API story review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007366525599999997,
+      "tokens_output": 5334
+    },
+    {
+      "title": "Reviewing AI commit: task status fix + tests",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0007153664,
+      "tokens_output": 371
+    },
+    {
+      "title": "AI commit review: Celery email notifications",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0009778664,
+      "tokens_output": 522
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0067337759999999995,
+      "tokens_output": 4194
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 7.25648e-05,
+      "tokens_output": 7
+    },
+    {
+      "title": "Mutation compiler spec perturbation",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 9.17448e-05,
+      "tokens_output": 36
+    },
+    {
+      "title": "Mutation compiler for spec injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 8.53048e-05,
+      "tokens_output": 15
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0049908488,
+      "tokens_output": 1924
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0059544688,
+      "tokens_output": 2622
+    },
+    {
+      "title": "Injecting false premise into to-do app spec",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0001107848,
+      "tokens_output": 28
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.007379679999999999,
+      "tokens_output": 3191
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006201467999999999,
+      "tokens_output": 2397
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0061628336,
+      "tokens_output": 2767
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0060007752,
+      "tokens_output": 3217
+    },
+    {
+      "title": "Task manager API multi-session review",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.004166304799999999,
+      "tokens_output": 3322
     }
   ]
 }

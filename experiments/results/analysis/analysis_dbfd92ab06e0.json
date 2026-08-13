@@ -1,0 +1,395 @@
+{
+  "story_name": "notification_service",
+  "story_id": "dbfd92ab06e0",
+  "language": "python",
+  "summary": {
+    "commits": 5,
+    "total_lines_added": 1161,
+    "total_lines_removed": 21,
+    "net_lines": 1140,
+    "average_convention_score": 0.818
+  },
+  "commits": [
+    {
+      "commit_hash": "8213d4e125052782a98304ca5120f8d20dcf56e2",
+      "commit_message": "[story] Session 1: greenfield",
+      "session_number": 1,
+      "ast": {
+        "files_added": 3,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 20,
+        "functions_removed": 0,
+        "classes_added": 1,
+        "classes_removed": 0,
+        "imports_added": 16,
+        "imports_removed": 0,
+        "lines_added": 330,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 28,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.818,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "conftest.py: Classes should use PascalCase",
+          "conftest.py: Module-level constants should be UPPER_CASE",
+          "test_notification_server.py: Module-level constants should be UPPER_CASE",
+          "test_redis_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "0164b77c2b14231bb1257fa83d3e875c53aee15a",
+      "commit_message": "[story] Session 2: feature_addition",
+      "session_number": 2,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 2,
+        "files_deleted": 0,
+        "functions_added": 11,
+        "functions_removed": 1,
+        "classes_added": 1,
+        "classes_removed": 0,
+        "imports_added": 1,
+        "imports_removed": 0,
+        "lines_added": 266,
+        "lines_removed": 6
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 2,
+        "complexity_delta": 20,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.818,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "conftest.py: Classes should use PascalCase",
+          "conftest.py: Module-level constants should be UPPER_CASE",
+          "test_notification_server.py: Module-level constants should be UPPER_CASE",
+          "test_redis_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "6c8b05e906c61719c98b352cd7f6a67285eb0b44",
+      "commit_message": "[story] Session 3: integration",
+      "session_number": 3,
+      "ast": {
+        "files_added": 2,
+        "files_modified": 1,
+        "files_deleted": 0,
+        "functions_added": 29,
+        "functions_removed": 2,
+        "classes_added": 1,
+        "classes_removed": 0,
+        "imports_added": 19,
+        "imports_removed": 0,
+        "lines_added": 532,
+        "lines_removed": 15
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 36,
+        "duplications_delta": 5.7
+      },
+      "convention": {
+        "score": 0.818,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "conftest.py: Classes should use PascalCase",
+          "conftest.py: Module-level constants should be UPPER_CASE",
+          "test_notification_server.py: Module-level constants should be UPPER_CASE",
+          "test_redis_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "c2e881cf1abf4978ae4b4bed1959dd8b9cc36db5",
+      "commit_message": "[story] Session 4: refactor",
+      "session_number": 4,
+      "ast": {
+        "files_added": 1,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 1,
+        "classes_removed": 0,
+        "imports_added": 2,
+        "imports_removed": 0,
+        "lines_added": 33,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": -0.10000000000000053
+      },
+      "convention": {
+        "score": 0.818,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "conftest.py: Classes should use PascalCase",
+          "conftest.py: Module-level constants should be UPPER_CASE",
+          "test_notification_server.py: Module-level constants should be UPPER_CASE",
+          "test_redis_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    },
+    {
+      "commit_hash": "13c23d391cf4cc348080f66bc09f2f8a24cb4bfe",
+      "commit_message": "[story] Session 5: cross_cutting",
+      "session_number": 5,
+      "ast": {
+        "files_added": 0,
+        "files_modified": 0,
+        "files_deleted": 0,
+        "functions_added": 0,
+        "functions_removed": 0,
+        "classes_added": 0,
+        "classes_removed": 0,
+        "imports_added": 0,
+        "imports_removed": 0,
+        "lines_added": 0,
+        "lines_removed": 0
+      },
+      "sonar": {
+        "available": true,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
+      },
+      "convention": {
+        "score": 0.818,
+        "violations": [
+          "app.py: Classes should use PascalCase",
+          "conftest.py: Classes should use PascalCase",
+          "conftest.py: Module-level constants should be UPPER_CASE",
+          "test_notification_server.py: Module-level constants should be UPPER_CASE",
+          "test_redis_integration.py: Module-level constants should be UPPER_CASE",
+          "transport.py: Module-level constants should be UPPER_CASE"
+        ]
+      },
+      "review": {
+        "score": null,
+        "problems": [],
+        "better_or_worse": ""
+      }
+    }
+  ],
+  "deep": {
+    "lsp": {
+      "available": true,
+      "tool": "pyright",
+      "errors": 17,
+      "warnings": 0
+    },
+    "solution": {
+      "tests_passed": 0,
+      "tests_total": 1,
+      "correctness_score": 0.0,
+      "evaluator_source": "unavailable",
+      "evaluator_independent": false,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "constraint_score": 1.0,
+      "lines_of_code": 2176,
+      "cyclomatic_complexity": 327.0,
+      "code_quality_score": 0.046,
+      "novelty_score": 0.7597,
+      "composite_score": 0.4232,
+      "sonar_analyzed": false,
+      "sonar_bugs": 0,
+      "sonar_vulnerabilities": 0,
+      "sonar_code_smells": 0,
+      "sonar_cognitive_complexity": 0,
+      "sonar_duplicated_lines_density": 0.0,
+      "sonar_ncloc": 0,
+      "sonar_maintainability_rating": "",
+      "sonar_reliability_rating": "",
+      "sonar_security_rating": "",
+      "sonar_quality_gate": "",
+      "sonar_quality_score": 0.5
+    },
+    "basin": {
+      "perturbation_strength": 0.5,
+      "perturbation_operator": "",
+      "perturbation_class": "",
+      "architecture_divergence": 0.5,
+      "structure_divergence": 0.7132,
+      "novelty_score": 0.7595,
+      "escape_score": 0.6418,
+      "total_tokens": 0,
+      "reasoning_tokens": 0,
+      "thinking_ratio": 0.0,
+      "cost_usd": 0.0,
+      "estimated_energy_j": 0.0,
+      "correctness": 0.0,
+      "constraints_met": 3,
+      "constraints_total": 3,
+      "lines_of_code": 1397,
+      "quality_per_dollar": 0.0,
+      "quality_per_joule": 0.0,
+      "sonar_analyzed": false,
+      "sonar_bugs_delta": 0,
+      "sonar_vulnerabilities_delta": 0,
+      "sonar_code_smells_delta": 0,
+      "sonar_cognitive_complexity_delta": 0,
+      "sonar_complexity_delta": 0,
+      "sonar_duplication_delta": 0.0,
+      "sonar_maintainability_delta": 0,
+      "sonar_reliability_delta": 0,
+      "sonar_security_delta": 0,
+      "sonar_baseline_bugs": 0,
+      "sonar_baseline_smells": 0,
+      "sonar_perturbed_bugs": 0,
+      "sonar_perturbed_smells": 0,
+      "converged_back": false,
+      "verdict": "escaped \u2014 model produced a structurally different solution",
+      "model": "anthropic/claude-sonnet-5",
+      "task": "notification_service",
+      "run_id": ""
+    },
+    "strategy": {
+      "strategy": "wasteful",
+      "strategy_score": 0.314,
+      "exploration_premium": 0.0,
+      "thermal_efficiency": 0.0,
+      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($3.4760, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
+      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "operator": "",
+      "perturbation_class": "",
+      "model": "anthropic/claude-sonnet-5",
+      "run_id": "",
+      "reasoning": {
+        "perturbation_strength": 0.5,
+        "perturbation_operator": "",
+        "perturbation_class": "",
+        "architecture_divergence": 0.5,
+        "structure_divergence": 0.7132,
+        "novelty_score": 0.7595,
+        "escape_score": 0.6418,
+        "total_tokens": 0,
+        "reasoning_tokens": 0,
+        "thinking_ratio": 0.0,
+        "cost_usd": 0.0,
+        "estimated_energy_j": 0.0,
+        "correctness": 0.0,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "lines_of_code": 1397,
+        "quality_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "sonar_analyzed": false,
+        "sonar_bugs_delta": 0,
+        "sonar_vulnerabilities_delta": 0,
+        "sonar_code_smells_delta": 0,
+        "sonar_cognitive_complexity_delta": 0,
+        "sonar_complexity_delta": 0,
+        "sonar_duplication_delta": 0.0,
+        "sonar_maintainability_delta": 0,
+        "sonar_reliability_delta": 0,
+        "sonar_security_delta": 0,
+        "sonar_baseline_bugs": 0,
+        "sonar_baseline_smells": 0,
+        "sonar_perturbed_bugs": 0,
+        "sonar_perturbed_smells": 0,
+        "converged_back": false,
+        "verdict": "escaped \u2014 model produced a structurally different solution",
+        "model": "anthropic/claude-sonnet-5",
+        "task": "notification_service",
+        "run_id": ""
+      },
+      "solution": {
+        "tests_passed": 0,
+        "tests_total": 1,
+        "correctness_score": 0.0,
+        "evaluator_source": "unavailable",
+        "evaluator_independent": false,
+        "constraints_met": 3,
+        "constraints_total": 3,
+        "constraint_score": 1.0,
+        "lines_of_code": 2176,
+        "cyclomatic_complexity": 327.0,
+        "code_quality_score": 0.046,
+        "novelty_score": 0.7597,
+        "composite_score": 0.4232,
+        "sonar_analyzed": false,
+        "sonar_bugs": 0,
+        "sonar_vulnerabilities": 0,
+        "sonar_code_smells": 0,
+        "sonar_cognitive_complexity": 0,
+        "sonar_duplicated_lines_density": 0.0,
+        "sonar_ncloc": 0,
+        "sonar_maintainability_rating": "",
+        "sonar_reliability_rating": "",
+        "sonar_security_rating": "",
+        "sonar_quality_gate": "",
+        "sonar_quality_score": 0.5
+      },
+      "efficiency": {
+        "prompt_tokens": 0,
+        "completion_tokens": 0,
+        "reasoning_tokens": 0,
+        "total_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_write_tokens": 0,
+        "thinking_ratio": 0.0,
+        "output_efficiency": 0.0,
+        "cost_input_usd": 0.0,
+        "cost_output_usd": 0.0,
+        "cost_reasoning_usd": 0.0,
+        "cost_cache_usd": 0.0,
+        "total_cost_usd": 3.475986,
+        "cost_is_estimated": true,
+        "energy_input_j": 0.0,
+        "energy_output_j": 0.0,
+        "energy_reasoning_j": 0.0,
+        "total_energy_j": 0.0,
+        "solution_density": 0.0,
+        "correctness_per_dollar": 0.0,
+        "quality_per_joule": 0.0,
+        "efficiency_score": 0.0
+      }
+    }
+  }
+}
