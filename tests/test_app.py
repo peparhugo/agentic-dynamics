@@ -2,10 +2,11 @@ import asyncio
 import json
 import urllib.request
 
+import fakeredis.aioredis
 import pytest
 import websockets
 
-from app import NotificationServer
+from app import NotificationServer, close_async_resource
 
 
 @pytest.fixture
@@ -23,6 +24,18 @@ async def running_server():
     finally:
         websocket_server.close()
         await websocket_server.wait_closed()
+        await notification_server.close()
+
+
+async def start_server(notification_server):
+    websocket_server = await websockets.serve(
+        notification_server.handler,
+        "127.0.0.1",
+        0,
+        process_request=notification_server.process_request,
+    )
+    port = websocket_server.sockets[0].getsockname()[1]
+    return websocket_server, f"ws://127.0.0.1:{port}", port
 
 
 async def connect(uri):
@@ -237,3 +250,87 @@ async def test_channels_endpoints_and_disconnect_cleanup(running_server):
     _, channels = await fetch_json(port, "/channels")
     assert channels == {"channels": {"alerts": 1}}
     await first.close()
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_across_server_instances(tmp_path):
+    redis_server = fakeredis.FakeServer()
+    first_redis = fakeredis.aioredis.FakeRedis(
+        server=redis_server, decode_responses=True
+    )
+    second_redis = fakeredis.aioredis.FakeRedis(
+        server=redis_server, decode_responses=True
+    )
+    first_app = NotificationServer(
+        redis_client=first_redis, database_url=str(tmp_path / "first.db")
+    )
+    second_app = NotificationServer(
+        redis_client=second_redis, database_url=str(tmp_path / "second.db")
+    )
+    first_server, first_uri, _ = await start_server(first_app)
+    second_server, second_uri, _ = await start_server(second_app)
+    sender, _ = await connect(first_uri)
+    recipient, _ = await connect(second_uri)
+
+    try:
+        await sender.send(
+            json.dumps({"type": "broadcast", "payload": {"text": "shared"}})
+        )
+        sender_message, recipient_message = await asyncio.gather(
+            sender.recv(), recipient.recv()
+        )
+        assert json.loads(sender_message)["payload"] == {"text": "shared"}
+        assert json.loads(recipient_message)["payload"] == {"text": "shared"}
+    finally:
+        await sender.close()
+        await recipient.close()
+        first_server.close()
+        second_server.close()
+        await first_server.wait_closed()
+        await second_server.wait_closed()
+        await first_app.close()
+        await second_app.close()
+        await close_async_resource(first_redis)
+        await close_async_resource(second_redis)
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    database = tmp_path / "messages.db"
+    app = NotificationServer(database_url=f"sqlite:///{database}")
+    websocket_server, uri, port = await start_server(app)
+    websocket, _ = await connect(uri)
+
+    try:
+        await websocket.send(json.dumps({"type": "subscribe", "channel": "history"}))
+        for value in (1, 2):
+            await websocket.send(
+                json.dumps(
+                    {
+                        "type": "broadcast",
+                        "channel": "history",
+                        "payload": {"value": value},
+                    }
+                )
+            )
+            await websocket.recv()
+
+        status, body = await fetch_json(port, "/messages?limit=1&offset=1")
+        assert status == 200
+        assert len(body["messages"]) == 1
+        assert body["messages"][0]["channel"] == "history"
+        assert body["messages"][0]["type"] == "broadcast"
+        assert body["messages"][0]["payload"] == {"value": 2}
+        assert body["messages"][0]["timestamp"].endswith("+00:00")
+    finally:
+        await websocket.close()
+        websocket_server.close()
+        await websocket_server.wait_closed()
+        await app.close()
+
+    reopened = NotificationServer(database_url=str(database))
+    assert [message["payload"] for message in reopened.messages.list(50, 0)] == [
+        {"value": 1},
+        {"value": 2},
+    ]
+    await reopened.close()

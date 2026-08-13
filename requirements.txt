@@ -1,3 +1,5 @@
 websockets>=11,<14
+redis>=5,<6
 pytest>=7
 pytest-asyncio>=0.21
+fakeredis>=2
