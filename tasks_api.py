@@ -12,6 +12,7 @@ import secrets
 from flask import Flask, jsonify, request
 
 from auth import create_token, hash_password, require_auth, verify_password
+from celery_tasks import send_notification_email
 from storage import TaskStore, UserStore
 
 DEFAULT_STORAGE_PATH = os.environ.get("TASKS_STORAGE_PATH", "tasks.json")
@@ -35,15 +36,19 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         data = request.get_json(silent=True) or {}
         username = data.get("username")
         password = data.get("password")
+        email = data.get("email")
         if not isinstance(username, str) or not username.strip():
             return jsonify({"error": "username is required"}), 400
         if not isinstance(password, str) or not password:
             return jsonify({"error": "password is required"}), 400
+        if email is not None and (not isinstance(email, str) or "@" not in email):
+            return jsonify({"error": "email must be a valid email address"}), 400
         username = username.strip()
         if app.user_store.get_by_username(username) is not None:
             return jsonify({"error": "username already taken"}), 409
-        user = app.user_store.create(username, hash_password(password))
-        return jsonify({"id": user["id"], "username": user["username"]}), 201
+        email = email.strip() if email else f"{username}@example.com"
+        user = app.user_store.create(username, hash_password(password), email)
+        return jsonify({"id": user["id"], "username": user["username"], "email": user["email"]}), 201
 
     @app.post("/auth/login")
     def login():
@@ -95,6 +100,7 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         if status is not None and (not isinstance(status, str) or not status.strip()):
             return jsonify({"error": "status must be a non-empty string"}), 400
 
+        previous_task = app.store.get(task_id, owner_id=user["id"])
         task = app.store.update(
             task_id,
             owner_id=user["id"],
@@ -103,6 +109,20 @@ def create_app(storage_path: str = DEFAULT_STORAGE_PATH,
         )
         if task is None:
             return jsonify({"error": "task not found"}), 404
+
+        newly_completed = (
+            status is not None
+            and task["status"] == "completed"
+            and (previous_task is None or previous_task["status"] != "completed")
+        )
+        if newly_completed:
+            try:
+                send_notification_email.delay(user["email"], task["title"])
+            except Exception:
+                app.logger.exception(
+                    "failed to enqueue completion notification for task %s", task_id
+                )
+
         return jsonify(task), 200
 
     return app

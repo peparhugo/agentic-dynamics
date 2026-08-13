@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from tasks_api import create_app
+from tasks_api import create_app, send_notification_email
 
 
 @pytest.fixture
@@ -329,3 +329,92 @@ def test_migration_preserves_pre_existing_tasks_without_owner_id(tmp_path):
         resp = client.post("/tasks", json={"title": "New task"}, headers=auth_headers(token))
         assert resp.status_code == 201
         assert resp.get_json()["id"] == 2
+
+
+# ── Registration email field ─────────────────────────────────────
+
+def test_register_defaults_email_when_not_provided(client):
+    resp = register(client, "alice", "password123")
+    assert resp.status_code == 201
+    assert resp.get_json()["email"] == "alice@example.com"
+
+
+def test_register_accepts_custom_email(client):
+    resp = client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "password123", "email": "alice@work.com"},
+    )
+    assert resp.status_code == 201
+    assert resp.get_json()["email"] == "alice@work.com"
+
+
+def test_register_invalid_email_returns_400(client):
+    resp = client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "password123", "email": "not-an-email"},
+    )
+    assert resp.status_code == 400
+
+
+# ── Notification trigger on status -> completed ──────────────────
+
+def test_status_change_to_completed_triggers_notification(client, auth, mocker):
+    mock_delay = mocker.patch.object(send_notification_email, "delay")
+    created = create_task(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_called_once_with("alice@example.com", "Buy milk")
+
+
+def test_status_change_to_non_completed_does_not_trigger_notification(client, auth, mocker):
+    mock_delay = mocker.patch.object(send_notification_email, "delay")
+    created = create_task(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_title_only_update_does_not_trigger_notification(client, auth, mocker):
+    mock_delay = mocker.patch.object(send_notification_email, "delay")
+    created = create_task(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"title": "Buy oat milk"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_not_called()
+
+
+def test_repeated_completed_update_does_not_retrigger_notification(client, auth, mocker):
+    mock_delay = mocker.patch.object(send_notification_email, "delay")
+    created = create_task(client, auth, "Buy milk").get_json()
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    mock_delay.assert_called_once()
+
+
+def test_notification_broker_failure_does_not_break_api_response(client, auth, mocker):
+    mocker.patch.object(send_notification_email, "delay", side_effect=ConnectionError("no broker"))
+    created = create_task(client, auth, "Buy milk").get_json()
+
+    resp = client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth)
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+
+
+def test_completed_notification_uses_task_owners_email(client, mocker):
+    mock_delay = mocker.patch.object(send_notification_email, "delay")
+    register(client, "bob", "password123")
+    bob_auth = auth_headers(login(client, "bob", "password123").get_json()["token"])
+    created = create_task(client, bob_auth, "Bob's task").get_json()
+
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=bob_auth)
+
+    mock_delay.assert_called_once_with("bob@example.com", "Bob's task")

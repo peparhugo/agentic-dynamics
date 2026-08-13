@@ -110,13 +110,14 @@ class UserStore:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, self.path)
 
-    def create(self, username: str, password_hash: str) -> dict:
+    def create(self, username: str, password_hash: str, email: str) -> dict:
         with self._lock:
             data = self._read()
             user = {
                 "id": data["next_id"],
                 "username": username,
                 "password_hash": password_hash,
+                "email": email,
             }
             data["users"].append(user)
             data["next_id"] += 1

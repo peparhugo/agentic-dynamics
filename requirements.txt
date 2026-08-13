@@ -1,3 +1,6 @@
 Flask
 pytest
+pytest-mock
 PyJWT
+celery
+redis
