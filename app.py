@@ -12,9 +12,40 @@ import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from celery import Celery
 from repositories import UserRepository, TaskRepository
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
+
+def get_db():
+    db_path = os.environ.get("DATABASE", "tasks.db")
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_rate_limit_key():
+    """Get rate limit key - uses user_id if available, otherwise IP."""
+    token = None
+    if 'Authorization' in request.headers:
+        auth_header = request.headers['Authorization']
+        try:
+            token = auth_header.split(" ")[1]
+            data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+            return f"user_{data['user_id']}"
+        except (IndexError, jwt.InvalidTokenError, jwt.ExpiredSignatureError):
+            pass
+    return get_remote_address()
+
+
+limiter = Limiter(
+    app=app,
+    key_func=get_rate_limit_key,
+    default_limits=["100 per minute"],
+    storage_uri=os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
+)
 
 celery_app = Celery(
     app.import_name,
@@ -24,13 +55,6 @@ celery_app = Celery(
 
 user_repo = UserRepository()
 task_repo = TaskRepository()
-
-
-def get_db():
-    db_path = os.environ.get("DATABASE", "tasks.db")
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def init_db():
@@ -95,6 +119,7 @@ def create_jwt_token(user_id, username):
 
 
 @app.route("/auth/register", methods=["POST"])
+@limiter.limit("100 per minute")
 def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -127,6 +152,7 @@ def register():
 
 
 @app.route("/auth/login", methods=["POST"])
+@limiter.limit("100 per minute")
 def login():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
@@ -153,6 +179,7 @@ def login():
 
 
 @app.route("/tasks", methods=["POST"])
+@limiter.limit("100 per minute")
 @token_required
 def create_task(current_user_id, current_username):
     data = request.get_json(silent=True) or {}
@@ -174,13 +201,44 @@ def create_task(current_user_id, current_username):
 
 
 @app.route("/tasks", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def list_tasks(current_user_id, current_username):
-    rows = task_repo.list_by_owner(current_user_id)
-    return jsonify([dict(r) for r in rows])
+    cursor = request.args.get("cursor", None)
+    limit = request.args.get("limit", default=20, type=int)
+
+    if limit < 1 or limit > 100:
+        limit = 20
+
+    all_rows = task_repo.list_by_owner(current_user_id)
+    tasks = [dict(r) for r in all_rows]
+    total = len(tasks)
+
+    start_idx = 0
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+            for i, task in enumerate(tasks):
+                if task['id'] == cursor_id:
+                    start_idx = i + 1
+                    break
+        except (ValueError, IndexError):
+            pass
+
+    page_tasks = tasks[start_idx : start_idx + limit]
+    next_cursor = None
+    if page_tasks and start_idx + limit < total:
+        next_cursor = str(page_tasks[-1]['id'])
+
+    return jsonify({
+        "data": page_tasks,
+        "next_cursor": next_cursor,
+        "total": total
+    })
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
+@limiter.limit("100 per minute")
 @token_required
 def get_task(current_user_id, current_username, task_id):
     row = task_repo.get_by_id(task_id, current_user_id)
@@ -192,6 +250,7 @@ def get_task(current_user_id, current_username, task_id):
 
 
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
+@limiter.limit("100 per minute")
 @token_required
 def update_task(current_user_id, current_username, task_id):
     from celery_tasks import send_notification_email
@@ -228,6 +287,11 @@ def update_task(current_user_id, current_username, task_id):
             send_notification_email.delay(user_email, task_title)
 
     return jsonify(dict(row))
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"error": "Rate limit exceeded"}), 429, {"Retry-After": "60"}
 
 
 if __name__ == "__main__":
