@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Operational Framework — AI FinOps Dynamics</title>
-<meta name="description" content="Operational principles derived from AI FinOps Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 249 experiment sessions.">
+<meta name="description" content="Operational principles derived from AI FinOps Dynamics: 10 rules, cost model, interactive calculator, decision framework, model cards, and provider playbook. Grounded in 1,097 story sessions and 227 perturbation experiments.">
 <meta property="og:title" content="Operational Framework — AI FinOps Dynamics">
 <meta property="og:description" content="Operational framework: observed patterns, derived metrics, modeled extensions">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/framework.html">
@@ -80,16 +80,23 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
+<!-- SECTION: WHY -->
+<section class="fsec" id="why"><div class="inr">
+<div class="pulse">Why — start here</div>
+<h2>AI costs don't grow linearly.<br>They compound.</h2>
+<p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
+</div></section>
+
 <!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr">
-<div class="pulse">The Ten Rules</div>
+<div class="pulse">What — The Ten Rules</div>
 <h2>Here is how you govern<br>AI costs — and scale your business.</h2>
-<p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the 249-session measurement corpus. <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
+<p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
 <div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
 <div class="rules-grid">
 <div class="rule" id="rule-1"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation — producing zero code despite high token output — it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across three perturbation classes: specification corruption, objective mutation, and process perturbation.<span class="rm">Concept: Grit (Ground-Truth Integrity) · Lever: C₀</span></div></div>
 <div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions). Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
-<div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
+<div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. <strong style="color:var(--t)">Measured:</strong> story cost roughly doubles across the five-session arc ($0.16 &rarr; $0.34, a 2.13&times; Snowball). The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
 <div class="rule" id="rule-4"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
 <div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
 <div class="rule" id="rule-6" style="border-left:3px solid var(--am)"><div class="rn amber">6</div><div class="rt"><strong>The Batch Discount.</strong> Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in &lt;4 hours, run in batch. Monitor queue depth. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Batch Economics &middot; Lever: b, Q</span></div></div>
@@ -103,7 +110,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- SECTION: The Levers -->
 <section class="fsec" id="levers"><div class="inr wide">
-<div class="pulse">The Levers</div>
+<div class="pulse">How — The Levers</div>
 <h2>What you control. What compounds.<br>What you must model.</h2>
 <p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
 
@@ -148,7 +155,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- SECTION: The Cost Model -->
 <section class="fsec" id="cost-model"><div class="inr wide">
-<div class="pulse">The Model</div>
+<div class="pulse">How — The Cost Model</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
 <p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 
@@ -195,7 +202,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <!-- SECTION: Interactive Calculator -->
 <section class="fsec" id="calculator"><div class="inr wide">
-<div class="pulse">Project Your Costs</div>
+<div class="pulse">What — Project Your Costs</div>
 <h2>Turn the equation into<br>your quarterly budget.</h2>
 <p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for unsupervised batch processing. Every adjustment recalculates your projected spend in real time.</p>
 
@@ -224,7 +231,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <!-- SECTION: Decision Framework -->
 <section class="fsec" id="decisions"><div class="inr">
-<div class="pulse">Decision Framework</div>
+<div class="pulse">How — Decision Framework</div>
 <h2>When to move fast.<br>When to model thoroughly.</h2>
 <div class="doors">
 <div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
@@ -237,15 +244,15 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <!-- SECTION: Model Cards -->
 <section class="fsec" id="model-cards"><div class="inr">
-<div class="pulse">Model Cards</div>
+<div class="pulse">What — Model Cards</div>
 <h2>Narration flail rates 6–50% across models.<br>See detailed model profiles &rarr;</h2>
 <div class="callout-box" style="margin-top:1rem"><a href="evidence.html" class="cta-btn">View Detailed Model Profiles →</a></div>
-<p class="note">All 3 provider families across 8 variants produce structurally sound code (AST-verified across 2,416 Python files). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
+<p class="note">All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
 </div></section>
 
 <!-- SECTION: Provider Playbook -->
 <section class="fsec" id="playbook"><div class="inr wide">
-<div class="pulse">The Provider Playbook</div>
+<div class="pulse">What — The Provider Playbook</div>
 <h2>How DeepSeek, OpenAI, and Anthropic<br>map to your cost optimization levers.</h2>
 <p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
 
@@ -300,18 +307,18 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <div class="params">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">DeepSeek</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.435</strong> (miss) &middot; <strong>$0.0036</strong> (hit) &middot; Output: <strong>$0.87</strong><br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">OpenAI (Luna)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.20</strong> &middot; Output: <strong>$1.20</strong> &middot; Cache hit: <strong>$0.02</strong><br>Cache: 97.5% hit rate measured — 6.3K tokens/session<br><strong>Best:</strong> Cheapest per cell ($0.09) but minimal test coverage (7 tests/cell). Route to low-risk tasks.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Anthropic (Sonnet 5)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 98.2% hit rate measured<br><strong>Best:</strong> 73 tests/cell, test:code ratio 1.63 — deepest verification. Reserve for safety-critical work.<br><strong style="color:var(--ac)">Subscription route:</strong> the same model runs through the Claude CLI adapter (<code style="color:var(--ac)">--backend claude_cli</code>) — subscription-safe, no per-token API spend.</div></div>
+<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Anthropic (Sonnet 5)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 73% hit rate measured<br><strong>Best:</strong> 122 tests/cell — the deepest verification in the corpus. Reserve for safety-critical work.<br><strong style="color:var(--ac)">Subscription route:</strong> the same model runs through the Claude CLI adapter (<code style="color:var(--ac)">--backend claude_cli</code>) — subscription-safe, no per-token API spend.</div></div>
 </div>
 
 <h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Escalation Economics</h3>
 <p class="lead">When a cheap model fails, you pay the retry penalty — and you lose the verification the expensive model would have written. Here's what that actually costs.</p>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:700px;margin:1rem auto;text-align:left">
 <div>
-<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 71 stories</h4>
+<h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 221 stories</h4>
 <div class="tbl"><table><tbody>
-<tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">25.5&times; (Luna &rarr; Sonnet)</td></tr>
-<tr><td>Test coverage gap</td><td style="color:var(--am)">10&times; (7 vs 73 tests/cell)</td></tr>
-<tr><td>Sonnet vs DeepSeek gap</td><td style="color:var(--am)">16.8&times;</td></tr>
+<tr><td>Escalation multiplier (E&#8340;)</td><td style="color:var(--ac)">50&times; (Luna &rarr; Sonnet 5)</td></tr>
+<tr><td>Test coverage gap</td><td style="color:var(--am)">17&times; (7 vs 122 tests/cell)</td></tr>
+<tr><td>Sonnet vs DeepSeek gap</td><td style="color:var(--am)">33&times; ($4.58 vs $0.14)</td></tr>
 </tbody></table></div>
 </div>
 <div>
@@ -319,8 +326,8 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <div class="tbl"><table><tbody>
 <tr><td>Tier 1 (Luna)</td><td style="font-family:'JetBrains Mono',monospace">~$0.09</td></tr>
 <tr><td>Tier 2 (DeepSeek)</td><td style="font-family:'JetBrains Mono',monospace">~$0.14</td></tr>
-<tr><td>Tier 3 (Sonnet 5)</td><td style="font-family:'JetBrains Mono',monospace">~$2.32</td></tr>
-<tr><td>Verification depth</td><td style="font-family:'JetBrains Mono',monospace;color:var(--ac)">0.28 &rarr; 1.63 test:code</td></tr>
+<tr><td>Tier 3 (Sonnet 5)</td><td style="font-family:'JetBrains Mono',monospace">~$4.58</td></tr>
+<tr><td>Verification depth</td><td style="font-family:'JetBrains Mono',monospace;color:var(--ac)">7 &rarr; 122 tests/story</td></tr>
 </tbody></table></div>
 </div>
 </div>
@@ -332,7 +339,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <footer>
 <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
-<span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
+  <span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> · <a href="framework.html">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a> · <a href="#playbook">Playbook</a>
 </footer>
 

@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>AI FinOps Dynamics — Does your AI assistant make your system better, or just bigger?</title>
-<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 347 sessions, 3 models, test thoroughness that scales with cost.">
+<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 1,097 sessions, 7 models, and a verification gap that doesn't track price.">
 <meta property="og:title" content="AI FinOps Dynamics — Success isn't value.">
-<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 347 sessions, 3 models, 1573 tests.">
+<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 1,097 sessions, 7 models, 10,535 tests.">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -60,23 +60,23 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
-    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">AI FinOps Dynamics</div>
+    <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Why — AI FinOps Dynamics</div>
     <h1>Does your AI coding assistant make your system <strong style="color:var(--ac)">better, or just bigger?</strong></h1>
-    <p class="lead">Success isn't value. An agent can pass every test, run cheaply, and still silently degrade the system it's supposed to improve. Nobody is measuring the difference — and you can't manage what you can't measure.</p>
+    <p class="lead">We believe <strong style="color:var(--t)">success isn't value</strong>. An agent can pass every test it writes, run cheaply, and still silently degrade the system it's supposed to improve — and the cost compounds with every session whether the code improves or not. Nobody is measuring that difference. You can't manage what you can't measure, so we built the measurement.</p>
     <div class="hero-actions"><a href="methodology.html" class="cta-btn big">See How We Measure It</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="story.html" class="cta-btn ghost">Read the Story →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
     <h3>Measured Corpus</h3>
-    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">347</span></div></div>
-    <div class="proof-card"><span class="label">Model variants</span><div class="value"><span data-stat="variants">3</span></div></div>
-    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">71</span></div></div>
-    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">12.54</span></div></div>
+    <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">1,097</span></div></div>
+    <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
+    <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">221</span></div></div>
+    <div class="proof-card success"><span class="label">Total measured cost</span><div class="value">$<span data-stat="story_total_cost">288.69</span></div></div>
   </aside>
 </div></section>
 
 <!-- Section 2: HOW -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">How we measure it</div>
+  <div class="section-kicker">How — the instrument</div>
   <h2>Multi-session builds under controlled degradation.</h2>
   <p class="lead">Most benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>can it build and maintain a real system across five consecutive sessions — and what does that cost?</em> Each experiment is a <strong>story</strong>: a greenfield build that progresses through feature work, integration, refactoring, and cross-cutting concerns, with git commits between every session.</p>
   <div class="op-grid">
@@ -108,12 +108,12 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
       </ul>
     </div>
   </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">71 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 3 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. The instrument doesn't judge code quality — it measures how cost, verification, and recovery respond to degraded input.</p>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">221 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. The instrument doesn't judge code quality — it measures how cost, verification, and recovery respond to degraded input.</p>
 </div></section>
 
 <!-- Section 3: The instrument -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">How it works</div>
+  <div class="section-kicker">How — the pipeline</div>
   <h2>The measurement pipeline.</h2>
   <div class="pipeline">
     <div class="pipe-step"><div class="ps-label">Story config</div>Task, tier, model, perturbation condition</div>
@@ -127,45 +127,49 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
   <div class="hero-actions"><a href="methodology.html" class="cta-btn">Full Instrument Spec →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Source Code →</a></div>
 </div></section>
 
-<!-- Section 4: Three findings -->
+<!-- Section 4: WHAT -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What the corpus shows</div>
-  <h2>Three findings from 347 instrumented story sessions.</h2>
+  <div class="section-kicker">What — the evidence</div>
+  <h2>Four findings from 1,097 instrumented story sessions.</h2>
   <div class="finding">
     <div class="fn">Finding 1</div>
-    <h3>Test thoroughness scales with cost — and the curve is steep.</h3>
-    <p>GPT-5.6 Luna writes 7 tests per story for $0.09. DeepSeek v4 Pro writes 34 for $0.14. Claude Sonnet 5 writes 73 for $2.32. All three pass their tests — but test/code ratio jumps from 0.28 to 1.63 across the cost range. The cheap model ships code that works; the expensive model ships code that's actually verified. That gap is the FinOps question.</p>
+    <h3>Verification is a vendor behavior, not a price point.</h3>
+    <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. The 10× verification gap sits <em>between</em> vendors, not between price tiers. You don't buy verification by paying for a pricier sibling model; you buy it by switching vendors.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 2</div>
-    <h3>Cache behavior is a hidden cost lever, not a capability signal.</h3>
-    <p>DeepSeek reuses 78% of its context; Luna and Sonnet reuse 97-98%. Models that trust their cache send 6K new tokens per session; models that re-read the codebase send 35K. Two models can produce the same output at wildly different token economics purely through provider caching policy.</p>
+    <h3>Cost compounds across the five-session arc.</h3>
+    <p>The Snowball Rule, measured: a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session grows the codebase, and every new line inflates the cost of the next. Per-session cost understates maintenance work by ~2×.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 3</div>
-    <h3>Perturbation still costs — but differently per model.</h3>
-    <p>When specifications degrade (early_degrade condition), DeepSeek's cost rises 22% while Luna's stays flat. Some models absorb degraded input gracefully; others spend billable tokens recovering from it. Measuring that difference is pricing an outcome, not a prompt.</p>
+    <h3>Cache behavior is a hidden cost lever, not a capability signal.</h3>
+    <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness are three independent knobs — none predicts the other two.</p>
+  </div>
+  <div class="finding">
+    <div class="fn">Finding 4</div>
+    <h3>Degradation leaks — but models recover.</h3>
+    <p>Corrupting the session-1 spec (early_degrade) drops success to 85% and doubles the cascade rate; a pre-degraded seed (bad_seed) costs the most ($1.48/story) but succeeds 88%. Degradation raises cost and cascades slightly; it does not dominate the outcome.</p>
   </div>
   <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a></div>
 </div></section>
 
 <!-- Section 5: The concept -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">The concept</div>
+  <div class="section-kicker">What — the concept</div>
   <h2>Correctness is not verification.</h2>
   <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
-    Test:code ratio = test&nbsp;lines / source&nbsp;lines<br>
-    Luna: 0.28 &nbsp;&middot;&nbsp; DeepSeek: 1.09 &nbsp;&middot;&nbsp; Sonnet&nbsp;5: 1.63
+    Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
   </p>
-  <p>The three models pass their own tests at roughly equal rates. But the tests themselves differ by an order of magnitude. Luna ships 200 lines of tests that confirm the happy path. Sonnet 5 ships 1,188 lines that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." Only one is actually verified.</p>
-  <p>This is the durable-value gap. Correctness is whether the code passes the tests you have. Verification is whether you have the tests that would catch the failures that matter. An agent can produce working code while silently skimping on the safety net — and that trade-off is exactly what the price buys.</p>
+  <p>All seven models pass their own tests at roughly equal rates. But the tests themselves differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." Only one is actually verified.</p>
+  <p>This is the durable-value gap. Correctness is whether the code passes the tests you have. Verification is whether you have the tests that would catch the failures that matter. An agent can produce working code while silently skimping on the safety net — and that trade-off is a <em>vendor behavior</em>, not something the price tag buys.</p>
   <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">See the Verification Gap →</a></div>
 </div></section>
 
 <!-- Section 6: What this means -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What this means</div>
+  <div class="section-kicker">What — this means</div>
   <h2>If you can measure it, you can route on it.</h2>
   <p class="lead">Once cost, verification depth, and cache efficiency are measured together, model routing stops being about vendor price sheets and starts being about earned outcomes. Route cheap models to code that won't be looked at twice. Route expensive models where a missed edge case is expensive failure. The contribution is the <em>verification</em> dimension — nobody else is measuring how much safety net each dollar buys.</p>
   <div class="hero-actions"><a href="framework.html" class="cta-btn">Operational Framework →</a><a href="evidence.html" class="cta-btn ghost">Evidence →</a></div>
@@ -185,7 +189,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <footer>
   <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
-  <span data-stat="story_sessions">347</span> story sessions · <span data-stat="variants">3</span> model variants · <span data-stat="stories_total">71</span> stories · $<span data-stat="story_total_cost">12.54</span> measured<br>
+  <span data-stat="story_sessions">1,097</span> story sessions · <span data-stat="variants">7</span> models · <span data-stat="stories_total">221</span> stories · $<span data-stat="story_total_cost">288.69</span> measured<br>
   <a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
   <a href="story.html">Story</a> · <a href="methodology.html">Instrument</a> ·
   <a href="evidence.html">Evidence</a> · <a href="databricks.html">Related Work</a>
