@@ -125,13 +125,27 @@ class TaskRepository(BaseRepository):
             {"title": title, "created_at": created_at, "owner_id": owner_id}
         )
 
-    def list_for_owner(self, owner_id: int) -> list[sqlite3.Row]:
+    def list_for_owner(
+        self, owner_id: int, cursor: int | None, limit: int
+    ) -> list[sqlite3.Row]:
+        with self.connect(self.database) as connection:
+            cursor_filter = "AND id < ?" if cursor is not None else ""
+            parameters = (
+                (owner_id, cursor, limit)
+                if cursor is not None
+                else (owner_id, limit)
+            )
+            return connection.execute(
+                f"SELECT * FROM tasks WHERE owner_id = ? {cursor_filter} "
+                "ORDER BY id DESC LIMIT ?",
+                parameters,
+            ).fetchall()
+
+    def count_for_owner(self, owner_id: int) -> int:
         with self.connect(self.database) as connection:
             return connection.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? "
-                "ORDER BY created_at DESC, id DESC",
-                (owner_id,),
-            ).fetchall()
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
 
     def get_for_owner(self, task_id: int, owner_id: int) -> sqlite3.Row | None:
         with self.connect(self.database) as connection:

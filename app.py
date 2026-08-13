@@ -3,7 +3,9 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import jwt
-from flask import Flask, g, jsonify, request
+from flask import Flask, current_app, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -16,6 +18,22 @@ from repositories import (
 
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
+
+
+def rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(
+                token,
+                current_app.config["JWT_SECRET_KEY"],
+                algorithms=["HS256"],
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"address:{get_remote_address()}"
 
 
 def get_db():
@@ -48,11 +66,24 @@ def create_app(config: dict | None = None) -> Flask:
     application.config.from_mapping(
         JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "development-secret-change-me"),
         JWT_EXPIRATION_SECONDS=3600,
+        RATELIMIT_DEFAULT="100 per minute",
+        RATELIMIT_STORAGE_URI=os.environ.get(
+            "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+        ),
+        RATELIMIT_HEADERS_ENABLED=True,
     )
     if config:
         application.config.update(config)
         if config.get("DATABASE"):
             DATABASE = config["DATABASE"]
+
+    limiter = Limiter(
+        key_func=rate_limit_key,
+        application_limits=[application.config["RATELIMIT_DEFAULT"]],
+        storage_uri=application.config["RATELIMIT_STORAGE_URI"],
+        headers_enabled=application.config["RATELIMIT_HEADERS_ENABLED"],
+    )
+    limiter.init_app(application)
 
     user_repository = UserRepository(DATABASE)
     task_repository = TaskRepository(DATABASE)
@@ -146,8 +177,29 @@ def create_app(config: dict | None = None) -> Flask:
     @application.get("/tasks")
     @token_required
     def list_tasks():
-        tasks = task_repository.list_for_owner(g.user_id)
-        return jsonify([task_to_dict(task) for task in tasks])
+        cursor_value = request.args.get("cursor")
+        limit_value = request.args.get("limit", "20")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(limit_value)
+        except ValueError:
+            return jsonify({"error": "cursor and limit must be integers"}), 400
+        if cursor is not None and cursor < 1:
+            return jsonify({"error": "cursor must be a positive integer"}), 400
+        if limit < 1 or limit > 100:
+            return jsonify({"error": "limit must be between 1 and 100"}), 400
+
+        tasks = task_repository.list_for_owner(g.user_id, cursor, limit + 1)
+        has_more = len(tasks) > limit
+        page = tasks[:limit]
+        next_cursor = str(page[-1]["id"]) if has_more else None
+        return jsonify(
+            {
+                "data": [task_to_dict(task) for task in page],
+                "next_cursor": next_cursor,
+                "total": task_repository.count_for_owner(g.user_id),
+            }
+        )
 
     @application.get("/tasks/<int:task_id>")
     @token_required
