@@ -13,6 +13,17 @@ def client(tmp_path):
         yield c
 
 
+@pytest.fixture
+def rate_limited_client(tmp_path):
+    """A client with a small rate limit so limit-exceeded behavior can be
+    exercised quickly and deterministically, instead of firing 100+ requests."""
+    db_path = tmp_path / "tasks.db"
+    app = create_app(str(db_path), rate_limit="5 per minute")
+    app.config["TESTING"] = True
+    with app.test_client() as c:
+        yield c
+
+
 def register(client, username="alice", password="password123"):
     return client.post("/auth/register", json={"username": username, "password": password})
 
@@ -154,7 +165,10 @@ class TestListTasks:
         headers = auth_headers(client)
         resp = client.get("/tasks", headers=headers)
         assert resp.status_code == 200
-        assert resp.get_json() == []
+        data = resp.get_json()
+        assert data["data"] == []
+        assert data["next_cursor"] is None
+        assert data["total"] == 0
 
     def test_list_ordered_desc_by_created_at(self, client):
         headers = auth_headers(client)
@@ -163,7 +177,7 @@ class TestListTasks:
         create(client, "third", headers=headers)
         resp = client.get("/tasks", headers=headers)
         assert resp.status_code == 200
-        titles = [t["title"] for t in resp.get_json()]
+        titles = [t["title"] for t in resp.get_json()["data"]]
         assert titles == ["third", "second", "first"]
 
 
@@ -246,8 +260,8 @@ class TestTaskOwnership:
         create(client, "Alice task", headers=alice_headers)
         create(client, "Bob task", headers=bob_headers)
 
-        alice_titles = [t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()]
-        bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()]
+        alice_titles = [t["title"] for t in client.get("/tasks", headers=alice_headers).get_json()["data"]]
+        bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_headers).get_json()["data"]]
 
         assert alice_titles == ["Alice task"]
         assert bob_titles == ["Bob task"]
@@ -366,3 +380,159 @@ class TestErrorFormat:
         resp = client.get("/tasks")
         assert resp.content_type == "application/json"
         assert "error" in resp.get_json()
+
+
+class TestPagination:
+    def test_default_limit_is_20(self, client):
+        headers = auth_headers(client)
+        for i in range(25):
+            create(client, f"task-{i}", headers=headers)
+        resp = client.get("/tasks", headers=headers)
+        data = resp.get_json()
+        assert len(data["data"]) == 20
+        assert data["total"] == 25
+        assert data["next_cursor"] is not None
+
+    def test_pagination_walks_all_items_without_duplicates_or_gaps(self, client):
+        headers = auth_headers(client)
+        created = [create(client, f"task-{i}", headers=headers).get_json() for i in range(45)]
+        expected_ids = sorted((t["id"] for t in created), reverse=True)
+
+        seen_ids = []
+        cursor = None
+        pages = 0
+        while True:
+            url = "/tasks?limit=20" + (f"&cursor={cursor}" if cursor else "")
+            resp = client.get(url, headers=headers)
+            assert resp.status_code == 200
+            data = resp.get_json()
+            seen_ids.extend(t["id"] for t in data["data"])
+            cursor = data["next_cursor"]
+            pages += 1
+            assert pages <= 10
+            if cursor is None:
+                break
+
+        assert seen_ids == expected_ids
+        assert pages == 3
+
+    def test_limit_capped_at_100(self, client):
+        headers = auth_headers(client)
+        for i in range(5):
+            create(client, f"task-{i}", headers=headers)
+        resp = client.get("/tasks?limit=500", headers=headers)
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data["data"]) == 5
+        assert data["next_cursor"] is None
+
+    def test_limit_zero_rejected(self, client):
+        headers = auth_headers(client)
+        resp = client.get("/tasks?limit=0", headers=headers)
+        assert resp.status_code == 400
+
+    def test_negative_limit_rejected(self, client):
+        headers = auth_headers(client)
+        resp = client.get("/tasks?limit=-5", headers=headers)
+        assert resp.status_code == 400
+
+    def test_non_integer_limit_rejected(self, client):
+        headers = auth_headers(client)
+        resp = client.get("/tasks?limit=abc", headers=headers)
+        assert resp.status_code == 400
+
+    def test_non_integer_cursor_rejected(self, client):
+        headers = auth_headers(client)
+        resp = client.get("/tasks?cursor=abc", headers=headers)
+        assert resp.status_code == 400
+
+    def test_last_page_has_null_next_cursor(self, client):
+        headers = auth_headers(client)
+        for i in range(3):
+            create(client, f"task-{i}", headers=headers)
+        resp = client.get("/tasks?limit=10", headers=headers)
+        data = resp.get_json()
+        assert len(data["data"]) == 3
+        assert data["next_cursor"] is None
+
+    def test_pagination_scoped_per_owner(self, client):
+        alice_headers = auth_headers(client, "alice", "password123")
+        bob_headers = auth_headers(client, "bob", "password123")
+        create(client, "Alice task", headers=alice_headers)
+        for i in range(3):
+            create(client, f"Bob task {i}", headers=bob_headers)
+
+        alice_data = client.get("/tasks", headers=alice_headers).get_json()
+        bob_data = client.get("/tasks", headers=bob_headers).get_json()
+        assert alice_data["total"] == 1
+        assert bob_data["total"] == 3
+
+
+class TestRateLimiting:
+    def test_requests_within_limit_succeed(self, rate_limited_client):
+        headers = auth_headers(rate_limited_client)
+        for _ in range(5):
+            resp = rate_limited_client.get("/tasks", headers=headers)
+            assert resp.status_code == 200
+
+    def test_request_over_limit_returns_429(self, rate_limited_client):
+        headers = auth_headers(rate_limited_client)
+        for _ in range(5):
+            rate_limited_client.get("/tasks", headers=headers)
+        resp = rate_limited_client.get("/tasks", headers=headers)
+        assert resp.status_code == 429
+
+    def test_429_has_retry_after_header(self, rate_limited_client):
+        headers = auth_headers(rate_limited_client)
+        for _ in range(5):
+            rate_limited_client.get("/tasks", headers=headers)
+        resp = rate_limited_client.get("/tasks", headers=headers)
+        assert "Retry-After" in resp.headers
+        assert int(resp.headers["Retry-After"]) >= 0
+
+    def test_429_body_is_json_with_error(self, rate_limited_client):
+        headers = auth_headers(rate_limited_client)
+        for _ in range(5):
+            rate_limited_client.get("/tasks", headers=headers)
+        resp = rate_limited_client.get("/tasks", headers=headers)
+        assert resp.content_type == "application/json"
+        assert "error" in resp.get_json()
+
+    def test_rate_limit_applies_across_endpoints_for_same_user(self, rate_limited_client):
+        headers = auth_headers(rate_limited_client)
+        # Mix endpoints: the quota is per-user, not per-endpoint.
+        rate_limited_client.get("/tasks", headers=headers)
+        create(rate_limited_client, "a", headers=headers)
+        rate_limited_client.get("/tasks", headers=headers)
+        create(rate_limited_client, "b", headers=headers)
+        rate_limited_client.get("/tasks", headers=headers)
+        resp = rate_limited_client.get("/tasks", headers=headers)
+        assert resp.status_code == 429
+
+    def test_rate_limit_applies_to_auth_endpoints(self, rate_limited_client):
+        for _ in range(5):
+            rate_limited_client.post(
+                "/auth/login", json={"username": "nobody", "password": "wrong"}
+            )
+        resp = rate_limited_client.post(
+            "/auth/login", json={"username": "nobody", "password": "wrong"}
+        )
+        assert resp.status_code == 429
+
+    def test_rate_limit_scoped_per_user(self, rate_limited_client):
+        alice_headers = auth_headers(rate_limited_client, "alice", "password123")
+        bob_headers = auth_headers(rate_limited_client, "bob", "password123")
+
+        for _ in range(5):
+            rate_limited_client.get("/tasks", headers=alice_headers)
+        alice_resp = rate_limited_client.get("/tasks", headers=alice_headers)
+        bob_resp = rate_limited_client.get("/tasks", headers=bob_headers)
+
+        assert alice_resp.status_code == 429
+        assert bob_resp.status_code == 200
+
+    def test_default_rate_limit_is_100_per_minute(self, client):
+        headers = auth_headers(client)
+        responses = [client.get("/tasks", headers=headers) for _ in range(101)]
+        assert all(r.status_code == 200 for r in responses[:100])
+        assert responses[100].status_code == 429

@@ -1,11 +1,14 @@
 """Flask API for task management, backed by SQLite, with JWT authentication."""
 
 import os
+import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import jwt
 from flask import Flask, request, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from notifications import send_notification_email
@@ -13,8 +16,15 @@ from repositories import UserRepository, TaskRepository, init_db
 
 TOKEN_TTL_SECONDS = int(os.environ.get("TOKEN_TTL_SECONDS", "3600"))
 
+DEFAULT_TASKS_PAGE_LIMIT = 20
+MAX_TASKS_PAGE_LIMIT = 100
 
-def create_app(database: str = "tasks.db") -> Flask:
+
+def create_app(
+    database: str = "tasks.db",
+    rate_limit_storage_uri: str | None = None,
+    rate_limit: str | None = None,
+) -> Flask:
     app = Flask(__name__)
     app.config["DATABASE"] = database
     app.config["SECRET_KEY"] = os.environ.get(
@@ -24,6 +34,38 @@ def create_app(database: str = "tasks.db") -> Flask:
 
     user_repo = UserRepository(database)
     task_repo = TaskRepository(database)
+
+    def rate_limit_key() -> str:
+        """Key rate limits by authenticated user id, falling back to IP
+        for unauthenticated requests (e.g. login/register)."""
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer "):].strip()
+            try:
+                payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+                return f"user:{payload.get('sub')}"
+            except jwt.InvalidTokenError:
+                pass
+        return f"ip:{get_remote_address()}"
+
+    storage_uri = rate_limit_storage_uri or os.environ.get(
+        "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+    )
+    limit = rate_limit or os.environ.get("RATE_LIMIT", "100 per minute")
+    limiter = Limiter(
+        rate_limit_key,
+        app=app,
+        application_limits=[limit],
+        storage_uri=storage_uri,
+        headers_enabled=True,
+        # Unique per app instance so separate app instances (e.g. in tests)
+        # never share rate-limit counters even when using the same storage.
+        key_prefix=f"taskapp:{uuid.uuid4().hex}",
+    )
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(_e):
+        return jsonify({"error": "rate limit exceeded"}), 429
 
     def make_token(user_id: int, username: str) -> str:
         payload = {
@@ -125,8 +167,36 @@ def create_app(database: str = "tasks.db") -> Flask:
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks(user):
-        rows = task_repo.list_for_owner(user["id"])
-        return jsonify([dict(r) for r in rows])
+        cursor_param = request.args.get("cursor")
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit_param = request.args.get("limit")
+        limit = DEFAULT_TASKS_PAGE_LIMIT
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+            if limit < 1:
+                return jsonify({"error": "limit must be a positive integer"}), 400
+        limit = min(limit, MAX_TASKS_PAGE_LIMIT)
+
+        rows = task_repo.list_page_for_owner(user["id"], cursor, limit)
+        has_more = len(rows) > limit
+        page_rows = rows[:limit]
+        next_cursor = str(page_rows[-1]["id"]) if has_more and page_rows else None
+        total = task_repo.count_for_owner(user["id"])
+
+        return jsonify({
+            "data": [dict(r) for r in page_rows],
+            "next_cursor": next_cursor,
+            "total": total,
+        })
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth

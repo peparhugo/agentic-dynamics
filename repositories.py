@@ -127,13 +127,33 @@ class TaskRepository(BaseRepository):
         finally:
             conn.close()
 
-    def list_for_owner(self, owner_id: int) -> list:
+    def list_page_for_owner(self, owner_id: int, cursor: Optional[int], limit: int) -> list:
+        """Return up to `limit + 1` tasks after `cursor`, newest first.
+
+        The extra row (if present) lets the caller detect whether another
+        page follows without a separate COUNT query.
+        """
         conn = self._connect()
         try:
+            if cursor is None:
+                return conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
             return conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-                (owner_id,),
+                "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                (owner_id, cursor, limit + 1),
             ).fetchall()
+        finally:
+            conn.close()
+
+    def count_for_owner(self, owner_id: int) -> int:
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()
+            return row["c"]
         finally:
             conn.close()
 
