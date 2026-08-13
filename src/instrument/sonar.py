@@ -158,7 +158,7 @@ def run_sonar_analysis(
     sonar_url: str = SONAR_URL_DEFAULT,
     sonar_user: str = SONAR_USER_DEFAULT,
     sonar_password: str = SONAR_PASSWORD_DEFAULT,
-    timeout_sec: int = 120,
+    timeout_sec: int = 300,
 ) -> SonarMetrics:
     """Run sonar-scanner on a worktree and extract quality measures.
 
@@ -208,7 +208,7 @@ sonar.scm.disabled=true
     t0 = time.monotonic()
     try:
         result = subprocess.run(
-            [scanner, "-Dsonar.scanner.javaOpts=-Xmx512m"],
+            [scanner, "-Dsonar.scanner.javaOpts=-Xmx512m -XX:+UseSerialGC -XX:TieredStopAtLevel=1"],
             cwd=str(wt),
             capture_output=True,
             text=True,

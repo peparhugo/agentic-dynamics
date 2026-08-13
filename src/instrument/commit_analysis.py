@@ -485,6 +485,43 @@ def _empty_sonar_delta() -> dict[str, Any]:
     }
 
 
+def _prescan_sonar_parallel(
+    worktree: Path,
+    commit_hashes: list[str],
+    sonar_url: str,
+    max_workers: int = 6,
+) -> None:
+    """Warm the sonar cache by scanning every unique commit in parallel.
+
+    The delta loop re-runs ``run_sonar_analysis`` per commit (parent + child);
+    this pre-pass scans each unique commit once — concurrently — so the delta
+    loop only hits the process-local cache instead of re-launching the scanner
+    (~30s each) sequentially.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from .sonar import run_sonar_analysis
+
+    unique = list(dict.fromkeys(commit_hashes))
+    if not unique:
+        return
+
+    def scan(commit_hash: str) -> None:
+        with tempfile.TemporaryDirectory(prefix="prescan_", dir="/tmp") as tmp:
+            checkout = Path(tmp) / "checkout"
+            _run_git(worktree, "worktree", "add", "--detach", str(checkout), commit_hash)
+            try:
+                run_sonar_analysis(
+                    str(checkout),
+                    sonar_url=sonar_url,
+                    project_key=f"exp_{worktree.name}_{commit_hash[:12]}",
+                )
+            finally:
+                _run_git(worktree, "worktree", "remove", "--force", str(checkout))
+
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(unique))) as pool:
+        list(pool.map(scan, unique))
+
+
 # ── Full Commit Analysis ───────────────────────────────────────
 
 def analyze_commit(
@@ -547,6 +584,15 @@ def analyze_story_worktree(worktree: Path, run_sonar: bool = False) -> StoryAnal
 
     # Score conventions once on the final state (not per commit)
     final_score, final_violations = score_conventions(worktree, profile=profile)
+
+    # Warm the sonar cache by scanning every unique commit in parallel, so the
+    # delta loop below only hits cached metrics instead of re-running the scanner.
+    if run_sonar:
+        _prescan_sonar_parallel(
+            worktree,
+            [h for h, _ in commits],
+            os.environ.get("SONAR_URL", "http://127.0.0.1:9000"),
+        )
 
     # Analyze each pair (skip seed + mutation commits, focus on session commits)
     session_num = 0
