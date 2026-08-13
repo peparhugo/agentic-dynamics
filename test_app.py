@@ -5,11 +5,15 @@ Tests for the WebSocket notification server.
 import asyncio
 import json
 import pytest
+import tempfile
+import os
 from websockets import ConnectionClosed
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase, unittest_run_loop
 
 from app import NotificationServer, ClientRegistry
+from database import MessageDatabase
+from redis_pubsub import RedisPublisher, RedisSubscriber, ClientConnectionState
 
 
 class TestClientRegistry:
@@ -608,3 +612,247 @@ async def test_system_messages_format():
     sent = json.loads(ws.sent_messages[0])
     assert sent["type"] == "system"
     assert "message" in sent["payload"]
+
+
+class TestMessageDatabase:
+    """Tests for message persistence in SQLite."""
+
+    @pytest.fixture
+    def temp_db(self):
+        """Create a temporary database."""
+        fd, path = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        db = MessageDatabase(path)
+        yield db
+        # Cleanup
+        if os.path.exists(path):
+            os.remove(path)
+
+    def test_store_and_retrieve_message(self, temp_db):
+        """Test storing and retrieving a message."""
+        payload = {"content": "hello"}
+        msg_id = temp_db.store_message("alerts", "test", payload, "2024-01-01T00:00:00+00:00")
+
+        assert msg_id is not None
+
+        messages = temp_db.get_messages(channel="alerts")
+        assert len(messages) == 1
+        assert messages[0]["type"] == "test"
+        assert messages[0]["payload"]["content"] == "hello"
+
+    def test_get_messages_with_limit_and_offset(self, temp_db):
+        """Test retrieving messages with limit and offset."""
+        for i in range(10):
+            temp_db.store_message("alerts", "test", {"index": i}, f"2024-01-01T00:00:{i:02d}+00:00")
+
+        # Get first 3 messages
+        messages = temp_db.get_messages(limit=3, offset=0)
+        assert len(messages) == 3
+
+        # Get next 3 messages
+        messages = temp_db.get_messages(limit=3, offset=3)
+        assert len(messages) == 3
+
+    def test_get_message_count(self, temp_db):
+        """Test getting message count."""
+        assert temp_db.get_message_count() == 0
+
+        temp_db.store_message("alerts", "test", {"content": "hello"}, "2024-01-01T00:00:00+00:00")
+        assert temp_db.get_message_count() == 1
+
+        temp_db.store_message("alerts", "test", {"content": "world"}, "2024-01-01T00:00:01+00:00")
+        assert temp_db.get_message_count() == 2
+
+    def test_get_message_count_by_channel(self, temp_db):
+        """Test getting message count for a specific channel."""
+        temp_db.store_message("alerts", "test", {"content": "hello"}, "2024-01-01T00:00:00+00:00")
+        temp_db.store_message("alerts", "test", {"content": "world"}, "2024-01-01T00:00:01+00:00")
+        temp_db.store_message("system", "test", {"content": "info"}, "2024-01-01T00:00:02+00:00")
+
+        assert temp_db.get_message_count(channel="alerts") == 2
+        assert temp_db.get_message_count(channel="system") == 1
+        assert temp_db.get_message_count() == 3
+
+    def test_clear_messages(self, temp_db):
+        """Test clearing all messages."""
+        temp_db.store_message("alerts", "test", {"content": "hello"}, "2024-01-01T00:00:00+00:00")
+        temp_db.store_message("alerts", "test", {"content": "world"}, "2024-01-01T00:00:01+00:00")
+
+        assert temp_db.get_message_count() == 2
+
+        temp_db.clear_messages()
+        assert temp_db.get_message_count() == 0
+
+    def test_messages_are_ordered_by_id_desc(self, temp_db):
+        """Test that messages are returned in descending ID order."""
+        ids = []
+        for i in range(5):
+            msg_id = temp_db.store_message("alerts", "test", {"index": i}, f"2024-01-01T00:00:{i:02d}+00:00")
+            ids.append(msg_id)
+
+        messages = temp_db.get_messages()
+        returned_ids = [msg["id"] for msg in messages]
+
+        # Should be in descending order
+        assert returned_ids == list(reversed(ids))
+
+
+class TestNotificationServerIntegration(AioHTTPTestCase):
+    """Integration tests for NotificationServer with persistence."""
+
+    def setUp(self):
+        """Set up test fixtures."""
+        super().setUp()
+        self.temp_fd, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(self.temp_fd)
+
+        self.notification_server = NotificationServer(
+            host="localhost",
+            ws_port=8765,
+            http_port=8080,
+            database_url=self.db_path,
+        )
+
+    def tearDown(self):
+        """Cleanup test fixtures."""
+        if os.path.exists(self.db_path):
+            os.remove(self.db_path)
+        super().tearDown()
+
+    async def get_application(self):
+        """Create the test application."""
+        return self.notification_server.http_app
+
+    async def test_messages_endpoint_empty(self):
+        """Test messages endpoint with no messages."""
+        resp = await self.client.request("GET", "/messages")
+        assert resp.status == 200
+        data = await resp.json()
+        assert data["messages"] == []
+        assert data["total"] == 0
+        assert data["count"] == 0
+
+    async def test_messages_endpoint_with_messages(self):
+        """Test messages endpoint with stored messages."""
+        # Store some messages
+        self.notification_server.db.store_message(
+            "alerts",
+            "test",
+            {"content": "hello"},
+            "2024-01-01T00:00:00+00:00"
+        )
+        self.notification_server.db.store_message(
+            "alerts",
+            "test",
+            {"content": "world"},
+            "2024-01-01T00:00:01+00:00"
+        )
+
+        resp = await self.client.request("GET", "/messages")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 2
+        assert data["total"] == 2
+        assert data["count"] == 2
+
+    async def test_messages_endpoint_with_channel_filter(self):
+        """Test messages endpoint with channel filter."""
+        # Store messages to different channels
+        self.notification_server.db.store_message(
+            "alerts",
+            "test",
+            {"content": "alert"},
+            "2024-01-01T00:00:00+00:00"
+        )
+        self.notification_server.db.store_message(
+            "system",
+            "test",
+            {"content": "system"},
+            "2024-01-01T00:00:01+00:00"
+        )
+
+        resp = await self.client.request("GET", "/messages?channel=alerts")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 1
+        assert data["messages"][0]["channel"] == "alerts"
+
+    async def test_messages_endpoint_with_limit(self):
+        """Test messages endpoint with limit parameter."""
+        # Store 10 messages
+        for i in range(10):
+            self.notification_server.db.store_message(
+                "alerts",
+                "test",
+                {"index": i},
+                f"2024-01-01T00:00:{i:02d}+00:00"
+            )
+
+        resp = await self.client.request("GET", "/messages?limit=5")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 5
+        assert data["total"] == 10
+
+    async def test_messages_endpoint_with_offset(self):
+        """Test messages endpoint with offset parameter."""
+        # Store 10 messages
+        for i in range(10):
+            self.notification_server.db.store_message(
+                "alerts",
+                "test",
+                {"index": i},
+                f"2024-01-01T00:00:{i:02d}+00:00"
+            )
+
+        resp = await self.client.request("GET", "/messages?limit=5&offset=5")
+        assert resp.status == 200
+        data = await resp.json()
+        assert len(data["messages"]) == 5
+        assert data["count"] == 5
+
+    async def test_messages_endpoint_invalid_limit(self):
+        """Test messages endpoint with invalid limit parameter."""
+        resp = await self.client.request("GET", "/messages?limit=invalid")
+        assert resp.status == 400
+        data = await resp.json()
+        assert "error" in data
+
+    async def test_broadcast_stores_message(self):
+        """Test that broadcast messages are stored in database."""
+        ws = AsyncMockWebSocket()
+        self.notification_server.registry.register("client-1", ws)
+
+        message = {
+            "type": "broadcast",
+            "payload": {"content": "hello"},
+            "timestamp": "2024-01-01T00:00:00+00:00",
+        }
+
+        await self.notification_server.broadcast(message)
+
+        # Check database
+        stored = self.notification_server.db.get_messages(channel="broadcast")
+        assert len(stored) == 1
+        assert stored[0]["payload"]["content"] == "hello"
+
+    async def test_direct_message_stores_in_channel(self):
+        """Test that direct messages are stored with channel prefix."""
+        ws1 = AsyncMockWebSocket()
+        ws2 = AsyncMockWebSocket()
+
+        self.notification_server.registry.register("client-1", ws1)
+        self.notification_server.registry.register("client-2", ws2)
+
+        message = {
+            "type": "direct",
+            "payload": {"from": "client-1", "message": "hello"},
+            "timestamp": "2024-01-01T00:00:00+00:00",
+        }
+
+        await self.notification_server.send_direct("client-2", message)
+
+        # Check database
+        stored = self.notification_server.db.get_messages(channel="direct:client-2")
+        assert len(stored) == 1
+        assert stored[0]["payload"]["from"] == "client-1"

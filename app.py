@@ -1,5 +1,5 @@
 """
-WebSocket-based notification server.
+WebSocket-based notification server with Redis pub/sub and SQLite persistence.
 
 Features:
 - Accept WebSocket connections and assign unique IDs
@@ -7,11 +7,15 @@ Features:
 - Handle client disconnections
 - REST endpoint for health status
 - Thread-safe client registry
+- Redis pub/sub for distributed message delivery
+- SQLite for message persistence
+- Client connection state stored in Redis
 """
 
 import asyncio
 import json
 import uuid
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any
 import threading
@@ -19,6 +23,9 @@ import threading
 from aiohttp import web
 import websockets
 from websockets import ConnectionClosed
+
+from database import MessageDatabase
+from redis_pubsub import RedisPublisher, RedisSubscriber, ClientConnectionState
 
 
 class ClientRegistry:
@@ -89,12 +96,23 @@ class ClientRegistry:
 class NotificationServer:
     """WebSocket notification server."""
 
-    def __init__(self, host: str = "localhost", ws_port: int = 8765, http_port: int = 8080):
+    def __init__(self, host: str = "localhost", ws_port: int = 8765, http_port: int = 8080,
+                 redis_url: str | None = None, database_url: str | None = None):
         self.host = host
         self.ws_port = ws_port
         self.http_port = http_port
         self.registry = ClientRegistry()
         self.http_app = web.Application()
+
+        # Initialize Redis and database
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
+        self.db_path = database_url or os.getenv("DATABASE_URL", "messages.db")
+
+        self.db = MessageDatabase(self.db_path)
+        self.publisher = RedisPublisher(self.redis_url)
+        self.subscriber = RedisSubscriber(self.redis_url)
+        self.connection_state = ClientConnectionState(self.redis_url)
+
         self._setup_http_routes()
 
     def _setup_http_routes(self) -> None:
@@ -102,6 +120,7 @@ class NotificationServer:
         self.http_app.router.add_get("/health", self._health_handler)
         self.http_app.router.add_get("/channels", self._channels_handler)
         self.http_app.router.add_get("/channels/{name}/subscribers", self._channel_subscribers_handler)
+        self.http_app.router.add_get("/messages", self._messages_handler)
 
     async def _health_handler(self, request: web.Request) -> web.Response:
         """Health check endpoint."""
@@ -130,10 +149,47 @@ class NotificationServer:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
+    async def _messages_handler(self, request: web.Request) -> web.Response:
+        """Get stored messages from database."""
+        try:
+            limit = int(request.query.get("limit", 50))
+            offset = int(request.query.get("offset", 0))
+            channel = request.query.get("channel")
+
+            # Validate limits
+            limit = min(max(limit, 1), 1000)
+            offset = max(offset, 0)
+
+            messages = self.db.get_messages(channel=channel, limit=limit, offset=offset)
+            total_count = self.db.get_message_count(channel=channel)
+
+            return web.json_response({
+                "messages": messages,
+                "limit": limit,
+                "offset": offset,
+                "total": total_count,
+                "count": len(messages),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except (ValueError, TypeError):
+            return web.json_response({
+                "error": "Invalid query parameters",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }, status=400)
+
     async def _handle_client(self, websocket: Any, path: str) -> None:
         """Handle a new WebSocket client connection."""
         client_id = str(uuid.uuid4())
         self.registry.register(client_id, websocket)
+
+        # Store connection state in Redis
+        try:
+            self.connection_state.set_connected(client_id, {
+                "connected_at": datetime.now(timezone.utc).isoformat(),
+                "status": "connected",
+            })
+        except Exception:
+            pass
 
         try:
             # Send welcome message
@@ -165,6 +221,12 @@ class NotificationServer:
             pass
         finally:
             self.registry.unregister(client_id)
+
+            # Remove connection state from Redis
+            try:
+                self.connection_state.remove_connected(client_id)
+            except Exception:
+                pass
 
             # Broadcast disconnection event
             await self.broadcast({
@@ -217,6 +279,23 @@ class NotificationServer:
 
     async def broadcast(self, message: dict, exclude: str | None = None, channel: str | None = None) -> None:
         """Broadcast a message to all connected clients or to a specific channel."""
+        # Store message in database
+        msg_type = message.get("type", "unknown")
+        payload = message.get("payload", {})
+        timestamp = message.get("timestamp", datetime.now(timezone.utc).isoformat())
+        broadcast_channel = channel or "broadcast"
+
+        try:
+            self.db.store_message(broadcast_channel, msg_type, payload, timestamp)
+        except Exception:
+            pass
+
+        # Publish to Redis
+        try:
+            await self.publisher.publish(broadcast_channel, message)
+        except Exception:
+            pass
+
         if channel:
             # Send only to subscribers of the channel
             subscribers = self.registry.get_channel_subscribers(channel)
@@ -245,6 +324,23 @@ class NotificationServer:
 
     async def send_direct(self, client_id: str, message: dict) -> None:
         """Send a direct message to a specific client."""
+        # Store message in database
+        msg_type = message.get("type", "unknown")
+        payload = message.get("payload", {})
+        timestamp = message.get("timestamp", datetime.now(timezone.utc).isoformat())
+        channel = f"direct:{client_id}"
+
+        try:
+            self.db.store_message(channel, msg_type, payload, timestamp)
+        except Exception:
+            pass
+
+        # Publish to Redis
+        try:
+            await self.publisher.publish(channel, message)
+        except Exception:
+            pass
+
         client = self.registry.get_client(client_id)
         if client:
             await self._send_safe(client, json.dumps(message))
@@ -258,6 +354,14 @@ class NotificationServer:
 
     async def start(self) -> None:
         """Start both WebSocket and HTTP servers."""
+        # Initialize Redis connections
+        try:
+            await self.publisher.connect()
+            await self.subscriber.connect()
+            await self.subscriber.start()
+        except Exception:
+            pass
+
         # Start WebSocket server
         ws_server = await websockets.serve(self._handle_client, self.host, self.ws_port)
 
@@ -271,6 +375,20 @@ class NotificationServer:
         print(f"HTTP server running on http://{self.host}:{self.http_port}")
 
         return ws_server, runner
+
+    async def shutdown(self) -> None:
+        """Shutdown the server and cleanup resources."""
+        try:
+            await self.subscriber.stop()
+            await self.publisher.disconnect()
+            await self.subscriber.disconnect()
+        except Exception:
+            pass
+
+        try:
+            self.connection_state.close()
+        except Exception:
+            pass
 
 
 async def main():
