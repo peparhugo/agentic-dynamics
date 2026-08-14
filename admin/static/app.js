@@ -130,13 +130,17 @@
   /** Keep the command rail synchronized with matrix and selected live overlays. */
   function renderRail() {
     const totals = core.reconcileTelemetry(state.telemetry, state.liveSamplesByCell)
+    const capped = state.telemetry.history_capped === true
     const spend = $("#reported-spend")
     const formattedSpend = formatCost(totals.reported_cost)
-    spend.textContent = formattedSpend || "WAITING FOR COST TELEMETRY"
+    spend.textContent = formattedSpend ? `${formattedSpend}${capped ? "±" : ""}` : "WAITING FOR COST TELEMETRY"
     spend.setAttribute(
       "aria-label",
-      formattedSpend ? `${formattedSpend} cumulative reported spend, retained window` : "Waiting for cost telemetry",
+      formattedSpend
+        ? `${formattedSpend} cumulative reported spend, retained window${capped ? " truncated at 500 entries" : ""}`
+        : "Waiting for cost telemetry",
     )
+    $("#spend-provenance").textContent = capped ? "RETAINED WINDOW · TRUNCATED" : "RETAINED WINDOW"
 
     const input = $("#input-tokens")
     const output = $("#output-tokens")

@@ -74,6 +74,31 @@ def test_publish_event_maintains_history_log(monkeypatch):
     assert json.loads(fake.logs["events_log:cell_abc"][0])["type"] == "tool_use"
 
 
+def test_publish_event_persists_before_publish(monkeypatch):
+    """A live event must be retained before it is published (M3 ordering)."""
+    calls = []
+
+    class OrderingRedis:
+        def ping(self):
+            return True
+
+        def lpush(self, key, payload):
+            calls.append("lpush")
+
+        def ltrim(self, key, start, end):
+            calls.append("ltrim")
+
+        def publish(self, channel, payload):
+            calls.append("publish")
+
+    monkeypatch.setattr(live_module, "_connect", lambda: OrderingRedis())
+    pub = LivePublisher("cell_abc")
+
+    pub.publish_event({"type": "text"})
+
+    assert calls == ["lpush", "ltrim", "publish"]
+
+
 def test_publisher_disables_after_failure(monkeypatch):
     class FailingRedis:
         def ping(self):

@@ -128,3 +128,12 @@ def test_design_styles_keep_artifacts_bounded_on_narrow_screens():
     mobile = css[css.index("@media (max-width: 420px)"):]
     assert ".design-stream-actions" in mobile
     assert "grid-template-columns: minmax(0, 1fr)" in mobile
+
+
+def test_spend_rail_surfaces_retained_window_truncation():
+    """The spend rail labels a truncated retained window instead of hiding it."""
+    app = (STATIC / "app.js").read_text()
+
+    assert "history_capped" in app
+    assert "RETAINED WINDOW · TRUNCATED" in app
+    assert "#spend-provenance" in app
