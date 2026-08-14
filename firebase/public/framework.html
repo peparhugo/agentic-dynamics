@@ -26,36 +26,66 @@
 .framework-page .section-kicker::before{content:'';width:1.6rem;height:1px;background:currentColor}
 .framework-page .kicker-why{color:var(--fw-why)}
 .framework-page .kicker-what{color:var(--fw-what)}
-.framework-page .golden-label{font:600 .65rem/1 'JetBrains Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--t3)}
+.framework-page .micro-label{font:600 .65rem/1 'JetBrains Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--t3)}
 
-/* The WHY chapter is deliberately spacious so the proof receipts support rather than compete with the belief. */
-.framework-page .dossier-hero{padding-top:clamp(5rem,11vw,9rem);padding-bottom:clamp(4rem,9vw,7rem);background:radial-gradient(circle at 18% 24%,rgba(245,158,11,.13),transparent 35%),var(--bg)}
-.framework-page .hero-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.65fr);gap:clamp(2rem,6vw,5rem);align-items:end;text-align:left}
+/* The hero introduces the two operating modes before the detailed system map. */
+.framework-page .dossier-hero{padding-top:clamp(5rem,11vw,9rem);padding-bottom:clamp(4rem,9vw,7rem);background:radial-gradient(circle at 18% 24%,rgba(34,211,238,.12),transparent 35%),var(--bg)}
+.framework-page .hero-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(18rem,.7fr);gap:clamp(2rem,6vw,5rem);align-items:center;text-align:left}
 .framework-page .thesis{font-size:clamp(1rem,1.7vw,1.2rem);line-height:1.8;color:var(--t2);max-width:48rem;margin:1.5rem 0 0}
 .framework-page .hero-actions{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:2rem}
 .framework-page .cta-secondary{background:transparent;color:var(--t);border:1px solid var(--fw-line-strong)}
-.framework-page .proof-ledger{display:grid;gap:.7rem}
-.framework-page .proof-card{position:relative;background:color-mix(in srgb,var(--fw-surface) 88%,transparent);border:1px solid var(--fw-line);padding:1.2rem 1.25rem;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.15)}
-.framework-page .proof-card::before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:var(--fw-why)}
-.framework-page .proof-card.cyan::before{background:var(--fw-how)}
-.framework-page .proof-card strong{display:block;color:var(--t);font-size:.9rem;margin:.3rem 0}
-.framework-page .proof-card p{font-size:.78rem;line-height:1.65;color:var(--t2);margin:0}
-.framework-page .proof-value{font:700 1.35rem/1 'JetBrains Mono',monospace;color:var(--fw-why)}
-.framework-page .proof-card.cyan .proof-value{color:var(--fw-how)}
+.framework-page .mode-ledger{display:grid;gap:.7rem}
+.framework-page .mode-card{position:relative;background:color-mix(in srgb,var(--fw-surface) 88%,transparent);border:1px solid var(--fw-line);padding:1.2rem 1.25rem;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.15)}
+.framework-page .mode-card::before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:var(--fw-how)}
+.framework-page .mode-card.grid::before{background:var(--fw-what)}
+.framework-page .mode-card strong{display:block;color:var(--t);font-size:.9rem;margin:.3rem 0}
+.framework-page .mode-card p{font-size:.78rem;line-height:1.65;color:var(--t2);margin:0}
+.framework-page .mode-value{font:700 1.35rem/1 'JetBrains Mono',monospace;color:var(--fw-how)}
+.framework-page .mode-card.grid .mode-value{color:var(--fw-what)}
 .framework-page .audience-note{max-width:74rem;margin:0 auto;padding:1rem 1.25rem;background:var(--fw-inset);border:1px solid var(--fw-line);border-left:2px solid var(--fw-how);font-size:.78rem;line-height:1.7;color:var(--t2);text-align:left}
 
-/* The architecture wrapper is a keyboard-scrollable centerpiece; the list remains a complete text equivalent. */
+/* Both diagrams use document flow rather than fixed SVG coordinates, preventing label collisions at narrow widths. */
 .framework-page .architecture-section{background:var(--bg2);padding-top:clamp(4rem,8vw,7rem)}
 .framework-page .architecture-intro{display:flex;justify-content:space-between;gap:2rem;align-items:end;text-align:left;margin-bottom:1.5rem}
 .framework-page .architecture-intro .lead{max-width:39rem;margin:0}
-.framework-page .architecture-figure{margin:0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:var(--bg2);box-shadow:var(--panel-shadow);overflow:hidden;text-align:left}
-.framework-page .architecture-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-color:var(--fw-how) var(--fw-inset)}
-.framework-page .architecture-scroll:focus-visible{outline:2px solid var(--fw-how);outline-offset:-4px}
-.framework-page .architecture-map{display:block;width:100%;height:auto}
-.framework-page .architecture-figure figcaption{border-top:1px solid var(--fw-line);padding:1rem 1.25rem;color:var(--t2);font-size:.78rem;line-height:1.65}
+.framework-page .system-figure{margin:0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));box-shadow:var(--panel-shadow);overflow:hidden;text-align:left;padding:clamp(1rem,3vw,2rem)}
+.framework-page .mode-entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.framework-page .mode-entry{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-how);padding:1rem;min-width:0}
+.framework-page .mode-entry.experiment{border-top-color:var(--fw-what)}
+.framework-page .mode-entry .micro-label{color:var(--fw-how)}.framework-page .mode-entry.experiment .micro-label{color:var(--fw-what)}
+.framework-page .mode-entry strong{display:block;color:var(--t);font-size:1rem;margin:.5rem 0 .35rem}.framework-page .mode-entry p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
+.framework-page .merge-label{display:flex;align-items:center;justify-content:center;gap:.75rem;margin:1rem 0;color:var(--fw-how);font:700 .68rem/1 'JetBrains Mono',monospace;letter-spacing:.11em;text-transform:uppercase}
+.framework-page .merge-label::before,.framework-page .merge-label::after{content:'';height:1px;flex:1;background:var(--fw-line-strong)}
+.framework-page .process-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1.2rem;list-style:none;margin:0;padding:0}
+.framework-page .process-step{position:relative;background:var(--fw-inset);border:1px solid var(--fw-line-strong);padding:1rem;min-height:7.2rem}
+.framework-page .process-step:not(:last-child)::after{content:'\2192';position:absolute;right:-1rem;top:50%;transform:translateY(-50%);color:var(--fw-how);font-size:1.1rem;z-index:2}
+.framework-page .process-step span{display:block;color:var(--t3);font:700 .58rem/1 'JetBrains Mono',monospace;letter-spacing:.1em}.framework-page .process-step strong{display:block;color:var(--t);font-size:.88rem;margin:.65rem 0 .35rem}.framework-page .process-step p{font-size:.67rem;line-height:1.5;color:var(--t2);margin:0}
+.framework-page .system-planes{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1.2rem}
+.framework-page .system-plane{background:var(--bg);border:1px solid var(--fw-line);padding:1rem}.framework-page .system-plane:nth-child(2){border-top:2px solid var(--fw-what)}.framework-page .system-plane:nth-child(3){border-top:2px solid var(--fw-why)}
+.framework-page .system-plane strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.45rem}.framework-page .system-plane p{font-size:.69rem;line-height:1.55;color:var(--t2);margin:0}
+.framework-page .system-figure figcaption{border-top:1px solid var(--fw-line);margin:1.2rem 0 0;padding:1rem 0 0;color:var(--t2);font-size:.78rem;line-height:1.65}
+.framework-page .scale-band{margin-top:1rem;background:var(--fw-surface);border:1px solid var(--fw-line-strong);padding:1.25rem}
+.framework-page .scale-formula{font:700 clamp(1rem,2.5vw,1.5rem)/1.3 'JetBrains Mono',monospace;color:var(--t);text-align:center;margin-bottom:1rem}.framework-page .scale-formula span{color:var(--fw-how)}
+.framework-page .scale-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--fw-line)}
+.framework-page .scale-cell{background:var(--bg3);padding:1rem}.framework-page .scale-cell strong{display:block;color:var(--fw-how);font:800 1.15rem/1 'JetBrains Mono',monospace;margin-bottom:.45rem}.framework-page .scale-cell p{font-size:.68rem;line-height:1.5;color:var(--t2);margin:0}
 .framework-page .architecture-text{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:1rem 0 0;padding:0;list-style:none;background:var(--fw-line);border:1px solid var(--fw-line)}
 .framework-page .architecture-text li{background:var(--bg3);padding:1rem;color:var(--t2);font-size:.73rem;line-height:1.6;text-align:left}
 .framework-page .architecture-text strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.5rem}
+
+.framework-page .autonomy-section{background:var(--bg);padding-top:clamp(4rem,8vw,7rem)}
+.framework-page .authority-map{margin:1.5rem 0 0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));padding:clamp(1rem,3vw,2rem);box-shadow:var(--panel-shadow)}
+.framework-page .human-plane{display:grid;grid-template-columns:12rem 1fr;gap:1rem;align-items:center;background:var(--fw-surface);border:1px solid var(--fw-line);border-left:3px solid var(--fw-why);padding:1rem;text-align:left}
+.framework-page .human-plane strong{color:var(--fw-why);font:700 .72rem/1.3 'JetBrains Mono',monospace;letter-spacing:.08em}.framework-page .human-plane p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
+.framework-page .authority-connector{text-align:center;color:var(--fw-why);font:700 .65rem/2.4 'JetBrains Mono',monospace;letter-spacing:.08em}
+.framework-page .bounded-zone{border:1px solid var(--fw-how);padding:1.25rem;background:rgba(34,211,238,.025)}
+.framework-page .zone-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:1rem}.framework-page .zone-head strong{color:var(--fw-how);font:700 .75rem/1 'JetBrains Mono',monospace;letter-spacing:.08em}.framework-page .zone-head span{color:var(--t3);font-size:.67rem}
+.framework-page .autonomy-process{display:grid;grid-template-columns:repeat(6,1fr);gap:.5rem;list-style:none;margin:0;padding:0;counter-reset:auto-step}
+.framework-page .autonomy-process li{counter-increment:auto-step;position:relative;background:var(--fw-inset);border:1px solid var(--fw-line);padding:.8rem .6rem;text-align:center;color:var(--t);font-size:.7rem;min-width:0}
+.framework-page .autonomy-process li::before{content:'0' counter(auto-step);display:block;color:var(--t3);font:700 .56rem/1 'JetBrains Mono',monospace;margin-bottom:.45rem}.framework-page .autonomy-process li:not(:last-child)::after{content:'\2192';position:absolute;right:-.48rem;top:50%;transform:translate(50%,-50%);color:var(--fw-how);z-index:2}
+.framework-page .constraint-rail{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center;border-top:1px solid var(--fw-line);margin-top:1rem;padding-top:1rem}.framework-page .constraint-rail span{border:1px solid var(--fw-line);background:var(--bg);padding:.35rem .65rem;color:var(--t2);font:600 .6rem/1 'JetBrains Mono',monospace;text-transform:uppercase}
+.framework-page .authority-outputs{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;margin-top:.7rem}.framework-page .authority-output{background:var(--fw-surface);border:1px solid var(--fw-line);padding:1rem}.framework-page .authority-output strong{display:block;color:var(--fw-how);font-size:.75rem;margin-bottom:.35rem}.framework-page .authority-output.exception strong{color:var(--fw-why)}.framework-page .authority-output p{font-size:.68rem;line-height:1.5;color:var(--t2);margin:0}
+.framework-page .autonomy-levels{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem;margin-top:1rem}.framework-page .autonomy-level{background:var(--fw-surface);border:1px solid var(--fw-line);padding:1rem;text-align:left}.framework-page .autonomy-level strong{display:block;color:var(--t);font-size:.78rem;margin-bottom:.4rem}.framework-page .autonomy-level p{font-size:.68rem;line-height:1.55;color:var(--t2);margin:0}.framework-page .autonomy-level.current{border-top:2px solid var(--fw-what)}
+.framework-page .authority-caption{margin:1rem 0 0;color:var(--t2);font-size:.76rem;line-height:1.65;text-align:left}.framework-page .authority-caption strong{color:var(--fw-what)}
 
 /* Console lanes distinguish directly operated inputs from modeled compounding without changing provenance. */
 .framework-page .lever-console{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:2rem;text-align:left}
@@ -102,7 +132,7 @@
 .framework-page .cost-receipts .stat{background:var(--bg3);border:0;border-radius:0;padding:.85rem .75rem;min-width:0}
 .framework-page .cost-receipts .stat .v{font-size:1.05rem}
 
-/* The workbench owns the strongest local depth because it is where HOW becomes an operator action. */
+/* The workbench owns the strongest local depth because it turns parameters into an operator action. */
 .framework-page .framework-workbench{position:relative;background:var(--fw-surface);border:1px solid var(--fw-line-strong);border-top:3px solid var(--fw-how);padding:clamp(1rem,3vw,2rem);margin:1.25rem 0 0;text-align:left;box-shadow:0 28px 80px rgba(0,0,0,.32)}
 .framework-page .calc-mode{display:inline-flex;background:var(--fw-inset);border:1px solid var(--fw-line);padding:.25rem;gap:.25rem;margin-bottom:1.25rem}
 .framework-page .calc-mode button{border:1px solid transparent;padding:.6rem 1rem;font:700 .72rem/1 'JetBrains Mono',monospace;cursor:pointer}
@@ -172,11 +202,11 @@
 .framework-page .campaign-strip{display:flex;justify-content:space-between;align-items:center;gap:1.5rem;max-width:1100px;margin:0 auto;padding:2rem;background:var(--fw-surface);border:1px solid var(--fw-line-strong);border-top:2px solid var(--fw-what)}
 .framework-page .campaign-strip strong{display:block;color:var(--t);font-size:1rem}.framework-page .campaign-strip span{font-size:.73rem;color:var(--t3)}
 
-@media(max-width:1000px){.framework-page .hero-grid,.framework-page .cost-station{grid-template-columns:1fr}.framework-page .lever-console{grid-template-columns:1fr}.framework-page .architecture-text{grid-template-columns:repeat(2,1fr)}.framework-page .cost-receipts.stats{grid-template-columns:repeat(3,1fr)}.framework-page .policy-map{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.framework-page .fsec{padding:3.5rem 1rem}.framework-page .architecture-intro{display:block}.framework-page .architecture-intro .lead{margin-top:1rem}.framework-page .architecture-scroll .architecture-map{min-width:900px}.framework-page .params,.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid,.framework-page .framework-workbench .row{grid-template-columns:1fr}.framework-page .workbench-grid{grid-template-columns:1fr}.framework-page .calc-results{position:static}.framework-page .framework-workbench input[type=range]{min-height:44px}.framework-page .doors,.framework-page .provider-grid,.framework-page .escalation-grid{grid-template-columns:1fr}.framework-page .door-card{min-height:0}.framework-page .door-caption{display:block}.framework-page .implementation-strip{grid-template-columns:1fr}.framework-page .rule-group{grid-template-columns:1fr}.framework-page .rule-group-head{position:static}.framework-page .policy-map{grid-template-columns:repeat(2,1fr)}.framework-page .campaign-strip{align-items:flex-start;flex-direction:column;margin:0 1rem}.framework-page .chart-wrap{height:19rem}}
-@media(max-width:520px){.framework-page .hero-actions,.framework-page .calc-mode{display:grid}.framework-page .architecture-text,.framework-page .cost-receipts.stats,.framework-page .policy-map{grid-template-columns:1fr}.framework-page .roi-out{grid-template-columns:1fr}.framework-page .cr{min-width:38rem}}
+@media(max-width:1000px){.framework-page .hero-grid,.framework-page .cost-station{grid-template-columns:1fr}.framework-page .lever-console{grid-template-columns:1fr}.framework-page .architecture-text{grid-template-columns:repeat(2,1fr)}.framework-page .system-planes{grid-template-columns:1fr}.framework-page .cost-receipts.stats{grid-template-columns:repeat(3,1fr)}.framework-page .policy-map{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.framework-page .fsec{padding:3.5rem 1rem}.framework-page .architecture-intro{display:block}.framework-page .architecture-intro .lead{margin-top:1rem}.framework-page .process-row{grid-template-columns:1fr;gap:1.35rem}.framework-page .process-step{min-height:0}.framework-page .process-step:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-1.2rem;transform:translateX(50%)}.framework-page .scale-grid{grid-template-columns:1fr 1fr}.framework-page .human-plane{grid-template-columns:1fr}.framework-page .zone-head{display:block}.framework-page .zone-head span{display:block;margin-top:.45rem}.framework-page .autonomy-process{grid-template-columns:1fr;gap:1.1rem}.framework-page .autonomy-process li:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-.9rem;transform:translateX(50%)}.framework-page .authority-outputs,.framework-page .autonomy-levels{grid-template-columns:1fr}.framework-page .params,.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid,.framework-page .framework-workbench .row{grid-template-columns:1fr}.framework-page .workbench-grid{grid-template-columns:1fr}.framework-page .calc-results{position:static}.framework-page .framework-workbench input[type=range]{min-height:44px}.framework-page .doors,.framework-page .provider-grid,.framework-page .escalation-grid{grid-template-columns:1fr}.framework-page .door-card{min-height:0}.framework-page .door-caption{display:block}.framework-page .implementation-strip{grid-template-columns:1fr}.framework-page .rule-group{grid-template-columns:1fr}.framework-page .rule-group-head{position:static}.framework-page .policy-map{grid-template-columns:repeat(2,1fr)}.framework-page .campaign-strip{align-items:flex-start;flex-direction:column;margin:0 1rem}.framework-page .chart-wrap{height:19rem}}
+@media(max-width:520px){.framework-page .hero-actions,.framework-page .calc-mode{display:grid}.framework-page .mode-entry-grid,.framework-page .scale-grid,.framework-page .architecture-text,.framework-page .cost-receipts.stats,.framework-page .policy-map{grid-template-columns:1fr}.framework-page .roi-out{grid-template-columns:1fr}.framework-page .cr{min-width:38rem}}
 @media(prefers-reduced-motion:reduce){.framework-page *{scroll-behavior:auto!important;transition:none!important}}
-@media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .architecture-scroll{overflow:visible}.framework-page .architecture-map{min-width:0!important}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
+@media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
 </style>
 <script src="data.js"></script>
 </head>
@@ -184,46 +214,83 @@
 
 <nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
-<!-- SECTION: WHY -->
+<!-- SECTION: Shared execution -->
 <section class="fsec dossier-hero" id="why"><div class="inr wide">
   <div class="hero-grid">
     <div>
-      <div class="section-kicker kicker-why">WHY / BELIEF</div>
-      <h1>Measured information becomes testable policy.</h1>
-      <p class="thesis">You can't manage what you can't measure. This framework turns observed behavior into declared information, exposes the levers that shape cost, and makes operating policy an arm you can compare rather than a default you inherit.</p>
+      <div class="section-kicker">ONE ENGINE / TWO OPERATING MODES</div>
+      <h1>Run one workflow. Or evaluate it as a grid.</h1>
+      <p class="thesis">A production workflow and an experiment use the same compiler, jobs, attempts, ledger, and policy controls. Fix the factors and the engine runs one cell. Vary them and it runs a controlled grid. Compare the cells, adapt one variable, and the grid becomes a campaign.</p>
       <div class="hero-actions">
-        <a href="#architecture" class="cta-btn">See the machine &darr;</a>
-        <a href="#calculator" class="cta-btn cta-secondary">Test your levers &rarr;</a>
+        <a href="#architecture" class="cta-btn">See the shared engine &darr;</a>
+        <a href="#autonomy" class="cta-btn cta-secondary">See the autonomy boundary &rarr;</a>
       </div>
     </div>
-    <div class="proof-ledger" aria-label="Evidence motivating the framework">
-      <article class="proof-card">
-        <span class="golden-label">Snowball / Measured</span>
-        <div class="proof-value">$0.16 &rarr; $0.34</div>
-        <strong>The Snowball Rule is measured, not assumed.</strong>
-        <p>A story's cost roughly doubles from its greenfield session to its cross-cutting session.</p>
+    <div class="mode-ledger" aria-label="Workflow operating modes">
+      <article class="mode-card">
+        <span class="micro-label">OPERATE / FIXED ASSIGNMENT</span>
+        <div class="mode-value">1 cell</div>
+        <strong>Execute the selected workflow.</strong>
+        <p>Model, condition, policy, and constraints each have one active value.</p>
       </article>
-      <article class="proof-card cyan">
-        <span class="golden-label">Verification / Observed</span>
-        <div class="proof-value">~10 / ~120</div>
-        <strong>Verification is a vendor behavior, not a price point.</strong>
-        <p>OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120.</p>
+      <article class="mode-card grid">
+        <span class="micro-label">EXPERIMENT / VARIED FACTORS</span>
+        <div class="mode-value">G cells</div>
+        <strong>Execute controlled variants.</strong>
+        <p>The factor cross-product creates cells; every cell enters the same workflow engine.</p>
       </article>
     </div>
   </div>
 </div></section>
-<div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
+<div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations operating AI workflows at scale, from human-assisted engineering sessions to bounded autonomous pipelines. The current evidence is drawn from Python/Flask REST APIs and TypeScript/Node.js; validate the <a href="methodology.html" style="color:var(--ac)">instrument</a> in other domains before adopting its policy candidates.</div>
 
 <!-- ARCHITECTURE: Inline source keeps the system map theme-aware, printable, and dependency-free. -->
 <section class="fsec architecture-section"><div class="inr wide">
   <div class="architecture-intro">
     <div>
-      <div class="section-kicker">WHY &rarr; HOW &rarr; WHAT / SYSTEM MAP</div>
-      <h2>The information-acquisition machine.</h2>
+      <div class="section-kicker">WORKFLOW COMPILER / OPERATING MODES</div>
+      <h2>One execution engine,<br>from cell to campaign.</h2>
     </div>
-    <p class="lead">The ledger makes an unmeasured gap visible. Measurement rules turn events into information. Only then can control rules become policy arms that are tested, compared, and adapted.</p>
+    <p class="lead">A fixed assignment produces one workflow cell. Factor levels produce a grid of cells. Both compile into the same jobs and attempts; only the grid adds cross-arm comparison and adaptation.</p>
   </div>
-  <figure class="architecture-figure" id="architecture">
+  <figure class="system-figure" id="architecture" aria-labelledby="engine-title">
+    <div class="mode-entry-grid">
+      <article class="mode-entry">
+        <span class="micro-label">OPERATE</span>
+        <strong>Fixed factor assignment &rarr; 1 cell</strong>
+        <p>Run the workflow with one selected model, condition, policy, seed, and set of constraints.</p>
+      </article>
+      <article class="mode-entry experiment">
+        <span class="micro-label">EXPERIMENT</span>
+        <strong>Factor levels &rarr; G cells</strong>
+        <p>Expand the same workflow across the product of active factor levels. Each assignment is one controlled cell.</p>
+      </article>
+    </div>
+    <div class="merge-label" id="engine-title">same execution engine</div>
+    <ol class="process-row" aria-label="Shared workflow execution stages">
+      <li class="process-step"><span>01 / DECLARE</span><strong>Cell</strong><p>Workflow, factor assignment, instrumentation, budget, and deadline.</p></li>
+      <li class="process-step"><span>02 / ORDER</span><strong>Compile</strong><p>Validate dependencies and produce the executable DAG.</p></li>
+      <li class="process-step"><span>03 / CONTROL</span><strong>Jobs</strong><p>Materialize work with a policy arm and operating limits.</p></li>
+      <li class="process-step"><span>04 / EXECUTE</span><strong>Attempts</strong><p>Model calls, tools, retries, timing, tokens, and outcomes.</p></li>
+      <li class="process-step"><span>05 / RECORD</span><strong>Ledger</strong><p>Append-only events shared by operations and experiments.</p></li>
+    </ol>
+    <div class="system-planes">
+      <article class="system-plane"><strong>OBSERVE / MEASUREMENT</strong><p>Measurement rules turn ledger fields into named information: first-pass quality, cost, grit, uncertainty, and value.</p></article>
+      <article class="system-plane"><strong>CONTROL / POLICY</strong><p>Control rules consume available information to route, retry, escalate, budget, or halt work inside the running workflow.</p></article>
+      <article class="system-plane"><strong>LEARN / CAMPAIGN</strong><p>When G &gt; 1, compare policy arms, change one factor, and emit the next grid. The winning arm is already executable.</p></article>
+    </div>
+    <figcaption>A production workflow is one cell. An experiment is a controlled grid of those same cells. A campaign uses their evidence to revise the next workflow policy.</figcaption>
+  </figure>
+  <div class="scale-band" aria-labelledby="scale-title">
+    <div class="scale-formula" id="scale-title"><span>G</span> &times; <span>N</span> &times; <span>M</span> = instrumented evidence surface</div>
+    <div class="scale-grid">
+      <article class="scale-cell"><strong>G</strong><p>Grid breadth: the product of active factor levels, such as model &times; condition &times; policy &times; seed.</p></article>
+      <article class="scale-cell"><strong>N</strong><p>Workflow depth: linked sessions or stages whose accumulated effects must remain visible.</p></article>
+      <article class="scale-cell"><strong>M</strong><p>Measurement breadth: independent angles applied to each stage, from correctness to cost and recovery.</p></article>
+      <article class="scale-cell"><strong>G&times;N&times;M</strong><p>Adding a factor level multiplies cells; adding a stage or measurement expands every cell.</p></article>
+    </div>
+  </div>
+  <figure class="architecture-figure" hidden aria-hidden="true">
     <div class="architecture-scroll" tabindex="0" aria-label="Scrollable architecture diagram">
 <svg class="architecture-map" xmlns="http://www.w3.org/2000/svg"
      viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid meet"
@@ -362,19 +429,54 @@
     </div>
     <figcaption>Events are not policy. Measurement creates the information that makes a policy arm writable, comparable, and adaptable.</figcaption>
   </figure>
-  <ol class="architecture-text" aria-label="Architecture diagram text equivalent">
-    <li><strong>1 / SPECIFY AND EXECUTE</strong>ExperimentSpec records the question, workflow, factors, and rules. Compilation orders a DAG; factor cells become jobs and attempts.</li>
-    <li><strong>2 / RECORD AND MEASURE</strong>Attempts emit append-only ledger events. Declared measurement rules derive named information from those fields.</li>
-    <li><strong>3 / GATE AND COMPARE</strong>A control rule is writable only when its required information was produced. Policy then enters a grid as a testable arm.</li>
-    <li><strong>4 / CAMPAIGN AND ADAPT</strong>Compare cost, quality, latency, SLA, and value; repeat the grid as a campaign; change one variable in the next specification.</li>
+  <ol class="architecture-text" aria-label="Shared engine summary">
+    <li><strong>1 / SELECT OR VARY</strong>Fixed factors produce one cell. Varied factors produce G cells without changing the workflow executor.</li>
+    <li><strong>2 / EXECUTE AND RECORD</strong>Every cell becomes jobs and attempts that emit append-only events to the same ledger.</li>
+    <li><strong>3 / MEASURE AND CONTROL</strong>Measurement rules produce information. Admissible control rules consume it inside the running workflow.</li>
+    <li><strong>4 / COMPARE AND ADAPT</strong>Grids compare arms. Campaigns alter one factor and run the next evidence-acquisition pass.</li>
   </ol>
+</div></section>
+
+<!-- AUTONOMY: authority is explicit rather than implied by an unsupervised job label. -->
+<section class="fsec autonomy-section" id="autonomy"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker kicker-what">AUTHORITY / HUMAN CONTROL POINTS</div>
+      <h2>Autonomy is bounded,<br>not human-free.</h2>
+    </div>
+    <p class="lead">The agent may operate the workflow, but people define its objective, information requirements, policy, budget, and intervention conditions. Exceptions cross the boundary; routine work does not.</p>
+  </div>
+  <figure class="authority-map" aria-labelledby="authority-title">
+    <div class="human-plane">
+      <strong id="authority-title">HUMAN CONTROL PLANE</strong>
+      <p>Set objectives and specifications &middot; approve policy arms &middot; allocate budgets &middot; define acceptance and escalation thresholds &middot; review exceptions</p>
+    </div>
+    <div class="authority-connector">authorize &darr; &nbsp; &nbsp; evidence and exceptions &uarr;</div>
+    <div class="bounded-zone">
+      <div class="zone-head"><strong>BOUNDED AUTONOMOUS WORKFLOW</strong><span>policy acts only inside declared limits</span></div>
+      <ol class="autonomy-process" aria-label="Autonomous workflow stages">
+        <li>Admit</li><li>Route</li><li>Execute</li><li>Verify</li><li>Retry</li><li>Escalate</li>
+      </ol>
+      <div class="constraint-rail" aria-label="Enforced workflow constraints"><span>budget</span><span>deadline</span><span>quality</span><span>SLA</span><span>attempt limit</span><span>required information</span></div>
+    </div>
+    <div class="authority-outputs">
+      <article class="authority-output"><strong>Accepted outcome &rarr; downstream system</strong><p>Verified routine work continues without waiting for per-action human approval.</p></article>
+      <article class="authority-output exception"><strong>Exception &rarr; human adjudication</strong><p>Policy uncertainty, exhausted budgets, failed verification, and material risk leave the autonomous boundary.</p></article>
+    </div>
+    <div class="autonomy-levels" aria-label="Autonomy policy levels">
+      <article class="autonomy-level"><strong>Assisted</strong><p>The agent proposes work; a person approves consequential actions.</p></article>
+      <article class="autonomy-level"><strong>Supervised</strong><p>The agent executes routine work; a person reviews outcomes and exceptions.</p></article>
+      <article class="autonomy-level current"><strong>Bounded autonomous</strong><p>The policy routes, retries, and escalates inside explicit limits; people govern the boundary.</p></article>
+    </div>
+    <figcaption class="authority-caption"><strong>Human involvement is itself a policy factor.</strong> A grid can compare approval points, intervention thresholds, escalation routes, and autonomy levels using the same workflow engine above.</figcaption>
+  </figure>
 </div></section>
 
 <!-- SECTION: The Levers -->
 <section class="fsec" id="levers"><div class="inr wide">
-<div class="section-kicker">HOW / MEASURED AND MODELED INPUTS</div>
+<div class="section-kicker">ECONOMIC INPUTS / MEASURED AND MODELED</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
-<p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
+<p class="lead">Observed cost, outcome, and narration fields come from 227 experiment worktrees. Retry rate is a workload input until the attempt ledger measures it directly. Modeling parameters (&beta;, EPM) are calibrated to your codebase and energy market. Separating observations, controls, and assumptions is the difference between deterministic budgeting and surprise overruns.</p>
 <div class="lever-console">
   <article class="lever-lane">
     <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
@@ -390,12 +492,12 @@
     </div>
   </article>
   <article class="lever-lane autonomous">
-    <div class="lane-head"><h3>Autonomous Workloads (Rules 6&ndash;9)</h3><span>unsupervised / per job</span></div>
-    <p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
+    <div class="lane-head"><h3>Autonomous Workloads (Rules 6&ndash;9)</h3><span>bounded autonomy / per job</span></div>
+    <p class="lead" style="font-size:0.85rem">These drive the bounded autonomous cost model. Routine jobs run inside the declared policy; failed verification, exhausted limits, and material uncertainty return to the human control plane above.</p>
     <div class="params">
       <div class="param autonomous"><div class="psym">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div><div class="lever-meta"><span>Observed</span><span>Two-way route</span></div></div>
       <div class="param modeled"><div class="psym">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div><div class="lever-meta"><span>Controlled</span><span>Autonomous door</span></div></div>
-      <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 249 sessions. Drives the retry penalty R(r, E&#8340;).</div><div class="lever-meta"><span>Measured</span><span>Escalation gate</span></div></div>
+      <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and require another attempt or escalation. The calculator begins with an 11.5% scenario; replace it with your attempt-ledger rate before making a policy decision.</div><div class="lever-meta"><span>Scenario input</span><span>Escalation gate</span></div></div>
       <div class="param modeled"><div class="psym">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div><div class="lever-meta"><span>Modeled</span><span>Autonomous door</span></div></div>
       <div class="param modeled"><div class="psym">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div><div class="lever-meta"><span>Controlled</span><span>Budget ceiling</span></div></div>
       <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div><div class="lever-meta"><span>Modeled</span><span>One-way horizon</span></div></div>
@@ -418,13 +520,13 @@
 
 <!-- SECTION: The Cost Model -->
 <section class="fsec" id="cost-model"><div class="inr wide">
-<div class="section-kicker">HOW / COST MODEL</div>
+<div class="section-kicker">ECONOMICS / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
 <p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
 <div class="cost-station">
   <div class="formula-rail">
     <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
-    <article class="formula-plate autonomous"><strong>Autonomous Workloads <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span></strong>C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>C<sub>auto</sub> = W&times;C<sub>job</sub><br>T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br><span style="color:var(--t3);font-size:0.7em">r=0.115&rarr;WOC=<span data-stat-fmt="woc">0.90</span> &middot; E&#8340;=28.2&times;</span><span class="formula-controls">Controls: C&#8320; / b / r / E&#8340; / W</span></article>
+    <article class="formula-plate autonomous"><strong>Autonomous Workloads <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span></strong>C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>C<sub>auto</sub> = W&times;C<sub>job</sub><br>T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br><span style="color:var(--t3);font-size:0.7em">Example: r=0.115&rarr;WOC=0.90 &middot; E&#8340;=28.2&times;</span><span class="formula-controls">Controls: C&#8320; / b / r / E&#8340; / W</span></article>
     <article class="formula-plate value"><strong>Business Value Index <span style="color:var(--t3);font-size:0.7em">(Rule 10)</span></strong>BVI = WOC/(C<sub>job</sub>+H/W)<br><span style="color:var(--t3)">= successful outcomes per total dollar</span><br>C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H<span class="formula-controls">Controls: WOC / C<sub>job</sub> / H / W</span></article>
   </div>
   <div class="plot-panel">
@@ -444,14 +546,14 @@
     <p class="note">Baseline projections at IEA EPM (1.6%/yr). Use 3yr for quarterly budgeting. Use 10yr for strategic planning. Toggle to DS Scenarios for aggressive (2.5%) and optimistic (0.8%) energy paths. Operationalizes the <strong style="color:var(--am)">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
   </div>
 </div>
-<div class="stats cost-receipts"><div class="stat"><div class="v">—</div><div class="l">DS Monthly Cost</div><div class="s">Use calculator above — &beta;·v·N&sup2; depends on your inputs</div></div><div class="stat"><div class="v amber">—</div><div class="l">Claude Monthly Cost</div><div class="s">Use calculator above — same team, same output</div></div><div class="stat"><div class="v">1.6%</div><div class="l">EPM Annual Rate</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">2.5%</div><div class="l">Aggressive Scenario</div><div class="s">Toggle on chart to compare</div></div><div class="stat"><div class="v" style="color:var(--cy)">~667K</div><div class="l">Max Jobs/Day</div><div class="s">$10K budget, $0.015/job (no retry/batch)</div></div><div class="stat"><div class="v amber" data-stat="woc_percent">90%</div><div class="l">WOC Ratio</div><div class="s">Calculated: 1/(1+0.115)</div></div></div>
+<div class="stats cost-receipts"><div class="stat"><div class="v">—</div><div class="l">DS Monthly Cost</div><div class="s">Use calculator above — &beta;·v·N&sup2; depends on your inputs</div></div><div class="stat"><div class="v amber">—</div><div class="l">Claude Monthly Cost</div><div class="s">Use calculator above — same team, same output</div></div><div class="stat"><div class="v">1.6%</div><div class="l">EPM Annual Rate</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">2.5%</div><div class="l">Aggressive Scenario</div><div class="s">Toggle on chart to compare</div></div><div class="stat"><div class="v" style="color:var(--cy)">~667K</div><div class="l">Max Jobs/Day</div><div class="s">$10K budget, $0.015/job (no retry/batch)</div></div><div class="stat"><div class="v amber">90%</div><div class="l">Example WOC Ratio</div><div class="s">Scenario: 1/(1+0.115)</div></div></div>
 </div></section>
 
 <!-- SECTION: Interactive Calculator -->
 <section class="fsec" id="calculator"><div class="inr wide">
-<div class="section-kicker">HOW / INTERACTIVE WORKBENCH</div>
+<div class="section-kicker">SCENARIO / INTERACTIVE WORKBENCH</div>
 <h2>Turn the equation into<br>your quarterly budget.</h2>
-<p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for unsupervised batch processing. Every adjustment recalculates your projected spend in real time.</p>
+<p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for jobs operating inside declared policy limits. Every adjustment recalculates your projected spend in real time.</p>
 <div class="framework-workbench">
   <div class="calc-mode" aria-label="Calculator mode">
     <button id="btnAugmented" onclick="setCalcMode('augmented')" style="background:var(--ac);color:#09090b;border:none" aria-pressed="true" aria-controls="calcAugmented">Augmented Workforce</button>
@@ -467,7 +569,7 @@
       </div>
       <div id="calcAutonomous" style="display:none">
         <div class="row"><div><label>Workload <span class="val" id="v_workload">5,000</span> jobs/day</label><input type="range" min="100" max="100000" value="5000" oninput="updateROI()" id="r_workload"></div><div><label>Batch Fraction <span class="val" id="v_batch">70</span>%</label><input type="range" min="0" max="100" value="70" oninput="updateROI()" id="r_batch"></div></div>
-        <div class="row"><div><label>Retry Rate <span class="val" id="v_retry">11.5</span>% (measured)</label><input type="range" min="0" max="100" value="11.5" step="0.1" oninput="updateROI()" id="r_retry"></div><div><label>Escalation Tier <span class="val" id="v_escalation">DeepSeek &rarr; GPT-5.6 (28.2&times;)</span></label><input type="range" min="1" max="4" value="2" oninput="updateROI()" id="r_escalation"></div></div>
+        <div class="row"><div><label>Retry Rate <span class="val" id="v_retry">11.5</span>% (scenario)</label><input type="range" min="0" max="100" value="11.5" step="0.1" oninput="updateROI()" id="r_retry"></div><div><label>Escalation Tier <span class="val" id="v_escalation">DeepSeek &rarr; GPT-5.6 (28.2&times;)</span></label><input type="range" min="1" max="4" value="2" oninput="updateROI()" id="r_escalation"></div></div>
         <div class="row"><div><label>Baseline Cost / Job <span class="val" id="v_ac0">$0.015</span></label><input type="range" min="1" max="200" value="15" oninput="updateROI()" id="r_ac0"></div><div><label>EPM Annual Rate <span class="val" id="v_arate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_arate"></div></div>
       </div>
     </div>
@@ -483,15 +585,15 @@
 
 <!-- SECTION: Decision Framework -->
 <section class="fsec" id="decisions"><div class="inr">
-<div class="section-kicker kicker-what">WHAT / POLICY DECISIONS</div>
+<div class="section-kicker kicker-what">CONTROL / POLICY BOUNDARIES</div>
 <h2>Test reversible choices.<br>Model durable commitments.</h2>
 <div class="doors">
 <article class="door-card tw"><div class="door-symbol" aria-hidden="true">&olarr;</div><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p class="door-footer">Experiment. Measure. Iterate.</p></article>
 <article class="door-card ow"><div class="door-symbol" aria-hidden="true">&#x21E5;</div><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:var(--am)">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting provider default architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p class="door-footer">Model cumulative cost. Project 36 months.</p></article>
-<article class="door-card autonomous"><div class="door-symbol" aria-hidden="true">&#x2442;</div><h3>Autonomous Doors</h3><p>Decisions affecting <strong style="color:var(--cy)">batch routing, escalation chains, and SLA windows</strong>. Commit your autonomous workforce architecture for years.</p><ul><li>Batch vs on-demand workstream split</li><li>Escalation cascade design (which model when)</li><li>WOC ratio targets and retry budgets</li></ul><p class="door-footer">Design for &lt;1% human escalation. Measure WOC daily.</p></article>
+<article class="door-card autonomous"><div class="door-symbol" aria-hidden="true">&#x2442;</div><h3>Autonomous Doors</h3><p>Decisions affecting <strong style="color:var(--cy)">batch routing, escalation chains, and SLA windows</strong>. Commit your autonomous workforce architecture for years.</p><ul><li>Batch vs on-demand workstream split</li><li>Escalation cascade design (which model when)</li><li>First-pass targets and retry budgets</li></ul><p class="door-footer">Bound human escalation. Measure first-pass acceptance daily.</p></article>
 </div>
 <div class="door-caption"><strong style="color:var(--cy)">policy = a factor level / arm</strong><span>Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</span></div>
-<p class="golden-label" style="margin:1.25rem 0 0;text-align:left">30-day implementation:</p>
+<p class="micro-label" style="margin:1.25rem 0 0;text-align:left">30-day implementation:</p>
 <div class="implementation-strip" aria-label="30-day implementation">
   <div class="implementation-step">Classify tasks by complexity.</div><div class="implementation-step">Default-route constrained tasks to silent models.</div><div class="implementation-step">Establish verification gates and escalation paths.</div><div class="implementation-step">Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
 </div>
@@ -499,7 +601,7 @@
 
 <!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr wide">
-  <div class="section-kicker kicker-what">WHAT / PROPOSED CONTROL RULES</div>
+  <div class="section-kicker kicker-what">POLICY / PROPOSED CONTROL RULES</div>
   <h2>Turn observed patterns into<br>policy arms to test.</h2>
   <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
   <div class="rule-groups">
@@ -508,7 +610,7 @@
       <div class="rules-grid">
         <div class="rule" id="rule-1"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation — producing zero code despite high token output — it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across three perturbation classes: specification corruption, objective mutation, and process perturbation.<span class="rm">Concept: Grit (Ground-Truth Integrity) · Lever: C₀</span></div></div>
         <div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions). Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
-        <div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
+        <div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the accepted outcome, not the prompt. A cheaper model can lose its price advantage through failed verification, retries, and escalation. Derive first-pass quality from attempt number, acceptance, and an independent evaluator; then track it by task type, model, policy, and time window. Do not substitute a narrated report failure rate for an attempt-ledger measurement.<span class="rm">Concept: Cost-Per-Accepted-Outcome / First-Pass &middot; Lever: P, retry rate</span></div></div>
       </div>
     </section>
     <section class="rule-group" aria-labelledby="economics-rules">
@@ -534,7 +636,7 @@
 
 <!-- SECTION: Provider Playbook -->
 <section class="fsec" id="playbook"><div class="inr wide">
-<div class="section-kicker kicker-what">WHAT / CANDIDATE POLICY ARMS</div>
+<div class="section-kicker kicker-what">CONTROL / CANDIDATE POLICY ARMS</div>
 <h2>Map provider choices to<br>cost and verification hypotheses.</h2>
 <p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
 <div class="policy-map" aria-label="Policy tactics mapped to framework rules">
@@ -618,7 +720,7 @@
 
 <!-- SECTION: Model Cards -->
 <section class="fsec evidence-handoff" id="model-cards"><div class="inr">
-  <div class="section-kicker kicker-what">WHAT / MODEL CARDS</div>
+  <div class="section-kicker kicker-what">EVIDENCE / MODEL CARDS</div>
   <h2>Narration flail rates 6–50% across models.<br>See detailed model profiles &rarr;</h2>
   <div class="callout-box" style="margin-top:1rem"><a href="evidence.html" class="cta-btn">View Detailed Model Profiles →</a></div>
   <p class="note">All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
@@ -688,6 +790,11 @@ document.addEventListener('DOMContentLoaded',function(){
   // Anchor controls retain their href contract, so this listener supplies button-like group state without replacing them.
   [['yr3','yr10','yr25'],['epmBase','epmSens'],['vwCost','vwThroughput']].forEach(function(group){
     group.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('click',function(){group.forEach(function(peer){document.getElementById(peer).setAttribute('aria-pressed',peer===id)});if(id==='vwCost'||id==='vwThroughput')updateChartToggle(id,id==='vwCost'?'vwThroughput':'vwCost')})});
+  });
+  document.getElementById('vwThroughput').addEventListener('click',function(){
+    if(!chart||!chart.data||chart.data.datasets.length!==3)return;
+    ['r=5% scenario','r=11.5% scenario','r=11.4% scenario'].forEach(function(label,index){chart.data.datasets[index].label=label});
+    chart.update();
   });
 });
 </script>
