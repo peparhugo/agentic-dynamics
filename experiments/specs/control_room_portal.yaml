@@ -1,6 +1,6 @@
 name: control_room_portal
 question: "Does the agent_task workflow produce a working, measured enhancement to the control plane?"
-version: "0.1"
+version: "0.2"
 workflow:
   kind: agent_task
   params:
@@ -10,23 +10,76 @@ workflow:
         kind: agent
         prompt: |
           Write docs/scope.md scoping the following feature.
-          Goal: {goal}
-          Ground the scope in the existing code (admin/server.py, admin/static/). Do not invent new infrastructure.
-          Deliver exactly one file: docs/scope.md containing problem, constraints, and a concrete acceptance list.
+
+          GOAL:
+          {goal}
+
+          EXISTING SYSTEM — scope against this, do not redesign it:
+          - Backend admin/server.py (Flask, 194 lines). Endpoints:
+              GET  /api/matrix            -> {total, remaining_in_queue, queued, running, done, failed, timeout, completed, results_saved, cells: {cell_id: status}}
+              GET  /api/status            -> SSE stream of status transitions, each {cell_id, status}
+              GET  /api/events/<cell_id>  -> SSE stream: replays the events_log:<cell_id> list, then live events:<cell_id> channel
+              GET  /api/routing           -> routing-board JSON
+              POST /api/experiments       -> enqueue/clear the experiment queue
+              GET  /                      -> static dashboard (admin/static/)
+          - Redis (port 6380, db 1): story_jobs (queue), story_results (hash), story_status (hash cell_id->status),
+            status (pub/sub channel), events:<cell_id> (channel), events_log:<cell_id> (list, capped 500).
+          - Frontend admin/static/ (index.html + app.js ~219 lines vanilla JS + style.css). Three nav-switched
+            views today: matrix grid, cell inspector (live transcript), routing board. SSE-driven.
+
+          CONSTRAINTS:
+          - Keep the Flask SSE backend and the Redis keys intact. No new infrastructure, services, or build steps.
+          - Frontend is vanilla JS/HTML/CSS unless an already-installed dependency covers the need.
+
+          DELIVER exactly one file, docs/scope.md, with: (1) problem statement, (2) constraints, (3) a numbered
+          acceptance list that the implement phase can check off and the verify phase can test.
       - name: ux_design
         kind: agent
         prompt: |
-          Write docs/ux.md designing the user experience for: {goal}
-          Prior phases: {prior_phases}
-          Reference the existing admin/static/ (index.html, app.js, style.css).
-          Deliver exactly one file: docs/ux.md with layout, interaction flow, and visual language.
+          Write docs/ux.md designing the user experience for:
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          GROUNDING:
+          - Current frontend is admin/static/ (index.html + app.js + style.css): three nav-switched views
+            (matrix, cell inspector, routing) updated over SSE.
+          - The subject is AI FinOps: cost is the protagonist, not a footnote. Per-cell live telemetry
+            (status transitions + a stream of tool events) is already available over SSE.
+
+          DESIGN INTENT — make it genuinely interesting, not a dashboard of tables:
+          - A single-screen "mission-control" feel, with a live spend/burn-rate ticker up top.
+          - Cells as stateful, pulsing cards (queued -> running -> done/failed/timeout), each with a
+            token-cost sparkline.
+          - The selected cell's event stream as a terminal-style feed (the agent "thinking out loud"),
+            not a raw JSON dump.
+          - A control pane that connects to a running opencode session (or sits over the opencode web
+            server) so the operator can watch — and optionally steer — on the same surface as telemetry.
+            No iframes.
+
+          DELIVER exactly one file, docs/ux.md, with: (1) layout/screen map, (2) interaction flow,
+          (3) visual language (color, motion, typography), (4) which SSE endpoint feeds which element.
       - name: implement
         kind: agent
         prompt: |
           Implement the feature per docs/scope.md and docs/ux.md.
-          Goal: {goal}
-          Prior phases: {prior_phases}
-          Modify admin/ only. Keep the Flask SSE backend and Redis keys intact. Add tests.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Modify admin/ only. Keep the Flask backend contract and Redis keys intact; add new endpoints
+            only if strictly required and backwards-compatible.
+          - Frontend is vanilla JS/HTML/CSS in admin/static/. No build step, no new runtime dependencies.
+          - Add tests for any backend change; they must run under pytest.
+
+          DELIVER working code + tests. The verify phase runs pytest in this repository.
       - name: verify
         kind: test
 factors:
