@@ -225,7 +225,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="tbl"><table><thead><tr><th>Model</th><th>Reports</th><th>Avg Cost</th><th>95% CI</th><th>Total Cost</th><th>Correctness</th><th>Strategy</th></tr></thead><tbody id="cost-ranking-tbody">
 <tr id="no-data-row"><td colspan="7" class="t3">Loading data...</td></tr>
 </tbody></table></div>
-<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.06) while producing 1.26&times; more code (713 vs 568 LOC). Total Claude spend (<span class="tip" title="[M] Total spend across all 47 sessions including 5 narration-failure runs and 3 sessions without game reports.">$47.54</span>) exceeds all other models combined. Correctness data is from actual pytest/jest execution — <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall across 1572/1772 tests</span>. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
+<div class="insight"><strong>Key insight:</strong> DeepSeek costs 1/69th of Claude per session on average ($0.016 vs $1.085) while producing 1.24&times; more code (706 vs 568 LOC). Total Claude spend (<span class="tip" title="[M] Total spend across all 47 sessions including 5 narration-failure runs and 3 sessions without game reports.">$47.54</span>) exceeds all other models combined. Correctness data is from actual pytest/jest execution — <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall across 1572/1772 tests</span>. <strong>Cost per working outcome = C(K/P, v) / K, where P is pass rate.</strong></div>
 <div class="insight"><strong>Key insight:</strong> Experiment worktrees only — no personal sessions. Some model families show lower reasoning-token ratios (observed pattern; the causal mechanism — whether GRPO architecture, provider-side caching, or other factors — is not confirmed by this experiment). GPT-5-nano is the only model producing more reasoning tokens than output (1.01 ratio). 204/249 sessions analyzed with game reports — 26 narration failures, 19 unanalyzed.</div>
 
 <div class="insight"><strong>The Cache Tax:</strong> Claude writes 20,000 tokens to cache per session at $3.75/Mtok. DeepSeek writes zero — instead reads 197,000 tokens from cache at $0.14/Mtok. Same context management capability. <strong style="color:var(--am)">26.8&times; pricing difference.</strong> Cache strategy is a two-way door. Measure your hit rate. If under 50%, use cache-read. If over 80%, cache-write pays for itself.</div>
@@ -321,13 +321,13 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <!-- Cross-Model Rollup -->
 <section class="sec alt">
 <h3 id="cross-model-rollup">Cross-Model Rollup</h3>
-<p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.26&times; more code per session at 1/69th the cost of Claude. <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall test pass rate (1572/1772 tests)</span> from real pytest/jest execution.</p>
+<p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.24&times; more code per session at 1/69th the cost of Claude. <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall test pass rate (1572/1772 tests)</span> from real pytest/jest execution.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody id="rollup-tbody">
-<tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.45</td><td class="mono amber">$1.06</td><td class="mono">$0.29</td></tr>
-<tr><td>Test pass rate</td><td class="mono green">87%</td><td class="mono green">100%</td><td class="mono green">100%</td><td class="mono green">93%</td></tr>
-<tr><td>Avg thinking ratio</td><td class="mono green">8.2%</td><td class="mono">6.4%</td><td class="mono amber">0.0%</td><td class="mono">6.3%</td></tr>
-<tr><td>Avg LOC/session</td><td class="mono green">700</td><td class="mono">367</td><td class="mono">554</td><td class="mono">573</td></tr>
-<tr><td>Constraint score</td><td class="mono green">50%</td><td class="mono">71%</td><td class="mono">39%</td><td class="mono">47%</td></tr>
+<tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.257</td><td class="mono amber">$1.085</td><td class="mono">$0.287</td></tr>
+<tr><td>Test pass rate</td><td class="mono green">84%</td><td class="mono green">97%</td><td class="mono green">99%</td><td class="mono green">89%</td></tr>
+<tr><td>Avg thinking ratio</td><td class="mono green">8.7%</td><td class="mono">8.1%</td><td class="mono amber">0.0%</td><td class="mono">6.8%</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green">706</td><td class="mono">323</td><td class="mono">568</td><td class="mono">578</td></tr>
+<tr><td>Constraint score</td><td class="mono green">48%</td><td class="mono">49%</td><td class="mono">39%</td><td class="mono">47%</td></tr>
 </tbody></table></div>
 <div class="insight">These per-session averages from <span data-stat="reports">224</span> game reports are the most robust metric. The <span title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; gap</span> is the measured average across the full corpus — not the architectural extreme, not a cherry-picked single run.</div>
 
