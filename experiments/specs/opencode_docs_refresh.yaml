@@ -1,0 +1,274 @@
+name: opencode_docs_refresh
+question: "Can the opencode documentation (.opencode/*.md, AGENTS.md, CONTEXT.md files, opencode.json, and tools) be brought current with the code — and then ported to the Claude Code/CLI file taxonomy?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Investigate and inventory the drift between the opencode documentation and the actual
+          code, and write docs/opencode_docs_scope.md.
+
+          GOAL:
+          {goal}
+
+          CONTEXT — the code has outrun the docs. The drift inventory below is a STARTING
+          HYPOTHESIS to VERIFY against the actual files — read them, confirm or correct each
+          line, and fill in anything missed. Do not trust it blind.
+
+          KNOWN DRIFT (verify each):
+          - The spec/compiler is WRITTEN, not proposed: src/instrument/compile_experiment.py
+            (~376L) + experiment_spec.py (~446L) + tests/test_compile_experiment.py +
+            tests/test_experiment_spec.py all exist. But AGENTS.md, .opencode/instructions/
+            mental-model.md, all 3 agents, all 3 skills, all 5 commands, conventions.md, and
+            all 4 CONTEXT.md files call compile_experiment.py "proposed / not yet in the repo".
+          - New modules unmentioned anywhere: supervisor.py, workflow_runner.py, test_runner.py,
+            streaming.py, recovery_cost.py, constraint_detection.py, semantic_validation.py.
+          - New Control Room / supervisor subsystem: admin/ (claude_agents_client.py,
+            opencode_client.py, design_sessions.py, static/control-room-core.js) + scripts/
+            supervise.py, run_workflow.py, claude_agents_supervisor.py — absent from every doc.
+          - experiments/specs/ has 11 real specs (agentic_dynamics_story, claude_background_sessions,
+            code_review, control_room_portal, design_sessions, evidence_narrative, evidence_redesign,
+            fix_review_findings, framework_facelift, site_golden_circle, supervisor_control_room);
+            experiments/CONTEXT.md calls the dir "proposed" and names a flagship routing_regret.yaml
+            that does not exist.
+          - Script map stale: ~80 scripts now; mental-model.md lists ~19. Missing from all docs:
+            run_workflow.py, supervise.py, claude_agents_supervisor.py, analysis_worker.py,
+            analyze_stories.py, enqueue_analysis.py, enqueue_reviews.py, finalize_reviews.py,
+            review_worker.py, trigger_reviews.py, recover_stories.py, batch_stories.py,
+            batch_run.py, sweep_silent_mode.py, finish_sweep.py, remaining_batch.py,
+            multi_phase.py, backfill_costs.py, backfill_deep_metrics.py, backfill_story_artifacts.py,
+            compute_sonar_deltas.py, embed_sessions.py, rescore_conventions.py, verify_tests.py.
+          - PROVIDER_PRICING keys (efficiency.py) are now: deepseek, deepseek-flash, anthropic,
+            anthropic-haiku, openai, openai-luna, openai-sol, openai-terra. The instrument skill
+            lists a nonexistent "anthropic-sonnet5" and omits the new keys.
+          - BUILTIN_STORIES keys (story.py) are task_manager_api / static_site_gen /
+            notification_service; conventions.md + the instrument skill say task_manager_story etc.
+          - run_story.py supports 4 conditions (clean, bad_seed, early_degrade, late_degrade);
+            the .opencode/tools/run_story.ts enum has only 3 (missing late_degrade) and omits the
+            backend/codebase/worktree-root/results-dir/output-limit/standardize flags.
+          - experiments/configs/plans.yaml has 6 plans (ci, deploy, full_matrix, cross_models,
+            feature, ship_features); the pipeline tool + docs list 5, missing cross_models.
+          - 19 active lab books; the /lab command lists 13 and the lab-books skill description
+            says 14.
+          - 40 test files; mental-model.md lists ~28 (missing test_compile_experiment,
+            test_experiment_spec, test_workflow_runner, test_supervise, test_admin_* (6),
+            test_claude_agents_* (2)).
+          - opencode.json small_model is "deepseek/deepseek-chat" and all 3 agents use
+            model: deepseek/deepseek-chat; the current cheap model is deepseek/deepseek-v4-flash.
+          - AGENTS.md self-contradicts (load-bearing-rule line says "compiler written" while the
+            key-files line says "still proposed").
+          - .opencode/tools/enqueue.ts does not expose --model or --missing-only (both documented).
+          - STILL PENDING (do NOT mark as done): the instrumentation step 3 gap — confidence,
+            answer/explanation token split, attempt/timestamp fields, perturbation_strength,
+            test_executed_success remain unmeasured (see LEDGER_FIELDS in experiment_spec.py).
+            Only the "compiler is proposed" wording is wrong; the instrumentation wording is still true.
+
+          DOC TAXONOMIES YOU MUST LEARN HERE (you will need both again in the port phase):
+          - OpenCode: https://opencode.ai/docs/ — esp. /docs/agents/, /docs/skills/,
+            /docs/commands/, /docs/config/, /docs/rules/, /docs/custom-tools/, /docs/references/,
+            /docs/mcp-servers/. Note the actual on-disk locations this repo uses: AGENTS.md,
+            .opencode/instructions/*.md, .opencode/agent/*.md, .opencode/command/*.md,
+            .opencode/skill/*/SKILL.md, .opencode/tools/*.ts, opencode.json.
+          - Claude Code: https://code.claude.com/docs/en/cli-reference (and
+            https://code.claude.com/docs/llms.txt for the full page index). Note its taxonomy:
+            CLAUDE.md (memory), .claude/settings.json, .claude/agents/*.md, .claude/commands/*.md,
+            .claude/skills/*/SKILL.md, .mcp.json.
+
+          DELIVER exactly one file, docs/opencode_docs_scope.md:
+          (1) the verified drift inventory, file-by-file (what each doc says vs. what the code is),
+          (2) the opencode file taxonomy as actually used in this repo,
+          (3) the Claude Code file taxonomy (cited from the reference),
+          (4) a numbered acceptance list the build phase can check off and validate can test.
+      - name: challenge
+        kind: agent
+        prompt: |
+          Review the drift inventory and proposed update plan in docs/opencode_docs_scope.md,
+          and write docs/opencode_docs_challenge.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          Treat this as a genuine design review, not a compliance pass:
+          - Where you agree with the proposed updates, say so and why.
+          - Where you disagree, say so explicitly: is a finding wrong? Is a proposed new tool
+            unnecessary or the wrong shape? Is the drift inventory incomplete in a way that
+            changes the plan? Propose a concrete alternative for every disagreement.
+          - Question anything the scope treats as a fact rather than a choice: e.g. should
+            opencode.json small_model change at all without confirming the provider id? Should
+            new tools be one-per-script or should some be folded into existing tools (backfill
+            variants, review variants)? Should the port produce committed Claude Code files or a
+            mapping document only?
+
+          DELIVER exactly one file, docs/opencode_docs_challenge.md:
+          (1) what you agree with and why, (2) each disagreement + a concrete alternative,
+          (3) a one-line recommendation for the spec phase (proceed as scoped, or change course).
+      - name: spec
+        kind: agent
+        prompt: |
+          Write docs/opencode_docs_spec.md — the concrete update + port design — in light of the challenge.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Read docs/opencode_docs_scope.md and docs/opencode_docs_challenge.md; adjudicate every
+            challenge point (adopt / rebut / synthesize) with the decision recorded.
+          - Specify, file by file, the exact edits to: AGENTS.md, .opencode/instructions/
+            mental-model.md + conventions.md, the 3 agents, the 3 skills, the 5 commands, the 4
+            CONTEXT.md files, opencode.json, and the code_reviews design-doc status header.
+          - Specify the new tools to add under .opencode/tools/*.ts (at minimum: run_workflow,
+            compile_experiment, supervisor/control_room, review, analyze_trajectories, sync_data,
+            validate_session, generate_manifest) and the fixes to existing tools (run_story enum +
+            flags, enqueue --model/--missing-only, pipeline cross_models plan, batch description).
+          - Specify the opencode -> Claude Code taxonomy mapping as a TABLE (opencode file/location
+            -> Claude Code file/location -> notes), marking each row verified-against-docs or
+            needs-verification. Flag rows that do NOT port cleanly (e.g. opencode .ts custom tools
+            have no direct Claude Code file equivalent and go via MCP; opencode `references` ->
+            Claude Code permissions.additionalDirectories; opencode `compaction` -> Claude Code
+            /autocompact; opencode lsp/formatter toggles have no direct Claude Code equivalent).
+          - Order the work so the load-bearing files (mental-model.md, AGENTS.md — loaded every
+            session) are fixed first, and so the port phase consumes the already-corrected opencode
+            files rather than the stale ones.
+
+          DELIVER exactly one file, docs/opencode_docs_spec.md:
+          (1) the file-by-file edit plan, (2) the new-tool + tool-fix list, (3) the full
+          opencode->Claude Code mapping table with per-row status, (4) the challenge adjudication
+          table, (5) the acceptance list.
+      - name: build
+        kind: agent
+        prompt: |
+          Execute the updates per docs/opencode_docs_spec.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Fix the load-bearing files first: .opencode/instructions/mental-model.md, then AGENTS.md.
+          - Flip "proposed / not yet in the repo" to "written" ONLY for what is actually written
+            (experiment_spec.py, compile_experiment.py, supervisor.py, workflow_runner.py,
+            test_runner.py). Keep the instrumentation gap (confidence, answer/explanation split,
+            attempt/timestamp, perturbation_strength, test_executed_success) marked as still pending.
+          - Correct the factual drifts: PROVIDER_PRICING keys, BUILTIN_STORIES keys, the 4 story
+            conditions, the 6 plans (incl. cross_models), 19 labs, the real specs/ contents.
+          - Add the new .opencode/tools/*.ts files and fix the existing tool gaps exactly as specced.
+          - Do not change opencode.json's small_model or the agents' model field without confirming
+            the provider id is resolvable (leave a NOTE in the commit if you defer it).
+          - Keep the existing 40-test suite green; add no code that breaks imports.
+          - pytest MUST be given the tests explicitly: run `pytest tests/` (or
+            `pytest tests/test_<module>.py -v`), NEVER bare `pytest` — without a target it wanders
+            into generated dirs like experiments/results and mis-collects anything `test_`-prefixed.
+            (The `validate` phase runs the suite via `test_runner.run_suite`, i.e.
+            `pytest -q . --ignore=experiments/results --ignore=experiments/codebases`.)
+
+          DELIVER working edits across the docs + tools. The validate phase runs pytest in this
+          repository.
+      - name: validate
+        kind: test
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the refresh is complete and self-consistent, and write docs/opencode_docs_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS (report PASS/FAIL for each):
+          - No doc still calls compile_experiment.py "proposed" while the file exists on disk
+            (grep "proposed" across AGENTS.md, .opencode/, scripts/CONTEXT.md, src/instrument/CONTEXT.md,
+            experiments/CONTEXT.md, firebase/CONTEXT.md and triage every hit).
+          - PROVIDER_PRICING keys in the instrument skill match efficiency.py exactly.
+          - BUILTIN_STORIES keys in conventions.md + instrument skill match story.py (task_manager_api,
+            static_site_gen, notification_service).
+          - run_story tool enum lists all 4 conditions; pipeline tool/plan docs list cross_models.
+          - Lab-book counts agree across the /lab command, lab-books skill, and data-analysis agent.
+          - mental-model.md module map + script map cover supervisor.py, workflow_runner.py,
+            test_runner.py, run_workflow.py, supervise.py, and the specs/ dir.
+          - New .opencode/tools/*.ts files reference scripts that actually exist.
+          - pytest is green: run `pytest tests/ -q` with the tests directory EXPLICITLY specified
+            (bare `pytest` mis-collects generated dirs); the validate phase's `test_runner.run_suite`
+            runs `pytest -q . --ignore=experiments/results --ignore=experiments/codebases`.
+
+          DELIVER exactly one file, docs/opencode_docs_verify.md: PASS/FAIL per check + a summary of
+          anything still inconsistent (there should be none).
+      - name: port_to_claude
+        kind: agent
+        prompt: |
+          Port the corrected opencode documentation to the Claude Code/CLI file taxonomy, and write
+          docs/claude_code_port.md as the living "how to port" spec.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          FIRST — become expert in BOTH taxonomies, from the source docs (do not rely on memory):
+          - OpenCode: https://opencode.ai/docs/ — /docs/agents/, /docs/skills/, /docs/commands/,
+            /docs/config/, /docs/rules/, /docs/custom-tools/, /docs/references/, /docs/mcp-servers/.
+            Confirm the repo's actual on-disk locations (AGENTS.md, .opencode/instructions/,
+            .opencode/agent/, .opencode/command/, .opencode/skill/, .opencode/tools/, opencode.json).
+          - Claude Code: https://code.claude.com/docs/en/cli-reference and the full index at
+            https://code.claude.com/docs/llms.txt — then read the memory (CLAUDE.md), skills,
+            sub-agents, slash commands, settings, and MCP pages the index points to. Verify the
+            exact file paths and frontmatter fields against these docs; cite them.
+
+          PORT (working from the ALREADY-CORRECTED opencode files, not the stale ones):
+          1. Start from this draft mapping and VERIFY every row against the docs; correct rows that
+             the current reference contradicts:
+             - AGENTS.md                          -> CLAUDE.md (project memory)
+             - .opencode/instructions/*.md        -> CLAUDE.md @path imports (Claude Code has no
+                                                     instructions/ dir; verify the import syntax)
+             - .opencode/agent/*.md (subagents)   -> .claude/agents/*.md
+             - .opencode/command/*.md             -> .claude/commands/*.md (slash commands)
+             - .opencode/skill/*/SKILL.md         -> .claude/skills/*/SKILL.md
+             - .opencode/tools/*.ts (custom tools)-> NO direct file equivalent; Claude Code custom
+                                                     tools come via MCP servers (.mcp.json) or a
+                                                     plugin. Map each tool to an MCP server or
+                                                     document it as unported.
+             - opencode.json model/small_model    -> model settings / ANTHROPIC_MODEL +
+                                                     ANTHROPIC_SMALL_FAST_MODEL
+             - opencode.json permission           -> .claude/settings.json permissions
+             - opencode.json compaction           -> /autocompact (no config-file parity; document)
+             - opencode.json references           -> .claude/settings.json
+                                                     permissions.additionalDirectories + --add-dir
+             - opencode.json lsp / formatter      -> no direct Claude Code equivalent (document)
+             - opencode.json mcp                  -> .mcp.json (or claude mcp add)
+          2. Produce the actual ported files under .claude/ (CLAUDE.md, skills/, commands/, agents/,
+             settings.json as appropriate) and .mcp.json where a tool maps to an MCP server. Mirror
+             the corrected content, not a paraphrase, adapting only where the taxonomy forces it.
+          3. Do NOT invent capabilities Claude Code lacks (e.g. no opencode-style .ts tool files) —
+             record those as gaps with the Claude-native alternative.
+
+          DELIVER:
+          - docs/claude_code_port.md — the reusable "how to port opencode <-> Claude Code" spec:
+            the verified mapping table (with citations), the does-not-port-cleanly list, and the
+            step-by-step port recipe.
+          - The ported .claude/ files (and .mcp.json if warranted), committed alongside the doc.
+
+          The port doc must be written so a future taxonomy change can be re-ported by following it.
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: verified_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
