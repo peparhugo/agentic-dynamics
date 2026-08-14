@@ -82,15 +82,15 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- SECTION: WHY -->
 <section class="fsec" id="why"><div class="inr">
-<div class="pulse">Why — start here</div>
-<h2>AI costs don't grow linearly.<br>They compound.</h2>
+<div class="pulse">What — from information to policy</div>
+<h2>Measured information becomes<br>testable policy.</h2>
   <p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
 </div></section>
 
 <!-- SECTION: The Ten Rules -->
 <section class="fsec" id="rules"><div class="inr">
-<div class="pulse">What — The Rules</div>
-<h2>Here is how you govern<br>AI costs — and scale your business.</h2>
+<div class="pulse">What — Proposed Control Rules</div>
+<h2>Turn observed patterns into<br>policy arms to test.</h2>
 <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
 <div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
 <div class="rules-grid">
@@ -110,8 +110,8 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- SECTION: The Levers -->
 <section class="fsec" id="levers"><div class="inr wide">
-<div class="pulse">How — The Levers</div>
-<h2>What you control. What compounds.<br>What you must model.</h2>
+<div class="pulse">How — Measured and Modeled Inputs</div>
+<h2>Separate what is measured,<br>controlled, and modeled.</h2>
 <p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
 
 <h3 style="color:var(--ac);margin:1.5rem 0 0.5rem;text-align:center">Augmented Workforce (Rules 1&ndash;5)</h3>
@@ -231,8 +231,8 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <!-- SECTION: Decision Framework -->
 <section class="fsec" id="decisions"><div class="inr">
-<div class="pulse">How — Decision Framework</div>
-<h2>When to move fast.<br>When to model thoroughly.</h2>
+<div class="pulse">What — Policy Arms</div>
+<h2>Test reversible choices.<br>Model durable commitments.</h2>
 <div class="doors">
 <div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
 <div class="door ow"><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:var(--am)">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting provider default architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--am)">Model cumulative cost. Project 36 months.</p></div>
@@ -252,8 +252,8 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <!-- SECTION: Provider Playbook -->
 <section class="fsec" id="playbook"><div class="inr wide">
-<div class="pulse">What — The Provider Playbook</div>
-<h2>How DeepSeek, OpenAI, and Anthropic<br>map to your cost optimization levers.</h2>
+<div class="pulse">What — Candidate Policy Arms</div>
+<h2>Map provider choices to<br>cost and verification hypotheses.</h2>
 <p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
 
 <div class="constraints" style="max-width:750px">
@@ -285,7 +285,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">Two-Way Door</div><div class="pname"><strong>Cache Write vs Read.</strong> Cache writes preserve context but cost $3.75/Mtok (Anthropic). Cache reads retrieve context at $0.14/Mtok (DeepSeek). Measure your cache hit rate. If under 50%, switch to cache-read mode. If over 80%, cache-write pays for itself. Toggle per workstream.</div></div>
 </div>
 
-<h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Model Routing</h3>
+<h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Simulated Model Routing</h3>
 <p class="lead">Routing here isn't a vendor diagram — it's computed. <code style="color:var(--ac)">compute_routing()</code> (in <code>src/instrument/routing.py</code>) reads the experiment corpus, groups sessions by task, and recommends per task a <strong style="color:var(--ac)">default model</strong> (cheapest that clears the correctness threshold) or an <strong style="color:var(--am)">escalation model</strong> (when a higher-correctness model leads by a meaningful margin). It then simulates single-model vs grit-routed strategies across the whole corpus.</p>
 <div class="callout-box" style="margin-top:1rem"><strong>Routing chain:</strong> request &rarr; task classifier &rarr; computed default model &rarr; verification gate &rarr; escalate-on-margin</div>
 <div class="callout-box" style="margin-top:0.5rem;border-color:rgba(34,211,238,0.2);background:rgba(34,211,238,0.02)"><strong style="color:var(--cy)">60–80%</strong> of requests are simple (classification, formatting, lookup). These should never touch a frontier model.</div>
