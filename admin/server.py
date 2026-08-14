@@ -8,6 +8,13 @@ Endpoints:
     GET  /api/events/<cell_id> — SSE stream of a cell's events (replay + live)
     GET  /api/routing          — routing board (Phase 7; stub for now)
     POST /api/experiments      — enqueue/clear the experiment queue
+    GET  /api/claude-agents           — Claude background-session roster (Redis read only)
+    GET  /api/claude-agents/<id>/logs — one-shot log tail for an external session
+    GET  /api/claude-agents/daemon    — read-only `claude daemon status`
+    POST /api/claude-agents           — start a `claude --bg` session
+    POST /api/claude-agents/<id>/stop|respawn|rm — owned-session lifecycle control
+    POST /api/claude-agents/<id>/steer        — interrupt + resume with an adjusted prompt
+    POST /api/claude-agents/daemon/stop          — stop the local claude daemon
     GET  /                    — static dashboard (admin/static)
 
 Run:
@@ -29,6 +36,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -42,6 +50,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from flask import Flask, Response, jsonify, make_response, request
 
+from instrument.claude_adapter import _resolve_claude_model
 from instrument.live import (
     EVENT_CHANNEL_PREFIX,
     EVENT_LOG_MAX,
@@ -59,9 +68,25 @@ from instrument.supervisor import (
 )
 
 try:  # Package imports under pytest and WSGI.
+    from admin.claude_agents_client import (
+        CURSOR_KEY_PREFIX,
+        OWNED_SESSIONS_KEY,
+        ROSTER_KEY,
+        SESSION_ID_PATTERN,
+        ClaudeAgentsClient,
+        ClaudeAgentsError,
+    )
     from admin.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
     from admin.opencode_client import OpenCodeClient, OpenCodeError
 except ModuleNotFoundError:  # pragma: no cover - documented ``python admin/server.py`` launch
+    from claude_agents_client import (
+        CURSOR_KEY_PREFIX,
+        OWNED_SESSIONS_KEY,
+        ROSTER_KEY,
+        SESSION_ID_PATTERN,
+        ClaudeAgentsClient,
+        ClaudeAgentsError,
+    )
     from design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
     from opencode_client import OpenCodeClient, OpenCodeError
 
@@ -73,6 +98,11 @@ RESULTS_KEY = "story_results"
 HEARTBEAT_SECONDS = 15
 MAX_DESIGN_REQUEST_BYTES = 64 * 1024
 MAX_DESIGN_PROMPT_CHARS = 12_000
+MAX_CLAUDE_AGENT_REQUEST_BYTES = 64 * 1024
+MAX_CLAUDE_AGENT_TASK_CHARS = 12_000
+MAX_CLAUDE_AGENT_LOG_BYTES = 64 * 1024
+CLAUDE_AGENT_ADVISORS = {"fable", "opus", "sonnet"}
+CLAUDE_AGENT_ADVISOR_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{2,80}$")
 IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 ROOT = Path(__file__).resolve().parent.parent
 SUPERVISOR_FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
@@ -81,6 +111,7 @@ SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW"
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 _design_manager: DesignSessionManager | None = None
+_claude_agents_client: ClaudeAgentsClient | None = None
 
 
 def _redis() -> redis.Redis:
@@ -283,6 +314,34 @@ def _authorize_supervisor_action(
     return flag, None
 
 
+def _claude_agents() -> ClaudeAgentsClient:
+    """Construct the process-local ``claude`` CLI wrapper used for one-shot calls.
+
+    Only short, bounded, one-shot mutating commands (start/stop/respawn/rm/
+    daemon status/daemon stop) go through this client from Flask request
+    handlers; continuous polling belongs to
+    ``scripts/claude_agents_supervisor.py`` (docs/spec.md §2.1).
+    """
+    global _claude_agents_client
+    if _claude_agents_client is None:
+        _claude_agents_client = ClaudeAgentsClient()
+    return _claude_agents_client
+
+
+def _claude_agent_workdirs() -> dict[str, Path]:
+    """Parse the approved-workdir allowlist independently of ``_design_sessions()``.
+
+    A raw filesystem path from the browser is never accepted; only a key into
+    this dict is, mirroring ``DesignSessionManager``'s ``workdir_key`` rule.
+    """
+    configured = os.environ.get("FINOPS_CLAUDE_AGENT_WORKDIRS")
+    paths = [Path(item) for item in configured.split(os.pathsep) if item] if configured else [ROOT]
+    return {
+        "repository" if index == 0 else f"repository-{index + 1}": path
+        for index, path in enumerate(paths)
+    }
+
+
 def _design_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
     """Enforce the unauthenticated control plane's local JSON trust boundary."""
     remote = request.remote_addr or ""
@@ -368,6 +427,120 @@ def _design_error(error: Exception) -> tuple[Response, int]:
     if isinstance(error, ValueError):
         return jsonify({"error": str(error)}), 400
     return jsonify({"error": str(error), "code": "design_session_error"}), 503
+
+
+def _claude_agent_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
+    """Enforce the same local JSON trust boundary as design-session mutations.
+
+    Duplicated rather than shared with ``_design_mutation_body`` so that
+    ``/api/design-sessions*`` behavior can never change as a side effect of
+    this feature (docs/scope.md §4).
+    """
+    remote = request.remote_addr or ""
+    if remote not in {"127.0.0.1", "::1", "localhost"}:
+        return None, (jsonify({"error": "loopback access required"}), 403)
+    if urlsplit(request.host_url).hostname not in {"127.0.0.1", "::1", "localhost"}:
+        return None, (jsonify({"error": "loopback Host required"}), 403)
+    origin = request.headers.get("Origin")
+    if origin and origin.rstrip("/") != request.host_url.rstrip("/"):
+        return None, (jsonify({"error": "cross-origin request rejected"}), 403)
+    if not request.is_json:
+        return None, (jsonify({"error": "application/json request required"}), 415)
+    if request.content_length is not None and request.content_length > MAX_CLAUDE_AGENT_REQUEST_BYTES:
+        return None, (jsonify({"error": "request body too large"}), 413)
+    idempotency_key = request.headers.get("Idempotency-Key", "")
+    if not idempotency_key or len(idempotency_key) > 200:
+        return None, (jsonify({"error": "Idempotency-Key header required"}), 400)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, (jsonify({"error": "JSON object required"}), 400)
+    return body, None
+
+
+def _claude_agent_error(error: Exception) -> tuple[Response, int]:
+    """Translate expected claude-agent failures without leaking server internals."""
+    if isinstance(error, ClaudeAgentsError):
+        return jsonify({"error": str(error), "code": error.code}), 502
+    if isinstance(error, ValueError):
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"error": str(error), "code": "claude_agent_error"}), 503
+
+
+def _idempotent_claude_agent_response(
+    operation: str, body: dict, action
+) -> tuple[Response, int] | Response:
+    """Sibling of ``_idempotent_design_response`` under a distinct cache namespace.
+
+    Duplicated (rather than parameterized and shared) for the same reason as
+    ``_claude_agent_mutation_body``: ``/api/design-sessions*`` retry/replay
+    behavior must not change as a side effect of this feature.
+    """
+    supplied_key = request.headers["Idempotency-Key"]
+    request_digest = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    cache_id = hashlib.sha256(f"claude-agent:{operation}\0{supplied_key}".encode()).hexdigest()
+    cache_key = f"control_room:idempotency:{cache_id}"
+    reservation = json.dumps({"state": "pending", "request_digest": request_digest})
+    try:
+        redis_client = _redis()
+        reserved = redis_client.set(
+            cache_key,
+            reservation,
+            nx=True,
+            ex=IDEMPOTENCY_TTL_SECONDS,
+        )
+        if not reserved:
+            existing_raw = redis_client.get(cache_key)
+            existing = json.loads(existing_raw) if existing_raw else {}
+            if existing.get("request_digest") != request_digest:
+                return (
+                    jsonify({"error": "Idempotency-Key was already used with a different request"}),
+                    409,
+                )
+            if existing.get("state") == "complete":
+                return jsonify(existing.get("body", {})), int(existing.get("status", 200))
+            return (
+                jsonify({"error": "matching mutation is still in progress", "retryable": True}),
+                409,
+            )
+    except Exception as error:
+        return jsonify({"error": f"idempotency store unavailable: {error}"}), 503
+
+    try:
+        response = make_response(action())
+    except Exception as error:
+        response = make_response(_claude_agent_error(error))
+    completed = json.dumps({
+        "state": "complete",
+        "request_digest": request_digest,
+        "status": response.status_code,
+        "body": response.get_json(silent=True) or {},
+    })
+    with suppress(Exception):
+        redis_client.set(cache_key, completed, ex=IDEMPOTENCY_TTL_SECONDS)
+    return response
+
+
+def _require_owned_claude_agent(redis_client, session_id: str) -> tuple[Response, int] | None:
+    """Reject, before any subprocess call, an id absent from the owned set.
+
+    This is the server-side half of the ownership boundary (docs/spec.md
+    §1.2/§3.3): Stop/Respawn/Rm must be rejected for external sessions even
+    if a client bypasses the hidden UI affordance.
+    """
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
+        return jsonify({"error": "invalid session id"}), 400
+    try:
+        owned = redis_client.sismember(OWNED_SESSIONS_KEY, session_id)
+    except Exception as error:
+        return jsonify({"error": f"ownership check unavailable: {error}"}), 503
+    if not owned:
+        return (
+            jsonify({"error": "session not started from the Control Room; manage it with the claude CLI directly"}),
+            403,
+        )
+    return None
 
 
 def _sse(generator) -> Response:
@@ -916,6 +1089,271 @@ def api_design_session_run(portal_id) -> Response:
         return jsonify(result), 202
 
     return _idempotent_design_response(f"run:{portal_id}", body, run)
+
+
+@app.get("/api/claude-agents")
+def api_claude_agents() -> Response:
+    """Read the supervisor-maintained roster; never calls the ``claude`` CLI.
+
+    A missing or unparseable roster is a rendering concern, not a hard
+    failure: the fleet section shows a "supervisor not running" state while
+    the rest of the Control Room stays unaffected. ``workdirs`` is an
+    additive label list (mirroring ``/api/design-sessions``) so the start
+    form never needs a raw filesystem path from the browser.
+    """
+    workdirs = [{"key": key, "label": path.name or key} for key, path in _claude_agent_workdirs().items()]
+    try:
+        raw = _redis().get(ROSTER_KEY)
+        agents = json.loads(raw) if raw else None
+        if not isinstance(agents, list):
+            raise ValueError("roster unavailable")
+    except Exception:
+        return jsonify({"error": "supervisor_unavailable", "agents": [], "workdirs": workdirs}), 200
+    return jsonify({"agents": agents, "workdirs": workdirs})
+
+
+@app.get("/api/claude-agents/<session_id>/logs")
+def api_claude_agent_logs(session_id) -> Response:
+    """One-shot, best-effort log tail for external sessions (owned sessions use SSE)."""
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
+        return jsonify({"error": "invalid session id"}), 400
+    try:
+        logs = _claude_agents().get_logs(session_id)
+    except ClaudeAgentsError as error:
+        return jsonify({"error": str(error), "code": error.code}), 502
+    encoded = logs.encode("utf-8", errors="replace")
+    truncated = len(encoded) > MAX_CLAUDE_AGENT_LOG_BYTES
+    body = encoded[:MAX_CLAUDE_AGENT_LOG_BYTES].decode("utf-8", errors="replace")
+    response = make_response(body)
+    response.headers["Content-Type"] = "text/plain; charset=utf-8"
+    response.headers["X-Claude-Agent-Log-Truncated"] = "true" if truncated else "false"
+    response.headers["X-Claude-Agent-Log-Note"] = "one-shot best-effort tail, not a live stream"
+    return response
+
+
+@app.get("/api/claude-agents/daemon")
+def api_claude_agents_daemon() -> Response:
+    """Read-only ``claude daemon status``; no control affordance is attached here."""
+    try:
+        status = _claude_agents().daemon_status()
+    except ClaudeAgentsError as error:
+        return jsonify({"running": False, "error": str(error), "code": error.code}), 200
+    return jsonify(status)
+
+
+@app.post("/api/claude-agents")
+def api_start_claude_agent() -> Response:
+    """Start one ``claude --bg`` session in an approved workdir and record ownership."""
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+
+    workdir_key = body.get("workdir", "")
+    if not isinstance(workdir_key, str):
+        return jsonify({"error": "workdir must be a string"}), 400
+    workdir = _claude_agent_workdirs().get(workdir_key)
+    if workdir is None:
+        return jsonify({"error": "workdir is not approved"}), 400
+
+    task = body.get("task", "")
+    if not isinstance(task, str) or not task.strip() or len(task) > MAX_CLAUDE_AGENT_TASK_CHARS:
+        return (
+            jsonify({"error": f"task is required and must be at most {MAX_CLAUDE_AGENT_TASK_CHARS} characters"}),
+            400,
+        )
+
+    model = body.get("model")
+    resolved_model = None
+    if model is not None:
+        if not isinstance(model, str):
+            return jsonify({"error": "model must be a string"}), 400
+        resolved_model = _resolve_claude_model(model) or None
+
+    advisor = body.get("advisor")
+    if advisor is not None and not (
+        isinstance(advisor, str)
+        and (advisor in CLAUDE_AGENT_ADVISORS or CLAUDE_AGENT_ADVISOR_ID_PATTERN.fullmatch(advisor))
+    ):
+        return jsonify({"error": "advisor must be fable, opus, sonnet, or a full model id"}), 400
+
+    def start():
+        result = _claude_agents().start_agent(
+            task.strip(),
+            cwd=str(workdir),
+            model=resolved_model,
+            advisor=advisor,
+            skip_permissions=True,
+        )
+        session_id = result.get("id")
+        if not isinstance(session_id, str) or not SESSION_ID_PATTERN.fullmatch(session_id):
+            raise ClaudeAgentsError("claude --bg returned an unusable session id", code="malformed_json")
+        _redis().sadd(OWNED_SESSIONS_KEY, session_id)
+        return jsonify({"ok": True, "id": session_id}), 201
+
+    return _idempotent_claude_agent_response("start", body, start)
+
+
+@app.post("/api/claude-agents/<session_id>/stop")
+def api_stop_claude_agent(session_id) -> Response:
+    """``claude stop`` an owned session. The process ends; Respawn resumes it."""
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    rejection = _require_owned_claude_agent(_redis(), session_id)
+    if rejection:
+        return rejection
+
+    def stop():
+        result = _claude_agents().stop_agent(session_id)
+        return jsonify({
+            "ok": True,
+            "id": session_id,
+            "note": "process ended; the conversation is preserved and can be resumed with Respawn",
+            "result": result,
+        })
+
+    return _idempotent_claude_agent_response(f"stop:{session_id}", body, stop)
+
+
+@app.post("/api/claude-agents/<session_id>/respawn")
+def api_respawn_claude_agent(session_id) -> Response:
+    """``claude respawn`` an owned session with its conversation intact."""
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    rejection = _require_owned_claude_agent(_redis(), session_id)
+    if rejection:
+        return rejection
+
+    def respawn():
+        result = _claude_agents().respawn_agent(session_id)
+        return jsonify({"ok": True, "id": session_id, "result": result})
+
+    return _idempotent_claude_agent_response(f"respawn:{session_id}", body, respawn)
+
+
+@app.post("/api/claude-agents/<session_id>/rm")
+def api_rm_claude_agent(session_id) -> Response:
+    """``claude rm`` an owned session; the transcript remains on disk."""
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    redis_client = _redis()
+    rejection = _require_owned_claude_agent(redis_client, session_id)
+    if rejection:
+        return rejection
+
+    def rm():
+        result = _claude_agents().rm_agent(session_id)
+        redis_client.srem(OWNED_SESSIONS_KEY, session_id)
+        with suppress(Exception):
+            redis_client.delete(f"{CURSOR_KEY_PREFIX}{session_id}")
+        return jsonify({
+            "ok": True,
+            "id": session_id,
+            "note": (
+                "removed from the Claude agents list; transcript remains on disk and is "
+                f"reachable via `claude --resume {session_id}` outside the Control Room"
+            ),
+            "result": result,
+        })
+
+    return _idempotent_claude_agent_response(f"rm:{session_id}", body, rm)
+
+
+@app.post("/api/claude-agents/<session_id>/steer")
+def api_steer_claude_agent(session_id) -> Response:
+    """Steer an owned session: interrupt + resume with an adjusted prompt.
+
+    ``claude`` has no mid-flight send-input for a running background session,
+    so steering is stop + ``claude --bg --resume <id> "<prompt>"``. The resume
+    returns a *new* session id, which this handler adopts as the owned
+    successor (removing the interrupted id from the owned set).
+    """
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    redis_client = _redis()
+
+    prompt = body.get("prompt", "")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_CLAUDE_AGENT_TASK_CHARS:
+        return (
+            jsonify({"error": f"prompt is required and must be at most {MAX_CLAUDE_AGENT_TASK_CHARS} characters"}),
+            400,
+        )
+
+    model = body.get("model")
+    resolved_model = None
+    if model is not None:
+        if not isinstance(model, str):
+            return jsonify({"error": "model must be a string"}), 400
+        resolved_model = _resolve_claude_model(model) or None
+
+    advisor = body.get("advisor")
+    if advisor is not None and not (
+        isinstance(advisor, str)
+        and (advisor in CLAUDE_AGENT_ADVISORS or CLAUDE_AGENT_ADVISOR_ID_PATTERN.fullmatch(advisor))
+    ):
+        return jsonify({"error": "advisor must be fable, opus, sonnet, or a full model id"}), 400
+
+    def steer():
+        # Ownership is checked inside the idempotency action (not before it)
+        # because a successful steer remaps the owned id — a retried request
+        # must replay the cached success rather than 403 on the now-stale id.
+        rejection = _require_owned_claude_agent(redis_client, session_id)
+        if rejection:
+            return rejection
+        result = _claude_agents().steer_agent(
+            session_id,
+            prompt.strip(),
+            model=resolved_model,
+            advisor=advisor,
+            skip_permissions=True,
+        )
+        resumed_id = result.get("id")
+        if not isinstance(resumed_id, str) or not SESSION_ID_PATTERN.fullmatch(resumed_id):
+            raise ClaudeAgentsError("claude --bg --resume returned an unusable session id", code="malformed_json")
+        redis_client.sadd(OWNED_SESSIONS_KEY, resumed_id)
+        if resumed_id != session_id:
+            redis_client.srem(OWNED_SESSIONS_KEY, session_id)
+            with suppress(Exception):
+                redis_client.delete(f"{CURSOR_KEY_PREFIX}{session_id}")
+        return jsonify({
+            "ok": True,
+            "id": resumed_id,
+            "resumed_from": session_id,
+            "note": "session interrupted and resumed with the adjusted prompt; the new session id supersedes the previous one",
+        }), 200
+
+    return _idempotent_claude_agent_response(f"steer:{session_id}", body, steer)
+
+
+@app.post("/api/claude-agents/daemon/stop")
+def api_stop_claude_agents_daemon() -> Response:
+    """``claude daemon stop``, the most severe control this feature exposes.
+
+    ``keep_workers`` has no silent default: a missing or non-boolean value is
+    rejected in request parsing so the blast-radius choice is always explicit
+    in the logged request body, not just the UI copy.
+    """
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    if "keep_workers" not in body or not isinstance(body["keep_workers"], bool):
+        return jsonify({"error": "keep_workers boolean is required"}), 400
+    keep_workers = body["keep_workers"]
+
+    def stop_daemon():
+        result = _claude_agents().daemon_stop(keep_workers=keep_workers)
+        return jsonify({"ok": True, "keep_workers": keep_workers, "result": result})
+
+    return _idempotent_claude_agent_response("daemon-stop", body, stop_daemon)
 
 
 @app.get("/")

@@ -1,131 +1,317 @@
-# Live Design Sessions Scope
+# Claude Code Background Sessions Scope
 
 ## 1. Problem
 
-The Control Room can observe experiment cells, but it cannot host the design work that precedes them. An operator must leave the command rail to start an OpenCode conversation, draft YAML by hand, run validation separately, and then return to the portal to run or monitor work. This breaks the operational chain from intent to an executable `ExperimentSpec` and makes schema or requires/produces errors easy to discover too late.
+The Control Room already hosts a native supervisor surface for OpenCode:
+`admin/opencode_client.py` talks to the running OpenCode server, and
+`scripts/supervise.py` relays native sessions into the Control Room's
+Redis-backed event streams and flags stalled/off-track work for human review.
+There is no equivalent surface for Claude Code's own background-session
+mechanism.
 
-This feature extends the existing Control Room rather than replacing it. It adds two portal-managed, live OpenCode session kinds to the existing terminal and session-control panes:
+`src/instrument/claude_adapter.py` drives the `claude` CLI today, but only in
+headless, single-shot mode: `run_claude_agentic` builds one
+`claude -p "<prompt>" --output-format stream-json --dangerously-skip-permissions
+[--model ...]` subprocess, streams its `stream-json` events through
+`ClaudeStreamAdapter`, and returns when that one process exits
+[src/instrument/claude_adapter.py:236-346]. It never enumerates, attaches to,
+or controls a `claude --bg` background session, and it maps the framework's
+advisor-model id `claude-fable-5` to `claude-sonnet-5` for the primary model
+[src/instrument/claude_adapter.py:185-211] — Claude Code's own
+`--advisor fable` server-side advisor is a distinct mechanism, unused today.
 
-1. A **workflow design session** starts from an operator's feature description and directs the agent to maintain an unsaved `ExperimentSpec` whose `workflow.kind` is `agent_task` and whose workflow parameters contain phases.
-2. An **experiment design session** starts from an operator's research question and directs the agent to maintain a factorial `ExperimentSpec` containing factors, rules, metrics, and a comparison. A valid draft also receives a live cell preview from `experiment_matrix`.
+Claude Code separately ships a background-session product: `claude --bg`
+starts a supervised session that keeps running after the launching terminal
+exits, `claude agents` lists and monitors those sessions, and `claude attach`,
+`claude logs`, `claude stop`/`kill`, `claude respawn`, and `claude rm` manage
+one session's lifecycle, all hosted by a `claude daemon` supervisor process.
+None of this is visible from the Control Room. An operator who dispatches a
+`claude --bg` task today has no fleet card, no transcript, and no lifecycle
+controls inside the command rail — they have to shell out separately, which
+is exactly the gap the OpenCode native surface already closed for OpenCode.
 
-Both kinds use a server-owned temporary YAML draft as the exchange boundary between the agent and the portal. The backend parses and calls `validate_spec` whenever the UI requests the latest draft state, so syntax, construction, and validation errors can be shown beside the live transcript before Save or Run is enabled. A temporary file is chosen over scraping YAML from streamed prose because file content has a stable, testable boundary and OpenCode already operates in the repository workspace.
+This feature adds the Claude analog: list, observe, and lifecycle-control
+`claude --bg` sessions and the `claude daemon` that hosts them, inside the
+existing Control Room, reusing its command-rail aesthetic and SSE/Redis
+transport rather than building a second dashboard.
 
-The feature also changes the meaning of interactivity narrowly. Existing experiment-cell attachments remain observational. A portal-created design session may show Send and Steer controls because the investigated OpenCode API has an explicit, acknowledged backend path for both operations. This avoids implying that the existing `opencode run` subprocesses can be controlled.
+## 2. Investigated CLI Facts
 
-## 2. Investigated Integration Facts
+Investigated against the Claude Code CLI reference,
+<https://code.claude.com/docs/en/cli-reference>. Commands and flags below are
+quoted from that reference; anything not stated there is called out as not
+possible rather than inferred.
 
-### Existing Control Room
+### Starting a background session
 
-- The Flask app already serves the fleet snapshot, two SSE feeds, routing, queue actions, and the static shell at `GET /api/matrix`, `GET /api/status`, `GET /api/events/<cell_id>`, `GET /api/routing`, `POST /api/experiments`, and `GET /` [admin/server.py:225-253, 256-322, 325-362]. The new feature must be additive because these paths are the running Control Room contract.
-- Cell-event SSE subscribes before replaying `events_log:<cell_id>`, emits retained events oldest-first, sends a named `replay_complete` boundary, and then relays `events:<cell_id>` with heartbeats [admin/server.py:282-322]. Reusing this relay for a design-session stream preserves the current Redis/SSE behavior and frontend transcript machinery.
-- The frontend already renders the selected session identity from streamed `sessionID` values and labels the pane's current action as Watch, Detach, or retained-history inspection [admin/static/app.js:311-345]. Selecting another card closes the prior `EventSource`, clears cell-local transcript state, and opens only the selected stream [admin/static/app.js:531-558].
-- Detach currently closes only the browser `EventSource`; it sends no process-control request [admin/static/app.js:560-569]. That behavior remains unchanged for ordinary experiment cells.
-- Known and unknown events are rendered with DOM nodes and `textContent`, so a native OpenCode event adapter can preserve unfamiliar event data without injecting event payloads as HTML [admin/static/app.js:348-379; admin/static/control-room-core.js:144-217].
+- `claude --bg "<task>"` / `claude --background "<task>"` — starts the task as
+  a background agent and returns immediately, printing the session ID and
+  management commands. Cannot be combined with `-p`/`--print`. Can combine
+  with `--exec` to run a shell command as a background job instead of a Claude
+  session, and with `--agent` to run a specific subagent.
+- `--dangerously-skip-permissions`, when set on a `--bg` launch, persists
+  across supervisor restarts for that session (i.e., a respawn keeps the
+  original permission mode).
 
-### ExperimentSpec and execution
+### Listing / observing
 
-- `ExperimentSpec.from_yaml` uses `yaml.safe_load` and `from_dict`, while `to_yaml` writes to the caller-provided path without creating a parent directory or restricting the destination [src/instrument/experiment_spec.py:325-356]. A portal save endpoint must therefore enforce its own filename, directory, and atomic-write rules.
-- `validate_spec(spec: ExperimentSpec) -> list[str]` accumulates structural and requires/produces errors; an empty list means valid [src/instrument/experiment_spec.py:406-446]. `validate_rules` makes ledger fields plus measurement-rule outputs available and reports an unmet requirement with an "Instrument it first" error [src/instrument/experiment_spec.py:367-403]. The portal must display these returned strings verbatim rather than inventing a second validator.
-- `experiment_matrix(spec)` returns the Cartesian product of active factor levels as flat dictionaries with deterministic `cell_id` values [src/instrument/compile_experiment.py:107-128]. It does not call `validate_spec`, so the portal must validate first and only generate a preview when there are no errors.
-- `scripts/run_workflow.py` requires `--spec`, `--goal`, `--model`, and `--workdir`, accepts backend/budget/timeout controls, and runs the loaded spec through `run_workflow` [scripts/run_workflow.py:26-52]. It writes a JSON ledger under `experiments/results/workflows/<spec.name>/` [scripts/run_workflow.py:54-62].
-- The current queue is specifically named `story_jobs` and stores story status/results in `story_status` and `story_results` [scripts/enqueue.py:32-46]. Its worker unconditionally reads story, model, tier, quality, and condition fields and invokes `scripts/run_story.py` [scripts/worker.py:125-148]. A generic factorial cell from `experiment_matrix` is therefore not enqueue-compatible in this feature.
+- `claude agents` — opens an interactive terminal "agent view" for monitoring
+  and dispatching background sessions; **requires an interactive terminal**,
+  so it is not something a Flask backend can drive headlessly.
+- `claude agents --json` — prints active sessions as a JSON array, scriptable.
+- `claude agents --json --all` — same, but includes completed background
+  sessions.
+- `claude agents --cwd <path>` — restricts the listing to sessions started
+  under that directory.
+- `claude logs <id>` — prints recent output from one background session. This
+  is a plain, non-interactive stdout dump — safe to call headlessly and diff.
+- `claude attach <id>` — attaches to a background session **in a terminal**
+  to view and follow it live; the reference explicitly scopes this to
+  "view/follow," not steering input, and — like `claude agents` — implies a
+  real interactive TTY, not a scriptable stream.
+- `claude daemon status` — prints the background-session supervisor's state,
+  version, socket directory, and worker count; exits 1 if the supervisor
+  isn't running.
 
-### Running OpenCode server contract
+### Lifecycle control
 
-The contract below was checked on 2026-08-14 against the running server at `http://127.0.0.1:4096`, OpenCode `1.18.15`, and the installed SDK `1.18.15`. Runtime probe commands were:
+- `claude stop <id>` / `claude kill <id>` (`kill` is an alias for `stop`) —
+  stops a background session.
+- `claude respawn <id>` — restarts a background session, running or stopped,
+  **with its conversation intact**. `claude respawn --all` restarts every
+  running session (e.g., to pick up an updated Claude Code binary).
+- `claude rm <id>` — removes a session from the list. The transcript is not
+  deleted; it stays on disk and remains reachable via `claude --resume`.
+- `claude daemon stop --any` — stops the background-session supervisor and
+  every session it hosts. `--any` is required to confirm stopping an
+  on-demand supervisor (the default supervisor kind). `--keep-workers` leaves
+  the background sessions running so the next supervisor reconnects to them
+  instead of killing them. This is the documented recovery path for an
+  unresponsive supervisor.
 
-```text
-/home/drseuss/.opencode/bin/opencode --version
-/home/drseuss/.opencode/bin/opencode web --help
-curl --dump-header - 'http://127.0.0.1:4096/api/session?limit=1'
-curl --no-buffer --dump-header - 'http://127.0.0.1:4096/api/event'
-```
+### Advisor
 
-- `opencode web --help` confirms `--port`, `--hostname`, and repeatable `--cors` options. The live `GET /api/session?limit=1` returned HTTP 200 JSON with `{data: [...], cursor: {previous, next}}`. Each observed session included an ID, agent, model, token/cost/time data, title, and location.
-- The native session methods are `GET /api/session` to list, `POST /api/session` to create, `GET /api/session/{sessionID}/message` to reconstruct projected messages, and `POST /api/session/{sessionID}/prompt` to submit input [`.opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/sdk.gen.js`:3297-3350, 3425-3452, 3567-3586].
-- Session creation accepts optional ID, agent, and model fields plus a location; the generated SDK sends them as JSON to `POST /api/session` [`.opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/sdk.gen.js`:3324-3350]. The portal can therefore bind each design session to the repository directory without spawning another OpenCode server.
-- Prompt admission accepts a required prompt plus optional `delivery: "queue" | "steer"` and `resume`, returns HTTP 200 with `SessionInputAdmitted`, and defines 400, 401, 404, and 409 errors [`.opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/types.gen.d.ts`:9855-9894]. This is the explicit backend-supported Send/Steer path required before making the design pane interactive.
-- `GET /api/session/{sessionID}/event?after=<sequence>` is an SSE subscription that replays durable events after an aggregate sequence and then follows new events [`.opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/sdk.gen.js`:3493-3531]. The observed `GET /api/event` response was `200 text/event-stream` with `data:` frames, `server.connected`, and heartbeat comments. Session and global event delivery are SSE, not WebSocket.
-- The generated client also exposes `POST /api/session/{sessionID}/interrupt`, explicitly documented as interrupting active execution and doing nothing for an idle session [`.opencode/node_modules/@opencode-ai/sdk/dist/v2/gen/sdk.gen.js`:3533-3544]. Interrupt is available for a portal-owned design session but does not apply to legacy experiment-cell subprocesses.
-- `@opencode-ai/sdk` is an ES module at version `1.18.15`; its package exports native v2 JavaScript and type entry points [`.opencode/node_modules/@opencode-ai/sdk/package.json`:3-5, 12-43]. An `.mjs` client can import it, but the current Flask backend cannot use the JavaScript SDK without adding a Node process or moving control-plane credentials and event handling into the browser.
+- `--advisor <model>` (e.g. `--advisor fable`, `--advisor opus`,
+  `--advisor sonnet`, or a full model ID) enables the server-side advisor tool
+  for a session, and works with any session mode, including background
+  (`claude --bg --advisor fable "task"`). `fable` requires Fable 5 access. It
+  takes precedence over the `advisorModel` setting. This is a pass-through
+  launch flag, not something the Control Room implements — it only needs to
+  be exposed as an optional start-time input.
 
-### Existing CLI alternative
+### What is explicitly NOT possible
 
-- `run_opencode_agentic` constructs `opencode run --model ... --format json --auto --dir ...`, optionally adds variant/title, and appends one prompt [src/instrument/opencode.py:251-267]. It decodes stdout JSONL and publishes events, but exposes no native session client [src/instrument/opencode.py:269-297].
-- The shared subprocess runner closes stdin with `DEVNULL`, retains no writable channel, and treats process exit or timeout as the lifecycle boundary [src/instrument/streaming.py:31-50, 66-106]. Reusing it would provide process-per-prompt output, not a long-lived Send/Steer design session.
+The reference documents no way to send input to, or otherwise interactively
+steer, a *running* background session. `attach` is view/follow only; there is
+no `claude bg send`, no prompt-injection command, and no documented
+`delivery: steer` equivalent to OpenCode's native
+`POST /api/session/{id}/prompt` [contrast with admin/opencode_client.py:94-102].
+Concretely:
+
+- **Interrupt has no direct analog.** OpenCode's `interrupt` stops active work
+  *without* ending the session [admin/opencode_client.py:104-107]. Claude
+  Code's closest primitives are `stop` (ends the session; conversation is
+  preserved but the process is gone) and `respawn` (restarts the session with
+  its conversation intact, effectively resuming after a stop). Neither is a
+  live, in-flight interrupt-and-keep-running.
+- **There is no send-input / steer control.** This spec deliberately does not
+  invent one. Any control surface for background sessions is limited to the
+  lifecycle verbs the CLI actually exposes: stop/kill, respawn, rm, and
+  daemon stop.
+- **`claude agents` and `claude attach` need a real TTY**, so this feature
+  uses only the scriptable subset (`claude agents --json --all`,
+  `claude logs <id>`, `claude daemon status`, and the lifecycle commands)
+  driven via `subprocess`, the same way `claude_adapter.py` already drives the
+  CLI for headless runs [src/instrument/claude_adapter.py:291-299].
 
 ## 3. Chosen Integration Approach
 
 ### Decision
 
-Use a small Python adapter in `admin/` for the native OpenCode v2 HTTP API, then re-expose session events through the Control Room's existing Redis-backed `GET /api/events/<stream_id>` SSE path. The browser never contacts port `4096` directly.
+Add a small `admin/claude_agents_client.py` subprocess wrapper around the
+scriptable `claude` subcommands above (list, start, logs, stop, respawn, rm,
+daemon status), mirroring the shape of `OpenCodeClient`
+[admin/opencode_client.py] but calling a CLI instead of an HTTP API. Add a
+lightweight poller (module-level thread or endpoint-triggered refresh, not a
+new always-on service) that periodically runs `claude agents --json --all` to
+refresh a Redis-cached roster, and — for the currently selected/attached
+session only — diffs `claude logs <id>` output and republishes new lines
+through the existing `LivePublisher` event/log channel used by
+`instrument/live.py`, under a distinct `cell_id` namespace (e.g.
+`claude_bg_<session-id>`). The existing `GET /api/events/<cell_id>` SSE
+endpoint, its retained-history replay, and its `replay_complete` boundary
+[admin/server.py:450-490] then serve the transcript with zero new SSE
+machinery. Add new `POST`-mutating endpoints for start/stop/respawn/rm/daemon
+actions, all behind the loopback + JSON + Idempotency-Key guard the
+design-session endpoints already enforce [admin/server.py:104-124, 127-178].
 
-The backend flow is:
-
-1. `POST /api/design-sessions` accepts a kind (`workflow` or `experiment`), description/question, model, and an approved repository work directory. It creates a portal ID and temporary draft path, calls `POST /api/session`, records the returned OpenCode session ID, and submits a kind-specific initial prompt with `delivery: "queue"`.
-2. The initial prompt tells the agent to maintain only the assigned draft YAML. The workflow prompt requires `workflow.kind: agent_task` and phases; the experiment prompt requires factorial factors, rules, metrics, and comparison. A fixed draft path makes validation independent of conversational formatting.
-3. One backend relay per active design session consumes `GET /api/session/{id}/event?after=<last_sequence>`, records the durable sequence, adds the portal/OpenCode session identity, and publishes normalized or safely preserved events to the same bounded Redis channel/log pattern used by cell transcripts. Durable sequence tracking is required so an OpenCode reconnect does not duplicate the portal's retained log.
-4. `GET /api/design-sessions/<portal_id>/spec` reads the temporary draft, reports YAML/parser or `ExperimentSpec.from_dict` construction errors, then calls `validate_spec`. For a valid experiment design it also calls `experiment_matrix` and returns the ordered cell preview and count. Polling this lightweight endpoint while the pane is attached provides live validation without another event protocol or filesystem watcher service.
-5. `POST /api/design-sessions/<portal_id>/input` maps ordinary follow-up input to `delivery: "queue"` and an explicit Steer action to `delivery: "steer"`. The UI shows admission/failure separately from model output because the prompt response only acknowledges durable input.
-6. `POST /api/design-sessions/<portal_id>/save` re-parses and re-validates the current draft, derives or checks a safe `.yaml` basename, and atomically writes under `experiments/specs/`. Save never trusts an agent-supplied absolute path or `..` segment.
-7. `POST /api/design-sessions/<portal_id>/run` is offered only for a valid, saved workflow design. It invokes the existing `scripts/run_workflow.py` contract with explicit goal, model, workdir, timeout, and commit choice, and streams the resulting run under its own existing Control Room cell identity. Experiment-design enqueueing is not included because the current worker cannot dispatch generic matrix cells.
+The frontend gets one additive fleet section — "Claude background sessions"
+— rendered with the same card list, selection, and transcript hand-off
+pattern `selectCell`/`selectDesignSession` already use
+[admin/static/app.js:721-796], not a new page or visual language. Lifecycle
+buttons (Stop, Respawn, Rm) use the same `window.confirm`-gated pattern as the
+existing Interrupt control [admin/static/app.js:1284-1300], and Detach stays
+a browser-only `EventSource.close()` with no process effect
+[admin/static/app.js:803-811].
 
 ### Rationale
 
-- **Raw native HTTP instead of the JS SDK:** both surfaces describe the same generated routes, but raw HTTP fits the Python Flask process. It avoids a Node bridge, a frontend build step, and direct browser access to the OpenCode control plane. The installed SDK remains the pinned schema reference.
-- **Native API instead of `opencode run`:** the API has durable session identity, message reconstruction, session SSE, queue/steer admission, and interrupt. The current CLI wrapper has closed stdin and a subprocess-shaped lifecycle, so adapting it would recreate weaker session management.
-- **Backend event proxy instead of browser-to-4096:** the proxy preserves the command rail's one selected `EventSource`, retained Redis replay, transcript normalization, and same-origin error handling. It also keeps filesystem locations and control operations off the browser-visible OpenCode API.
-- **Polling a draft-state endpoint instead of parsing streamed prose:** the YAML file is the artifact that will be saved and run. Validating that exact file prevents a displayed conversational example from diverging from the executable spec and is deterministic under tests.
-- **Separate design-session metadata from `story_status`:** story queue keys have a fixed worker contract. Separate metadata avoids making portal conversations look like runnable story jobs, while their event streams can still reuse bounded `events:<stream_id>` and `events_log:<stream_id>` transport.
-- **Workflow Run now, generic enqueue later:** `run_workflow.py` already accepts the saved artifact, whereas `story_jobs` cannot represent or execute `experiment_matrix` cells. Hiding unsupported enqueue controls is safer than writing nominal jobs that the worker will fail.
+- **Subprocess, not a new client library or service.** `claude_adapter.py`
+  already resolves the CLI binary and drives it via subprocess for headless
+  runs [src/instrument/claude_adapter.py:36-46, 291-299]; there is no HTTP API
+  for background sessions to call instead — the CLI *is* the contract. This
+  keeps the pattern consistent with the one Claude Code integration this
+  repo already has, and avoids adding a daemon RPC client that isn't
+  documented.
+- **`claude logs` polling instead of `claude attach`.** `attach` is
+  documented as an interactive terminal follow, the same category as
+  `claude agents`'s own "requires an interactive terminal" caveat. Wiring a
+  no-TTY subprocess to `attach` risks it blocking on terminal I/O or emitting
+  control codes meant for a real terminal. `logs` is a plain stdout dump,
+  safe to call on an interval and diff — the same shape as
+  `scripts/supervise.py`'s existing poll-and-relay loop
+  [scripts/supervise.py:81-94, 158-176, 243-269], just polling a CLI command
+  instead of an HTTP session.
+- **Reuse the `cell_id`-namespaced relay-into-`/api/events/<cell_id>` pattern.**
+  `scripts/supervise.py` already proves this pattern for OpenCode: it invents
+  a readable `cell_id` per native session (`_cell_id_for`,
+  [scripts/supervise.py:151-155]) and relays that session's events into the
+  Control Room's existing Redis event log/channel so the frontend needs no
+  new stream type [scripts/supervise.py:158-176]. Background Claude sessions
+  do the same under a `claude_bg_` prefix, so `admin/server.py`'s SSE
+  endpoint, replay boundary, and frontend transcript renderer need no changes.
+- **No steer/send-input control, anywhere in the surface.** The CLI reference
+  has no equivalent to OpenCode's `delivery: queue|steer` prompt admission
+  [admin/opencode_client.py:94-102]. Inventing one (e.g. by piping into a
+  wrapped subprocess's stdin) would control a mechanism the CLI doesn't
+  document as supported and could silently corrupt session state. The
+  Control Room's job here is Observe (list, logs, daemon status) and a
+  narrow, confirmed Control (start, stop/kill, respawn, rm, daemon stop) —
+  not steering.
+- **Reuse the existing model-alias table and workdir-allowlist pattern.**
+  Background-session start should call `_resolve_claude_model`
+  [src/instrument/claude_adapter.py:203-211] so a UI-selected model produces
+  the exact same `--model` argument the headless adapter already produces,
+  and should restrict `--cwd`/launch directory the same way design sessions
+  restrict `workdir` to a configured allowlist
+  [admin/server.py:81-101], rather than accepting an arbitrary path from the
+  browser.
+- **Daemon-stop is scoped as a rare, heavily-gated action, not a routine
+  control.** `claude daemon stop` affects every session the supervisor hosts,
+  not just ones the Control Room started. It is exposed only as an explicit,
+  separately confirmed action, defaults to `--keep-workers` (sessions survive
+  and the next supervisor reconnects to them) unless the operator
+  affirmatively also wants to end running sessions, and is not offered from
+  any bulk or default control.
 
 ## 4. Constraints
 
-- Preserve the current command-rail layout, visual language, fleet monitoring, terminal behavior, routing drawer, queue utilities, and narrow-screen behavior. Design sessions are an additive mode in the existing terminal and session pane, not a replacement dashboard or iframe.
-- Preserve all existing endpoint paths, response fields, Redis story keys, queue semantics, and the 500-entry cell-event retention behavior. New design-session APIs and metadata must not repurpose `story_jobs`, `story_status`, or `story_results`.
-- Use the already running OpenCode server, defaulting to `http://127.0.0.1:4096` through configuration. Do not start another OpenCode server, add a Node sidecar, add a WebSocket service, or require browser CORS access to port `4096`.
-- Keep the OpenCode integration native-v2-only for portal-created sessions. Do not mix `/api/session...` lifecycle calls with compatibility `/session...` messages or `/event` envelopes, because their projections and pagination differ.
-- Treat OpenCode `1.18.15` and the installed `@opencode-ai/sdk` v2 generated files as the implemented contract. Unknown event types must remain visible, and API/schema mismatch must produce an explicit unavailable/error state rather than silently dropping data.
-- Keep ordinary experiment-cell panes observational. Send, Steer, and Interrupt appear only when the selected identity is a portal-owned design session with a recorded OpenCode session ID. Detach remains a browser-stream action and must not be labeled as Interrupt.
-- Keep the unsaved draft outside `experiments/specs/`. Only the backend may choose its temporary path, and only an explicit successful Save may create or replace an `experiments/specs/*.yaml` file.
-- Parse YAML safely, catch parser and dataclass-construction errors, and call the existing `validate_spec` as the authoritative semantic gate. Do not duplicate or relax its rules in JavaScript. Call `experiment_matrix` only after that gate passes.
-- Save only a normalized basename ending in `.yaml`, reject path traversal and symlink escape, and use an atomic same-directory replacement. Existing files require explicit overwrite confirmation so an agent cannot silently replace a committed spec.
-- Run only a valid, saved workflow spec. Require explicit model, workdir, timeout, and commit intent; display the exact launch parameters and require confirmation before starting because `run_workflow.py` can modify and commit a worktree.
-- Do not expose experiment-design Enqueue in this phase. Supporting it requires a separate generic job schema and worker dispatch path, which is outside this extension and must not be simulated through `story_jobs`.
-- Restrict mutating design-session endpoints to same-origin, JSON requests from a loopback operator unless the portal gains authentication. The Flask app currently binds beyond loopback, and the new endpoints can spend model budget and write files, so read-only deployment assumptions are insufficient.
-- Bound request sizes, prompt sizes, relay buffers, reconnect backoff, retained design events, and draft polling frequency. An unavailable Redis or OpenCode server must degrade to a visible state without blocking the Flask request worker indefinitely.
-- Never render prompt, YAML, validation error, model output, or tool payload as trusted HTML. Preserve keyboard operation, textual status, visible focus, live-region announcements, `375px` usability, and `prefers-reduced-motion` behavior.
-- Add no new infrastructure or frontend build system. Python modules and the existing vanilla JavaScript/CSS/static Flask application are the implementation surface.
+- Extend `admin/server.py` and `admin/static/` additively. Do not modify
+  `admin/opencode_client.py`, `scripts/supervise.py`, or any
+  `/api/design-sessions*` behavior — that surface belongs to a different
+  feature owner and this feature must not change its endpoints, Redis keys,
+  or semantics.
+- Drive `claude` exclusively via `subprocess`, matching
+  `src/instrument/claude_adapter.py`'s existing pattern. No new network
+  service, no daemon RPC client, no polling of an undocumented socket
+  protocol — only the CLI surfaces named in section 2.
+- Do not implement, expose, or imply a send-input/steer control for a running
+  background session. If the CLI reference gains one in the future, treat
+  that as new investigation, not something to anticipate now.
+- Reuse `GET /api/events/<cell_id>` and its retained-history/`replay_complete`
+  contract [admin/server.py:450-490] for background-session transcripts. Do
+  not add a second SSE endpoint shape or a new frontend stream type.
+- Reuse the loopback + same-origin + JSON + `Idempotency-Key` mutation guard
+  [admin/server.py:104-178] for every new `POST` endpoint (start, stop,
+  respawn, rm, daemon stop), exactly as `/api/design-sessions/*` already does.
+- Every destructive action — `stop`/`kill`, `rm`, `daemon stop` — is a
+  one-way door from the operator's perspective and requires an explicit
+  confirmation step in the UI before the request is sent, matching the
+  existing Interrupt confirmation pattern [admin/static/app.js:1284-1300].
+  `respawn` is control but not destructive (conversation survives) and does
+  not require the same confirmation weight, though it should still be a
+  deliberate click, not a default action.
+- `claude daemon stop` defaults to `--keep-workers`; only an explicit,
+  separately labeled operator choice omits it and allows sessions to be
+  killed along with the supervisor.
+- Restrict where background sessions can be started to a configured directory
+  allowlist, reusing the shape of the existing `workdirs` mapping
+  [admin/server.py:81-101]. Never accept an arbitrary filesystem path from
+  the browser as a launch `--cwd`.
+- Reuse `_resolve_claude_model`
+  [src/instrument/claude_adapter.py:203-211] for model selection so background
+  sessions and headless runs resolve framework model ids identically.
+  `--advisor` is passed straight through as an optional string from a small
+  fixed set (`fable`, `opus`, `sonnet`, or a full model id); do not build new
+  advisor logic.
+- No new build step, dependency, or frontend framework. Python + the existing
+  vanilla JS/CSS static app remain the implementation surface, per the
+  Control Room's existing constraints.
+- Bound poll frequency, JSON body size, and log-tail size the same way
+  `/api/design-sessions` already bounds request size and prompt length
+  [admin/server.py:66-67]; an unavailable `claude` binary or daemon must
+  degrade to a visible error state, not hang the Flask request thread.
 
 ## 5. Acceptance Criteria
 
-1. [ ] `GET /` still loads the existing single-screen Control Room, and all pre-existing API and SSE tests pass without changing the baseline semantics of matrix, status, cell events, routing, or queue actions.
-2. [ ] The Control Room presents distinct `New workflow design session` and `New experiment design session` actions without hiding the existing fleet, transcript, session pane, routing drawer, or queue utilities.
-3. [ ] Starting either kind requires a non-empty feature description or research question and an explicit model; while the request is pending the initiating control is disabled and duplicate submissions are prevented.
-4. [ ] A successful start calls native `POST /api/session` with the approved worktree location, stores both portal and OpenCode session IDs, sends the kind-specific initial prompt through `POST /api/session/{id}/prompt` with `delivery: "queue"`, and returns a stable design-session summary to the browser.
-5. [ ] `GET /api/design-sessions` returns portal-owned sessions after a page reload without including arbitrary OpenCode sessions, and exposes kind, title, portal stream ID, OpenCode session ID, lifecycle state, draft state, and timestamps without exposing unrestricted filesystem paths.
-6. [ ] Selecting a design session uses the existing terminal feed and closes any previously selected cell/design `EventSource`; selecting an ordinary fleet cell restores its existing read-only controls and transcript behavior.
-7. [ ] The backend consumes native `GET /api/session/{id}/event?after=<sequence>` as SSE, relays text, reasoning, tool, status, usage, and unknown events safely into the selected Control Room stream, and includes the OpenCode session identity needed by the control pane.
-8. [ ] If the OpenCode SSE disconnects, the relay reconnects with the last durable aggregate sequence and does not duplicate already retained events. Browser reconnect and Redis replay remain bounded and preserve the existing `replay_complete` behavior.
-9. [ ] If a relay must reconstruct display state, it uses native `GET /api/session/{id}/message`; it does not mix native sessions with compatibility `/session` or `/event` responses.
-10. [ ] A selected portal-owned design session exposes Send, Steer, Interrupt, and browser-only Detach with distinct labels and confirmation where destructive; ordinary experiment cells expose none of Send, Steer, or Interrupt.
-11. [ ] Send maps to `delivery: "queue"`, Steer maps to `delivery: "steer"`, and both display input-admitted acknowledgement separately from subsequent model events. HTTP 400, 401, 404, 409, timeout, and malformed-response cases produce actionable inline errors without duplicating input.
-12. [ ] Interrupt calls native `POST /api/session/{id}/interrupt` only for the selected portal-owned session and reports whether the request was accepted; Detach only closes the browser stream and never interrupts OpenCode.
-13. [ ] Each design session receives a unique backend-owned temporary `.yaml` draft and an initial prompt that names that exact path. The agent's conversational YAML is never treated as the saved artifact unless it exists in that draft.
-14. [ ] The draft-state API distinguishes no draft yet, invalid YAML, `ExperimentSpec` construction failure, `validate_spec` errors, and valid state. Returned validation errors are displayed inline beside the terminal and update without a full page reload.
-15. [ ] Every syntactically loadable draft is passed to the existing `validate_spec`; JavaScript does not decide validity, and Save/Run remain disabled whenever parsing, construction, or validation returns an error.
-16. [ ] A workflow design prompt and resulting valid draft use `workflow.kind: agent_task` with phase parameters, while an experiment design prompt and resulting valid draft use `design: factorial` and include factors, rules, metrics, and comparison.
-17. [ ] For a valid experiment design, the backend calls `experiment_matrix` only after validation and returns the ordered cell count and assignments. Zero cells, duplicate-looking IDs, and a preview too large for the pane are reported safely rather than freezing or silently enqueueing work.
-18. [ ] Save accepts only a safe `.yaml` basename under `experiments/specs/`, re-parses and re-validates immediately before writing, writes atomically, rejects traversal/symlink escape, and requires explicit confirmation before replacing an existing spec.
-19. [ ] A successful Save reports the repository-relative path and exact saved content; a failed Save leaves both the existing destination and temporary draft intact.
-20. [ ] Run is available only for a valid, saved workflow design. Before launch, the UI shows and confirms spec path, goal, model, workdir, timeout, backend/budget options, and commit intent, then invokes `scripts/run_workflow.py` with those explicit values.
-21. [ ] A launched workflow receives a distinct Control Room cell/stream identity so its output can be watched with the existing fleet transcript behavior; design-session conversation events and workflow execution events are not merged into one misleading lifecycle.
-22. [ ] Experiment design offers Save and matrix preview but no Enqueue action. No implementation path writes generic matrix cells into `story_jobs` or causes the current story worker to receive a non-story job.
-23. [ ] OpenCode unavailable, Redis unavailable, invalid server JSON, SSE disconnect, missing draft, and workflow-launch failure each preserve the last useful transcript/draft content and expose a textual retryable or terminal state without a blank pane or uncaught JavaScript error.
-24. [ ] Mutating design-session endpoints reject non-JSON, oversized, cross-origin, and non-loopback unauthenticated requests. User-supplied filenames and workdirs cannot escape configured allowlists, and OpenCode connection details are not returned to the browser.
-25. [ ] At desktop and `375px` widths, session creation, transcript, validation errors, matrix preview, and Save/Run controls remain readable without page-level horizontal overflow. All actions are keyboard reachable, status is not color-only, and motion honors `prefers-reduced-motion`.
-26. [ ] Backend tests mock OpenCode and Redis and cover create/list, native request bodies, SSE parsing/reconnect sequence, event relay bounds, draft parsing, `validate_spec` gating, matrix preview gating, safe atomic Save, workflow Run arguments, authorization checks, and every documented error response.
-27. [ ] Frontend tests cover kind selection, one-stream handoff, read-only versus interactive controls, Send/Steer/Interrupt mapping, live validation states, matrix-preview bounds, Save/Run enablement, duplicate-submit prevention, and empty/offline/error accessibility states.
-28. [ ] A contract test or documented local smoke test against OpenCode `1.18.15` verifies list, create, queue input, steer input, session SSE content type/replay, message reconstruction, and interrupt without relying on WebSockets or direct browser access to port `4096`.
-29. [ ] The complete repository `pytest` suite passes after implementation.
+1. [ ] `admin/claude_agents_client.py` wraps `claude agents --json --all`,
+   `claude --bg`, `claude logs <id>`, `claude stop <id>`,
+   `claude respawn <id>`, `claude rm <id>`, and `claude daemon status` /
+   `claude daemon stop --any [--keep-workers]` as subprocess calls, each
+   returning parsed JSON or raw text plus a distinguishable error for a
+   missing binary, non-zero exit, or timeout.
+2. [ ] `GET /api/claude-agents` returns the cached/refreshed roster from
+   `claude agents --json --all` (id, status, task/title, model, cwd,
+   started/updated timestamps) without blocking on a live CLI call for every
+   request.
+3. [ ] `POST /api/claude-agents` starts a session via `claude --bg`, accepts
+   only a workdir key from the configured allowlist (never a raw path),
+   resolves the requested model through `_resolve_claude_model`, accepts an
+   optional `--advisor` value from the fixed set, enforces the loopback/JSON/
+   Idempotency-Key guard, and returns the new session id.
+4. [ ] A background session's transcript is exposed through the existing
+   `GET /api/events/<cell_id>` endpoint under a `claude_bg_<id>` cell id fed
+   by a `claude logs <id>`-polling relay; no new SSE route or event schema is
+   added, and the existing `replay_complete` boundary behavior is unchanged
+   for both existing and new cell ids.
+5. [ ] `POST /api/claude-agents/<id>/stop` (aliasing `kill`) requires the
+   mutation guard, requires the caller to have gone through an explicit
+   confirmation step client-side, and reports whether the CLI accepted the
+   stop.
+6. [ ] `POST /api/claude-agents/<id>/respawn` restarts the session and the
+   response/roster reflects that its conversation id is unchanged.
+7. [ ] `POST /api/claude-agents/<id>/rm` requires confirmation, removes the
+   session from the roster, and the response/UI states plainly that the
+   transcript remains on disk and is not deleted.
+8. [ ] `GET /api/claude-agents/daemon` returns `claude daemon status` output
+   (or a clear "supervisor not running" state derived from its exit code 1)
+   as a read-only observation with no control affordance attached.
+9. [ ] `POST /api/claude-agents/daemon/stop` is a separate, explicitly
+   confirmed action; it defaults to `--keep-workers` and only omits it when
+   the operator has made an additional, distinct choice to also end running
+   sessions; the UI states that this affects every session the supervisor
+   hosts, not just ones started from the Control Room.
+10. [ ] No endpoint, UI control, or client method sends input to, prompts,
+    or otherwise steers a running background session. Grepping the new code
+    for anything resembling `delivery: steer` or a stdin-writing subprocess
+    against an attached session finds nothing.
+11. [ ] The Control Room fleet view gains a "Claude background sessions"
+    section using the existing card/list visual language; selecting a card
+    reuses the existing selection/EventSource hand-off and transcript pane
+    instead of a new page or panel type.
+12. [ ] Detach on a background-session card only closes the browser
+    `EventSource`, exactly like existing cell/design-session Detach; it never
+    calls stop, respawn, or rm.
+13. [ ] All existing `/api/matrix`, `/api/status`, `/api/events/<cell_id>`,
+    `/api/routing`, `/api/experiments`, and `/api/design-sessions*` behavior,
+    Redis keys, and tests are unchanged by this feature.
+14. [ ] Backend tests mock the `claude` subprocess (missing binary, non-zero
+    exit, malformed JSON, timeout) and cover list/start/stop/respawn/rm/daemon
+    status/daemon stop, the mutation guard on every new `POST` route, the
+    workdir allowlist rejection path, and the model/advisor pass-through.
+15. [ ] Frontend tests or a documented manual check cover: roster rendering,
+    card selection reusing the shared transcript pane, confirmation prompts
+    for stop/rm/daemon-stop, and that no UI path offers a "send" or "steer"
+    action for a background session.
+16. [ ] The repository's `pytest` suite passes unchanged for all
+    pre-existing tests after this feature is implemented.
