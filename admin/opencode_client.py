@@ -19,6 +19,12 @@ MAX_HTTP_BODY_BYTES = 2_000_000
 MAX_SSE_EVENT_BYTES = 2_000_000
 
 
+def _model_ref(model: str) -> dict[str, str]:
+    """Translate a flat ``"provider/model"`` id into the native Model.Ref shape."""
+    provider, _, mid = model.partition("/")
+    return {"providerID": provider, "id": mid}
+
+
 @dataclass
 class OpenCodeError(RuntimeError):
     """Actionable failure returned by or encountered while calling OpenCode."""
@@ -75,17 +81,24 @@ class OpenCodeClient:
             raise OpenCodeError("OpenCode returned an unexpected JSON response")
         return result
 
-    def create_session(self, *, location: str, model: str) -> dict[str, Any]:
-        """Create a native session bound to an approved repository location."""
-        return self._json_request("POST", "/api/session", {"location": location, "model": model})
+    def create_session(self, *, location: str | dict[str, Any], model: str | dict[str, Any]) -> dict[str, Any]:
+        """Create a native session bound to an approved repository location.
 
-    def send_input(self, session_id: str, prompt: str, *, delivery: str) -> dict[str, Any]:
+        Accepts flat ``"provider/model"`` and directory-path strings and translates
+        them to the native structured refs (Model.Ref / LocationRef).
+        """
+        loc = location if isinstance(location, dict) else {"directory": location}
+        mod = model if isinstance(model, dict) else _model_ref(model)
+        return self._json_request("POST", "/api/session", {"location": loc, "model": mod})
+
+    def send_input(self, session_id: str, prompt: str | dict[str, Any], *, delivery: str) -> dict[str, Any]:
         """Queue or steer one durable prompt into an existing native session."""
         encoded = quote(session_id, safe="")
+        body = prompt if isinstance(prompt, dict) else {"text": prompt}
         return self._json_request(
             "POST",
             f"/api/session/{encoded}/prompt",
-            {"prompt": prompt, "delivery": delivery},
+            {"prompt": body, "delivery": delivery},
         )
 
     def interrupt(self, session_id: str) -> dict[str, Any]:
