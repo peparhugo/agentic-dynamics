@@ -15,20 +15,27 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "admin"))
+sys.path.insert(0, str(ROOT / "src"))
 
 from opencode_client import OpenCodeClient, OpenCodeError  # noqa: E402
+
+from instrument.live import LivePublisher  # noqa: E402
 
 BASE_URL = os.environ.get("OPENCODE_BASE_URL", "http://127.0.0.1:4096")
 MONITOR_MODEL = os.environ.get("SUPERVISOR_MODEL", "deepseek/deepseek-v4-flash")
 POLL_INTERVAL = int(os.environ.get("SUPERVISOR_POLL_INTERVAL", "60"))
 ACTIVE_WINDOW = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))  # seconds
 BATCH_EVENTS = int(os.environ.get("SUPERVISOR_BATCH_EVENTS", "12"))
+RELAY = os.environ.get("SUPERVISOR_RELAY", "1") == "1"
+RELAY_WAIT = float(os.environ.get("SUPERVISOR_RELAY_WAIT", "1.0"))  # bounded stream window
+RELAY_WAIT_FIRST = float(os.environ.get("SUPERVISOR_RELAY_WAIT_FIRST", "8.0"))  # first-seen catch-up
 FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
 STATE_FILE = ROOT / "experiments" / "results" / "supervisor" / "monitor_session.json"
 
@@ -138,6 +145,68 @@ def parse_verdict(reply: str) -> tuple[str, str]:
     return status, why
 
 
+def _slugify(value: str) -> str:
+    out = "".join(ch if ch.isalnum() else "_" for ch in value).strip("_").lower()
+    return out[:50] or "session"
+
+
+def _cell_id_for(session: dict) -> str:
+    """A readable Redis cell id for a native session, e.g. live_gpt_5_6_sol_facelift."""
+    model = (session.get("model") or {}).get("id", "?")
+    title = session.get("title") or ""
+    return f"live_{_slugify(model)}_{_slugify(title)}"
+
+
+def _event_sequence(event: dict) -> str | None:
+    for src in (event, event.get("properties") if isinstance(event.get("properties"), dict) else {}):
+        for key in ("sequence", "aggregateSequence", "aggregate_sequence", "_sse_id"):
+            v = src.get(key)
+            if isinstance(v, (str, int)) and not isinstance(v, bool):
+                return str(v)
+    return None
+
+
+def relay_once(client: OpenCodeClient, cursors: dict[str, str]) -> None:
+    """Bridge each active native session's events into Redis (Control Room stream).
+
+    Uses a bounded SSE read: a daemon thread consumes iter_events for RELAY_WAIT
+    seconds, events are published under ``live_<model>_<title>`` and the cell is
+    registered in ``story_status`` so it shows in the fleet.
+    """
+    if not RELAY:
+        return
+    for s in active_sessions(client):
+        sid = s.get("id", "")
+        cell_id = _cell_id_for(s)
+        after = cursors.get(sid)
+        first = after is None
+        collected: list[dict] = []
+
+        def consume(sid=sid, after=after, collected=collected) -> None:
+            try:
+                for ev in client.iter_events(sid, after=after):
+                    collected.append(ev)
+            except OpenCodeError:
+                pass
+
+        t = threading.Thread(target=consume, daemon=True)
+        t.start()
+        t.join(timeout=RELAY_WAIT_FIRST if first else RELAY_WAIT)
+
+        if not collected:
+            continue
+        last_seq = next((s2 for e in collected if (s2 := _event_sequence(e))), None)
+        if last_seq:
+            cursors[sid] = last_seq
+        if first:
+            continue  # discard replayed history; stream only new events from here on
+        publisher = LivePublisher(cell_id)
+        if publisher.enabled:
+            publisher.set_status("running")
+        for ev in collected:
+            publisher.publish_event(ev)
+
+
 def emit_flag(session: dict, status: str, why: str) -> None:
     flag = {
         "at": now(),
@@ -193,16 +262,24 @@ def main() -> None:
 
     client = OpenCodeClient(BASE_URL)
     monitor_id = ensure_monitor(client, args.location)
-    log(f"monitoring every {POLL_INTERVAL}s (active window {ACTIVE_WINDOW}s); flags -> {FLAGS_FILE}")
+    cursors: dict[str, str] = {}
+    log(f"relaying + monitoring (assess every {POLL_INTERVAL}s); flags -> {FLAGS_FILE}")
 
+    last_assess = 0.0
     while True:
         try:
-            supervise_once(client, monitor_id, args.location)
-        except Exception as e:  # noqa: BLE001 - a transient error must not kill the monitor
-            log(f"error: {e!r}")
+            relay_once(client, cursors)
+        except Exception as e:  # noqa: BLE001
+            log(f"relay error: {e!r}")
+        if time.time() - last_assess >= POLL_INTERVAL:
+            try:
+                supervise_once(client, monitor_id, args.location)
+            except Exception as e:  # noqa: BLE001
+                log(f"error: {e!r}")
+            last_assess = time.time()
         if args.once:
             return
-        time.sleep(POLL_INTERVAL)
+        time.sleep(2)
 
 
 if __name__ == "__main__":
