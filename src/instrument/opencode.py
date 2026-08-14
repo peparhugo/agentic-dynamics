@@ -42,6 +42,7 @@ class AgenticResult:
     task: str = ""
     model: str = ""
     workdir: str = ""
+    session_id: str = ""
     exit_code: int = 0
     duration_s: float = 0.0
     error: str = ""
@@ -188,6 +189,8 @@ def run_opencode_agentic(
     init_git: bool = True,
     on_event: Callable[[dict[str, Any]], None] | None = None,
     transcript_path: str | None = None,
+    session_id: str | None = None,
+    fork: bool = False,
 ) -> AgenticResult:
     """Spawn an opencode agentic session in an isolated worktree.
 
@@ -214,6 +217,10 @@ def run_opencode_agentic(
             back to Redis live publishing (``FINOPS_CELL_ID``) when omitted.
         transcript_path: Optional path for the session JSONL transcript.
             Defaults to ``<workdir>/.instrument/session.jsonl``.
+        session_id: When set together with ``fork=True``, resume the workflow by
+            forking the given session (``--session <id> --fork``), so the shared
+            context prefix is served as provider cache reads.
+        fork: Fork from ``session_id`` to reuse its context prefix (cache reads).
 
     Returns:
         AgenticResult with complete execution trace.
@@ -264,6 +271,8 @@ def run_opencode_agentic(
         cmd.extend(["--variant", THINKING_VARIANTS[thinking_effort]])
     if session_name:
         cmd.extend(["--title", session_name])
+    if fork and session_id:
+        cmd.extend(["--session", session_id, "--fork"])
     if prompt:
         cmd.append(prompt)
 
@@ -296,6 +305,8 @@ def run_opencode_agentic(
     # Parse JSONL output even on non-zero exit (partial output)
     if stream.stdout:
         _parse_session_output(stream.stdout, result)
+
+    result.session_id = _extract_session_id(stream.stdout)
 
     # Fall back to token × provider pricing when the events report no per-step cost
     # (e.g. openai models, whose step_finish carries cost=0). Keeps live cost honest
@@ -374,6 +385,24 @@ def _list_files(dirpath: str) -> set[str]:
         return {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()}
     except Exception:
         return set()
+
+
+def _extract_session_id(stdout: str) -> str:
+    """Extract the sessionID from the first JSONL event that carries one."""
+    if not stdout:
+        return ""
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        sid = obj.get("sessionID", "")
+        if sid:
+            return sid
+    return ""
 
 
 def _parse_session_output(stdout: str, result: AgenticResult) -> None:

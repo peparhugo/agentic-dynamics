@@ -249,6 +249,8 @@ def run_claude_agentic(
     init_git: bool = True,
     on_event: Callable[[dict[str, Any]], None] | None = None,
     transcript_path: str | None = None,
+    session_id: str | None = None,
+    fork: bool = False,
 ) -> AgenticResult:
     """Run an agentic session through the Claude CLI, emitting opencode JSONL.
 
@@ -260,6 +262,10 @@ def run_claude_agentic(
     Note: Claude CLI exposes no reasoning-effort flag; thinking is constrained
     by the standardized prompt header (``thinking_budget_tokens``), matching
     the opencode path.
+
+    ``session_id`` + ``fork=True`` resume the workflow by forking the given
+    session (``--resume <id> --fork-session``), so the shared context prefix is
+    served as provider cache reads.
     """
     import tempfile
 
@@ -298,16 +304,23 @@ def run_claude_agentic(
         "--dangerously-skip-permissions",
     ]
     cmd.extend(_claude_model_arg(model))
+    if fork and session_id:
+        cmd.extend(["--resume", session_id, "--fork-session"])
 
     adapter = ClaudeStreamAdapter()
     translated_lines: list[str] = []
     publisher = make_publisher() if on_event is None else None
+    captured_session_id = ""
 
     def on_line(line: str) -> None:
+        nonlocal captured_session_id
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
             return
+        sid = event.get("session_id", "")
+        if sid:
+            captured_session_id = sid
         for out in adapter.feed(event):
             translated_lines.append(json.dumps(out))
             if on_event is not None:
@@ -327,6 +340,8 @@ def run_claude_agentic(
     result.raw_transcript = "\n".join(translated_lines)
     if result.raw_transcript:
         _parse_session_output(result.raw_transcript, result)
+
+    result.session_id = captured_session_id
 
     result.duration_s = time.monotonic() - t0
     result.files_created, result.files_modified = _diff_workdir(workdir, files_before)

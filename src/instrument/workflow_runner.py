@@ -52,6 +52,10 @@ class PhaseResult:
     # agent phases
     tokens: dict[str, int] = field(default_factory=dict)
     cost_usd: float = 0.0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    cache_hit_rate: float = 0.0
+    session_id: str = ""
     files_created: list[str] = field(default_factory=list)
     files_modified: list[str] = field(default_factory=list)
     final_response: str = ""
@@ -71,6 +75,10 @@ class PhaseResult:
             "error": self.error,
             "tokens": self.tokens,
             "cost_usd": self.cost_usd,
+            "cache_read_tokens": self.cache_read_tokens,
+            "cache_write_tokens": self.cache_write_tokens,
+            "cache_hit_rate": self.cache_hit_rate,
+            "session_id": self.session_id,
             "files_created": self.files_created,
             "files_modified": self.files_modified,
             "test_executed_success": self.test_executed_success,
@@ -191,6 +199,7 @@ def run_workflow(
     stop_on_error: bool = True,
     resume: bool = False,
     publish: bool = True,
+    fork: bool | None = None,
     run_agentic_fn: Callable[..., Any] | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
@@ -200,7 +209,11 @@ def run_workflow(
     ``publish=True`` emits live telemetry to Redis so the Control Room shows the run as a
     cell (``story_status`` hash + ``status``/``events:<cell>`` channels). Each phase
     publishes a ``step_finish`` event carrying its tokens/cost, which feeds the ticker.
-    ``run_agentic_fn`` is injectable so tests can substitute a fake agent (no LLM).
+    ``fork=True`` chains each agent phase off the previous phase's session (opencode
+    ``--session <id> --fork``; Claude CLI ``--resume <id> --fork-session``; same model
+    only) so the shared context prefix is served as provider cache reads. ``fork=None``
+    falls back to the spec's ``workflow.params.fork`` flag. ``run_agentic_fn`` is
+    injectable so tests can substitute a fake agent (no LLM).
     """
     errors = validate_spec(spec)
     if errors:
@@ -246,6 +259,10 @@ def run_workflow(
             else:
                 break
 
+    fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
+    prev_session_id = ""
+    prev_model = ""
+
     for phase_def in phases[start_idx:]:
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
@@ -269,17 +286,29 @@ def run_workflow(
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
                 os.environ["FINOPS_CELL_ID"] = cell_id
                 try:
-                    ar = run_agent(
-                        prompt,
-                        model=model,
-                        backend=backend,
-                        workdir=str(wd),
-                        thinking_effort=thinking_effort,
-                        thinking_budget_tokens=thinking_budget_tokens,
-                        output_token_limit=output_token_limit,
-                        timeout=phase_timeout,
-                        silent_mode=silent_mode,
-                    )
+                    agent_kwargs: dict[str, Any] = {
+                        "model": model,
+                        "backend": backend,
+                        "workdir": str(wd),
+                        "thinking_effort": thinking_effort,
+                        "thinking_budget_tokens": thinking_budget_tokens,
+                        "output_token_limit": output_token_limit,
+                        "timeout": phase_timeout,
+                        "silent_mode": silent_mode,
+                    }
+                    # Cache-aware forking: reuse the previous phase's session prefix so
+                    # the shared context is served as provider cache reads (DeepSeek
+                    # cache read ~120x cheaper than input). A model switch breaks the
+                    # cache prefix, so only fork when the model is unchanged. Both
+                    # backends support it (opencode --session/--fork; claude --resume/--fork-session).
+                    if (
+                        fork_enabled
+                        and prev_session_id
+                        and prev_model == model
+                    ):
+                        agent_kwargs["session_id"] = prev_session_id
+                        agent_kwargs["fork"] = True
+                    ar = run_agent(prompt, **agent_kwargs)
                 finally:
                     if prev_cell is None:
                         os.environ.pop("FINOPS_CELL_ID", None)
@@ -293,6 +322,14 @@ def run_workflow(
                     "total": getattr(ar, "total_tokens", 0),
                 }
                 pr.cost_usd = getattr(ar, "estimated_cost_usd", 0.0)
+                pr.cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
+                pr.cache_write_tokens = getattr(ar, "cache_write_tokens", 0)
+                pr.cache_hit_rate = round(getattr(ar, "cache_hit_rate", 0.0), 4)
+                sid = getattr(ar, "session_id", "")
+                if sid:
+                    pr.session_id = sid
+                    prev_session_id = sid
+                prev_model = model
                 pr.files_created = list(getattr(ar, "files_created", []) or [])
                 pr.files_modified = list(getattr(ar, "files_modified", []) or [])
                 pr.final_response = getattr(ar, "final_response", "")
