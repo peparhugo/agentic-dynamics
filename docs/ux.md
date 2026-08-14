@@ -1,244 +1,293 @@
-# Control Room UX Design
+# Control Room Live Design Sessions
 
-The Control Room replaces the three disconnected admin views with one operational surface. Its hierarchy is deliberately financial: reported spend and burn rate are always visible, the fleet explains where that spend is occurring, and the selected agent's transcript explains why.
+The Control Room remains one operational surface: reported spend and burn establish financial context, the fleet shows active work, and the terminal explains what the selected agent is doing. Live design sessions extend that chain upstream so an operator can move from intent to a validated `ExperimentSpec` without leaving the command rail.
 
-The surface is observational in this phase. A running cell can be attached and watched, but the current runner has no authenticated inbound command channel, retained process registry, or writable subprocess input. The UI must not imply that a prompt, pause, abort, or steering action is available. This preserves the approved scope while leaving the control pane structurally ready for a future, explicitly secured command transport.
+Two session kinds are supported:
+
+- **Workflow design** turns a feature goal into an `ExperimentSpec` with `workflow.kind: agent_task` and an ordered phase plan.
+- **Experiment design** turns a research question into a factorial `ExperimentSpec` with factors, rules, metrics, and a comparison.
+
+Both are portal-owned OpenCode sessions. Existing experiment cells remain observational; Send, Steer, Interrupt, Save, Run, and Enqueue controls never appear for an ordinary fleet cell. This boundary is necessary because current cell subprocesses have no writable command channel, while the native OpenCode session API has explicit prompt and interrupt operations.
 
 ## 1. Layout and Screen Map
 
-### Desktop: one screen, three levels of attention
+### Desktop
 
-The application fills the viewport and uses a fixed command rail above a three-pane workspace. Only the pane interiors scroll; keeping the financial header and fleet state anchored prevents context loss during a long transcript.
+The existing full-viewport grid and `5fr 5fr 2.5fr` workspace proportions remain unchanged. Design work occupies the existing transcript and session-control panes rather than opening an editor, modal workspace, iframe, or second application. Reuse keeps spend, queue health, and competing fleet work visible while a spec is drafted.
 
 ```text
-+--------------------------------------------------------------------------------------+
-| CONTROL ROOM   LIVE | REPORTED SPEND  $12.4821  PARTIAL | BURN  $0.084/min  60s      |
-| 14:32:08 UTC        | INPUT 4.18M | OUTPUT 682K       | Redis: live | 03 running     |
-+------------------------------------+--------------------------------+----------------+
-| FLEET  30 CELLS                    | CELL / TRANSCRIPT              | SESSION CONTROL|
-| [All] [Running] [Risk] [Search...] | story__tier__model__condition | READ ONLY      |
-|                                    | RUNNING  stream: live          |                |
-| +----------------+ +-------------+ |                                | Cell           |
-| | RUNNING    24c | | QUEUED      | | 14:31:58  THINK                 | full cell id   |
-| | story...       | | story...    | | Checking the failing route... |                |
-| | ▁▂▃▅ tokens  ╱$| | no samples  | |                                | Status RUNNING |
-| +----------------+ +-------------+ | 14:32:01  TOOL bash             | Stream LIVE    |
-| +----------------+ +-------------+ | $ pytest tests/test_api.py     | Session abc123 |
-| | DONE       $...| | FAILED  !   | | completed in 1.8s              |                |
-| | story...       | | story...    | |                                | [Detach]       |
-| | ▁▂▂▃ tokens  ╱$| | ▂▅▇ cost    | | 14:32:04  STEP                 |                |
-| +----------------+ +-------------+ | 1,284 in / 312 out / $0.0241   | Watching does  |
-|                                    |                                | not control the|
-|  queued 14  running 3  done 11    | [Follow: on] [Pause] [Clear]   | experiment.    |
-|  failed 1  timeout 1              |                                |                |
-+------------------------------------+--------------------------------+----------------+
-| ROUTING BOARD  collapsed drawer                 | Queue actions | telemetry: partial |
-+--------------------------------------------------------------------------------------+
++------------------------------------------------------------------------------------------------+
+| CONTROL ROOM  LIVE | REPORTED SPEND $12.4821 PARTIAL | BURN $0.084/min | 03 running | Redis live|
++-------------------------------------+----------------------------------+--------------------------+
+| FLEET 30 CELLS                      | DESIGN / TERMINAL                | SESSION CONTROL          |
+| [All] [Running] [Risk] [Search...]  | EXPERIMENT DESIGN   drafting    | DESIGN SESSIONS          |
+|                                     | session ds_7af / stream live     | [Workflow design]        |
+| +----------------+ +--------------+ |                                  | [Experiment design]      |
+| | RUNNING        | | QUEUED       | | 14:31:58 OPERATOR                |                          |
+| | story...       | | story...     | | Compare retry policies...        | Kind  Experiment         |
+| | ▁▂▃▅ tokens ╱$ | | no samples   | |                                  | Model deepseek/...       |
+| +----------------+ +--------------+ | 14:32:01 AGENT                   | Draft draft-7af.yaml     |
+| +----------------+ +--------------+ | I'll define policy as a factor...| Revision 8               |
+| | DONE           | | FAILED       | |                                  |                          |
+| | story...       | | story...     | | 14:32:05 SPEC                    | VALIDATION               |
+| | ▁▂▂▃ tokens ╱$ | | ▂▅▇ cost     | | name: retry-policy-study         | VALID / 12 CELLS         |
+| +----------------+ +--------------+ | factors:                         |                          |
+|                                     |   - name: policy                 | [Save spec] [Enqueue]    |
+| queued 14  running 3  done 11       |     levels: [fixed, dynamics]    |                          |
+| failed 1  timeout 1                 |                                  | [Send] [Steer]           |
+|                                     | 14:32:06 VALIDATE  PASS          | [Interrupt] [Detach]     |
+|                                     | spec valid - 12 cells            |                          |
+|                                     |                                  | Recent design sessions   |
+|                                     | [Follow on] [Pause] [Clear view] | wf_2c1  valid            |
+|                                     | > Ask for a change...      [Send]| ds_7af  drafting         |
++-------------------------------------+----------------------------------+--------------------------+
+| ROUTING BOARD  collapsed drawer                    | Queue actions | telemetry: partial          |
++------------------------------------------------------------------------------------------------+
 ```
 
-The column proportions are `5fr 5fr 2.5fr`, with practical minimum widths rather than equal columns. The fleet and transcript carry most of the operator's work, while the control pane remains narrow because it exposes identity and connection state rather than a fake command console.
+### Command rail and fleet
 
-### Command rail
+The reported-spend ticker, 60-second burn trace, token totals, fleet counters, Redis state, cards, filters, and queue utility menu retain their current positions and meanings. Design-session cost events contribute to reported telemetry only when the backend can attribute finite, non-negative token and cost values; otherwise the rail continues to say `WAITING FOR COST TELEMETRY` or carries `PARTIAL` provenance. This avoids turning session creation into an unsupported accounting claim.
 
-The command rail contains four groups in reading order:
+Design sessions do not masquerade as experiment cells in the fleet. A compact `Recent design sessions` list lives in the session pane, while workflow executions and enqueued experiment cells enter the fleet under distinct execution identities. Separating conversation identity from execution identity prevents one transcript from implying that drafting and running are the same lifecycle.
 
-1. **Identity and clock:** `CONTROL ROOM`, UTC clock, and an overall `LIVE`, `RECONNECTING`, or `OFFLINE` label. UTC avoids ambiguity when correlating transcript entries with server logs.
-2. **Reported spend:** cumulative numeric cost with four decimal places and a `PARTIAL` or `RETAINED WINDOW` qualifier when completeness cannot be proven. The qualifier is adjacent to the amount so reported telemetry cannot be mistaken for an invoice.
-3. **Burn rate:** cost per minute over a labeled rolling 60-second window, plus a tiny horizontal trace of recent live cost deltas. A fixed window makes movement interpretable rather than merely animated.
-4. **Token and fleet counters:** input tokens, output tokens, running cells, and Redis state. Tokens explain movement in cost without competing visually with the primary monetary signal.
+### Session launchers
 
-Before a valid numeric cost event exists, the amount reads `WAITING FOR COST TELEMETRY`; it never displays `$0.00` as if zero spend were known. Negative, absent, or malformed cost and token values do not enter totals.
+`Workflow design` and `Experiment design` are persistent, equally weighted buttons under a `DESIGN SESSIONS` label at the top of the session pane. Their full labels are always visible; icons may supplement but never replace the words. The pane is the correct location because these actions create sessions, while the command rail remains reserved for fleet-wide financial and connection state.
 
-### Fleet pane
+Choosing a launcher replaces the lower session details with a compact start form:
 
-The fleet pane replaces the Matrix view with a dense, selectable card field. Its header includes total cells, filter chips (`All`, `Running`, `Risk`), and search by full cell ID. Filters change presentation only and never interrupt telemetry collection.
+| Session kind | Required fields | Optional fields | Why |
+|---|---|---|---|
+| Workflow design | Feature goal, model, approved workdir | Backend, thinking budget | The goal seeds phases, and explicit execution context prevents the agent from choosing a repository or cost profile implicitly. |
+| Experiment design | Research question, model, approved workdir | Seed, budget ceiling | The question anchors factors and metrics, while seed and budget make eventual cell growth visible early. |
 
-Each card contains:
+`Start workflow design` and `Start experiment design` use kind-specific labels rather than a generic `Create`. The initiating button is disabled while pending, and the typed prompt remains visible after a failure so retries do not require reconstruction.
 
-- A shape icon and explicit status word: `QUEUED`, `RUNNING`, `DONE`, `FAILED`, `TIMEOUT`, or `UNKNOWN`.
-- The full cell ID over multiple lines rather than an ellipsis. Cell IDs encode experiment factors, so truncation would remove operationally useful identity.
-- Latest reported step cost, or `no cost yet`; unsupported zeroes are not invented.
-- A 36-pixel token-cost sparkline. Muted vertical bars encode total tokens per step and an amber line encodes reported step cost. Two encodings let the operator distinguish token volume from price movement in very little space.
-- An accessible summary such as `Latest sample: 1,596 tokens, 2.4 cents; 8 samples shown`. The chart itself is decorative because a tiny chart cannot carry sufficient accessible meaning.
+### Terminal in design mode
 
-Cards sort by urgency first (`running`, `failed`, `timeout`, `queued`, `done`) and then by cell ID. This puts spend-producing and intervention-worthy cells above completed work while retaining deterministic order within a state.
+Selecting a design session changes the center heading from `CELL / TRANSCRIPT` to `DESIGN / TERMINAL`; it does not change the pane's terminal structure. The selected fleet keyline clears, the prior detail `EventSource` closes, and one design-session stream opens. Selecting a fleet card reverses this handoff and restores the read-only cell controls.
 
-The selected card receives a solid inset keyline and `SELECTED` text. Selection cannot rely on glow alone. A running card's accessible action is `Watch running cell <id>`; queued and terminal cards use `Inspect cell <id>`.
+Design mode adds four semantic row types to the existing `THINK`, `AGENT`, `TOOL`, `STEP`, `EVENT`, and `RAW` rows:
 
-### Transcript pane
-
-The center pane is a terminal, not a JSON viewer. Its sticky header shows the selected cell's full ID, status, stream state, and local transcript controls. The feed translates known events into compact semantic rows:
-
-| Event | Presentation | Reasoning |
+| Row | Presentation | Design decision |
 |---|---|---|
-| `reasoning` | `THINK` row with softly dimmed prose | Keeps the agent's working process readable without making it louder than outcomes. |
-| `text` | `AGENT` row in the brightest body text | Treats the answer or narration as primary transcript content. |
-| `tool_use` | `TOOL <name>` row with status, summarized input, and expandable output | Shows what the agent did while preventing large tool payloads from overwhelming the feed. |
-| `step_start` | Thin numbered divider | Makes long sessions scannable without adding a card around every step. |
-| `step_finish` | `STEP` row with input, output, reasoning, cache tokens, and reported cost when present | Connects each unit of work directly to its financial consequence. |
-| Unknown JSON | `EVENT` row with a collapsed, formatted details disclosure | Preserves forward compatibility instead of silently dropping data. |
-| Plain text | `RAW` row with escaped text | Keeps malformed or legacy events visible and safe. |
+| `OPERATOR` | Submitted prompt with `queued`, `steered`, or `admission failed` state | Admission is shown separately from agent output because a successful prompt request confirms receipt, not completion. |
+| `SPEC` | Complete current draft in a mono, syntax-aware YAML block, labeled with draft revision | The backend-owned draft is the save/run artifact; showing it avoids treating conversational YAML as executable truth. |
+| `VALIDATE PASS` | `spec valid - 12 cells`, or `spec valid - workflow ready` | A positive row makes the gate visible in the same chronology as the edit that satisfied it. |
+| `VALIDATE ERROR` | One parser, construction, or `validate_spec` error per wrapped line, followed by a count | Verbatim server errors preserve the authoritative validator and keep requires/produces failures actionable. |
 
-Rows use a UTC timestamp when one is supplied. If an event has no timestamp, the UI uses an arrival marker such as `received now` and does not fabricate server time.
+The latest `SPEC` row is expanded by default and earlier spec revisions collapse to `SPEC revision N`. A `Show previous revision` disclosure preserves audit context without making repeated YAML dominate the transcript. Syntax highlighting is presentation-only and uses escaped text nodes; the browser never parses highlighted markup from agent output.
 
-The feed retains at most 500 rendered rows. `Follow` scrolls only when the operator is already at the bottom; manual upward scrolling suspends follow and exposes a `Jump to live` control. `Pause` freezes rendering locally while buffering within the same bound. `Clear view` removes local rows only and is followed by helper text stating that Redis history and the experiment are unchanged.
+Validation rows are inserted only when the draft revision or validation state changes. This prevents polling from flooding the terminal with duplicate `spec valid` rows. The session pane always mirrors the latest state as `NO DRAFT`, `PARSING`, `INVALID YAML`, `INVALID SPEC`, `VALID`, `VALID / UNSAVED CHANGES`, or `SAVED`.
 
 ### Session control pane
 
-The right pane is titled `SESSION CONTROL` with a persistent `READ ONLY` badge. It contains:
+For a portal-owned design session, the pane shows:
 
-- Selected cell ID and current cell status.
-- Event-stream state: `connecting`, `live`, `reconnecting`, `disconnected`, or `unavailable`.
-- OpenCode session ID when a selected event supplies `sessionID`; otherwise `Session identity not observed yet`.
-- `Watch` for an unattached running cell and `Detach` for an attached stream. Detach closes only the browser's selected-cell `EventSource` and leaves the worker untouched.
-- A short boundary statement: `Watching does not send input or control the experiment.`
+- Session kind, portal session ID, OpenCode session ID, model, approved workdir label, and stream state.
+- Draft basename, revision, last validation time, validation state, and cell count when available.
+- `Save spec` plus kind-specific `Run workflow` or `Enqueue` actions.
+- A prompt composer with `Send` and `Steer`, followed by `Interrupt` and browser-only `Detach`.
+- Recent portal-owned design sessions, sorted active first and then by most recent activity.
 
-No disabled prompt box, Send button, process Pause button, or Abort button is shown. Disabled controls would still suggest a capability the system does not possess. A future steering phase can add a command composer in this pane only after cell-to-session identity, authentication, authorization, command acknowledgement, and graceful cancellation are implemented outside the current Redis telemetry contract.
+`Send` queues the next turn. `Steer` injects guidance into active work and is visually secondary because it can redirect an in-progress response. `Interrupt` requests native session interruption and requires confirmation. `Detach` only closes the browser stream and never implies process control. Distinct verbs prevent four materially different actions from collapsing into an ambiguous Pause control.
 
-### Routing and queue utilities
+For an ordinary fleet cell, the pane returns to the existing `READ ONLY` badge, identity, stream state, Watch/Detach behavior, and boundary copy. Design-only controls are removed rather than disabled so the portal does not advertise unsupported control over worker subprocesses.
 
-The existing Routing view becomes a bottom drawer so it remains reachable without displacing live operations. Opening the drawer fetches routing data and presents the current per-task and strategy tables unchanged in meaning.
+### Validation and action area
 
-Queue actions live in a small utility menu rather than the primary rail because queue administration is secondary to observation. `Enqueue` and `Clear queued work` use the existing experiments API. Clear requires confirmation with the exact warning `This clears queued metadata; it does not cancel running work.`
+`Save spec` is enabled only for a draft that parses, constructs as `ExperimentSpec`, and returns no errors from server-side `validate_spec`. If the destination exists, confirmation shows the repository-relative path and requires an explicit `Replace existing spec` action. This protects committed specifications from an agent-selected overwrite.
+
+After saving, any draft change marks the session `VALID / UNSAVED CHANGES` and disables Run/Enqueue until the new revision is saved. Executions therefore always reference a stable repository artifact rather than mutable temporary content.
+
+For workflow design, `Run workflow` opens an in-pane confirmation sheet listing spec path, goal, model, workdir, backend, timeout, token budget, and commit intent. The final button reads `Run workflow`; the sheet states that tools may modify the worktree and spend model budget.
+
+For experiment design, `Enqueue` opens the same style of confirmation sheet listing spec path, exact cell count, factor dimensions, models, seed, queue target, and any available budget estimate. The final button reads `Enqueue 12 cells`; it never says merely `Confirm`. The server revalidates the saved bytes and recomputes the matrix before admission, rejecting the request if the revision or count changed.
+
+The current `story_jobs` worker cannot execute generic `experiment_matrix` cells. Therefore `Enqueue` is rendered only when the draft-state response advertises `capabilities.enqueue: true` from a generic ExperimentSpec dispatcher. Until that transport exists, a valid experiment shows `Validated; enqueue unavailable` with `Save spec` still active. This is a deliberate honesty constraint, not a disabled-looking promise.
 
 ### Narrow screens
 
-At widths below `760px`, the command rail wraps into a two-row spend strip and the workspace becomes one vertical sequence: spend, fleet, transcript, session control, routing drawer. The fleet uses one card per row at `375px`; the transcript receives at least `55vh` so it remains useful rather than becoming a token preview.
+Below `760px`, the existing page sequence remains spend rail, fleet, transcript, session control, and routing drawer. Starting or selecting a design session adds `Jump to design terminal` from the session pane and `Back to session controls` from the terminal. At `375px`, launchers stack, the prompt composer uses a full-width text area, action pairs wrap into 44-pixel minimum targets, and YAML scrolls inside its own block without page-level horizontal overflow.
 
-The selected card exposes `Jump to transcript`, and the transcript exposes `Back to fleet`. These are anchor movements within the same document, not separate views, preserving the single-screen mental model. No pane or control creates horizontal page overflow; only long terminal payloads may scroll inside their own code block.
+The transcript retains at least `55vh`, because reducing it to a preview would make agent drafting and validation errors impossible to follow. Confirmation sheets remain in document flow rather than becoming viewport modals, preserving keyboard order and avoiding mobile viewport traps.
 
 ## 2. Interaction Flow
 
-### Arrival and hydration
+### Shared session lifecycle
 
-1. The shell renders immediately with skeleton cards and explicit `connecting` labels rather than blank regions.
-2. `GET /api/matrix` hydrates cell identity, statuses, counts, and additive retained-window telemetry summaries. Last-known content remains visible on later fetch failures because an outage should not erase operational context.
-3. `GET /api/status` opens once and applies status transitions in place. Native EventSource retry is surfaced as `reconnecting`; the application must not create parallel status streams.
-4. If no cells exist, the fleet displays `No cells are queued or retained` with an optional `Enqueue experiment` action. Spend remains `WAITING FOR COST TELEMETRY` rather than zero.
-5. No cell is selected automatically unless there is exactly one running cell. This avoids surprising attachment in a busy fleet while making the single-agent case immediate.
+1. The operator chooses one of the two labeled launchers, supplies the required intent, model, and approved workdir, then starts the session.
+2. `POST /api/design-sessions` creates a portal-owned session, backend-selected temporary YAML path, and native OpenCode session. The initial prompt names the exact draft path and the constraints for that session kind.
+3. The portal selects the returned design session, closes any prior detail stream, and attaches through the existing terminal SSE relay. The operator's initial intent appears as the first `OPERATOR` row.
+4. OpenCode reasoning, text, tools, and usage appear through the normal terminal row renderer. The transcript retains the existing Follow, Pause, Clear view, replay, and 500-row bounds.
+5. While attached, the browser requests the latest draft after a relevant tool/text event and at a bounded idle cadence. The backend reads the temporary file, parses it safely, constructs `ExperimentSpec`, calls `validate_spec`, and returns the authoritative revision and state.
+6. A changed draft produces one `SPEC` row and one changed `VALIDATE` result. Parser and construction failures remain distinct from semantic validator errors so the operator knows whether to fix YAML shape or experiment logic.
+7. The operator can ask for a correction with `Send`, redirect active drafting with `Steer`, or interrupt only the portal-owned native session. Prompt admission appears immediately; model output remains asynchronous.
+8. The operator saves only after a passing validation state. The backend re-reads and revalidates before atomically writing under `experiments/specs/`.
+9. Run or Enqueue requires that exact saved revision and a second explicit confirmation. A successful launch returns a separate execution identity, which becomes selectable in the fleet without replacing the design conversation.
 
-The matrix telemetry addition is a snapshot, not an append-only client ledger: each successful response replaces the retained-window totals and per-cell sample arrays. Replacement prevents five-second polling from counting the same history repeatedly. The existing response fields and meanings remain unchanged; new telemetry fields are additive and derived from existing `events_log:<cell_id>` entries.
+On reload, `GET /api/design-sessions` restores portal-owned session summaries and the most recently selected identity. It does not enumerate arbitrary OpenCode sessions, because portal ownership determines which sessions may expose mutating controls.
 
-### Selecting and watching a cell
+### Workflow design flow
 
-1. Clicking a card, pressing Enter on its focused action, or choosing `Watch` sets one global selected-cell ID.
-2. The card receives the selection keyline, the transcript header changes immediately, and any previous selected-cell EventSource closes before the new one opens.
-3. The browser connects to `GET /api/events/<encoded-cell-id>`. Retained events render chronologically, followed by live events from the same stream.
-4. The session pane changes from `connecting` to `live` on the first event. A quiet but healthy stream remains live; lack of agent output is not itself an error.
-5. If a native event contains `sessionID`, the pane reveals it with a copy action. Session identity is informational because a cell may span multiple native sessions and Claude translation may not supply one.
-6. Selecting another card repeats the handoff without affecting the global status stream or matrix polling.
+1. The operator selects `Workflow design` and enters a concrete feature goal such as `Add audit-log export with tests`, plus model and approved workdir.
+2. The agent is prompted to maintain one draft whose `workflow.kind` is `agent_task` and whose parameters contain ordered phases. The terminal shows the operator intent before agent drafting so the artifact can be judged against its source request.
+3. The first draft appears as `SPEC revision 1`. Live validation checks the complete `ExperimentSpec`, including factorial structure and rule requirements, not only the workflow block.
+4. If validation fails, errors appear inline, for example `workflow.kind 'story' ...` or an unmet requires/produces message ending in `Instrument it first.` `Save spec` and `Run workflow` remain unavailable.
+5. The operator sends a correction or lets the agent revise. A passing draft displays `VALIDATE PASS - spec valid - workflow ready`; the session pane switches to `VALID`.
+6. `Save spec` asks for a safe `.yaml` basename and, only when needed, an overwrite confirmation. Success reports the repository-relative path and marks the revision `SAVED`.
+7. `Run workflow` presents all launch parameters and side effects. On confirmation, the backend revalidates the saved file and starts the existing workflow runner under a new execution identity.
+8. The portal selects the new fleet execution only if the operator chooses `Watch run`; otherwise the design transcript remains visible. This avoids destroying the context needed for a follow-up revision.
 
-For a queued cell, the pane says `Waiting for worker` and remains ready to receive history/live events. For `done`, `failed`, or `timeout`, it says `Inspecting retained history`; terminal cards do not imply that the underlying process is attachable.
+### Experiment design flow
 
-### Reading live work
+1. The operator selects `Experiment design` and enters a research question such as `Does a dynamics retry policy reduce cost without lowering accepted quality?`, plus model and approved workdir.
+2. The agent is prompted to maintain one factorial draft containing factors, rules, metrics, comparison, stopping conditions, and provenance-bearing evidence classes.
+3. Each draft revision is passed to `validate_spec`. In particular, control-rule `requires` must be available from ledger fields or measurement-rule `produces`; policy arms cannot become enqueueable merely because their YAML parses.
+4. After validation passes, the backend computes a bounded `experiment_matrix` preview. The terminal prints `VALIDATE PASS - spec valid - 12 cells`, and the session pane exposes the total plus a collapsed factor-assignment preview.
+5. Zero cells, duplicate-looking cell IDs, a matrix above the configured preview/admission cap, or a missing generic dispatcher are capability errors, not `validate_spec` errors. The UI labels them separately as `VALID SPEC / NOT ENQUEUEABLE`, preserving the meaning of the authoritative validator.
+6. `Save spec` persists the validated revision. If generic dispatch is available, `Enqueue` then shows the exact cell count and dimensions in the queue-style confirmation sheet.
+7. On confirmation, the backend revalidates, recomputes the matrix, and enqueues an immutable saved revision. A mismatch returns to the draft with `Spec changed; review the new 16-cell matrix` rather than admitting a different workload.
+8. Accepted cells appear through the normal fleet snapshot and status stream. The design session stays available in Recent design sessions for interpretation and later adaptation.
 
-Incoming selected-cell events are normalized by type before rendering. Known text is escaped, tool input/output is summarized, and unknown content remains available through a disclosure. This provides terminal immediacy without trusting event payloads as HTML.
+### Validation feedback rules
 
-When a valid `step_finish` arrives, the selected card sparkline and its latest-cost label update immediately. The spend rail reconciles that sample against the latest fleet snapshot rather than blindly adding it, so replay and automatic reconnection cannot double-count reported spend. Replayed samples may hydrate cumulative retained spend, but only samples observed after the live boundary enter the rolling burn-rate window.
+The draft-state contract distinguishes these states because each has a different remedy:
 
-Because the current retained event list is capped at 500 entries, any total derived from a full list or an unknown history boundary is labeled `PARTIAL` or `RETAINED WINDOW`. Cost language consistently uses `reported`, never `actual`, `invoice`, or `bill`.
+| State | Terminal copy | Available actions |
+|---|---|---|
+| No draft | `Waiting for the agent to write the assigned draft` | Send, Steer, Interrupt, Detach |
+| Invalid YAML | Parser location and message | Send, Steer, Interrupt, Detach |
+| Construction error | Dataclass/schema construction message | Send, Steer, Interrupt, Detach |
+| Validation errors | Verbatim `validate_spec` errors | Send, Steer, Interrupt, Detach |
+| Valid, unsaved | `spec valid - N cells` or `workflow ready` | Save spec, conversation controls |
+| Valid, saved | Saved path and revision | Run workflow or Enqueue when capable, conversation controls |
+| Valid, not runnable | Capability reason such as matrix cap or unavailable dispatcher | Save spec, conversation controls |
 
-### Stream interruption and recovery
+The browser never duplicates `validate_spec` logic. Client-side checks cover only required form fields and obvious request shape; all validity, cell counts, saved-revision checks, and launch gates come from the backend. One source of truth prevents a green browser state from disagreeing with execution.
 
-The status source and selected-cell source each expose these visible states:
+### Confirmation and failure behavior
 
-- `connecting`: initial connection has not delivered data.
-- `live`: connection is open and data has been observed.
-- `reconnecting`: EventSource reported an error and will retry.
-- `disconnected`: the operator detached or the page intentionally closed the source.
-- `unavailable`: the server returned a nonrecoverable response or Redis is unavailable.
+Save, Run, Enqueue, Interrupt, and existing queue-clear operations use the same compact confirmation pattern: action name, target, consequences, Cancel first, and a specific final verb. Destructive or spend-producing actions are never triggered by Enter while focus is in the prompt composer.
 
-On interruption, cards, totals, samples, and transcript rows remain in place with a `last update` age. Reconnection resumes into the same selected cell, deduplicates retained replay before rendering or aggregation, and does not multiply EventSource instances. This favors continuity while clearly distinguishing stale data from live telemetry.
+While a mutation request is pending, only its initiating control is disabled and labeled with progress, such as `Saving...` or `Enqueueing 12 cells...`. Duplicate submissions carry an idempotency key. Failure leaves the latest transcript, draft, entered filename, and confirmation parameters in place, then focuses an inline error summary. Preserving context is more useful than resetting a control plane after a transient OpenCode, Redis, or filesystem error.
 
-### Transcript controls
-
-- `Pause` stops DOM insertion, not network receipt or the experiment. Its label becomes `Resume (N buffered)`.
-- `Resume` appends the bounded buffer in order and follows only if follow mode was active before pausing.
-- `Follow` toggles automatic bottom alignment. Manual upward scrolling turns it off without discarding events.
-- `Clear view` requests confirmation only when buffered content exists, clears local presentation, and never calls a backend deletion endpoint.
-- `Detach` closes the selected-cell stream and freezes the current transcript. The selected card remains selected so the operator can reattach without searching again.
-
-### Keyboard and announcements
-
-Cards are real buttons or contain one real button, support normal tab order, and use visible focus rings. Status transitions announce through a polite live region; failures and Redis loss use an assertive alert. Continuous transcript content is not automatically announced because it would overwhelm screen-reader users; the transcript is a named log region that can be entered on demand.
+Stream reconnection, draft polling failure, and OpenCode unavailability are separate states. A stream failure marks transcript freshness; a draft failure marks validation stale and disables Save/Run/Enqueue; an OpenCode control failure disables Send/Steer/Interrupt. Independent degradation keeps safe read-only information available.
 
 ## 3. Visual Language
 
-### Color
+### Existing operations-room palette
 
-The palette resembles a dim operations room rather than a generic analytics dashboard:
+The feature uses the implemented Control Room tokens rather than introducing editor chrome:
 
-| Token | Value | Use and rationale |
+| Token | Value | Use |
 |---|---:|---|
-| `--ink-0` | `#07090c` | Viewport background; near-black gives luminous telemetry contrast without pure-black glare. |
-| `--ink-1` | `#0d1117` | Pane background; a small lift establishes structure without visible card chrome everywhere. |
-| `--ink-2` | `#151b23` | Selected and interactive surfaces. |
-| `--line` | `#2a3441` | Borders and graph grids; blue-gray stays subordinate to data. |
-| `--text` | `#e8edf2` | Primary text at accessible contrast. |
-| `--muted` | `#8b98a8` | Labels and inactive metadata, never essential status alone. |
-| `--cost` | `#ffbf47` | Spend, burn, and cost traces; amber is the protagonist and appears nowhere decorative. |
-| `--queued` | `#8793a1` | Neutral queued state. |
-| `--running` | `#43b9ff` | Active work and connection indicators. |
-| `--done` | `#57d38c` | Successful terminal state. |
-| `--failed` | `#ff6470` | Failed state and actionable errors. |
-| `--timeout` | `#c995ff` | Timeout; violet distinguishes it from both cost amber and failure red. |
+| `--ink-0` | `#07090c` | Viewport and terminal ground |
+| `--ink-1` | `#0d1117` | Pane background |
+| `--ink-2` | `#151b23` | Selected and interactive rows |
+| `--line` | `#2a3441` | Borders and YAML guides |
+| `--line-strong` | `#46566a` | Focus and selected revision boundaries |
+| `--text` | `#e8edf2` | Agent text and YAML values |
+| `--muted` | `#9ba8b8` | Metadata and inactive labels |
+| `--cost` | `#ffbf47` | Money only |
+| `--running` | `#43b9ff` | Live stream, drafting, links, YAML keys |
+| `--done` | `#57d38c` | Valid and saved states |
+| `--failed` | `#ff6470` | Parser, construction, validation, and request errors |
+| `--timeout` | `#c995ff` | Timeout and YAML scalar accents |
 
-Every status combines color with a word and icon: hollow circle for queued, rotating-notch circle for running, check for done, cross for failed, and clock for timeout. Cost retains exclusive ownership of amber so the eye learns one stable financial cue.
+Amber remains exclusive to reported money and cost traces. Validation uses green/red and syntax uses blue, violet, text, and muted tones, so syntax highlighting cannot be mistaken for spend.
 
-Subtle one-pixel grid lines may sit behind the fleet at low opacity. They provide instrument-panel character without scanline animation, fake noise, gradients on every card, or decorative data that could be mistaken for telemetry.
+### Typography and syntax
 
-### Typography and numbers
+Labels and controls use the existing system sans stack. Prompts, transcript rows, IDs, timestamps, validation text, and YAML use `ui-monospace, "SFMono-Regular", Consolas, monospace`. This makes the design session feel like the current terminal rather than a foreign embedded IDE.
 
-The UI uses dependency-free local stacks:
+The YAML block has line numbers, preserved indentation, wrapped comments, and horizontal scrolling only for indivisible tokens. Keys, strings, numbers, booleans, nulls, comments, and punctuation receive restrained syntax color, but the raw source remains selectable and available through `Copy YAML`. Highlighting runs over escaped source and never accepts model-produced HTML.
 
-- Labels and controls: `system-ui, -apple-system, "Segoe UI", sans-serif`.
-- Cell IDs, transcript, clocks, costs, and tokens: `ui-monospace, "SFMono-Regular", Consolas, monospace`.
+`OPERATOR`, `AGENT`, `SPEC`, and `VALIDATE` remain uppercase, letter-spaced row labels in the same timestamp gutter used by current events. Validation errors wrap beneath the label with hanging indentation so long requires/produces messages stay scannable.
 
-Section labels are uppercase, letter-spaced, and small; body text remains sentence case. Monetary figures use tabular numerals and a larger weight, preventing width jitter as spend updates. Costs show four decimals below `$100`, tokens use compact suffixes in the rail, and exact values remain available in accessible labels or details.
+### Shape, hierarchy, and motion
 
-### Motion
+Launchers and actions use the current one-pixel border, four-pixel radius, and 44-pixel minimum target. The draft is a terminal row with a stronger left rule, not a floating rounded card. This keeps the industrial hierarchy and prevents the spec from looking detached from the conversation that produced it.
 
-Motion communicates state changes only:
+The latest validation state is repeated in the session pane because it governs actions; earlier validation remains in transcript chronology because it explains the path to validity. This intentional duplication separates current control state from historical evidence.
 
-- Running cards emit a restrained two-second border pulse, not a whole-card scale animation. This indicates active spend without making the matrix visually unstable.
-- A new cost sample draws the final sparkline segment over 180 milliseconds and briefly brightens the spend amount. The movement ties cause to financial effect.
-- Status transitions cross-fade the icon and border over 160 milliseconds. Terminal states stop all pulsing immediately.
-- Transcript rows appear without typewriter effects; streaming content is already moving and does not need theatrical delay.
-- Drawer and pane transitions use at most 180 milliseconds and never block input.
+New transcript rows appear without typewriter effects. A changed validation badge cross-fades over at most 160 milliseconds; drafting retains the existing restrained running pulse; terminal validation stops pulsing. Under `prefers-reduced-motion: reduce`, all pulses, fades, and smooth scrolling are removed while words, icons, and border states remain.
 
-Under `prefers-reduced-motion: reduce`, pulses, line drawing, smooth scrolling, and cross-fades are removed. Running state remains apparent through icon, status text, border color, and live connection copy.
+### Accessibility and trust
 
-### Density, shape, and hierarchy
+Every state combines text, icon, and color. The transcript remains a named `role="log"` that is not continuously announced; prompt admission, validation-state changes, and mutation results use a separate polite live region, while failed Save/Run/Enqueue uses an assertive alert. This announces consequential changes without reading every model token to screen-reader users.
 
-Cards use four-pixel corner radii, one-pixel borders, and almost no shadow. The compact industrial shape differentiates the Control Room from soft consumer dashboards and leaves visual emphasis for the amber spend rail.
+Keyboard order follows launcher, start form, terminal controls, prompt composer, session actions, and recent sessions. Opening a confirmation moves focus to its heading; Cancel or success returns focus to the initiating control. Escape closes only the confirmation or routing drawer and never detaches or interrupts a session.
 
-Spacing follows a four-pixel base unit. Fleet cards are information-dense but retain a minimum 44-pixel selection target. Pane headings and controls remain fixed while content scrolls, and terminal line length is constrained enough to read reasoning while tool output can expand to full pane width.
+Prompt text, agent output, tool payloads, YAML, filenames, and validation errors are always rendered with `textContent` or equivalent escaped nodes. The backend owns workdirs and temporary paths, while Save accepts only a normalized `.yaml` basename under `experiments/specs/`. These trust boundaries are part of the experience because a design session can spend budget, run tools, and write repository files.
 
-## 4. Data and SSE Element Map
+## 4. Endpoint and Stream Element Map
 
-The design preserves Flask, all current paths, and the existing Redis names and meanings: `story_jobs`, `story_results`, `story_status`, `status`, `events:<cell_id>`, and `events_log:<cell_id>`. No iframe, second service, framework, or alternate realtime transport is introduced.
+The feature is additive. Existing endpoints keep their current contracts; rows marked **new** are required for portal-managed design sessions. The browser remains same-origin and never connects directly to the OpenCode server.
 
-| Source | Transport and cadence | Elements fed | Client behavior |
+| Source | Status and cadence | Elements fed | Contract and rationale |
 |---|---|---|---|
-| `GET /api/matrix` | JSON on load and every five seconds | Fleet inventory, initial/current statuses, state counts, Redis-unavailable state, reported-spend snapshot, token totals, and all card sparkline histories | Preserve current fields. Add only derived telemetry summaries/samples from retained event logs. Replace snapshots rather than accumulating them so polling cannot duplicate spend. Keep the last good snapshot on errors. |
-| `GET /api/status` | One page-lifetime SSE connection | Card status word/icon/border/pulse, fleet counters, selected-cell status, overall connection indicator | Parse existing `{cell_id, status}` messages. Unknown statuses use the neutral treatment. Heartbeat comments maintain the connection but do not create visual events. |
-| `GET /api/events/<encoded-cell-id>` | One SSE connection for the selected cell; retained replay then live Pub/Sub | Terminal rows, selected-card live sparkline, selected latest-cost label, immediate spend/token reconciliation, rolling burn-rate samples, session ID, and selected-stream state | Close the previous source before switching. Interpret existing `text`, `reasoning`, `tool_use`, `step_start`, and `step_finish` payloads; preserve unknown JSON and plain text. Bound rendered rows to 500 and deduplicate replay on reconnect. |
-| `GET /api/routing` | JSON when the Routing drawer first opens, with manual refresh | Per-task routing and strategy simulation drawer | Preserve current table meanings and show explicit empty/error states. Routing never blocks the live workspace. |
-| `POST /api/experiments` | JSON request initiated from the utility menu | Enqueue and clear progress/result notices | Send only existing `enqueue` or `clear` actions. Disable the initiating control while pending. Require confirmation for clear and state that running work is not cancelled. |
-| `GET /` and `/static/*` | Initial document/assets | Entire Control Room shell | Render useful connecting and empty states before Redis data arrives. No iframe or frontend build step is required. |
+| `GET /` and `/static/*` | Existing, initial load | Entire shell, launchers, terminal and control-pane states | The static Flask application remains the only frontend surface; no iframe or build system is required. |
+| `GET /api/matrix` | Existing JSON, load plus five-second poll | Fleet, counts, retained telemetry, reported spend, token totals, card traces | Design conversations are not cells. Only launched workflow executions or admitted experiment cells appear here under separate IDs. |
+| `GET /api/status` | Existing page-lifetime SSE | Fleet status transitions, counters, global connection state | The page opens one global status stream. Design-session lifecycle does not create one stream per session. |
+| `GET /api/events/<encoded-stream-id>` | Existing SSE relay, one selected detail at a time | Cell or design transcript, reasoning, agent text, tools, usage, session identity, replay boundary | Design relays normalize native OpenCode events into the existing retained Redis channel/log pattern. Switching selection closes the previous source before opening another. |
+| `GET /api/routing` | Existing JSON, drawer open/refresh | Routing drawer | Design mode does not displace or reinterpret routing evidence. |
+| `POST /api/experiments` | Existing JSON mutation | Existing hardcoded queue Enqueue/Clear notices | This endpoint retains story-queue semantics and is never used for a drafted ExperimentSpec. |
+| `POST /api/design-sessions` | **New** JSON mutation | Start-form pending/success/error, selected design identity | Accepts `kind`, intent, model, approved workdir key, and bounded options; creates the portal/native session and assigned temporary draft. |
+| `GET /api/design-sessions` | **New** JSON on load and manual retry | Recent design sessions, restored selection, lifecycle badges | Returns portal-owned summaries only, without unrestricted filesystem paths or arbitrary native sessions. |
+| `GET /api/design-sessions/<id>/spec` | **New** JSON after relevant events and bounded polling | `SPEC` row, validation rows, current badge, cell preview, action capability gates | Reads the exact temporary artifact, parses, constructs, calls `validate_spec`, and only then computes a bounded matrix preview. Revision/ETag support avoids duplicate rows. |
+| `POST /api/design-sessions/<id>/input` | **New** JSON mutation | `OPERATOR` admission row, Send/Steer status | Maps `delivery: queue` to Send and `delivery: steer` to Steer. Admission acknowledgement is not presented as agent completion. |
+| `POST /api/design-sessions/<id>/interrupt` | **New** JSON mutation | Interrupt confirmation/result and lifecycle state | Proxies native interrupt only for a portal-owned session. It is separate from browser Detach. |
+| `POST /api/design-sessions/<id>/save` | **New** JSON mutation | Saved path/revision, overwrite confirmation, Save result | Re-parses and revalidates, enforces a safe basename, and writes atomically under `experiments/specs/`; existing files require explicit overwrite intent. |
+| `POST /api/design-sessions/<id>/run` | **New** workflow-only JSON mutation | Run confirmation/result and returned fleet execution ID | Revalidates the immutable saved revision and invokes the workflow runner with explicit launch parameters. |
+| `POST /api/design-sessions/<id>/enqueue` | **New**, gated experiment-only JSON mutation | Enqueue capability, exact-cell confirmation, admission result | Requires a generic ExperimentSpec dispatcher, revalidates and recomputes cells, and must not write generic cells into the existing story-only queue. |
 
-### Feed ownership and reconciliation
+### Draft-state response
 
-The matrix snapshot owns fleet-wide retained totals and sparkline history; the selected event SSE owns immediate presentation for one watched cell. This split is intentional: opening an EventSource for every card would exceed common HTTP/1 per-origin connection limits and duplicate the backend's per-cell Pub/Sub work.
+The draft endpoint returns one coherent snapshot so the spec text, validation state, matrix count, and enabled actions cannot come from different revisions:
 
-For selected-cell events, the client keeps a cell-scoped identity ledger for the retained window and reconciles incoming samples with the next matrix snapshot. Automatic SSE replay can therefore redraw missing transcript rows without adding cost twice. Historical samples establish cumulative reported telemetry but do not enter the live 60-second burn window; only newly observed post-attachment samples do.
+```json
+{
+  "session_id": "ds_7af",
+  "revision": 8,
+  "draft_state": "valid",
+  "yaml": "name: retry-policy-study\n...",
+  "validation": {
+    "valid": true,
+    "errors": [],
+    "validated_at": "2026-08-14T14:32:06Z"
+  },
+  "matrix": {
+    "count": 12,
+    "preview": [{"cell_id": "...", "policy": "fixed"}],
+    "truncated": false
+  },
+  "saved": {
+    "revision": 8,
+    "path": "experiments/specs/retry-policy-study.yaml"
+  },
+  "capabilities": {
+    "save": true,
+    "run": false,
+    "enqueue": true,
+    "reason": null
+  }
+}
+```
 
-The UI treats the current event schema defensively:
+For malformed YAML or construction failure, `yaml` and the exact error remain available while `validation.valid` is false and all mutation capabilities are false except conversation controls. For a valid but unsaved revision, `save` is true and Run/Enqueue are false. Capability fields are backend decisions, not client inference.
 
-- `part.tokens.input`, `part.tokens.output`, `part.tokens.reasoning`, and cache counts contribute only when finite and non-negative.
-- `part.cost` contributes only when finite and non-negative.
-- Missing fields render as unavailable rather than numeric zero unless the event explicitly reports zero.
-- `sessionID` is displayed when present but is never assumed to be stable for the entire cell.
-- Tool payloads are escaped and collapsed by default.
+### Stream ownership and event handling
 
-The current SSE streams have no durable cursor and the event log retains only 500 entries. The visual contract therefore promises a live operational estimate, not accounting completeness. Whenever the client cannot prove complete history, the spend rail and affected card details visibly carry `PARTIAL` or `RETAINED WINDOW` provenance.
+The page owns exactly two SSE connections at most: one global `/api/status` source and one selected `/api/events/<stream-id>` source. Reusing the selected-detail stream avoids browser connection fan-out and preserves the existing replay/follow/pause machinery.
+
+The native OpenCode relay tracks its durable aggregate sequence before publishing into the portal's bounded Redis event log. Browser reconnect still receives retained events followed by `replay_complete`; occurrence-based deduplication remains defensive, but durable relay sequencing prevents native reconnects from multiplying design rows.
+
+Draft validation is not scraped from SSE prose. The browser fetches the backend-owned file snapshot through the spec endpoint, then creates local `SPEC` and `VALIDATE` terminal rows keyed by revision and state hash. This split makes the artifact authoritative while keeping validation visually integrated with the streamed conversation.
+
+### Launch handoff
+
+A successful workflow Run or experiment Enqueue returns an execution ID and stream ID. Subsequent status comes from `/api/matrix` and `/api/status`, and selecting that execution reads `/api/events/<stream-id>` like any other fleet item. The design-session stream remains separate and recoverable from Recent design sessions.
+
+All mutating design endpoints require same-origin JSON, bounded bodies, portal-session ownership, an idempotency key, and loopback access unless authentication is added. Errors from OpenCode, Redis, validation, filesystem writes, queue admission, or the runner are returned as structured JSON and rendered inline without erasing last-known transcript or draft content.
