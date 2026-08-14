@@ -1,0 +1,155 @@
+name: rag_knowledge_base
+question: >-
+  Independently, per model, research the state of the art in runtime retrieval-augmented
+  generation for AI agents, then design and propose an "agent intelligent knowledge base":
+  (1) where the agent knowledge lives (Neo4j graph vs ChromaDB vectors vs Redis stream vs
+  Elasticsearch, or a hybrid), (2) how a work item is augmented at runtime from that store,
+  and (3) a prompt-constructor agent that turns a raw work item into an optimally augmented
+  prompt. Each of deepseek-v4-pro, claude-fable-5, and gpt-5.6-sol researches and proposes
+  independently, in its own worktree, grounded in this repo's existing infra and the external
+  cutting edge. Output per cell is a proposal + integration/impact plan.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true   # chain the 3 phases' sessions so shared context becomes DeepSeek cache reads
+    context:
+      brief: >-
+        We want an "intelligent knowledge base" that supports runtime RAG for the agents in this
+        repo. Given an incoming work item (a prompt/task), the system should (a) retrieve the most
+        relevant knowledge — structural/graph relationships, semantic/vector similarity, and the raw
+        reasoning stream — and (b) hand that retrieved context to a SEPARATE prompt-constructor agent
+        that synthesizes an optimally augmented prompt, which then drives the working agent. This is
+        an exploratory phase: each model is free to propose a different storage topology, retrieval
+        strategy, and prompt-builder design. The deliverable is a proposal and how it fits (or changes)
+        this codebase and infra — not a shipped implementation.
+      load_bearing_rule: >-
+        This repo is an information-acquisition machine: instrument -> derive (measurement rules ->
+        information) -> write policy (control rules consuming that information) -> grid -> campaign.
+        A control rule may only consume information that is already measured. Your proposal must state
+        which signals it needs, which are already measured (see the ledger), and which would have to be
+        instrumented first. Do not propose consuming `confidence` (unmeasured) without also specifying
+        its instrumentation.
+    phases:
+      - name: survey
+        kind: agent
+        prompt: |
+          Research the state of the art and map this repo's existing knowledge infrastructure. Write
+          docs/rag_survey.md.
+
+          GOAL:
+          {goal}
+
+          PART A — EXTERNAL STATE OF THE ART (cite sources, tag [X] external / [H] heuristic):
+          - Runtime RAG for agents: GraphRAG vs hybrid retrieval (BM25 + dense + graph traversal),
+            agentic memory, knowledge-graph + vector fusion, retrieval as a tool call vs a context stage.
+          - Prompt construction: meta-agents / prompt-optimizer patterns (e.g. "another agent that builds
+            an amazing prompt from the work item"), automatic prompt engineering, self-reflective prompt
+            synthesis. How is prompt quality measured?
+          - Storage topology trade-offs: Neo4j (graph) vs ChromaDB/vector store vs Elasticsearch
+            (full-text + stream) vs Redis stream — cost, latency, freshness, and query-time join cost.
+          - Cutting edge as of mid-2026: cite concrete papers/frameworks where possible; be honest about
+            what is [X] external claim vs [H] your own heuristic.
+
+          PART B — THIS REPO'S EXISTING INFRA (read the code, cite file:line for every claim):
+          - src/instrument/graph.py — Neo4jClient: how experiments are already modeled as a graph
+            (models, configs, runs, operators, strategies, basin topologies). This is the seed of a
+            knowledge graph.
+          - src/instrument/embeddings.py — EmbeddingClient + ChromaStore (Ollama bge-m3 + ChromaDB):
+            the existing vector search path (extract_session_text / extract_session_steps).
+          - src/instrument/codebase_graph.py — CodebaseGraph / build_graph(): import-graph structural
+            metrics, Neo4j or in-memory networkx.
+          - src/instrument/trajectory.py — ReasoningTrajectory / TrajectoryStep: the raw reasoning
+            stream (thought/action/tool/tokens) that is the natural "stream" of agent knowledge.
+          - src/instrument/live.py — LivePublisher: Redis pub/sub telemetry (the current live stream).
+          - src/instrument/routing.py — compute_routing() / recommend_route(): the existing "route a
+            task type to a model" policy that a runtime-RAG layer would sit beside.
+          - src/instrument/workflow_runner.py — run_workflow(): the execution loop a runtime-augmentation
+            hook would need to inject into.
+          - src/instrument/experiment_spec.py — LEDGER_FIELDS + validate_rules(): what is already
+            measured vs unmeasured (confidence, perturbation_strength, test_executed_success).
+          - src/instrument/efficiency.py — PROVIDER_PRICING: the cost model every storage/retrieval
+            choice must be priced against.
+
+          SURVEY REQUIREMENTS:
+          - Inventory which of the pieces above are REUSABLE vs missing. Do not propose rebuilding
+            Neo4jClient or ChromaStore — say how you would extend or bypass them.
+          - Identify the gap for runtime retrieval: what would the retrieval step need that does not
+            exist today (index freshness, hybrid scoring, graph+vector traversal, prompt synthesis).
+
+          DELIVER exactly one file, docs/rag_survey.md: (1) external SOTA summary with [X]/[H] tags,
+          (2) repo infra map with file:line citations, (3) reusable vs missing, (4) the open questions
+          your design phase must resolve.
+      - name: design
+        kind: agent
+        prompt: |
+          Design the agent intelligent knowledge base and its runtime augmentation path. Write
+          docs/rag_design.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DESIGN REQUIREMENTS (your own choices — this is exploratory, defend them):
+          1. Storage topology — choose (and justify) where knowledge lives: Neo4j graph, ChromaDB
+             vectors, Redis stream, Elasticsearch, or a concrete hybrid. You are NOT bound to Neo4j;
+             if Elasticsearch (or something else) is the better home for the "stream", say so and why.
+             Price each choice against PROVIDER_PRICING and current infra.
+          2. Runtime augmentation pipeline — given a work item, the exact retrieval flow: what is
+             queried, how graph + vector + full-text signals are combined/scored, what is injected
+             into context, and where in run_workflow()/run_opencode_agentic() the hook lives.
+          3. Prompt-constructor agent — a SEPARATE agent that turns the work item + retrieved context
+             into an optimally augmented prompt. Spec its role, its inputs/outputs, how it stays cheap
+             (cache/fork economics), and how its output quality is measured.
+          4. Knowledge ingestion — how agent sessions/trajectories become knowledge: what is extracted,
+             how it is embedded/indexed into the graph + vector + stream, and freshness/eviction.
+          5. Load-bearing rule — list every signal your design consumes; mark each as measured-in-ledger,
+             measured-by-a-rule-you-would-write, or unmeasured-needs-instrumentation. `confidence` is
+             unmeasured and must not be silently consumed.
+
+          DELIVER exactly one file, docs/rag_design.md: (1) storage decision + rationale, (2) retrieval
+          pipeline (data flow + scoring), (3) prompt-constructor agent spec, (4) ingestion pipeline,
+          (5) the signal/instrumentation table honoring the load-bearing rule, (6) failure modes and
+          fallbacks.
+      - name: proposal
+        kind: agent
+        prompt: |
+          Consolidate into a final proposal plus an integration/impact plan. Write docs/rag_proposal.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          DELIVER exactly one file, docs/rag_proposal.md containing:
+          1. Executive summary — the idea in one paragraph.
+          2. The proposal — storage topology, runtime augmentation, prompt-constructor agent, ingestion,
+             referencing your docs/rag_survey.md and docs/rag_design.md.
+          3. Integration plan — exactly which existing modules/files change (extend graph.py's
+             Neo4jClient, embeddings.py's ChromaStore, add a retrieval module, hook workflow_runner.py),
+             and which are left untouched. New modules vs modifications, in build order.
+          4. Infra impact — new services (Neo4j / Elasticsearch / ChromaDB / Redis), cost estimate via
+             PROVIDER_PRICING, and how the Redis queue isolation (finops-queue on 6380 vs finops-redis on
+             6379) is respected.
+          5. How we measure it — what would prove the knowledge base + prompt-constructor actually
+             improves agent work (correctness, cost, latency), and which measurement rules would have to
+             be written first (the load-bearing rule).
+          6. Risks, unknowns, and what you would want the other models' proposals to be compared on.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro, anthropic/claude-fable-5, openai/gpt-5.6-sol]}
+design: factorial
+# This is an exploratory research grid: there are no control rules yet (nothing consumes
+# unmeasured information). Proposal quality is the qualitative output, scored by human or
+# cross-model review (review.py compare_implementations), not auto-measured here.
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: files_created, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 20.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
