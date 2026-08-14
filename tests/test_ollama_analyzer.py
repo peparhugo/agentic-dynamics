@@ -1,14 +1,17 @@
 """Tests for Ollama analyzer module."""
 
 import json
-import tempfile
-import pytest
 import socket
+import tempfile
 from pathlib import Path
+
+import pytest
+
 from instrument.ollama_analyzer import OllamaAnalyzer, load_summary_data
 
 try:
-    s = socket.create_connection(("localhost", 11434), timeout=2); s.close()
+    s = socket.create_connection(("localhost", 11434), timeout=2)
+    s.close()
     _OLLAMA_OK = True
 except Exception:
     _OLLAMA_OK = False
@@ -107,14 +110,21 @@ class TestOllamaAnalyzer:
 
 
 class TestLoadSummaryData:
-    def test_returns_list(self):
-        entries = load_summary_data()
+    def test_returns_list(self, tmp_path):
+        # Loader behavior should not depend on whichever experiment corpus is generated locally.
+        summary_path = tmp_path / "summary.json"
+        summary_path.write_text(json.dumps({"entries": [{
+            "model": "test-model",
+            "cost": 0.01,
+            "correctness": 0.9,
+        }]}))
+
+        entries = load_summary_data(summary_path)
         assert isinstance(entries, list)
-        if entries:
-            entry = entries[0]
-            assert "model" in entry
-            assert "cost" in entry
-            assert "correctness" in entry
+        entry = entries[0]
+        assert "model" in entry
+        assert "cost" in entry
+        assert "correctness" in entry
 
     def test_missing_file_returns_empty_list(self):
         entries = load_summary_data(Path("/nonexistent/summary.json"))

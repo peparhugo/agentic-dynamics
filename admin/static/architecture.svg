@@ -1,0 +1,469 @@
+<svg class="architecture-map" xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="architecture-title architecture-desc">
+  <title id="architecture-title">The information-acquisition machine</title>
+  <desc id="architecture-desc">An ExperimentSpec compiles into a DAG, controlled cells, jobs, and attempts. Attempts emit append-only ledger events. Measurement rules turn those events into information before a dependency gate permits policy. Policy becomes an experiment arm in a grid and campaign, outcomes are compared, and adaptation changes one variable in the next specification. The diagram also maps the machine to Why, How, What, cost levers, reversible and compounding doors, and the N by M evidence burden.</desc>
+
+  <defs>
+    <!-- Theme-aware surfaces retain standalone fallbacks when the SVG is opened directly. -->
+    <linearGradient id="ground-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset="0.55" stop-color="#0b111a"/>
+      <stop offset="1" stop-color="#070a0f"/>
+    </linearGradient>
+    <radialGradient id="why-gradient" cx="50%" cy="45%" r="68%">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.2"/>
+      <stop offset="0.58" stop-color="#f59e0b" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0.02"/>
+    </radialGradient>
+    <linearGradient id="instrument-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#152231"/>
+      <stop offset="1" stop-color="#0d1721"/>
+    </linearGradient>
+    <linearGradient id="policy-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#152337"/>
+      <stop offset="1" stop-color="#0c1522"/>
+    </linearGradient>
+    <pattern id="dossier-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#94a3b8" stroke-opacity="0.045" stroke-width="1"/>
+    </pattern>
+    <filter id="amber-glow" x="-30%" y="-50%" width="160%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="cyan-glow" x="-30%" y="-50%" width="160%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrow-neutral" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" class="marker-neutral"/>
+    </marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" class="marker-cyan"/>
+    </marker>
+    <marker id="arrow-sky" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" class="marker-sky"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10Z" class="marker-amber"/>
+    </marker>
+  </defs>
+
+  <style>
+    .architecture-map {
+      --arch-bg: var(--bg2, #0b111a);
+      --arch-bg-deep: var(--bg, #070a0f);
+      --arch-surface: var(--bg3, #101722);
+      --arch-surface-raised: var(--bg4, #1b2637);
+      --arch-line: var(--b, rgba(148, 163, 184, 0.18));
+      --arch-line-strong: var(--ba, rgba(148, 163, 184, 0.3));
+      --arch-text: var(--t, #f8fafc);
+      --arch-text-soft: var(--t2, #cbd5e1);
+      --arch-text-muted: var(--t3, #718096);
+      --arch-cyan: var(--ac, #22d3ee);
+      --arch-amber: var(--am, #f59e0b);
+      --arch-sky: var(--cy, #38bdf8);
+      --arch-success: var(--success, #22c55e);
+      color: var(--arch-text);
+      font-family: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+      width: 100%;
+      height: auto;
+      background: var(--arch-bg);
+    }
+    .figure-ground { fill: url(#ground-gradient); stroke: var(--arch-line); stroke-width: 1; }
+    .grid-texture { fill: url(#dossier-grid); opacity: 0.8; }
+    .region { fill: none; vector-effect: non-scaling-stroke; }
+    .region-what { stroke: var(--arch-sky); stroke-width: 1.5; stroke-dasharray: 10 8; opacity: 0.48; }
+    .region-how-outer { stroke: var(--arch-cyan); stroke-width: 1.5; opacity: 0.52; }
+    .region-how-inner { stroke: var(--arch-cyan); stroke-width: 1; opacity: 0.25; }
+    .region-why { fill: url(#why-gradient); stroke: var(--arch-amber); stroke-width: 2; }
+    .region-label { font-size: 14px; font-weight: 700; letter-spacing: 0.18em; }
+    .region-detail { fill: var(--arch-text-muted); font-size: 10px; letter-spacing: 0.08em; }
+    .what-label { fill: var(--arch-sky); }
+    .how-label { fill: var(--arch-cyan); }
+    .why-label { fill: var(--arch-amber); }
+    .map-title { fill: var(--arch-text); font-size: 21px; font-weight: 700; letter-spacing: 0.08em; }
+    .map-subtitle { fill: var(--arch-text-muted); font-size: 10px; letter-spacing: 0.06em; }
+    .edge { fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; vector-effect: non-scaling-stroke; }
+    .edge-neutral { stroke: var(--arch-text-muted); marker-end: url(#arrow-neutral); }
+    .edge-cyan { stroke: var(--arch-cyan); marker-end: url(#arrow-cyan); }
+    .edge-sky { stroke: var(--arch-sky); marker-end: url(#arrow-sky); }
+    .edge-amber { stroke: var(--arch-amber); stroke-dasharray: 7 6; marker-end: url(#arrow-amber); }
+    .edge-faint { fill: none; stroke: var(--arch-line-strong); stroke-width: 1; stroke-dasharray: 3 5; }
+    .marker-neutral { fill: var(--arch-text-muted); }
+    .marker-cyan { fill: var(--arch-cyan); }
+    .marker-sky { fill: var(--arch-sky); }
+    .marker-amber { fill: var(--arch-amber); }
+    .edge-label {
+      fill: var(--arch-text-muted);
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      paint-order: stroke;
+      stroke: var(--arch-bg);
+      stroke-width: 5px;
+      stroke-linejoin: round;
+    }
+    .node .node-surface { stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+    .node-instrument .node-surface { fill: url(#instrument-gradient); stroke: var(--arch-cyan); }
+    .node-policy .node-surface { fill: url(#policy-gradient); stroke: var(--arch-sky); }
+    .node-adapt .node-surface { fill: var(--arch-surface); stroke: var(--arch-amber); }
+    .node-title { fill: var(--arch-text); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; }
+    .node-detail { fill: var(--arch-text-soft); font-size: 10px; }
+    .node-index { fill: var(--arch-text-muted); font-size: 8px; letter-spacing: 0.12em; }
+    .concept-card { fill: var(--arch-bg-deep); fill-opacity: 0.7; stroke: var(--arch-line-strong); stroke-width: 1; }
+    .concept-title { fill: var(--arch-cyan); font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
+    .concept-copy { fill: var(--arch-text-soft); font-size: 10px; }
+    .concept-rule { stroke: var(--arch-line-strong); stroke-width: 1; }
+    .why-statement { fill: var(--arch-text); font-size: 21px; font-weight: 700; letter-spacing: 0.08em; }
+    .why-substatement { fill: var(--arch-amber); font-size: 15px; font-weight: 700; letter-spacing: 0.08em; }
+    .why-caption { fill: var(--arch-text-soft); font-size: 10px; }
+    .gate-diamond { fill: var(--arch-surface-raised); stroke: var(--arch-cyan); stroke-width: 1.6; }
+    .gate-label { fill: var(--arch-text); font-size: 9px; font-weight: 700; text-anchor: middle; }
+    .gate-pass { fill: var(--arch-success); }
+    .gate-caption { fill: var(--arch-cyan); font-size: 9px; letter-spacing: 0.06em; }
+    .door-panel { fill: var(--arch-bg-deep); fill-opacity: 0.82; stroke: var(--arch-line-strong); stroke-width: 1; }
+    .door-key-cyan { stroke: var(--arch-cyan); stroke-width: 3; }
+    .door-key-amber { stroke: var(--arch-amber); stroke-width: 3; }
+    .door-title { fill: var(--arch-text); font-size: 9px; font-weight: 700; letter-spacing: 0.05em; }
+    .door-detail { fill: var(--arch-text-muted); font-size: 8.5px; }
+    .brace { fill: none; stroke-width: 1; vector-effect: non-scaling-stroke; }
+    .brace-cyan { stroke: var(--arch-cyan); opacity: 0.62; }
+    .brace-amber { stroke: var(--arch-amber); opacity: 0.62; }
+    .brace-label { font-size: 9px; letter-spacing: 0.025em; text-anchor: middle; }
+    .brace-label-cyan { fill: var(--arch-cyan); }
+    .brace-label-amber { fill: var(--arch-amber); }
+    .rail-label { fill: var(--arch-text-muted); font-size: 9px; font-weight: 700; letter-spacing: 0.1em; }
+    .rail-stage { fill: var(--arch-bg-deep); stroke: var(--arch-line-strong); stroke-width: 1; }
+    .rail-stage-text { fill: var(--arch-text-soft); font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-anchor: middle; }
+    .rail-edge { fill: none; stroke: var(--arch-text-muted); stroke-width: 1.2; marker-end: url(#arrow-neutral); }
+    .rail-gate { fill: var(--arch-surface-raised); stroke: var(--arch-cyan); stroke-width: 1.2; }
+    .rail-gate-caption { fill: var(--arch-cyan); font-size: 8px; text-anchor: middle; }
+    .tracer { fill: none; stroke-linecap: round; stroke-width: 2.4; stroke-dasharray: 0.8 99.2; pathLength: 100; opacity: 0.7; }
+    .tracer-execution { stroke: var(--arch-cyan); animation: trace-forward 9s linear infinite; }
+    .tracer-feedback { stroke: var(--arch-amber); animation: trace-feedback 12s linear infinite; }
+    @keyframes trace-forward { to { stroke-dashoffset: -100; } }
+    @keyframes trace-feedback { from { stroke-dashoffset: 45; } to { stroke-dashoffset: -55; } }
+    @media (prefers-reduced-motion: reduce) {
+      .tracer { display: none; animation: none; }
+      .architecture-map * { transition: none !important; }
+    }
+    @media (prefers-color-scheme: light) {
+      .architecture-map {
+        --arch-bg: var(--bg2, #f1f5f9);
+        --arch-bg-deep: var(--bg, #ffffff);
+        --arch-surface: var(--bg3, #e8eef5);
+        --arch-surface-raised: var(--bg4, #dbe5ef);
+        --arch-line: var(--b, rgba(15, 23, 42, 0.16));
+        --arch-line-strong: var(--ba, rgba(15, 23, 42, 0.3));
+        --arch-text: var(--t, #0f172a);
+        --arch-text-soft: var(--t2, #334155);
+        --arch-text-muted: var(--t3, #64748b);
+        --arch-cyan: var(--ac, #0891b2);
+        --arch-amber: var(--am, #b45309);
+        --arch-sky: var(--cy, #0284c7);
+      }
+      .figure-ground { fill: var(--arch-bg); }
+      .grid-texture { opacity: 0.28; }
+      .node-instrument .node-surface, .node-policy .node-surface { fill: var(--arch-surface); }
+    }
+    @media print {
+      .figure-ground { fill: #fff; stroke: #555; }
+      .grid-texture, .tracer { display: none; }
+      .region-what { stroke: #555; stroke-dasharray: 10 8; }
+      .region-how-outer, .region-how-inner, .region-why { stroke: #333; filter: none; }
+      .region-why, .node-instrument .node-surface, .node-policy .node-surface { fill: #fff; }
+      .architecture-map { --arch-text: #000; --arch-text-soft: #222; --arch-text-muted: #555; --arch-bg: #fff; --arch-bg-deep: #fff; --arch-surface: #fff; --arch-surface-raised: #eee; }
+    }
+  </style>
+
+  <!-- The dossier ground gives the formal map a bounded, printable working surface. -->
+  <rect class="figure-ground" x="1" y="1" width="1438" height="898" rx="26"/>
+  <rect class="grid-texture" x="1" y="1" width="1438" height="898" rx="26"/>
+
+  <!-- WHY, HOW, and WHAT are semantic territories, distinguished by line style as well as color. -->
+  <g class="architecture-rings">
+    <rect class="region region-what" x="24" y="24" width="1392" height="852" rx="40"/>
+    <rect class="region region-how-outer" x="168" y="104" width="1122" height="590" rx="34"/>
+    <rect class="region region-how-inner" x="176" y="112" width="1106" height="574" rx="29"/>
+    <rect class="region region-why" x="500" y="330" width="440" height="190" rx="95" filter="url(#amber-glow)"/>
+
+    <text class="region-label what-label" x="48" y="58">WHAT</text>
+    <text class="region-detail" x="113" y="58">DECISIONS / DOORS / CAMPAIGNS</text>
+    <text class="region-label how-label" x="190" y="137">HOW</text>
+    <text class="region-detail" x="246" y="137">INSTRUMENT / COST LEVERS / N &#x00D7; M</text>
+    <text class="region-label why-label" x="526" y="361">WHY</text>
+
+    <text class="map-title" x="720" y="58" text-anchor="middle">THE INFORMATION-ACQUISITION MACHINE</text>
+    <text class="map-subtitle" x="720" y="80" text-anchor="middle">EVENTS &#x2192; INFORMATION &#x2192; TESTABLE POLICY &#x2192; ADAPTATION</text>
+  </g>
+
+  <!-- Connections establish execution order first; active color begins only at measurement. -->
+  <g class="architecture-edges">
+    <path class="edge edge-neutral" d="M360 188H380"/>
+    <text class="edge-label" x="370" y="176" text-anchor="middle">compile</text>
+
+    <path class="edge edge-neutral" d="M560 188H582"/>
+    <text class="edge-label" x="571" y="176" text-anchor="middle">factor cross-product</text>
+
+    <path class="edge edge-neutral" d="M727 188H747"/>
+    <text class="edge-label" x="737" y="176" text-anchor="middle">materialize / enqueue</text>
+
+    <path class="edge edge-neutral" d="M892 188H912"/>
+    <text class="edge-label" x="902" y="176" text-anchor="middle">execute</text>
+
+    <path class="edge edge-neutral" d="M1072 188H1094"/>
+    <text class="edge-label" x="1083" y="176" text-anchor="middle">emit events</text>
+
+    <path class="edge edge-cyan" d="M1172 226V320"/>
+    <text class="edge-label" x="1182" y="276">instrument</text>
+
+    <path class="edge edge-cyan" d="M1172 390C1172 441 1158 468 1120 500"/>
+    <text class="edge-label" x="1174" y="450">derive / measurement rules</text>
+
+    <path class="edge edge-cyan" d="M1000 538C982 538 974 568 965 617"/>
+    <text class="edge-label" x="993" y="586" text-anchor="end">arm loss</text>
+
+    <path class="edge edge-neutral" d="M755 617H450"/>
+    <text class="edge-label" x="603" y="605" text-anchor="middle">compare outcomes</text>
+
+    <path class="edge edge-amber" d="M280 617H174V188H190"/>
+    <text class="edge-label" x="161" y="412" transform="rotate(-90 161 412)" text-anchor="middle">next specification / tweak one variable</text>
+
+    <path class="edge edge-cyan" d="M1120 576C1120 604 1102 612 1080 625"/>
+    <path class="edge edge-sky" d="M1080 675C1080 686 1072 692 1068 700"/>
+    <path class="edge edge-sky" d="M955 740H925"/>
+    <text class="edge-label" x="940" y="728" text-anchor="middle">arm</text>
+    <path class="edge edge-sky" d="M720 740H690"/>
+    <text class="edge-label" x="705" y="728" text-anchor="middle">grid</text>
+    <path class="edge edge-amber" d="M480 740C434 740 400 689 365 654"/>
+    <text class="edge-label" x="431" y="702" text-anchor="middle">adapt</text>
+
+    <!-- Faint leaders bind the ordering rail to its concrete stages without implying data flow. -->
+    <path class="edge-faint" d="M1305 820V790H1265V355H1249"/>
+    <path class="edge-faint" d="M1130 820V790H1210V538H1240"/>
+    <path class="edge-faint" d="M925 820V790H1068V780"/>
+    <path class="edge-faint" d="M740 820V790H822V780"/>
+    <path class="edge-faint" d="M550 820V790H585V780"/>
+  </g>
+
+  <!-- Every stage is an explicit title/detail pair so the system remains readable without motion. -->
+  <g class="architecture-nodes">
+    <g class="node node-instrument" aria-label="ExperimentSpec: question, workflow, factors, and rules">
+      <title>ExperimentSpec</title>
+      <rect class="node-surface" x="190" y="150" width="170" height="76" rx="10"/>
+      <text class="node-index" x="204" y="168">01 / INTENT</text>
+      <text class="node-title" x="204" y="191">ExperimentSpec</text>
+      <text class="node-detail" x="204" y="211">question &#x00B7; workflow &#x00B7; factors &#x00B7; rules</text>
+    </g>
+
+    <g class="node node-instrument" aria-label="DAG: validate, cells, execute, measure, compare, and adapt">
+      <title>DAG</title>
+      <rect class="node-surface" x="380" y="150" width="180" height="76" rx="10"/>
+      <text class="node-index" x="394" y="168">02 / ORDER</text>
+      <text class="node-title" x="394" y="191">DAG</text>
+      <text class="node-detail" x="394" y="207">
+        <tspan x="394">validate &#x2192; cells &#x2192; execute</tspan>
+        <tspan x="394" dy="13">measure &#x2192; compare &#x2192; adapt</tspan>
+      </text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Cells: factor cross-product">
+      <title>Cells</title>
+      <rect class="node-surface" x="582" y="150" width="145" height="76" rx="10"/>
+      <text class="node-index" x="596" y="168">03 / DESIGN</text>
+      <text class="node-title" x="596" y="191">CELLS</text>
+      <text class="node-detail" x="596" y="211">factor cross-product</text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Jobs: budget, deadline, and policy arm">
+      <title>Jobs</title>
+      <rect class="node-surface" x="747" y="150" width="145" height="76" rx="10"/>
+      <text class="node-index" x="761" y="168">04 / CONTROL</text>
+      <text class="node-title" x="761" y="191">JOBS</text>
+      <text class="node-detail" x="761" y="207">
+        <tspan x="761">budget &#x00B7; deadline</tspan>
+        <tspan x="761" dy="13">policy arm</tspan>
+      </text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Attempts: tokens, timing, tools, and outcome">
+      <title>Attempts</title>
+      <rect class="node-surface" x="912" y="150" width="160" height="76" rx="10"/>
+      <text class="node-index" x="926" y="168">05 / EXECUTION</text>
+      <text class="node-title" x="926" y="191">ATTEMPTS</text>
+      <text class="node-detail" x="926" y="207">
+        <tspan x="926">tokens &#x00B7; timing &#x00B7; tools</tspan>
+        <tspan x="926" dy="13">outcome</tspan>
+      </text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Ledger: append-only events">
+      <title>Ledger</title>
+      <rect class="node-surface" x="1094" y="150" width="155" height="76" rx="10"/>
+      <text class="node-index" x="1108" y="168">06 / VISIBILITY</text>
+      <text class="node-title" x="1108" y="191">LEDGER</text>
+      <text class="node-detail" x="1108" y="211">append-only events</text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Measure: measurement rules">
+      <title>Measure</title>
+      <rect class="node-surface" x="1094" y="320" width="155" height="70" rx="10"/>
+      <text class="node-index" x="1108" y="338">07 / DERIVE</text>
+      <text class="node-title" x="1108" y="361">MEASURE</text>
+      <text class="node-detail" x="1108" y="380">measurement rules</text>
+    </g>
+
+    <g class="node node-instrument" aria-label="Information: first-pass, grit, cost, and uncertainty">
+      <title>Information</title>
+      <rect class="node-surface" x="1000" y="500" width="240" height="76" rx="10" filter="url(#cyan-glow)"/>
+      <text class="node-index" x="1014" y="518">08 / DECISION INPUTS</text>
+      <text class="node-title" x="1014" y="541">INFORMATION</text>
+      <text class="node-detail" x="1014" y="561">first-pass &#x00B7; grit &#x00B7; cost &#x00B7; uncertainty</text>
+    </g>
+
+    <g class="node node-policy" aria-label="Compare: cost, quality, latency, SLA, and value">
+      <title>Compare</title>
+      <rect class="node-surface" x="755" y="580" width="210" height="74" rx="10"/>
+      <text class="node-index" x="769" y="598">09 / ARM LOSS</text>
+      <text class="node-title" x="769" y="621">COMPARE</text>
+      <text class="node-detail" x="769" y="641">cost &#x00B7; quality &#x00B7; latency &#x00B7; SLA &#x00B7; value</text>
+    </g>
+
+    <g class="node node-adapt" aria-label="Adapt: tweak one variable">
+      <title>Adapt</title>
+      <rect class="node-surface" x="280" y="580" width="170" height="74" rx="10"/>
+      <text class="node-index" x="294" y="598">10 / LEARNING</text>
+      <text class="node-title" x="294" y="621">ADAPT</text>
+      <text class="node-detail" x="294" y="641">tweak one variable</text>
+    </g>
+
+    <g class="node node-policy" aria-label="Policy: route, retry, escalate, and budget; policy is a factor level and arm">
+      <title>Policy</title>
+      <rect class="node-surface" x="955" y="700" width="225" height="80" rx="10"/>
+      <text class="node-index" x="969" y="718">CONTROL RULE</text>
+      <text class="node-title" x="969" y="741">POLICY</text>
+      <text class="node-detail" x="969" y="758">route &#x00B7; retry &#x00B7; escalate &#x00B7; budget</text>
+      <text class="node-detail" x="969" y="772">policy = factor level / arm</text>
+    </g>
+
+    <g class="node node-policy" aria-label="Grid: policy as an arm">
+      <title>Grid</title>
+      <rect class="node-surface" x="720" y="700" width="205" height="80" rx="10"/>
+      <text class="node-index" x="734" y="718">CONTROLLED TEST</text>
+      <text class="node-title" x="734" y="741">GRID</text>
+      <text class="node-detail" x="734" y="763">policy as an arm</text>
+    </g>
+
+    <g class="node node-policy" aria-label="Campaign: repeat the grid">
+      <title>Campaign</title>
+      <rect class="node-surface" x="480" y="700" width="210" height="80" rx="10"/>
+      <text class="node-index" x="494" y="718">DISCIPLINE</text>
+      <text class="node-title" x="494" y="741">CAMPAIGN</text>
+      <text class="node-detail" x="494" y="763">repeat the grid</text>
+    </g>
+  </g>
+
+  <!-- Gates bind policy eligibility to measured fields and decisions to reversible or compounding doors. -->
+  <g class="architecture-gates">
+    <g aria-label="Why: measured information becomes testable policy">
+      <text class="why-statement" x="720" y="406" text-anchor="middle">MEASURED INFORMATION</text>
+      <text class="why-substatement" x="720" y="438" text-anchor="middle">BECOMES TESTABLE POLICY</text>
+      <path d="M620 458H820" class="concept-rule"/>
+      <text class="why-caption" x="720" y="482" text-anchor="middle">unmeasured gap &#x2192; ledger visibility &#x2192; decision</text>
+    </g>
+
+    <g aria-label="How cost levers and calculator bind to the instrument">
+      <rect class="concept-card" x="190" y="320" width="280" height="205" rx="12"/>
+      <text class="concept-title" x="208" y="347">HOW / COST LEVERS</text>
+      <text class="concept-copy" x="208" y="374">C&#x2080; baseline cost &#x00B7; P frontier premium</text>
+      <text class="concept-copy" x="208" y="395">e eligible share &#x00B7; r routed share</text>
+      <text class="concept-copy" x="208" y="416">&#x03B2; compounding &#x00B7; EPM effective premium</text>
+      <path class="concept-rule" d="M208 438H452"/>
+      <text class="concept-title" x="208" y="463">INTERACTIVE CALCULATOR</text>
+      <text class="concept-copy" x="208" y="486">reversible scenario test</text>
+      <text class="concept-copy" x="208" y="507">before a default becomes architecture</text>
+    </g>
+
+    <g aria-label="Dependency gate: required information must be a subset of produced information">
+      <path class="gate-diamond" d="M1080 625L1110 650L1080 675L1050 650Z"/>
+      <circle class="gate-pass" cx="1080" cy="633" r="3.5"/>
+      <text class="gate-label" x="1080" y="650">requires</text>
+      <text class="gate-label" x="1080" y="662">&#x2286; produced?</text>
+      <text class="gate-caption" x="1118" y="654">information first</text>
+    </g>
+
+    <g aria-label="What decision surfaces: two-way route, one-way architecture, autonomous door, and provider playbook">
+      <rect class="door-panel" x="1198" y="594" width="194" height="184" rx="12"/>
+      <line class="door-key-cyan" x1="1212" y1="611" x2="1212" y2="641"/>
+      <text class="door-title" x="1222" y="617">TWO-WAY DOOR</text>
+      <text class="door-detail" x="1222" y="633">per-task route</text>
+      <line class="door-key-amber" x1="1212" y1="652" x2="1212" y2="682"/>
+      <text class="door-title" x="1222" y="658">ONE-WAY DOOR</text>
+      <text class="door-detail" x="1222" y="674">default architecture</text>
+      <line class="door-key-cyan" x1="1212" y1="693" x2="1212" y2="723"/>
+      <text class="door-title" x="1222" y="699">AUTONOMOUS DOOR</text>
+      <text class="door-detail" x="1222" y="715">policy acts inside budget</text>
+      <line class="door-key-amber" x1="1212" y1="734" x2="1212" y2="764"/>
+      <text class="door-title" x="1222" y="740">PROVIDER PLAYBOOK</text>
+      <text class="door-detail" x="1222" y="756">route &#x00B7; reserve &#x00B7; review</text>
+    </g>
+  </g>
+
+  <!-- Symbolic N by M braces describe evidence and analysis burden without adding measured values. -->
+  <g class="architecture-burden">
+    <path class="brace brace-cyan" d="M582 246V254Q582 264 592 264H1239Q1249 264 1249 274V282"/>
+    <path class="brace brace-cyan" d="M1249 282V306H1218V320"/>
+    <text class="brace-label brace-label-cyan" x="916" y="288">N linked sessions &#x00D7; M measurement angles = instrumented evidence surface</text>
+
+    <path class="brace brace-amber" d="M755 660V666Q755 676 765 676H1230Q1240 676 1240 666V660"/>
+    <path class="brace brace-amber" d="M1240 660V410H1218V390"/>
+    <text class="brace-label brace-label-amber" x="998" y="691">analysis burden = N &#x00D7; M before cross-arm aggregation</text>
+  </g>
+
+  <!-- The rail is read right-to-left, following arrows from instrumentation to campaign. -->
+  <g class="architecture-order" aria-label="Load-bearing order: instrument, derive, write policy, grid, campaign">
+    <text class="rail-label" x="62" y="842">LOAD-BEARING ORDER / FOLLOW ARROWS</text>
+
+    <rect class="rail-stage" x="1230" y="820" width="150" height="38" rx="9"/>
+    <text class="rail-stage-text" x="1305" y="843">INSTRUMENT</text>
+    <path class="rail-edge" d="M1230 839H1190"/>
+
+    <rect class="rail-stage" x="1070" y="820" width="120" height="38" rx="9"/>
+    <text class="rail-stage-text" x="1130" y="843">DERIVE</text>
+    <path class="rail-edge" d="M1070 839H1059"/>
+
+    <path class="rail-gate" d="M1043 824L1059 839L1043 854L1027 839Z"/>
+    <circle class="gate-pass" cx="1043" cy="839" r="3"/>
+    <path class="rail-edge" d="M1027 839H1015"/>
+    <text class="rail-gate-caption" x="1043" y="872">information first</text>
+
+    <rect class="rail-stage" x="835" y="820" width="180" height="38" rx="9"/>
+    <text class="rail-stage-text" x="925" y="843">WRITE POLICY</text>
+    <path class="rail-edge" d="M835 839H800"/>
+
+    <rect class="rail-stage" x="680" y="820" width="120" height="38" rx="9"/>
+    <text class="rail-stage-text" x="740" y="843">GRID</text>
+    <path class="rail-edge" d="M680 839H625"/>
+
+    <rect class="rail-stage" x="475" y="820" width="150" height="38" rx="9"/>
+    <text class="rail-stage-text" x="550" y="843">CAMPAIGN</text>
+  </g>
+
+  <!-- Slow tracers are redundant orientation cues; reduced-motion and print modes remove them. -->
+  <g class="architecture-motion" aria-hidden="true">
+    <path class="tracer tracer-execution" pathLength="100"
+          d="M190 188H1172V390C1172 441 1158 468 1120 500"/>
+    <path class="tracer tracer-feedback" pathLength="100"
+          d="M755 617H450H280H174V188H190"/>
+  </g>
+</svg>
