@@ -71,3 +71,60 @@ def test_styles_cover_narrow_screens_focus_and_reduced_motion():
     assert "@media (prefers-reduced-motion: reduce)" in css
     assert ":focus-visible" in css
     assert ".cell-card.status-running" in css
+
+
+def test_design_session_shell_has_distinct_launch_and_interactive_controls():
+    """Design controls are explicit while the existing read-only panel remains."""
+    html = (STATIC / "index.html").read_text()
+
+    for required in (
+        'id="new-workflow-design"',
+        'id="new-experiment-design"',
+        'id="design-start-form"',
+        'id="validation-errors"',
+        'id="matrix-preview"',
+        'id="save-spec-button"',
+        'id="run-workflow-button"',
+        'id="send-design-input"',
+        'id="steer-design-input"',
+        'id="interrupt-design"',
+        'id="detach-design"',
+        'id="recent-design-list"',
+    ):
+        assert required in html
+    assert "Enqueue" not in html[html.index('id="design-control-panel"'):html.index('class="recent-designs"')]
+
+
+def test_design_client_reuses_one_stream_and_server_capability_gates():
+    """Selection and validation extend, rather than fork, established machinery."""
+    app = (STATIC / "app.js").read_text()
+
+    assert "function selectDesignSession(portalId, attach)" in app
+    assert "if (state.eventSource) state.eventSource.close()" in app
+    assert "connectSelectedStream()" in app
+    assert "!state.draftFresh || !draft?.capabilities?.save" in app
+    assert "!state.draftFresh || !draft?.capabilities?.run" in app
+    assert 'fetch(`/api/design-sessions/${encodeURIComponent(selectedAtRequest)}/spec`)' in app
+    assert 'delivery === "steer" ? $("#steer-design-input")' in app
+    assert "/interrupt`, {})" in app
+    assert "detachSelectedStream" in app
+    assert 'headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() }' in app
+
+
+def test_design_styles_keep_artifacts_bounded_on_narrow_screens():
+    """YAML and action groups remain usable without page-level overflow."""
+    css = (STATIC / "style.css").read_text()
+
+    for selector in (
+        ".design-launcher-grid",
+        ".validation-panel",
+        ".row-yaml",
+        ".row-validate-pass",
+        ".row-validate-error",
+        ".recent-design",
+        ".design-control-panel > .mobile-anchor",
+    ):
+        assert selector in css
+    mobile = css[css.index("@media (max-width: 420px)"):]
+    assert ".design-stream-actions" in mobile
+    assert "grid-template-columns: minmax(0, 1fr)" in mobile

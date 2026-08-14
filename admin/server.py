@@ -16,17 +16,20 @@ Run:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import os
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from pathlib import Path
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, jsonify, make_response, request
 
 from instrument.live import (
     EVENT_CHANNEL_PREFIX,
@@ -37,20 +40,130 @@ from instrument.live import (
 )
 from instrument.routing import compute_routing
 
+try:  # Package imports under pytest and WSGI.
+    from admin.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
+    from admin.opencode_client import OpenCodeClient, OpenCodeError
+except ModuleNotFoundError:  # pragma: no cover - documented ``python admin/server.py`` launch
+    from design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
+    from opencode_client import OpenCodeClient, OpenCodeError
+
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
 QUEUE_KEY = "story_jobs"
 RESULTS_KEY = "story_results"
 HEARTBEAT_SECONDS = 15
+MAX_DESIGN_REQUEST_BYTES = 64 * 1024
+MAX_DESIGN_PROMPT_CHARS = 12_000
+IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
+ROOT = Path(__file__).resolve().parent.parent
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
+_design_manager: DesignSessionManager | None = None
 
 
 def _redis():
     import redis
 
     return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
+
+
+def _design_sessions() -> DesignSessionManager:
+    """Construct the process-local manager around persistent Redis metadata."""
+    global _design_manager
+    if _design_manager is None:
+        configured = os.environ.get("FINOPS_DESIGN_WORKDIRS")
+        paths = [Path(item) for item in configured.split(os.pathsep) if item] if configured else [ROOT]
+        workdirs = {
+            "repository" if index == 0 else f"repository-{index + 1}": path
+            for index, path in enumerate(paths)
+        }
+        _design_manager = DesignSessionManager(
+            root=ROOT,
+            redis_factory=_redis,
+            opencode=OpenCodeClient(os.environ.get("OPENCODE_SERVER_URL", "http://127.0.0.1:4096")),
+            workdirs=workdirs,
+        )
+    return _design_manager
+
+
+def _design_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
+    """Enforce the unauthenticated control plane's local JSON trust boundary."""
+    remote = request.remote_addr or ""
+    if remote not in {"127.0.0.1", "::1", "localhost"}:
+        return None, (jsonify({"error": "loopback access required"}), 403)
+    if urlsplit(request.host_url).hostname not in {"127.0.0.1", "::1", "localhost"}:
+        return None, (jsonify({"error": "loopback Host required"}), 403)
+    origin = request.headers.get("Origin")
+    if origin and origin.rstrip("/") != request.host_url.rstrip("/"):
+        return None, (jsonify({"error": "cross-origin request rejected"}), 403)
+    if not request.is_json:
+        return None, (jsonify({"error": "application/json request required"}), 415)
+    if request.content_length is not None and request.content_length > MAX_DESIGN_REQUEST_BYTES:
+        return None, (jsonify({"error": "request body too large"}), 413)
+    idempotency_key = request.headers.get("Idempotency-Key", "")
+    if not idempotency_key or len(idempotency_key) > 200:
+        return None, (jsonify({"error": "Idempotency-Key header required"}), 400)
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict):
+        return None, (jsonify({"error": "JSON object required"}), 400)
+    return body, None
+
+
+def _idempotent_design_response(operation: str, body: dict, action):
+    """Reserve and replay one JSON mutation result using Redis atomic ``SET NX``."""
+    supplied_key = request.headers["Idempotency-Key"]
+    request_digest = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    cache_id = hashlib.sha256(f"{operation}\0{supplied_key}".encode()).hexdigest()
+    cache_key = f"control_room:idempotency:{cache_id}"
+    reservation = json.dumps({"state": "pending", "request_digest": request_digest})
+    try:
+        redis_client = _redis()
+        reserved = redis_client.set(
+            cache_key,
+            reservation,
+            nx=True,
+            ex=IDEMPOTENCY_TTL_SECONDS,
+        )
+        if not reserved:
+            existing_raw = redis_client.get(cache_key)
+            existing = json.loads(existing_raw) if existing_raw else {}
+            if existing.get("request_digest") != request_digest:
+                return jsonify({"error": "Idempotency-Key was already used with a different request"}), 409
+            if existing.get("state") == "complete":
+                return jsonify(existing.get("body", {})), int(existing.get("status", 200))
+            return jsonify({"error": "matching mutation is still in progress", "retryable": True}), 409
+    except Exception as error:
+        return jsonify({"error": f"idempotency store unavailable: {error}"}), 503
+
+    try:
+        response = make_response(action())
+    except Exception as error:
+        response = make_response(_design_error(error))
+    completed = json.dumps({
+        "state": "complete",
+        "request_digest": request_digest,
+        "status": response.status_code,
+        "body": response.get_json(silent=True) or {},
+    })
+    with suppress(Exception):
+        redis_client.set(cache_key, completed, ex=IDEMPOTENCY_TTL_SECONDS)
+    # The action already completed. A cache-write failure must not invite a
+    # new-key retry that duplicates paid or filesystem-changing work.
+    return response
+
+
+def _design_error(error: Exception):
+    """Translate expected manager failures without leaking server internals."""
+    if isinstance(error, KeyError):
+        return jsonify({"error": "design session not found"}), 404
+    if isinstance(error, OpenCodeError):
+        return jsonify({"error": str(error), "code": "opencode_unavailable"}), error.status
+    if isinstance(error, ValueError):
+        return jsonify({"error": str(error)}), 400
+    return jsonify({"error": str(error), "code": "design_session_error"}), 503
 
 
 def _sse(generator):
@@ -249,7 +362,17 @@ def api_matrix():
         "results_saved": len(results),
         "cells": statuses,
     }
-    response["telemetry"] = _retained_telemetry(r, statuses)
+    design_stream_ids: list[str] = []
+    try:
+        for payload in r.hgetall(DESIGN_SESSIONS_KEY).values():
+            metadata = json.loads(payload)
+            stream_id = metadata.get("stream_id") if isinstance(metadata, dict) else None
+            if isinstance(stream_id, str) and stream_id:
+                design_stream_ids.append(stream_id)
+    except Exception:
+        # Fleet telemetry remains useful if optional design metadata is absent.
+        pass
+    response["telemetry"] = _retained_telemetry(r, [*statuses, *design_stream_ids])
     return jsonify(response)
 
 
@@ -355,6 +478,133 @@ def api_experiments():
         return jsonify({"error": str(e)}), 500
 
     return jsonify({"ok": proc.returncode == 0, "output": (proc.stdout or proc.stderr).strip()})
+
+
+@app.get("/api/design-sessions")
+def api_design_sessions():
+    """List only portal-owned design sessions and approved workdir labels."""
+    try:
+        return jsonify(_design_sessions().list_sessions())
+    except Exception as error:
+        return _design_error(error)
+
+
+@app.post("/api/design-sessions")
+def api_create_design_session():
+    """Create a native design conversation and submit its artifact prompt."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    intent = body.get("intent", "")
+    if not isinstance(intent, str) or len(intent) > MAX_DESIGN_PROMPT_CHARS:
+        return jsonify({"error": f"intent must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+    def create():
+        session = _design_sessions().create(
+            kind=body.get("kind", ""),
+            intent=intent,
+            model=body.get("model", "") if isinstance(body.get("model", ""), str) else "",
+            workdir_key=body.get("workdir", "") if isinstance(body.get("workdir", ""), str) else "",
+        )
+        return jsonify({"ok": True, "session": session}), 201
+
+    return _idempotent_design_response("create", body, create)
+
+
+@app.get("/api/design-sessions/<portal_id>/spec")
+def api_design_session_spec(portal_id):
+    """Return the coherent draft, validation, matrix, save, and capability state."""
+    try:
+        return jsonify(_design_sessions().draft_state(portal_id))
+    except Exception as error:
+        return _design_error(error)
+
+
+@app.post("/api/design-sessions/<portal_id>/input")
+def api_design_session_input(portal_id):
+    """Map Send and Steer to native durable prompt admission."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    prompt = body.get("prompt", "")
+    if not isinstance(prompt, str) or len(prompt) > MAX_DESIGN_PROMPT_CHARS:
+        return jsonify({"error": f"prompt must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+    return _idempotent_design_response(
+        f"input:{portal_id}",
+        body,
+        lambda: jsonify(_design_sessions().send_input(portal_id, prompt=prompt, delivery=body.get("delivery", "queue"))),
+    )
+
+
+@app.post("/api/design-sessions/<portal_id>/interrupt")
+def api_design_session_interrupt(portal_id):
+    """Interrupt native work without changing the browser attachment."""
+    _body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert _body is not None
+    return _idempotent_design_response(
+        f"interrupt:{portal_id}",
+        _body,
+        lambda: jsonify(_design_sessions().interrupt(portal_id)),
+    )
+
+
+@app.post("/api/design-sessions/<portal_id>/save")
+def api_design_session_save(portal_id):
+    """Atomically save a revalidated draft under experiments/specs."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    if "overwrite" in body and not isinstance(body["overwrite"], bool):
+        return jsonify({"error": "overwrite must be a boolean"}), 400
+    def save():
+        result = _design_sessions().save(
+            portal_id,
+            filename=body.get("filename", "") if isinstance(body.get("filename", ""), str) else "",
+            overwrite=body.get("overwrite") is True,
+        )
+        return jsonify(result), 409 if result.get("conflict") else 200
+
+    return _idempotent_design_response(f"save:{portal_id}", body, save)
+
+
+@app.post("/api/design-sessions/<portal_id>/run")
+def api_design_session_run(portal_id):
+    """Launch an explicitly confirmed saved workflow under a new stream ID."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    required = {"goal", "model", "workdir", "timeout", "commit"}
+    missing = sorted(required - body.keys())
+    if missing:
+        return jsonify({"error": f"missing explicit run fields: {missing}"}), 400
+    if not isinstance(body["commit"], bool):
+        return jsonify({"error": "commit must be a boolean"}), 400
+    if not isinstance(body["timeout"], int) or isinstance(body["timeout"], bool):
+        return jsonify({"error": "timeout must be an integer"}), 400
+    for field in ("thinking_budget_tokens", "output_token_limit"):
+        value = body.get(field, 0)
+        if not isinstance(value, int) or isinstance(value, bool):
+            return jsonify({"error": f"{field} must be an integer"}), 400
+    def run():
+        result = _design_sessions().run_workflow(
+            portal_id,
+            goal=body["goal"] if isinstance(body["goal"], str) else "",
+            model=body["model"] if isinstance(body["model"], str) else "",
+            workdir_key=body["workdir"] if isinstance(body["workdir"], str) else "",
+            timeout=body["timeout"],
+            commit=body["commit"] is True,
+            backend=body.get("backend") or None,
+            thinking_budget_tokens=body.get("thinking_budget_tokens", 0),
+            output_token_limit=body.get("output_token_limit", 0),
+        )
+        return jsonify(result), 202
+
+    return _idempotent_design_response(f"run:{portal_id}", body, run)
 
 
 @app.get("/")

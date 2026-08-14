@@ -14,6 +14,8 @@
   const REPLAY_RACE_TAIL = 500
   const REPLAY_RACE_WINDOW_MS = 250
   const MATRIX_POLL_MS = 5000
+  const DESIGN_LIST_POLL_MS = 10000
+  const DRAFT_POLL_MS = 3000
   const BURN_WINDOW_MS = 60000
   const STATUS_SYMBOLS = {
     queued: "○",
@@ -31,6 +33,7 @@
     liveSamplesByCell: new Map(),
     burnSamples: [],
     selectedId: null,
+    selectedType: null,
     selectedSessionIds: [],
     rows: [],
     buffer: [],
@@ -62,6 +65,15 @@
     routingOpen: false,
     routingReturnFocus: null,
     queuePending: false,
+    designSessions: new Map(),
+    approvedWorkdirs: [],
+    designFormKind: null,
+    designMutationPending: false,
+    draftRequestInFlight: false,
+    draftPollTimer: null,
+    draftState: null,
+    draftSignature: null,
+    draftFresh: false,
   }
 
   /** Query one required shell element. */
@@ -308,9 +320,91 @@
     renderRail()
   }
 
-  /** Synchronize transcript and read-only control headers with one selection. */
+  /** Return the selected portal-owned design session, if design mode is active. */
+  function selectedDesignSession() {
+    return state.selectedType === "design" ? state.designSessions.get(state.selectedId) || null : null
+  }
+
+  /** Render recent portal-owned sessions without mixing them into fleet cells. */
+  function renderRecentDesigns() {
+    const list = $("#recent-design-list")
+    list.replaceChildren()
+    const sessions = Array.from(state.designSessions.values())
+    if (sessions.length === 0) {
+      list.appendChild(element("p", "empty-state", "No portal-owned design sessions yet."))
+      return
+    }
+    for (const session of sessions) {
+      const button = element("button", `recent-design${state.selectedType === "design" && state.selectedId === session.portal_id ? " selected" : ""}`)
+      button.type = "button"
+      button.appendChild(element("span", "recent-design-title", session.title))
+      button.appendChild(element("span", "recent-design-meta", `${session.kind} · ${session.draft_state.replaceAll("_", " ")} · r${session.revision}`))
+      button.addEventListener("click", () => selectDesignSession(session.portal_id, true))
+      list.appendChild(button)
+    }
+  }
+
+  /** Mirror authoritative draft capabilities into the design control pane. */
+  function renderDesignControls(session) {
+    const draft = state.draftState
+    $("#design-kind").textContent = session.kind === "workflow" ? "WORKFLOW DESIGN" : "EXPERIMENT DESIGN"
+    $("#design-portal-id").textContent = session.portal_id
+    $("#design-opencode-id").textContent = session.opencode_session_id || "Unavailable"
+    $("#design-session-model").textContent = session.model
+    $("#design-session-workdir").textContent = session.workdir_label
+    $("#design-draft-name").textContent = session.draft_name
+    $("#design-revision").textContent = String(draft?.revision ?? session.revision ?? 0)
+
+    const draftState = draft?.draft_state || session.draft_state || "no_draft"
+    const savedCurrent = Boolean(draft?.saved && draft.saved.revision === draft.revision)
+    const displayState = savedCurrent
+      ? "SAVED"
+      : draftState === "valid" && session.saved_revision
+        ? "VALID / UNSAVED CHANGES"
+        : draftState.replaceAll("_", " ").toUpperCase()
+    const badge = $("#validation-badge")
+    badge.textContent = displayState
+    badge.className = `validation-badge validation-${draft?.validation?.valid ? "valid" : "invalid"}`
+    const errors = Array.isArray(draft?.validation?.errors) ? draft.validation.errors : []
+    $("#validation-summary").textContent = draft?.validation?.valid
+      ? session.kind === "experiment"
+        ? `Spec valid · ${draft.matrix?.count ?? 0} cells`
+        : "Spec valid · workflow ready"
+      : draft?.capabilities?.reason || (errors.length ? `${errors.length} validation error${errors.length === 1 ? "" : "s"}` : "Waiting for the assigned draft.")
+    const errorList = $("#validation-errors")
+    errorList.replaceChildren(...errors.map((message) => element("li", "", message)))
+
+    const matrix = $("#matrix-preview")
+    matrix.hidden = !draft?.matrix
+    if (draft?.matrix) {
+      $("#matrix-summary").textContent = `${draft.matrix.count} cells${draft.matrix.truncated ? ` · first ${draft.matrix.preview.length} shown` : ""}`
+      $("#matrix-cells").textContent = draft.matrix.preview.map((cell) => JSON.stringify(cell)).join("\n")
+    }
+    $("#save-spec-button").disabled = !state.draftFresh || !draft?.capabilities?.save || state.designMutationPending
+    const runForm = $("#run-workflow-form")
+    runForm.hidden = session.kind !== "workflow"
+    $("#run-workflow-button").disabled = !state.draftFresh || !draft?.capabilities?.run || state.designMutationPending
+  }
+
+  /** Synchronize terminal and control headers with either selection kind. */
   function renderSelection() {
     const cellId = state.selectedId
+    const design = selectedDesignSession()
+    $("#cell-control-panel").hidden = Boolean(design)
+    $("#design-control-panel").hidden = !design
+    $("#transcript-mode").textContent = design ? "Design / Terminal" : "Cell / Transcript"
+    $("#control-mode").textContent = design ? "Portal-owned session" : "Read-only attachment"
+    $("#ownership-badge").textContent = design ? "INTERACTIVE" : "READ ONLY"
+    $("#ownership-badge").className = design ? "interactive-badge" : "readonly-badge"
+    if (design) {
+      $("#transcript-title").textContent = design.title
+      $("#selected-status").textContent = design.lifecycle_state.toUpperCase()
+      $("#selected-status").className = "status-word status-running"
+      $("#selected-stream-state").textContent = state.streamState.toUpperCase()
+      renderDesignControls(design)
+      renderRecentDesigns()
+      return
+    }
     const status = cellId ? core.normalizeStatus(state.cells[cellId]) : "unknown"
     $("#transcript-title").textContent = cellId || "NO CELL SELECTED"
     $("#selected-status").textContent = status.toUpperCase()
@@ -343,18 +437,22 @@
             ? "Watching the existing event stream"
             : "Selected but detached"
     $("#control-guidance").textContent = guidance
+    renderRecentDesigns()
   }
 
   /** Render normalized transcript rows and preserve follow only when requested. */
   function renderTranscript(scrollToBottom = false) {
     const feed = $("#transcript-feed")
     feed.replaceChildren()
+    const design = selectedDesignSession()
     if (!state.selectedId) {
       feed.appendChild(element("div", "terminal-empty", "Select a fleet card to inspect retained events and watch live work."))
     } else if (state.rows.length === 0) {
       const message = state.streamState === "connecting"
         ? "Connecting to retained history…"
-        : "No retained events observed for this cell."
+        : design
+          ? "No retained design-session events observed yet."
+          : "No retained events observed for this cell."
       feed.appendChild(element("div", "terminal-empty", message))
     } else {
       for (const row of state.rows) feed.appendChild(createTranscriptRow(row))
@@ -370,7 +468,18 @@
     meta.appendChild(element("time", "row-time", row.timestamp))
     meta.appendChild(element("span", "row-label", row.label))
     node.appendChild(meta)
-    node.appendChild(element("div", "row-text", row.text))
+    if (row.kind === "spec") {
+      if (row.latest) {
+        node.appendChild(element("pre", "row-yaml", row.text))
+      } else {
+        const previous = element("details", "row-details")
+        previous.appendChild(element("summary", "", `Show previous revision ${row.revision}`))
+        previous.appendChild(element("pre", "row-yaml", row.text))
+        node.appendChild(previous)
+      }
+    } else {
+      node.appendChild(element("div", "row-text", row.text))
+    }
     if (row.detail) {
       const details = element("details", "row-details")
       details.appendChild(element("summary", "", "Show escaped payload"))
@@ -471,6 +580,83 @@
     }
     renderSelection()
     renderFleet()
+    if (state.selectedType === "design") void loadDraftState()
+  }
+
+  /** Append one browser-generated artifact row within the shared transcript cap. */
+  function appendLocalRow(row) {
+    const shouldFollow = state.follow && isTranscriptAtBottom()
+    state.rows = core.boundedAppend(state.rows, [{
+      key: `${state.selectedId}-${Date.now()}-${row.kind}`,
+      timestamp: `${new Date().toISOString().slice(11, 19)} UTC`,
+      detail: "",
+      ...row,
+    }], MAX_TRANSCRIPT_ROWS)
+    renderTranscript(shouldFollow)
+  }
+
+  /** Poll the assigned artifact and add rows only when its coherent state changes. */
+  async function loadDraftState() {
+    const session = selectedDesignSession()
+    if (!session || state.draftRequestInFlight) return
+    const selectedAtRequest = session.portal_id
+    state.draftRequestInFlight = true
+    try {
+      const response = await fetch(`/api/design-sessions/${encodeURIComponent(selectedAtRequest)}/spec`)
+      const draft = await response.json()
+      if (!response.ok) throw new Error(draft.error || "Draft state unavailable")
+      if (state.selectedType !== "design" || state.selectedId !== selectedAtRequest) return
+      const previous = state.draftState
+      const signature = JSON.stringify([
+        draft.revision,
+        draft.draft_state,
+        draft.validation?.errors,
+        draft.saved?.revision,
+        draft.matrix?.count,
+        draft.capabilities?.reason,
+      ])
+      state.draftState = draft
+      state.draftFresh = true
+      if (draft.yaml && draft.revision !== previous?.revision) {
+        for (const row of state.rows) {
+          if (row.kind === "spec") row.latest = false
+        }
+        appendLocalRow({
+          kind: "spec",
+          label: "SPEC",
+          text: draft.yaml,
+          revision: draft.revision,
+          latest: true,
+        })
+      }
+      if (signature !== state.draftSignature) {
+        const valid = draft.validation?.valid === true
+        const matrixText = session.kind === "experiment"
+          ? ` · ${draft.matrix?.count ?? 0} cells`
+          : " · workflow ready"
+        appendLocalRow({
+          kind: valid ? "validate-pass" : "validate-error",
+          label: valid ? "VALIDATE PASS" : "VALIDATE ERROR",
+          text: valid
+            ? `spec valid${matrixText}`
+            : draft.validation?.errors?.join("\n") || draft.capabilities?.reason || "Waiting for draft",
+        })
+        state.draftSignature = signature
+        announce(valid ? "ExperimentSpec validation passed" : "ExperimentSpec validation changed")
+      }
+      renderSelection()
+    } catch (error) {
+      if (state.selectedType === "design" && state.selectedId === selectedAtRequest) {
+        state.draftFresh = false
+        $("#validation-badge").textContent = "VALIDATION STALE"
+        $("#validation-summary").textContent = error.message || "Draft state unavailable"
+        $("#save-spec-button").disabled = true
+        $("#run-workflow-button").disabled = true
+        announce("Draft validation is unavailable; mutation controls are disabled", true)
+      }
+    } finally {
+      state.draftRequestInFlight = false
+    }
   }
 
   /** Detect whether insertion should retain automatic bottom alignment. */
@@ -530,11 +716,18 @@
 
   /** Select one global cell and hand off the single selected-cell EventSource. */
   function selectCell(cellId, attach) {
-    const changed = state.selectedId !== cellId
+    const changed = state.selectedId !== cellId || state.selectedType !== "cell"
     if (changed) {
       if (state.eventSource) state.eventSource.close()
       state.eventSource = null
       state.selectedId = cellId
+      state.selectedType = "cell"
+      state.draftState = null
+      state.draftSignature = null
+      state.draftFresh = false
+      if (state.draftPollTimer) window.clearInterval(state.draftPollTimer)
+      state.draftPollTimer = null
+      try { window.localStorage.removeItem("control-room-selected-design") } catch (_error) {}
       state.selectedSessionIds = []
       state.rows = []
       state.buffer = []
@@ -555,6 +748,52 @@
     renderSelection()
     renderTranscript(false)
     if (attach && !state.attached) connectSelectedStream()
+  }
+
+  /** Select a portal-owned design identity and hand off the same detail source. */
+  function selectDesignSession(portalId, attach) {
+    const session = state.designSessions.get(portalId)
+    if (!session) return
+    const changed = state.selectedId !== portalId || state.selectedType !== "design"
+    if (changed) {
+      if (state.eventSource) state.eventSource.close()
+      state.eventSource = null
+      state.selectedId = portalId
+      state.selectedType = "design"
+      state.selectedSessionIds = session.opencode_session_id ? [session.opencode_session_id] : []
+      state.rows = []
+      state.buffer = []
+      state.eventLedgerCounts = new Map()
+      state.eventLedgerOrder = []
+      state.replaySkipCounts = new Map()
+      state.replaySeenCounts = new Map()
+      state.replayTail = []
+      state.raceDuplicateCounts = new Map()
+      state.paused = false
+      state.follow = true
+      state.attached = false
+      state.streamState = "disconnected"
+      state.draftState = null
+      state.draftSignature = null
+      state.draftFresh = false
+      $("#design-prompt").value = ""
+      $("#design-input-result").textContent = ""
+      $("#save-spec-result").textContent = ""
+      $("#run-workflow-result").textContent = ""
+      $("#pause-button").textContent = "Pause"
+      $("#run-goal").value = session.intent
+      $("#run-model").value = session.model
+      $("#run-workdir").value = session.workdir
+      try { window.localStorage.setItem("control-room-selected-design", portalId) } catch (_error) {}
+      announce(`Selected ${session.kind} design session ${portalId}`)
+    }
+    renderFleet()
+    renderSelection()
+    renderTranscript(false)
+    if (attach && !state.attached) connectSelectedStream()
+    void loadDraftState()
+    if (state.draftPollTimer) window.clearInterval(state.draftPollTimer)
+    state.draftPollTimer = window.setInterval(loadDraftState, DRAFT_POLL_MS)
   }
 
   /** Detach the browser only; no process or Redis control request is made. */
@@ -774,6 +1013,241 @@
     }
   }
 
+  /** Return a collision-resistant mutation key without requiring a build-time helper. */
+  function mutationKey() {
+    return window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  }
+
+  /** Call a same-origin JSON design mutation and preserve structured errors. */
+  async function designMutation(path, body) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() },
+      body: JSON.stringify(body),
+    })
+    let data
+    try {
+      data = await response.json()
+    } catch (_error) {
+      throw new Error(`Control Room returned an unreadable response (${response.status})`)
+    }
+    if (!response.ok) {
+      const error = new Error(data.error || data.message || `Request failed (${response.status})`)
+      error.response = data
+      error.status = response.status
+      throw error
+    }
+    return data
+  }
+
+  /** Fill both approved-workdir controls from backend-owned labels. */
+  function renderWorkdirOptions() {
+    for (const selector of ["#design-workdir", "#run-workdir"]) {
+      const select = $(selector)
+      const previous = select.value
+      select.replaceChildren()
+      for (const item of state.approvedWorkdirs) {
+        const option = element("option", "", item.label)
+        option.value = item.key
+        select.appendChild(option)
+      }
+      if (state.approvedWorkdirs.some((item) => item.key === previous)) select.value = previous
+    }
+  }
+
+  /** Restore portal ownership summaries without enumerating native server sessions. */
+  async function loadDesignSessions({ restore = false } = {}) {
+    try {
+      const response = await fetch("/api/design-sessions")
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Design sessions unavailable")
+      state.designSessions = new Map((data.sessions || []).map((session) => [session.portal_id, session]))
+      state.approvedWorkdirs = Array.isArray(data.workdirs) ? data.workdirs : []
+      renderWorkdirOptions()
+      renderRecentDesigns()
+      if (restore) {
+        let selected = null
+        try { selected = window.localStorage.getItem("control-room-selected-design") } catch (_error) {}
+        if (selected && state.designSessions.has(selected)) selectDesignSession(selected, true)
+      }
+      if (state.selectedType === "design" && !state.designSessions.has(state.selectedId)) {
+        detachSelectedStream()
+        state.selectedId = null
+        state.selectedType = null
+        state.draftState = null
+        renderSelection()
+        renderTranscript(false)
+      } else {
+        renderSelection()
+      }
+    } catch (error) {
+      $("#recent-design-list").replaceChildren(element("p", "error-state", error.message || "Design sessions unavailable"))
+    }
+  }
+
+  /** Reveal a kind-specific start form while preserving entered text on failure. */
+  function openDesignStart(kind) {
+    state.designFormKind = kind
+    $("#design-start-form").hidden = false
+    $("#design-start-title").textContent = kind === "workflow" ? "NEW WORKFLOW DESIGN" : "NEW EXPERIMENT DESIGN"
+    $("#design-intent-label").textContent = kind === "workflow" ? "Feature goal" : "Research question"
+    $("#start-design-session").textContent = kind === "workflow" ? "Start workflow design" : "Start experiment design"
+    $("#design-intent").focus()
+  }
+
+  /** Start one native session with duplicate submission prevention. */
+  async function startDesignSession(event) {
+    event.preventDefault()
+    if (state.designMutationPending) return
+    const button = $("#start-design-session")
+    const originalLabel = button.textContent
+    state.designMutationPending = true
+    button.disabled = true
+    button.textContent = "Starting…"
+    $("#design-start-result").textContent = "Creating native OpenCode session…"
+    try {
+      const data = await designMutation("/api/design-sessions", {
+        kind: state.designFormKind,
+        intent: $("#design-intent").value,
+        model: $("#design-model").value,
+        workdir: $("#design-workdir").value,
+      })
+      state.designSessions.set(data.session.portal_id, data.session)
+      $("#design-start-form").hidden = true
+      $("#design-start-result").textContent = ""
+      renderRecentDesigns()
+      selectDesignSession(data.session.portal_id, true)
+      announce(`${data.session.kind} design session started`)
+    } catch (error) {
+      $("#design-start-result").textContent = error.message || "Design session could not be started"
+      announce($("#design-start-result").textContent, true)
+    } finally {
+      state.designMutationPending = false
+      button.disabled = false
+      button.textContent = originalLabel
+    }
+  }
+
+  /** Admit one queued or steering prompt and report admission separately. */
+  async function submitDesignInput(delivery) {
+    const session = selectedDesignSession()
+    const prompt = $("#design-prompt").value
+    if (!session || !prompt.trim() || state.designMutationPending) return
+    const button = delivery === "steer" ? $("#steer-design-input") : $("#send-design-input")
+    const originalLabel = button.textContent
+    state.designMutationPending = true
+    button.disabled = true
+    button.textContent = delivery === "steer" ? "Steering…" : "Sending…"
+    $("#design-input-result").textContent = `${delivery === "steer" ? "Steering" : "Queueing"} input…`
+    try {
+      await designMutation(`/api/design-sessions/${encodeURIComponent(session.portal_id)}/input`, { prompt, delivery })
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#design-input-result").textContent = `Input admitted · ${delivery === "steer" ? "steered" : "queued"}`
+      $("#design-prompt").value = ""
+      announce(`Operator input ${delivery === "steer" ? "steered" : "queued"}`)
+    } catch (error) {
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#design-input-result").textContent = `Admission failed · ${error.message}`
+      announce($("#design-input-result").textContent, true)
+    } finally {
+      state.designMutationPending = false
+      button.disabled = false
+      button.textContent = originalLabel
+      renderSelection()
+    }
+  }
+
+  /** Save the exact validated revision, requiring a second explicit overwrite action. */
+  async function saveSpec(event) {
+    event.preventDefault()
+    const session = selectedDesignSession()
+    if (!session || state.designMutationPending) return
+    const filename = $("#save-spec-name").value
+    const button = $("#save-spec-button")
+    state.designMutationPending = true
+    button.disabled = true
+    button.textContent = "Saving…"
+    $("#save-spec-result").textContent = "Revalidating draft…"
+    try {
+      let result
+      try {
+        result = await designMutation(`/api/design-sessions/${encodeURIComponent(session.portal_id)}/save`, { filename, overwrite: false })
+      } catch (error) {
+        if (error.status !== 409 || !error.response?.conflict) throw error
+        if (selectedDesignSession()?.portal_id !== session.portal_id) return
+        const replace = window.confirm(`Replace existing spec ${error.response.path}? The previous file will be overwritten atomically.`)
+        if (!replace) {
+          $("#save-spec-result").textContent = "Save cancelled; existing spec unchanged"
+          return
+        }
+        result = await designMutation(`/api/design-sessions/${encodeURIComponent(session.portal_id)}/save`, { filename, overwrite: true })
+      }
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#save-spec-result").textContent = `Saved ${result.path} at revision ${result.revision}`
+      announce(`Saved ExperimentSpec ${result.path}`)
+      await loadDraftState()
+      void loadDesignSessions()
+    } catch (error) {
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#save-spec-result").textContent = error.message || "Save failed"
+      announce($("#save-spec-result").textContent, true)
+    } finally {
+      state.designMutationPending = false
+      button.textContent = "Save spec"
+      renderSelection()
+    }
+  }
+
+  /** Confirm explicit launch parameters before spending budget or changing files. */
+  async function runWorkflow(event) {
+    event.preventDefault()
+    const session = selectedDesignSession()
+    if (!session || state.designMutationPending) return
+    const launch = {
+      goal: $("#run-goal").value,
+      model: $("#run-model").value,
+      workdir: $("#run-workdir").value,
+      backend: $("#run-backend").value || null,
+      timeout: Number($("#run-timeout").value),
+      thinking_budget_tokens: Number($("#run-thinking-budget").value),
+      output_token_limit: Number($("#run-output-limit").value),
+      commit: $("#run-commit").checked,
+    }
+    const confirmation = [
+      `Run saved spec: ${state.draftState?.saved?.path}`,
+      `Goal: ${launch.goal}`,
+      `Model: ${launch.model}`,
+      `Workdir: ${launch.workdir}`,
+      `Backend: ${launch.backend || "auto"}`,
+      `Timeout: ${launch.timeout}s per phase`,
+      `Thinking token budget: ${launch.thinking_budget_tokens}`,
+      `Output token limit: ${launch.output_token_limit}`,
+      `Commit successful phases: ${launch.commit ? "yes" : "no"}`,
+      "This can modify the worktree and spend model budget. Continue?",
+    ].join("\n")
+    if (!window.confirm(confirmation)) return
+    const button = $("#run-workflow-button")
+    state.designMutationPending = true
+    button.disabled = true
+    button.textContent = "Launching…"
+    $("#run-workflow-result").textContent = "Starting separate workflow execution…"
+    try {
+      const result = await designMutation(`/api/design-sessions/${encodeURIComponent(session.portal_id)}/run`, launch)
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#run-workflow-result").textContent = `Launched ${result.execution_id}; select it in Fleet to watch the run`
+      announce(`Workflow ${result.execution_id} launched`)
+      void loadMatrix()
+    } catch (error) {
+      if (selectedDesignSession()?.portal_id !== session.portal_id) return
+      $("#run-workflow-result").textContent = error.message || "Workflow launch failed"
+      announce($("#run-workflow-result").textContent, true)
+    } finally {
+      state.designMutationPending = false
+      button.textContent = "Run workflow"
+      renderSelection()
+    }
+  }
+
   /** Update clock, staleness, and the rolling window without network activity. */
   function tick() {
     const now = new Date()
@@ -788,6 +1262,43 @@
 
   /** Register all local controls after the immediate shell has rendered. */
   function bindControls() {
+    $("#new-workflow-design").addEventListener("click", () => openDesignStart("workflow"))
+    $("#new-experiment-design").addEventListener("click", () => openDesignStart("experiment"))
+    $("#cancel-design-start").addEventListener("click", () => {
+      $("#design-start-form").hidden = true
+      $("#design-start-result").textContent = ""
+    })
+    $("#design-start-form").addEventListener("submit", startDesignSession)
+    $("#design-composer").addEventListener("submit", (event) => {
+      event.preventDefault()
+      void submitDesignInput("queue")
+    })
+    $("#steer-design-input").addEventListener("click", () => void submitDesignInput("steer"))
+    $("#interrupt-design").addEventListener("click", async () => {
+      const session = selectedDesignSession()
+      if (!session || state.designMutationPending) return
+      if (!window.confirm(`Interrupt active OpenCode work in ${session.portal_id}? The browser stream stays attached.`)) return
+      const button = $("#interrupt-design")
+      state.designMutationPending = true
+      button.disabled = true
+      button.textContent = "Interrupting…"
+      try {
+        await designMutation(`/api/design-sessions/${encodeURIComponent(session.portal_id)}/interrupt`, {})
+        $("#design-input-result").textContent = "Interrupt accepted; stream remains attached"
+        announce("OpenCode interrupt accepted")
+        void loadDesignSessions()
+      } catch (error) {
+        $("#design-input-result").textContent = error.message || "Interrupt failed"
+        announce($("#design-input-result").textContent, true)
+      } finally {
+        state.designMutationPending = false
+        button.disabled = false
+        button.textContent = "Interrupt"
+      }
+    })
+    $("#detach-design").addEventListener("click", detachSelectedStream)
+    $("#save-spec-form").addEventListener("submit", saveSpec)
+    $("#run-workflow-form").addEventListener("submit", runWorkflow)
     document.querySelectorAll(".filter-chip").forEach((button) => {
       button.addEventListener("click", () => {
         state.filter = button.dataset.filter
@@ -895,7 +1406,9 @@
   renderSelection()
   tick()
   loadMatrix()
+  loadDesignSessions({ restore: true })
   connectStatusStream()
   window.setInterval(loadMatrix, MATRIX_POLL_MS)
+  window.setInterval(loadDesignSessions, DESIGN_LIST_POLL_MS)
   window.setInterval(tick, 1000)
 })(window.ControlRoomCore)

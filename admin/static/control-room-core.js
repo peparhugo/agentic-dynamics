@@ -170,6 +170,10 @@
     if (type === "reasoning") {
       return { ...common, kind: "think", label: "THINK", text: readable(part.text) }
     }
+    if (type === "operator") {
+      const delivery = event.delivery === "steer" ? "steered" : "queued"
+      return { ...common, kind: "operator", label: "OPERATOR", text: `${readable(event.text)} · ${delivery}` }
+    }
     if (type === "text") {
       return { ...common, kind: "agent", label: "AGENT", text: readable(part.text) }
     }
@@ -194,6 +198,7 @@
     }
     if (type === "step_finish") {
       const sample = common.sample
+      if (!sample) return { ...common, kind: "step", label: "STEP", text: "No usage reported" }
       const fields = []
       if (sample?.input_tokens !== null) fields.push(`${sample.input_tokens.toLocaleString()} in`)
       if (sample?.output_tokens !== null) fields.push(`${sample.output_tokens.toLocaleString()} out`)

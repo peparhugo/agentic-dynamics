@@ -70,7 +70,7 @@
       <section id="transcript-panel" class="pane transcript-pane" aria-labelledby="transcript-title">
         <header class="pane-header transcript-header">
           <div class="transcript-identity">
-            <div class="eyebrow">Cell / Transcript</div>
+            <div id="transcript-mode" class="eyebrow">Cell / Transcript</div>
             <h2 id="transcript-title">NO CELL SELECTED</h2>
             <div class="inline-state">
               <span id="selected-status" class="status-word status-unknown">UNKNOWN</span>
@@ -91,36 +91,125 @@
         <p id="transcript-note" class="pane-note">Clear view affects this browser only; Redis history and the experiment are unchanged.</p>
       </section>
 
-      <aside class="pane control-pane" aria-labelledby="control-title">
+      <aside id="session-controls" class="pane control-pane" aria-labelledby="control-title">
         <header class="pane-header control-header">
           <div>
-            <div class="eyebrow">Read-only attachment</div>
+            <div id="control-mode" class="eyebrow">Read-only attachment</div>
             <h2 id="control-title">SESSION CONTROL</h2>
           </div>
-          <span class="readonly-badge">READ ONLY</span>
+          <span id="ownership-badge" class="readonly-badge">READ ONLY</span>
         </header>
-        <dl class="control-facts">
-          <div>
-            <dt>Cell</dt>
-            <dd id="control-cell">No cell selected</dd>
+        <section class="design-launchers" aria-labelledby="design-launchers-title">
+          <h3 id="design-launchers-title">DESIGN SESSIONS</h3>
+          <div class="design-launcher-grid">
+            <button id="new-workflow-design" type="button">Workflow design</button>
+            <button id="new-experiment-design" type="button">Experiment design</button>
           </div>
-          <div>
-            <dt>Status</dt>
-            <dd id="control-status">UNKNOWN</dd>
+        </section>
+
+        <form id="design-start-form" class="control-form" hidden>
+          <h3 id="design-start-title">NEW DESIGN SESSION</h3>
+          <label>
+            <span id="design-intent-label">Feature goal</span>
+            <textarea id="design-intent" rows="5" maxlength="12000" required></textarea>
+          </label>
+          <label>
+            <span>Model</span>
+            <input id="design-model" type="text" placeholder="provider/model" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Approved workdir</span>
+            <select id="design-workdir" required><option value="">Loading approved workdirs…</option></select>
+          </label>
+          <div class="form-actions">
+            <button id="cancel-design-start" type="button">Cancel</button>
+            <button id="start-design-session" class="primary-action" type="submit">Start design session</button>
           </div>
-          <div>
-            <dt>Stream</dt>
-            <dd id="control-stream">DISCONNECTED</dd>
+          <output id="design-start-result" class="inline-result" aria-live="polite"></output>
+        </form>
+
+        <section id="cell-control-panel">
+          <dl class="control-facts">
+            <div>
+              <dt>Cell</dt>
+              <dd id="control-cell">No cell selected</dd>
+            </div>
+            <div>
+              <dt>Status</dt>
+              <dd id="control-status">UNKNOWN</dd>
+            </div>
+            <div>
+              <dt>Stream</dt>
+              <dd id="control-stream">DISCONNECTED</dd>
+            </div>
+            <div>
+              <dt>OpenCode session</dt>
+              <dd id="control-session">Session identity not observed yet</dd>
+            </div>
+          </dl>
+          <button id="copy-session" class="secondary-action" type="button" hidden>Copy session ID</button>
+          <button id="watch-button" class="primary-action" type="button" disabled>Select a cell</button>
+          <p id="control-guidance" class="control-guidance">Select a cell to inspect telemetry.</p>
+          <p class="boundary-copy">Watching does not send input or control the experiment.</p>
+        </section>
+
+        <section id="design-control-panel" class="design-control-panel" hidden>
+          <a class="mobile-anchor" href="#transcript-panel">Jump to design terminal</a>
+          <dl class="control-facts design-facts">
+            <div><dt>Kind</dt><dd id="design-kind">--</dd></div>
+            <div><dt>Portal / OpenCode</dt><dd><span id="design-portal-id">--</span><br><span id="design-opencode-id">--</span></dd></div>
+            <div><dt>Model / Workdir</dt><dd><span id="design-session-model">--</span><br><span id="design-session-workdir">--</span></dd></div>
+            <div><dt>Draft</dt><dd><span id="design-draft-name">--</span> · revision <span id="design-revision">0</span></dd></div>
+          </dl>
+          <section class="validation-panel" aria-labelledby="validation-title">
+            <div class="validation-heading">
+              <h3 id="validation-title">VALIDATION</h3>
+              <span id="validation-badge" class="validation-badge">NO DRAFT</span>
+            </div>
+            <p id="validation-summary">Waiting for the assigned draft.</p>
+            <ul id="validation-errors"></ul>
+            <details id="matrix-preview" hidden>
+              <summary id="matrix-summary">Matrix preview</summary>
+              <pre id="matrix-cells"></pre>
+            </details>
+          </section>
+          <form id="save-spec-form" class="control-form compact-form">
+            <label><span>Spec basename</span><input id="save-spec-name" type="text" placeholder="experiment-name.yaml" required></label>
+            <button id="save-spec-button" type="submit" disabled>Save spec</button>
+            <output id="save-spec-result" class="inline-result" aria-live="polite"></output>
+          </form>
+          <form id="run-workflow-form" class="control-form compact-form" hidden>
+            <h3>RUN WORKFLOW</h3>
+            <label><span>Goal</span><textarea id="run-goal" rows="3" required></textarea></label>
+            <label><span>Model</span><input id="run-model" type="text" required></label>
+            <label><span>Approved workdir</span><select id="run-workdir" required></select></label>
+            <label><span>Backend</span><select id="run-backend"><option value="">Auto</option><option value="opencode">OpenCode</option><option value="claude_cli">Claude CLI</option></select></label>
+            <label><span>Per-phase timeout (seconds)</span><input id="run-timeout" type="number" min="1" max="7200" value="1800" required></label>
+            <label><span>Thinking token budget</span><input id="run-thinking-budget" type="number" min="0" value="0"></label>
+            <label><span>Output token limit</span><input id="run-output-limit" type="number" min="0" value="0"></label>
+            <label class="check-label"><input id="run-commit" type="checkbox" checked> Commit successful phases</label>
+            <p class="boundary-copy">Running can modify the approved worktree and spend model budget. Launch parameters are confirmed before execution.</p>
+            <button id="run-workflow-button" type="submit" disabled>Run workflow</button>
+            <output id="run-workflow-result" class="inline-result" aria-live="polite"></output>
+          </form>
+          <form id="design-composer" class="control-form composer-form">
+            <label><span>Ask for a change</span><textarea id="design-prompt" rows="4" maxlength="12000" required></textarea></label>
+            <div class="form-actions">
+              <button id="send-design-input" type="submit">Send</button>
+              <button id="steer-design-input" type="button">Steer</button>
+            </div>
+            <output id="design-input-result" class="inline-result" aria-live="polite"></output>
+          </form>
+          <div class="design-stream-actions">
+            <button id="interrupt-design" class="danger-action" type="button">Interrupt</button>
+            <button id="detach-design" type="button">Detach</button>
           </div>
-          <div>
-            <dt>OpenCode session</dt>
-            <dd id="control-session">Session identity not observed yet</dd>
-          </div>
-        </dl>
-        <button id="copy-session" class="secondary-action" type="button" hidden>Copy session ID</button>
-        <button id="watch-button" class="primary-action" type="button" disabled>Select a cell</button>
-        <p id="control-guidance" class="control-guidance">Select a cell to inspect telemetry.</p>
-        <p class="boundary-copy">Watching does not send input or control the experiment.</p>
+        </section>
+
+        <section class="recent-designs" aria-labelledby="recent-designs-title">
+          <h3 id="recent-designs-title">RECENT DESIGN SESSIONS</h3>
+          <div id="recent-design-list"><p class="empty-state">No portal-owned design sessions yet.</p></div>
+        </section>
       </aside>
     </main>
 
