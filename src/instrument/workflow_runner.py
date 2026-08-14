@@ -29,6 +29,7 @@ from typing import Any
 from .backends import run_agentic
 from .experiment_spec import ExperimentSpec, validate_spec
 from .language import detect_language
+from .live import LivePublisher
 from .test_runner import run_suite, test_executed_success
 
 
@@ -162,6 +163,11 @@ def _completed_phases(workdir: Path, phase_names: list[str]) -> set[str]:
     return completed
 
 
+def _cell_id(spec_name: str, model: str) -> str:
+    slug = "".join(ch if ch.isalnum() else "_" for ch in f"{spec_name}_{model}")
+    return f"wf_{slug.lower().strip('_')}"
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -177,12 +183,16 @@ def run_workflow(
     commit: bool = True,
     stop_on_error: bool = True,
     resume: bool = False,
+    publish: bool = True,
     run_agentic_fn: Callable[..., Any] | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
     ``resume=True`` skips phases that already have a ``[workflow] <phase>`` commit and
     re-enters from the first incomplete phase (carrying prior-phase context).
+    ``publish=True`` emits live telemetry to Redis so the Control Room shows the run as a
+    cell (``story_status`` hash + ``status``/``events:<cell>`` channels). Each phase
+    publishes a ``step_finish`` event carrying its tokens/cost, which feeds the ticker.
     ``run_agentic_fn`` is injectable so tests can substitute a fake agent (no LLM).
     """
     errors = validate_spec(spec)
@@ -206,6 +216,15 @@ def run_workflow(
     result = WorkflowRunResult(
         spec_name=spec.name, model=model, workdir=str(wd), goal=goal, started_at=_now()
     )
+
+    cell_id = _cell_id(spec.name, model)
+    publisher = LivePublisher(cell_id) if publish else None
+    if publisher is not None and publisher.enabled:
+        publisher.set_status("running")
+        publisher.publish_event({
+            "type": "text", "sessionID": cell_id,
+            "part": {"text": f"workflow {spec.name} — {goal[:120]}"},
+        })
 
     prior: list[str] = []
     start_idx = 0
@@ -274,9 +293,27 @@ def run_workflow(
         prior.append(f"{name} ({pr.status})")
         result.phases.append(pr)
 
+        if publisher is not None and publisher.enabled:
+            tokens = pr.tokens or {}
+            publisher.publish_event({
+                "type": "step_finish", "sessionID": cell_id,
+                "part": {
+                    "text": f"phase {name} {pr.status}",
+                    "tokens": {
+                        "input": tokens.get("in", 0),
+                        "output": tokens.get("out", 0),
+                        "reasoning": tokens.get("reasoning", 0),
+                        "total": tokens.get("total", 0),
+                    },
+                    "cost": pr.cost_usd,
+                },
+            })
+
         if pr.status == "failed" and stop_on_error:
             break
 
     result.ended_at = _now()
     result.git_sha = _git_head(wd)
+    if publisher is not None and publisher.enabled:
+        publisher.set_status("done" if result.ok else "failed")
     return result

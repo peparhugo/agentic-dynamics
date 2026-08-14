@@ -69,6 +69,20 @@ class LivePublisher:
         except Exception:
             self._disabled = True
 
+    def set_status(self, status: str) -> None:
+        """Record status in the ``story_status`` hash AND publish the transition.
+
+        The portal's fleet reads the hash (``GET /api/matrix``); the live stream reads
+        the channel (``GET /api/status``). Both must be updated for a cell to appear.
+        """
+        if not self.enabled:
+            return
+        try:
+            self._r.hset(STATUS_KEY, self.cell_id, status)
+            self._r.publish(STATUS_CHANNEL, json.dumps({"cell_id": self.cell_id, "status": status}))
+        except Exception:
+            self._disabled = True
+
     def publish_event(self, event: dict[str, Any] | str) -> None:
         """Publish a single session event to ``events:{cell_id}``.
 
