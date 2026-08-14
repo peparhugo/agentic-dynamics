@@ -1,0 +1,117 @@
+name: evidence_narrative
+question: "Can the evidence page be re-narrated as a golden-circle story of the full corpus, with the archived perturbation runs as chronological context?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/narrative.md: the narrative design for restructuring firebase/public/evidence.html.
+
+          GOAL:
+          {goal}
+
+          FRAME — a golden-circle story of the FULL corpus, in chronological order:
+          - Simon Sinek's golden circle, explicit: WHY (the unmeasured gap that demanded measurement) at
+            the center, HOW (the instrument and its N×M scaling) as the ring, WHAT (the findings and the
+            field) as the outside. This is a discovery narrative, not a product page.
+          - CHRONOLOGY (important — reverse the current ordering): the archived single-session
+            PERTURBATION experiments came FIRST (they measured search dynamics — grit, basin escape,
+            recovery cost — under controlled degradation, ~227 runs across 8 model variants × 10
+            operators). The multi-session STORY experiments came SECOND (the current instrument: 3
+            codebases × 2 tiers × 2 qualities × conditions, ~1,097 sessions, 221 stories, 7 models).
+            The story instrument REUSES the operators and recovery signals the perturbation runs
+            discovered. So the page must present the perturbation corpus as the ARCHIVED PRECURSOR that
+            motivated the story instrument, then the story corpus as the CURRENT state of the field.
+          - FULL OVERVIEW: both corpora, clearly distinguished and provenance-tagged ([M]/[C]/[H]/[X]).
+            Do not merge them — the perturbation corpus (227 single-session runs) and the story corpus
+            (1,097 multi-session story sessions) are distinct measurements.
+
+          THE DATA HAS BEEN REBUILT: firebase/public/data.js now carries BOTH corpora (the perturbation
+          summary was restored from archive and the story data is intact — story_sessions 1097,
+          stories_total 221, story_total_cost 288.6909, variants 7). The re-narrative must use the full
+          rebuilt data, not the old story-only framing.
+
+          THE NATURAL-BEHAVIOR CAVEAT (must be stated prominently in the verification finding):
+          - We NEVER instructed the models how many tests to write. The test-count differences observed
+            (e.g. Luna ~7 vs Sonnet ~122 tests per story) are therefore NATURAL, emergent model
+            behavior — NOT a model ignoring an instruction or doing a bad job of following one. The
+            models were told to build the same system; the volume and edge-case coverage of the tests
+            they chose to write is their own unguided behavior. This makes the "verification gap" a
+            measured property of the models' disposition, not a compliance failure. State this
+            explicitly, in plain language, near the verification finding.
+
+          EXISTING STRUCTURE (ground truth): evidence.html is ~1573 lines. Lines ~63-248 are the story
+          evidence (verification gap, review agent, AST/Sonar, dynamics, 5-session arc). Lines ~249-812
+          are the current "Legacy — Single-Session Perturbation Experiments" section (grit spectrum,
+          flail rate, cost efficiency, AST, Sonar, constraint detection, token costs, perturbation
+          response, cross-model rollup) with many app.js-driven canvas charts (gritMatrixChart,
+          narrationChart, costBarChart, snowballChart) and tbody ids (cost-ranking-tbody,
+          sonar-quality-body, token-cost-tbody, rollup-tbody). A large inline <script> follows the footer.
+
+          HARD CONSTRAINTS:
+          - Preserve every number, data-stat binding, and provenance tag. Reorder and re-narrate, never
+            re-derive.
+          - Do NOT break app.js: keep every canvas id and tbody id it references present in the DOM, or
+            guard the app.js call sites (this is a real risk — the charts must still render).
+          - Keep all <a href>/#anchor links working.
+
+          DELIVER exactly one file, docs/narrative.md: (1) the golden-circle thesis for the evidence
+          page, (2) the chronological re-order plan (perturbation-as-precursor → story-as-current),
+          (3) the full-overview structure, (4) the exact wording of the natural-behavior caveat,
+          (5) a chart/app.js integrity register (every id that must survive).
+      - name: rewrite
+        kind: agent
+        prompt: |
+          Restructure firebase/public/evidence.html per docs/narrative.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Edit evidence.html markup + scoped <style>. Do NOT touch app.js, base.css, or data.js.
+          - Preserve every number, data-stat binding, provenance tag.
+          - Keep every canvas id and tbody id that app.js references present (charts must still render);
+            if you wrap sections in <details>, re-trigger chart render on open so canvases are not 0-width.
+          - Present the perturbation corpus as the ARCHIVED PRECURSOR (chronologically first), then the
+            story corpus as the CURRENT state, both under an explicit golden-circle narrative.
+          - State the natural-behavior caveat prominently near the verification finding, in plain language.
+          - Keep all nav links and #anchors working.
+
+          DELIVER the restructured evidence.html.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the evidence restructure is data-safe and functional.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Every data-stat="..." key resolves in firebase/public/data.js.
+          - No measured number or provenance tag changed (git diff evidence.html against HEAD~1).
+          - Every canvas id and tbody id that app.js references is still present in evidence.html.
+          - The natural-behavior caveat is present and correctly worded (test-count differences are
+            natural/emergent, NOT instruction-following failure).
+          - All internal <a href="#..."> anchors resolve; the golden-circle structure (Why/How/What)
+            is explicit in section kickers.
+
+          DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + summary.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
