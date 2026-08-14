@@ -20,6 +20,7 @@ def app():
 def reset_db():
     with app_module.get_db() as conn:
         conn.execute("DELETE FROM tasks")
+        conn.execute("DELETE FROM users")
         conn.commit()
     yield
 
