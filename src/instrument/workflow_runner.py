@@ -17,6 +17,7 @@ later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import time
@@ -257,17 +258,27 @@ def run_workflow(
                     pr.error = suite.get("tail", "")[-400:]
             else:
                 prompt = _build_phase_prompt(phase_def, goal, prior)
-                ar = run_agent(
-                    prompt,
-                    model=model,
-                    backend=backend,
-                    workdir=str(wd),
-                    thinking_effort=thinking_effort,
-                    thinking_budget_tokens=thinking_budget_tokens,
-                    output_token_limit=output_token_limit,
-                    timeout=phase_timeout,
-                    silent_mode=silent_mode,
-                )
+                # Point the agent's built-in publisher at this workflow's cell so the
+                # fine-grained session events stream into the Control Room.
+                prev_cell = os.environ.get("FINOPS_CELL_ID")
+                os.environ["FINOPS_CELL_ID"] = cell_id
+                try:
+                    ar = run_agent(
+                        prompt,
+                        model=model,
+                        backend=backend,
+                        workdir=str(wd),
+                        thinking_effort=thinking_effort,
+                        thinking_budget_tokens=thinking_budget_tokens,
+                        output_token_limit=output_token_limit,
+                        timeout=phase_timeout,
+                        silent_mode=silent_mode,
+                    )
+                finally:
+                    if prev_cell is None:
+                        os.environ.pop("FINOPS_CELL_ID", None)
+                    else:
+                        os.environ["FINOPS_CELL_ID"] = prev_cell
                 pr.model = model
                 pr.tokens = {
                     "in": getattr(ar, "prompt_tokens", 0),
