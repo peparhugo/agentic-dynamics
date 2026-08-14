@@ -1,3 +1,6 @@
+Ported from `.opencode/instructions/mental-model.md` (loaded unconditionally there via
+`opencode.json`'s `instructions` array). Kept in sync by hand — see `docs/claude_code_port.md`.
+
 # File map, signatures, and dependencies. No theory. No methodology.
 
 This repo is an **information-acquisition machine for AI economics**: controlled
@@ -206,6 +209,7 @@ admin/server.py — Control Room portal: SSE telemetry, routing, supervisor flag
 design sessions, Claude background sessions (port 8000, FINOPS_PORT). Full route
 list: scripts/CONTEXT.md.
 .opencode/tools/dashboard.ts — pull tool: Redis status matrix via monitor.py --json
+(opencode-only; on the Claude Code side, run `python scripts/monitor.py --json` via Bash).
 
 ## Test files
 

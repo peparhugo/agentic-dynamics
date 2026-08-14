@@ -1,7 +1,5 @@
 ---
 description: Create a new experiment config and run it through the perturbation pipeline
-agent: build
-subtask: true
 ---
 
 Create a new experiment config and run it end-to-end.

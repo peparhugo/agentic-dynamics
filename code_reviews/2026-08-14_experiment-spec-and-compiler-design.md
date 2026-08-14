@@ -1,6 +1,9 @@
 # ExperimentSpec + Compiler — Design Specification
 
-Status: proposed (v2, corrected) · Owner: AI FinOps Dynamics instrument
+Status: written (v2, corrected) — spec (experiment_spec.py) and compiler
+(compile_experiment.py) both implemented and tested; the load-bearing instrumentation
+gap (confidence, perturbation_strength, test_executed_success, answer/explanation
+token split) remains open — see §7/ledger. · Owner: AI FinOps Dynamics instrument
 Date: 2026-08-14 · Supersedes: the v1 framing in this file (policy-vs-experiment split,
 OVAT-as-design, "bandit end-state") — all removed; see §3 for the correction.
 

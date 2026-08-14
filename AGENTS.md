@@ -25,7 +25,7 @@ python scripts/analyze_worktrees.py
 python scripts/inventory.py refresh
 python scripts/sync_data.py          # story results -> parquet (before build_data)
 python scripts/build_data.py
-python admin/server.py               # SSE dashboard (default 8000 = ChromaDB; use FINOPS_PORT)
+python admin/server.py               # SSE dashboard (default 8000 = ChromaDB; use FINOPS_PORT) — now the Control Room portal (matrix/status/flags/design-sessions/claude-agents), see docs/supervisor_design.md
 pytest tests/
 pytest tests/test_<module>.py -v
 firebase deploy --only hosting       # deploy = inventory -> sync -> build -> deploy
@@ -44,8 +44,9 @@ firebase deploy --only hosting       # deploy = inventory -> sync -> build -> de
 - `scripts/CONTEXT.md` — script reference
 - `experiments/CONTEXT.md` — experiment ecosystem
 - `firebase/CONTEXT.md` — website documentation
+- `docs/supervisor_design.md` — Control Room / supervisor subsystem (flag-only rail: observe, never steer); see also `docs/spec.md`, `docs/scope.md` for the fuller design cluster.
 
-`src/instrument/experiment_spec.py` (spec dataclasses + requires/produces validator) is **written**; `src/instrument/compile_experiment.py` (spec → DAG) is still proposed.
+Both `src/instrument/experiment_spec.py` and `src/instrument/compile_experiment.py` are **written** — see `src/instrument/CONTEXT.md` for the module table and the ledger's still-unmeasured fields.
 
 ## Skills (load when entering a domain)
 

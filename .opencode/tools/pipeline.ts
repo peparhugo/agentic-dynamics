@@ -2,7 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 
 export default tool({
   description:
-    "Run or inspect a pipeline plan (YAML-driven phase orchestration). Plans: ci (lint→test→build), deploy (refresh→sync→build→deploy), full_matrix (experiment matrix→analyze→review→regenerate→deploy), feature (spec→implement→lint→test→review→ship), ship_features (parallel workstreams→conflict detect→PR create→merge)",
+    "Run or inspect a pipeline plan (YAML-driven phase orchestration). Plans: ci (lint→test→build), deploy (refresh→sync→build→deploy), full_matrix (experiment matrix→analyze→review→regenerate→deploy), feature (spec→implement→lint→test→review→ship), ship_features (parallel workstreams→conflict detect→PR create→merge), cross_models (flash → haiku → sonnet → sol → terra → analyze → reviews → regenerate → deploy)",
   args: {
     action: tool.schema
       .enum(["run", "dry_run", "graph", "status", "reset", "check_deps"])
@@ -13,7 +13,7 @@ export default tool({
       .string()
       .optional()
       .default("ci")
-      .describe("Plan name: ci, deploy, full_matrix, feature, or ship_features"),
+      .describe("Plan name: ci, deploy, full_matrix, cross_models, feature, or ship_features"),
     from_phase: tool.schema.string().optional().describe("Start execution from this phase id"),
     until_phase: tool.schema.string().optional().describe("Stop execution after this phase id"),
     only_phases: tool.schema.string().optional().describe("Comma-separated subset of phase ids to run"),

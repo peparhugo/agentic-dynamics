@@ -2,12 +2,12 @@
 
 34 experiment YAML configs (+ `plans.yaml`), 224+ game reports, 19 active lab books, 6 peer reviews.
 
-## `experiments/specs/` — ExperimentSpec YAML (proposed)
+## `experiments/specs/` — ExperimentSpec YAML (written; 11 real specs)
 
 The spec/compiler introduces an `ExperimentSpec` layer above the configs. A spec declares
 `workflow`, `factors` (model, condition, **policy** as a first-class factor), `design`
 (factorial), `rules` (measurement vs control), `metrics`, `comparison`, `writeup`, `stop`, and
-`adapt`. Flagship: `experiments/specs/routing_regret.yaml`:
+`adapt`. Flagship: `experiments/specs/agentic_dynamics_story.yaml`:
 
 ```yaml
 factors:

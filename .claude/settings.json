@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "Agent",
+      "WebFetch",
+      "Skill"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(firebase deploy *)",
+      "Bash(rm -rf /tmp/exp_*)"
+    ]
+  },
+  "autoCompactEnabled": true
+}

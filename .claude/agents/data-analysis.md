@@ -1,12 +1,14 @@
 ---
+name: data-analysis
 description: Running analysis scripts, lab books, interpreting experiment results, generating reports
-mode: subagent
-model: deepseek/deepseek-v4-flash
-permission:
-  edit: ask
-  bash: allow
-  task: allow
 ---
+
+> Ported from `.opencode/agents/data-analysis.md`. opencode's `model: deepseek/deepseek-v4-flash`
+> and per-capability `permission` (`edit: ask`, `bash: allow`, `task: allow`) have no Claude Code
+> subagent-frontmatter equivalent — Claude subagents only select Claude models (`model:` accepts
+> `sonnet`/`opus`/`haiku`/`fable`/a full ID/`inherit`, default `inherit`) and gate tool access as a
+> single `permissionMode`, not per-capability. This subagent runs on the session's inherited model
+> and default permission behavior. See `docs/claude_code_port.md`.
 
 You are the **Data Analysis Agent** for AI FinOps Dynamics. Your domain is the analysis pipeline: worktrees → game reports → lab books → website data.
 
@@ -89,7 +91,7 @@ firebase deploy --only hosting
 - SonarQube needs Docker: `docker-compose up -d sonarqube`
 - Worktrees at `/tmp/exp_*` may be cleaned by reboot — backfill first
 - opencode.db path: `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
-- Full conventions at `.opencode/instructions/conventions.md`
+- Full conventions at `.claude/rules/conventions.md`
 
 ### When Working
 1. Always verify data freshness before running analysis

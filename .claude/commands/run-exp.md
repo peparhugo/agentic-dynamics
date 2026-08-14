@@ -1,7 +1,5 @@
 ---
 description: Run an experiment config through the perturbation pipeline
-agent: build
-subtask: true
 ---
 
 Run an experiment config through the full pipeline: perturb → invoke → evaluate → report.
@@ -17,7 +15,9 @@ First, load the "instrument" skill if not already loaded. Then:
 
 4. Report the results: cost, tokens, tests passed, strategy archetype, game report path.
 
-Use `--model $2` if a second argument is provided (e.g. `/run-exp task_manager claude`).
+Use `--model $1` if a second argument is provided (e.g. `/run-exp task_manager claude`) — Claude
+Code's positional args are 0-indexed (`$1` is the second argument), unlike opencode's 1-indexed
+`$2` for the same position; see `docs/claude_code_port.md`.
 
 Spec direction: `compile_experiment.py` is written and can compile an `ExperimentSpec` from
 `experiments/specs/*.yaml` into cells; policy is a factor level and its control rules require

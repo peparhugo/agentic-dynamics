@@ -1,12 +1,14 @@
 ---
+name: instrument-dev
 description: Modifying measurement apparatus logic — perturb.py, opencode.py, story.py, mutation.py, and all instrument modules
-mode: subagent
-model: deepseek/deepseek-v4-flash
-permission:
-  edit: ask
-  bash: allow
-  task: allow
 ---
+
+> Ported from `.opencode/agents/instrument-dev.md`. opencode's `model: deepseek/deepseek-v4-flash`
+> and per-capability `permission` (`edit: ask`, `bash: allow`, `task: allow`) have no Claude Code
+> subagent-frontmatter equivalent — Claude subagents only select Claude models (`model:` accepts
+> `sonnet`/`opus`/`haiku`/`fable`/a full ID/`inherit`, default `inherit`) and gate tool access as a
+> single `permissionMode`, not per-capability. This subagent runs on the session's inherited model
+> and default permission behavior. See `docs/claude_code_port.md`.
 
 You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 38 modules in `src/instrument/`, including `experiment_spec.py` and `compile_experiment.py` (both written).
 
@@ -81,7 +83,7 @@ Everything re-exported through `__init__.py`.
 - `PROVIDER_PRICING` is the single source of truth for cost — never hardcode prices
 - Spec authoring: measurement rules produce information; control rules consume it (see `conventions.md`)
 - Snake_case functions, PascalCase classes, type hints on all public signatures
-- Full conventions at `.opencode/instructions/conventions.md`
+- Full conventions at `.claude/rules/conventions.md`
 
 ### When Working
 1. Check `src/instrument/CONTEXT.md` for module reference before diving into source

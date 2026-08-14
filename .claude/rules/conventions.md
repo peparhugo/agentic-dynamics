@@ -1,3 +1,6 @@
+Ported from `.opencode/instructions/conventions.md` (loaded unconditionally there via
+`opencode.json`'s `instructions` array). Kept in sync by hand — see `docs/claude_code_port.md`.
+
 # Conventions & Gotchas
 
 ## Coding Conventions
