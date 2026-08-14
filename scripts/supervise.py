@@ -15,7 +15,6 @@ import argparse
 import json
 import os
 import sys
-import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,8 +33,6 @@ POLL_INTERVAL = int(os.environ.get("SUPERVISOR_POLL_INTERVAL", "60"))
 ACTIVE_WINDOW = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))  # seconds
 BATCH_EVENTS = int(os.environ.get("SUPERVISOR_BATCH_EVENTS", "12"))
 RELAY = os.environ.get("SUPERVISOR_RELAY", "1") == "1"
-RELAY_WAIT = float(os.environ.get("SUPERVISOR_RELAY_WAIT", "1.0"))  # bounded stream window
-RELAY_WAIT_FIRST = float(os.environ.get("SUPERVISOR_RELAY_WAIT_FIRST", "8.0"))  # first-seen catch-up
 FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
 STATE_FILE = ROOT / "experiments" / "results" / "supervisor" / "monitor_session.json"
 
@@ -157,54 +154,37 @@ def _cell_id_for(session: dict) -> str:
     return f"live_{_slugify(model)}_{_slugify(title)}"
 
 
-def _event_sequence(event: dict) -> str | None:
-    for src in (event, event.get("properties") if isinstance(event.get("properties"), dict) else {}):
-        for key in ("sequence", "aggregateSequence", "aggregate_sequence", "_sse_id"):
-            v = src.get(key)
-            if isinstance(v, (str, int)) and not isinstance(v, bool):
-                return str(v)
-    return None
+def relay_once(client: OpenCodeClient, cursors: dict[str, int]) -> None:
+    """Bridge each active session's message activity into Redis (Control Room stream).
 
-
-def relay_once(client: OpenCodeClient, cursors: dict[str, str]) -> None:
-    """Bridge each active native session's events into Redis (Control Room stream).
-
-    Uses a bounded SSE read: a daemon thread consumes iter_events for RELAY_WAIT
-    seconds, events are published under ``live_<model>_<title>`` and the cell is
-    registered in ``story_status`` so it shows in the fleet.
+    Polls the message snapshot (non-blocking) rather than the SSE stream, so large
+    sessions don't force a slow full-history replay. New messages since the last poll
+    are published under ``live_<model>_<title>`` and the cell is registered in
+    ``story_status``.
     """
     if not RELAY:
         return
     for s in active_sessions(client):
         sid = s.get("id", "")
         cell_id = _cell_id_for(s)
-        after = cursors.get(sid)
-        first = after is None
-        collected: list[dict] = []
-
-        def consume(sid=sid, after=after, collected=collected) -> None:
-            try:
-                for ev in client.iter_events(sid, after=after):
-                    collected.append(ev)
-            except OpenCodeError:
-                pass
-
-        t = threading.Thread(target=consume, daemon=True)
-        t.start()
-        t.join(timeout=RELAY_WAIT_FIRST if first else RELAY_WAIT)
-
-        if not collected:
+        try:
+            resp = client.messages(sid)
+        except OpenCodeError:
             continue
-        last_seq = next((s2 for e in collected if (s2 := _event_sequence(e))), None)
-        if last_seq:
-            cursors[sid] = last_seq
-        if first:
-            continue  # discard replayed history; stream only new events from here on
+        msgs = resp.get("data") or resp.get("messages") or []
+        last_count = cursors.get(sid, 0)
+        if len(msgs) <= last_count:
+            continue
         publisher = LivePublisher(cell_id)
         if publisher.enabled:
             publisher.set_status("running")
-        for ev in collected:
-            publisher.publish_event(ev)
+        for m in msgs[last_count:]:
+            role = m.get("role", "?")
+            for part in m.get("parts") or m.get("content") or []:
+                text = part.get("text") if isinstance(part, dict) else part
+                if text:
+                    publisher.publish_event({"type": "text", "role": role, "part": {"text": text[:600]}})
+        cursors[sid] = len(msgs)
 
 
 def emit_flag(session: dict, status: str, why: str) -> None:
