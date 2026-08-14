@@ -254,24 +254,82 @@ def emit_flag(session: dict, status: str, why: str) -> None:
     print(f"[FLAG] {status}: {flag['title']} — {why}", flush=True)
 
 
-def supervise_once(client: OpenCodeClient, monitor_id: str, location: str) -> None:
-    sessions = active_sessions(client, skip=monitor_id)
-    if not sessions:
-        log("no active sessions")
-        return
-    for s in sessions:
-        sid = s.get("id", "")
-        title = s.get("title", "")[:60]
+def running_cells(redis_client) -> list[str]:
+    """Running workflow cells (wf_*) from the story_status hash, newest first."""
+    statuses = redis_client.hgetall("story_status")
+    return sorted(
+        (cid for cid, st in statuses.items() if cid.startswith("wf_") and st == "running"),
+        reverse=True,
+    )
+
+
+def _cell_activity(redis_client, cell_id: str, limit: int) -> str:
+    """Recent activity text from a cell's retained event log (Redis, not opencode API)."""
+    try:
+        events = redis_client.lrange(f"events_log:{cell_id}", -limit, -1)
+    except Exception:
+        return ""
+    lines: list[str] = []
+    for raw in events:
         try:
-            msgs = client.messages(sid)
-        except OpenCodeError:
+            ev = json.loads(raw)
+        except json.JSONDecodeError:
             continue
-        text = _text_from_messages(msgs, BATCH_EVENTS)
+        etype = ev.get("type", "event")
+        part = ev.get("part") or {}
+        text = ""
+        if isinstance(part, dict):
+            text = part.get("text") or part.get("reasoning") or ""
+            if not text and part.get("tool"):
+                state = part.get("state") or {}
+                inp = state.get("input") if isinstance(state, dict) else None
+                detail = ""
+                if isinstance(inp, dict):
+                    detail = inp.get("filePath") or inp.get("command") or inp.get("pattern") or ""
+                text = f"tool:{part.get('tool', '?')} {str(detail)[:80]}".strip()
+        if text:
+            lines.append(f"{etype}: {text[:200]}")
+    return "\n".join(lines) if lines else ""
+
+
+KNOWN_CELL_MODELS = {
+    "openai_gpt_5_6_sol": "openai/gpt-5.6-sol",
+    "openai_gpt_5_6_luna": "openai/gpt-5.6-luna",
+    "openai_gpt_5_6_terra": "openai/gpt-5.6-terra",
+    "deepseek_deepseek_v4_pro": "deepseek/deepseek-v4-pro",
+    "deepseek_deepseek_v4_flash": "deepseek/deepseek-v4-flash",
+    "anthropic_claude_fable_5": "anthropic/claude-fable-5",
+    "anthropic_claude_haiku_4_5": "anthropic/claude-haiku-4-5",
+    "anthropic_claude_sonnet_5": "anthropic/claude-sonnet-5",
+}
+
+
+def cell_model(cell_id: str) -> str:
+    for slug, model in KNOWN_CELL_MODELS.items():
+        if slug in cell_id:
+            return model
+    return "unknown"
+
+
+def supervise_once(client: OpenCodeClient, monitor_id: str, redis_client) -> None:
+    """Assess running workflow cells from their Redis event stream (flag only).
+
+    The opencode server API does not expose ``opencode run`` transcripts (messages/
+    history are empty), so the assessment reads the events that ``run_workflow``
+    publishes under each ``wf_*`` cell via FINOPS_CELL_ID — the same stream the
+    Control Room terminal renders.
+    """
+    cells = running_cells(redis_client)
+    if not cells:
+        return
+    for cell_id in cells:
+        text = _cell_activity(redis_client, cell_id, BATCH_EVENTS)
         if not text.strip():
             continue
+        model = cell_model(cell_id)
         batch = (
-            f"SESSION: {title}\n"
-            f"MODEL: {(s.get('model') or {}).get('id', '?')}\n"
+            f"CELL: {cell_id}\n"
+            f"MODEL: {model}\n"
             f"RECENT ACTIVITY (newest last):\n{text}\n\n"
             "Assess and reply STATUS + WHY."
         )
@@ -279,11 +337,11 @@ def supervise_once(client: OpenCodeClient, monitor_id: str, location: str) -> No
             client.send_input(monitor_id, batch, delivery="queue")
             reply = read_reply(client, monitor_id, wait_s=45.0)
         except OpenCodeError as e:
-            log(f"monitor error for {title}: {e}")
+            log(f"monitor error for {cell_id}: {e}")
             continue
         status, why = parse_verdict(reply)
         if status not in ("healthy", "unknown"):
-            emit_flag(s, status, why)
+            emit_flag({"id": cell_id, "title": cell_id, "model": {"id": model}}, status, why)
 
 
 def main() -> None:
@@ -294,6 +352,7 @@ def main() -> None:
 
     client = OpenCodeClient(BASE_URL)
     monitor_id = ensure_monitor(client, args.location)
+    redis_client = _redis()
     threads: dict[str, threading.Thread] = {}
     finished: set[str] = set()
     log(f"relaying + monitoring (assess every {POLL_INTERVAL}s); flags -> {FLAGS_FILE}")
@@ -306,7 +365,7 @@ def main() -> None:
             log(f"relay error: {e!r}")
         if time.time() - last_assess >= POLL_INTERVAL:
             try:
-                supervise_once(client, monitor_id, args.location)
+                supervise_once(client, monitor_id, redis_client)
             except Exception as e:  # noqa: BLE001
                 log(f"error: {e!r}")
             last_assess = time.time()
