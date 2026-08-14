@@ -49,6 +49,29 @@
 .framework-page .architecture-intro{display:flex;justify-content:space-between;gap:2rem;align-items:end;text-align:left;margin-bottom:1.5rem}
 .framework-page .architecture-intro .lead{max-width:39rem;margin:0}
 .framework-page .system-figure{margin:0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));box-shadow:var(--panel-shadow);overflow:hidden;text-align:left;padding:clamp(1rem,3vw,2rem)}
+.framework-page .diagram-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-color:var(--fw-how) var(--fw-inset);border-radius:.75rem}
+.framework-page .diagram-scroll:focus-visible{outline:2px solid var(--fw-how);outline-offset:3px}
+.framework-page .diagram-map{display:block;width:100%;height:auto;min-width:980px;background:var(--bg)}
+.framework-page .diagram-map .map-ground{fill:var(--bg);stroke:var(--fw-line);stroke-width:1}
+.framework-page .diagram-map .map-grid{fill:url(#workflow-grid);opacity:.72}
+.framework-page .diagram-map .map-kicker{fill:var(--fw-how);font:700 11px 'JetBrains Mono',monospace;letter-spacing:.18em}
+.framework-page .diagram-map .map-title{fill:var(--t);font:700 23px 'JetBrains Mono',monospace;letter-spacing:.05em}
+.framework-page .diagram-map .map-copy{fill:var(--t3);font:500 10px 'JetBrains Mono',monospace;letter-spacing:.035em}
+.framework-page .diagram-map .map-label{fill:var(--t3);font:700 9px 'JetBrains Mono',monospace;letter-spacing:.12em}
+.framework-page .diagram-map .map-node{fill:var(--bg3);stroke:var(--fw-line-strong);stroke-width:1.2}
+.framework-page .diagram-map .map-node.cyan{stroke:var(--fw-how)}.framework-page .diagram-map .map-node.blue{stroke:var(--fw-what)}.framework-page .diagram-map .map-node.amber{stroke:var(--fw-why)}
+.framework-page .diagram-map .node-index{fill:var(--t3);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.1em}
+.framework-page .diagram-map .node-title{fill:var(--t);font:700 14px 'JetBrains Mono',monospace;letter-spacing:.06em}
+.framework-page .diagram-map .node-copy{fill:var(--t2);font:500 9px 'JetBrains Mono',monospace}
+.framework-page .diagram-map .flow{fill:none;stroke:var(--t3);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#workflow-arrow)}
+.framework-page .diagram-map .flow.cyan{stroke:var(--fw-how);marker-end:url(#workflow-arrow-cyan)}.framework-page .diagram-map .flow.blue{stroke:var(--fw-what);marker-end:url(#workflow-arrow-blue)}.framework-page .diagram-map .flow.amber{stroke:var(--fw-why);stroke-dasharray:7 6;marker-end:url(#workflow-arrow-amber)}
+.framework-page .diagram-map .flow-note{fill:var(--t3);font:500 8px 'JetBrains Mono',monospace;paint-order:stroke;stroke:var(--bg);stroke-width:4px}
+.framework-page .diagram-map .mode-surface{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .diagram-map .mode-surface.operate{stroke:var(--fw-how)}.framework-page .diagram-map .mode-surface.experiment{stroke:var(--fw-what)}
+.framework-page .diagram-map .rail{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .diagram-map .rail-divider{stroke:var(--fw-line);stroke-width:1}
+.framework-page .diagram-map .scale-symbol{fill:var(--fw-how);font:800 22px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-op{fill:var(--t3);font:400 20px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-title{fill:var(--t);font:700 11px 'JetBrains Mono',monospace}.framework-page .diagram-map .scale-copy{fill:var(--t3);font:500 8px 'JetBrains Mono',monospace}
+.framework-page .diagram-map .tracer{fill:none;stroke:var(--fw-how);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:1 99;pathLength:100;opacity:.72;animation:fw-trace 8s linear infinite}.framework-page .diagram-map .tracer.return{stroke:var(--fw-why);animation-duration:11s}
+@keyframes fw-trace{to{stroke-dashoffset:-100}}
+.framework-page .system-figure.redesigned>.mode-entry-grid,.framework-page .system-figure.redesigned>.merge-label,.framework-page .system-figure.redesigned>.process-row,.framework-page .system-figure.redesigned>.system-planes{display:none}
 .framework-page .mode-entry-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .framework-page .mode-entry{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-how);padding:1rem;min-width:0}
 .framework-page .mode-entry.experiment{border-top-color:var(--fw-what)}
@@ -74,6 +97,12 @@
 
 .framework-page .autonomy-section{background:var(--bg);padding-top:clamp(4rem,8vw,7rem)}
 .framework-page .authority-map{margin:1.5rem 0 0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:linear-gradient(145deg,var(--bg2),var(--bg));padding:clamp(1rem,3vw,2rem);box-shadow:var(--panel-shadow)}
+.framework-page .authority-map.redesigned>.human-plane,.framework-page .authority-map.redesigned>.authority-connector,.framework-page .authority-map.redesigned>.bounded-zone,.framework-page .authority-map.redesigned>.authority-outputs,.framework-page .authority-map.redesigned>.autonomy-levels{display:none}
+.framework-page .autonomy-map .boundary{fill:rgba(34,211,238,.025);stroke:var(--fw-how);stroke-width:1.5;stroke-dasharray:9 6}
+.framework-page .autonomy-map .human-surface{fill:var(--bg2);stroke:var(--fw-why);stroke-width:1.4}
+.framework-page .autonomy-map .limit-pill{fill:var(--bg);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .autonomy-map .limit-text{fill:var(--t2);font:700 8px 'JetBrains Mono',monospace;letter-spacing:.08em;text-anchor:middle}
+.framework-page .autonomy-map .mode-tab{fill:var(--bg2);stroke:var(--fw-line-strong);stroke-width:1}.framework-page .autonomy-map .mode-tab.active{stroke:var(--fw-what);stroke-width:1.5}
+.framework-page .autonomy-map .outcome-surface{fill:var(--bg2);stroke:var(--fw-how);stroke-width:1}.framework-page .autonomy-map .outcome-surface.exception{stroke:var(--fw-why)}
 .framework-page .human-plane{display:grid;grid-template-columns:12rem 1fr;gap:1rem;align-items:center;background:var(--fw-surface);border:1px solid var(--fw-line);border-left:3px solid var(--fw-why);padding:1rem;text-align:left}
 .framework-page .human-plane strong{color:var(--fw-why);font:700 .72rem/1.3 'JetBrains Mono',monospace;letter-spacing:.08em}.framework-page .human-plane p{font-size:.73rem;line-height:1.6;color:var(--t2);margin:0}
 .framework-page .authority-connector{text-align:center;color:var(--fw-why);font:700 .65rem/2.4 'JetBrains Mono',monospace;letter-spacing:.08em}
@@ -203,10 +232,10 @@
 .framework-page .campaign-strip strong{display:block;color:var(--t);font-size:1rem}.framework-page .campaign-strip span{font-size:.73rem;color:var(--t3)}
 
 @media(max-width:1000px){.framework-page .hero-grid,.framework-page .cost-station{grid-template-columns:1fr}.framework-page .lever-console{grid-template-columns:1fr}.framework-page .architecture-text{grid-template-columns:repeat(2,1fr)}.framework-page .system-planes{grid-template-columns:1fr}.framework-page .cost-receipts.stats{grid-template-columns:repeat(3,1fr)}.framework-page .policy-map{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.framework-page .fsec{padding:3.5rem 1rem}.framework-page .architecture-intro{display:block}.framework-page .architecture-intro .lead{margin-top:1rem}.framework-page .process-row{grid-template-columns:1fr;gap:1.35rem}.framework-page .process-step{min-height:0}.framework-page .process-step:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-1.2rem;transform:translateX(50%)}.framework-page .scale-grid{grid-template-columns:1fr 1fr}.framework-page .human-plane{grid-template-columns:1fr}.framework-page .zone-head{display:block}.framework-page .zone-head span{display:block;margin-top:.45rem}.framework-page .autonomy-process{grid-template-columns:1fr;gap:1.1rem}.framework-page .autonomy-process li:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-.9rem;transform:translateX(50%)}.framework-page .authority-outputs,.framework-page .autonomy-levels{grid-template-columns:1fr}.framework-page .params,.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid,.framework-page .framework-workbench .row{grid-template-columns:1fr}.framework-page .workbench-grid{grid-template-columns:1fr}.framework-page .calc-results{position:static}.framework-page .framework-workbench input[type=range]{min-height:44px}.framework-page .doors,.framework-page .provider-grid,.framework-page .escalation-grid{grid-template-columns:1fr}.framework-page .door-card{min-height:0}.framework-page .door-caption{display:block}.framework-page .implementation-strip{grid-template-columns:1fr}.framework-page .rule-group{grid-template-columns:1fr}.framework-page .rule-group-head{position:static}.framework-page .policy-map{grid-template-columns:repeat(2,1fr)}.framework-page .campaign-strip{align-items:flex-start;flex-direction:column;margin:0 1rem}.framework-page .chart-wrap{height:19rem}}
+@media(max-width:768px){.framework-page .fsec{padding:3.5rem 1rem}.framework-page .architecture-intro{display:block}.framework-page .architecture-intro .lead{margin-top:1rem}.framework-page .diagram-map{min-width:900px}.framework-page .process-row{grid-template-columns:1fr;gap:1.35rem}.framework-page .process-step{min-height:0}.framework-page .process-step:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-1.2rem;transform:translateX(50%)}.framework-page .scale-grid{grid-template-columns:1fr 1fr}.framework-page .human-plane{grid-template-columns:1fr}.framework-page .zone-head{display:block}.framework-page .zone-head span{display:block;margin-top:.45rem}.framework-page .autonomy-process{grid-template-columns:1fr;gap:1.1rem}.framework-page .autonomy-process li:not(:last-child)::after{content:'\2193';right:50%;top:auto;bottom:-.9rem;transform:translateX(50%)}.framework-page .authority-outputs,.framework-page .autonomy-levels{grid-template-columns:1fr}.framework-page .params,.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid,.framework-page .framework-workbench .row{grid-template-columns:1fr}.framework-page .workbench-grid{grid-template-columns:1fr}.framework-page .calc-results{position:static}.framework-page .framework-workbench input[type=range]{min-height:44px}.framework-page .doors,.framework-page .provider-grid,.framework-page .escalation-grid{grid-template-columns:1fr}.framework-page .door-card{min-height:0}.framework-page .door-caption{display:block}.framework-page .implementation-strip{grid-template-columns:1fr}.framework-page .rule-group{grid-template-columns:1fr}.framework-page .rule-group-head{position:static}.framework-page .policy-map{grid-template-columns:repeat(2,1fr)}.framework-page .campaign-strip{align-items:flex-start;flex-direction:column;margin:0 1rem}.framework-page .chart-wrap{height:19rem}}
 @media(max-width:520px){.framework-page .hero-actions,.framework-page .calc-mode{display:grid}.framework-page .mode-entry-grid,.framework-page .scale-grid,.framework-page .architecture-text,.framework-page .cost-receipts.stats,.framework-page .policy-map{grid-template-columns:1fr}.framework-page .roi-out{grid-template-columns:1fr}.framework-page .cr{min-width:38rem}}
-@media(prefers-reduced-motion:reduce){.framework-page *{scroll-behavior:auto!important;transition:none!important}}
-@media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
+@media(prefers-reduced-motion:reduce){.framework-page *{scroll-behavior:auto!important;transition:none!important}.framework-page .diagram-map .tracer{display:none;animation:none}}
+@media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .diagram-map{min-width:0}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
 </style>
 <script src="data.js"></script>
 </head>
@@ -253,7 +282,91 @@
     </div>
     <p class="lead">A fixed assignment produces one workflow cell. Factor levels produce a grid of cells. Both compile into the same jobs and attempts; only the grid adds cross-arm comparison and adaptation.</p>
   </div>
-  <figure class="system-figure" id="architecture" aria-labelledby="engine-title">
+  <figure class="system-figure redesigned" id="architecture" aria-labelledby="workflow-map-title">
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable shared workflow engine diagram">
+      <svg class="diagram-map workflow-map" viewBox="0 0 1440 760" role="img" aria-labelledby="workflow-map-title workflow-map-desc">
+        <title id="workflow-map-title">One workflow engine operating as a single cell or an experimental grid</title>
+        <desc id="workflow-map-desc">A fixed factor assignment and a factor cross-product converge on the same cell, compiler, jobs, attempts, and ledger. The ledger produces information for runtime policy. Experimental grids additionally compare arms and adapt the next specification. A lower rail shows grid breadth times workflow depth times measurement breadth.</desc>
+        <defs>
+          <pattern id="workflow-grid" width="30" height="30" patternUnits="userSpaceOnUse"><path d="M30 0H0V30" fill="none" stroke="currentColor" stroke-opacity=".055"/></pattern>
+          <linearGradient id="workflow-ground" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="var(--bg3)"/><stop offset=".55" stop-color="var(--bg2)"/><stop offset="1" stop-color="var(--bg)"/></linearGradient>
+          <radialGradient id="workflow-core" cx="50%" cy="50%" r="70%"><stop offset="0" stop-color="var(--fw-how)" stop-opacity=".2"/><stop offset="1" stop-color="var(--fw-how)" stop-opacity=".025"/></radialGradient>
+          <filter id="workflow-glow" x="-40%" y="-60%" width="180%" height="220%"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          <marker id="workflow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--t3)"/></marker>
+          <marker id="workflow-arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-how)"/></marker>
+          <marker id="workflow-arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-what)"/></marker>
+          <marker id="workflow-arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--fw-why)"/></marker>
+        </defs>
+        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#workflow-ground)"/>
+        <rect class="map-grid" x="1" y="1" width="1438" height="758" rx="24"/>
+
+        <text class="map-kicker" x="54" y="52">OPERATING MODEL / SHARED EXECUTION</text>
+        <text class="map-title" x="54" y="84">ONE ENGINE, FROM CELL TO CAMPAIGN</text>
+        <text class="map-copy" x="54" y="108">FIX THE FACTORS TO OPERATE. VARY THEM TO LEARN. THE EXECUTION PATH DOES NOT CHANGE.</text>
+
+        <g aria-label="Operate mode: fixed factors produce one cell">
+          <rect class="mode-surface operate" x="54" y="158" width="262" height="106" rx="12"/>
+          <text class="node-index" x="72" y="181">OPERATE / FIXED ASSIGNMENT</text>
+          <text class="node-title" x="72" y="211">1 CELL</text>
+          <text class="node-copy" x="72" y="233">one active model &#x00B7; condition</text>
+          <text class="node-copy" x="72" y="249">policy &#x00B7; seed &#x00B7; constraints</text>
+        </g>
+        <g aria-label="Experiment mode: factor levels produce G cells">
+          <rect class="mode-surface experiment" x="54" y="296" width="262" height="106" rx="12"/>
+          <text class="node-index" x="72" y="319">EXPERIMENT / FACTOR LEVELS</text>
+          <text class="node-title" x="72" y="349">G CELLS</text>
+          <text class="node-copy" x="72" y="371">product of active factor levels</text>
+          <text class="node-copy" x="72" y="387">same workflow in every assignment</text>
+        </g>
+
+        <path class="flow cyan" d="M316 211C354 211 354 257 392 257"/>
+        <path class="flow blue" d="M316 349C354 349 354 289 392 289"/>
+        <text class="flow-note" x="340" y="201">select</text><text class="flow-note" x="337" y="338">expand</text>
+
+        <g aria-label="Cell: workflow and factor assignment">
+          <rect x="392" y="225" width="148" height="96" rx="48" fill="url(#workflow-core)" stroke="var(--fw-how)" stroke-width="1.6" filter="url(#workflow-glow)"/>
+          <text class="node-index" x="466" y="253" text-anchor="middle">SHARED UNIT</text>
+          <text class="node-title" x="466" y="280" text-anchor="middle">CELL</text>
+          <text class="node-copy" x="466" y="300" text-anchor="middle">workflow + assignment</text>
+        </g>
+
+        <path class="flow cyan" d="M540 273H576"/><path class="flow cyan" d="M724 273H756"/><path class="flow cyan" d="M904 273H936"/><path class="flow cyan" d="M1084 273H1116"/>
+        <text class="flow-note" x="558" y="259" text-anchor="middle">validate</text><text class="flow-note" x="740" y="259" text-anchor="middle">materialize</text><text class="flow-note" x="920" y="259" text-anchor="middle">execute</text><text class="flow-note" x="1100" y="259" text-anchor="middle">record</text>
+        <path class="tracer" pathLength="100" d="M540 273H1238"/>
+
+        <g><rect class="map-node cyan" x="576" y="225" width="148" height="96" rx="11"/><text class="node-index" x="594" y="247">02 / ORDER</text><text class="node-title" x="594" y="276">COMPILE</text><text class="node-copy" x="594" y="298">dependencies &#x2192; DAG</text></g>
+        <g><rect class="map-node cyan" x="756" y="225" width="148" height="96" rx="11"/><text class="node-index" x="774" y="247">03 / CONTROL</text><text class="node-title" x="774" y="276">JOBS</text><text class="node-copy" x="774" y="298">policy &#x00B7; budget &#x00B7; due</text></g>
+        <g><rect class="map-node cyan" x="936" y="225" width="148" height="96" rx="11"/><text class="node-index" x="954" y="247">04 / EXECUTE</text><text class="node-title" x="954" y="276">ATTEMPTS</text><text class="node-copy" x="954" y="298">calls &#x00B7; tools &#x00B7; retries</text></g>
+        <g><rect class="map-node cyan" x="1116" y="225" width="148" height="96" rx="11"/><text class="node-index" x="1134" y="247">05 / VISIBILITY</text><text class="node-title" x="1134" y="276">LEDGER</text><text class="node-copy" x="1134" y="298">append-only events</text></g>
+
+        <path class="flow cyan" d="M1190 321V390"/><text class="flow-note" x="1201" y="360">derive</text>
+        <g><rect class="map-node cyan" x="1080" y="390" width="220" height="96" rx="11" filter="url(#workflow-glow)"/><text class="node-index" x="1098" y="413">MEASUREMENT RULES</text><text class="node-title" x="1098" y="442">INFORMATION</text><text class="node-copy" x="1098" y="464">quality &#x00B7; cost &#x00B7; grit &#x00B7; uncertainty</text></g>
+
+        <path class="flow blue" d="M1080 438H992"/><text class="flow-note" x="1036" y="424" text-anchor="middle">consume</text>
+        <g><rect class="map-node blue" x="800" y="390" width="192" height="96" rx="11"/><text class="node-index" x="818" y="413">RUNTIME CONTROL</text><text class="node-title" x="818" y="442">POLICY</text><text class="node-copy" x="818" y="461">route &#x00B7; retry &#x00B7; escalate</text><text class="node-copy" x="818" y="476">budget &#x00B7; halt</text></g>
+        <path class="flow blue" d="M896 390C896 355 850 355 830 321"/><text class="flow-note" x="865" y="351">acts inside job</text>
+
+        <path class="flow blue" d="M800 438H712"/>
+        <g><rect class="map-node blue" x="520" y="390" width="192" height="96" rx="11"/><text class="node-index" x="538" y="413">WHEN G &gt; 1</text><text class="node-title" x="538" y="442">COMPARE ARMS</text><text class="node-copy" x="538" y="464">cost &#x00B7; quality &#x00B7; latency &#x00B7; value</text></g>
+        <path class="flow amber" d="M520 438H432"/>
+        <g><rect class="map-node amber" x="286" y="390" width="146" height="96" rx="11"/><text class="node-index" x="304" y="413">CAMPAIGN</text><text class="node-title" x="304" y="442">ADAPT</text><text class="node-copy" x="304" y="461">change one factor</text><text class="node-copy" x="304" y="476">emit next grid</text></g>
+        <path class="flow amber" d="M359 390C359 362 336 349 316 349"/><path class="tracer return" pathLength="100" d="M800 438H286V390C286 362 316 349 316 349"/>
+        <text class="flow-note" x="390" y="373">next specification</text>
+
+        <g aria-label="Scale: G times N times M">
+          <rect class="rail" x="54" y="566" width="1332" height="132" rx="14"/>
+          <text class="map-label" x="76" y="593">SCALE / INSTRUMENTED EVIDENCE SURFACE</text>
+          <line class="rail-divider" x1="370" y1="612" x2="370" y2="680"/><line class="rail-divider" x1="690" y1="612" x2="690" y2="680"/><line class="rail-divider" x1="1010" y1="612" x2="1010" y2="680"/>
+          <text class="scale-symbol" x="82" y="642">G</text><text class="scale-title" x="122" y="627">GRID BREADTH</text><text class="scale-copy" x="122" y="648">PRODUCT OF FACTOR LEVELS</text><text class="scale-copy" x="122" y="665">MODEL &#x00D7; CONDITION &#x00D7; POLICY &#x00D7; SEED</text>
+          <text class="scale-op" x="346" y="648">&#x00D7;</text>
+          <text class="scale-symbol" x="398" y="642">N</text><text class="scale-title" x="438" y="627">WORKFLOW DEPTH</text><text class="scale-copy" x="438" y="648">LINKED SESSIONS OR STAGES</text><text class="scale-copy" x="438" y="665">ACCUMULATED EFFECTS STAY VISIBLE</text>
+          <text class="scale-op" x="666" y="648">&#x00D7;</text>
+          <text class="scale-symbol" x="718" y="642">M</text><text class="scale-title" x="758" y="627">MEASUREMENT BREADTH</text><text class="scale-copy" x="758" y="648">INDEPENDENT ANGLES PER STAGE</text><text class="scale-copy" x="758" y="665">QUALITY &#x00B7; COST &#x00B7; RECOVERY &#x00B7; VALUE</text>
+          <text class="scale-op" x="986" y="648">=</text>
+          <text class="scale-symbol" x="1038" y="642">G&#x00D7;N&#x00D7;M</text><text class="scale-title" x="1170" y="627">EVIDENCE SURFACE</text><text class="scale-copy" x="1170" y="648">EACH NEW LEVEL MULTIPLIES CELLS</text><text class="scale-copy" x="1170" y="665">CAMPAIGNS REPEAT THE SURFACE</text>
+        </g>
+      </svg>
+    </div>
     <div class="mode-entry-grid">
       <article class="mode-entry">
         <span class="micro-label">OPERATE</span>
@@ -281,7 +394,7 @@
     </div>
     <figcaption>A production workflow is one cell. An experiment is a controlled grid of those same cells. A campaign uses their evidence to revise the next workflow policy.</figcaption>
   </figure>
-  <div class="scale-band" aria-labelledby="scale-title">
+  <div class="scale-band" aria-labelledby="scale-title" hidden>
     <div class="scale-formula" id="scale-title"><span>G</span> &times; <span>N</span> &times; <span>M</span> = instrumented evidence surface</div>
     <div class="scale-grid">
       <article class="scale-cell"><strong>G</strong><p>Grid breadth: the product of active factor levels, such as model &times; condition &times; policy &times; seed.</p></article>
@@ -446,7 +559,72 @@
     </div>
     <p class="lead">The agent may operate the workflow, but people define its objective, information requirements, policy, budget, and intervention conditions. Exceptions cross the boundary; routine work does not.</p>
   </div>
-  <figure class="authority-map" aria-labelledby="authority-title">
+  <figure class="authority-map redesigned" aria-labelledby="autonomy-map-title">
+    <div class="diagram-scroll" tabindex="0" aria-label="Scrollable autonomy boundary diagram">
+      <svg class="diagram-map autonomy-map" viewBox="0 0 1440 760" role="img" aria-labelledby="autonomy-map-title autonomy-map-desc">
+        <title id="autonomy-map-title">Human governance around a bounded autonomous workflow</title>
+        <desc id="autonomy-map-desc">People set objectives, approve policies, allocate budgets, and define intervention conditions. Inside the bounded workflow, policy admits, routes, executes, verifies, retries, and escalates work. Accepted outcomes continue downstream while exhausted limits and material risk return to human adjudication. Assisted, supervised, and bounded autonomous levels can be compared as policy factors.</desc>
+        <rect class="map-ground" x="1" y="1" width="1438" height="758" rx="24" style="fill:url(#workflow-ground)"/>
+        <rect class="map-grid" x="1" y="1" width="1438" height="758" rx="24"/>
+
+        <text class="map-kicker" x="54" y="52" style="fill:var(--fw-why)">AUTHORITY MAP / HUMAN CONTROL POINTS</text>
+        <text class="map-title" x="54" y="84">AUTONOMY IS A BOUNDARY, NOT AN ABSENCE</text>
+        <text class="map-copy" x="54" y="108">PEOPLE GOVERN THE ENVELOPE. POLICY OPERATES THE WORK. EXCEPTIONS CROSS THE LINE.</text>
+
+        <g aria-label="Human control plane">
+          <rect class="human-surface" x="96" y="142" width="1248" height="92" rx="46" filter="url(#workflow-glow)"/>
+          <text class="node-index" x="132" y="169" style="fill:var(--fw-why)">HUMAN CONTROL PLANE</text>
+          <text class="node-title" x="132" y="197">OBJECTIVE &#x00B7; SPECIFICATION &#x00B7; POLICY APPROVAL &#x00B7; BUDGET &#x00B7; INTERVENTION CONDITIONS</text>
+          <text class="node-copy" x="132" y="216">Humans move from operating every action to governing what the autonomous system is authorized to do.</text>
+        </g>
+
+        <path class="flow amber" d="M330 234V278"/><text class="flow-note" x="342" y="259">authorize</text>
+        <path class="flow cyan" d="M1110 278V234"/><text class="flow-note" x="1122" y="259">evidence + exceptions</text>
+
+        <g aria-label="Bounded autonomous workflow">
+          <rect class="boundary" x="126" y="278" width="1188" height="274" rx="22"/>
+          <text class="map-kicker" x="154" y="308">BOUNDED AUTONOMOUS WORKFLOW</text>
+          <text class="map-copy" x="1280" y="308" text-anchor="end">POLICY ACTS ONLY INSIDE DECLARED LIMITS</text>
+
+          <path class="flow cyan" d="M302 380H334"/><path class="flow cyan" d="M482 380H514"/><path class="flow cyan" d="M662 380H694"/><path class="flow cyan" d="M842 380H874"/><path class="flow amber" d="M1022 380H1054"/>
+          <path class="tracer" pathLength="100" d="M154 380H1202"/>
+
+          <g><rect class="map-node cyan" x="154" y="338" width="148" height="84" rx="10"/><text class="node-index" x="172" y="359">01 / GATE</text><text class="node-title" x="172" y="385">ADMIT</text><text class="node-copy" x="172" y="405">scope + eligibility</text></g>
+          <g><rect class="map-node cyan" x="334" y="338" width="148" height="84" rx="10"/><text class="node-index" x="352" y="359">02 / SELECT</text><text class="node-title" x="352" y="385">ROUTE</text><text class="node-copy" x="352" y="405">model + depth</text></g>
+          <g><rect class="map-node cyan" x="514" y="338" width="148" height="84" rx="10"/><text class="node-index" x="532" y="359">03 / ACT</text><text class="node-title" x="532" y="385">EXECUTE</text><text class="node-copy" x="532" y="405">attempt + tools</text></g>
+          <g><rect class="map-node blue" x="694" y="338" width="148" height="84" rx="10" filter="url(#workflow-glow)"/><text class="node-index" x="712" y="359">04 / DECIDE</text><text class="node-title" x="712" y="385">VERIFY</text><text class="node-copy" x="712" y="405">acceptance gate</text></g>
+          <g><rect class="map-node blue" x="874" y="338" width="148" height="84" rx="10"/><text class="node-index" x="892" y="359">05 / RECOVER</text><text class="node-title" x="892" y="385">RETRY</text><text class="node-copy" x="892" y="405">within attempt limit</text></g>
+          <g><rect class="map-node amber" x="1054" y="338" width="148" height="84" rx="10"/><text class="node-index" x="1072" y="359">06 / EXIT</text><text class="node-title" x="1072" y="385">ESCALATE</text><text class="node-copy" x="1072" y="405">tier or human</text></g>
+
+          <path class="flow blue" d="M948 422C948 474 588 474 588 422"/><text class="flow-note" x="768" y="474" text-anchor="middle">failed verification returns with bounded context</text>
+
+          <g aria-label="Enforced limits">
+            <text class="map-label" x="154" y="512">ENFORCED AT EVERY DECISION</text>
+            <rect class="limit-pill" x="352" y="488" width="112" height="34" rx="17"/><text class="limit-text" x="408" y="509">BUDGET</text>
+            <rect class="limit-pill" x="478" y="488" width="112" height="34" rx="17"/><text class="limit-text" x="534" y="509">DEADLINE</text>
+            <rect class="limit-pill" x="604" y="488" width="112" height="34" rx="17"/><text class="limit-text" x="660" y="509">QUALITY</text>
+            <rect class="limit-pill" x="730" y="488" width="112" height="34" rx="17"/><text class="limit-text" x="786" y="509">SLA</text>
+            <rect class="limit-pill" x="856" y="488" width="134" height="34" rx="17"/><text class="limit-text" x="923" y="509">ATTEMPT LIMIT</text>
+            <rect class="limit-pill" x="1004" y="488" width="172" height="34" rx="17"/><text class="limit-text" x="1090" y="509">REQUIRED INFORMATION</text>
+          </g>
+        </g>
+
+        <path class="flow cyan" d="M768 422V590H1000"/><text class="flow-note" x="782" y="569">accepted</text>
+        <path class="flow amber" d="M1128 422V590H1168"/><text class="flow-note" x="1139" y="569">limit exhausted</text>
+
+        <g aria-label="Autonomy levels as policy factors">
+          <text class="map-label" x="54" y="591">AUTONOMY LEVEL = POLICY FACTOR</text>
+          <rect class="mode-tab" x="54" y="610" width="188" height="92" rx="10"/><text class="node-index" x="72" y="633">ASSISTED</text><text class="node-copy" x="72" y="657">agent proposes</text><text class="node-copy" x="72" y="675">human approves action</text>
+          <rect class="mode-tab" x="256" y="610" width="188" height="92" rx="10"/><text class="node-index" x="274" y="633">SUPERVISED</text><text class="node-copy" x="274" y="657">agent executes routine</text><text class="node-copy" x="274" y="675">human reviews exceptions</text>
+          <rect class="mode-tab active" x="458" y="610" width="210" height="92" rx="10"/><text class="node-index" x="476" y="633" style="fill:var(--fw-what)">BOUNDED AUTONOMOUS</text><text class="node-copy" x="476" y="657">policy acts inside limits</text><text class="node-copy" x="476" y="675">human governs boundary</text>
+        </g>
+
+        <g aria-label="Workflow outcomes">
+          <rect class="outcome-surface" x="720" y="610" width="304" height="92" rx="10"/><text class="node-index" x="740" y="633" style="fill:var(--fw-how)">ACCEPTED OUTCOME</text><text class="node-title" x="740" y="661">DOWNSTREAM SYSTEM &#x2192;</text><text class="node-copy" x="740" y="682">routine work continues without per-action approval</text>
+          <rect class="outcome-surface exception" x="1040" y="610" width="346" height="92" rx="10"/><text class="node-index" x="1060" y="633" style="fill:var(--fw-why)">EXCEPTION</text><text class="node-title" x="1060" y="661">HUMAN ADJUDICATION &#x2191;</text><text class="node-copy" x="1060" y="682">uncertainty &#x00B7; failed verification &#x00B7; material risk</text>
+        </g>
+      </svg>
+    </div>
     <div class="human-plane">
       <strong id="authority-title">HUMAN CONTROL PLANE</strong>
       <p>Set objectives and specifications &middot; approve policy arms &middot; allocate budgets &middot; define acceptance and escalation thresholds &middot; review exceptions</p>
