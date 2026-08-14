@@ -53,6 +53,7 @@ CURSOR_KEY_PREFIX = "claude_bg:cursor:"
 CELL_ID_PREFIX = "claude_bg_"
 
 _SESSION_ID_FIELD_RE = re.compile(r"(?i)\bsession\s*id\b\s*[:=]?\s*([A-Za-z0-9_-]{1,128})")
+_BACKGROUNDED_RE = re.compile(r"(?i)backgrounded\s*[·•:]\s*([A-Za-z0-9_-]{1,128})")
 _BARE_TOKEN_RE = re.compile(r"^[A-Za-z0-9_-]{6,128}$")
 
 
@@ -60,11 +61,15 @@ def _extract_session_id_from_bg_output(text: str) -> str | None:
     """Parse the session id out of ``claude --bg``'s human-readable stdout.
 
     The CLI reference states the command "prints the session id and
-    management commands" without pinning an exact format, so this looks for
-    a labeled ``session id`` field first and falls back to the first
-    standalone id-shaped token in the output.
+    management commands" without pinning an exact format. Observed output is
+    ``backgrounded · <id>``, so this looks for a labeled ``session id`` field
+    first, then the ``backgrounded ·`` form, then a standalone id-shaped
+    token, then a final id-shaped regex fallback.
     """
     match = _SESSION_ID_FIELD_RE.search(text)
+    if match:
+        return match.group(1)
+    match = _BACKGROUNDED_RE.search(text)
     if match:
         return match.group(1)
     for line in text.splitlines():
@@ -185,6 +190,51 @@ class ClaudeAgentsClient:
         if not session_id or not SESSION_ID_PATTERN.fullmatch(session_id):
             raise ClaudeAgentsError("claude --bg did not report a usable session id", code="malformed_json")
         return {"id": session_id, "raw_output": stdout}
+
+    def steer_agent(
+        self,
+        session_id: str,
+        prompt: str,
+        *,
+        cwd: str | None = None,
+        model: str | None = None,
+        advisor: str | None = None,
+        skip_permissions: bool = True,
+        timeout: float = 15.0,
+    ) -> dict:
+        """``claude stop <id>`` then ``claude --bg --resume <id> "<prompt>"``.
+
+        Steering-by-restart: interrupt the running session (if any), then
+        resume its conversation as a new background session carrying the
+        adjusted prompt. ``claude`` has no mid-flight send-input for a
+        running background session, so this is the closest documented
+        equivalent. The resume returns a *new* session id. ``cwd`` is omitted
+        when not given — ``--resume`` restores the session's own working
+        directory from its saved state.
+        """
+        # Interrupt first. A stop against an already-stopped session is a
+        # non-zero exit, which is expected and tolerated here — resume works
+        # from a stopped session's on-disk conversation.
+        try:
+            self.stop_agent(session_id, timeout=timeout)
+        except ClaudeAgentsError:
+            pass
+        args = ["--bg", "--resume", session_id, prompt]
+        if cwd:
+            args.extend(["--cwd", cwd])
+        if model:
+            args.extend(["--model", model])
+        if advisor:
+            args.extend(["--advisor", advisor])
+        if skip_permissions:
+            args.append("--dangerously-skip-permissions")
+        stdout, _returncode = self._run(args, timeout=timeout, expect_json=False)
+        resumed_id = _extract_session_id_from_bg_output(stdout or "")
+        if not resumed_id or not SESSION_ID_PATTERN.fullmatch(resumed_id):
+            raise ClaudeAgentsError(
+                "claude --bg --resume did not report a usable session id", code="malformed_json"
+            )
+        return {"id": resumed_id, "resumed_from": session_id, "raw_output": stdout}
 
     def get_logs(self, session_id: str, *, timeout: float = 10.0) -> str:
         """``claude logs <session_id>`` — a bounded, best-effort recent-output tail."""

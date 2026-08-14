@@ -13,6 +13,7 @@ Endpoints:
     GET  /api/claude-agents/daemon    — read-only `claude daemon status`
     POST /api/claude-agents           — start a `claude --bg` session
     POST /api/claude-agents/<id>/stop|respawn|rm — owned-session lifecycle control
+    POST /api/claude-agents/<id>/steer        — interrupt + resume with an adjusted prompt
     POST /api/claude-agents/daemon/stop          — stop the local claude daemon
     GET  /                    — static dashboard (admin/static)
 
@@ -1016,6 +1017,74 @@ def api_rm_claude_agent(session_id) -> Response:
         })
 
     return _idempotent_claude_agent_response(f"rm:{session_id}", body, rm)
+
+
+@app.post("/api/claude-agents/<session_id>/steer")
+def api_steer_claude_agent(session_id) -> Response:
+    """Steer an owned session: interrupt + resume with an adjusted prompt.
+
+    ``claude`` has no mid-flight send-input for a running background session,
+    so steering is stop + ``claude --bg --resume <id> "<prompt>"``. The resume
+    returns a *new* session id, which this handler adopts as the owned
+    successor (removing the interrupted id from the owned set).
+    """
+    body, failure = _claude_agent_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    redis_client = _redis()
+
+    prompt = body.get("prompt", "")
+    if not isinstance(prompt, str) or not prompt.strip() or len(prompt) > MAX_CLAUDE_AGENT_TASK_CHARS:
+        return (
+            jsonify({"error": f"prompt is required and must be at most {MAX_CLAUDE_AGENT_TASK_CHARS} characters"}),
+            400,
+        )
+
+    model = body.get("model")
+    resolved_model = None
+    if model is not None:
+        if not isinstance(model, str):
+            return jsonify({"error": "model must be a string"}), 400
+        resolved_model = _resolve_claude_model(model) or None
+
+    advisor = body.get("advisor")
+    if advisor is not None and not (
+        isinstance(advisor, str)
+        and (advisor in CLAUDE_AGENT_ADVISORS or CLAUDE_AGENT_ADVISOR_ID_PATTERN.fullmatch(advisor))
+    ):
+        return jsonify({"error": "advisor must be fable, opus, sonnet, or a full model id"}), 400
+
+    def steer():
+        # Ownership is checked inside the idempotency action (not before it)
+        # because a successful steer remaps the owned id — a retried request
+        # must replay the cached success rather than 403 on the now-stale id.
+        rejection = _require_owned_claude_agent(redis_client, session_id)
+        if rejection:
+            return rejection
+        result = _claude_agents().steer_agent(
+            session_id,
+            prompt.strip(),
+            model=resolved_model,
+            advisor=advisor,
+            skip_permissions=True,
+        )
+        resumed_id = result.get("id")
+        if not isinstance(resumed_id, str) or not SESSION_ID_PATTERN.fullmatch(resumed_id):
+            raise ClaudeAgentsError("claude --bg --resume returned an unusable session id", code="malformed_json")
+        redis_client.sadd(OWNED_SESSIONS_KEY, resumed_id)
+        if resumed_id != session_id:
+            redis_client.srem(OWNED_SESSIONS_KEY, session_id)
+            with suppress(Exception):
+                redis_client.delete(f"{CURSOR_KEY_PREFIX}{session_id}")
+        return jsonify({
+            "ok": True,
+            "id": resumed_id,
+            "resumed_from": session_id,
+            "note": "session interrupted and resumed with the adjusted prompt; the new session id supersedes the previous one",
+        }), 200
+
+    return _idempotent_claude_agent_response(f"steer:{session_id}", body, steer)
 
 
 @app.post("/api/claude-agents/daemon/stop")

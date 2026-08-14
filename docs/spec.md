@@ -23,8 +23,9 @@ without inventing any steering capability the CLI doesn't document.
 
 ### 1.1 Scope of this phase
 
-In scope: **observe** (roster, per-session transcript tail, daemon status)
-and **lifecycle control** (start, stop/kill, respawn, rm, daemon stop) for
+In scope: **observe** (roster, per-session transcript tail, daemon status),
+**lifecycle control** (start, stop/kill, respawn, rm, daemon stop), and
+**steering-by-restart** (interrupt + resume with an adjusted prompt, §3.3) for
 `claude --bg` sessions, reusing the Control Room's existing card/transcript
 UI and SSE plumbing.
 
@@ -358,6 +359,30 @@ hidden button.
   checked to confirm the conversation id is unchanged before the card
   re-renders as running.
 
+### 3.3.1 `POST /api/claude-agents/<id>/steer` — steering by restart
+
+This supersedes the original "no steering" conclusion. The CLI has no
+mid-flight send-input for a *running* background session, but it does have a
+documented restart primitive: `claude --bg --resume <id> "<prompt>"` resumes a
+stopped session's on-disk conversation and runs a new prompt. Steering is
+therefore implemented as **interrupt + adjust + continue**:
+
+- The client's `steer_agent(session_id, prompt)` does `claude stop <id>` (a
+  non-zero exit against an already-stopped session is expected and tolerated)
+  then `claude --bg --resume <id> "<prompt>" [--model ...] [--advisor ...]
+  [--dangerously-skip-permissions]`, extracting the *new* session id from the
+  observed `backgrounded · <id>` output.
+- The endpoint enforces ownership *inside* the idempotency action (not before
+  it), because a successful steer remaps the owned id — a retried request
+  must replay the cached success rather than 403 on the now-stale id.
+- On success the handler adopts the new id as owned (`SADD` the new id, `SREM`
+  the interrupted id, clear the old cursor) and returns the successor id.
+
+Steer is owned-only and requires a deliberate form submit but no
+`window.confirm` (it preserves the conversation; it redirects rather than
+destroys). This is what closes the gap to feature-parity with the OpenCode
+supervisor surface's `delivery: steer`.
+
 ### 3.4 `POST /api/claude-agents/<id>/rm`
 
 Requires ownership (§3.3's same check) and `window.confirm` (rm removes the
@@ -402,6 +427,7 @@ still be killed by this call). Accordingly:
 | Start | n/a (creates) | none (deliberate form submit) | one session, owned workdir only |
 | Stop/kill | Process ends now; conversation resumable via Respawn | `window.confirm` | one owned session |
 | Respawn | Fully reversible (that's its purpose) | deliberate click, no confirm dialog | one owned session |
+| Steer | Conversation preserved; new session id supersedes the old | deliberate form submit, no confirm dialog | one owned session |
 | Rm | Removed from list; transcript stays on disk, resumable only outside this UI | `window.confirm` | one owned session |
 | Daemon stop (keep-workers) | Supervisor restarts and reconnects; sessions survive | `window.confirm`, blast-radius copy | every session on the host |
 | Daemon stop (end sessions) | Every hosted session ends | `window.confirm` + separate explicit toggle | every session on the host |
@@ -465,12 +491,15 @@ row, since there was nothing to resolve. The four disagreement points
    boolean in the body (no silent default in request parsing), requires
    client-side confirmation naming the host-wide blast radius, and requires
    a second, distinct confirmation before `keep_workers: false` can be sent.
-9. No endpoint, client method, or UI control sends input to, prompts, or
-   otherwise steers a running background session; no subprocess call in
+9. `POST /api/claude-agents/<id>/steer` implements steering-by-restart: it
+   requires ownership (403 before any subprocess call), a non-empty bounded
+   `prompt`, and the mutation guard; it invokes `claude stop <id>` then
+   `claude --bg --resume <id> "<prompt>"`, adopts the returned id as the
+   owned successor (`SADD` new id, `SREM` interrupted id, clear the old
+   cursor), and is idempotent on retry. No subprocess call in
    `admin/claude_agents_client.py` or `scripts/claude_agents_supervisor.py`
-   writes to a launched session's stdin. Grepping the new code for
-   `delivery: steer` or a stdin-writing subprocess against an attached
-   session finds nothing.
+   writes to a launched session's stdin — steering is stop-and-resume, never
+   mid-flight input injection.
 10. The Control Room fleet view gains a "Claude background sessions"
     section using the existing card/list visual language; selecting an
     owned card reuses the existing selection/`EventSource` hand-off and

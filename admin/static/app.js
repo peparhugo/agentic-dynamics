@@ -416,6 +416,7 @@
     $("#claude-agent-control-model").textContent = entry.model || "Unknown model"
     $("#claude-agent-control-cwd").textContent = entry.cwd || "Unknown workdir"
     $("#claude-agent-owned-controls").hidden = !entry.owned
+    $("#claude-agent-steer-form").hidden = !entry.owned
     $("#claude-agent-external-controls").hidden = entry.owned
     $("#claude-agent-transcript-note").textContent = entry.owned
       ? entry.relay_active === false
@@ -1720,6 +1721,33 @@
       } finally {
         state.claudeAgentMutationPending = false
         $("#claude-agent-rm").disabled = false
+      }
+    })
+
+    $("#claude-agent-steer-form").addEventListener("submit", async (event) => {
+      event.preventDefault()
+      const entry = selectedClaudeAgent()
+      const prompt = $("#claude-agent-steer-prompt").value.trim()
+      if (!entry || !entry.owned || state.claudeAgentMutationPending || !prompt) return
+      state.claudeAgentMutationPending = true
+      const button = $("#claude-agent-steer")
+      button.disabled = true
+      const originalLabel = button.textContent
+      button.textContent = "Steering…"
+      try {
+        const result = await claudeAgentMutation(`/api/claude-agents/${encodeURIComponent(entry.id)}/steer`, { prompt })
+        $("#claude-agent-steer-result").textContent = `Steered — resumed as ${result.id}`
+        $("#claude-agent-steer-prompt").value = ""
+        announce(`Steered ${entry.id} → ${result.id}`)
+        await loadClaudeAgents()
+        selectClaudeAgent(result.id, true)
+      } catch (error) {
+        $("#claude-agent-steer-result").textContent = error.message || "Steer failed"
+        announce($("#claude-agent-steer-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        button.disabled = false
+        button.textContent = originalLabel
       }
     })
 

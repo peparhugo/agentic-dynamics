@@ -30,6 +30,9 @@ def test_claude_agents_shell_exposes_roster_daemon_and_control_regions():
         'id="claude-agent-control-panel"',
         'id="claude-agent-control-id"',
         'id="claude-agent-owned-controls"',
+        'id="claude-agent-steer-form"',
+        'id="claude-agent-steer-prompt"',
+        'id="claude-agent-steer"',
         'id="claude-agent-stop"',
         'id="claude-agent-respawn"',
         'id="claude-agent-rm"',
@@ -42,13 +45,25 @@ def test_claude_agents_shell_exposes_roster_daemon_and_control_regions():
         assert required in html, f"missing {required}"
 
 
-def test_claude_agent_control_panel_has_no_send_or_steer_affordance():
-    """No UI path offers a send/steer/prompt action for any background session."""
+def test_claude_agent_control_panel_has_steer_but_no_send_or_interrupt_affordance():
+    """Steering exists (owned-only); there is no separate send or interrupt control."""
     html = (STATIC / "index.html").read_text()
     panel = html[html.index('id="claude-agent-control-panel"') : html.index('id="recent-designs-title"')]
 
-    for forbidden in ("Send", "Steer", "<textarea", 'type="text"', "Interrupt"):
+    assert "Steer" in panel
+    assert 'id="claude-agent-steer-prompt"' in panel
+    for forbidden in ("Send", "Interrupt", 'type="text"'):
         assert forbidden not in panel
+
+
+def test_steer_form_is_owned_only_and_client_gated():
+    app = (STATIC / "app.js").read_text()
+    assert '$("#claude-agent-steer-form").hidden = !entry.owned' in app
+
+    block = app[app.index('$("#claude-agent-steer-form").addEventListener') :]
+    block = block[: block.index("})\n") + 3]
+    assert "!entry.owned" in block
+    assert "!prompt" in block
 
 
 def test_claude_agent_grid_reuses_the_shared_selection_and_stream_machinery():

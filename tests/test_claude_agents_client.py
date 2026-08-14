@@ -225,6 +225,70 @@ def test_daemon_stop_passes_keep_workers_flag(monkeypatch):
     assert captured[1] == ["claude", "daemon", "stop", "--any"]
 
 
+def test_steer_agent_stops_then_resumes_with_prompt_and_extracts_new_id(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[1] == "stop":
+            return FakeCompletedProcess(stdout=json.dumps({"ok": True}))
+        return FakeCompletedProcess(stdout="Starting background service…\nbackgrounded · 0bdc9da5\n")
+
+    client = _client(monkeypatch, fake_run)
+    result = client.steer_agent("old_sess_1", "adjust the plan", cwd="/tmp/work", skip_permissions=False)
+
+    assert result["id"] == "0bdc9da5"
+    assert result["resumed_from"] == "old_sess_1"
+    assert calls[0] == ["claude", "stop", "old_sess_1"]
+    assert calls[1] == ["claude", "--bg", "--resume", "old_sess_1", "adjust the plan", "--cwd", "/tmp/work"]
+
+
+def test_steer_agent_tolerates_a_failed_stop_and_still_resumes(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[1] == "stop":
+            return FakeCompletedProcess(returncode=1, stderr="not running")
+        return FakeCompletedProcess(stdout="backgrounded · 0bdc9da5\n")
+
+    client = _client(monkeypatch, fake_run)
+    result = client.steer_agent("old_sess_1", "keep going")
+
+    assert result["id"] == "0bdc9da5"
+    assert calls[1][:3] == ["claude", "--bg", "--resume"]
+
+
+def test_steer_agent_includes_model_advisor_and_skip_permissions(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        if cmd[1] == "stop":
+            return FakeCompletedProcess(stdout=json.dumps({"ok": True}))
+        return FakeCompletedProcess(stdout="backgrounded · new_id_1\n")
+
+    client = _client(monkeypatch, fake_run)
+    client.steer_agent("old_1", "go", model="claude-sonnet-4-5", advisor="fable", skip_permissions=True)
+
+    assert calls[1] == [
+        "claude", "--bg", "--resume", "old_1", "go",
+        "--model", "claude-sonnet-4-5", "--advisor", "fable", "--dangerously-skip-permissions",
+    ]
+
+
+def test_steer_agent_raises_without_a_usable_resumed_id(monkeypatch):
+    def fake_run(cmd, **kwargs):
+        if cmd[1] == "stop":
+            return FakeCompletedProcess(stdout=json.dumps({"ok": True}))
+        return FakeCompletedProcess(stdout="nothing to see here\n")
+
+    client = _client(monkeypatch, fake_run)
+    with pytest.raises(ClaudeAgentsError) as excinfo:
+        client.steer_agent("old_1", "go")
+    assert excinfo.value.code == "malformed_json"
+
+
 def test_every_call_closes_stdin(monkeypatch):
     """No subprocess call in this module ever leaves stdin open to a background session."""
     captured_kwargs = []

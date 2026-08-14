@@ -277,6 +277,14 @@
             <div><dt>Model / Workdir</dt><dd><span id="claude-agent-control-model">--</span><br><span id="claude-agent-control-cwd">--</span></dd></div>
           </dl>
           <p id="claude-agent-transcript-note" class="boundary-copy"></p>
+          <form id="claude-agent-steer-form" class="control-form compact-form">
+            <label><span>Adjust and continue (steer)</span><textarea id="claude-agent-steer-prompt" rows="3" maxlength="12000" placeholder="Resume the session's conversation with these new instructions"></textarea></label>
+            <div class="form-actions">
+              <button id="claude-agent-steer" class="primary-action" type="submit">Steer</button>
+            </div>
+            <p class="boundary-copy">Steering interrupts the running session and resumes its conversation with the new prompt under a new session id.</p>
+            <output id="claude-agent-steer-result" class="inline-result" aria-live="polite"></output>
+          </form>
           <div id="claude-agent-owned-controls" class="design-stream-actions">
             <button id="claude-agent-stop" class="danger-action" type="button">Stop</button>
             <button id="claude-agent-respawn" type="button">Respawn</button>

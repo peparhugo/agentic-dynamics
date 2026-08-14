@@ -62,7 +62,9 @@ class FakeClient:
         self.daemon_status_calls = 0
         self.daemon_stop_calls: list[bool] = []
         self.get_logs_calls: list[str] = []
+        self.steer_calls: list[dict] = []
         self.start_result = {"id": "sess_started01"}
+        self.steer_result = {"id": "sess_steered02", "resumed_from": None}
         self.daemon_status_result = {"running": True, "pid": 4242}
         self.get_logs_result = "log text\n"
         self.error: ClaudeAgentsError | None = None
@@ -107,6 +109,13 @@ class FakeClient:
         self.get_logs_calls.append(session_id)
         self._maybe_raise()
         return self.get_logs_result
+
+    def steer_agent(self, session_id, prompt, *, cwd=None, model=None, advisor=None, skip_permissions=True, timeout=15.0):
+        self.steer_calls.append(
+            {"session_id": session_id, "prompt": prompt, "model": model, "advisor": advisor}
+        )
+        self._maybe_raise()
+        return self.steer_result
 
 
 @pytest.fixture
@@ -408,6 +417,73 @@ def test_lifecycle_actions_reject_unsafe_id_shape(fake_redis, fake_client):
 
     assert response.status_code in (400, 404)
     assert fake_client.stop_calls == []
+
+
+# ---------------------------------------------------------------------------
+# POST /api/claude-agents/<id>/steer — steering by restart
+# ---------------------------------------------------------------------------
+
+
+def test_steer_rejects_non_owned_before_any_subprocess_call(fake_redis, fake_client):
+    response = server.app.test_client().post(
+        "/api/claude-agents/sess_external/steer", json={"prompt": "adjust the plan"}, headers=_headers()
+    )
+
+    assert response.status_code == 403
+    assert fake_client.steer_calls == []
+
+
+def test_steer_rejects_empty_prompt_without_calling_the_cli(fake_redis, fake_client):
+    fake_redis.owned.add("sess_owned01")
+
+    response = server.app.test_client().post(
+        "/api/claude-agents/sess_owned01/steer", json={"prompt": "   "}, headers=_headers()
+    )
+
+    assert response.status_code == 400
+    assert fake_client.steer_calls == []
+
+
+def test_steer_succeeds_and_remaps_ownership_to_the_new_id(fake_redis, fake_client):
+    fake_redis.owned.add("sess_owned01")
+    fake_client.steer_result = {"id": "sess_steered02", "resumed_from": "sess_owned01"}
+
+    response = server.app.test_client().post(
+        "/api/claude-agents/sess_owned01/steer", json={"prompt": "adjust the plan"}, headers=_headers()
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body["id"] == "sess_steered02"
+    assert body["resumed_from"] == "sess_owned01"
+    assert "sess_steered02" in fake_redis.owned
+    assert "sess_owned01" not in fake_redis.owned
+    assert fake_client.steer_calls[0]["prompt"] == "adjust the plan"
+
+
+def test_steer_keeps_ownership_when_the_id_is_unchanged(fake_redis, fake_client):
+    fake_redis.owned.add("sess_owned01")
+    fake_client.steer_result = {"id": "sess_owned01", "resumed_from": "sess_owned01"}
+
+    response = server.app.test_client().post(
+        "/api/claude-agents/sess_owned01/steer", json={"prompt": "again"}, headers=_headers()
+    )
+
+    assert response.status_code == 200
+    assert "sess_owned01" in fake_redis.owned
+
+
+def test_steer_is_idempotent_on_retry(fake_redis, fake_client):
+    fake_redis.owned.add("sess_owned01")
+    client = server.app.test_client()
+    body = {"prompt": "keep going"}
+    headers = _headers("steer-retry")
+
+    first = client.post("/api/claude-agents/sess_owned01/steer", json=body, headers=headers)
+    second = client.post("/api/claude-agents/sess_owned01/steer", json=body, headers=headers)
+
+    assert first.get_json() == second.get_json()
+    assert len(fake_client.steer_calls) == 1
 
 
 # ---------------------------------------------------------------------------
