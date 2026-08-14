@@ -162,6 +162,10 @@ workflow:
             policy keeps the same model, the existing chaining already forks for free.
           - Do not consume unmeasured fields (confidence, edge_case_coverage) unless you also ship the
             measurement rule that produces them.
+          - When running tests, specify the exact test files (e.g. tests/test_routing.py,
+            tests/test_workflow_runner.py, tests/test_backends.py, tests/test_claude_adapter.py,
+            tests/test_experiment_spec.py, tests/test_compile_experiment.py). NEVER run bare
+            `pytest`, `pytest tests/ -q`, or `python -m pytest tests/`.
 
           DELIVER the implementation plus tests. Cover: pin wins; allowed_models restricts the choice;
           unconstrained draws from the full pool; preference scoring (lowest-cost-highest-coverage
