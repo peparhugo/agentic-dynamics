@@ -1,0 +1,133 @@
+name: claude_background_sessions
+question: "Can the Control Room observe and control Claude Code background sessions the way it observes opencode sessions?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/scope.md scoping the following feature.
+
+          GOAL:
+          {goal}
+
+          EXISTING PIECES (ground truth, do not rebuild):
+          - Control Room: admin/server.py (Flask SSE backend) + admin/static/ (app.js, control-room-core.js,
+            style.css, index.html). Endpoints today: GET /api/matrix, GET /api/status (SSE),
+            GET /api/events/<cell_id> (SSE), GET /api/routing, POST /api/experiments, GET/POST
+            /api/design-sessions (+ /spec /input /interrupt /save /run), GET /. Command-rail aesthetic:
+            spend ticker, fleet of pulsing cell cards, terminal transcript, session control pane, routing drawer.
+          - OpenCode native surface (owned by another agent — this spec is the CLAUDE analog, do not touch it):
+            admin/opencode_client.py (OpenCodeClient: create_session, send_input, interrupt, messages,
+            iter_events) + scripts/supervise.py (flash monitor, flag-only: healthy/stalled/off_track ->
+            experiments/results/supervisor/flags.jsonl).
+          - Claude CLI integration today: src/instrument/claude_adapter.py drives the Claude CLI HEADLESS,
+            single-shot (--output-format stream-json), and maps anthropic/claude-fable-5 -> --model
+            claude-sonnet-5. It does NOT enumerate or control background sessions.
+
+          INTEGRATION SURFACE YOU MUST INVESTIGATE FIRST (contract: Claude Code CLI reference,
+          https://code.claude.com/docs/en/cli-reference — cite exact commands in scope.md):
+          - claude agents [--json --all]  — list active (and completed) background sessions as JSON.
+          - claude --bg/--background "<task>" — start a background session; prints the session id.
+          - claude attach <id>, claude logs <id>, claude stop/kill <id>, claude respawn <id>, claude rm <id>.
+          - claude daemon status / claude daemon stop — the background-session supervisor process.
+          - --advisor fable — server-side advisor model (Fable 5).
+          Determine, from the reference, what OBSERVE and CONTROL are actually possible for a background
+          session — in particular whether steering a running background session is possible at all
+          (attach for interactive steering? --cloud follow-ups?) and what interrupt maps to (stop/respawn).
+          State plainly what is NOT possible; do not invent a send_input equivalent that the CLI lacks.
+
+          CONSTRAINTS:
+          - Extend the existing Control Room; keep its command-rail aesthetic and SSE/Redis backend pattern.
+          - Drive the claude CLI via subprocess (as claude_adapter.py does) unless the reference justifies
+            otherwise. No new services or build steps.
+          - Human-in-the-loop invariant: the surface lists/observes/controls background sessions; any
+            destructive act (stop/kill) is a one-way door requiring explicit confirmation.
+
+          DELIVER exactly one file, docs/scope.md: (1) problem, (2) the investigated CLI facts with
+          command references, (3) chosen integration approach + rationale, (4) constraints,
+          (5) a numbered acceptance list the build phase can check off and validate can test.
+      - name: challenge
+        kind: agent
+        prompt: |
+          Review the proposed approach in docs/scope.md and record where you agree, and where you disagree.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          You are invited — not required — to disagree with our approach. Treat this as a genuine design
+          review, not a compliance pass:
+          - Where you agree, say so and why.
+          - Where you disagree, say so explicitly: identify the weakness, the hidden assumption, or the
+            risk, and propose a concrete alternative. A disagreement that proposes nothing is not useful.
+          - If the scope overlooks a better surface in the CLI reference (a different command, or a
+            decision to NOT build something), say so.
+
+          DELIVER exactly one file, docs/challenge.md: (1) what you agree with and why, (2) each point of
+          disagreement with the approach and a concrete alternative, (3) a one-line recommendation for the
+          spec phase (proceed as scoped, or change course and to what).
+      - name: spec
+        kind: agent
+        prompt: |
+          Write docs/spec.md — the design spec for the feature — in light of the challenge.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - Read docs/scope.md and docs/challenge.md. Address every point in challenge.md explicitly:
+            adopt it, rebut it, or synthesize it. The final design may accept or reject each disagreement,
+            but must record the decision and why.
+          - Specify: the Claude Code session surface layout in the Control Room; the observe path
+            (claude agents --json -> which endpoint), the control path (attach/logs/stop/respawn) with the
+            door discipline (stop/kill = one-way, explicit confirmation), and how a background session's
+            id maps to something the terminal can render.
+          - State the steering boundary honestly: if the CLI cannot steer a running background session,
+            say so in the spec rather than promising a capability the reference does not support.
+
+          DELIVER exactly one file, docs/spec.md: (1) design overview, (2) the observe path + endpoint
+          contract, (3) the control path + door discipline, (4) the challenge adjudication table
+          (each challenge point -> adopted/rebutted/synthesized -> why), (5) acceptance list.
+      - name: build
+        kind: agent
+        prompt: |
+          Implement the feature per docs/spec.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Extend admin/ only (server.py + static/). Reuse the existing SSE/Redis backend pattern and the
+            Control Room's frontend modules (control-room-core.js + app.js).
+          - Drive the claude CLI via subprocess exactly as specified in docs/spec.md; do not call
+            admin/opencode_client.py (that is the opencode surface, owned elsewhere).
+          - Keep all existing admin tests passing. Add tests for the new endpoint(s) and the control
+            wiring, mocking the claude CLI (no live daemon/background-session dependency).
+          - stop/kill is a one-way door: require explicit confirmation, matching the site's existing
+            door discipline.
+
+          DELIVER working code + tests. The validate phase runs pytest in this repository.
+      - name: validate
+        kind: test
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: verified_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
