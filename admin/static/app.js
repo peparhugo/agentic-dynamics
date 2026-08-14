@@ -1,4 +1,4 @@
-"use strict"
+"use strict";
 
 /**
  * Control Room browser controller.
@@ -880,7 +880,10 @@
       state.routingReturnFocus?.focus()
     })
     $("#routing-refresh").addEventListener("click", loadRouting)
-    $("#enqueue-button").addEventListener("click", () => runQueueAction("enqueue"))
+    $("#enqueue-button").addEventListener("click", () => {
+      const warning = "This enqueues the full experiment matrix (~30 cells) on the default model and will incur real cost. Continue?"
+      if (window.confirm(warning)) runQueueAction("enqueue")
+    })
     $("#clear-queue-button").addEventListener("click", () => {
       const warning = "This clears queued metadata; it does not cancel running work."
       if (window.confirm(warning)) runQueueAction("clear")
