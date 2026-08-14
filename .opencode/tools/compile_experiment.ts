@@ -9,8 +9,8 @@ import sys, json
 from pathlib import Path
 
 sys.path.insert(0, "src")
-from instrument.experiment_spec import load_spec
-from instrument.compile_experiment import compile_spec, validate_rules, SpecError
+from instrument.experiment_spec import load_spec, validate_rules
+from instrument.compile_experiment import compile_spec, SpecError
 
 spec_path, mode = sys.argv[1], sys.argv[2]
 spec = load_spec(Path(spec_path))
