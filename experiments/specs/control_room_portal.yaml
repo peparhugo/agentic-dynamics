@@ -83,7 +83,7 @@ workflow:
       - name: verify
         kind: test
 factors:
-  - {name: model, levels: [openai/gpt-5.6-sol]}
+  - {name: model, levels: [openai/gpt-5.6-sol, deepseek/deepseek-v4-pro, anthropic/claude-fable-5]}
 design: factorial
 metrics:
   - {name: cost_per_phase, agg: distribution, over: cell}
