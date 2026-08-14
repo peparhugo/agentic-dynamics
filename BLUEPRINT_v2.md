@@ -1,5 +1,9 @@
 # Blueprint v3 — AI FinOps Dynamics: Actual State & Next Steps
 
+> **Superseded by `BLUEPRINT_v3.md`** — this doc ends at v0.9 / pre-spec next-steps. The
+> ExperimentSpec + Compiler design (information-acquisition machine) is the current roadmap.
+> See `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+
 **Status:** v0.9 complete. 26 cells, 122 sessions, 100% success, $0.19 DeepSeek spend. Lab Book 14 published.
 
 ---

@@ -87,6 +87,16 @@ Phase kinds: `shell`, `test`, `lint`, `matrix`, `review`, `pipeline`, `ship`,
 `experiments/results/workstreams/{plan}_{phase}.json`.
 CLI filters: `--from`, `--until`, `--only`, `--prompt`, `--workers`.
 
+### Spec/Compiler (proposed — next build target)
+`compile_experiment.py` will compile an `ExperimentSpec` into a DAG
+(`validate → cells → execute → measure → compare → writeup → adapt`), generalizing the existing
+transport: `experiment_matrix` → `_gen_matrix_cells` (`pipeline.py:394`), `compare_arms` →
+`routing.simulate_strategies` (`routing.py:98`), `evaluate_rules` → the lab books. `adapt` is the
+new campaign loop (tweak one factor, emit the next grid). Ordering: instrument `confidence`
+(plus `answer`/`explanation` token split, attempt/timestamp fields) before authoring
+`model_cascade`/`dynamics` arms — the validator refuses unmet `requires`. Design:
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+
 ### Working Directory Map
 - `opencode.db` → `~/.local/share/opencode/opencode.db` or env `OPENCODE_DB`
 - Worktrees → `/tmp/exp_*`

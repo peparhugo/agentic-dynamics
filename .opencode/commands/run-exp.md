@@ -18,3 +18,7 @@ First, load the "instrument" skill if not already loaded. Then:
 4. Report the results: cost, tokens, tests passed, strategy archetype, game report path.
 
 Use `--model $2` if a second argument is provided (e.g. `/run-exp task_manager claude`).
+
+Spec direction (proposed): `compile_experiment.py` will compile an `ExperimentSpec` from
+`experiments/specs/*.yaml` into cells; policy is a factor level and its control rules require
+`confidence` (not yet instrumented). See `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.

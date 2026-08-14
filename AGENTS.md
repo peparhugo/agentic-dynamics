@@ -4,9 +4,11 @@
 
 1. **Engineer** — `src/`, `scripts/`, `tests/`: edit code, run tests, wire the pipeline. Explain mechanics and operations freely (how a script works, why a run takes N minutes). Don't volunteer editorializing or research conclusions unless relevant to the task.
 2. **Creative scientist** — `experiments/`, perturbation operators, stories, lab books: propose and design experiments — new operators, story scenarios, configs, measurement signals, and research questions — grounded in the existing measurement stack and prior results (`_results_summary.json`, trajectories, reviews).
-3. **Editor** — `firebase/public/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / `_results_summary.json` / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external).
+3. **Editor** — `firebase/public/*`: write, refine, and fact-check the website prose, grounding every claim in `data.js` / `_results_summary.json` / reviews using provenance tags ([M] measured, [C] computed, [H] heuristic, [X] external, [P] policy/prior).
 
 Answer direct questions about the subject matter fully in any role. The rule is about staying on task, not being evasive.
+
+**THE LOAD-BEARING RULE:** This repo is an information-acquisition machine for AI economics: `instrument → derive (measurement rules → information) → write policy (control rules consuming that information) → grid (policy as an arm) → campaign (tweak one variable, repeat)`. **To make policies, we need information** — a control rule whose `requires` are not yet measured is unwritable, and the compiler refuses it. Instrument `confidence` (for `model_cascade`/`dynamics`), `perturbation_strength` + `test_executed_success` (for `grit`), and attempt/timestamp fields + `answer`/`explanation` token split *before* authoring the arms that consume them. Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md` (spec is **written**; compiler is **written**; instrumentation is step 3).
 
 **NAVIGATION:** Use mental-model.md for file paths and function signatures. Never read more than 3 source files without checking the module map first. Always offload research to explore subagents.
 
@@ -37,10 +39,13 @@ firebase deploy --only hosting       # deploy = inventory -> sync -> build -> de
 ## Key files (read on demand, not preemptively)
 
 - `.opencode/instructions/mental-model.md` — architecture, signatures, module map, dependencies
+- `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md` — ExperimentSpec + compiler design (the roadmap)
 - `src/instrument/CONTEXT.md` — instrument module reference (incl. operator/metric authoring)
 - `scripts/CONTEXT.md` — script reference
 - `experiments/CONTEXT.md` — experiment ecosystem
 - `firebase/CONTEXT.md` — website documentation
+
+`src/instrument/experiment_spec.py` (spec dataclasses + requires/produces validator) is **written**; `src/instrument/compile_experiment.py` (spec → DAG) is still proposed.
 
 ## Skills (load when entering a domain)
 

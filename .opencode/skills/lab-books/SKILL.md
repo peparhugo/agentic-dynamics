@@ -1,6 +1,6 @@
 ---
 name: lab-books
-description: Running structured lab book analyses against accumulated experiment data. Each lab book answers a specific research question using _results_summary.json, inventory.json, and trajectory data. Contains full knowledge of all 14 lab books and their data dependencies.
+description: Running structured lab book analyses against accumulated experiment data. Each lab book answers a specific research question using _results_summary.json, inventory.json, and trajectory data. Contains full knowledge of all 19 active lab books and their data dependencies.
 ---
 
 # Lab Books Skill — Full Lab Analysis Knowledge
@@ -21,7 +21,7 @@ Lab books read from these files in `experiments/results/`:
 - `_trajectory_aggregate.json` — per-model trajectory aggregates
 - `inventory.json` — experiment registry
 
-## Active Lab Books (9 non-deprecated)
+## Active Lab Books (19 non-deprecated)
 
 ### Cost & Pricing Analysis
 
@@ -100,6 +100,32 @@ Lab books read from these files in `experiments/results/`:
 - Analyzes experiment design itself as data
 - Output: `experiments/results/lab_opencode_meta_analysis.json`
 
+## Newer Labs (story-era + frontier)
+
+**14. lab_story_arc.py** (116L) — "How does a story's quality/cost arc evolve across sessions?"
+- Per-session trajectory over the 5-session story format
+- Output: `experiments/results/lab_story_arc.json`
+
+**15. lab_condition_effects.py** (102L) — "Do perturbation conditions move outcome metrics?"
+- CLEAN / BAD_SEED / EARLY_DEGRADE / LATE_DEGRADE comparison
+- Output: `experiments/results/lab_condition_effects.json`
+
+**16. lab_cache_economics.py** (94L) — "What is cache hits worth in dollars/rework?"
+- Cache-hit economics from session transcripts
+- Output: `experiments/results/lab_cache_economics.json`
+
+**17. lab_quality_frontier.py** (99L) — "Where is the quality-per-cost frontier per model?"
+- Pareto frontier across correctness/cost/maintainability
+- Output: `experiments/results/lab_quality_frontier.json`
+
+**18. lab_verification_frontier.py** (110L) — "What verification depth buys what correctness?"
+- Verification-effort vs verified-outcome frontier
+- Output: `experiments/results/lab_verification_frontier.json`
+
+**19. lab_verification_value.py** (121L) — "Is independent verification worth its cost?"
+- Agent-authored vs independent-evaluator value delta
+- Output: `experiments/results/lab_verification_value.json`
+
 ## DEPRECATED Lab Books (DO NOT RUN — use non-deprecated alternatives)
 
 ```
@@ -109,6 +135,8 @@ lab_cross_model_reasoning_DEPRECATED_bge_m3.py        (177L)
 lab_divergence_cascades_DEPRECATED_bge_m3.py           (211L)
 lab_cluster_stability_DEPRECATED_bge_m3.py             (218L)
 lab_recovery_curves_DEPRECATED_bge_m3.py               (367L)
+lab_reasoning_divergence_DEPRECATED_bge_m3.py          (166L)
+lab_semantic_clusters_DEPRECATED_bge_m3.py             (160L)
 ```
 
 These used bge-m3 embeddings via Ollama. Superseded by new semantic_validation.py approach (no embeddings needed).
@@ -158,6 +186,15 @@ lab_story_review.py        → _results_summary.json, stories/*.json
 2. Create script: `scripts/lab_<name>.py` that reads from standard JSON sources
 3. Output to: `experiments/results/lab_<name>.json`
 4. Run with: `python scripts/lab_<name>.py`
+
+## Labs as Measurement Rules (proposed)
+
+In the spec/compiler model, each lab book is a **measurement rule** (`plane: "measurement"`):
+it consumes ledger/attempt fields and produces information. `compile_experiment.py`'s
+`evaluate_rules` phase will drive these from `spec.rules` instead of one-off scripts. A control
+rule (e.g. `model_cascade`) can only be authored after its `requires` (e.g. `confidence`) are
+produced by a measurement rule — instrument before policy. Design:
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common Gotchas
 

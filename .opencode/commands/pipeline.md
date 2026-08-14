@@ -18,3 +18,8 @@ To run the steps manually (or when Redis is unavailable), load the "analyze" ski
 6. `firebase deploy --only hosting`
 
 Report each step's output and any errors encountered.
+
+Spec direction (proposed): `compile_experiment.py` will add a compile/validate phase
+(`validate → cells → execute → measure → compare → writeup → adapt`) ahead of this chain; the
+`deploy` plan then becomes the `measure → compare → writeup` tail of the spec DAG. See
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.

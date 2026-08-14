@@ -46,7 +46,7 @@ python scripts/validate_session.py --worktree /tmp/exp_xyz
 python scripts/build_data.py
 ```
 
-## analyze_worktrees.py (1396L) — The Big One
+## analyze_worktrees.py (1398L) — The Big One
 
 This is the primary analysis script. For each worktree it:
 1. Evaluates solution quality via `evaluate_solution()` → SolutionMetrics
@@ -115,7 +115,7 @@ python scripts/inventory.py worktrees # List worktrees
 Reads: `opencode.db` (SQLite session store), worktrees, config YAMLs, result JSONs.
 Writes: `experiments/inventory.json`
 
-## build_data.py (649L) — Website Data Generator
+## build_data.py (1188L) — Website Data Generator
 
 ```bash
 python scripts/build_data.py
@@ -169,6 +169,23 @@ python scripts/build_data.py
 # 5. Deploy:
 firebase deploy --only hosting
 ```
+
+## Measure / Compare / Writeup (proposed — spec-driven)
+
+The compiler (`compile_experiment.py`, proposed) reframes this pipeline as spec-driven phases:
+`validate → cells → execute → measure → compare → writeup → adapt`. Today's scripts map onto the
+future phases:
+
+| Phase | Today | Proposed (spec-driven) |
+|---|---|---|
+| measure | `analyze_worktrees.py` + `analyze_trajectories.py` | `evaluate_rules` — measurement rules in `spec.rules` over the ledger |
+| compare | `lab_task_routing.py` / `routing.simulate_strategies` | `compare_arms` — regret/effect over `spec.comparison.arm_factor` |
+| writeup | `game_report.py` + lab-book templates | `writeup` — lab-book from `spec.question` + `spec.metrics` |
+| adapt | — (manual) | `adapt` — tweak one factor, emit next grid (campaign loop) |
+
+The load-bearing rule applies: a control rule's `requires` must be produced by a measurement
+rule before the compiler admits it (see `conventions.md`). Design:
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## Common Gotchas
 

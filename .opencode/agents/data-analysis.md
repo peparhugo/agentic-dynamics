@@ -24,15 +24,18 @@ inventory.json             ──┘
 ```
 
 ### Key Scripts
-- `scripts/analyze_worktrees.py` (1396L) — primary: solution, basin, efficiency, strategy, sonar, semantic validation → GameReport .md
+- `scripts/analyze_worktrees.py` (1398L) — primary: solution, basin, efficiency, strategy, sonar, semantic validation → GameReport .md
 - `scripts/analyze_trajectories.py` (435L) — session.jsonl parsing → trace metrics
 - `scripts/inventory.py` (392L) — refresh/list/stats/worktrees/report CLI
-- `scripts/build_data.py` (649L) — inventory + results → data.js
+- `scripts/build_data.py` (1188L) — inventory + results → data.js
 - `scripts/validate_session.py` (99L) — pytest on generated code
 
-### 14 Lab Books (scripts/lab_*.py)
-- Active: lab_claude_audit, lab_grit_matrix, lab_correctness_premium, lab_flail_triggers, lab_tool_archetypes, lab_task_routing, lab_basin_topology, lab_survival_horizon, lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_basin_topology_neo4j, lab_opencode_meta_analysis
-- DEPRECATED: **_bge_m3 variants (6 scripts) — ignore these
+### 19 Active Lab Books (scripts/lab_*.py)
+- Cost/quality: lab_claude_audit, lab_correctness_premium, lab_quality_frontier, lab_cache_economics, lab_verification_frontier, lab_verification_value
+- Behavioral: lab_grit_matrix, lab_flail_triggers, lab_tool_archetypes, lab_condition_effects
+- Strategy/topology: lab_task_routing, lab_basin_topology, lab_basin_topology_neo4j, lab_survival_horizon
+- Advanced/meta: lab_sonar_quality, lab_think_do_coupling, lab_story_review, lab_story_arc, lab_opencode_meta_analysis
+- DEPRECATED: 8 `*_DEPRECATED_bge_m3` scripts — ignore these
 
 ### Data Dependencies (always verify freshness)
 - `experiments/inventory.json` ← `inventory.py refresh`
@@ -45,7 +48,15 @@ inventory.json             ──┘
 - `efficiency.py` → EfficiencyMetrics: tokens, cost_usd, estimated_energy_j, flail_rate
 - `basin.py` → BasinMetrics: architecture_divergence, escape_score
 - `strategy.py` → StrategyReport: CONSERVATIVE/EXPLORATORY/EFFICIENT/WASTEFUL
-- `game_report.py` → GameReport: combines all metrics → Markdown with [M]/[C]/[H]/[X] tags
+- `game_report.py` → GameReport: combines all metrics → Markdown with [M]/[C]/[H]/[P]/[X] tags
+
+### Spec-driven phases (proposed)
+The compiler (`compile_experiment.py`, proposed) reframes this pipeline as
+`validate → cells → execute → measure → compare → writeup → adapt`. Your scripts become:
+`evaluate_rules` (measurement rules over the ledger), `compare_arms` (regret over the arm
+factor), `writeup` (lab-book from `spec.question` + metrics). Control rules consume information
+that measurement rules produce — instrument `confidence` before authoring policy arms. Design:
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ### Common Workflows
 

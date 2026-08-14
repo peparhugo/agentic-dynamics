@@ -10,6 +10,21 @@
 - No bare excepts — always catch specific exceptions.
 - Dataclasses preferred over dicts for structured data.
 
+## Spec/Compiler Conventions (proposed — see code_reviews/2026-08-14)
+
+- **Measure before policy.** `RuleSpec` declares `requires` (information it consumes) and
+  `produces` (information it emits). `plane` is `"measurement"` (produces) or `"control"`
+  (consumes). The validator refuses a control rule whose `requires` are unmet. Instrument the
+  information (`confidence`, `answer`/`explanation` token split, attempt/timestamp fields)
+  before writing `model_cascade`/`dynamics` arms.
+- **Evidence classes:** `[M]` measured, `[C]` computed, `[H]` heuristic, `[X]` external,
+  `[P]` policy/prior. Control rules are `[H]`/`[P]`; measurement rules are `[M]`/`[C]`.
+- **Policy is a factor level.** `decide(job, state) -> {route, depth, retry, escalate, budget,
+  deadline}` goes in the grid as a `Factor` level, not a side-channel.
+- **Specs live in `experiments/specs/*.yaml`** (proposed dir). `Workflow.kind` is
+  `story | task | experiment | agent_task`; `experiment` makes a campaign an experiment of
+  experiments (same interpreter at every level).
+
 ## Anti-Patterns
 
 - Do NOT import from deprecated modules: `experiment.py`, `adapter.py`, `lab_book.py`.
@@ -17,6 +32,10 @@
 - Do NOT add heavy deps to core modules. Optional heavy deps go behind try/except.
 - Do NOT hardcode model names or pricing. Use `efficiency.py:PROVIDER_PRICING`.
 - Do NOT read `experiment.py` or `adapter.py` for new work — they have deprecation warnings.
+- Do NOT hand-author policy logic as a one-off in scripts. Once `compile_experiment.py` lands,
+  `_gen_matrix_cells` (`pipeline.py:394`) is generalized by `experiment_matrix` and
+  `routing.simulate_strategies` (`routing.py:98`) by `compare_arms` — route new work through the
+  spec, not through direct calls to those two.
 
 ## Project-Specific Gotchas
 

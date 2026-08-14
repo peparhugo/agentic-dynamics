@@ -6,6 +6,8 @@ subtask: true
 
 Create a new experiment config and run it end-to-end.
 
+> Spec direction (proposed): the `ExperimentSpec` + compiler (`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`) will make this command "author a spec" — declare `factors`, `rules` (measurement vs control), `metrics`, `comparison`, `stop`, `adapt` in `experiments/specs/*.yaml` and let `compile_experiment.py` generate the cells. Until that lands, this command writes a config directly. Remember: control rules (e.g. `model_cascade`/`dynamics`) require `confidence`, which is not yet instrumented — measure before policy.
+
 1. Load the "instrument" skill.
 2. Determine the language and task. `$ARGUMENTS` may name a language (e.g. `/new-exp go`) and/or a task slug (e.g. `/new-exp go_rate_limiter`). If only a language is given, propose a fresh problem in that language not already covered by an existing config.
 3. Create `experiments/configs/<name>.yaml` modeled on the closest same-language config:

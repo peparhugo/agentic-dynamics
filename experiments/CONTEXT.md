@@ -1,6 +1,26 @@
 # `experiments/` — Experiment Ecosystem
 
-34 YAML configs, 224+ game reports, 13 lab books, 6 peer reviews.
+34 experiment YAML configs (+ `plans.yaml`), 224+ game reports, 19 active lab books, 6 peer reviews.
+
+## `experiments/specs/` — ExperimentSpec YAML (proposed)
+
+The spec/compiler introduces an `ExperimentSpec` layer above the configs. A spec declares
+`workflow`, `factors` (model, condition, **policy** as a first-class factor), `design`
+(factorial), `rules` (measurement vs control), `metrics`, `comparison`, `writeup`, `stop`, and
+`adapt`. Flagship: `experiments/specs/routing_regret.yaml`:
+
+```yaml
+factors:
+  - {name: model,     levels: [flash, luna, pro, haiku, terra, sonnet, sol]}
+  - {name: condition, levels: [clean, bad_seed, early_degrade, late_degrade]}
+  - {name: policy,    levels: [cheapest, premium_static, quality_cascade, dynamics]}
+rules:
+  - {name: model_cascade, plane: control, evidence_class: "[H]",
+     requires: [confidence], produces: [escalation_decision]}   # ← refused until confidence is measured
+```
+
+The compiler refuses `dynamics`/`model_cascade` until `confidence` is instrumented (measure
+before policy). Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
 ## `experiments/configs/` — 34 Experiment Definitions
 
@@ -76,10 +96,10 @@ Each YAML defines: task description, constraints, perturbation operators, streng
 | `README.md` | Dataset access instructions (inventory CLI) |
 | `reports/` | **224+ game reports** — per-experiment Markdown + artifact directories |
 
-## `experiments/lab_books/` — 13 Experiment Plans
+## `experiments/lab_books/` — 20 Experiment Plans
 
 Methodology documents defining hypothesis, data sources, analysis steps, interpretation.
-Implemented by the 14 `scripts/lab_*.py` scripts.
+Implemented by the 19 active `scripts/lab_*.py` scripts.
 
 | Document | Question |
 |----------|----------|
@@ -96,6 +116,13 @@ Implemented by the 14 `scripts/lab_*.py` scripts.
 | `lab_cross_model_reasoning.md` | Cross-model reasoning comparison |
 | `lab_basin_topology_neo4j.md` | Basin topology via Neo4j graph analysis |
 | `lab_opencode_meta_analysis.md` | Meta-analysis of opencode experiment patterns |
+| `lab_story_review.md` | Review patterns across multi-session stories |
+| `lab_story_arc.md` | Quality/cost arc across story sessions |
+| `lab_condition_effects.md` | Perturbation condition effects |
+| `lab_cache_economics.md` | Cache-hit economics |
+| `lab_quality_frontier.md` | Quality-per-cost frontier |
+| `lab_verification_frontier.md` | Verification depth vs correctness |
+| `lab_verification_value.md` | Independent verification value |
 
 ## `experiments/reviews/` — 6 Peer Review Documents
 

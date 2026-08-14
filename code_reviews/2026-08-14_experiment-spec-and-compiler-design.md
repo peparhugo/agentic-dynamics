@@ -154,8 +154,8 @@ rules:
      requires: [attempt_number, accepted, evaluator_independent],
      produces: [first_pass_rate, accepted_outcome]}
   - {name: grit,               plane: measurement, evidence_class: "[M]",
-     requires: [attempt_number, completed, condition],
-     produces: [grit, recovery_rate]}
+     requires: [perturbation_strength, test_executed_success, condition],
+     produces: [grit, retention, grit_auc, recovery_premium]}
   - {name: outcome_multiplier, plane: measurement, evidence_class: "[P]",
      requires: [value, rework_cost, reuse_value],
      produces: [net_value]}
@@ -181,9 +181,12 @@ adapt: {strategy: coordinate_descent, selection: highest_regret}
 ```
 
 **The compiler refuses this spec as written** — `model_cascade` requires `confidence`,
-which no measurement rule produces. The correct move is to *instrument confidence
-first*, then re-run. That refusal is the architecture doing its job: it tells you
-what to measure next.
+and `grit` requires `perturbation_strength` + `test_executed_success`; none are produced
+by the ledger yet. The correct move is to *instrument those fields first*, then re-run.
+That refusal is the architecture doing its job: it tells you what to measure next.
+(Note the asymmetry — `first_pass_quality` and `outcome_multiplier` consume ledger fields
+that already exist, so they are admissible; `grit` and `model_cascade` are gated because
+their inputs are not yet instrumented.)
 
 ## 6. The compiler — spec → DAG
 
@@ -233,14 +236,18 @@ class AttemptRecord:
     tokens: dict               # {in, out, reasoning, answer, explanation}
     cache_hit; tool_calls; queue_wait_ms; service_time_ms
     completed; first_pass; accepted; evaluator_independent
-    confidence: float | None   # ← currently UNMEASURED; model_cascade needs it
+    confidence: float | None            # ← UNMEASURED; model_cascade needs it
+    perturbation_strength: float | None # ← UNMEASURED; grit needs it (the s axis)
+    test_executed_success: bool | None  # ← UNMEASURED; grit needs it (verified success)
     cost: dict                 # {inference, orchestration}
     rework_cost; reuse_value
 ```
 
 The `confidence` field is the concrete example of the gap: it's what the "dynamics"
-arm wants and the ledger doesn't produce yet. `answer`/`explanation` token split
-unlocks Explanation Tax. Everything else is bookkeeping that the rules need.
+arm wants and the ledger doesn't produce yet. `perturbation_strength` +
+`test_executed_success` are what the `grit` rule needs (Grit(s) is a retention curve
+over strength conditioned on verified success, per `basin.py`). `answer`/`explanation`
+token split unlocks Explanation Tax. Everything else is bookkeeping that the rules need.
 
 ## 8. Rule evaluator interface
 
@@ -281,10 +288,12 @@ Every run pins `git_sha`, `pricing_version`, `dataset_hash`, `seed`,
 
 1. `experiment_spec.py` — dataclasses + loader + **the requires/produces validator**.
 2. `compile_experiment.py` — spec → DAG; `experiment_matrix` generalizes
-   `_gen_matrix_cells`; `compare_arms` generalizes `routing.simulate_strategies`.
-3. Instrument the missing information the policies need — **start with `confidence`**
-   (and attempt/timestamp fields), because `model_cascade`/`dynamics` are unwritable
-   without it.
+   `_gen_matrix_cells`; `compare_arms` generalizes `routing.simulate_strategies`;
+   `evaluate_rules` + `RuleResult` interface, with `grit` gated until its inputs exist.
+3. Instrument the missing information — **`confidence`** (for `model_cascade`/`dynamics`),
+   **`perturbation_strength` + `test_executed_success`** (for `grit`), plus
+   attempt/timestamp fields and the `answer`/`explanation` token split. Until these are
+   in the ledger, the validator refuses the rules that consume them.
 4. `adapt` — tweak one factor, emit the next grid.
 5. Run `routing_regret.yaml` end-to-end; the validator gates when the "dynamics" arm
    is actually admissible.

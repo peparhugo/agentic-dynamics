@@ -18,7 +18,43 @@ Prompts ──→ perturb.py ──→ perturb_prompt() ──→ perturbed prom
                                               recovery.py, strategy.py ──→ game_report.py
 ```
 
-Key files you'll modify: `scripts/run.py` (495L), `src/instrument/opencode.py` (526L), `src/instrument/perturb.py` (728L), `src/instrument/story.py` (1095L), `src/instrument/mutation.py` (414L).
+Key files you'll modify: `scripts/run.py` (502L), `src/instrument/opencode.py` (614L), `src/instrument/perturb.py` (752L), `src/instrument/story.py` (1374L), `src/instrument/mutation.py` (438L).
+
+## Spec & Compiler (proposed — next build target)
+
+The repo is an **information-acquisition machine**: `instrument → derive (measurement rules →
+information) → write policy (control rules consuming that information) → grid (policy as an arm)
+→ campaign (tweak one variable, repeat)`. Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
+
+Two modules are proposed, **not yet in the repo**:
+
+```
+src/instrument/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
+                                     # ComparisonSpec, WriteupSpec, StopSpec, AdaptSpec + validator
+src/instrument/compile_experiment.py # compile_spec(spec) -> DAG; validate_rules(spec) -> errors
+```
+
+**The load-bearing rule (enforced by the validator):** `RuleSpec` declares `requires` (information
+it consumes) and `produces` (information it emits). `plane` is `"measurement"` (produces) or
+`"control"` (consumes). The compiler refuses a control rule whose `requires` are unmet:
+
+```
+ERROR: policy arm "dynamics" requires [confidence, first_pass, deadline_slack]
+       — not produced by the ledger or any rule in this spec. Instrument these first.
+```
+
+**Consequence for implementation order — instrument `confidence` FIRST** (plus attempt/timestamp
+fields and the `answer`/`explanation` token split), then author the `model_cascade`/`dynamics`
+control arms. `confidence` is currently UNMEASURED in the ledger.
+
+**Reuse map (no new transport):** `experiment_matrix` generalizes `_gen_matrix_cells`
+(`pipeline.py:394`); `experiment_run` = existing enqueue+worker+run_story; `evaluate_rules` =
+the lab books driven by `spec.rules`; `compare_arms` = `routing.simulate_strategies`
+(`routing.py:98`); `adapt` = new campaign loop (tweak one factor, emit next grid).
+
+**Flagship spec:** `experiments/specs/routing_regret.yaml` (proposed) — factors
+`{model, condition, policy}` where `policy ∈ {cheapest, premium_static, quality_cascade,
+dynamics}`. The validator gates the `dynamics` arm until `confidence` is instrumented.
 
 ## Perturbation Operators (perturb.py)
 
@@ -54,7 +90,7 @@ python scripts/run.py --config experiments/configs/comparative.yaml --model deep
 # task, constraints[], operators[], strengths[], model, turns, thinking_effort
 ```
 
-Config names (omit .yaml): baseline, url_shortener, task_manager, twitter_timeline, web_crawler, search_kv_store, mint_financial, social_graph, collaborative_editor, data_table, form_wizard, notification_system, autocomplete_search, typescript_ssg*, flask_maintenance, fastapi_maintenance, architecture_redesign, rust_git_store, rust_redis, rust_proxy, go_crawler, go_jobqueue, go_grpc_chat, comparative, constraint_detection, recovery_cost, iterative_build, factorial_compound, silent_mode_sweep.
+Config names (omit .yaml): baseline, url_shortener, task_manager, twitter_timeline, web_crawler, search_kv_store, mint_financial, social_graph, collaborative_editor, data_table, form_wizard, notification_system, autocomplete_search, typescript_ssg*, typescript_eventbus, typescript_multitenant_api, flask_maintenance, fastapi_maintenance, architecture_redesign, rust_git_store, rust_redis, rust_proxy, go_crawler, go_jobqueue, go_grpc_chat, comparative, constraint_detection, recovery_cost, iterative_build, factorial_compound, silent_mode_sweep. (`plans.yaml` is the pipeline plan file, not an experiment config.)
 
 Typescript variants: typescript_ssg, typescript_ssg_claude, typescript_ssg_gpt5, typescript_ssg_gpt5mini.
 
