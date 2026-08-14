@@ -18,11 +18,16 @@ future opencode change. Keep both surfaces in sync by hand — there is no build
   `$ARGUMENTS` matches opencode's all-args form; numbered positional args do not — Claude
   Code's `$N` is 0-indexed where opencode's `$1`/`$2` is 1-indexed (`/run-exp` was adjusted
   for this; check any new numbered-arg command against the port doc).
-- `.claude/skills/*/SKILL.md` — the 3 opencode skills (`analyze`, `instrument`, `lab-books`),
-  ported verbatim.
-- `.opencode/tools/*.ts` do **not** have a Claude Code file equivalent — they're thin
-  `Bun.$` wrappers around `scripts/*.py` CLIs; invoke the underlying script directly via
-  Bash instead. No `.mcp.json` is shipped (see the port doc's D1 rationale).
+- `.claude/skills/{analyze,instrument,lab-books}/SKILL.md` — the 3 opencode skills, ported
+  (since extended with corrected `.opencode/tools/*.ts` flag knowledge — see below).
+- `.claude/skills/{run-workflow,control-room,queue,review}/SKILL.md` — net-new skills with
+  no opencode-side source, covering 9 of the 25 `.opencode/tools/*.ts` tools whose exact
+  flags/safety gates weren't documented anywhere in `.claude/` (`docs/claude_tools_to_skills_scope.md`).
+- `.opencode/tools/*.ts` do **not** have a 1:1 Claude Code file equivalent — no `.mcp.json`
+  is shipped (see the port doc's D1 rationale) — but all 25 tools' knowledge is now covered
+  by the 7 skills above (9 net-new, 10 folded into the 3 existing skills, 6 already covered
+  by commands/`AGENTS.md`): invoke the underlying script directly via Bash per the relevant
+  skill's documented invocation. See `docs/claude_code_port.md` §8 for the disposition table.
 - `.claude/settings.json` ports `opencode.json`'s `permission` block; `model`/`small_model`,
   `compaction.reserved`/`prune`, `subagent_depth`, `lsp`, `formatter` have no settings.json
   field and are not simulated — see the port doc.

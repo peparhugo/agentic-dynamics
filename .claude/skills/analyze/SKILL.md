@@ -16,11 +16,11 @@ You are working with the post-hoc analysis pipeline for AI FinOps Dynamics exper
                      │                               _trajectory_aggregate.json
                      └──→ validate_session.py ──→ test pass/fail per worktree
 
-_results_summary.json  ──┐
-_trajectory_aggregate.json ──→ build_data.py ──→ firebase/public/data.js
-inventory.json           ──┘                              │
-                                                          ▼
-                                              firebase deploy → web.app
+stories/*.json ──→ sync_data.py ──→ sessions.parquet, stories.parquet ──┐
+_results_summary.json  ────────────────────────────────────────────────┼──→ build_data.py ──→ firebase/public/data.js
+_trajectory_aggregate.json ─────────────────────────────────────────────┤                              │
+inventory.json           ───────────────────────────────────────────────┘                              ▼
+                                                                                              firebase deploy → web.app
 ```
 
 ## Primary Entry Points
@@ -39,10 +39,13 @@ python scripts/analyze_worktrees.py --dry-run               # Inspect without ru
 # 3. Analyze session transcripts (step-level metrics):
 python scripts/analyze_trajectories.py
 
-# 4. Validate generated code:
-python scripts/validate_session.py --worktree /tmp/exp_xyz
+# 4. Validate generated code (flag is --workdir, not --worktree):
+python scripts/validate_session.py --workdir /tmp/exp_xyz
 
-# 5. Build website data:
+# 5. Sync story results to parquet (before build_data.py):
+python scripts/sync_data.py
+
+# 6. Build website data:
 python scripts/build_data.py
 ```
 
@@ -98,8 +101,13 @@ Produces:
 
 Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test pass/fail.
 
+Confirmed flags (`scripts/validate_session.py:83-85`) — note **`--workdir`, not
+`--worktree`**:
+
 ```bash
-python scripts/validate_session.py --worktree /tmp/exp_xyz
+python scripts/validate_session.py --workdir /tmp/exp_xyz
+python scripts/validate_session.py --session-id <opencode-session-id>
+python scripts/validate_session.py --model deepseek   # filter by model (default: "all")
 ```
 
 ## inventory.py (392L) — Data Registry CLI
@@ -115,10 +123,28 @@ python scripts/inventory.py worktrees # List worktrees
 Reads: `opencode.db` (SQLite session store), worktrees, config YAMLs, result JSONs.
 Writes: `experiments/inventory.json`
 
+## sync_data.py — Story Results → Parquet
+
+Run this **before** `build_data.py` when story results have changed (`AGENTS.md`'s Commands
+block: "story results -> parquet (before build_data)"). Confirmed modes (manual `sys.argv`
+parse in `main()`, `scripts/sync_data.py`):
+
+```bash
+python scripts/sync_data.py                        # sync: write sessions.parquet + stories.parquet
+python scripts/sync_data.py --check                 # print row counts for both parquet files
+python scripts/sync_data.py --query "<duckdb SQL>"  # run SQL against both parquet files, print results
+```
+
+`--check` requires `sessions.parquet` to already exist (prints "No parquet files. Run
+without --check first." and returns otherwise). `--query` needs at least one more `sys.argv`
+element after it — the query text is read as the *last* CLI argument
+(`sys.argv[-1]`), so pass the SQL as a single quoted final argument.
+
 ## build_data.py (1188L) — Website Data Generator
 
 ```bash
-python scripts/build_data.py
+python scripts/build_data.py            # write firebase/public/data.js
+python scripts/build_data.py --dry-run  # print the data instead of writing (confirmed scripts/build_data.py:1168)
 ```
 
 Reads: inventory.json, _results_summary.json, _trajectory_aggregate.json.
@@ -164,9 +190,11 @@ python scripts/inventory.py refresh
 # 3. Analyze worktrees:
 python scripts/analyze_worktrees.py
 python scripts/analyze_trajectories.py
-# 4. Build website data:
+# 4. Sync story results to parquet:
+python scripts/sync_data.py
+# 5. Build website data:
 python scripts/build_data.py
-# 5. Deploy:
+# 6. Deploy:
 firebase deploy --only hosting
 ```
 
@@ -196,3 +224,27 @@ rule before the compiler admits it (see `conventions.md`). Design:
 - SonarQube requires Docker running (`docker-compose up -d sonarqube`).
 - The 5 DEPRECATED lab book scripts (`*_bge_m3`) have been superseded — use the non-DEPRECATED versions.
 - opencode.db path: usually `~/.local/share/opencode/opencode.db` or from env `OPENCODE_DB`.
+
+## Tool invocations (ported from `.opencode/tools/*.ts`)
+
+The opencode tools below shell to the scripts already documented in this skill. On the
+Claude Code side there's no tool wrapper — invoke the script directly via Bash, using the
+exact flags below (verified against each script's own `argparse`, not the tool's schema —
+the tool's own `args: {}` schema exposes none of `analyze_worktrees.py`'s real flags).
+
+- **`analyze_worktrees.ts`** → `scripts/analyze_worktrees.py`. Full confirmed flag set
+  (`scripts/analyze_worktrees.py:1031-1043`): `--worktree PATH`, `--limit INT`, `--dry-run`,
+  `--baseline PATH` (comparison baseline worktree), `--no-tests` (skip pytest), `--no-sonar`
+  (skip SonarQube), `--sonar-url URL` (default `http://localhost:9000`), `--sonar-user`
+  (default `admin`), `--sonar-password` (default `admin`), `--sonar-timeout INT` (default
+  `120`), `--tests` (run tests, default on already), `--timeout INT` (test timeout seconds,
+  default `120`).
+- **`analyze_trajectories.ts`** → `scripts/analyze_trajectories.py`. Flags match the tool
+  1:1: `--limit INT`, `--model STR`, `--dry-run`.
+- **`sync_data.ts`** → `scripts/sync_data.py` — see the "sync_data.py" section above
+  (sync / `--check` / `--query "<sql>"` modes).
+- **`build_data.ts`** → `scripts/build_data.py` — see the "build_data.py" section above
+  (plain run, or `--dry-run`).
+- **`validate_session.ts`** → `scripts/validate_session.py` — `--workdir`, `--session-id`,
+  `--model` (default `all`). **Not `--worktree`** — see the "validate_session.py" section
+  above.

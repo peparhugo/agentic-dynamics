@@ -15,7 +15,7 @@ Answer direct questions about the subject matter fully in any role. The rule is 
 ## Commands
 
 ```bash
-python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek
+python scripts/run.py experiments/configs/<name>.yaml --model deepseek
 python scripts/run_story.py <story> --model <provider/model> --backend <opencode|claude_cli>
 python scripts/enqueue.py --model <provider/model> --missing-only   # fill queue, skip done cells
 python scripts/worker.py             # BRPOP worker — run N in parallel

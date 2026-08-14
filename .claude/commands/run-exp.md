@@ -11,7 +11,7 @@ First, load the "instrument" skill if not already loaded. Then:
 
 2. If no config specified, list the available configs and ask which to run.
 
-3. Run: `python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek`
+3. Run: `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`
 
 4. Report the results: cost, tokens, tests passed, strategy archetype, game report path.
 

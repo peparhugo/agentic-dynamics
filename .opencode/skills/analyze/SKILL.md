@@ -40,7 +40,7 @@ python scripts/analyze_worktrees.py --dry-run               # Inspect without ru
 python scripts/analyze_trajectories.py
 
 # 4. Validate generated code:
-python scripts/validate_session.py --worktree /tmp/exp_xyz
+python scripts/validate_session.py --workdir /tmp/exp_xyz
 
 # 5. Build website data:
 python scripts/build_data.py
@@ -99,7 +99,7 @@ Produces:
 Runs `pytest` on generated code in worktrees. Replaces heuristic correctness with actual test pass/fail.
 
 ```bash
-python scripts/validate_session.py --worktree /tmp/exp_xyz
+python scripts/validate_session.py --workdir /tmp/exp_xyz
 ```
 
 ## inventory.py (392L) — Data Registry CLI
