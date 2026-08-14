@@ -1,0 +1,87 @@
+name: fix_review_findings
+question: "Can a model apply a well-specified review-findings fix list to the Control Room?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/fixplan.md: a triage + fix plan for the Control Room review findings.
+
+          GOAL:
+          {goal}
+
+          READ THESE (the review to act on, with exact file:line citations and fix suggestions):
+          - docs/review/code_review.md — CRITICAL C1 (already fixed — unauthenticated enqueue + bind),
+            MAJOR M1–M4, MINOR N1–N4, convention N5–N6.
+          - docs/review/architecture_review.md — ranked architecture recommendations 1–5.
+
+          NOTE: the code has moved since the review (admin/server.py is now ~620 lines with the
+          design_sessions feature merged in), so line numbers are stale but the findings are structural.
+          Re-locate each finding in the current code before planning the fix.
+
+          TRIAGE INSTRUCTIONS:
+          - M1 (unpipelined Redis LRANGE per cell in /api/matrix): fix with a Redis pipeline.
+          - M2 (history_capped computed but never surfaced): thread it to the frontend so "reported
+            spend" is honestly labeled when the 500-entry window is truncated.
+          - M3 (publish-before-persist in src/instrument/live.py): reorder to lpush+ltrim before
+            publish (or verify sample membership before dropping the overlay) — fix the root cause.
+          - M4 (Werkzeug dev server, no connection cap): do NOT over-engineer. Document the limitation
+            and add a gunicorn command example; it's a local operator tool.
+          - MINORs: fix the cheap, safe ones (N5 return-type annotations on admin/server.py route
+            handlers, N6 line-length, N1 dead `identity` computation if trivial). Skip anything risky.
+
+          HARD CONSTRAINTS:
+          - Do not change behavior the 25 existing admin tests assert on. Do not touch data.js/base.css.
+          - Preserve the "observational, no write path" property and the additive-only API contract.
+
+          DELIVER exactly one file, docs/fixplan.md: (1) each finding re-located to current file:line,
+          (2) the concrete fix per finding, (3) order, (4) which MINORs to skip and why.
+      - name: implement
+        kind: agent
+        prompt: |
+          Implement the fixes per docs/fixplan.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Edit admin/server.py, admin/static/app.js, and src/instrument/live.py only as the plan says.
+          - Keep the 25 existing admin tests passing. Add a test for any non-trivial change.
+          - M3 (live.py ordering) must not break the replay/live dedup contract the tests rely on.
+
+          DELIVER the fixes + any new tests.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the fixes.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Run python3 -m pytest tests/test_admin_server.py tests/test_admin_frontend.py
+            tests/test_admin_design_sessions.py -q → must pass.
+          - Run python3 -m pytest tests/test_live.py -q (if it exists) → must pass.
+          - Confirm M1 (pipeline), M2 (history_capped surfaced), M3 (persist-before-publish) are
+            actually implemented, and M4 is documented.
+
+          DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + summary of what changed.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 5.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
