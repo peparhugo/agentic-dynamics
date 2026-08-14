@@ -24,6 +24,16 @@ workflow:
           - Design system: firebase/public/base.css (dark dossier, JetBrains Mono, panel cards,
             amber/coral/cyan accents var(--ac)/var(--am)/var(--cy), .cta-btn, .section-kicker).
 
+          GOLDEN-CIRCLE FRAME — the WHOLE page follows Simon Sinek's golden circle (Why → How → What),
+          not just the architecture visual. Organize the face-lifted page in this order, with explicit
+          Why/How/What section kickers, so the page narrative and the architecture visual share one structure:
+          - WHY (center) = the belief: measured information should become testable policy. This is the
+            page's opening proposition, not a feature list.
+          - HOW (ring) = the levers and cost model: C₀, P, ε, r, β, EPM, the interactive calculator —
+            how cost/verification are measured and controlled.
+          - WHAT (outside) = the policies: one-way vs two-way doors, the autonomous door, the provider
+            playbook, escalation economics — the decisions the measured information makes possible.
+
           THE NEW ARCHITECTURE VISUAL — the centerpiece of this pass:
           - The user has two reference visuals that formalize the CONCEPTUAL context but MISS the
             engineering architecture. Produce a BEAUTIFUL diagram of the architecture and how it BINDS to
