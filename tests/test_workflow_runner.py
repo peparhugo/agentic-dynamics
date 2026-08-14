@@ -103,3 +103,34 @@ def test_run_workflow_commits_per_phase(tmp_path):
     assert result.phases[0].commit_hash  # scope phase produced a commit
     log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, capture_output=True, text=True)
     assert "[workflow] scope" in log.stdout
+
+
+def test_run_workflow_resume_skips_committed_phases(tmp_path):
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    calls = []
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt.splitlines()[1])
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))  # unique → commits
+        return _fake_agent(ok=len(calls) < 3, error="boom")
+
+    run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    # implement (3rd agent call) failed → only scope + ux committed
+
+    calls.clear()
+
+    def agent2(prompt, *, model, backend, workdir, **kwargs):
+        calls.append(prompt.splitlines()[1])
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "x.md").write_text(str(len(calls)))
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path,
+                          resume=True, run_agentic_fn=agent2)
+    assert [p.phase for p in result.phases] == ["implement", "verify"]
+    assert len(calls) == 1  # only implement re-runs; scope/ux skipped

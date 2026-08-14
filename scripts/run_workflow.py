@@ -35,6 +35,8 @@ def main() -> None:
     ap.add_argument("--output-token-limit", type=int, default=0)
     ap.add_argument("--timeout", type=int, default=1800, help="per-phase timeout (s)")
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
+    ap.add_argument("--resume", action="store_true",
+                    help="skip phases that already have a [workflow] <phase> commit")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
@@ -49,6 +51,7 @@ def main() -> None:
         output_token_limit=args.output_token_limit,
         timeout=args.timeout,
         commit=not args.no_commit,
+        resume=args.resume,
     )
 
     print(json.dumps(result.to_dict(), indent=2))

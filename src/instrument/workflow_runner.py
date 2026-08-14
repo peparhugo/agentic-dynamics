@@ -17,6 +17,7 @@ later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 from collections.abc import Callable
@@ -145,6 +146,22 @@ def _git_head(workdir: Path) -> str:
         return ""
 
 
+def _completed_phases(workdir: Path, phase_names: list[str]) -> set[str]:
+    """Return phase names that already have a ``[workflow] <phase>`` commit."""
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%s"], cwd=workdir, capture_output=True, text=True
+        )
+    except Exception:
+        return set()
+    completed: set[str] = set()
+    for line in log.stdout.splitlines():
+        m = re.search(r"\[workflow\]\s+(\S+)", line)
+        if m and m.group(1) in phase_names:
+            completed.add(m.group(1))
+    return completed
+
+
 def run_workflow(
     spec: ExperimentSpec,
     *,
@@ -159,10 +176,13 @@ def run_workflow(
     silent_mode: bool = False,
     commit: bool = True,
     stop_on_error: bool = True,
+    resume: bool = False,
     run_agentic_fn: Callable[..., Any] | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
 
+    ``resume=True`` skips phases that already have a ``[workflow] <phase>`` commit and
+    re-enters from the first incomplete phase (carrying prior-phase context).
     ``run_agentic_fn`` is injectable so tests can substitute a fake agent (no LLM).
     """
     errors = validate_spec(spec)
@@ -188,15 +208,28 @@ def run_workflow(
     )
 
     prior: list[str] = []
-    for phase_def in phases:
+    start_idx = 0
+    if resume:
+        phase_names = [str(p.get("name", "?")) for p in phases]
+        completed = _completed_phases(wd, phase_names)
+        for i, phase_def in enumerate(phases):
+            name = str(phase_def.get("name", "?"))
+            if name in completed:
+                prior.append(f"{name} (ok)")
+                start_idx = i + 1
+            else:
+                break
+
+    for phase_def in phases[start_idx:]:
         name = str(phase_def.get("name", "?"))
         kind = str(phase_def.get("kind", "agent"))
+        phase_timeout = int(phase_def.get("timeout", timeout))
         pr = PhaseResult(phase=name, kind=kind, status="ok")
         t0 = time.time()
 
         try:
             if kind == "test":
-                suite = run_suite(wd, language)
+                suite = run_suite(wd, language, timeout=phase_timeout)
                 pr.tests_passed = suite["passed"]
                 pr.tests_total = suite["total"]
                 pr.test_executed_success = test_executed_success(suite)
@@ -213,7 +246,7 @@ def run_workflow(
                     thinking_effort=thinking_effort,
                     thinking_budget_tokens=thinking_budget_tokens,
                     output_token_limit=output_token_limit,
-                    timeout=timeout,
+                    timeout=phase_timeout,
                     silent_mode=silent_mode,
                 )
                 pr.model = model
