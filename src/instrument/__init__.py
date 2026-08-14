@@ -10,66 +10,19 @@ v0.6: Multi-language analysis via tree-sitter. Flash V4 mutation compiler.
 """
 
 # Deprecated: Perturbation, PerturbationOperator — only build_operators/perturb_prompt used by current scripts
-from .perturb import build_operators, perturb_prompt, PERTURBATION_CLASSES, perturbation_class_for
+from .backends import get_backend_for_model, resolve_backend, run_agentic
+
 # Deprecated: ReasoningTrajectory, TrajectoryStep, compute_trajectory_distance — not used by current scripts
 from .basin import BasinMetrics, measure_basin_escape
-# Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
-from .solution import SolutionMetrics, evaluate_solution
-from .efficiency import EfficiencyMetrics, compute_efficiency, compute_cost_estimate
-# Deprecated: StrategyType — not used by current scripts
-from .strategy import StrategyReport, classify_strategy
-from .game_report import GameReport
-from .sonar import SonarMetrics, run_sonar_analysis, compute_sonar_diff, sonar_quality_score
-# Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
-from .recovery_cost import compute_recovery_cost
-# Deprecated: ConstraintDetection, DetectionReport, detection_summary — not used by current scripts
-from .constraint_detection import detect_constraints
-# Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
-from .semantic_validation import analyze_markers, analyze_ast
-# Deprecated: EmbeddingClient, extract_session_text — not used by current scripts
-from .embeddings import ChromaStore, extract_session_steps
-# Deprecated: InstrumentedAdapter, InvokeTimeoutError — old pipeline; run_opencode_agentic replaces adapter.py
-# Deprecated: ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment — old pipeline; not used by current scripts
-# Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
-from .graph import Neo4jClient
-from .ollama_analyzer import OllamaAnalyzer, load_summary_data
-from .opencode_analyzer import OpencodeAnalyzer, REPORTS_DIR
-from .opencode import run_opencode_agentic, AgenticResult, normalize_opencode_event
-from .streaming import stream_subprocess, StreamResult
-from .claude_adapter import run_claude_agentic, ClaudeStreamAdapter, adapt_usage
-from .backends import get_backend_for_model, resolve_backend, run_agentic
-from .live import LivePublisher, make_publisher
-from .routing import compute_routing, normalize_task, recommend_route, simulate_strategies
-
-# v0.6: Multi-language analysis + mutation compiler + story orchestrator
-from .language import (
-    LanguageProfile,
-    CodebaseAST,
-    detect_language,
-    parse_codebase,
-    get_parser,
-    collect_functions,
-    collect_imports,
-)
-from .mutation import (
-    MutationArtifact,
-    compile_mutation,
-    apply_mutation,
-    ALL_OPERATORS,
-    SPECIFICATION_OPERATORS,
-    CODEBASE_OPERATORS,
-)
-from .story import (
-    StoryConfig,
-    StoryResult,
-    SessionSpec,
-    SessionResult,
-    run_story,
-    save_story_result,
-    load_story_result,
-    BUILTIN_STORIES,
-    PerturbationCondition,
-    condition_to_mutations,
+from .claude_adapter import ClaudeStreamAdapter, adapt_usage, run_claude_agentic
+from .codebase_graph import (
+    CodebaseGraph,
+    GraphDelta,
+    GraphMetrics,
+    ModuleNode,
+    build_graph,
+    compute_graph_delta,
+    compute_metrics,
 )
 from .commit_analysis import (
     CommitAnalysis,
@@ -80,36 +33,122 @@ from .commit_analysis import (
     compute_deep_metrics,
     score_conventions,
 )
-from .review import (
-    CommitReview,
-    StoryReview,
-    review_commit,
-    review_story,
-    generate_tests,
-    compare_implementations,
+
+# v1.0: the compiler — spec → DAG
+from .compile_experiment import (
+    DAG,
+    MEASUREMENT_RULES,
+    Phase,
+    RuleResult,
+    SpecError,
+    compare_arms,
+    compile_spec,
+    evaluate_rules,
+    experiment_matrix,
+    first_pass_quality,
 )
+
+# Deprecated: ConstraintDetection, DetectionReport, detection_summary — not used by current scripts
+from .constraint_detection import detect_constraints
+from .efficiency import EfficiencyMetrics, compute_cost_estimate, compute_efficiency
+
+# Deprecated: EmbeddingClient, extract_session_text — not used by current scripts
+from .embeddings import ChromaStore, extract_session_steps
 from .entropy import (
     EntropyProfile,
     compute_entropy,
     entropy_delta,
     entropy_delta_detailed,
 )
-from .codebase_graph import (
-    CodebaseGraph,
-    ModuleNode,
-    GraphMetrics,
-    GraphDelta,
-    build_graph,
-    compute_metrics,
-    compute_graph_delta,
+
+# v1.0: ExperimentSpec — declarative specs + the requires/produces validator
+from .experiment_spec import (
+    LEDGER_FIELDS,
+    AdaptSpec,
+    ComparisonSpec,
+    ExperimentSpec,
+    Factor,
+    MetricSpec,
+    RuleSpec,
+    StopSpec,
+    Workflow,
+    WriteupSpec,
+    load_spec,
+    validate_rules,
+    validate_spec,
 )
+from .game_report import GameReport
+
+# Deprecated: InstrumentedAdapter, InvokeTimeoutError — old pipeline; run_opencode_agentic replaces adapter.py
+# Deprecated: ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment — old pipeline; not used by current scripts
+# Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
+from .graph import Neo4jClient
+
+# v0.6: Multi-language analysis + mutation compiler + story orchestrator
+from .language import (
+    CodebaseAST,
+    LanguageProfile,
+    collect_functions,
+    collect_imports,
+    detect_language,
+    get_parser,
+    parse_codebase,
+)
+from .live import LivePublisher, make_publisher
 from .lsp_diagnostics import (
     LSPDiagnostic,
     LSPReport,
-    run_diagnostics,
-    diagnostics_delta,
     available_tools,
+    diagnostics_delta,
+    run_diagnostics,
 )
+from .mutation import (
+    ALL_OPERATORS,
+    CODEBASE_OPERATORS,
+    SPECIFICATION_OPERATORS,
+    MutationArtifact,
+    apply_mutation,
+    compile_mutation,
+)
+from .ollama_analyzer import OllamaAnalyzer, load_summary_data
+from .opencode import AgenticResult, normalize_opencode_event, run_opencode_agentic
+from .opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
+from .perturb import PERTURBATION_CLASSES, build_operators, perturb_prompt, perturbation_class_for
+
+# Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
+from .recovery_cost import compute_recovery_cost
+from .review import (
+    CommitReview,
+    StoryReview,
+    compare_implementations,
+    generate_tests,
+    review_commit,
+    review_story,
+)
+from .routing import compute_routing, normalize_task, recommend_route, simulate_strategies
+
+# Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
+from .semantic_validation import analyze_ast, analyze_markers
+
+# Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
+from .solution import SolutionMetrics, evaluate_solution
+from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
+from .story import (
+    BUILTIN_STORIES,
+    PerturbationCondition,
+    SessionResult,
+    SessionSpec,
+    StoryConfig,
+    StoryResult,
+    condition_to_mutations,
+    load_story_result,
+    run_story,
+    save_story_result,
+)
+
+# Deprecated: StrategyType — not used by current scripts
+from .strategy import StrategyReport, classify_strategy
+from .streaming import StreamResult, stream_subprocess
 
 __all__ = [
     "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for",
@@ -150,4 +189,11 @@ __all__ = [
     "build_graph", "compute_metrics", "compute_graph_delta",
     "LSPDiagnostic", "LSPReport", "run_diagnostics",
     "diagnostics_delta", "available_tools",
+    # v1.0 spec/compiler
+    "ExperimentSpec", "Workflow", "Factor", "RuleSpec", "MetricSpec",
+    "ComparisonSpec", "WriteupSpec", "StopSpec", "AdaptSpec",
+    "LEDGER_FIELDS", "load_spec", "validate_rules", "validate_spec",
+    "DAG", "Phase", "SpecError", "RuleResult", "MEASUREMENT_RULES",
+    "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
+    "first_pass_quality",
 ]
