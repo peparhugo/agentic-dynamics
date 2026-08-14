@@ -183,9 +183,7 @@ def compute_model_data(inventory, summary, db_breakdown):
     models = []
 
     for mid in MODEL_DISPLAY_ORDER:
-        if mid not in model_breakdown:
-            continue
-        inv = model_breakdown[mid]
+        inv = model_breakdown.get(mid, {})
         label = MODEL_LABELS.get(mid, mid)
         provider = get_provider(mid)
 
@@ -197,7 +195,7 @@ def compute_model_data(inventory, summary, db_breakdown):
         narrated = [r for r in reports if r.get("narration_failure")]
 
         avg_cost = _fmt_usd(sum(r.get("cost", 0) for r in valid) / max(len(valid), 1))
-        total_cost = _fmt_usd(inv.get("cost", 0))
+        total_cost = _fmt_usd(inv.get("cost", 0) if inv else sum(r.get("cost", 0) for r in reports))
 
         pass_rate_val = None
         total_tests = 0
@@ -267,7 +265,7 @@ def compute_model_data(inventory, summary, db_breakdown):
             "id": mid,
             "label": label,
             "provider": provider,
-            "sessions": inv.get("sessions", 0),
+            "sessions": inv.get("sessions", len(reports)),
             "n_reports": len(reports),
             "n_valid": len(valid),
             "n_narrated": len(narrated),
