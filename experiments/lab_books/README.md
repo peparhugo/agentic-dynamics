@@ -4,10 +4,13 @@ Structured experiment plans for analyzing the AI FinOps Dynamics dataset. Each l
 
 ## Status
 
-All 13 lab books have been executed. Analysis scripts in `scripts/` produce results to `experiments/results/lab_*.json`. 
-The lab books below represent the initial 8 planned analyses; 5 additional analyses (reasoning divergence, semantic clusters, 
-cross-model reasoning, basin topology neo4j, and opencode meta-analysis) were added during execution and are documented 
-in their respective lab book files.
+19 lab books are active (`scripts/lab_*.py`, non-deprecated). Analysis scripts in `scripts/`
+produce results to `experiments/results/lab_*.json`. 8 earlier analyses
+(`reasoning_divergence`, `semantic_clusters`, `cross_model_reasoning`, `drift_trajectories`,
+`reasoning_volatility`, `divergence_cascades`, `cluster_stability`, `recovery_curves`) are
+**deprecated** (`*_DEPRECATED_bge_m3.py`) — superseded by `semantic_validation.py` and no
+longer listed below. Full current list: `.opencode/skills/lab-books/SKILL.md` (source of
+truth per the doc-refresh's D4 decision — this README summarizes it, doesn't duplicate it).
 
 ## Lab Books
 
@@ -21,23 +24,22 @@ in their respective lab book files.
 | 6 | `lab_task_routing.md` | What's the optimal model-per-task routing? | Grit-routed strategy beats any single-model strategy |
 | 7 | `lab_basin_topology.md` | What is each model's attractor basin topology? | Basin classification reveals model default strategies |
 | 8 | `lab_survival_horizon.md` | How many sessions before bankruptcy? | Cost compounds faster than most budgets can absorb |
-| 9 | `lab_reasoning_divergence.md` | How do reasoning trajectories diverge under perturbation? | Manifold perturbations produce higher per-step divergence |
-| 10 | `lab_semantic_clusters.md` | What semantic clusters emerge in reasoning patterns? | Models fall into distinct reasoning typologies |
-| 11 | `lab_cross_model_reasoning.md` | How does reasoning differ across models? | Architecture determines reasoning topology more than scaling |
-| 12 | `lab_basin_topology_neo4j.md` | What is basin topology via graph analysis? | Neo4j validates attractor basin framework |
-| 13 | `lab_opencode_meta_analysis.md` | What patterns exist in opencode experiments? | Models analyzing themselves reveal self-consistency limits |
+| 9 | `lab_basin_topology_neo4j.md` | What is basin topology via graph analysis? | Neo4j validates attractor basin framework |
+| 10 | `lab_opencode_meta_analysis.md` | What patterns exist in opencode experiments? | Models analyzing themselves reveal self-consistency limits |
+| 11 | `lab_sonar_quality.py` (no lab book `.md` yet) | Does perturbation degrade static code quality? | Higher thinking_ratio correlates with better Sonar quality |
+| 12 | `lab_think_do_coupling.py` (no lab book `.md` yet) | How coupled are a model's reasoning and its actions? | High-coupling models narrate what they actually do; low-coupling models flail |
 
 ### Story-era labs (multi-session story corpus, added 2026-08-13)
 
 | # | File | Question | Hypothesis |
 |---|------|----------|------------|
-| 14 | `lab_story_review.md` | What review patterns emerge across stories? | Review quality is condition-independent |
-| 15 | `lab_verification_frontier.md` | Does test thoroughness track cost? | Verification is a vendor behavior, not a price point |
-| 16 | `lab_story_arc.md` | Does cost compound across the 5-session arc? | Snowball Rule: session cost doubles across the arc |
-| 17 | `lab_condition_effects.md` | Does perturbing the seed change the whole arc? | early_degrade lowers success and raises cascades |
-| 18 | `lab_verification_value.md` | Does writing more tests predict reviewer outcomes? | Tests weakly correlate with fewer "worse" commits |
-| 19 | `lab_cache_economics.md` | Is cache policy the hidden cost driver? | Cache hit rate, tokens, and cost are independent knobs |
-| 20 | `lab_quality_frontier.md` | Is code cleanliness decoupled from cost? | Cleanliness moves independently of price |
+| 13 | `lab_story_review.md` | What review patterns emerge across stories? | Review quality is condition-independent |
+| 14 | `lab_verification_frontier.md` | Does test thoroughness track cost? | Verification is a vendor behavior, not a price point |
+| 15 | `lab_story_arc.md` | Does cost compound across the 5-session arc? | Snowball Rule: session cost doubles across the arc |
+| 16 | `lab_condition_effects.md` | Does perturbing the seed change the whole arc? | early_degrade lowers success and raises cascades |
+| 17 | `lab_verification_value.md` | Does writing more tests predict reviewer outcomes? | Tests weakly correlate with fewer "worse" commits |
+| 18 | `lab_cache_economics.md` | Is cache policy the hidden cost driver? | Cache hit rate, tokens, and cost are independent knobs |
+| 19 | `lab_quality_frontier.md` | Is code cleanliness decoupled from cost? | Cleanliness moves independently of price |
 
 ## Execution
 

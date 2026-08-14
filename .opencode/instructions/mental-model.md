@@ -30,15 +30,21 @@ routing.py ── recommend model per task type from experiment results
 live.py ──── Redis pub/sub telemetry (feeds admin portal)
 ```
 
-## The spec/compiler layer — PARTIALLY BUILT
+```
+supervisor.py ── Redis flag/session↔cell mapping contracts (no OpenCode client dep — observe only, see docs/supervisor_design.md)
+workflow_runner.py ── executes an agent_task workflow's phases inside a git worktree, committing + ledgering each
+test_runner.py ── independent pytest/jest/go-test/cargo-test runner; sole source of truth for test_executed_success
+```
 
-Two new modules, per the design doc. `experiment_spec.py` is **written** (dataclasses,
-YAML loader, requires/produces validator, tests). `compile_experiment.py` is still
-**proposed**.
+## The spec/compiler layer — WRITTEN
+
+Two modules, per the design doc: `experiment_spec.py` (dataclasses, YAML loader,
+requires/produces validator, tests) and `compile_experiment.py` (spec → DAG). Both are
+**written**.
 
 ```
 experiment_spec.py     — WRITTEN — dataclasses + YAML loader + requires/produces validator
-compile_experiment.py  — proposed — spec → DAG; generalizes _gen_matrix_cells + routing.simulate_strategies
+compile_experiment.py  — WRITTEN — spec → DAG; generalizes _gen_matrix_cells + routing.simulate_strategies
 ```
 
 Core objects (see §2 of the design doc):
@@ -137,7 +143,7 @@ compute_routing(entries) -> dict   # per-task recs + strategy simulation
 recommend_route(task_type, entries, *, correctness_threshold, lead_margin) -> dict
 ```
 
-### Proposed signatures (spec/compiler — not in the repo yet)
+### Spec/compiler signatures (written — src/instrument/{experiment_spec,compile_experiment}.py)
 
 ```
 # experiment_spec.py
@@ -166,7 +172,7 @@ first_pass_quality(attempts) -> RuleResult   # measurement (produces)
 model_cascade(attempts, state) -> RuleResult # control (consumes confidence)
 ```
 
-### Ledger (the data model rules consume) — PROPOSED
+### Ledger (the data model rules consume) — schema WRITTEN; fields below marked UNMEASURED are the open instrumentation gap
 
 ```
 JobRecord:    job_id, spec_id, workflow, factors{model,condition,policy,seed},
@@ -185,43 +191,44 @@ AttemptRecord: attempt_id, job_id, parent_attempt_id, attempt_number, retry_reas
 
 ## Script map
 
-```
-scripts/run.py            — experiment: perturb → invoke → evaluate
-scripts/run_story.py      — multi-session story CLI
-scripts/analyze_worktrees.py — worktrees → GameReport .md + _results_summary.json
-scripts/analyze_trajectories.py — session.jsonl → trajectory JSON
-scripts/inventory.py      — refresh, list, stats, worktrees, report
-scripts/sync_data.py      — story results → sessions.parquet + stories.parquet
-scripts/build_data.py     — inventory+results+parquet → firebase/public/data.js
-scripts/validate_session.py — pytest on generated code
-scripts/enqueue.py + worker.py — Redis experiment queue
-scripts/backfill_artifacts.py + backfill_sonar.py — data migration
-scripts/backfill_story_transcripts.py — recover session_{n}.jsonl from opencode.db
-scripts/monitor.py        — Redis queue dashboard (--json for machine output)
-scripts/review_all.py     — review every story (ThreadPoolExecutor, no Redis)
-scripts/review_stories.py + review_worker.py — batch/Redis review runners
-scripts/generate_manifest.py — SHA256 manifest
-scripts/pipeline.py       — YAML-driven phase orchestration (plans.yaml; 11 kinds)
-scripts/plan.py           — [deprecated] hardcoded phase orchestration, superseded by pipeline.py
-scripts/compile_experiment.py — [proposed] spec → DAG (see design doc)
-19 active scripts/lab_*.py — measurement rules; 8 *_DEPRECATED_bge_m3 to ignore
+78 scripts across 5 categories (experiment runners, post-hoc analysis, data pipeline,
+19 active lab_*.py + 8 deprecated *_bge_m3, Redis queue/review workers). Full table:
+`scripts/CONTEXT.md` (the authoritative, per-script reference — keep this pointer,
+don't re-duplicate the table here).
 
-admin/server.py           — Flask portal: SSE telemetry + routing (port 8000, FINOPS_PORT)
+Primary entry points: run.py, run_story.py, run_workflow.py, pipeline.py,
+inventory.py, build_data.py, sync_data.py, analyze_worktrees.py,
+analyze_trajectories.py, validate_session.py, enqueue.py + worker.py,
+review_all.py (+ review_stories.py/review_worker.py/trigger_reviews.py/
+enqueue_reviews.py/finalize_reviews.py), monitor.py, generate_manifest.py.
+
+admin/server.py — Control Room portal: SSE telemetry, routing, supervisor flags,
+design sessions, Claude background sessions (port 8000, FINOPS_PORT). Full route
+list: scripts/CONTEXT.md.
 .opencode/tools/dashboard.ts — pull tool: Redis status matrix via monitor.py --json
-```
 
 ## Test files
 
+39 files total (`ls tests/test_*.py | wc -l` — verify current count), by module family:
+
 ```
-tests/test_pipeline.py (673L), test_story.py (330L), test_opencode_events.py (212L),
-test_mutation.py (205L), test_embeddings.py (200L), test_commit_analysis.py (200L),
-test_lsp.py (188L), test_claude_adapter.py (181L), test_trajectory_embedding.py (178L),
-test_review_agent.py (151L), test_pricing.py (149L), test_correctness_lineage.py (148L),
-test_language.py (143L), test_opencode_analyzer.py (136L), test_graph.py (131L),
-test_entropy.py (126L), test_codebase_graph.py (125L), test_ollama_analyzer.py (121L),
-test_live.py (91L), test_perturb.py (88L), test_data_integrity.py (72L),
-test_routing.py (66L), test_strategy.py (64L), test_recovery.py (58L),
-test_adapter.py (53L), test_streaming.py (49L), test_backends.py (30L)
+Core pipeline (27): test_pipeline.py, test_story.py, test_opencode_events.py,
+test_mutation.py, test_embeddings.py, test_commit_analysis.py, test_lsp.py,
+test_claude_adapter.py, test_trajectory_embedding.py, test_review_agent.py,
+test_pricing.py, test_correctness_lineage.py, test_language.py,
+test_opencode_analyzer.py, test_graph.py, test_entropy.py, test_codebase_graph.py,
+test_ollama_analyzer.py, test_live.py, test_perturb.py, test_data_integrity.py,
+test_routing.py, test_strategy.py, test_recovery.py, test_adapter.py,
+test_streaming.py, test_backends.py
+
+Admin/supervisor (6): test_admin_claude_agents.py, test_admin_claude_agents_frontend.py,
+test_admin_design_sessions.py, test_admin_frontend.py, test_admin_server.py,
+test_admin_supervisor.py
+
+Claude-agents (2): test_claude_agents_client.py, test_claude_agents_supervisor.py
+
+Spec/compiler + workflow (4): test_compile_experiment.py, test_experiment_spec.py,
+test_workflow_runner.py, test_supervise.py
 ```
 
 ## Navigation

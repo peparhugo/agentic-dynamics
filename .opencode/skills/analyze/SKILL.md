@@ -170,9 +170,9 @@ python scripts/build_data.py
 firebase deploy --only hosting
 ```
 
-## Measure / Compare / Writeup (proposed — spec-driven)
+## Measure / Compare / Writeup (written — spec-driven)
 
-The compiler (`compile_experiment.py`, proposed) reframes this pipeline as spec-driven phases:
+The compiler (`compile_experiment.py`, written) reframes this pipeline as spec-driven phases:
 `validate → cells → execute → measure → compare → writeup → adapt`. Today's scripts map onto the
 future phases:
 

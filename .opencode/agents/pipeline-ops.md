@@ -1,7 +1,7 @@
 ---
 description: Data pipeline operations — inventory management, backfill, website build, Firebase deploy, Redis worker management
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-v4-flash
 permission:
   edit: ask
   bash: allow
@@ -78,7 +78,8 @@ python scripts/pipeline.py --check-deps            # validate all DAGs
 
 Plans: `ci` (lint→typecheck→test→build), `deploy` (refresh→sync→build_data→firebase),
 `full_matrix` (matrix→analyze→review→regenerate→deploy), `feature` (spec→implement→lint→test→review→ship),
-`ship_features` (parallel workstreams→conflict detect→PR create→merge).
+`ship_features` (parallel workstreams→conflict detect→PR create→merge), `cross_models`
+(flash → haiku → sonnet → sol → terra → analyze → reviews → regenerate → deploy).
 
 Phase kinds: `shell`, `test`, `lint`, `matrix`, `review`, `pipeline`, `ship`,
 `fan_out`, `conflict_detect`, `pr_create`, `pr_merge`.
@@ -87,8 +88,8 @@ Phase kinds: `shell`, `test`, `lint`, `matrix`, `review`, `pipeline`, `ship`,
 `experiments/results/workstreams/{plan}_{phase}.json`.
 CLI filters: `--from`, `--until`, `--only`, `--prompt`, `--workers`.
 
-### Spec/Compiler (proposed — next build target)
-`compile_experiment.py` will compile an `ExperimentSpec` into a DAG
+## Spec/Compiler (written)
+`compile_experiment.py` is written and compiles an `ExperimentSpec` into a DAG
 (`validate → cells → execute → measure → compare → writeup → adapt`), generalizing the existing
 transport: `experiment_matrix` → `_gen_matrix_cells` (`pipeline.py:394`), `compare_arms` →
 `routing.simulate_strategies` (`routing.py:98`), `evaluate_rules` → the lab books. `adapt` is the

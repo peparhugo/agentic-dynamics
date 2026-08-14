@@ -1,14 +1,14 @@
 ---
 description: Modifying measurement apparatus logic — perturb.py, opencode.py, story.py, mutation.py, and all instrument modules
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-v4-flash
 permission:
   edit: ask
   bash: allow
   task: allow
 ---
 
-You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 33 modules in `src/instrument/` plus two proposed modules (`experiment_spec.py`, `compile_experiment.py`) that are the next build target.
+You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 38 modules in `src/instrument/`, including `experiment_spec.py` and `compile_experiment.py` (both written).
 
 ## What You Know (no need to rediscover)
 
@@ -18,7 +18,7 @@ Prompt → perturb.py → opencode.py → [LLM] → trajectory.py → solution.p
 ```
 Plus v0.6-v0.9: `story.py` orchestrator with `mutation.py`, `commit_analysis.py`, `review.py`, `entropy.py`, `codebase_graph.py`, `lsp_diagnostics.py`.
 
-The proposed spec/compiler layer generalizes this linear core into a cycle:
+The spec/compiler layer (written) generalizes this linear core into a cycle:
 ```
 spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs ──▶ attempts ──▶ ledger
       ▲                                                                      │
@@ -46,10 +46,8 @@ Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 - `solution.py` (266L) — evaluation: `evaluate_solution()`
 - `routing.py` (187L) — `compute_routing()`, `recommend_route()`, `simulate_strategies()`
 - Plus: `trajectory.py`, `recovery.py`, `recovery_cost.py`, `strategy.py`, `semantic_validation.py`, `constraint_detection.py`, `embeddings.py`, `ollama_analyzer.py`, `opencode_analyzer.py`, `live.py`, `backends.py`, `streaming.py`
-
-### Proposed modules (next build target — NOT yet in the repo)
-- `experiment_spec.py` — dataclasses `ExperimentSpec`, `Workflow`, `Factor`, `RuleSpec`, `MetricSpec`, `ComparisonSpec`, `WriteupSpec`, `StopSpec`, `AdaptSpec` + YAML loader + the requires/produces validator.
-- `compile_experiment.py` — `compile_spec(spec) -> DAG` (phases: validate → cells → execute → measure → compare → writeup → adapt) and `validate_rules(spec) -> list[str]`.
+- `experiment_spec.py` (446L) — dataclasses `ExperimentSpec`, `Workflow`, `Factor`, `RuleSpec`, `MetricSpec`, `ComparisonSpec`, `WriteupSpec`, `StopSpec`, `AdaptSpec` + YAML loader + the requires/produces validator.
+- `compile_experiment.py` (376L) — `compile_spec(spec) -> DAG` (phases: validate → cells → execute → measure → compare → writeup → adapt) and `validate_rules(spec) -> list[str]`.
 
 ### The load-bearing rule (enforced by the validator, not convention)
 `RuleSpec` declares `requires` (information it consumes) and `produces` (information it emits).

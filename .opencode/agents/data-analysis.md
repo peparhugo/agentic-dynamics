@@ -1,7 +1,7 @@
 ---
 description: Running analysis scripts, lab books, interpreting experiment results, generating reports
 mode: subagent
-model: deepseek/deepseek-chat
+model: deepseek/deepseek-v4-flash
 permission:
   edit: ask
   bash: allow
@@ -50,8 +50,8 @@ inventory.json             ──┘
 - `strategy.py` → StrategyReport: CONSERVATIVE/EXPLORATORY/EFFICIENT/WASTEFUL
 - `game_report.py` → GameReport: combines all metrics → Markdown with [M]/[C]/[H]/[P]/[X] tags
 
-### Spec-driven phases (proposed)
-The compiler (`compile_experiment.py`, proposed) reframes this pipeline as
+### Spec-driven phases (written)
+The compiler (`compile_experiment.py`, written) reframes this pipeline as
 `validate → cells → execute → measure → compare → writeup → adapt`. Your scripts become:
 `evaluate_rules` (measurement rules over the ledger), `compare_arms` (regret over the arm
 factor), `writeup` (lab-book from `spec.question` + metrics). Control rules consume information

@@ -10,7 +10,7 @@
 - No bare excepts — always catch specific exceptions.
 - Dataclasses preferred over dicts for structured data.
 
-## Spec/Compiler Conventions (proposed — see code_reviews/2026-08-14)
+## Spec/Compiler Conventions (written — see code_reviews/2026-08-14)
 
 - **Measure before policy.** `RuleSpec` declares `requires` (information it consumes) and
   `produces` (information it emits). `plane` is `"measurement"` (produces) or `"control"`
@@ -21,7 +21,7 @@
   `[P]` policy/prior. Control rules are `[H]`/`[P]`; measurement rules are `[M]`/`[C]`.
 - **Policy is a factor level.** `decide(job, state) -> {route, depth, retry, escalate, budget,
   deadline}` goes in the grid as a `Factor` level, not a side-channel.
-- **Specs live in `experiments/specs/*.yaml`** (proposed dir). `Workflow.kind` is
+- **Specs live in `experiments/specs/*.yaml`** (11 real specs, e.g. `agentic_dynamics_story.yaml`). `Workflow.kind` is
   `story | task | experiment | agent_task`; `experiment` makes a campaign an experiment of
   experiments (same interpreter at every level).
 
@@ -32,10 +32,10 @@
 - Do NOT add heavy deps to core modules. Optional heavy deps go behind try/except.
 - Do NOT hardcode model names or pricing. Use `efficiency.py:PROVIDER_PRICING`.
 - Do NOT read `experiment.py` or `adapter.py` for new work — they have deprecation warnings.
-- Do NOT hand-author policy logic as a one-off in scripts. Once `compile_experiment.py` lands,
-  `_gen_matrix_cells` (`pipeline.py:394`) is generalized by `experiment_matrix` and
-  `routing.simulate_strategies` (`routing.py:98`) by `compare_arms` — route new work through the
-  spec, not through direct calls to those two.
+- Do NOT hand-author policy logic as a one-off in scripts. `compile_experiment.py` is written and
+  generalizes `_gen_matrix_cells` (`pipeline.py:394`) as `experiment_matrix` and
+  `routing.simulate_strategies` (`routing.py:98`) as `compare_arms` — route new grid/comparison
+  work through the spec, not through direct calls to those two.
 
 ## Project-Specific Gotchas
 
@@ -50,8 +50,8 @@
 - DeepSeek pricing lives in `efficiency.py:PROVIDER_PRICING["deepseek"]`.
   Claude pricing at `PROVIDER_PRICING["anthropic"]`.
 - `tests/conftest.py` has availability check fixtures — tests skip gracefully when infra is down.
-- `BUILTIN_STORIES` in story.py has 3 stories: task_manager_story, static_site_gen_story,
-  notification_service_story. Stories are also defined in configs as YAML.
+- `BUILTIN_STORIES` in story.py has 3 stories: task_manager_api, static_site_gen,
+  notification_service. Stories are also defined in configs as YAML.
 - v0.6-v0.9 modules (story, commit_analysis, review, entropy, codebase_graph,
   mutation, language, lsp_diagnostics) are the newest layer. Older modules (perturb, basin,
   solution, efficiency, strategy, game_report) are battle-tested core.

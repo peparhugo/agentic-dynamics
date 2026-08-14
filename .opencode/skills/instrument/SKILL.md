@@ -20,13 +20,13 @@ Prompts ──→ perturb.py ──→ perturb_prompt() ──→ perturbed prom
 
 Key files you'll modify: `scripts/run.py` (502L), `src/instrument/opencode.py` (614L), `src/instrument/perturb.py` (752L), `src/instrument/story.py` (1374L), `src/instrument/mutation.py` (438L).
 
-## Spec & Compiler (proposed — next build target)
+## Spec & Compiler (written)
 
 The repo is an **information-acquisition machine**: `instrument → derive (measurement rules →
 information) → write policy (control rules consuming that information) → grid (policy as an arm)
 → campaign (tweak one variable, repeat)`. Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
-Two modules are proposed, **not yet in the repo**:
+Two modules, both **written**:
 
 ```
 src/instrument/experiment_spec.py    # ExperimentSpec, Workflow, Factor, RuleSpec, MetricSpec,
@@ -52,9 +52,9 @@ control arms. `confidence` is currently UNMEASURED in the ledger.
 the lab books driven by `spec.rules`; `compare_arms` = `routing.simulate_strategies`
 (`routing.py:98`); `adapt` = new campaign loop (tweak one factor, emit next grid).
 
-**Flagship spec:** `experiments/specs/routing_regret.yaml` (proposed) — factors
-`{model, condition, policy}` where `policy ∈ {cheapest, premium_static, quality_cascade,
-dynamics}`. The validator gates the `dynamics` arm until `confidence` is instrumented.
+**Example spec:** `experiments/specs/agentic_dynamics_story.yaml` (one of 11 real specs in
+`experiments/specs/`). The validator gates any arm consuming unmeasured information (e.g.
+`confidence`) until that information is instrumented.
 
 ## Perturbation Operators (perturb.py)
 
@@ -145,9 +145,9 @@ from ai_finops_dynamics import compile_mutation, apply_mutation, ALL_OPERATORS
 # apply_mutation() writes mutated code to target_path
 
 # BUILTIN_STORIES dict keys:
-# "task_manager_story" — 5 sessions building a task API
-# "static_site_gen_story" — 5 sessions building a TypeScript SSG
-# "notification_service_story" — 5 sessions building notification delivery
+# "task_manager_api" — 5 sessions building a task API
+# "static_site_gen" — 5 sessions building a TypeScript SSG
+# "notification_service" — 5 sessions building notification delivery
 ```
 
 ## Measurement Stack (post-hoc, consumed by analyze_worktrees.py)
@@ -187,7 +187,7 @@ markdown = gr.to_markdown()  # with [M]/[C]/[H]/[X] tags
 
 ```python
 from ai_finops_dynamics.efficiency import PROVIDER_PRICING
-# Keys: "deepseek", "anthropic", "anthropic-sonnet5", "openai", "openai-luna"
+# Keys: "deepseek", "deepseek-flash", "anthropic", "anthropic-sonnet5", "anthropic-haiku", "openai", "openai-luna", "openai-sol", "openai-terra"
 # Each has: prompt_per_1k, completion_per_1k, reasoning_per_1k (if applicable)
 
 # DeepSeek: 37B active MoE params, env var DEEPSEEK_API_KEY

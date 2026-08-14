@@ -1,10 +1,10 @@
 # `src/instrument/` — Measurement Apparatus
 
-33 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
+38 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
 outputs): basin escape rates, recovery cost, attractor strength, strategy classification.
 Pip-installable as `ai-finops-dynamics`.
 
-Two modules form the spec/compiler layer (see `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`). `experiment_spec.py` is **written**; `compile_experiment.py` is **proposed**. Together they turn the library from a linear pipeline into a cycle: `spec → DAG → cells → jobs → attempts → information → policy → grid → campaign`.
+Two modules form the spec/compiler layer (see `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`). `experiment_spec.py` and `compile_experiment.py` are both **written**. Together they turn the library from a linear pipeline into a cycle: `spec → DAG → cells → jobs → attempts → information → policy → grid → campaign`.
 
 ## Architecture
 
@@ -47,6 +47,19 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | `adapter.py` | 149 | [deprecated] Wraps LLM calls to capture trajectory steps | `InstrumentedAdapter` |
 | `opencode.py` | 614 | Spawns real opencode sessions (think/write/test loop) | `run_opencode_agentic()` |
 | `experiment.py` | 309 | [deprecated] Orchestrates full experiment: perturb → invoke → evaluate | `ExperimentConfig`, `run_experiment()` |
+| `language.py` | 295 | Multi-language codebase analysis via tree-sitter — unified parsing API across Python/TypeScript/Go/Rust; foundation module, no internal deps | `LanguageProfile`, `detect_language()`, `get_parser()`, `CodebaseAST`, `parse_codebase()`, `collect_imports()`, `collect_functions()` |
+
+### Story / Multi-Session (v0.6–v0.9)
+
+| Module | Lines | Purpose | Key Exports |
+|--------|-------|---------|-------------|
+| `story.py` | 1374 | Multi-session story orchestrator — N sequential coding sessions, each building on the prior session's git commit | `PerturbationCondition`, `condition_to_mutations()`, `StoryConfig`, `StoryResult`, `run_story()`, `save_story_result()`, `BUILTIN_STORIES` |
+| `mutation.py` | 438 | Flash V4 mutation compiler — semantic perturbation of specs and code, pinned as a hashable artifact per cell | `MutationArtifact`, `compile_mutation()`, `apply_mutation()` |
+| `commit_analysis.py` | 841 | Per-commit analysis: AST diff, SonarQube delta, convention scoring | `ConventionRules`, `CommitAnalysis`, `StoryAnalysis`, `compute_ast_diff()`, `score_conventions()`, `compute_sonar_delta()` |
+| `review.py` | 809 | LLM code review pool — commit reviewer, story reviewer, cross-model comparator, held-out test generator | `CommitReview`, `StoryReview`, `review_commit()`, `review_story()`, `generate_tests()`, `compare_implementations()` |
+| `entropy.py` | 363 | Architectural entropy — information-theoretic disorder across function length, module size, import graph, naming, file-responsibility mapping | `EntropyProfile`, `compute_entropy()`, `entropy_delta()`, `entropy_delta_detailed()` |
+| `codebase_graph.py` | 356 | Import-graph structural metrics — modularity, coupling, centrality, connected components; Neo4j or in-memory networkx | `CodebaseGraph`, `GraphMetrics`, `build_graph()`, `compute_metrics()`, `GraphDelta` |
+| `lsp_diagnostics.py` | 401 | Language-server diagnostics (pyright, tsc, golangci-lint, rust-analyzer), graceful fallback when tools are missing | `LSPReport`, `LSPToolConfig`, `run_diagnostics()`, `diagnostics_delta()`, `available_tools()` |
 
 ### Measurement Modules
 
@@ -66,6 +79,24 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 |--------|-------|---------|-------------|
 | `constraint_detection.py` | 268 | Detects whether model notices removed constraints | `ConstraintDetection` |
 | `semantic_validation.py` | 300 | 3 signals: pragmatic markers, AST edit distance, tool-call latency | `MarkerProfile`, `ASTProfile`, `EscapeProfile`, `analyze_markers()`, `analyze_ast()`, `analyze_escape()` |
+
+### Analysis / Graph
+
+| Module | Lines | Purpose | Key Exports |
+|--------|-------|---------|-------------|
+| `embeddings.py` | 288 | Text embedding + vector search via Ollama (bge-m3) + ChromaDB; replaces the trigram heuristic in `trajectory.py` with real cosine distance | `EmbeddingClient`, `ChromaStore`, `extract_session_text()`, `extract_session_steps()` |
+| `graph.py` | 524 | Neo4j knowledge graph population — models experiments as an interconnected graph of models, configs, runs, operators, strategies, basin topologies | `Neo4jClient` |
+| `ollama_analyzer.py` | 173 | Qualitative experiment analysis via DeepSeek R1 on Ollama — narrative commentary over game report metrics + session data | `OllamaAnalyzer`, `load_summary_data()` |
+| `opencode_analyzer.py` | 245 | Qualitative experiment analysis via real opencode sessions with DeepSeek — a meta-experiment, measured by the same instrument | `OpencodeAnalyzer` |
+| `sonar.py` | 401 | SonarQube static analysis for LLM-generated code — bugs, vulnerabilities, code smells, cognitive complexity, duplications, maintainability, plus differential quality analysis | `SonarMetrics`, `compute_sonar_diff()`, `run_sonar_analysis()`, `sonar_quality_score()` |
+
+### Control Room / Workflow
+
+| Module | Lines | Purpose | Key Exports |
+|--------|-------|---------|-------------|
+| `supervisor.py` | 171 | Shared Redis contracts for human-reviewed supervisor flags — observation metadata only; deliberately no OpenCode client dependency, so observation can't become control | `canonical_json()`, `normalize_flag()`, `parse_mapping()`, `register_session_mapping()`, `register_event_mapping()` |
+| `workflow_runner.py` | 336 | Executes an `agent_task` workflow's phases inside a git worktree, committing + ledgering (tokens, cost, `test_executed_success`) after each phase; the `execute` phase of the spec/compiler DAG | `PhaseResult`, `WorkflowRunResult`, `run_workflow()` |
+| `test_runner.py` | 140 | Independent pytest/jest/go-test/cargo-test runner, keyed off `language.py`; sole source of truth for `test_executed_success` — never taken from the model's self-reported pass/fail | `resolve_node()`, `run_suite()`, `suite_succeeded()` |
 
 ### Backend, Telemetry & Routing
 
@@ -89,9 +120,9 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | Module | Status | Purpose | Key Exports |
 |--------|--------|---------|-------------|
 | `experiment_spec.py` | **written** | Spec dataclasses + YAML loader + requires/produces validator | `ExperimentSpec`, `Workflow`, `Factor`, `RuleSpec`, `MetricSpec`, `ComparisonSpec`, `WriteupSpec`, `StopSpec`, `AdaptSpec`, `LEDGER_FIELDS`, `load_spec`, `validate_rules`, `validate_spec` |
-| `compile_experiment.py` | proposed | spec → DAG; generalizes `_gen_matrix_cells` + `simulate_strategies` | `compile_spec()`, `validate_rules()`, `RuleResult` |
+| `compile_experiment.py` | **written** | spec → DAG; generalizes `_gen_matrix_cells` + `simulate_strategies` | `compile_spec()`, `validate_rules()`, `RuleResult` |
 
-### The rule/ledger interface (proposed)
+### The rule/ledger interface (schema written; UNMEASURED fields below are the open instrumentation gap)
 
 ```
 RuleSpec(name, plane, evidence_class, requires, produces)
@@ -144,7 +175,7 @@ warnings). Use `opencode.py` / `run_opencode_agentic()` for running experiments.
 - **Model-agnostic** (semantic_validation.py): No embeddings needed. Uses linguistic markers + AST analysis.
 - **Provenance-tagged** (game_report.py): All metrics tagged [M]easured, [C]omputed, [H]euristic, [P]olicy, or e[X]ternal.
 - **Energy estimation** (efficiency.py): DeepSeek uses 37B active MoE params; Claude/others use architecture estimates with GPU TDP constants.
-- **Measure before policy** (proposed): measurement rules produce information; control rules consume it. The validator refuses unwritable control arms.
+- **Measure before policy** (written — `compile_experiment.py`'s validator): measurement rules produce information; control rules consume it. The validator refuses unwritable control arms.
 
 ## Adding a New Perturbation Operator
 
