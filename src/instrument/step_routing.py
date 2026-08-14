@@ -143,18 +143,40 @@ class ModelSignals:
     def from_dict(cls, d: dict[str, Any]) -> ModelSignals:
         """Build from a flat dict keyed by signal field names (``model`` included)."""
         kwargs: dict[str, Any] = {"model": d.get("model", "")}
-        for signal, field in SIGNAL_FIELDS.items():
-            if field in d:
-                kwargs[field] = d.get(field)
+        for _signal, field_name in SIGNAL_FIELDS.items():
+            if field_name in d:
+                kwargs[field_name] = d.get(field_name)
         return cls(**kwargs)
+
+
+def _mean_present(group: list[dict[str, Any]], field: str) -> float | None:
+    """Mean of a signal over entries that carry a finite value; ``None`` when unmeasured.
+
+    ``_results_summary.json`` rows mark an unmeasured dimension with ``NaN`` (see
+    ``analyze_worktrees.py``), so NaN — like ``None`` — is skipped rather than averaged in.
+    """
+    vals: list[float] = []
+    for e in group:
+        v = e.get(field)
+        if v is None:
+            continue
+        try:
+            fv = float(v)
+        except (TypeError, ValueError):
+            continue
+        if fv != fv:  # NaN check (float('nan') != itself)
+            continue
+        vals.append(fv)
+    return (sum(vals) / len(vals)) if vals else None
 
 
 def build_signal_store(entries: list[dict[str, Any]]) -> dict[str, ModelSignals]:
     """Aggregate experiment entries (``_results_summary.json`` rows) into per-model signals.
 
-    Mirrors ``routing.recommend_route``'s per-model averaging, but keeps the full signal set:
-    ``correctness`` (mean), ``cost`` (mean), ``efficiency`` (correctness/cost), and
-    ``cache_hit_rate`` (mean when present). Models absent from ``entries`` are omitted.
+    Mirrors ``routing.recommend_route``'s per-model averaging, but keeps the full measured
+    signal set: ``correctness`` (mean), ``cost`` (mean), ``efficiency`` (correctness/cost), and
+    the SolutionMetrics quality dimensions plus ``cache_hit_rate`` (mean when present). Models
+    absent from ``entries`` are omitted.
     """
     by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for e in entries:
@@ -167,13 +189,16 @@ def build_signal_store(entries: list[dict[str, Any]]) -> dict[str, ModelSignals]
         n = len(group)
         correctness = sum(e.get("correctness", 0) or 0 for e in group) / n
         cost = sum(e.get("cost", 0) or 0 for e in group) / n
-        hits = [e.get("cache_hit_rate") for e in group if e.get("cache_hit_rate") is not None]
         store[m] = ModelSignals(
             model=m,
             correctness=correctness,
             cost=cost,
             efficiency=(correctness / cost) if cost > 0 else None,
-            cache_hit_rate=(sum(hits) / len(hits)) if hits else None,
+            cache_hit_rate=_mean_present(group, "cache_hit_rate"),
+            constraint_score=_mean_present(group, "constraint_score"),
+            code_quality_score=_mean_present(group, "code_quality_score"),
+            novelty_score=_mean_present(group, "novelty_score"),
+            composite_score=_mean_present(group, "composite_score"),
         )
     return store
 

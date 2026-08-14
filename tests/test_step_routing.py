@@ -228,6 +228,22 @@ def test_build_signal_store_aggregates_entries():
     assert store[DS].cache_hit_rate is None
 
 
+def test_build_signal_store_aggregates_quality_dimensions():
+    # SolutionMetrics quality dimensions are measured today and must be consumable by the
+    # router; NaN marks "unmeasured" in _results_summary.json and is skipped, not averaged in.
+    entries = [
+        {"model": DS, "constraint_score": 0.6, "code_quality_score": 0.8},
+        {"model": DS, "constraint_score": 0.8, "code_quality_score": float("nan")},
+        {"model": CL, "novelty_score": 0.4, "composite_score": 0.7},
+    ]
+    store = build_signal_store(entries)
+    assert store[DS].constraint_score == 0.7
+    assert store[DS].code_quality_score == 0.8  # NaN row dropped, not averaged
+    assert store[CL].novelty_score == 0.4
+    assert store[CL].composite_score == 0.7
+    assert store[DS].novelty_score is None
+
+
 def test_resolve_pool_prefers_model_pool_then_default():
     spec_pool = ExperimentSpec(
         name="x", question="q", version="1",
