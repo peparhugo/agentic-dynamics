@@ -135,6 +135,6 @@ def run_suite(
     return _run_pytest(workdir, timeout)
 
 
-def test_executed_success(result: dict) -> bool:
+def suite_succeeded(result: dict) -> bool:
     """Derive the verified-success boolean from a ``run_suite`` result."""
     return bool(result.get("total", 0) > 0 and result.get("failed", 0) == 0 and result.get("errors", 0) == 0)

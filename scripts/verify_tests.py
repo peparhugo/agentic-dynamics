@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from instrument.test_runner import resolve_node, run_suite, test_executed_success  # noqa: E402
+from instrument.test_runner import resolve_node, run_suite, suite_succeeded  # noqa: E402
 
 STORIES_DIR = ROOT / "experiments" / "results" / "stories"
 OUT_PATH = ROOT / "experiments" / "results" / "verified_tests.json"
@@ -62,7 +62,7 @@ def verify_cell(d: dict, node: str) -> dict:
     t0 = time.time()
     r = run_suite(Path(worktree), language, node=node)
     result.update(r)
-    result["test_executed_success"] = test_executed_success(r)
+    result["test_executed_success"] = suite_succeeded(r)
     result["duration_s"] = round(time.time() - t0, 2)
     if not result["test_executed_success"] and r.get("tail"):
         result["note"] = r["tail"][-400:]

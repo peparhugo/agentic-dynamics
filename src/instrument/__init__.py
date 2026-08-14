@@ -155,7 +155,7 @@ from .supervisor import (
     normalize_flag,
     register_session_mapping,
 )
-from .test_runner import run_suite, test_executed_success
+from .test_runner import run_suite, suite_succeeded
 
 # v1.0: the execute phase — run an agent_task workflow in a worktree
 from .workflow_runner import (
@@ -211,7 +211,7 @@ __all__ = [
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",
     "PhaseResult", "WorkflowRunResult", "run_workflow",
-    "run_suite", "test_executed_success",
+    "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
 ]

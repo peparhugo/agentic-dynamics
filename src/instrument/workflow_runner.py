@@ -31,7 +31,7 @@ from .backends import run_agentic
 from .experiment_spec import ExperimentSpec, validate_spec
 from .language import detect_language
 from .live import LivePublisher
-from .test_runner import run_suite, test_executed_success
+from .test_runner import run_suite, suite_succeeded
 
 
 def _now() -> str:
@@ -258,7 +258,7 @@ def run_workflow(
                 suite = run_suite(wd, language, timeout=phase_timeout)
                 pr.tests_passed = suite["passed"]
                 pr.tests_total = suite["total"]
-                pr.test_executed_success = test_executed_success(suite)
+                pr.test_executed_success = suite_succeeded(suite)
                 if suite.get("failed", 0) > 0 or suite.get("errors", 0) > 0:
                     pr.status = "failed"
                     pr.error = suite.get("tail", "")[-400:]
