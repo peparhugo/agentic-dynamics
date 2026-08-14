@@ -1,157 +1,252 @@
-# Golden-Circle Narrative Design
+# Evidence Page Narrative Design
 
 ## 1. Golden-Circle Thesis
 
-**WHY:** We believe success is not value: as AI agents build and operate software at scale, a passing result does not tell us whether the system became more durable, more verified, or merely more expensive to maintain. **HOW:** We turn that invisible gap into information by instrumenting many linked sessions from many measurement angles, analyzing the resulting N x M corpus, and repeating the cycle `instrument -> derive -> write policy -> grid -> campaign`. **WHAT:** That process reveals a field, **AI FinOps Dynamics**, concerned with how cost, verification, maintainability, recovery, routing, and long-horizon value change as agentic work compounds.
+`firebase/public/evidence.html` should tell one chronological discovery story about two distinct corpora. It should use Simon Sinek's Golden Circle explicitly, moving from the center outward:
 
-The order is deliberate: the site begins with a belief, shows the method that made the gap observable, and only then names the result. The instrument is evidence of the discovery, not the object being sold.
+1. **WHY, the center: the unmeasured gap.** A successful coding session does not reveal how a model responds to degraded information, how much recovery costs, how thoroughly the model verifies its own work, or what happens when that work becomes the next session's starting point. The research began because those dynamics were invisible, not because the project needed a product page.
+2. **HOW, the ring: the instrument and its N x M scaling.** The first instrument varied perturbations across single-session runs and measured search dynamics. The current instrument scales the same question across linked story sessions and multiple independent measurement angles. `N x M` means many observations multiplied by many ways of examining each observation, not one composite score and not a larger benchmark leaderboard.
+3. **WHAT, the outside: the findings and the field.** The two corpora expose recovery, verification, cost, quality, and compounding behavior as separate dimensions. Together they motivate AI FinOps Dynamics as a field of measurement. They do not become one pooled dataset, and the page must not imply that either corpus is a subset of the other.
 
-## 2. Page-by-Page Narrative Map
+The page should name the circle in the hero and then enact it. A short WHY opens the page, the chronological experiment record shows HOW the measurement evolved, and the findings from each stage form the WHAT. This order makes the instrument evidence of discovery rather than the object being sold.
 
-| Page | Golden-circle role | Narrative job | Editorial decision and reason |
-|---|---|---|---|
-| `index.html` | **WHY -> HOW -> WHAT** | Give the whole discovery in miniature: the unmeasured value gap, the N x M method, and the field that emerged. | Keep the circle explicit on the home page because it is the entry point, but make WHY the center of gravity; corpus statistics are proof, not the opening proposition. |
-| `story.html` | **WHY -> HOW -> WHAT** | Tell the chronological discovery: a cost anomaly raised a question, scaling the question required an instrument, and the instrument exposed a broader field. | Reorder the current parts because the page presently reaches WHAT, returns to HOW, and then returns to the author's qualifications; a discovery story should move outward through the circle once. |
-| `methodology.html` | **HOW** | Specify how sessions are run, degraded, isolated, traced, evaluated, and reproduced. | Make this the authority for apparatus details so the home and story pages can explain the method without reading like product documentation. |
-| `evidence.html` | **WHAT: observed** | Hold the measured, computed, heuristic, and external evidence, with corpus boundaries and provenance intact. | Separate observations from interpretation because the field is credible only if readers can inspect what was measured and what was inferred. |
-| `framework.html` | **WHAT: operational** | Show how measured information can become control rules, policy arms, and routing experiments. | Describe routing and decision rules as testable policies where they have not yet been run as arms; this keeps the result scientific rather than promotional. |
-| `accelerator.html` | **WHAT: possible applications** | Show what organizations might do with the dynamics once the relevant information exists. | Keep projections and implementation ideas outside the core discovery and retain their modeled or heuristic status; possibility is not measured proof. |
-| `databricks.html` | **WHY support / WHAT context** | Place the discovery beside related external work and identify where this corpus adds a different measurement angle. | Use comparison to establish context, not priority or superiority; the narrative is about a need becoming visible, not winning a category claim. |
-| `glossary.html` | **Reference across all rings** | Define the vocabulary readers need to move between belief, method, and result. | Keep it outside the linear story so definitions support the circle without interrupting it. |
+### Thesis copy
 
-The intended reading path is `index.html` -> `story.html` -> `methodology.html` -> `evidence.html` -> `framework.html`. The remaining pages are supporting branches: applications, related work, and terminology.
+The hero may use the following framing, with the two live corpus summaries immediately below it:
 
-## 3. The N x M Scaling Story
+> **WHY / HOW / WHAT.** We began with an unmeasured gap: a passing result could not tell us how a model searched, recovered, verified, or changed the cost of the next session. We first built controlled single-session perturbation experiments to make search dynamics visible. Those experiments discovered the operators and recovery signals that the current multi-session story instrument reuses. What emerged is a field view of agentic work across cost, verification, quality, recovery, and time.
 
-The work began with one bounded question: **how does one model's cost and quality respond when its input is degraded?** A single clean-versus-degraded comparison could answer that question for one task at one moment, but it could not show what happens when agent output becomes the next agent's starting point. Agentic software work is cumulative, so the unit of observation had to expand from a prompt to a session and from a session to a linked story.
+The design decision is to mention both corpora before showing either one. Readers should understand from the first screen that they are about to see a chronology, not a single homogeneous sample.
 
-That creates the first scaling axis, **N sessions**. Thousands of sessions must be queued, isolated, resumed, and attributed to the correct model, condition, codebase, and point in the story. Each session changes the artifact inherited by the next one, so cost and quality cannot be understood as independent prompt-level snapshots.
+## 2. Corpus Boundary And Chronology
 
-The second axis is **M measurement angles**. A passing test is only one view of an outcome. The same sessions must be examined for code quality from different angles, maintainability, cost of maintainability, long-horizon scalability, routing for one-way and two-way doors, verification depth, cache economics, recovery under degraded input, and the cost required to sustain an accepted outcome. No single score can stand in for that set because correctness is not verification and immediate success is not durable value.
+The current page leads with the story corpus and relegates the earlier work to a section titled "Legacy." Reverse that order. "Archived precursor" is the preferred label because it states status without implying that the evidence is obsolete or part of the current story matrix.
 
-The experiment is therefore an **N x M instrumentation problem**: N linked sessions multiplied by M ways of asking whether the resulting work created value. Collection is only half of the scaling problem. Every measurement angle must then be evaluated across models, conditions, tasks, tiers, commits, and positions in the story, which makes analysis itself another N x M problem. Running more sessions without analysis produces volume, not information; adding more metrics without consistent event capture produces incomparable claims.
+### Full-corpus ledger
 
-The answer is an architecture for repeated information acquisition:
+Place two adjacent scope cards under the hero. Do not add their observations together or use a shared label such as "total sessions."
 
-1. **Instrument:** capture the events and fields that later rules require, including attempts, timing, tokens, cost, tests, cache behavior, code changes, reviews, and perturbation context.
-2. **Derive:** apply measurement rules that turn those events into information such as first-pass quality, verification depth, recovery, maintainability, or cost per accepted outcome.
-3. **Write policy:** allow control rules to consume only information the instrument actually produces; an unmeasured input cannot support a defensible policy.
-4. **Grid:** run policy choices as experimental arms across controlled factor combinations rather than presenting a preferred rule as a conclusion.
-5. **Campaign:** change one variable, repeat the grid, compare the result, and use the remaining uncertainty to choose the next measurement.
+| Corpus | Status and time | Scope to show | Measurement role | Provenance rule |
+|---|---|---|---|---|
+| Single-session perturbation corpus | **Archived precursor, first** | Approximately 227 classified single-session runs, 224 game reports where that is the relevant denominator, 201 Grit-matrix sessions where that is the relevant denominator, 8 model variants, and 10 perturbation operators | Controlled degradation revealed Grit, basin escape, recovery cost, flail behavior, strategy archetypes, and the seven recovery signals | Keep each existing denominator and its existing `[M]`, `[C]`, `[H]`, or `[X]` tag. Do not rewrite 227, 224, and 201 as if they counted the same artifact. |
+| Multi-session story corpus | **Current instrument, second** | 1,097 sessions, 221 executed stories, 210 unique cells plus 11 reruns, 7 models, $288.6909 total story cost, 3 codebases, 2 tiers, 2 codebase qualities, and the existing conditions | Linked five-session builds measure natural verification behavior, review and static quality, solution dynamics, and compounding cost | Preserve the live `data-stat` bindings and their current formatting, including `1,097`, `221`, `7`, and `$288.69` on the rendered page. |
 
-This sequence is the bridge from HOW to WHAT. It turns one model-comparison question into a repeatable way to study the dynamics of agentic work. **AI FinOps Dynamics** is the name for the resulting field of inquiry, not the name of a product: it asks how cost, quality, verification, and future maintenance move together, where they separate, and which policies improve value under measured conditions.
+The ledger is a boundary device, not a new aggregate. It should include this sentence prominently:
 
-## 4. Required Home and Story Changes
+> These are two distinct measurements. The 227 single-session perturbation runs came first; the 1,097 story sessions came later and reuse the precursor's operators and recovery signals. They are presented together as a chronology, not merged into one denominator.
 
-### `index.html`
+### Chronological acts
 
-The page should retain its current WHY/HOW/WHAT order, but each section needs to move from “we built a tool” to “we found an unmeasured gap, built the means to observe it, and discovered a field.”
+1. **Prologue, WHY: what a passing result concealed.** Introduce the inability to observe search, recovery, verification disposition, and downstream cost from one successful output. Keep this conceptual and short so evidence, not manifesto, dominates the page.
+2. **Act I, HOW began: archived single-session perturbation experiments.** Present the perturbation design, 10 operators, model coverage, limitations, and provenance legend before any perturbation finding. Replace "Legacy" with "Archived Precursor" while retaining `id="perturbation"`.
+3. **Act I, WHAT was discovered.** Keep the entire perturbation evidence corpus in its existing internal order: Grit, flail rate, cost efficiency, AST and Sonar analysis, constraints, token cost, perturbation response, rollup, profiles, exploratory trajectory measures, operator impact, modeled energy, strategy distribution, sources, and independent validation.
+4. **Bridge, WHY the instrument changed.** State that controlled single sessions made operators and recovery signals measurable, but could not show whether effects persist when one model output becomes the next session's codebase. That limitation motivated the linked story design.
+5. **Act II, HOW now scales: current multi-session story instrument.** Introduce the `3 codebases x 2 tiers x 2 qualities x conditions` matrix, 5-session arcs, 7 models, 221 stories, and 1,097 sessions. Explicitly say that the story instrument reuses the precursor's perturbation operators and recovery signals rather than presenting the story corpus as an unrelated replacement.
+6. **Act II, WHAT is visible now.** Present verification behavior first, then second-model reviews, AST/Sonar diagnostics, model dynamics, and the five-session cost arc. The natural-behavior caveat belongs at the start of the verification finding, not in a distant limitations footer.
+7. **Epilogue, WHAT became a field.** Close by distinguishing observed evidence from open control questions. AI FinOps Dynamics is the outside of the circle: the study of how cost, verification, quality, recovery, and long-horizon value move together and where they separate.
 
-| Location | Current text | Required replacement | Design reason |
-|---|---|---|---|
-| `<title>` | “AI FinOps Dynamics — Does your AI assistant make your system better, or just bigger?” | **“AI FinOps Dynamics — Success Is Not Value”** | State the central belief before naming any apparatus. |
-| Hero kicker | “Why — AI FinOps Dynamics” | **Keep unchanged.** | It already locates the reader at the center of the circle. |
-| Hero headline | “Does your AI coding assistant make your system better, or just bigger?” | **“Agentic AI is scaling faster than our ability to measure its value.”** | Move from a tool-level question to the systemic need that initiated the discovery. |
-| Hero lead | Current paragraph ending “so we built the measurement.” | **“AI agents can pass their own tests, complete a session cheaply, and still leave behind code that is harder to verify and more expensive to maintain. At scale, cost compounds every session whether the code improves or not. Success is observable; durable value usually is not. That is the gap we set out to measure.”** | End WHY with the research need, not with the thing built to address it. |
-| Hero evidence card | “Measured Corpus” beside the WHY | **Keep the card and all values, but relabel it “Evidence behind the discovery” and visually subordinate it to the belief.** | Numbers establish that the belief was investigated; they should not replace the belief. |
-| First HOW kicker | “How — the instrument” | **“How — the question scaled”** | Introduce the N x M problem before presenting its solution. |
-| First HOW headline | “Multi-session builds under controlled degradation.” | **“One question became an N x M measurement problem.”** | Make the scaling problem the heart of HOW, as required by the discovery arc. |
-| First HOW lead | Current benchmark-versus-story paragraph | **“The original question compared one model's cost and quality under degraded input. Answering it properly required N linked sessions, because each output becomes the next session's codebase, and M measurement angles, because passing tests cannot stand in for verification, maintainability, cache economics, routing risk, or long-horizon cost. The corpus is the product of that multiplication, not a larger benchmark.”** | Explain why the apparatus had to exist rather than advertising its features. |
-| HOW cards | “Five-session story arc,” “Perturbation conditions,” and “Full quality stack” | **Rename the cards “N — linked sessions,” “Controlled variation,” and “M — measurement angles.”** Preserve the existing session and condition details; expand the third card's prose to name maintainability, cost of maintainability, long-horizon scalability, one-way/two-way-door routing, verification depth, and cache economics. | Make the two scaling axes visible without discarding the concrete experimental design. |
-| Second HOW kicker | “How — the pipeline” | **“How — from events to policy”** | Distinguish raw collection from the information and control layers. |
-| Second HOW headline | “The measurement pipeline.” | **“Instrument, derive, write policy, grid, campaign.”** | Put the load-bearing architecture in the public narrative verbatim. |
-| Pipeline steps | Seven implementation-oriented steps from story config through cost and value | **Replace the top-level sequence with five steps: “Instrument — capture events,” “Derive — turn events into information,” “Write policy — consume measured information,” “Grid — test policy as an arm,” and “Campaign — change one variable and repeat.”** Session traces, static analysis, tests, and reviews remain as examples under Instrument and Derive. | Show how the machine creates knowledge, not merely how jobs move through software. |
-| WHAT evidence headline | “Four findings from 1,097 instrumented story sessions.” | **“The unmeasured gap became visible.”** Keep the corpus count in the supporting sentence. | Lead with the discovery while preserving the measured scope. |
-| Finding 1 | “Verification is a vendor behavior, not a price point.” | **“Price and verification depth do not move together in this corpus.”** | Keep the finding inside the observed sample rather than universalizing it. |
-| Finding 2 | “Cost compounds across the five-session arc.” | **“Later sessions cost more across the five-session arc.”** | Preserve the measured endpoint change while leaving the generalized N² mechanism explicitly modeled. |
-| Finding 3 | “Cache behavior is a hidden cost lever, not a capability signal.” | **“Cache behavior separates token volume from session cost.”** | State the measured separation without claiming that cache carries no capability information. |
-| Finding 4 | “Degradation leaks — but models recover.” | **“Degradation can leak across sessions, and recovery can be measured.”** | Tie the observation back to the reason linked sessions are necessary. |
-| Concept kicker | “What — the concept” | **“What — the durable-value gap”** | Name the discovery before naming the field. |
-| Concept headline | “Correctness is not verification.” | **Keep unchanged.** | This is the clearest expression of the observed gap between passing available tests and having enough tests to expose important failures. |
-| Final WHAT kicker | “What — this means” | **“What — the field”** | The outside of the circle is the result of the inquiry. |
-| Final WHAT headline | “If you can measure it, you can route on it.” | **“A measurement question became AI FinOps Dynamics.”** | Routing is one policy to test, not the total result and not yet a universal conclusion. |
-| Final WHAT lead | Current prescriptive routing paragraph | **“The evidence points beyond cost per prompt or success per session. AI FinOps Dynamics studies how agentic cost, verification, maintainability, recovery, and long-horizon value change together, then tests policies against those measurements. Routing is one possible policy arm: its value must be demonstrated in a controlled grid, not assumed from a price sheet.”** | Define the field as an ongoing information-acquisition discipline and keep policy claims falsifiable. |
+This structure satisfies chronology without flattening the Golden Circle. The page moves outward once overall, while each experimental act contributes a HOW followed by its own measured WHAT.
 
-The metadata descriptions should be rewritten to match the new thesis, but their current corpus numbers must remain exactly as registered below. Calls to action should use research verbs such as “Examine the method,” “Inspect the evidence,” and “Follow the discovery,” avoiding product verbs such as “get,” “buy,” or “adopt.”
+## 3. Full-Overview Structure
 
-### `story.html`
+Implementation should move existing DOM blocks rather than recreate their content. Moving a section with its tables, tooltips, provenance labels, and nearby inline script preserves the literal numbers and avoids accidental changes in rounding or denominator.
 
-The page should become the canonical discovery narrative and should be reordered once, from WHY through HOW to WHAT. The proposed order is: current lines 51-97; current lines 99-123; current lines 154-191; current lines 125-152; then current lines 194-206. This order keeps the personal trigger, experiment, instrument, and implication while removing the present backward movement through the circle.
+### Page outline
 
-| Location | Current text | Required replacement | Design reason |
-|---|---|---|---|
-| Main headline | “How a $20 API key became an experimental instrument.” | **“A $20 API key exposed a value-measurement gap.”** | Open with the discovery that demanded explanation, not the artifact eventually built. |
-| Subtitle | “I wasn't trying to build a research instrument…” | **“I was trying to spend less while I was away. The unexplained difference between cost, output, and durable value turned a personal budget experiment into a measurement question.”** | Preserve the personal origin while making curiosity, rather than invention, the causal force. |
-| Part 1 label | “Part 1 · The Discovery” | **“Part 1 · Why — The Anomaly”** | Locate the origin story explicitly at the center of the circle. |
-| First Part 1 headline | “The subscription problem.” | **“The cost anomaly.”** | The subscription is context; the unexplained outcome is what starts the inquiry. |
-| Second Part 1 headline | “What $12.73 built.” | **“The cost gap demanded an explanation.”** | Avoid framing spend as a product-building boast; make the same facts evidence for the research question. |
-| Part 2 label | “Part 2 · The Insight” | **“Part 2 · How — The Question Scaled”** | The first response to the anomaly was experimental design, not a finished framework. |
-| Part 2 headline | “So I started researching.” | **“One comparison became an N x M experiment.”** | Put the scaling story at the center of the personal narrative. |
-| New subsection after the current perturbation discussion | No current equivalent | **“Scaling the question changed the problem.”** Explain N linked sessions, M measurement angles, and the second N x M burden of analyzing the resulting sessions. | The existing story jumps from perturbation findings to implications; this subsection explains why an architecture was necessary. |
-| Current Part 4 label, moved before current Part 3 | “Part 4 · Instrumentation, Not Benchmarks” | **“Part 3 · How — The Instrument”** | Complete the HOW ring before presenting implications. |
-| Instrument headline | “What I built is instrumentation.” | **“The question required instrumentation, not another benchmark.”** | Retain the distinction while keeping the instrument subordinate to the question. |
-| Instrument body structure | Queue, chained sessions, routing module, operational failures | **Reframe under the five-stage sequence `instrument -> derive -> write policy -> grid -> campaign`; keep queue isolation, resumability, chained sessions, and analysis concurrency as the operational evidence for why scale is hard.** | Connect the personal engineering story to the architecture that turns volume into information. |
-| Qualifications headline | “Why I was the person who could build this.” | **“The question crossed four disciplines.”** | Preserve the economics, physics, energy-market, and software-system perspectives while removing founder-pitch language. Career experience can remain as context, not proof of uniqueness. |
-| Current Part 3 label, moved after the instrument | “Part 3 · What This Means” | **“Part 4 · What — The Field”** | Name the result only after readers understand the method. |
-| Current Part 3 headline | “From ‘DeepSeek is cheaper’ to ‘here are the dynamics.’” | **“The result was not a cheaper-model verdict.”** | Prevent the story from collapsing back into vendor comparison. |
-| Part 4 body | Current operational, policy, long-term, business, and energy implications | **Organize these as dimensions of AI FinOps Dynamics: immediate cost, durable verification, maintainability, recovery, one-way/two-way-door routing, and long-horizon economics. Mark measured observations, computed results, heuristic interpretations, and external inputs exactly as they are marked now.** | The field is the outside of the circle; its dimensions are results and open questions, not sales claims. |
-| Benchmarks headline | “Why benchmarks failed. Why buzzwords don't help.” | **“The field starts where benchmarks stop.”** | State the boundary positively and avoid claiming that all benchmarks failed. |
-| Closing proposition | “This project gives AI FinOps a foundation.” | **“The discovery defines a research program: measure the events, derive the information, test the policy, and repeat.”** | End with an invitation to inquiry rather than ownership of a category. |
+| Order | Proposed section | Existing material to move intact | Narrative purpose and design decision |
+|---:|---|---|---|
+| 1 | **The Evidence: WHY / HOW / WHAT** | Current hero shell, rebuilt as a two-corpus ledger | Establish the unmeasured gap and announce that the page covers the full corpus in chronological order. Do not use the current story-only hero sentence. |
+| 2 | **WHY: The Gap A Passing Result Could Not Measure** | New prose only; no new metric | Name search dynamics, recovery, verification disposition, and compounding context as the reason measurement was required. |
+| 3 | **Act I: Archived Precursor** | Current `#perturbation` introduction, perturbation TL;DR, provenance legend, and limitations | Put experimental design and caveats before findings. Retain all counts and tags exactly. |
+| 4 | **Grit And Recovery** | `#grit-spectrum`, generated manifold/semantic heading, `#flail-rate`, `#grit-model-filters`, `#gritMatrixChart`, `#narration-tbody`, and `#narrationChart` | Show the first measurements that made degraded-input behavior legible. |
+| 5 | **Economic And Code Outputs** | `#cost-efficiency`, `#cost-ranking`, `#cost-ranking-tbody`, `#costBarChart`, `#ast-analysis`, `#ast-metric-head`, `#ast-metric-body`, `#ast-insight`, generated Sonar heading, `#sonar-quality-body`, `#constraint-detection`, `#token-costs`, and `#token-cost-tbody` | Preserve the complete precursor overview rather than reducing it to Grit alone. |
+| 6 | **Perturbation Response And Rollup** | `#perturbation-response`, `#perturbation-split`, `#cross-model-rollup`, `#rollup-tbody`, and `#locVsCostChart` | Keep per-class response and cross-model summaries within the archived corpus boundary. |
+| 7 | **Scope, Profiles, And Research Notebook** | Generated current-scope heading, `#model-profiles`, `#model-cards-root`, `#tool-profiles`, `#tool-profile-body`, Research Notebook notice, `#reasoning-coherence`, `#rvs-body`, `#semantic-drift`, `#drift-body`, `#perturbation-recovery`, `#recovery-body`, `#think-do-coupling`, `#coupling-body`, `#cluster-stability`, `#stability-body`, `#divergence-cascades`, and `#cascade-body` | Preserve lower-confidence exploratory analyses, but keep their existing warning visibly above them so they are not promoted to primary evidence by the reorder. |
+| 8 | **Quality, Operators, And Modeled Extensions** | `#sonar-impact`, `#sonar-impact-body`, `#operator-impact`, `#operator-impact-body`, Modeling Extensions notice, `#energy-ranking`, `#energy-ranking-cards`, `#drift-trajectories`, `#strategy-distribution`, `#data-sources`, and independent validation | Complete the archived corpus before crossing into the current instrument. `[C]` and `[X]` modeled material remains visibly distinct from measured billing and filesystem evidence. |
+| 9 | **Bridge: What The Precursor Made Possible** | New transition copy | State the causal chronology plainly: the perturbation runs discovered reusable operators and recovery signals; the story instrument applies them across linked sessions to observe persistence and compounding. |
+| 10 | **Act II: The Current Story Instrument** | Current story TL;DR, rewritten only for chronology and corpus scope | Introduce 3 codebases, 2 tiers, 2 qualities, existing conditions, 5 linked sessions, 221 stories, 1,097 sessions, 7 models, and $288.6909 without importing any perturbation denominator. |
+| 11 | **Natural Verification Behavior** | `#story-models` section and its complete table, footnote, and findings | Lead the current-state evidence with the verification result. Insert the exact caveat from section 4 before interpreting Luna/Sonnet test-count differences. |
+| 12 | **Independent Review And Static Quality** | `#reviews`, generated reviewer-flags heading, `#static-analysis`, and every `data-anal-model` row | Separate authored test volume from what a second model, AST analysis, SonarQube, conventions, and diagnostics observe. |
+| 13 | **Solution Dynamics** | `#dynamics` and every `data-anal` cell | Show how the precursor's solution, basin, and strategy measurements carry into the current story instrument. |
+| 14 | **The Five-Session Arc** | `#arc`, generated seed-perturbation heading, `#snowballChart`, and its inline chart script | End the current corpus with the longitudinal result that the precursor could not measure: cost and context compound as the codebase is inherited. |
+| 15 | **WHAT: The Field Now Visible** | New synthesis plus existing source/CTA/footer elements as appropriate | Close with dimensions and open questions, not a purchasing recommendation. Keep both corpus names in the synthesis and keep the footer's live story bindings unchanged. |
 
-## 5. Measurement and Provenance Preservation Register
+### Bridge copy
 
-This refresh changes framing only. Implementation must not hand-edit `firebase/public/data.js`, change a `data-stat` binding, round a generated value differently, move a claim between provenance classes, merge the story and perturbation corpora, or silently “correct” a literal/live conflict. If a measurement is changed later, it must change through the data pipeline, not through this narrative refresh.
+Use this transition between the corpora:
 
-### Provenance tags that must not change
+> **The precursor found the signals; the story instrument followed them through time.** The archived runs showed how to perturb a specification and measure Grit, basin escape, recovery, flailing, and strategy in one session. They could not show whether those effects survived the handoff into the next task. The current instrument reuses those operators and recovery signals across five linked sessions, where each model inherits the code and context produced before it.
+
+The bridge is necessary because visual order alone does not establish methodological inheritance. It must explicitly state that the second corpus was motivated by and reuses the first.
+
+## 4. Exact Natural-Behavior Caveat
+
+Place the following callout verbatim immediately below the `#story-models` lead and before the tests-per-story table or its first interpretive insight:
+
+> **We never instructed the models how many tests to write.** Every model was asked to build the same system, but the number of tests and the edge cases covered were left entirely to the model. The difference between Luna at about 7 tests per story and Sonnet at about 122 is therefore natural, emergent behavior, not a failure to follow instructions. The verification gap measures the models' own unguided disposition toward verification, not instruction-following compliance.
+
+This wording is deliberately plain. It establishes the experimental protocol before readers encounter the largest test-count contrast, prevents "fewer tests" from being misread as disobedience, and limits the finding to observed model behavior. Do not weaken it to a footnote, tooltip, or methodology link.
+
+The surrounding finding should distinguish these quantities rather than treating them as synonyms:
+
+- **Tests authored or counted:** how many tests the model chose to create.
+- **Tests executed:** how many tests the apparatus actually ran.
+- **Self-test pass rate:** whether those authored tests passed.
+- **Independent review or correctness evidence:** what a second evaluator or another measurement method observed.
+
+That distinction preserves the main result: the count difference is natural behavior, while the adequacy of those tests remains a separate question.
+
+## 5. Number, Binding, And Provenance Preservation
+
+This redesign changes order and explanatory prose only. It must not re-derive a number, pool corpora, alter displayed rounding, change a denominator, or move a claim from one provenance class to another.
+
+### Provenance contract
 
 | Tag | Existing meaning | Preservation rule |
 |---|---|---|
-| `[M]` | Measured directly from API/session data or the filesystem: tokens, costs, tests, LOC, cache tokens, exit codes, and duration. | Do not recast a measured observation as a conclusion, and do not remove the tag when prose changes. |
-| `[C]` | Computed from measurements: ratios, aggregates, confidence intervals, density, and other derived values. | Keep the underlying operands and computation aligned with `data.js`; do not present `[C]` as directly observed. |
-| `[H]` | Heuristic: author-chosen thresholds or classifications such as quality, novelty, escape, correctness estimates, and strategy. | Preserve the uncertainty and do not promote a heuristic to `[M]`. |
-| `[X]` | External: provider pricing, energy estimates, projections, or other cited sources. | Preserve the source boundary and citation; do not imply the experiment measured the external quantity. |
+| `[M]` | Measured from provider/session data, executed tools, or generated artifacts | Keep the tag and source boundary with the number. Reordering does not make a measurement universal. |
+| `[C]` | Computed from measured values | Keep operands, denominator, rounding, and tag unchanged. Do not restate a ratio as directly measured. |
+| `[H]` | Heuristic estimate, threshold, or classification | Keep the limitations text adjacent enough that readers cannot mistake the value for an executed test or direct observation. |
+| `[X]` | External constant, estimate, projection, or cited source | Preserve the citation and do not imply that the corpus measured the external quantity. |
 
-There is no `[P]` tag in the current public HTML or JavaScript. The word “policy” in the new narrative describes a control-rule stage and must not introduce a new provenance tag during this prose-only refresh.
+No `[P]` provenance tag currently appears on the page. The Golden-Circle narrative must use only the existing `[M]/[C]/[H]/[X]` legend unless the site's provenance system is changed separately.
 
-### Canonical live values from `data.js`
+### Live `data-stat` bindings that must remain byte-for-byte
 
-These values and their existing provenance assignments must remain unchanged:
+The following supported bindings occur on the page and must survive the reorder with their current fallback text and formatting:
 
-- `[M]` summary values: **80 worktrees**, **1,097 sessions**, **224 game reports**, **$288.6909 total cost**, **3 architectures**, **7 variants**, and **35 configs**.
-- `[C]` summary values: **221 total stories**, **210 unique stories**, **11 reruns**, **1,097 story sessions**, and **$288.6909 story cost**.
-- `[C]` cost gap: **23x**, computed as **$1.590337 / $0.068166 = 23.3x**.
-- `[C]` overall pass rate: **99.9% (10,726/10,738)**.
-- `[M]` test totals: **10,726 passed** and **10,738 run**.
-- `[M]` model-family costs: **$6.8678 DeepSeek** and **$135.6352 Claude**.
-- `[M]` corpus totals: **0 narrated**, **221 valid reports**, and **221 reports analyzed**.
-- Existing displayed rounding must remain where already used: **1,097**, **224**, **$288.69**, **23x**, **$6.87**, **$135.64**, and **99.9%**.
+- `stories_total`
+- `story_sessions`
+- `variants`
+- `story_total_cost`
+- `reports`
+- `sessions`
 
-### `index.html` numbers that must not change
+The cross-model rollup also contains these current bindings, which must not be renamed or dropped even where `app.js` presently leaves the fallback text in place:
 
-- Metadata and corpus scope: **1,097 sessions**, **7 models**, **10,535 tests** in the current OpenGraph description, **221 stories**, **3 codebases**, and **2 tiers**.
-- Story design: **five consecutive sessions**, including the numbered **Sessions 1-5** and their existing greenfield, feature, integration, refactor, and cross-cutting labels.
-- Finding 1: **41x**, **$0.09**, **$3.75**, approximately **10 tests**, **2.9x**, **$1.59**, **$4.58**, approximately **120 tests**, and the **10x verification gap**.
-- Finding 2: **$0.16 -> $0.34**, **18.7K -> 34.9K tokens**, and approximately **2x**.
-- Finding 3: approximately **47K tokens per session**, **$0.07**, **$3.75**, **98% cache hit**, **6.3K tokens**, and **three independent knobs**.
-- Finding 4: **85%**, **$1.48 per story**, and **88%**.
-- Tests per story: **Luna 7, Terra 9, Sol 13, Flash 34, Pro 34, Haiku 117, Sonnet 122**.
-- Footer and proof-ledger values: **1,097 story sessions**, **7 models**, **221 stories**, and **$288.69 measured**.
-- Release identity: **v0.9** and **August 2026**.
+- `rollup-ds-cost`, `rollup-g56-cost`, `rollup-claude-cost`, `rollup-all-cost`
+- `rollup-ds-pass`, `rollup-g56-pass`, `rollup-claude-pass`, `rollup-all-pass`
+- `rollup-ds-think`, `rollup-g56-think`, `rollup-claude-think`, `rollup-all-think`
+- `rollup-ds-loc`, `rollup-g56-loc`, `rollup-claude-loc`, `rollup-all-loc`
+- `rollup-ds-constraint`, `rollup-g56-constraint`, `rollup-claude-constraint`, `rollup-all-constraint`
 
-### `story.html` numbers that must not change
+Generated cost rows may emit `data-stat="ci95"`; preserve that attribute as part of the renderer contract. Do not add a new formatter or silently convert fallback literals during a narrative-only reorder.
 
-- Origin: **2026**, approximately **$700/month**, the **$20 USD** API key, and **under $13 total**.
-- Current literal cards and historical statements: **3 models**, **347 instrumented/total sessions**, **$12.73**, **224 game reports**, and **8 models**. These currently coexist with live substitutions and must not be reconciled as part of a prose-only narrative change.
-- Current live substitutions: **$6.87 DeepSeek cost**, **$288.69 total research/all-model cost**, **23x measured cost gap**, and **$135.64 Claude cost**.
-- Perturbation corpus: **11% Claude flail**, **8% DeepSeek flail**, **14% GPT-5-nano flail**, **227 runs**, and **8.5% Claude narration penalty**.
-- Pricing and cache claims: **11.5x**, **$10.00 versus $0.87 per 1M output tokens `[X]`**, **78%**, approximately **35K tokens**, **97-98%**, and approximately **6K tokens**.
-- Long-horizon claims: the **N²** term, **4Ms**, **1.8x by 2050**, **2035**, **2%**, and the **three-year** horizon. The N² relationship must remain labeled as modeled wherever it is generalized beyond the measured five-session endpoints.
-- Verification examples: **Luna 7 tests for $0.09** and **Sonnet 5 73 tests for $2.32**.
-- Instrument operations: the queue was wiped **twice** and analysis concurrency moved from **one to four**.
-- Scale statement: **over 2,000 sessions**, comprising **1,097 story-building runs**, **221 cells**, **7 models**, and **911 independent reviews**.
-- External energy claims: **700W**, **220% growth**, and **6.7-12% of US generation**; their external-source status must remain explicit.
-- Footer values, including their live replacements: **347/1,097 sessions**, **3/7 models**, **71/221 stories**, **$12.54/$288.69 measured**, plus **v0.9** and **August 2026**.
+### Analysis bindings that must remain intact
 
-### Site-wide preservation boundary
+Keep all current `tr[data-anal-model]` values and all child `data-anal` fields unchanged. The model keys are `deepseek-v4-flash`, `gpt-5.6-luna`, `deepseek-v4-pro`, `claude-haiku-4-5`, `gpt-5.6-terra`, `claude-sonnet-5`, and `gpt-5.6-sol`. The bound fields are:
 
-No numerical or provenance-bearing content is proposed to change in `methodology.html`, `evidence.html`, `framework.html`, `accelerator.html`, `databricks.html`, or `glossary.html`. Their formulas, thresholds, corpus counts, prices, model counts, test counts, projections, citations, chart inputs, calculator defaults, generated tooltips, and `[M]/[C]/[H]/[X]` tags remain byte-for-byte outside the scope of the narrative implementation. In particular, the **227-worktree perturbation corpus** must remain distinct from the **1,097-session, 221-story corpus**; neither may be added to, divided by, or described as the other.
+- Story static analysis: `commits`, `lines_added`, `functions_added`, `sonar_smells_delta`, `sonar_complexity_delta`, and `avg_convention`.
+- Story dynamics: `solution_correctness`, `solution_constraints`, `solution_quality`, `solution_novelty`, `basin_escape`, and `lsp_errors_per_cell`.
+
+These rows are populated by shared `app.js`. Copying table text while dropping the attributes would leave plausible-looking fallbacks and silently disconnect the page from rebuilt data.
+
+### Movement rule
+
+For each existing evidence block, move the opening section/comment, all prose, tables, tooltips, provenance markers, chart containers, and any immediately associated inline script as one unit. Leave the large footer script after all target elements. This guarantees that immediate IIFEs still run after their table bodies exist and that `DOMContentLoaded` renderers can still find every target regardless of narrative order.
+
+## 6. Chart And Script Integrity Register
+
+Every ID below is a DOM contract. Preserve spelling and case exactly. If implementation intentionally removes a target, guard its script lookup first; the preferred design is to retain every target so all charts and tables continue to render.
+
+### Canvas and interactive controls
+
+| Required ID | Element | Consumer | Why it must survive |
+|---|---|---|---|
+| `snowballChart` | `canvas` | Story-arc inline `DOMContentLoaded` handler | Renders current five-session average cost; the handler is guarded but deleting it would remove a required finding. |
+| `grit-model-filters` | `div` | Large footer script | Receives generated model and perturbation-class filter buttons for the precursor Grit matrix. |
+| `gritMatrixChart` | `canvas` | Large footer script | Renders and rebuilds the 201-session interactive precursor scatter plot. |
+| `narrationChart` | `canvas` | Large footer script | Renders narration penalty by model. |
+| `costBarChart` | `canvas` | Large footer script | Renders average cost per session by model. |
+| `locVsCostChart` | `canvas` | Large footer script | Renders the code-output-versus-cost bubble chart. |
+
+### Script-populated tables and containers
+
+| Required ID | Element | Consumer and behavior |
+|---|---|---|
+| `narration-tbody` | `tbody` | Cleared and rebuilt by the large footer script. |
+| `cost-ranking-tbody` | `tbody` | Cleared and rebuilt from model records. |
+| `ast-metric-head` | `thead` | Its child `tr` receives generated model headers. |
+| `ast-metric-body` | `tbody` | Receives generated AST metric rows. |
+| `ast-insight` | `div` | Receives the generated AST summary. |
+| `sonar-quality-body` | `tbody` | Receives generated Sonar rows. |
+| `token-cost-tbody` | `tbody` | Cleared and rebuilt with token-cost rows. |
+| `model-cards-root` | `div` | Receives model-card HTML and currently has no null guard, making preservation mandatory. |
+| `tool-profile-body` | `tbody` | Receives the eight tool-profile rows from its adjacent IIFE. |
+| `rvs-body` | `tbody` | Receives reasoning-volatility rows. |
+| `drift-body` | `tbody` | Receives semantic-drift rows. |
+| `recovery-body` | `tbody` | Receives perturbation-recovery rows. |
+| `coupling-body` | `tbody` | Receives think/do coupling rows. |
+| `stability-body` | `tbody` | Receives cluster-stability rows. |
+| `cascade-body` | `tbody` | Receives divergence-cascade rows. |
+| `sonar-impact-body` | `tbody` | Receives perturbation quality-impact rows. |
+| `operator-impact-body` | `tbody` | Receives computed operator-impact rows. |
+| `energy-ranking-cards` | `div` | Receives computed energy-ranking cards. |
+| `strategy-distribution` | `div` | Receives the computed strategy bar and tags. This must be the unique renderer target. |
+
+### Structural IDs to preserve
+
+These IDs are not all directly queried today, but they are part of the page's table, loading-state, styling, or anchor contract and should survive a reorder:
+
+- `no-data-row`
+- `sonar-quality-tbl`
+- `rollup-tbody`
+- `tool-profile-tbody`
+- `sonar-impact-tbody`
+- `operator-impact-tbl`
+- `data-sources`
+
+### Duplicate-ID correction
+
+The current HTML assigns `strategy-distribution` to both the heading and the renderer `div`. `document.getElementById('strategy-distribution')` can therefore select the heading and inject the chart into it. During the eventual HTML restructure:
+
+- Keep `id="strategy-distribution"` on the renderer `div`, preserving both script lookup and the public fragment.
+- Give the heading the explicit ID `strategy-distribution-heading`.
+- Point the generated/manual TOC item at `strategy-distribution-heading` while leaving `#strategy-distribution` as a valid fragment target immediately below it.
+
+This is the only ID split required by the narrative design. It fixes invalid DOM without deleting the existing public anchor or changing the renderer lookup.
+
+## 7. Anchor And Link Integrity Register
+
+Shared `app.js` builds the floating table of contents from every `h2` and `h3`, inventing a slug only when a heading has no ID. Reordering headings is safe; changing text-derived slugs is not. Make current runtime slugs explicit before changing heading copy.
+
+### Public and authored anchor contract
+
+- `#story-models` must remain on the verification section. `index.html` links directly to `evidence.html#story-models`.
+- `#perturbation` must remain on the archived-precursor introduction.
+- The current in-page `href="#story-models"` must remain valid. After reversing chronology, change only its visible direction from "Back to the story evidence" to a forward transition such as "Continue to the current story evidence."
+- `#data-sources` must remain on the data-sources disclosure.
+- `#strategy-distribution` must remain valid through the unique renderer target described above.
+
+### Existing explicit heading anchors to retain
+
+`story-models`, `reviews`, `static-analysis`, `dynamics`, `arc`, `perturbation`, `grit-spectrum`, `flail-rate`, `cost-efficiency`, `cost-ranking`, `ast-analysis`, `constraint-detection`, `token-costs`, `perturbation-response`, `perturbation-split`, `cross-model-rollup`, `model-profiles`, `tool-profiles`, `reasoning-coherence`, `semantic-drift`, `perturbation-recovery`, `think-do-coupling`, `cluster-stability`, `divergence-cascades`, `sonar-impact`, `operator-impact`, `energy-ranking`, and `drift-trajectories`.
+
+### Current runtime-generated anchors to make explicit
+
+- `what-the-reviewer-flags`
+- `does-perturbing-the-seed-change-the-whole-arc`
+- `manifold-vs-semantic-grit-deepseek-vs-claude`
+- `code-quality-sonarqube-static-analysis`
+- `current-scope-whats-next`
+
+Making these IDs explicit decouples links from punctuation or title changes. Keep all existing navigation, GitHub, methodology, `data.js`, BGE-M3, CTA, and footer `href` values working. Narrative reordering does not justify changing destinations.
+
+## 8. Implementation Acceptance Checks
+
+The later `evidence.html` implementation is complete only when all of the following are true:
+
+1. The hero names Simon Sinek's WHY/HOW/WHAT model and displays two visibly separate corpus summaries.
+2. The archived perturbation corpus appears before the current story corpus.
+3. The bridge states that the story instrument reuses operators and recovery signals discovered by the perturbation runs.
+4. No sentence pools 227 perturbation runs with 1,097 story sessions or calls the result one session total.
+5. Every existing number, tooltip number, `data-stat`, `data-anal`, and `[M]/[C]/[H]/[X]` marker remains present with the same corpus and denominator.
+6. The exact natural-behavior caveat appears prominently beside the verification finding.
+7. Every ID in the chart and script register exists exactly once, except `no-data-row`, which may be replaced by its renderer as it is today.
+8. `strategy-distribution` is no longer duplicated, and the strategy bar renders into its `div` rather than its heading.
+9. Every current explicit and generated fragment resolves after load, including the inbound `evidence.html#story-models` link.
+10. All five canvases render, all generated tables populate, model cards appear, Grit filters work, and the browser console has no null-target or duplicate-ID errors.
+11. Desktop and mobile retain readable corpus boundaries; chronology must not depend on a side-by-side layout that collapses ambiguously on narrow screens.
+12. `firebase/public/data.js` remains generated and untouched. Any future correction to measurements must flow through `scripts/build_data.py`, not this narrative restructure.
+
+The smallest safe implementation is a DOM reorder plus focused bridge and caveat copy. New charts, new calculations, and schema migration are outside this narrative change because they would create evidence rather than re-narrate the rebuilt corpus.
