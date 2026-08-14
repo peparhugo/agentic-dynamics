@@ -45,9 +45,16 @@ workflow:
           - src/instrument/backends.py — get_backend_for_model() (anthropic/* -> claude_cli,
             else opencode), run_agentic().
           - src/instrument/opencode.py — AgenticResult.cache_read_tokens / cache_write_tokens /
-            cache_hit_rate; where cache tokens are parsed from opencode JSON output.
+            cache_hit_rate; where cache tokens are parsed from opencode JSON output; and
+            run_opencode_agentic(session_id, fork) -> --session <id> --fork.
+          - src/instrument/claude_adapter.py — run_claude_agentic(session_id, fork) ->
+            --resume <id> --fork-session (captures the forked session id from the init event).
+          - src/instrument/workflow_runner.py — the ALREADY-BUILT cache-aware fork chaining:
+            workflow.params.fork gates it; each agent phase forks the prior phase's session id
+            (--session/--fork or --resume/--fork-session) when the model is unchanged, and the
+            per-phase ledger records cache_read_tokens / cache_write_tokens / cache_hit_rate.
           - src/instrument/story.py — the --session <id> --fork continuation path (~lines 660-711),
-            _read_session_id(), _extract_session_id_from_stdout(); how a fork reuses the context prefix.
+            _read_session_id(); prior art for how a fork reuses the context prefix.
           - src/instrument/efficiency.py — PROVIDER_PRICING: deepseek cache_read vs input rates.
           - src/instrument/solution.py — SolutionMetrics (correctness_score, constraint_score,
             code_quality_score, novelty_score).
@@ -67,8 +74,9 @@ workflow:
             cache_hit_rate, efficiency, and the SolutionMetrics quality dimensions. Identify what is
             NOT yet measured — specifically edge-case code coverage (no branch/mutation coverage
             signal exists), and confidence.
-          - Document the fork mechanism precisely: how --session <id> --fork reuses the context prefix
-            as cache reads, and what happens to the cache when the model CHANGES between steps.
+          - Document the fork mechanism precisely: how --session <id> --fork (opencode) and
+            --resume <id> --fork-session (claude) reuse the context prefix as cache reads, and what
+            happens to the cache when the model CHANGES between steps.
 
           DELIVER exactly one file, docs/routing_survey.md: (1) current routing path with file:line
           citations, (2) measured vs unmeasured signals, (3) the fork/cache mechanism, (4) the gap for
@@ -109,11 +117,11 @@ workflow:
              The policy converts objectives into a scoring function over the eligible set. Design the
              schema, the scoring function, and the tie/fallback behavior.
 
-          D. Cache-aware forking — EVERY step runs by forking from the previous step's session
-             (opencode run --session <prev_id> --fork) so the shared context prefix is served as a
-             cache read. Design the session chaining: capture the session id at the end of each step
-             and pass it to the next. State explicitly the trade-off: switching model between steps
-             BREAKS the cache prefix, so the policy must weigh cache-read savings against routing to a
+          D. Cache-aware forking — ALREADY IMPLEMENTED in workflow_runner.py (fork: true). Every
+             step forks from the previous step's session (opencode --session <prev_id> --fork /
+             claude --resume <prev_id> --fork-session) so the shared context prefix is served as a
+             cache read. The design's job is the trade-off: switching model between steps BREAKS the
+             cache prefix, so the routing policy must weigh cache-read savings against routing to a
              different (better) model, using PROVIDER_PRICING cache_read vs input rates.
 
           E. Load-bearing rule — the policy consumes only MEASURED signals. `edge_case_coverage` is
@@ -148,16 +156,17 @@ workflow:
             the subset, unconstrained draws from the full pool. Validate allowed_models (unknown id,
             empty subset) at spec load time.
           - Implement the preferences block -> scoring function over measured signals.
-          - Implement cache-aware session chaining: capture each step's session id and fork the next
-            step from it (reuse story.py's --session <id> --fork pattern and its session-id helpers).
-            Do not fork across a model switch without accounting for the lost cache prefix.
+          - Cache-aware forking is ALREADY BUILT (workflow_runner.py, fork: true). Do not rebuild it.
+            Your routing policy must respect it: it can only select a different model for a step when
+            the cache-prefix loss (cache_read vs input pricing) is worth the routing gain. If the
+            policy keeps the same model, the existing chaining already forks for free.
           - Do not consume unmeasured fields (confidence, edge_case_coverage) unless you also ship the
             measurement rule that produces them.
 
           DELIVER the implementation plus tests. Cover: pin wins; allowed_models restricts the choice;
           unconstrained draws from the full pool; preference scoring (lowest-cost-highest-coverage
-          example); cache-fork chaining reuses the prior session id; model-switch invalidates/reprices
-          the cache prefix; graceful fallback when no measurement exists for a step.
+          example); the model-switch-vs-cache-prefix trade-off is priced; graceful fallback when no
+          measurement exists for a step.
       - name: verify
         kind: agent
         prompt: |
@@ -170,17 +179,20 @@ workflow:
           {prior_phases}
 
           CHECKS:
-          - Run the repo test suite (pytest tests/ -q) and report the exact command + results. Any
-            failure introduced by this change must be fixed before reporting PASS.
+          - Run ONLY the routing-relevant tests — never a bare suite — and report the exact command
+            + results. Specify the files explicitly, e.g.:
+            `python -m pytest tests/test_routing.py tests/test_workflow_runner.py tests/test_backends.py tests/test_claude_adapter.py tests/test_experiment_spec.py tests/test_compile_experiment.py -q`.
+            Any failure introduced by this change must be fixed before reporting PASS.
           - Confirm the three-step semantics (pin / allowed_models subset / full pool) are tested.
           - Confirm allowed_models validation rejects unknown ids and empty subsets.
           - Confirm the preferences block maps to a scoring function over MEASURED signals, and that
             the "lowest cost + highest edge-case coverage" example degrades or gates cleanly when
             edge_case_coverage is not yet measured.
-          - Confirm cache-aware forking: each step forks from the prior session id, and a model switch
-            is detected and its cache prefix repriced.
+          - Confirm cache-aware forking still works end to end (workflow_runner.py fork: true): each
+            step forks from the prior session id, and the routing policy prices a model switch against
+            the lost cache prefix.
           - Confirm the router reads only measured signals and does not reference confidence.
-          - Run `python -c "from ai_finops_dynamics.experiment_spec import validate_spec"` to confirm
+          - Run `python -c "from instrument.experiment_spec import validate_spec"` to confirm
             the spec module still imports and validates cleanly.
 
           DELIVER exactly one file, docs/routing_verify.md: PASS/FAIL per check, the exact pytest

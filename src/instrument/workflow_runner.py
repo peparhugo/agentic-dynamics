@@ -195,6 +195,7 @@ def run_workflow(
     output_token_limit: int = 0,
     timeout: int = 1800,
     silent_mode: bool = False,
+    enforce_pytest: bool = False,
     commit: bool = True,
     stop_on_error: bool = True,
     resume: bool = False,
@@ -212,8 +213,11 @@ def run_workflow(
     ``fork=True`` chains each agent phase off the previous phase's session (opencode
     ``--session <id> --fork``; Claude CLI ``--resume <id> --fork-session``; same model
     only) so the shared context prefix is served as provider cache reads. ``fork=None``
-    falls back to the spec's ``workflow.params.fork`` flag. ``run_agentic_fn`` is
-    injectable so tests can substitute a fake agent (no LLM).
+    falls back to the spec's ``workflow.params.fork`` flag.
+    ``enforce_pytest=False`` (default) stops the runner from injecting the blanket
+    "Run pytest. Fix failures." standardized constraint into agent phases — each phase
+    must specify its own tests, and a phase can opt in via ``enforce_pytest: true`` on
+    the phase. ``run_agentic_fn`` is injectable so tests can substitute a fake agent.
     """
     errors = validate_spec(spec)
     if errors:
@@ -295,6 +299,9 @@ def run_workflow(
                         "output_token_limit": output_token_limit,
                         "timeout": phase_timeout,
                         "silent_mode": silent_mode,
+                        "enforce_pytest": bool(
+                            phase_def.get("enforce_pytest", enforce_pytest)
+                        ),
                     }
                     # Cache-aware forking: reuse the previous phase's session prefix so
                     # the shared context is served as provider cache reads (DeepSeek
