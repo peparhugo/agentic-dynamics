@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>The Story — AI FinOps Dynamics</title>
-<meta name="description" content="How a $20 API key became an experimental instrument for AI FinOps. The personal story behind 249 sessions, 8 models, and 224 game reports.">
+<meta name="description" content="How a $20 API key exposed a value-measurement gap. The discovery story behind 249 sessions, 8 models, and 224 game reports.">
 <meta property="og:title" content="AI FinOps Dynamics">
-<meta property="og:description" content="The personal story: how a $20 API key became a measurement instrument">
+<meta property="og:description" content="The discovery story: how a $20 API key exposed a gap between success and durable value">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/story.html">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -48,12 +48,12 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <article>
 
-<h1>How a $20 API key became an experimental instrument.</h1>
-<p class="subtitle">I wasn't trying to build a research instrument. I was trying to save money on a trip to Italy. What happened next changed how I think about AI costs.</p>
+<h1>A $20 API key exposed a value-measurement gap.</h1>
+<p class="subtitle">I was trying to spend less while I was away. The unexplained difference between cost, output, and durable value turned a personal budget experiment into a measurement question.</p>
 
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 1 &middot; The Discovery</div>
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 1 &middot; Why — The Anomaly</div>
 
-<h2>The subscription problem.</h2>
+<h2>The cost anomaly.</h2>
 
 <p>At the start of 2026, I was spending close to $700 per month on AI subscriptions. ChatGPT Pro. Claude Max. All the tiers. I used them for everything &ndash; coding, writing, thinking through architecture decisions, running experiments. It was just the cost of doing business. I didn't think about it.</p>
 
@@ -70,9 +70,9 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <div class="stat-card"><div class="v cyan"><span data-stat="costgap">17&times;</span></div><div class="l">Measured Cost Gap</div></div>
 </div>
 
-<h2>What $12.73 built.</h2>
+<h2>The cost gap demanded an explanation.</h2>
 
-<p>In the time it took me to burn through twelve dollars and seventy-three cents, I:</p>
+<p>In the time it took me to burn through $12.73, I:</p>
 
 <div class="highlight">
 <ul style="list-style:none;padding:0;font-size:0.9rem;color:var(--t2);line-height:2">
@@ -96,11 +96,11 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 <cite>&ndash; Me, staring at the DeepSeek billing dashboard, on a train from Rome to Naples</cite>
 </blockquote>
 
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 2 &middot; The Insight</div>
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 2 &middot; How — The Question Scaled</div>
 
-<h2>So I started researching.</h2>
+<h2>One comparison became an N x M experiment.</h2>
 
-<p>Here is what I learned. It turned a personal budgeting hack into a framework that governs AI costs at scale.</p>
+<p>The price difference was only the first observation. To understand whether cheaper output also created durable value, I needed to compare behavior under controlled degradation and follow what happened after each session.</p>
 
 <p>The experiments revealed something I didn't expect. When we deliberately broke the instructions — inverted constraints, removed critical requirements, injected alien vocabulary — the models produced materially different recovery and output behavior. I initially thought the cost difference was simply token volume. It wasn't. That led me to start perturbing specifications and measuring how the agents behaved.</p>
 
@@ -122,96 +122,100 @@ blockquote cite{display:block;font-size:0.75rem;color:var(--t3);font-style:norma
 
 <p>Later analysis revealed the deeper layer: equal token counts do not equate to identical cost. Claude Sonnet 5's tokens cost 11.5&times; more per unit (<span class="tip" title="[X] External — provider list pricing per 1M output tokens">$10.00 vs $0.87 per 1M output tokens</span>). And cache behavior splits the models: DeepSeek reuses only 78% of its context, re-reading the codebase every session at 35K tokens, while Luna and Sonnet trust their cache at 97-98% hit rates and send 6K new tokens. Two models produce the same codebase at wildly different token economics.</p>
 
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; What This Means</div>
+<h2>Scaling the question changed the problem.</h2>
 
-<h2>From "DeepSeek is cheaper" to "here are the dynamics."</h2>
+<p>A clean-versus-degraded prompt comparison could answer one bounded question, but agentic software work is cumulative. N linked sessions were needed because each session changes the codebase inherited by the next. M measurement angles were needed because tests alone cannot represent maintainability, maintainability cost, long-horizon scalability, one-way and two-way-door routing risk, verification depth, cache economics, recovery, or cost per accepted outcome.</p>
 
-<p>I started out trying to show that DeepSeek was more efficient. That was the whole point. Run the same tasks. Measure the costs. Publish the numbers. Simple.</p>
+<p>Collection was only half of the multiplication. The same sessions then had to be analyzed across models, conditions, tasks, tiers, commits, and positions in the story: a second N x M burden. More sessions without analysis produce volume, not information; more metrics without consistent event capture produce incomparable claims.</p>
 
-<p><strong>But I realized I wasn't just saving money per session. I was preserving budget runway.</strong> The gap between DeepSeek and Claude wasn't just about price &ndash; it was about how long my team could operate before we hit our spending limit. A CTO doesn't need the cheapest model for every prompt. They need a policy that maximizes outcomes before the budget runs out.</p>
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 3 &middot; How — The Instrument</div>
 
-<p>But as I stood back and thought about what I was actually measuring, the scope kept expanding.</p>
+<h2>The question required instrumentation, not another benchmark.</h2>
 
-<p><strong>Day-to-day operations.</strong> Teams using AI coding assistants. What model should they default to? When should they escalate? The Silent Inference Rule and the Explanation Tax Rule answer this.</p>
+<p><strong>Instrument — capture events.</strong> This is instrumentation that runs async CLI sessions at scale: a queue that workers drain, isolation so sessions cannot delete the lab, resumability after timeouts, and per-session capture of cost, tests, cache behavior, code changes, and perturbation context. The instrument does not judge code. It runs thousands of sessions and records what happened.</p>
 
-<p><strong>Production systems.</strong> Model routing at scale. Classify the task, dispatch to the cheapest capable model. The Select-then-Route pattern isn't just a research concept — it's an operational architecture.</p>
+<p><strong>Because the outcome of one session is the starting point of the next.</strong> Five sessions chain into a story — greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting — each committing onto the last. The output becomes the next codebase. The measured arc shows later sessions costing more; the N&sup2; relationship is a modeled extension beyond those endpoints.</p>
 
-<p><strong>Policy decisions.</strong> One-way doors vs two-way doors. Switching C&#8320; is reversible. Committing to an architecture that determines &beta; and v is not. The decision framework wasn't theoretical — it emerged from watching how costs compound when you get the architecture wrong.</p>
+<p><strong>Derive — turn events into information.</strong> Session traces, tests, static analysis, and independent reviews become measures of verification depth, maintainability, recovery, and cost per accepted outcome. This is the analysis layer that turns the N x M corpus into comparable evidence.</p>
 
-<p><strong>Long-term planning.</strong> Under linear context-growth assumptions, cumulative context cost contains an N&sup2; term (modeled extension, not independently tested). The &beta;·v·N&sup2; term dominates long-run cost — model the curve before architectural commitments.</p>
-
-<p><strong>Business outcomes.</strong> CostPerOutcome. Not cost per prompt. Not cost per session. The durable value of an accepted outcome, divided by what it cost to produce and sustain it. The only metric that matters if you're accountable for results.</p>
-
-<p><strong>Energy economics.</strong> EPM(t). The Energy Price Multiplier. Local energy markets determine long-term compute prices. The 4Ms framework from Google Cloud formalizes this. The IEA projects 1.8&times; growth by 2050. Whatever model looks cheapest today gets more expensive every year — and the models with the highest Watt-per-useful-token ratio compound fastest.</p>
+<p><strong>Write policy, then grid.</strong> A separate module — the one I'm focused on now — can use measured information to propose routing experiments. DeepSeek through opencode. Sonnet through the Claude CLI. Luna through opencode. The same chained sessions and passing tests produced different observed verification depth: Sonnet writes 73 tests for $2.32 while Luna writes 7 for $0.09. Which toolchain should receive one kind of session is a policy question to test as an arm, not a conclusion to infer from price alone.</p>
 
 <div class="callout">
 <div class="icon">&#9888;</div>
-<p><strong>This became a cumulative model for AI FinOps without me even realizing it.</strong> I thought I was comparing two models. I was actually building a predictive model for AI outcome delivery costs that scales from individual sessions to enterprise-wide deployment over multi-decade horizons.</p>
+<p><strong>Campaign — change one variable and repeat.</strong> Running sessions at scale is itself a measurement problem. The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and must resume without losing attribution. None of this is the finding; all of it is required to make repeated comparisons possible.</p>
 </div>
 
-<p>What I didn't expect: when I first published this instrument, I thought the story was 'DeepSeek uses fewer tokens.' It doesn't. The story was subtler — the multi-session pipeline revealed that what you actually buy with a more expensive model is <em>verification</em>. Luna writes 7 tests per story for $0.09. Sonnet 5 writes 73 for $2.32. Both codebases pass their tests. Only one is actually tested. That's the durable-value gap this whole instrument exists to measure.</p>
-
-<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 4 &middot; Instrumentation, Not Benchmarks</div>
-
-<h2>What I built is instrumentation.</h2>
-
-<p>Not a benchmark. Instrumentation that runs async CLI sessions at scale — a queue you fill, workers that drain it, isolation so the sessions can't delete the lab, per-session cost capture. The instrument doesn't judge code. It runs thousands of sessions and records what each one cost.</p>
-
-<p><strong>Because the outcome of one session is the starting point of the next.</strong> Five sessions chain into a story — greenfield &rarr; feature &rarr; integration &rarr; refactor &rarr; cross-cutting — each committing onto the last. The output becomes the next codebase. That's where it compounds: every session grows the codebase, and every new line inflates the cost of the next one. The Snowball Rule. The N&sup2; term isn't an equation I invented — it's the chained sessions, measured.</p>
-
-<p><strong>On top of that sits a separate module — the one I'm focused on now — that runs the routing experiments.</strong> Fine-tuning which toolchain a session gets routed to, and measuring the implication of that routing. DeepSeek through opencode. Sonnet through the Claude CLI. Luna through opencode. Same chained sessions, same passing tests — but Sonnet writes 73 tests for $2.32 while Luna writes 7 for $0.09. Which toolchain do you route the session to? The cheapest capable one. And "capable" is the thing you only learn by running the chained sessions through different toolchains and reading the cost back.</p>
-
-<div class="callout">
-<div class="icon">&#9888;</div>
-<p><strong>Running sessions at scale is itself a cost-management problem.</strong> The queue got wiped twice because the sessions I was running deleted the lab. SonarQube processes one analysis at a time, so I stood up four. Sessions time out mid-story and have to be resumable. Every session's cost — tokens, dollars, even the subagent calls — has to be captured per model. None of it is the science. All of it is <em>required</em> to run the sessions.</p>
-</div>
-
-<p><strong>The payoff: the cost becomes visible.</strong> Over 2,000 sessions — 1,097 story-building runs across 221 cells and seven models, plus 911 independent reviews — for roughly the price of a lunch in Rome. Once the sessions run themselves, each toolchain's cost comes into view, and the routing choice stops being a guess.</p>
+<p><strong>The payoff is information, not session volume.</strong> Over 2,000 sessions — 1,097 story-building runs across 221 cells and seven models, plus 911 independent reviews — made cost and verification differences visible on the same linked work. That evidence can support a proposed policy; only a controlled grid can establish whether the policy improves value.</p>
 
 <blockquote>
-"The outcome of one session is the starting point of the next. Route it wrong and the cost compounds."
+"The outcome of one session is the starting point of the next. Measure it before deciding how to route it."
 </blockquote>
 
-<h2>Why I was the person who could build this.</h2>
+<h2>The question crossed four disciplines.</h2>
 
-<p>This framework sits at an intersection that almost nobody occupies. And that's not arrogance — it's an observation about how research gets siloed.</p>
+<p>The measurement problem did not fit inside a single discipline. Economics, physics, energy markets, and software systems each exposed a different part of the same cumulative process.</p>
 
-<p><strong>Economics.</strong> I understand cost curves, compounding growth, and the difference between marginal and total cost. When I saw the N&sup2; term in the cumulative cost equation, I didn't see math. I saw a production function. Context inflation is the new inflation. Codebase growth is a second-order cost driver, and most engineering teams don't have the economic vocabulary to model it.</p>
+<p><strong>Economics.</strong> Cost curves distinguish marginal from total cost. The N&sup2; term in the modeled cumulative equation reads as a production function: codebase growth can become a second-order cost driver rather than a sequence of independent prompt charges.</p>
 
-<p><strong>Physics.</strong> Energy is not a line item. It's the substrate. A GPU drawing 700W while running is converting electrons into tokens. The Energy Price Multiplier isn't a metaphor — it's a measurable physical quantity. Understanding thermodynamics gave me the intuition that Watt-per-useful-token would matter more than token-per-dollar over long horizons. That intuition became the EPM Horizon Rule.</p>
+<p><strong>Physics.</strong> A GPU drawing 700W while running converts energy into computation. That makes Watt-per-useful-token and the Energy Price Multiplier physical inputs to long-horizon hypotheses, not substitutes for directly measured session cost.</p>
 
-<p><strong>Energy markets.</strong> Local energy prices determine long-term compute costs. Goldman Sachs projects 220% growth in AI power demand. The EIA expects data centers to consume 6.7&ndash;12% of US generation. These aren't data points you add to a slide. They're structural inputs to a model. If you don't model energy as a variable, you're not doing FinOps — you're doing procurement.</p>
+<p><strong>Energy markets.</strong> External projections estimate 220% growth in AI power demand and data-center consumption of 6.7&ndash;12% of US generation. These are external structural inputs to a model, not outcomes measured by this experiment.</p>
 
-<p><strong>Software engineering and system architecture.</strong> I've built production systems. I know what a model routing layer looks like at scale. I understand why switching C&#8320; is a two-way door and committing to an architecture that determines &beta; is not. The decision framework didn't come from a management book. It came from watching architecture decisions compound across codebases.</p>
+<p><strong>Software engineering and system architecture.</strong> Production experience supplied the operational constraints: switching C&#8320; can be a two-way door, while architecture choices that determine &beta; may persist across the codebase. Those distinctions become hypotheses that the instrument can test.</p>
 
-<p><strong>C-suite career growth.</strong> I've been in the rooms where these decisions get made. I know what a CFO needs to see. I know what a CTO needs to justify. I know the difference between a benchmark that impresses engineers and a framework that changes procurement policy. The ten rules are written for the people who sign contracts, not the people who run benchmarks.</p>
+<p><strong>Career context.</strong> Work with CFO and CTO decisions clarified the difference between evidence that describes a benchmark and evidence strong enough to change a policy. The ten rules are possible control rules; where they have not been run as arms, they remain proposals.</p>
 
 <div class="callout">
 <div class="icon">&#9888;</div>
-<p><strong>None of these disciplines alone would have produced this instrument.</strong> A physicist would stop at the EPM equation. An economist would stop at the cost curve. A software architect would stop at the routing layer. A CTO would stop at the decision framework. It took all of them together to see that these aren't separate problems — they're the same problem at different scales.</p>
+<p><strong>The disciplines constrain one another.</strong> Physics bounds the energy input, economics describes compounding cost, software architecture explains inherited state, and operational leadership asks which decision the evidence can actually support. Together they turn separate observations into a testable research program.</p>
 </div>
 
-<h2>Why benchmarks failed. Why buzzwords don't help.</h2>
+<div style="text-align:center;margin:3rem 0 1.5rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;color:var(--ac);text-transform:uppercase;letter-spacing:1px">Part 4 &middot; What — The Field</div>
 
-<p>Before this, what did AI FinOps even mean? Vendors threw around "outcome-based pricing" and "AI-native optimization" and "cost-intelligent routing." None of it was operational. None of it had an equation behind it. None of it could tell you, under your specific assumptions, what your costs would be in 2035.</p>
+<h2>The result was not a cheaper-model verdict.</h2>
 
-<p>Benchmarks compare one model to another on a synthetic task. That's interesting. It's not useful. A CTO doesn't need to know that Model A scores 2% higher on HumanEval. They need to know whether switching models will save or cost them money over three years, given their team size, their velocity, their codebase growth rate, and their energy price exposure.</p>
+<p>I started out trying to show that DeepSeek was more efficient: run the same tasks, measure the costs, and publish the numbers. The linked sessions showed why that answer was incomplete. AI FinOps Dynamics is the name for the resulting field of inquiry, not a product: it studies where immediate cost, durable verification, maintainability, recovery, routing, and long-horizon economics move together and where they separate.</p>
 
-<p><strong>This project gives AI FinOps a foundation.</strong> Not a benchmark. Not a white paper. Not a vendor dashboard. A predictive model with empirically measured parameters, a set of operational principles, and an interactive calculator that lets any team project their own costs under their own assumptions. That's what the term should have meant all along.</p>
+<p><strong>Immediate cost.</strong> The DeepSeek and Claude gap was not only price per session; it changed how long a fixed budget could sustain work. A useful policy must maximize accepted outcomes before the budget runs out, rather than choose the cheapest model for every prompt.</p>
+
+<p><strong>Durable verification.</strong> What I didn't expect when I first published the instrument was that the deeper distinction was not simply token count. Luna writes 7 tests per story for $0.09. Sonnet 5 writes 73 for $2.32. Both codebases pass their tests. Only one has the broader observed safety net. That is the durable-value gap the instrument was built to measure.</p>
+
+<p><strong>Maintainability and recovery.</strong> A passing result does not reveal what the next agent inherits, how expensive the code is to maintain, or whether degraded input leaks into later work. Linked sessions make those questions observable without collapsing them into a single score.</p>
+
+<p><strong>One-way and two-way-door routing.</strong> Switching C&#8320; can be reversible. Committing to an architecture that determines &beta; and v may not be. Routing is therefore a possible policy arm: classify the task, apply a measured verification gate, and test whether the proposed route improves durable value.</p>
+
+<p><strong>Long-horizon economics.</strong> Under linear context-growth assumptions, cumulative context cost contains an N&sup2; term (modeled extension, not independently tested). The &beta;·v·N&sup2; term is a hypothesis for long-run cost — model the curve before architectural commitments.</p>
+
+<p><strong>Cost per accepted outcome.</strong> CostPerOutcome is not cost per prompt or cost per session. It asks for the durable value of an accepted outcome divided by what it cost to produce and sustain it.</p>
+
+<p><strong>Energy economics.</strong> EPM(t), the Energy Price Multiplier, brings external energy-market assumptions into long-horizon modeling. The 4Ms framework from Google Cloud formalizes this dimension, and the IEA projects 1.8&times; growth by 2050. Those external projections inform scenarios; this corpus did not measure them.</p>
+
+<div class="callout">
+<div class="icon">&#9888;</div>
+<p><strong>The comparison opened a broader question.</strong> I thought I was comparing two models. The evidence instead pointed to a field that connects individual sessions with cumulative outcome-delivery costs over multi-decade horizons, while keeping measured observations separate from modeled extensions.</p>
+</div>
+
+<h2>The field starts where benchmarks stop.</h2>
+
+<p>Benchmarks can compare models on bounded tasks. They do not by themselves explain, under a team's assumptions, what cumulative costs would be in 2035 or whether the resulting software remains verifiable and maintainable.</p>
+
+<p>A one-task score can still be useful, including a 2% difference on HumanEval. The missing question is whether switching models saves or costs money over three years once team size, velocity, inherited codebase growth, verification depth, and energy exposure enter the analysis.</p>
+
+<p><strong>The discovery defines a research program: measure the events, derive the information, test the policy, and repeat.</strong></p>
 
 <blockquote>
-"The instrument didn't come from theory. It came from watching $12.73 do more work than $700 ever did — and needing to understand why."
+"The instrument didn't come from theory. It came from seeing $12.73 and $700 produce an unexplained difference — and needing to understand why."
 </blockquote>
 
-<p>This project doesn't answer <strong>"what did we spend last month?"</strong> It answers <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> Under modeled assumptions, the N&sup2; tax compounds — every session grows the codebase, and every new line compounds the cost of the next one.</p>
+<p>The immediate record answers <strong>"what did we spend last month?"</strong> The modeled question asks <strong style="color:var(--ac)">"what will we spend over the next 3 years?"</strong> Under modeled assumptions, the N&sup2; term describes how inherited codebase growth can affect cumulative cost; it remains one hypothesis to test, not a measured forecast.</p>
 
 <div style="text-align:center;margin:2rem 0">
-<a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">Explore AI FinOps Dynamics &rarr;</a>
+<a href="/" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s">Follow the Discovery &rarr;</a>
 </div>
 
 </article>
 
-<div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">See the Evidence →</a></div>
+<div style="text-align:center;margin:2rem 0"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 
 <footer>
 <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>

@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>AI FinOps Dynamics — Does your AI assistant make your system better, or just bigger?</title>
-<meta name="description" content="Success isn't value. An open instrument measuring what drives the cost and value of agentic AI outcomes. 1,097 sessions, 7 models, and a verification gap that doesn't track price.">
-<meta property="og:title" content="AI FinOps Dynamics — Success isn't value.">
-<meta property="og:description" content="An open experimental instrument measuring the economics of agentic AI outcomes. 1,097 sessions, 7 models, 10,535 tests.">
+<title>AI FinOps Dynamics — Success Is Not Value</title>
+<meta name="description" content="Success is observable; durable value is not. Evidence from 1,097 sessions and 7 models reveals where cost, verification, and maintainability separate.">
+<meta property="og:title" content="AI FinOps Dynamics — Success Is Not Value">
+<meta property="og:description" content="A value-measurement gap, investigated across 1,097 sessions, 7 models, and 10,535 tests.">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -61,12 +61,12 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 <section class="dossier-hero home-hero"><div class="hero-grid">
   <div>
     <div class="section-kicker" style="font-size:0.82rem;margin-bottom:0.5rem;color:var(--ac);letter-spacing:0.12em">Why — AI FinOps Dynamics</div>
-    <h1>Does your AI coding assistant make your system <strong style="color:var(--ac)">better, or just bigger?</strong></h1>
-    <p class="lead">We believe <strong style="color:var(--t)">success isn't value</strong>. An agent can pass every test it writes, run cheaply, and still silently degrade the system it's supposed to improve — and the cost compounds with every session whether the code improves or not. Nobody is measuring that difference. You can't manage what you can't measure, so we built the measurement.</p>
-    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">See How We Measure It</a><a href="evidence.html" class="cta-btn ghost">Review the Evidence →</a><a href="story.html" class="cta-btn ghost">Read the Story →</a></div>
+    <h1>Agentic AI is scaling faster than our ability to <strong style="color:var(--ac)">measure its value.</strong></h1>
+    <p class="lead">AI agents can pass their own tests, complete a session cheaply, and still leave behind code that is harder to verify and more expensive to maintain. At scale, cost compounds every session whether the code improves or not. Success is observable; durable value usually is not. That is the gap we set out to measure.</p>
+    <div class="hero-actions"><a href="methodology.html" class="cta-btn big">Examine the Method</a><a href="evidence.html" class="cta-btn ghost">Inspect the Evidence →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
   </div>
   <aside class="proof-ledger" aria-label="Key numbers">
-    <h3>Measured Corpus</h3>
+    <h3>Evidence behind the discovery</h3>
     <div class="proof-card"><span class="label">Story sessions</span><div class="value"><span data-stat="story_sessions">1,097</span></div></div>
     <div class="proof-card"><span class="label">Models</span><div class="value"><span data-stat="variants">7</span></div></div>
     <div class="proof-card"><span class="label">Multi-session stories</span><div class="value"><span data-stat="stories_total">221</span></div></div>
@@ -76,12 +76,12 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
 
 <!-- Section 2: HOW -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">How — the instrument</div>
-  <h2>Multi-session builds under controlled degradation.</h2>
-  <p class="lead">Most benchmarks ask: <em>can the model solve a clean task?</em> This instrument asks: <em>can it build and maintain a real system across five consecutive sessions — and what does that cost?</em> Each experiment is a <strong>story</strong>: a greenfield build that progresses through feature work, integration, refactoring, and cross-cutting concerns, with git commits between every session.</p>
+  <div class="section-kicker">How — the question scaled</div>
+  <h2>One question became an N x M measurement problem.</h2>
+  <p class="lead">The original question compared one model's cost and quality under degraded input. Answering it properly required N linked sessions, because each output becomes the next session's codebase, and M measurement angles, because passing tests cannot stand in for verification, maintainability, cache economics, routing risk, or long-horizon cost. The corpus is the product of that multiplication, not a larger benchmark.</p>
   <div class="op-grid">
     <div class="op-card">
-      <h4>Five-session story arc</h4>
+      <h4>N — linked sessions</h4>
       <ul>
         <li>Session 1: greenfield build from spec</li>
         <li>Session 2: feature addition</li>
@@ -91,7 +91,7 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
       </ul>
     </div>
     <div class="op-card">
-      <h4>Perturbation conditions</h4>
+      <h4>Controlled variation</h4>
       <ul>
         <li><strong>Clean</strong> — unmodified specifications</li>
         <li><strong>Bad seed</strong> — the starting codebase is pre-degraded</li>
@@ -99,80 +99,79 @@ body.light .route-panel{background:rgba(34,211,238,0.08)}
       </ul>
     </div>
     <div class="op-card">
-      <h4>Full quality stack</h4>
+      <h4>M — measurement angles</h4>
       <ul>
-        <li>AST diffs and convention scoring per commit</li>
-        <li>SonarQube static analysis</li>
-        <li>A second model reviews every commit</li>
-        <li>Test count, edge cases, and test/code ratio measured</li>
+        <li>AST diffs, conventions, and maintainability per commit</li>
+        <li>Maintainability cost and long-horizon scalability</li>
+        <li>One-way/two-way-door routing and verification depth</li>
+        <li>Cache economics, recovery, tests, and independent review</li>
       </ul>
     </div>
   </div>
-  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">221 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. The instrument doesn't judge code quality — it measures how cost, verification, and recovery respond to degraded input.</p>
+  <p style="font-size:0.78rem;color:var(--t3);margin-top:0.5rem">221 stories across 3 codebases (CRUD API, static site generator, notification service) and 2 tiers, run against 7 models. Every token, dollar, cache hit, and test is measured and provenance-tagged. Collection creates one N x M burden; analysis creates a second across models, conditions, tasks, tiers, commits, and story positions. More sessions without analysis are volume, not information.</p>
 </div></section>
 
 <!-- Section 3: The instrument -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">How — the pipeline</div>
-  <h2>The measurement pipeline.</h2>
+  <div class="section-kicker">How — from events to policy</div>
+  <h2>Instrument, derive, write policy, grid, campaign.</h2>
   <div class="pipeline">
-    <div class="pipe-step"><div class="ps-label">Story config</div>Task, tier, model, perturbation condition</div>
-    <div class="pipe-step"><div class="ps-label">Session 1–5</div>Greenfield → feature → integration → refactor → cross-cutting</div>
-    <div class="pipe-step"><div class="ps-label">Trace capture</div>Token accounting, cache reads, cost per step</div>
-    <div class="pipe-step"><div class="ps-label">Static analysis</div>AST diffs, SonarQube, convention scoring</div>
-    <div class="pipe-step"><div class="ps-label">Test measurement</div>Test count, edge cases, test/code ratio</div>
-    <div class="pipe-step"><div class="ps-label">Review agent</div>Second model reviews every commit</div>
-    <div class="pipe-step"><div class="ps-label">Cost + value</div>Measured $, cache efficiency, verification depth</div>
+    <div class="pipe-step"><div class="ps-label">Instrument — capture events</div>Session 1–5 traces, tokens, cache reads, cost, tests, and code changes</div>
+    <div class="pipe-step"><div class="ps-label">Derive — turn events into information</div>Static analysis, reviews, verification depth, recovery, and cost per accepted outcome</div>
+    <div class="pipe-step"><div class="ps-label">Write policy — consume measured information</div>Control rules use only fields the instrument actually produces</div>
+    <div class="pipe-step"><div class="ps-label">Grid — test policy as an arm</div>Compare policy choices across controlled factor combinations</div>
+    <div class="pipe-step"><div class="ps-label">Campaign — change one variable and repeat</div>Use the remaining uncertainty to select the next measurement</div>
   </div>
-  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Full Instrument Spec →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Source Code →</a></div>
+  <div class="hero-actions"><a href="methodology.html" class="cta-btn">Examine the Method →</a><a href="https://github.com/peparhugo/ai-finops-framework" class="cta-btn ghost">Inspect the Source →</a></div>
 </div></section>
 
 <!-- Section 4: WHAT -->
 <section class="dossier-section alt"><div class="dossier-inner">
   <div class="section-kicker">What — the evidence</div>
-  <h2>Four findings from 1,097 instrumented story sessions.</h2>
+  <h2>The unmeasured gap became visible.</h2>
+  <p class="lead">The supporting corpus contains 1,097 instrumented story sessions. Four findings made the gap concrete.</p>
   <div class="finding">
     <div class="fn">Finding 1</div>
-    <h3>Verification is a vendor behavior, not a price point.</h3>
-    <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. The 10× verification gap sits <em>between</em> vendors, not between price tiers. You don't buy verification by paying for a pricier sibling model; you buy it by switching vendors.</p>
+    <h3>Price and verification depth do not move together in this corpus.</h3>
+    <p>OpenAI spans a 41× price range — Luna at $0.09 and Sol at $3.75 — and both write ~10 tests per story. Claude spans 2.9× — Haiku at $1.59 and Sonnet 5 at $4.58 — and both write ~120. All pass their tests. In these observed tasks, the 10× verification gap appears <em>between</em> vendors rather than between price tiers; the result describes this corpus, not a universal purchasing rule.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 2</div>
-    <h3>Cost compounds across the five-session arc.</h3>
-    <p>The Snowball Rule, measured: a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session grows the codebase, and every new line inflates the cost of the next. Per-session cost understates maintenance work by ~2×.</p>
+    <h3>Later sessions cost more across the five-session arc.</h3>
+    <p>The measured story cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34), while tokens grow from 18.7K to 34.9K. Every session inherits a larger codebase, so per-session cost understates the observed maintenance arc by ~2×. Generalizing that mechanism beyond the measured arc remains modeled.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 3</div>
-    <h3>Cache behavior is a hidden cost lever, not a capability signal.</h3>
-    <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness are three independent knobs — none predicts the other two.</p>
+    <h3>Cache behavior separates token volume from session cost.</h3>
+    <p>The cheapest model (Flash) and the most expensive (Sol) both send ~47K tokens per session — Flash at $0.07, Sol at $3.75. Luna hits a 98% cache-hit rate and sends just 6.3K. Token volume, cache policy, and test thoroughness appear as three separate knobs in this corpus; their separation does not establish that any one predicts the other two.</p>
   </div>
   <div class="finding">
     <div class="fn">Finding 4</div>
-    <h3>Degradation leaks — but models recover.</h3>
+    <h3>Degradation can leak across sessions, and recovery can be measured.</h3>
     <p>Corrupting the session-1 spec (early_degrade) drops success to 85% and doubles the cascade rate; a pre-degraded seed (bad_seed) costs the most ($1.48/story) but succeeds 88%. Degradation raises cost and cascades slightly; it does not dominate the outcome.</p>
   </div>
-  <div class="hero-actions"><a href="evidence.html" class="cta-btn">See the Full Evidence →</a></div>
+  <div class="hero-actions"><a href="evidence.html" class="cta-btn">Inspect the Evidence →</a></div>
 </div></section>
 
 <!-- Section 5: The concept -->
 <section class="dossier-section"><div class="dossier-inner">
-  <div class="section-kicker">What — the concept</div>
+  <div class="section-kicker">What — the durable-value gap</div>
   <h2>Correctness is not verification.</h2>
   <p class="lead">A model can pass every test it writes and still leave a system unverified. The gap is measured by test thoroughness:</p>
   <p style="font-family:'JetBrains Mono',monospace;color:var(--ac);font-size:0.85rem;line-height:2;text-align:center;padding:1rem;background:var(--bg3);border-radius:10px;border:1px solid var(--b)">
     Tests per story: Luna 7 &middot; Terra 9 &middot; Sol 13 &middot; Flash 34 &middot; Pro 34 &middot; Haiku 117 &middot; Sonnet 122
   </p>
-  <p>All seven models pass their own tests at roughly equal rates. But the tests themselves differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." Only one is actually verified.</p>
-  <p>This is the durable-value gap. Correctness is whether the code passes the tests you have. Verification is whether you have the tests that would catch the failures that matter. An agent can produce working code while silently skimping on the safety net — and that trade-off is a <em>vendor behavior</em>, not something the price tag buys.</p>
-  <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">See the Verification Gap →</a></div>
+  <p>All seven models pass their own tests at roughly equal rates, but the tests differ by an order of magnitude. Luna ships ~7 tests that confirm the happy path. Sonnet 5 ships ~122 that probe edge cases — duplicate usernames, whitespace titles, missing bearer tokens, idempotent notifications. Both codebases "work." One has a much broader observed verification surface.</p>
+  <p>This is the durable-value gap. Correctness asks whether code passes the tests you have. Verification asks whether you have the tests that would catch the failures that matter. In this corpus, that safety net varies by vendor family, while price alone does not explain the difference.</p>
+  <div class="hero-actions"><a href="evidence.html#story-models" class="cta-btn">Inspect the Verification Gap →</a></div>
 </div></section>
 
 <!-- Section 6: What this means -->
 <section class="dossier-section alt"><div class="dossier-inner">
-  <div class="section-kicker">What — this means</div>
-  <h2>If you can measure it, you can route on it.</h2>
-  <p class="lead">Once cost, verification depth, and cache efficiency are measured together, model routing stops being about vendor price sheets and starts being about earned outcomes. Route cheap models to code that won't be looked at twice. Route expensive models where a missed edge case is expensive failure. The contribution is the <em>verification</em> dimension — nobody else is measuring how much safety net each dollar buys.</p>
-  <div class="hero-actions"><a href="framework.html" class="cta-btn">Operational Framework →</a><a href="evidence.html" class="cta-btn ghost">Evidence →</a></div>
+  <div class="section-kicker">What — the field</div>
+  <h2>A measurement question became AI FinOps Dynamics.</h2>
+  <p class="lead">The evidence points beyond cost per prompt or success per session. AI FinOps Dynamics studies how agentic cost, verification, maintainability, recovery, and long-horizon value change together, then tests policies against those measurements. Routing is one possible policy arm: its value must be demonstrated in a controlled grid, not assumed from a price sheet.</p>
+  <div class="hero-actions"><a href="framework.html" class="cta-btn">Examine Policy Experiments →</a><a href="story.html" class="cta-btn ghost">Follow the Discovery →</a></div>
 </div></section>
 
 <!-- Bottom links -->
