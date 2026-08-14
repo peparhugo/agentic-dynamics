@@ -43,11 +43,13 @@ def _int_from(pattern: str, text: str) -> int:
 
 
 def _run_pytest(workdir: Path, timeout: int) -> dict:
+    cmd = [
+        sys.executable, "-m", "pytest", "-q", "--tb=short", ".",
+        # Stale generated artifacts under experiments/results must never be collected.
+        "--ignore=experiments/results", "--ignore=experiments/codebases",
+    ]
     try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "pytest", "-q", "--tb=short", "."],
-            cwd=workdir, capture_output=True, text=True, timeout=timeout,
-        )
+        proc = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         return {"runner": "pytest", "passed": 0, "failed": 0, "errors": 1, "total": 0,
                 "pass_rate": 0.0, "tail": f"timeout after {timeout}s"}
