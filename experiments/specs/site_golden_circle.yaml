@@ -1,0 +1,102 @@
+name: site_golden_circle
+question: "Can the public site tell a golden-circle story of discovering a field, not a product?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/narrative.md: the golden-circle narrative design for the public site.
+
+          GOAL:
+          {goal}
+
+          FRAME — this is a STORY, not a pitch:
+          - Simon Sinek's golden circle, strictly: WHY (the belief) at the center, HOW (the method) as
+            the ring, WHAT (the result) as the outside. The site must read as a discovery, not a sale.
+          - The discovery: AI agents are now used at scale to build and operate software, and nobody is
+            measuring whether that work is creating value or just consuming cost. We measured it and
+            found a durable, invisible gap ("success isn't value", "correctness isn't verification",
+            "cost compounds every session whether the code improves or not").
+
+          THE SCALING STORY (this is the heart of the refresh):
+          - The original problem was one question: how does one model's cost and quality respond to
+            degraded input? But properly instrumenting this at scale is an N×M problem — N sessions
+            (thousands of agentic sessions) × M measurement angles (code quality from different angles,
+            maintainability, cost-of-maintainability, long-horizon scalability, routing for one-way and
+            two-way doors, verification depth, cache economics). And then you must ANALYZE that volume of
+            sessions — which is itself an N×M analysis problem.
+          - The answer is the instrumentation architecture: instrument → derive (measurement rules turn
+            events into information) → write policy (control rules consume that information) → grid
+            (policy as an arm) → campaign (tweak one variable, repeat). This is the machine that turns a
+            single measurement question into a field.
+
+          EXISTING SITE (ground truth, do not fabricate numbers):
+          - 8 pages in firebase/public/: index.html (home), story.html, framework.html, methodology.html,
+            evidence.html, accelerator.html, databricks.html, glossary.html, plus app.js/base.css and the
+            generated data.js (window.DYNAMICS_DATA, provenance-tagged [M]/[C]/[H]/[X]).
+          - Every number on the site is live-generated from data.js. Preserve every number and every
+            provenance tag — the refresh reframes the PROSE, never the measurements.
+          - Current index.html already has Why/How/What section kickers but reads as "we built a
+            measurement tool". The refresh must read as "we discovered a need and are defining a field".
+
+          DELIVER exactly one file, docs/narrative.md: (1) the golden-circle thesis in 3 sentences,
+          (2) the page-by-page narrative map (which page carries WHY vs HOW vs WHAT), (3) the N×M
+          scaling story written out, (4) which specific sections/headlines in index.html and story.html
+          must change and to what, (5) an explicit list of numbers/provenance tags that must NOT change.
+      - name: rewrite
+        kind: agent
+        prompt: |
+          Rewrite the public-site prose per docs/narrative.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Edit firebase/public/*.html prose ONLY. Do not change data.js, app.js, or base.css mechanics.
+          - Every number and every provenance tag ([M]/[C]/[H]/[X]) must be preserved verbatim — this is
+            a reframe of narrative, not a re-derivation of measurements. If a number appears in a
+            sentence you rewrite, keep the exact figure and its data-stat reference.
+          - Keep the existing page structure and nav; change headlines, kickers, section order, and body
+            copy to realize the golden-circle story and the N×M scaling narrative from docs/narrative.md.
+          - The tone is a founder explaining a discovery to a technical peer — not marketing. No
+            superlatives, no "revolutionary", no pricing framing.
+
+          DELIVER: rewritten index.html and story.html (the two story-bearing pages), plus targeted
+          headline/kicker edits to framework.html and methodology.html where narrative.md says so.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the rewrite is internally consistent and data-safe.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Every data-stat="..." key referenced in the edited HTML resolves to a key that exists in
+            firebase/public/data.js. List any orphaned or renamed keys.
+          - No measured number in the rewritten pages differs from the corresponding value in data.js.
+          - All <a href> targets still resolve to files that exist in firebase/public/.
+          - The golden-circle structure is intact: WHY, HOW, WHAT each appear as explicit section
+            kickers, in that order, on index.html.
+
+          DELIVER exactly one file, docs/verify.md: a checklist with PASS/FAIL per check and a diff
+          summary of every number that did or did not change.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
