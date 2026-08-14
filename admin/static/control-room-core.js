@@ -1,4 +1,4 @@
-"use strict"
+"use strict";
 
 /**
  * Pure data helpers for the Control Room.
