@@ -1,0 +1,106 @@
+name: evidence_redesign
+question: "Can the evidence page lead with the story corpus and treat the precursor as compact background, without golden-circle scaffolding?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/redesign.md: the redesign plan for firebase/public/evidence.html.
+
+          GOAL:
+          {goal}
+
+          PROBLEM (from direct user feedback — honor it precisely):
+          - The current page is "brutal" and too focused on the golden circle. The golden circle is a
+            THINKING tool, not page furniture: remove every explicit label — the hero's "SIMON SINEK'S
+            GOLDEN CIRCLE · WHY / HOW / WHAT", the `.circle-label` kickers ("WHY · THE CENTER",
+            "ACT I · HOW THE MEASUREMENT BEGAN", "ACT I · WHAT ...", "ACT II · WHAT ...", "WHAT · THE
+            OUTSIDE OF THE CIRCLE"). Tell the story directly; never name the framework.
+          - The page is INVERTED: Act I (the archived single-session perturbation precursor) is ~560 lines
+            and dominates; Act II (the multi-session story corpus) is the MORE IMPORTANT part but sits
+            second and smaller. Even though the precursor came first chronologically, the page must LEAD
+            with the story corpus (the current instrument — the primary evidence) and treat the precursor
+            as a COMPACT background section, explicitly framed as "how we got here" rather than the main event.
+
+          FULL DATA IS NOW RECOVERED (ground truth):
+          - Story corpus: 7 models (deepseek-v4-pro/flash, gpt-5.6-luna/sol/terra, claude-haiku-4-5,
+            claude-fable-5), 221 stories, 1,097 sessions, \$288.6909 total cost. This is the primary evidence.
+          - Perturbation precursor: 8 models (deepseek-v4-pro, claude-fable-5, gpt-5, gpt-5-mini, gpt-5.5,
+            gpt-5.6, gpt-5.6-fast, gpt-5-nano), 227 single-session runs, 224 game reports. Background/archive.
+
+          TARGET STRUCTURE (story-first):
+          1. Hero — the story corpus: 221 stories / 1,097 sessions / 7 models / \$288.69, told as the
+             primary evidence of agentic-work dynamics. No golden-circle vocabulary.
+          2. The story evidence (promote to the main body, in its existing internal order): natural
+             verification behavior (KEEP the natural-behavior caveat — it is a finding, not framework),
+             second-model review, AST/Sonar quality, solution dynamics, the 5-session arc.
+          3. "How we got here" — the perturbation precursor as a COMPACT background section (collapsed
+             `<details>` or a short summary block, not 560 lines of charts). State plainly that the
+             precursor discovered the operators and recovery signals the story instrument reuses.
+
+          HARD CONSTRAINTS:
+          - Preserve every number, provenance tag ([M]/[C]/[H]/[X]), data-stat/data-anal binding, and
+            canvas/tbody ID (the app.js chart contract). Reorder and re-narrate; never re-derive.
+          - The natural-behavior caveat stays, verbatim, prominent in the story verification section.
+          - If the precursor content is collapsed, re-trigger chart render on expand so canvases are not
+            0-width (the known app.js trap).
+          - Remove the golden-circle scaffolding but keep the underlying narrative: unmeasured gap →
+            instrument → findings → field. Just don't say "WHY/HOW/WHAT" or "Simon Sinek".
+
+          DELIVER exactly one file, docs/redesign.md: (1) the new hero copy, (2) the story-first reorder,
+          (3) how the precursor becomes compact background (collapse vs shorten vs archive page — pick one
+          and justify), (4) the exact golden-circle scaffolding to remove, (5) a chart/app.js integrity
+          register, (6) acceptance checks.
+      - name: rewrite
+        kind: agent
+        prompt: |
+          Implement the redesign per docs/redesign.md, editing firebase/public/evidence.html only.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Lead with the story corpus; the perturbation precursor becomes compact background.
+          - Remove all explicit golden-circle labels (`.circle-label` kickers, the hero's WHY/HOW/WHAT
+            line, "Simon Sinek"). Keep the natural-behavior caveat.
+          - Preserve every number, provenance tag, data-stat/data-anal binding, and canvas/tbody id.
+          - Do NOT touch app.js, base.css, or data.js. Keep nav links and #anchors working.
+          - If the precursor collapses into a <details>, ensure charts re-render on open.
+
+          DELIVER the redesigned evidence.html.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the redesign is data-safe and meets the brief.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Story corpus leads the page (its hero + sections appear before the precursor background).
+          - No `.circle-label` / "Simon Sinek" / "WHY · HOW · WHAT" scaffolding remains in visible copy.
+          - Every data-stat/data-anal key resolves; every canvas/tbody id present; no number or provenance
+            tag changed (git diff against HEAD~1).
+          - The natural-behavior caveat is present and prominent.
+          - The precursor section is visibly compact (collapsed or clearly shorter than the story body).
+
+          DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + summary.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
