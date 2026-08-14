@@ -1,6 +1,6 @@
 name: framework_facelift
-question: "Can the operational framework page be visually modernized without altering its measured content?"
-version: "0.1"
+question: "Can the operational framework page be visually modernized — including a binding architecture visual — without altering its measured content?"
+version: "0.2"
 workflow:
   kind: agent_task
   params:
@@ -9,48 +9,81 @@ workflow:
       - name: scope
         kind: agent
         prompt: |
-          Write docs/facelift.md: the visual-redesign plan for the framework page.
+          Write docs/facelift.md: the visual-redesign plan for the framework page, INCLUDING the
+          architecture visual.
 
           GOAL:
           {goal}
 
-          CONTEXT — this is a FACE LIFT, not a rewrite:
-          - firebase/public/framework.html (~59KB) is the "Operational Framework" page. It already has
-            strong content: a cost model (C₀, P, ε, r, β, EPM), an interactive calculator, one-way vs
-            two-way door framing, an autonomous-workload door, and a provider playbook (pricing, cache
-            strategy, simulated routing, budget enforcement, reference cards, escalation economics).
-          - The page was recently prose-refreshed to read "Measured information becomes testable policy",
-            but its VISUAL presentation is dense and dated: heavy inline styles, long unbroken sections,
-            and a calculator that feels bolted-on rather than designed.
-          - The site's design system lives in firebase/public/base.css (dark dossier aesthetic: JetBrains
-            Mono accents, panel cards, amber/coral/cyan accent colors, .cta-btn, .section-kicker,
-            responsive breakpoints). app.js powers the calculator (model_costs, escalation_tiers from
-            window.DYNAMICS_DATA) and other interactivity.
+          CONTEXT — a FACE LIFT plus one new visual:
+          - firebase/public/framework.html (~59KB) is the "Operational Framework" page. It has strong
+            content: cost model (C₀, P, ε, r, β, EPM), interactive calculator, one-way vs two-way doors,
+            autonomous door, provider playbook. Recently prose-refreshed to "Measured information becomes
+            testable policy", but its VISUAL presentation is dense and dated (heavy inline styles, long
+            unbroken sections, a bolted-on calculator).
+          - Design system: firebase/public/base.css (dark dossier, JetBrains Mono, panel cards,
+            amber/coral/cyan accents var(--ac)/var(--am)/var(--cy), .cta-btn, .section-kicker).
 
-          DESIGN GOALS (the face lift):
-          - Modernize layout and visual hierarchy: clear section rhythm, card-based groupings, generous
-            spacing, consistent use of the base.css design tokens (var(--ac), var(--am), var(--cy),
-            var(--bg3), panel shadows) instead of one-off inline styles.
-          - Make the interactive calculator feel like a centerpiece, not a form: labeled input groups,
-            live-output readouts, a cleaner "how this is computed" toggle.
-          - Make the one-way/two-way/autonomous doors a visual set-piece (three aligned cards with clear
-            accent colors), and the provider playbook a scannable card grid rather than stacked headings.
-          - Keep it dark-dossier: no new fonts, no external libraries beyond what the site already loads.
+          THE NEW ARCHITECTURE VISUAL — the centerpiece of this pass:
+          - The user has two reference visuals that formalize the CONCEPTUAL context but MISS the
+            engineering architecture. Produce a BEAUTIFUL diagram of the architecture and how it BINDS to
+            each concept, to fill that gap. This is the primary new deliverable.
+          - The architecture to depict (the information-acquisition machine):
+              spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells (factor cross-product) ──▶ jobs ──▶ attempts ──▶ ledger (events)
+                ▲                                                                                                     │
+                └──── adapt (tweak one variable) ◀── compare ◀── information ◀── measure (measurement rules) ◀───────┘
+            plus the load-bearing ordering: instrument → derive (measurement rules turn events into information)
+            → write policy (control rules consume that information) → grid (policy as an arm) → campaign
+            (tweak one variable, repeat).
+          - BIND each stage to a concept: WHY = the unmeasured gap the ledger makes visible; HOW = the
+            N×M instrumentation (N linked sessions × M measurement angles) plus the N×M analysis burden;
+            WHAT = policy/grid/campaign as the repeatable discipline that defines the field. Label the
+            one-way/two-way door distinction where routing enters (policy = a factor level / arm).
+          - Style: inline SVG (no external libs), dark-dossier palette, JetBrains Mono labels, amber/coral/
+            cyan accents, subtle motion only if it degrades gracefully (prefers-reduced-motion). It must
+            feel like a formal systems diagram, not a marketing graphic.
+
+          FACE-LIFT GOALS (unchanged from before):
+          - Modernize layout: card-based groupings, clear section rhythm, design-token driven instead of
+            one-off inline styles; make the calculator a centerpiece; doors a three-card set-piece; the
+            playbook a scannable card grid.
 
           HARD CONSTRAINTS:
-          - Preserve every number, every data-stat="..." binding, every provenance tag ([M]/[C]/[H]/[X]),
-            and the calculator's model_costs/escalation_tiers fallback values verbatim.
-          - Do not change base.css, app.js, or data.js. The face lift is framework.html's markup + a
-            <style> block scoped to this page only.
-          - All existing <a href> anchors (e.g. #calculator, #playbook) and nav must keep working.
+          - Preserve every number, data-stat binding, provenance tag, and the calculator's
+            model_costs/escalation_tiers fallback values verbatim.
+          - Do not change base.css, app.js, or data.js. All <a href>/#anchors keep working.
 
-          DELIVER exactly one file, docs/facelift.md: (1) the current-problems list, (2) the proposed
-          section-by-section visual changes, (3) the design-token mapping (which var() to use where),
-          (4) an explicit register of every number/data-stat that must NOT change.
+          DELIVER exactly one file, docs/facelift.md: (1) current-problems list, (2) section-by-section
+          visual changes, (3) the design-token mapping, (4) the full architecture-visual design (what each
+          node/edge means, the concept bindings, the SVG structure/colors), (5) the number/data-stat
+          preservation register.
+      - name: architecture_visual
+        kind: agent
+        prompt: |
+          Produce the architecture visual per docs/facelift.md, as a self-contained inline SVG.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - A single inline <svg> (with a <defs> for gradients/markers) suitable to embed in
+            firebase/public/framework.html. No external images, no JS-drawn canvas.
+          - Dark-dossier palette (JetBrains Mono labels, amber/coral/cyan accents). It must read as a
+            formal systems diagram — the information-acquisition loop (spec → DAG → cells → jobs →
+            attempts → ledger → information → policy → grid → campaign → adapt) with each stage labeled
+            against its concept (Why/How/What, N×M, one-way/two-way doors).
+          - Write it to admin/static/architecture.svg (or a standalone framework-architecture.html preview)
+            and describe in the phase's commit how it will be inlined into framework.html.
+
+          DELIVER the SVG file + a short note (docs/architecture_visual.md) on the concept bindings.
       - name: rewrite
         kind: agent
         prompt: |
-          Implement the face lift per docs/facelift.md, editing firebase/public/framework.html only.
+          Implement the face lift per docs/facelift.md, editing firebase/public/framework.html only,
+          and inline the architecture visual into the page.
 
           GOAL:
           {goal}
@@ -60,12 +93,13 @@ workflow:
 
           HARD RULES:
           - Edit framework.html markup + a scoped <style> block. Do NOT touch base.css, app.js, or data.js.
-          - Preserve every number, data-stat binding, provenance tag, and the calculator fallback values.
-          - The calculator must still read window.DYNAMICS_DATA.calculator.model_costs / escalation_tiers
-            and still call the same app.js functions (toggleHow, etc.) — do not break its JS contract.
-          - Keep all nav links and #anchors working. Dark dossier aesthetic, design-token driven.
+          - Preserve every number, data-stat binding, provenance tag, and calculator fallback value.
+          - The calculator must keep reading window.DYNAMICS_DATA.calculator.model_costs / escalation_tiers
+            and calling the same app.js functions (toggleHow, etc.).
+          - Inline the architecture SVG (from the architecture_visual phase) as the page's centerpiece,
+            in the dark-dossier style. Keep all nav links and #anchors working.
 
-          DELIVER the face-lifted framework.html.
+          DELIVER the face-lifted framework.html with the embedded architecture visual.
       - name: verify
         kind: agent
         prompt: |
@@ -78,13 +112,11 @@ workflow:
           {prior_phases}
 
           CHECKS:
-          - Every data-stat="..." key in the edited framework.html resolves in firebase/public/data.js.
-          - No measured number or calculator fallback (model_costs, escalation_tiers) changed vs the
-            prior committed version (git diff against HEAD~1 for framework.html).
-          - The page still references every app.js function it did before (toggleHow, etc.), and no
-            <script> tag was removed or reordered.
+          - Every data-stat="..." key in framework.html resolves in firebase/public/data.js.
+          - No measured number or calculator fallback changed (git diff framework.html against HEAD~1).
+          - The inline SVG parses (all tags closed, valid <svg> element) and has no external references.
+          - All app.js function references (toggleHow, etc.) still present; no <script> reordered/removed.
           - All internal <a href="#..."> anchors resolve to an id present in the page.
-          - The page renders with no unclosed tags (basic structural check).
 
           DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + a summary of any number that
           changed (there should be none).
