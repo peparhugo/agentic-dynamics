@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .efficiency import compute_cost_estimate
 from .live import make_publisher
 from .streaming import stream_subprocess
 
@@ -295,6 +296,25 @@ def run_opencode_agentic(
     # Parse JSONL output even on non-zero exit (partial output)
     if stream.stdout:
         _parse_session_output(stream.stdout, result)
+
+    # Fall back to token × provider pricing when the events report no per-step cost
+    # (e.g. openai models, whose step_finish carries cost=0). Keeps live cost honest
+    # instead of silently reading $0.00.
+    if result.estimated_cost_usd == 0.0 and result.total_tokens > 0:
+        provider, _, model_id = model.partition("/")
+        try:
+            est = compute_cost_estimate(
+                prompt_tokens=result.prompt_tokens,
+                completion_tokens=result.completion_tokens,
+                reasoning_tokens=result.reasoning_tokens,
+                cache_read_tokens=result.cache_read_tokens,
+                cache_write_tokens=result.cache_write_tokens,
+                provider=provider,
+                model=model_id,
+            )
+            result.estimated_cost_usd = est["total_cost_usd"]
+        except (ValueError, KeyError):
+            pass
 
     result.duration_s = time.monotonic() - t0
 
