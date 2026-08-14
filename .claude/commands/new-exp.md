@@ -14,6 +14,6 @@ Create a new experiment config and run it end-to-end.
    - TypeScript → `typescript_eventbus.yaml`, `typescript_multitenant_api.yaml`
    - Python → `task_manager.yaml`, `url_shortener.yaml`
 4. The config needs: `name` (matches filename), `task` (detailed spec), `constraints` (8-10), `operators` (5-6 of the 10), `strengths`, `model` + `model_id`. For Go/Rust set `standardized.enforce_pytest: false` (correctness runs `go test`/`cargo test`, not pytest).
-5. Run: `python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek`
+5. Run: `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`
 6. Verify output exists (GameReport + worktree at /tmp/exp_*), then report: cost, tokens, tests passed, strategy archetype, and the game report path.
 7. Offer to run the downstream pipeline: `python scripts/analyze_worktrees.py` then `python scripts/pipeline.py --plan deploy`.

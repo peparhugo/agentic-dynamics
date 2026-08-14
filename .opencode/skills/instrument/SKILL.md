@@ -81,10 +81,10 @@ perturbed_prompt, perturbation = perturb_prompt(
 
 ```bash
 # Single experiment (primary entry point):
-python scripts/run.py --config experiments/configs/task_manager.yaml --model deepseek
+python scripts/run.py experiments/configs/task_manager.yaml --model deepseek
 
 # Cross-model comparison:
-python scripts/run.py --config experiments/configs/comparative.yaml --model deepseek
+python scripts/run.py experiments/configs/comparative.yaml --model deepseek
 
 # The 34 configs are at experiments/configs/*.yaml. Each defines:
 # task, constraints[], operators[], strengths[], model, turns, thinking_effort
@@ -122,7 +122,7 @@ result = run_opencode_agentic(
 
 ```bash
 # Run a 5-session story with perturbation:
-python scripts/run_story.py --story task_manager --condition early_degrade \
+python scripts/run_story.py task_manager_api --condition early_degrade \
     --codebase-quality good --tier tier1_minimal --model deepseek
 ```
 
@@ -221,11 +221,11 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 
 ### Running a single experiment end-to-end:
 1. Pick config from experiments/configs/
-2. `python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek`
+2. `python scripts/run.py experiments/configs/<name>.yaml --model deepseek`
 3. Check output in experiments/results/ and /tmp/exp_*
 
 ### Running a story experiment (v0.9):
-1. `python scripts/run_story.py --story task_manager --condition clean --model deepseek`
+1. `python scripts/run_story.py task_manager_api --condition clean --model deepseek`
 2. Results in experiments/results/stories/
 
 ### Adding a new perturbation operator:
@@ -244,7 +244,7 @@ python scripts/finish_sweep.py       # Incomplete sweep cells
 4. Language flags — critical for correctness measurement:
    - Go/Rust: `standardized: {enabled: true, enforce_pytest: false}` — runs `go test`/`cargo test`, NOT pytest.
    - Python: `standardized.enforce_pytest: true` (default pytest).
-5. Run: `python scripts/run.py --config experiments/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
+5. Run: `python scripts/run.py experiments/configs/<name>.yaml --model deepseek` (or the `run_experiment` tool).
 6. Verify: GameReport + artifacts under `experiments/results/`, worktree at `/tmp/exp_*`.
 7. Downstream: `python scripts/analyze_worktrees.py` then `python scripts/pipeline.py --plan deploy` to publish to the website.
 
