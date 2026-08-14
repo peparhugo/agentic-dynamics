@@ -1,0 +1,164 @@
+name: routing_follow_up
+question: >-
+  Can deepseek-v4-pro activate the per-step routing layer per docs/routing_next_steps.md —
+  wire the signal store from measured experiment results, surface routing validation in the
+  Control Room, and apply the hygiene fixes (items 1, 2, and 5) — leaving signal
+  instrumentation and the routing campaign as separate follow-ups?
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    phases:
+      - name: signal_store
+        kind: agent
+        prompt: |
+          Implement the signal-store wiring (docs/routing_next_steps.md item 1) and write
+          docs/routing_signal_store_notes.md.
+
+          GOAL:
+          {goal}
+
+          READ FIRST:
+          - docs/routing_next_steps.md §1 — the authoritative spec, including the field-name and
+            model-id mismatch tables (your source of truth for the derivations and aliases).
+          - src/instrument/step_routing.py — build_signal_store(), ModelSignals, _mean_present(),
+            SIGNAL_FIELDS, MEASURED_SIGNALS.
+          - src/instrument/workflow_runner.py — where run_workflow accepts `signals`/`preferences`
+            (~line 212) and reads the static `workflow.params.signals` fallback (~line 293).
+          - scripts/run_workflow.py — the orchestration entry point (load_spec -> run_workflow).
+          - experiments/results/_results_summary.json — inspect the `entries` list directly to
+            confirm field names before coding.
+
+          REQUIREMENTS:
+          - Add src/instrument/signal_store.py exporting:
+            load_results(path=Path("experiments/results/_results_summary.json")) -> list[dict]
+              (read the `entries` key; do not re-derive from `by_model`).
+            derive_cache_hit_rate(e) -> float | None from
+              tokens_cache_read / (tokens_input + tokens_cache_read), None on zero denominator.
+            derive_constraint_score(e) -> float | None from
+              constraints_met / constraints_total, None when constraints_total is 0.
+            MODEL_ALIASES: dict[str, list[str]] + normalize_model_id(model) -> str, mapping the
+              current model_pool ids to the legacy result ids (e.g. openai/gpt-5.6-sol ->
+              openai/gpt-5.6); keep results ids that already match unchanged.
+            build_signal_store(entries, *, aliases=MODEL_ALIASES) -> dict[str, ModelSignals] that
+              applies the derivations + aliases BEFORE aggregation, and aggregates every
+              dimension with the existing NaN/None-aware _mean_present (including correctness and
+              cost — see item 5.3).
+          - Wire it into scripts/run_workflow.py: when the spec declares routing (model_pool or
+            per-phase selectors or preferences) and no --signals was supplied, build the store
+            from load_results() and pass signals=... to run_workflow. Keep the explicit
+            signals/preferences kwargs as the override hook. Do NOT break build_data.py /
+            analyze_worktrees.py consumers of _results_summary.json.
+          - Update src/instrument/__init__.py exports for the new module.
+          - Add tests in tests/test_signal_store.py: derivation (incl. div-by-zero), alias
+            resolution (openai/gpt-5.6 -> openai/gpt-5.6-sol), a model measured only under a
+            legacy id resolves, and correctness/cost now skip NaN rows instead of defaulting to 0.
+
+          HARD RULES:
+          - Follow repo conventions: snake_case functions, PascalCase classes, type hints on
+            public signatures, dataclasses over dicts.
+          - Do not consume unmeasured signals (confidence, edge_case_coverage) in the store.
+          - When running tests, specify the exact test files (never bare `pytest` or
+            `pytest tests/ -q`).
+
+          DELIVER src/instrument/signal_store.py + tests + the wiring + the notes doc.
+      - name: portal_validation
+        kind: agent
+        prompt: |
+          Surface routing validation in the Control Room (docs/routing_next_steps.md item 2).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - admin/design_sessions.py — draft_state() (~line 439) and its `errors = validate_spec(spec)`
+            call (~line 516); the existing `validation.errors` / capabilities shape.
+          - src/instrument/step_routing.py — validate_workflow_routing(spec, *, default_model).
+          - tests/test_admin_design_sessions.py — existing draft-validation test conventions.
+
+          REQUIREMENTS:
+          - In draft_state, compose validate_workflow_routing into the error list after
+            validate_spec (import from instrument.step_routing), passing the session's default
+            model where available. Routing-inactive specs must still validate trivially (the
+            function already short-circuits).
+          - Add a test in tests/test_admin_design_sessions.py: a workflow draft whose spec has
+            `allowed_models: ["unknown/model"]` yields a draft_state with that routing error and
+            save disabled; a routing-inactive draft is unaffected.
+
+          HARD RULES:
+          - Make the smallest coherent change; do not alter the existing validate_spec flow or
+            the capabilities UI beyond surfacing the new error strings.
+          - When running tests, specify the exact test files (tests/test_admin_design_sessions.py,
+            tests/test_step_routing.py, tests/test_signal_store.py) — never bare pytest.
+      - name: hygiene
+        kind: agent
+        prompt: |
+          Apply the hygiene/correctness cleanups (docs/routing_next_steps.md item 5).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIREMENTS:
+          - 5.1: add `.instrument/` to .gitignore and `git rm --cached .instrument/session.jsonl`
+            (it is currently tracked in the repo), and exclude `.instrument/` from the workflow
+            runner's commit snapshot so transcripts stop entering history.
+          - 5.2: fix _init_git_workdir (src/instrument/opencode.py ~line 351): make it a no-op
+            when `git rev-parse HEAD` already succeeds (an initialized repo with history), and
+            skip the `git commit -m "Initial"` when nothing is staged (check `git status --porcelain`).
+          - 5.3: in src/instrument/step_routing.py build_signal_store, route correctness and cost
+            through the NaN/None-aware _mean_present (drop the `or 0` defaults) so a sparse entry
+            cannot bias the aggregate. Ensure efficiency is still computed as correctness/cost
+            only when cost > 0.
+
+          HARD RULES:
+          - Do not alter unrelated behavior; keep _init_git_workdir's git config (user.name/email)
+            for the genuinely-new-repo case.
+          - When running tests, specify the exact test files (tests/test_opencode_events.py,
+            tests/test_step_routing.py, tests/test_signal_store.py, tests/test_workflow_runner.py)
+            — never bare pytest.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the follow-up work and write docs/routing_follow_up_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Run ONLY the routing-relevant tests, specifying files explicitly, e.g.:
+            `python -m pytest tests/test_signal_store.py tests/test_step_routing.py tests/test_routing.py tests/test_workflow_runner.py tests/test_backends.py tests/test_claude_adapter.py tests/test_experiment_spec.py tests/test_compile_experiment.py tests/test_admin_design_sessions.py tests/test_opencode_events.py -q`.
+            Never run a bare suite. Report the exact command + results; fix any introduced failure.
+          - Confirm build_signal_store(load_results()) returns non-None constraint_score and
+            cache_hit_rate for models that carry constraints_total / tokens_cache_read, and that
+            model aliases resolve (openai/gpt-5.6-sol <- openai/gpt-5.6).
+          - Confirm scripts/run_workflow.py auto-populates signals for a routing spec and still
+            runs routing-inactive specs unchanged.
+          - Confirm .instrument/session.jsonl is no longer tracked (git ls-files .instrument is
+            empty) and _init_git_workdir no longer creates an "Initial" commit in an already
+            initialized worktree.
+          - Confirm draft_state surfaces a routing error for an invalid allowed_models id.
+          - Run `python3 -c "from instrument.experiment_spec import validate_spec"` and confirm
+            the spec module imports cleanly.
+
+          DELIVER exactly one file, docs/routing_follow_up_verify.md: PASS/FAIL per check, the
+          exact pytest command + results, and a summary of what changed.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
