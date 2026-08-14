@@ -138,9 +138,18 @@ def _build_phase_prompt(phase: dict[str, Any], goal: str, prior: list[str]) -> s
 
 
 def _git_commit(workdir: Path, phase: str, goal: str) -> str:
-    """Stage and commit the worktree; return the short hash, or "" if nothing to commit."""
+    """Stage and commit the worktree; return the short hash, or "" if nothing to commit.
+
+    ``.instrument/`` (the runner's own session transcripts) is excluded from the snapshot
+    via a pathspec so ephemeral transcripts stop entering history (docs/routing_next_steps.md
+    item 5.1). The exclusion is explicit here rather than relying on ``.gitignore``, since a
+    fresh worktree may not yet carry the repo's ignore rules.
+    """
     try:
-        subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True, timeout=60)
+        subprocess.run(
+            ["git", "add", "-A", "--", ":(exclude).instrument"],
+            cwd=workdir, capture_output=True, timeout=60,
+        )
         staged = subprocess.run(
             ["git", "diff", "--cached", "--quiet"], cwd=workdir, capture_output=True
         )

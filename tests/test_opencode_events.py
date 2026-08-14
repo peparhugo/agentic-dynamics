@@ -5,9 +5,12 @@ and v2 (current) opencode event formats, producing a canonical representation.
 """
 
 import json
+import subprocess
+from pathlib import Path
+
 import pytest
 
-from instrument.opencode import normalize_opencode_event
+from instrument.opencode import _init_git_workdir, normalize_opencode_event
 
 
 # ── v1 format (historical — flat structure, no "part" key) ───────────────────
@@ -210,3 +213,43 @@ def test_both_formats_produce_same_canonical_tool_signature():
     # Schema versions differ but canonical fields match
     assert ev1["_schema"] == 1
     assert ev2["_schema"] == 2
+
+
+# ── git workdir initialization hygiene (docs/routing_next_steps.md item 5.2) ──
+
+
+def _git_rev_parse_head(path: Path) -> bool:
+    return subprocess.run(["git", "rev-parse", "HEAD"], cwd=path, capture_output=True).returncode == 0
+
+
+def test_init_git_workdir_is_a_noop_when_history_exists(tmp_path):
+    """An already-committed worktree must not gain a misnamed "Initial" commit."""
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "a@a"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "a"], cwd=tmp_path, check=True)
+    (tmp_path / "file.txt").write_text("content")
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "real"], cwd=tmp_path, check=True)
+    head_before = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
+
+    _init_git_workdir(str(tmp_path))
+
+    head_after = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
+    log = subprocess.run(["git", "log", "--oneline"], cwd=tmp_path, capture_output=True, text=True).stdout
+    assert head_after == head_before  # no new commit was created
+    assert "Initial" not in log
+
+
+def test_init_git_workdir_skips_empty_initial_commit(tmp_path):
+    """A fresh, empty worktree initializes with config but no empty "Initial" commit."""
+    _init_git_workdir(str(tmp_path))
+
+    assert _git_rev_parse_head(tmp_path) is False  # nothing staged → no commit
+    email = subprocess.run(
+        ["git", "config", "user.email"], cwd=tmp_path, capture_output=True, text=True
+    ).stdout.strip()
+    assert email == "experiment@instrument.local"  # runner identity still set for the new repo

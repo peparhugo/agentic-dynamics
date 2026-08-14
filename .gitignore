@@ -31,6 +31,9 @@ experiments/results/verified_tests.json
 # Local message/chat databases (runtime artifacts)
 messages.db
 
+# Instrument session transcripts (runtime artifacts — rewritten every run, never provenance)
+.instrument/
+
 # Review intermediate files (per-session + story, merged by finalize_reviews.py)
 experiments/results/reviews/review_*_S*.json
 experiments/results/reviews/review_*_story.json

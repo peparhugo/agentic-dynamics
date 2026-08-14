@@ -19,8 +19,34 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 
-from instrument.experiment_spec import load_spec  # noqa: E402
+from instrument.experiment_spec import ExperimentSpec, load_spec  # noqa: E402
+from instrument.signal_store import build_signal_store, load_results  # noqa: E402
+from instrument.step_routing import ModelSignals  # noqa: E402
 from instrument.workflow_runner import run_workflow  # noqa: E402
+
+
+def _spec_declares_routing(spec: ExperimentSpec) -> bool:
+    """True when the spec activates per-step routing (mirrors ``validate_workflow_routing``).
+
+    Routing is active when the workflow declares a ``model_pool``, any per-phase
+    ``model``/``allowed_models`` selector, or a ``preferences`` block. Only then do we bother
+    building the signal store; single-model specs run unchanged (cold router).
+    """
+    params = spec.workflow.params
+    if params.get("model_pool"):
+        return True
+    if params.get("preferences"):
+        return True
+    return any(
+        "model" in p or "allowed_models" in p for p in (params.get("phases") or [])
+    )
+
+
+def _load_signals(path: str) -> dict[str, ModelSignals]:
+    """Load an explicit signals override from a JSON file: ``{model: {field: value, …}}``."""
+    with open(path) as fh:
+        raw = json.load(fh)
+    return {m: ModelSignals.from_dict(d) for m, d in raw.items()}
 
 
 def main() -> None:
@@ -37,9 +63,27 @@ def main() -> None:
     ap.add_argument("--no-commit", action="store_true", help="do not commit after phases")
     ap.add_argument("--resume", action="store_true",
                     help="skip phases that already have a [workflow] <phase> commit")
+    ap.add_argument("--signals", default=None,
+                    help="path to a JSON file mapping model id -> measured signals "
+                         "(overrides the auto-built signal store)")
     args = ap.parse_args()
 
     spec = load_spec(Path(args.spec))
+
+    # Signal-store wiring (docs/routing_next_steps.md item 1): when the spec declares routing
+    # and no explicit --signals override was supplied, build the store from the measured
+    # corpus so the router consumes real data instead of cold-starting. The explicit
+    # signals/preferences kwargs on run_workflow remain the override hook.
+    signals: dict[str, ModelSignals] | None = None
+    if args.signals:
+        signals = _load_signals(args.signals)
+    elif _spec_declares_routing(spec):
+        try:
+            signals = build_signal_store(load_results())
+        except (FileNotFoundError, json.JSONDecodeError):
+            # No measured corpus available — let the router cold-start deterministically.
+            signals = None
+
     result = run_workflow(
         spec,
         goal=args.goal,
@@ -52,6 +96,7 @@ def main() -> None:
         timeout=args.timeout,
         commit=not args.no_commit,
         resume=args.resume,
+        signals=signals,
     )
 
     print(json.dumps(result.to_dict(), indent=2))

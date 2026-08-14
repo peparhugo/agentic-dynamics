@@ -37,6 +37,7 @@ from instrument.live import (
     STATUS_CHANNEL,
     STATUS_KEY,
 )
+from instrument.step_routing import validate_workflow_routing
 from instrument.supervisor import register_event_mapping
 
 try:  # Package import under pytest; sibling import for ``python admin/server.py``.
@@ -514,6 +515,11 @@ class DesignSessionManager:
             return base
 
         errors = validate_spec(spec)
+        # Surface per-step routing validation at Save time (docs/routing_next_steps.md item 2):
+        # an unknown ``allowed_models`` id, a duplicate ``model_pool``, or a forbidden/unknown
+        # preference signal must fail the draft here, not at run time. The session's default
+        # model seeds ``resolve_pool``; routing-inactive specs short-circuit to an empty list.
+        errors += validate_workflow_routing(spec, default_model=session.get("model", ""))
         # Session kind is an artifact constraint, not a replacement for the
         # ExperimentSpec validator.  It is evaluated only after validate_spec.
         if not SAFE_SPEC_ID.fullmatch(str(spec.name)):

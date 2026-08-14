@@ -130,6 +130,16 @@ from .routing import compute_routing, normalize_task, recommend_route, simulate_
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
+# v1.0: the signal store — measured per-model signals derived from _results_summary.json
+from .signal_store import (
+    MODEL_ALIASES,
+    build_signal_store,
+    derive_cache_hit_rate,
+    derive_constraint_score,
+    load_results,
+    normalize_model_id,
+)
+
 # Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
 from .solution import SolutionMetrics, evaluate_solution
 from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
@@ -143,7 +153,6 @@ from .step_routing import (
     RouteState,
     RoutingPreferences,
     StepSelector,
-    build_signal_store,
     cache_switch_penalty,
     parse_step_selector,
     resolve_pool,
@@ -209,7 +218,9 @@ __all__ = [
     "StepSelector", "MEASURED_SIGNALS", "FORBIDDEN_SIGNALS",
     "parse_step_selector", "validate_step_selector", "validate_preferences",
     "validate_workflow_routing", "resolve_pool", "cache_switch_penalty",
-    "build_signal_store",
+    # v1.0 signal store
+    "build_signal_store", "load_results", "derive_cache_hit_rate",
+    "derive_constraint_score", "normalize_model_id", "MODEL_ALIASES",
     # v0.6
     "LanguageProfile", "CodebaseAST", "detect_language", "parse_codebase",
     "get_parser", "collect_functions", "collect_imports",

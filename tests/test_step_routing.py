@@ -8,13 +8,13 @@ validator gating (edge_case_coverage / confidence), and graceful cold-start fall
 from types import SimpleNamespace
 
 from instrument.experiment_spec import ExperimentSpec, Factor, Workflow
+from instrument.signal_store import build_signal_store
 from instrument.step_routing import (
     FORBIDDEN_SIGNALS,
     MEASURED_SIGNALS,
     ModelSignals,
     RouteState,
     RoutingPreferences,
-    build_signal_store,
     cache_switch_penalty,
     resolve_pool,
     route_step,
@@ -217,27 +217,30 @@ def test_build_signal_store_aggregates_entries():
     entries = [
         {"model": DS, "correctness": 0.9, "cost": 0.001},
         {"model": DS, "correctness": 0.7, "cost": 0.003},
-        {"model": CL, "correctness": 0.95, "cost": 0.010, "cache_hit_rate": 0.5},
+        {"model": CL, "correctness": 0.95, "cost": 0.010,
+         "tokens_cache_read": 500, "tokens_input": 500},
     ]
     store = build_signal_store(entries)
     assert set(store) == {DS, CL}
     assert store[DS].correctness == 0.8
     assert store[DS].cost == 0.002
     assert store[DS].efficiency == 0.8 / 0.002
-    assert store[CL].cache_hit_rate == 0.5
+    assert store[CL].cache_hit_rate == 0.5  # 500 / (500 + 500)
     assert store[DS].cache_hit_rate is None
 
 
 def test_build_signal_store_aggregates_quality_dimensions():
     # SolutionMetrics quality dimensions are measured today and must be consumable by the
     # router; NaN marks "unmeasured" in _results_summary.json and is skipped, not averaged in.
+    # constraint_score is *derived* (constraints_met / constraints_total), not read directly.
     entries = [
-        {"model": DS, "constraint_score": 0.6, "code_quality_score": 0.8},
-        {"model": DS, "constraint_score": 0.8, "code_quality_score": float("nan")},
+        {"model": DS, "constraints_met": 6, "constraints_total": 10, "code_quality_score": 0.8},
+        {"model": DS, "constraints_met": 8, "constraints_total": 10,
+         "code_quality_score": float("nan")},
         {"model": CL, "novelty_score": 0.4, "composite_score": 0.7},
     ]
     store = build_signal_store(entries)
-    assert store[DS].constraint_score == 0.7
+    assert store[DS].constraint_score == 0.7  # (0.6 + 0.8) / 2
     assert store[DS].code_quality_score == 0.8  # NaN row dropped, not averaged
     assert store[CL].novelty_score == 0.4
     assert store[CL].composite_score == 0.7

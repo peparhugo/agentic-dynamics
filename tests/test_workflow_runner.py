@@ -105,6 +105,27 @@ def test_run_workflow_commits_per_phase(tmp_path):
     assert "[workflow] scope" in log.stdout
 
 
+def test_run_workflow_excludes_instrument_from_commit(tmp_path):
+    """The runner's own ``.instrument/`` transcripts never enter history (item 5.1)."""
+    spec = load_spec(SPEC)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.email", "t@t"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "config", "user.name", "t"], cwd=tmp_path, check=True)
+
+    def agent(prompt, *, model, backend, workdir, **kwargs):
+        (Path(workdir) / ".instrument").mkdir(exist_ok=True)
+        (Path(workdir) / ".instrument" / "session.jsonl").write_text("transcript")
+        (Path(workdir) / "docs").mkdir(exist_ok=True)
+        (Path(workdir) / "docs" / "scope.md").write_text("scope")
+        return _fake_agent()
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, run_agentic_fn=agent)
+    assert result.phases[0].commit_hash
+    tracked = subprocess.run(["git", "ls-files"], cwd=tmp_path, capture_output=True, text=True)
+    assert ".instrument" not in tracked.stdout
+    assert "docs/scope.md" in tracked.stdout
+
+
 def test_run_workflow_resume_skips_committed_phases(tmp_path):
     spec = load_spec(SPEC)
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
