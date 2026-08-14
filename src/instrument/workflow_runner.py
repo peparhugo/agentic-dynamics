@@ -148,18 +148,24 @@ def _git_head(workdir: Path) -> str:
         return ""
 
 
-def _completed_phases(workdir: Path, phase_names: list[str]) -> set[str]:
-    """Return phase names that already have a ``[workflow] <phase>`` commit."""
+def _completed_phases(workdir: Path, phase_names: list[str], goal: str) -> set[str]:
+    """Return phase names that already have a ``[workflow] <phase>`` commit *for this goal*.
+
+    The worktree inherits ``[workflow] <phase>`` commits from every workflow merged into
+    main, and phase names collide across workflows (scope/rewrite/verify). Match the goal
+    prefix in the commit subject so resume only skips this run's own phases.
+    """
     try:
         log = subprocess.run(
             ["git", "log", "--format=%s"], cwd=workdir, capture_output=True, text=True
         )
     except Exception:
         return set()
+    goal_prefix = goal[:40]
     completed: set[str] = set()
     for line in log.stdout.splitlines():
-        m = re.search(r"\[workflow\]\s+(\S+)", line)
-        if m and m.group(1) in phase_names:
+        m = re.search(r"\[workflow\]\s+(\S+)\s+—\s+(.+)", line)
+        if m and m.group(1) in phase_names and m.group(2).startswith(goal_prefix):
             completed.add(m.group(1))
     return completed
 
@@ -231,7 +237,7 @@ def run_workflow(
     start_idx = 0
     if resume:
         phase_names = [str(p.get("name", "?")) for p in phases]
-        completed = _completed_phases(wd, phase_names)
+        completed = _completed_phases(wd, phase_names, goal)
         for i, phase_def in enumerate(phases):
             name = str(phase_def.get("name", "?"))
             if name in completed:
