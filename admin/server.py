@@ -462,8 +462,11 @@ def api_routing():
 
 @app.post("/api/experiments")
 def api_experiments():
-    body = request.get_json(silent=True) or {}
-    action = body.get("action", "enqueue")
+    # Never default to a costly action: require an explicit JSON body + action.
+    body = request.get_json(silent=True)
+    if not isinstance(body, dict) or "action" not in body:
+        return jsonify({"error": "missing action"}), 400
+    action = body["action"]
     if action not in ("enqueue", "clear"):
         return jsonify({"error": f"unknown action {action!r}"}), 400
 
@@ -614,4 +617,6 @@ def index():
 
 if __name__ == "__main__":
     port = int(os.environ.get("FINOPS_PORT", "8000"))
-    app.run(host="0.0.0.0", port=port, threaded=True)
+    # Secure default: loopback only. Bind wider via FINOPS_HOST=0.0.0.0 explicitly.
+    host = os.environ.get("FINOPS_HOST", "127.0.0.1")
+    app.run(host=host, port=port, threaded=True)
