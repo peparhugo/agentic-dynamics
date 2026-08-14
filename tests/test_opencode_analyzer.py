@@ -1,15 +1,19 @@
 """Tests for opencode-driven analysis module."""
 
+import json
+from types import SimpleNamespace
+
 import pytest
-from pathlib import Path
+
+import instrument.opencode_analyzer as analyzer_module
 from instrument.opencode_analyzer import (
     OpencodeAnalyzer,
+    _build_batch_prompt,
+    _build_comparison_prompt,
+    _build_session_prompt,
+    _load_session_jsonl,
     _load_summary,
     _resolve_worktree,
-    _build_session_prompt,
-    _build_comparison_prompt,
-    _build_batch_prompt,
-    _load_session_jsonl,
 )
 
 
@@ -47,7 +51,21 @@ class TestSessionJsonl:
 
 
 class TestBuildPrompt:
-    def test_session_prompt_has_metrics(self):
+    def test_session_prompt_has_metrics(self, tmp_path, monkeypatch):
+        # Prompt formatting is tested against stable inputs, not the mutable result aggregate.
+        reports_dir = tmp_path / "reports"
+        session_dir = reports_dir / "exp_0s36_d3n"
+        session_dir.mkdir(parents=True)
+        (session_dir / "session.jsonl").write_text('{"type": "reasoning"}\n')
+        summary_path = tmp_path / "summary.json"
+        summary_path.write_text(json.dumps({"entries": [{
+            "worktree_name": "exp_0s36_d3n",
+            "model": "deepseek/deepseek-v4-pro",
+            "correctness": 0.9,
+        }]}))
+        monkeypatch.setattr(analyzer_module, "REPORTS_DIR", reports_dir)
+        monkeypatch.setattr(analyzer_module, "SUMMARY_PATH", summary_path)
+
         prompt = _build_session_prompt("exp_0s36_d3n")
         assert "exp_0s36_d3n" in prompt
         assert "deepseek/deepseek-v4-pro" in prompt
@@ -127,10 +145,23 @@ class TestOpencodeAnalyzer:
             if "No entries" in str(e):
                 pytest.skip("No wasteful entries available")
 
-    def test_model_analysis(self):
-        try:
-            result = self.analyzer.analyze_model("deepseek/deepseek-v4-pro")
-            assert result is not None
-            assert result.duration_s > 0
-        except ValueError as e:
-            pytest.fail(f"Model analysis failed: {e}")
+    def test_model_analysis(self, monkeypatch):
+        model_id = "deepseek/deepseek-v4-pro"
+        expected_entries = [{"model": model_id, "experiment": "fixture"}]
+        captured = {}
+
+        monkeypatch.setattr(analyzer_module, "_load_summary", lambda: expected_entries)
+
+        def fake_batch_analyze(entries, question):
+            """Capture the filtered batch without invoking the external analysis harness."""
+            captured["entries"] = entries
+            captured["question"] = question
+            return SimpleNamespace(duration_s=1.0)
+
+        monkeypatch.setattr(self.analyzer, "batch_analyze", fake_batch_analyze)
+
+        result = self.analyzer.analyze_model(model_id)
+
+        assert result.duration_s > 0
+        assert captured["entries"] == expected_entries
+        assert model_id in captured["question"]

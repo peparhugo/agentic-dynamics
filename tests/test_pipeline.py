@@ -4,34 +4,29 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from pipeline import (
-    PlanPhase,
+    EXECUTORS,
     PlanDefinition,
+    PlanPhase,
     PlanState,
     Workstream,
-    load_plans,
-    validate_plan,
-    topological_order,
-    workstream_waves,
+    _detect_conflicts,
     _detect_cycles,
+    _execute_pipeline,
+    _execute_shell,
     _interpolate_levels,
-    _substitute_template,
     _parse_phase,
     _parse_workstreams,
     _resolve_cwd,
-    _detect_conflicts,
-    _execute_shell,
-    _execute_test,
-    _execute_lint,
-    _execute_pipeline,
-    EXECUTORS,
+    _substitute_template,
+    load_plans,
+    topological_order,
+    validate_plan,
+    workstream_waves,
 )
-
 
 VALID_PLANS_YAML = """
 plans:
@@ -565,7 +560,8 @@ class TestResolveCwd:
     def test_root_default(self):
         phase = PlanPhase(id="a", kind="shell")
         result = _resolve_cwd(phase, {})
-        assert result.endswith("ai-finops-framework")
+        # Feature worktrees have arbitrary basenames; the default must be this repository root.
+        assert result == str(Path(__file__).resolve().parent.parent)
 
 
 class TestDetectConflicts:
@@ -597,7 +593,6 @@ class TestDetectConflictsIntegration:
         return git
 
     def test_clean_merge(self, tmp_path):
-        import subprocess
         git = self._make_repo(tmp_path)
         (tmp_path / "g.txt").write_text("new\n")
         git("add", "-A")
