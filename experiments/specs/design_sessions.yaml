@@ -1,0 +1,117 @@
+name: design_sessions
+question: "Can the Control Room host live opencode design sessions that author and validate ExperimentSpecs?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/scope.md scoping the following feature.
+
+          GOAL:
+          {goal}
+
+          THIS WORKTREE ALREADY CONTAINS THE CONTROL ROOM (do not rebuild it — extend it):
+          - admin/server.py — Flask SSE backend, now with server-side telemetry aggregation helpers
+            (_retained_telemetry, _step_sample, ...) that add a `telemetry` field to GET /api/matrix.
+          - admin/static/ — app.js (~900 lines) + control-room-core.js (pure data helpers) + style.css.
+            A single-screen "command rail" layout: reported-spend/burn ticker, fleet of pulsing cell
+            cards with sparklines, terminal transcript, read-only session control pane, routing drawer,
+            queue actions in a utility menu.
+          - Endpoints: GET /api/matrix, GET /api/status (SSE), GET /api/events/<cell> (SSE),
+            GET /api/routing, POST /api/experiments, GET / (static).
+
+          INTEGRATION SURFACE YOU MUST INVESTIGATE FIRST (cite exact facts in scope.md):
+          - An `opencode web` server is already running at http://127.0.0.1:4096 (full web UI + server
+            API; `opencode web --help` shows --port/--hostname/--cors). Determine the HTTP/WebSocket
+            contract for listing/creating a session and streaming its events.
+          - The opencode JS SDK (`@opencode-ai/sdk`, importable as .mjs) is an alternative programmatic
+            surface. Compare it against the raw server API.
+          - The repo already drives opencode via the CLI: src/instrument/opencode.py run_opencode_agentic
+            spawns `opencode run` as a subprocess. A third option is the portal backend spawning a session
+            and re-exposing it over the existing SSE transport. Pick ONE approach and justify it.
+
+          DESIGN-SESSION CONTRACT (the thing being built):
+          - Two session kinds, both LIVE opencode sessions rendered in the Control Room's existing
+            terminal + control pane (no iframe, consistent with the read-only attachment design):
+            1. "Workflow design session" — operator describes a feature; the agent drafts an ExperimentSpec
+               (workflow: agent_task with phases), validated live by src/instrument/experiment_spec.py
+               validate_spec, errors surfaced inline.
+            2. "Experiment design session" — operator describes a research question; the agent drafts a
+               factorial ExperimentSpec (factors/rules/metrics/comparison), validated live and compiled to
+               cells via src/instrument/compile_experiment.py experiment_matrix.
+          - A drafted spec must be saveable to experiments/specs/*.yaml and (optionally) runnable via
+            scripts/run_workflow.py or enqueued.
+
+          CONSTRAINTS:
+          - Extend the existing Control Room; keep its command-rail aesthetic and SSE/Redis backend pattern.
+          - No new infrastructure beyond what opencode already provides (the :4096 server or an SDK).
+          - The session pane stays observational unless an explicit, backend-supported send/steer path exists.
+
+          DELIVER exactly one file, docs/scope.md: (1) problem, (2) the investigated integration facts with
+          line/reference citations, (3) chosen integration approach + rationale, (4) constraints,
+          (5) a numbered acceptance list the implement phase can check off and verify can test.
+      - name: ux_design
+        kind: agent
+        prompt: |
+          Write docs/ux.md designing the experience for:
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          GROUNDING:
+          - The Control Room is a single-screen command rail (reported-spend ticker + burn trace, fleet of
+            pulsing cell cards, terminal transcript, read-only session control pane, routing drawer, queue
+            utility menu). The design must extend this language, not introduce a new one.
+          - Sessions stream events over SSE today; live design sessions should feel like the existing
+            terminal transcript, not a foreign embedded widget.
+
+          DESIGN INTENT:
+          - Two clearly-labeled session launchers ("Workflow design", "Experiment design") in the control
+            pane or command rail.
+          - A design session reads like the terminal: the operator's prompt, the agent's drafting, and
+            inline validation results (validate_spec errors or "spec valid — 12 cells") rendered as
+            terminal rows, with the drafted spec shown in a mono, syntax-aware block.
+          - A "Save spec" / "Enqueue" action on a validated draft, with the same confirmation discipline
+            as the existing queue actions.
+
+          DELIVER exactly one file, docs/ux.md: (1) layout/screen map, (2) interaction flow for both
+          session kinds, (3) visual language, (4) which endpoint/stream feeds each element.
+      - name: implement
+        kind: agent
+        prompt: |
+          Implement the feature per docs/scope.md and docs/ux.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Extend admin/ only. Reuse the existing SSE/Redis backend pattern and the Control Room's
+            existing frontend modules (control-room-core.js + app.js).
+          - The opencode integration must use the approach justified in docs/scope.md.
+          - Drafted specs are validated via src/instrument/experiment_spec.py validate_spec (and
+            compile_experiment.py experiment_matrix for experiment sessions); do not reimplement validation.
+          - Add tests for any backend change; they must run under pytest.
+
+          DELIVER working code + tests. The verify phase runs pytest in this repository.
+      - name: verify
+        kind: test
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: verified_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
