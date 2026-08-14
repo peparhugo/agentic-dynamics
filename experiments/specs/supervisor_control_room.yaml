@@ -1,0 +1,108 @@
+name: supervisor_control_room
+question: "Can the Control Room surface the supervisor's flags and let a human review, steer, and interrupt?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/supervisor_design.md: the design for surfacing the supervisor in the Control Room.
+
+          GOAL:
+          {goal}
+
+          CONTEXT — the loop to close is: supervisor flags → human sees "needs attention" → human
+          reviews the session → human steers or interrupts. Today the supervisor runs but its flags are
+          invisible (they land in a file nothing reads), and the steer/interrupt API exists but has no UI.
+
+          EXISTING PIECES (ground truth, do not rebuild):
+          - Control Room: admin/server.py (Flask SSE backend) + admin/static/ (app.js ~900 lines +
+            control-room-core.js, the command-rail aesthetic: spend ticker, fleet of pulsing cards,
+            terminal transcript, read-only session control pane, routing drawer, queue utility menu).
+          - Supervisor: scripts/supervise.py — a flash monitor session that polls active :4096 sessions,
+            micro-batches their activity, assesses (healthy/stalled/off_track), and emits flags. Each flag
+            is JSON: {at, session_id, title, model, status, why}. Written append-only to
+            experiments/results/supervisor/flags.jsonl + stdout. FLAG-ONLY today (never steers/interrupts).
+          - opencode client: admin/opencode_client.py — send_input(session_id, prompt, delivery) [steer],
+            interrupt(session_id), messages(session_id), iter_events(session_id, after). These are the
+            native :4096 API methods; nothing in the UI calls them for monitored sessions yet.
+          - Session identity: workflow sessions stream to Redis under wf_<spec>_<model> cells (via
+            FINOPS_CELL_ID); other sessions are bridged under live_<model>_<title> cells by the
+            supervisor's relay. A flag's session_id is the native ses_... id, which must map to a cell the
+            terminal can render.
+
+          DESIGN REQUIREMENTS:
+          - A "Needs Attention" / "Supervisor" surface in the Control Room that lists flagged sessions
+            with status + reason + a compact summary (model, age, last activity). The design must make
+            attention obvious without interrupting the fleet view.
+          - Review flow: selecting a flag loads that session's activity into the existing terminal (map
+            the flag's session_id → the Redis cell). Do not build a second terminal.
+          - Act flow: steer (send a prompt to the session) and interrupt, wired to opencode_client.py,
+            with the door discipline the rest of the site already uses — interrupt is a ONE-WAY door
+            (destructive, requires explicit confirmation); steer is reversible but deliberate.
+          - Human-in-the-loop is the invariant: the supervisor only FLAGS. The human decides and acts.
+            The UI must make that boundary legible (a "supervisor flags, you decide" affordance).
+          - Plumbing: supervisor pushes flags to a Redis list (supervisor_flags); admin/server.py serves
+            GET /api/flags from it (with flags.jsonl as a fallback so nothing is lost on restart).
+
+          HARD CONSTRAINTS:
+          - Extend the existing Control Room; keep its command-rail aesthetic and SSE/Redis pattern.
+          - Preserve the 25 existing admin tests; add tests for the new endpoint + the steer/interrupt
+            wiring (mocked opencode client, no live :4096 dependency).
+          - Do not change the supervisor's flag-only assessment semantics.
+
+          DELIVER exactly one file, docs/supervisor_design.md: (1) the needs-attention surface layout,
+          (2) the flag→session review mapping, (3) the steer/interrupt interaction + door discipline,
+          (4) the /api/flags contract, (5) the session_id→cell mapping strategy, (6) an acceptance list.
+      - name: implement
+        kind: agent
+        prompt: |
+          Implement the supervisor surface per docs/supervisor_design.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Extend admin/ (server.py + static/). Update scripts/supervise.py's emit_flag to also LPUSH
+            each flag to the supervisor_flags Redis list.
+          - GET /api/flags reads supervisor_flags (fallback to flags.jsonl). Steer/interrupt go through
+            admin/opencode_client.py (send_input / interrupt) with server-side confirmation for interrupt.
+          - Keep all 25 existing admin tests passing. Add tests for /api/flags and the steer/interrupt
+            endpoints (mock OpenCodeClient; no live :4096).
+          - The supervisor only flags — the human acts. Do not add any autonomous steering.
+
+          DELIVER working code + tests. The verify phase runs pytest.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the supervisor surface.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - python3 -m pytest tests/test_admin_server.py tests/test_admin_frontend.py
+            tests/test_admin_design_sessions.py -q → pass, plus any new tests.
+          - GET /api/flags returns the supervisor_flags list; steer/interrupt endpoints work against a
+            mocked client; interrupt requires explicit confirmation.
+          - No autonomous steering anywhere (the supervisor flags; the human acts).
+
+          DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + summary.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
