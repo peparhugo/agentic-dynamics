@@ -65,6 +65,68 @@
           <div class="skeleton-card" aria-hidden="true"></div>
         </div>
         <div id="fleet-counts" class="fleet-counts" aria-label="Fleet status counts"></div>
+
+        <section id="claude-agents" class="claude-agents-pane" aria-labelledby="claude-agents-title">
+          <header class="pane-header claude-agents-header">
+            <div>
+              <div class="eyebrow">Claude background sessions</div>
+              <h2 id="claude-agents-title"><span id="claude-agent-total">--</span> SESSIONS</h2>
+            </div>
+            <button id="new-claude-agent" type="button">Start background session</button>
+          </header>
+
+          <div id="claude-agent-daemon-panel" class="daemon-panel" aria-labelledby="daemon-panel-title">
+            <h3 id="daemon-panel-title">DAEMON</h3>
+            <dl class="control-facts">
+              <div><dt>Status</dt><dd id="daemon-status">UNKNOWN</dd></div>
+              <div><dt>PID</dt><dd id="daemon-pid">--</dd></div>
+            </dl>
+            <div class="daemon-stop-controls">
+              <label class="check-label">
+                <input id="daemon-end-sessions" type="checkbox">
+                Also end every hosted session (keep_workers: false)
+              </label>
+              <button id="daemon-stop-button" class="danger-action" type="button">Stop daemon</button>
+            </div>
+            <p class="boundary-copy">Stopping the daemon affects every background session on this machine, not just ones started from the Control Room.</p>
+            <output id="daemon-stop-result" class="inline-result" aria-live="polite"></output>
+          </div>
+
+          <form id="claude-agent-start-form" class="control-form" hidden>
+            <h3>NEW BACKGROUND SESSION</h3>
+            <label>
+              <span>Task</span>
+              <textarea id="claude-agent-task" rows="4" maxlength="12000" required></textarea>
+            </label>
+            <label>
+              <span>Model (optional)</span>
+              <input id="claude-agent-model" type="text" placeholder="provider/model" autocomplete="off">
+            </label>
+            <label>
+              <span>Advisor (optional)</span>
+              <select id="claude-agent-advisor">
+                <option value="">None</option>
+                <option value="fable">fable</option>
+                <option value="opus">opus</option>
+                <option value="sonnet">sonnet</option>
+              </select>
+            </label>
+            <label>
+              <span>Approved workdir</span>
+              <select id="claude-agent-workdir" required><option value="">Loading approved workdirs…</option></select>
+            </label>
+            <p class="boundary-copy">Launched unattended with --dangerously-skip-permissions, the same as every other headless run this framework makes.</p>
+            <div class="form-actions">
+              <button id="cancel-claude-agent-start" type="button">Cancel</button>
+              <button id="start-claude-agent" class="primary-action" type="submit">Start session</button>
+            </div>
+            <output id="claude-agent-start-result" class="inline-result" aria-live="polite"></output>
+          </form>
+
+          <div id="claude-agent-grid" class="fleet-grid claude-agent-grid" aria-busy="true">
+            <p class="empty-state">Loading Claude background sessions…</p>
+          </div>
+        </section>
       </section>
 
       <section id="transcript-panel" class="pane transcript-pane" aria-labelledby="transcript-title">
@@ -204,6 +266,29 @@
             <button id="interrupt-design" class="danger-action" type="button">Interrupt</button>
             <button id="detach-design" type="button">Detach</button>
           </div>
+        </section>
+
+        <section id="claude-agent-control-panel" class="claude-agent-control-panel" hidden>
+          <a class="mobile-anchor" href="#transcript-panel">Jump to transcript</a>
+          <dl class="control-facts">
+            <div><dt>Session</dt><dd id="claude-agent-control-id">--</dd></div>
+            <div><dt>Status</dt><dd id="claude-agent-control-status">UNKNOWN</dd></div>
+            <div><dt>Ownership</dt><dd id="claude-agent-control-ownership">--</dd></div>
+            <div><dt>Model / Workdir</dt><dd><span id="claude-agent-control-model">--</span><br><span id="claude-agent-control-cwd">--</span></dd></div>
+          </dl>
+          <p id="claude-agent-transcript-note" class="boundary-copy"></p>
+          <div id="claude-agent-owned-controls" class="design-stream-actions">
+            <button id="claude-agent-stop" class="danger-action" type="button">Stop</button>
+            <button id="claude-agent-respawn" type="button">Respawn</button>
+            <button id="claude-agent-rm" class="danger-action" type="button">Rm</button>
+            <button id="claude-agent-detach" type="button">Detach</button>
+          </div>
+          <div id="claude-agent-external-controls" class="design-stream-actions" hidden>
+            <button id="claude-agent-fetch-logs" type="button">Fetch latest log tail</button>
+            <button id="claude-agent-detach-external" type="button">Detach</button>
+          </div>
+          <pre id="claude-agent-external-log" class="claude-agent-external-log"></pre>
+          <output id="claude-agent-action-result" class="inline-result" aria-live="polite"></output>
         </section>
 
         <section class="recent-designs" aria-labelledby="recent-designs-title">

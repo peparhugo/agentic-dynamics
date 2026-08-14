@@ -17,6 +17,9 @@
   const DESIGN_LIST_POLL_MS = 10000
   const DRAFT_POLL_MS = 3000
   const BURN_WINDOW_MS = 60000
+  const CLAUDE_AGENTS_POLL_MS = 10000
+  const CLAUDE_AGENTS_DAEMON_POLL_MS = 15000
+  const CLAUDE_AGENT_CELL_PREFIX = "claude_bg_"
   const STATUS_SYMBOLS = {
     queued: "○",
     running: "◔",
@@ -74,6 +77,12 @@
     draftState: null,
     draftSignature: null,
     draftFresh: false,
+    claudeAgents: new Map(),
+    claudeAgentsUnavailable: false,
+    approvedClaudeAgentWorkdirs: [],
+    selectedClaudeAgentId: null,
+    claudeAgentMutationPending: false,
+    claudeAgentDaemon: null,
   }
 
   /** Query one required shell element. */
@@ -329,6 +338,13 @@
     return state.selectedType === "design" ? state.designSessions.get(state.selectedId) || null : null
   }
 
+  /** Return the selected Claude background-session roster entry, if selected. */
+  function selectedClaudeAgent() {
+    return state.selectedType === "claude_agent"
+      ? state.claudeAgents.get(state.selectedClaudeAgentId) || null
+      : null
+  }
+
   /** Render recent portal-owned sessions without mixing them into fleet cells. */
   function renderRecentDesigns() {
     const list = $("#recent-design-list")
@@ -390,22 +406,113 @@
     $("#run-workflow-button").disabled = !state.draftFresh || !draft?.capabilities?.run || state.designMutationPending
   }
 
-  /** Synchronize terminal and control headers with either selection kind. */
+  /** Render the roster-derived fields and lifecycle affordances for one selected agent. */
+  function renderClaudeAgentControls(entry) {
+    $("#claude-agent-control-id").textContent = entry.id
+    $("#claude-agent-control-status").textContent = String(entry.status || "unknown").toUpperCase()
+    $("#claude-agent-control-ownership").textContent = entry.owned
+      ? "OWNED — full lifecycle control"
+      : "EXTERNAL — not started here; manage it with the claude CLI directly"
+    $("#claude-agent-control-model").textContent = entry.model || "Unknown model"
+    $("#claude-agent-control-cwd").textContent = entry.cwd || "Unknown workdir"
+    $("#claude-agent-owned-controls").hidden = !entry.owned
+    $("#claude-agent-external-controls").hidden = entry.owned
+    $("#claude-agent-transcript-note").textContent = entry.owned
+      ? entry.relay_active === false
+        ? "Transcript relay paused (fleet at capacity)."
+        : "Claude transcripts are a best-effort, tail-bounded relay of “recent output,” not a gapless history API."
+      : "External session — showing a one-shot, best-effort log tail only, not a live stream."
+  }
+
+  /** Render urgency-agnostic Claude background-session cards, owned first. */
+  function renderClaudeAgentGrid() {
+    const grid = $("#claude-agent-grid")
+    grid.setAttribute("aria-busy", "false")
+    grid.replaceChildren()
+    const entries = Array.from(state.claudeAgents.values())
+    if (state.claudeAgentsUnavailable) {
+      grid.appendChild(element("p", "empty-state", "Supervisor not running — start scripts/claude_agents_supervisor.py to see the roster."))
+    } else if (entries.length === 0) {
+      grid.appendChild(element("p", "empty-state", "No Claude background sessions observed."))
+    }
+    const knownStatuses = new Set(["queued", "running", "done", "failed", "timeout"])
+    for (const entry of entries) {
+      const selected = state.selectedType === "claude_agent" && state.selectedClaudeAgentId === entry.id
+      const status = String(entry.status || "unknown").toLowerCase()
+      const statusWord = knownStatuses.has(status) ? status : "unknown"
+      const card = element("article", `cell-card claude-agent-card status-${statusWord}${selected ? " selected" : ""}`)
+      const button = element("button", "cell-select")
+      button.type = "button"
+      button.title = entry.id
+      button.setAttribute("aria-pressed", String(selected))
+      button.setAttribute("aria-label", `${entry.owned ? "Owned" : "External"} Claude background session ${entry.id}`)
+      button.addEventListener("click", () => selectClaudeAgent(entry.id, true))
+
+      const heading = element("div", "cell-heading")
+      heading.appendChild(element("span", `status-word status-${statusWord}`, statusWord.toUpperCase()))
+      heading.appendChild(element("span", `ownership-chip ${entry.owned ? "owned" : "external"}`, entry.owned ? "OWNED" : "EXTERNAL"))
+      button.appendChild(heading)
+      button.appendChild(element("span", "cell-id", entry.id))
+      button.appendChild(element("span", "claude-agent-task", entry.task || entry.title || "No task recorded"))
+      button.appendChild(element("span", "claude-agent-meta", `${entry.model || "unknown model"} · ${entry.cwd || "unknown cwd"}`))
+      card.appendChild(button)
+      grid.appendChild(card)
+    }
+    $("#claude-agent-total").textContent = String(entries.length)
+  }
+
+  /** Fill the start-session workdir control from backend-owned approved labels. */
+  function renderClaudeAgentWorkdirOptions() {
+    const select = $("#claude-agent-workdir")
+    const previous = select.value
+    select.replaceChildren()
+    for (const item of state.approvedClaudeAgentWorkdirs) {
+      const option = element("option", "", item.label)
+      option.value = item.key
+      select.appendChild(option)
+    }
+    if (state.approvedClaudeAgentWorkdirs.some((item) => item.key === previous)) select.value = previous
+  }
+
+  /** Render the always-visible, read-only daemon panel (no control affordance here). */
+  function renderClaudeAgentDaemon() {
+    const daemon = state.claudeAgentDaemon || { running: false }
+    $("#daemon-status").textContent = daemon.running ? "RUNNING" : "NOT RUNNING"
+    $("#daemon-pid").textContent = daemon.pid ? String(daemon.pid) : "--"
+  }
+
+  /** Synchronize terminal and control headers with any of the three selection kinds. */
   function renderSelection() {
     const cellId = state.selectedId
     const design = selectedDesignSession()
-    $("#cell-control-panel").hidden = Boolean(design)
+    const claudeAgent = selectedClaudeAgent()
+    $("#cell-control-panel").hidden = Boolean(design) || Boolean(claudeAgent)
     $("#design-control-panel").hidden = !design
-    $("#transcript-mode").textContent = design ? "Design / Terminal" : "Cell / Transcript"
-    $("#control-mode").textContent = design ? "Portal-owned session" : "Read-only attachment"
-    $("#ownership-badge").textContent = design ? "INTERACTIVE" : "READ ONLY"
-    $("#ownership-badge").className = design ? "interactive-badge" : "readonly-badge"
+    $("#claude-agent-control-panel").hidden = !claudeAgent
+    $("#transcript-mode").textContent = design ? "Design / Terminal" : claudeAgent ? "Claude background session" : "Cell / Transcript"
+    $("#control-mode").textContent = design
+      ? "Portal-owned session"
+      : claudeAgent
+        ? (claudeAgent.owned ? "Portal-owned background session" : "External background session — read only")
+        : "Read-only attachment"
+    $("#ownership-badge").textContent = design ? "INTERACTIVE" : claudeAgent ? (claudeAgent.owned ? "OWNED" : "EXTERNAL") : "READ ONLY"
+    $("#ownership-badge").className = design || claudeAgent?.owned ? "interactive-badge" : "readonly-badge"
     if (design) {
       $("#transcript-title").textContent = design.title
       $("#selected-status").textContent = design.lifecycle_state.toUpperCase()
       $("#selected-status").className = "status-word status-running"
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       renderDesignControls(design)
+      renderRecentDesigns()
+      return
+    }
+    if (claudeAgent) {
+      const status = String(claudeAgent.status || "unknown").toLowerCase()
+      $("#transcript-title").textContent = claudeAgent.id
+      $("#selected-status").textContent = status.toUpperCase()
+      $("#selected-status").className = `status-word status-${status}`
+      $("#selected-stream-state").textContent = state.streamState.toUpperCase()
+      renderClaudeAgentControls(claudeAgent)
       renderRecentDesigns()
       return
     }
@@ -800,6 +907,49 @@
     state.draftPollTimer = window.setInterval(loadDraftState, DRAFT_POLL_MS)
   }
 
+  /** Select a Claude background session and hand off the same detail source.
+   *
+   * Only owned sessions attach the shared SSE stream (§1.4:
+   * ``claude_bg_<id>`` is exactly the existing ``/api/events/<cell_id>``
+   * route). External sessions never attach — they render a one-shot
+   * ``/logs`` fetch instead of a live transcript.
+   */
+  function selectClaudeAgent(id, attach) {
+    const entry = state.claudeAgents.get(id)
+    if (!entry) return
+    const cellId = `${CLAUDE_AGENT_CELL_PREFIX}${id}`
+    const changed = state.selectedId !== cellId || state.selectedType !== "claude_agent"
+    if (changed) {
+      if (state.eventSource) state.eventSource.close()
+      state.eventSource = null
+      state.selectedId = cellId
+      state.selectedType = "claude_agent"
+      state.selectedClaudeAgentId = id
+      state.selectedSessionIds = []
+      state.rows = []
+      state.buffer = []
+      state.eventLedgerCounts = new Map()
+      state.eventLedgerOrder = []
+      state.replaySkipCounts = new Map()
+      state.replaySeenCounts = new Map()
+      state.replayTail = []
+      state.raceDuplicateCounts = new Map()
+      state.paused = false
+      state.follow = true
+      state.attached = false
+      state.streamState = "disconnected"
+      state.draftState = null
+      $("#claude-agent-action-result").textContent = ""
+      $("#claude-agent-external-log").textContent = ""
+      $("#pause-button").textContent = "Pause"
+      announce(`Selected Claude background session ${id}`)
+    }
+    renderClaudeAgentGrid()
+    renderSelection()
+    renderTranscript(false)
+    if (entry.owned && attach && !state.attached) connectSelectedStream()
+  }
+
   /** Detach the browser only; no process or Redis control request is made. */
   function detachSelectedStream() {
     if (state.eventSource) state.eventSource.close()
@@ -1044,6 +1194,28 @@
     return data
   }
 
+  /** Call a same-origin JSON claude-agent mutation and preserve structured errors. */
+  async function claudeAgentMutation(path, body) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": mutationKey() },
+      body: JSON.stringify(body),
+    })
+    let data
+    try {
+      data = await response.json()
+    } catch (_error) {
+      throw new Error(`Control Room returned an unreadable response (${response.status})`)
+    }
+    if (!response.ok) {
+      const error = new Error(data.error || data.message || `Request failed (${response.status})`)
+      error.response = data
+      error.status = response.status
+      throw error
+    }
+    return data
+  }
+
   /** Fill both approved-workdir controls from backend-owned labels. */
   function renderWorkdirOptions() {
     for (const selector of ["#design-workdir", "#run-workdir"]) {
@@ -1087,6 +1259,42 @@
     } catch (error) {
       $("#recent-design-list").replaceChildren(element("p", "error-state", error.message || "Design sessions unavailable"))
     }
+  }
+
+  /** Read the supervisor-maintained roster; this call never reaches the claude CLI. */
+  async function loadClaudeAgents() {
+    try {
+      const response = await fetch("/api/claude-agents")
+      const data = await response.json()
+      state.claudeAgentsUnavailable = data.error === "supervisor_unavailable"
+      const agents = Array.isArray(data.agents) ? data.agents : []
+      state.claudeAgents = new Map(
+        agents.filter((entry) => entry && typeof entry.id === "string").map((entry) => [entry.id, entry]),
+      )
+      state.approvedClaudeAgentWorkdirs = Array.isArray(data.workdirs) ? data.workdirs : []
+      renderClaudeAgentWorkdirOptions()
+    } catch (_error) {
+      state.claudeAgentsUnavailable = true
+    }
+    renderClaudeAgentGrid()
+    if (state.selectedType === "claude_agent" && !state.claudeAgents.has(state.selectedClaudeAgentId)) {
+      detachSelectedStream()
+      state.selectedId = null
+      state.selectedType = null
+      state.selectedClaudeAgentId = null
+    }
+    renderSelection()
+  }
+
+  /** Read-only ``claude daemon status``; no control affordance is derived here. */
+  async function loadClaudeAgentDaemon() {
+    try {
+      const response = await fetch("/api/claude-agents/daemon")
+      state.claudeAgentDaemon = await response.json()
+    } catch (_error) {
+      state.claudeAgentDaemon = { running: false }
+    }
+    renderClaudeAgentDaemon()
   }
 
   /** Reveal a kind-specific start form while preserving entered text on failure. */
@@ -1403,6 +1611,167 @@
       const warning = "This clears queued metadata; it does not cancel running work."
       if (window.confirm(warning)) runQueueAction("clear")
     })
+    bindClaudeAgentControls()
+  }
+
+  /** Register every Claude background-session control: start, stop, respawn, rm, daemon. */
+  function bindClaudeAgentControls() {
+    $("#new-claude-agent").addEventListener("click", () => {
+      $("#claude-agent-start-form").hidden = false
+      $("#claude-agent-task").focus()
+    })
+    $("#cancel-claude-agent-start").addEventListener("click", () => {
+      $("#claude-agent-start-form").hidden = true
+      $("#claude-agent-start-result").textContent = ""
+    })
+    $("#claude-agent-start-form").addEventListener("submit", async (event) => {
+      event.preventDefault()
+      if (state.claudeAgentMutationPending) return
+      const button = $("#start-claude-agent")
+      const originalLabel = button.textContent
+      state.claudeAgentMutationPending = true
+      button.disabled = true
+      button.textContent = "Starting…"
+      $("#claude-agent-start-result").textContent = "Starting claude --bg session…"
+      try {
+        const model = $("#claude-agent-model").value.trim()
+        const advisor = $("#claude-agent-advisor").value
+        const data = await claudeAgentMutation("/api/claude-agents", {
+          task: $("#claude-agent-task").value,
+          workdir: $("#claude-agent-workdir").value,
+          ...(model ? { model } : {}),
+          ...(advisor ? { advisor } : {}),
+        })
+        $("#claude-agent-start-form").hidden = true
+        $("#claude-agent-start-result").textContent = ""
+        $("#claude-agent-task").value = ""
+        announce(`Started Claude background session ${data.id}`)
+        await loadClaudeAgents()
+        selectClaudeAgent(data.id, true)
+      } catch (error) {
+        $("#claude-agent-start-result").textContent = error.message || "Could not start session"
+        announce($("#claude-agent-start-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        button.disabled = false
+        button.textContent = originalLabel
+      }
+    })
+
+    $("#claude-agent-stop").addEventListener("click", async () => {
+      const entry = selectedClaudeAgent()
+      if (!entry || !entry.owned || state.claudeAgentMutationPending) return
+      if (!window.confirm(`Stop Claude background session ${entry.id}? The process ends now; the conversation is preserved and can be resumed with Respawn.`)) return
+      state.claudeAgentMutationPending = true
+      $("#claude-agent-stop").disabled = true
+      try {
+        const result = await claudeAgentMutation(`/api/claude-agents/${encodeURIComponent(entry.id)}/stop`, {})
+        $("#claude-agent-action-result").textContent = result.note || "Stop accepted"
+        announce(`Stop accepted for ${entry.id}`)
+        void loadClaudeAgents()
+      } catch (error) {
+        $("#claude-agent-action-result").textContent = error.message || "Stop failed"
+        announce($("#claude-agent-action-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        $("#claude-agent-stop").disabled = false
+      }
+    })
+
+    $("#claude-agent-respawn").addEventListener("click", async () => {
+      const entry = selectedClaudeAgent()
+      if (!entry || !entry.owned || state.claudeAgentMutationPending) return
+      state.claudeAgentMutationPending = true
+      $("#claude-agent-respawn").disabled = true
+      try {
+        await claudeAgentMutation(`/api/claude-agents/${encodeURIComponent(entry.id)}/respawn`, {})
+        $("#claude-agent-action-result").textContent = "Respawned; conversation id unchanged"
+        announce(`Respawned ${entry.id}`)
+        void loadClaudeAgents()
+      } catch (error) {
+        $("#claude-agent-action-result").textContent = error.message || "Respawn failed"
+        announce($("#claude-agent-action-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        $("#claude-agent-respawn").disabled = false
+      }
+    })
+
+    $("#claude-agent-rm").addEventListener("click", async () => {
+      const entry = selectedClaudeAgent()
+      if (!entry || !entry.owned || state.claudeAgentMutationPending) return
+      if (!window.confirm(`Remove Claude background session ${entry.id} from the agents list? The transcript stays on disk and is reachable only outside the Control Room.`)) return
+      state.claudeAgentMutationPending = true
+      $("#claude-agent-rm").disabled = true
+      try {
+        const result = await claudeAgentMutation(`/api/claude-agents/${encodeURIComponent(entry.id)}/rm`, {})
+        announce(`Removed ${entry.id}`)
+        detachSelectedStream()
+        state.selectedId = null
+        state.selectedType = null
+        state.selectedClaudeAgentId = null
+        $("#claude-agent-action-result").textContent = result.note || "Removed"
+        renderSelection()
+        renderTranscript(false)
+        void loadClaudeAgents()
+      } catch (error) {
+        $("#claude-agent-action-result").textContent = error.message || "Rm failed"
+        announce($("#claude-agent-action-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        $("#claude-agent-rm").disabled = false
+      }
+    })
+
+    $("#claude-agent-detach").addEventListener("click", detachSelectedStream)
+    $("#claude-agent-detach-external").addEventListener("click", detachSelectedStream)
+
+    $("#claude-agent-fetch-logs").addEventListener("click", async () => {
+      const entry = selectedClaudeAgent()
+      if (!entry || entry.owned) return
+      $("#claude-agent-fetch-logs").disabled = true
+      $("#claude-agent-external-log").textContent = "Fetching…"
+      try {
+        const response = await fetch(`/api/claude-agents/${encodeURIComponent(entry.id)}/logs`)
+        const text = await response.text()
+        if (!response.ok) throw new Error(text || `Request failed (${response.status})`)
+        $("#claude-agent-external-log").textContent = text || "(no output)"
+        announce(`Fetched latest log tail for ${entry.id}`)
+      } catch (error) {
+        $("#claude-agent-external-log").textContent = error.message || "Log fetch failed"
+        announce($("#claude-agent-external-log").textContent, true)
+      } finally {
+        $("#claude-agent-fetch-logs").disabled = false
+      }
+    })
+
+    // Blast-radius confirm always required; ending every hosted session needs a
+    // second, visually distinct toggle plus its own confirm before it can be sent.
+    $("#daemon-stop-button").addEventListener("click", async () => {
+      if (state.claudeAgentMutationPending) return
+      const keepWorkers = !$("#daemon-end-sessions").checked
+      if (!window.confirm("Stop the Claude agents daemon? This affects every background session on this machine, not just ones started from the Control Room.")) return
+      if (!keepWorkers && !window.confirm("This also ends every running session the daemon hosts, including sessions not started from the Control Room. Continue?")) return
+      state.claudeAgentMutationPending = true
+      $("#daemon-stop-button").disabled = true
+      $("#daemon-stop-result").textContent = "Stopping daemon…"
+      try {
+        await claudeAgentMutation("/api/claude-agents/daemon/stop", { keep_workers: keepWorkers })
+        $("#daemon-stop-result").textContent = keepWorkers
+          ? "Daemon stopped; hosted sessions preserved"
+          : "Daemon stopped; every hosted session ended"
+        announce($("#daemon-stop-result").textContent, true)
+        $("#daemon-end-sessions").checked = false
+        void loadClaudeAgentDaemon()
+        void loadClaudeAgents()
+      } catch (error) {
+        $("#daemon-stop-result").textContent = error.message || "Daemon stop failed"
+        announce($("#daemon-stop-result").textContent, true)
+      } finally {
+        state.claudeAgentMutationPending = false
+        $("#daemon-stop-button").disabled = false
+      }
+    })
   }
 
   bindControls()
@@ -1411,8 +1780,12 @@
   tick()
   loadMatrix()
   loadDesignSessions({ restore: true })
+  loadClaudeAgents()
+  loadClaudeAgentDaemon()
   connectStatusStream()
   window.setInterval(loadMatrix, MATRIX_POLL_MS)
   window.setInterval(loadDesignSessions, DESIGN_LIST_POLL_MS)
+  window.setInterval(loadClaudeAgents, CLAUDE_AGENTS_POLL_MS)
+  window.setInterval(loadClaudeAgentDaemon, CLAUDE_AGENTS_DAEMON_POLL_MS)
   window.setInterval(tick, 1000)
 })(window.ControlRoomCore)
