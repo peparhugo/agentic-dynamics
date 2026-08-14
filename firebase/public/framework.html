@@ -15,254 +15,534 @@
 <link rel="stylesheet" href="base.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
-h1{font-size:clamp(2rem,5.5vw,4rem);font-weight:800;letter-spacing:-1.5px;line-height:1.08;margin-bottom:1rem;color:#fff}
-h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;line-height:1.2;margin-bottom:0.8rem;color:#fff}
-.exec{background:rgba(11,17,26,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(34,211,238,0.12);border-radius:14px;padding:1.8rem;margin:2rem 0;text-align:left}
-.exec h3{color:var(--ac);font-size:0.78rem;text-transform:uppercase;letter-spacing:1px;margin-bottom:1rem}
-.exec li{margin:0.5rem 0;font-size:0.85rem;line-height:1.6;color:var(--t2);list-style:none;padding-left:1.5rem;position:relative}
-.exec li::before{content:'';position:absolute;left:0;top:0.55rem;width:8px;height:8px;border-radius:50%;background:var(--ac)}
-.exec strong{color:var(--t)}
-.card .cname{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:0.5rem;color:var(--t)}
-.card .cval{font-size:1.4rem;font-weight:800;color:var(--ac)}
-.card .cval.amber{color:var(--am)}
-.card .csub{font-size:0.72rem;color:var(--t2);margin:0.3rem 0}
-.card .ctag{display:inline-block;padding:0.15rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin:0.3rem 0;background:rgba(34,211,238,0.08);color:var(--ac);border:1px solid rgba(34,211,238,0.15)}
-.card .ctag.amber{background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.15)}
-.card .ctag.cyan{background:rgba(34,211,238,0.08);color:var(--cy);border:1px solid rgba(34,211,238,0.15)}
-.wtm{background:var(--bg4);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem;margin:1rem 0;font-size:0.85rem;color:var(--t2);line-height:1.7}
-.wtm strong{color:var(--t)}
-.constraints{display:grid;grid-template-columns:1fr;gap:0.3rem;margin:1rem 0;max-width:650px;margin-left:auto;margin-right:auto}
-.cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:0.5rem;align-items:center;padding:0.45rem 0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--b);font-size:0.78rem}
-.cr.head{background:var(--bg4);font-weight:600;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--t2)}
-.cr .nm{font-weight:500}.cr .fl{font-family:'JetBrains Mono',monospace;font-size:0.68rem;color:var(--t3)}.cr .ck{text-align:center}
-.rules-grid{display:grid;grid-template-columns:1fr;gap:0.5rem;max-width:720px;margin:1rem auto}
-.rule{display:flex;align-items:flex-start;gap:1.2rem;padding:0.9rem 1.2rem;background:var(--bg3);border:1px solid var(--b);border-radius:10px;font-size:0.85rem;text-align:left}
-.rule .rn{font-size:1.6rem;font-weight:800;min-width:2rem;text-align:center;flex-shrink:0;color:var(--ac)}
-.rule .rn.amber{color:var(--am)}.rule .rn.purple{color:#a78bfa}
-.rule .rt{flex:1}.rule .rt strong{color:var(--t)}.rule .rt .rm{display:block;font-size:0.72rem;color:var(--t3);margin-top:0.2rem}
-.rule .rt .badge-ext{display:inline-block;padding:0.1rem 0.5rem;border-radius:4px;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-top:0.3rem;background:rgba(251,191,36,0.08);color:var(--am);border:1px solid rgba(251,191,36,0.2)}
-.badge-mod{background:rgba(245,158,11,0.12);color:var(--am);font-size:0.6rem;padding:1px 6px;border-radius:3px;margin-left:4px}
-.params{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.6rem;max-width:780px;margin:1rem auto}
-.param{background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0.9rem 1rem;text-align:left}
-.param .psym{font-family:'JetBrains Mono',monospace;font-size:0.78rem;font-weight:700;color:var(--ac);margin-bottom:0.2rem}
-.param .pname{font-size:0.72rem;color:var(--t2)}
-.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin:1rem 0}
-.door{background:var(--bg3);border:1px solid var(--b);border-radius:12px;padding:1.3rem;text-align:left}
-.door.tw{border-left:3px solid var(--ac)}.door.ow{border-left:3px solid var(--am)}
-.door h3{font-size:0.9rem;margin-bottom:0.5rem}.door.tw h3{color:var(--ac)}.door.ow h3{color:var(--am)}
-.door p,.door li{font-size:0.82rem;color:var(--t2);line-height:1.6;margin:0.3rem 0}.door ul{list-style:none;padding:0}.door li::before{content:'\2192 ';color:var(--t3)}
-.roi-calc{background:rgba(11,17,26,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(34,211,238,0.12);border-radius:12px;padding:1.5rem;margin:1rem 0;text-align:left}
-.roi-calc .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
-.roi-calc label{display:block;font-size:0.72rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--t3);margin-bottom:0.3rem}
-.roi-calc input[type=range]{width:100%;accent-color:var(--ac)}
-.roi-calc .val{font-size:0.72rem;color:var(--ac);font-family:'JetBrains Mono',monospace}
-.roi-out{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:0.6rem;margin-top:1rem}
-.roi-out .o{background:var(--bg4);border-radius:8px;padding:0.8rem;text-align:center}
-.roi-out .o .ov{font-size:1.2rem;font-weight:800;color:var(--ac);transition:color .15s}
-.roi-out .o .ov.flash{color:#818CF8}
-.roi-out .o .ov.amber{color:var(--am)}
-.roi-out .o .ol{font-size:0.65rem;color:var(--t3);text-transform:uppercase;letter-spacing:0.5px;margin-top:0.2rem}
-.chart-wrap{max-width:700px;margin:1rem auto}.chart-wrap canvas{width:100%!important}
-.risk-box{background:rgba(251,191,36,0.04);border:1px solid rgba(251,191,36,0.1);border-radius:12px;padding:1.3rem;font-size:0.85rem;color:var(--t2);line-height:1.7;display:flex;align-items:flex-start;gap:1rem}
-.risk-box .icon{font-size:1.8rem;flex-shrink:0}.risk-box strong{color:var(--am)}
-.refs{font-size:0.72rem;color:var(--t3);line-height:1.7;margin:1rem 0}.refs strong{color:var(--t2)}
-.card .detail{display:none;font-size:0.72rem;color:var(--t3);line-height:1.6;margin-top:0.6rem;padding-top:0.6rem;border-top:1px solid var(--b)}
-.card.expanded .detail{display:block}
-.model-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0.8rem;margin:1.2rem 0}
-.chart-toggle-row{display:flex;justify-content:center;gap:0.5rem;margin-top:0.8rem;font-size:0.7rem;flex-wrap:wrap}
-.callout-box{background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.2);border-radius:12px;padding:1.3rem;font-size:0.85rem;color:var(--t2);line-height:1.7;text-align:center}
-.callout-box strong{color:var(--ac)}
-@media(max-width:768px){.fsec{padding:3rem 1rem}.doors{grid-template-columns:1fr}.roi-calc .row{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}.params{grid-template-columns:1fr}}@media(max-width:550px){.cards{grid-template-columns:1fr}.model-cards{grid-template-columns:1fr}}
+/* Semantic aliases bind the facelift to the shared theme instead of adding a page-specific palette. */
+.framework-page{--fw-why:var(--am);--fw-how:var(--ac);--fw-what:var(--cy);--fw-surface:var(--bg3);--fw-inset:var(--bg4);--fw-line:var(--b);--fw-line-strong:var(--ba)}
+.framework-page h1{font-size:clamp(2.35rem,6vw,5.25rem);font-weight:800;letter-spacing:-.055em;line-height:.98;margin:0;color:var(--t);max-width:13ch}
+.framework-page h2{font-size:clamp(1.7rem,3.5vw,2.8rem);font-weight:750;letter-spacing:-.035em;line-height:1.08;margin:.5rem 0 .8rem;color:var(--t)}
+.framework-page h3{color:var(--t)}
+.framework-page .fsec{position:relative;overflow:hidden}
+.framework-page .fsec>.inr{position:relative;z-index:1}
+.framework-page .section-kicker{display:inline-flex;align-items:center;gap:.55rem;font:700 .68rem/1 'JetBrains Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--fw-how);margin-bottom:1rem}
+.framework-page .section-kicker::before{content:'';width:1.6rem;height:1px;background:currentColor}
+.framework-page .kicker-why{color:var(--fw-why)}
+.framework-page .kicker-what{color:var(--fw-what)}
+.framework-page .golden-label{font:600 .65rem/1 'JetBrains Mono',monospace;letter-spacing:.13em;text-transform:uppercase;color:var(--t3)}
+
+/* The WHY chapter is deliberately spacious so the proof receipts support rather than compete with the belief. */
+.framework-page .dossier-hero{padding-top:clamp(5rem,11vw,9rem);padding-bottom:clamp(4rem,9vw,7rem);background:radial-gradient(circle at 18% 24%,rgba(245,158,11,.13),transparent 35%),var(--bg)}
+.framework-page .hero-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(18rem,.65fr);gap:clamp(2rem,6vw,5rem);align-items:end;text-align:left}
+.framework-page .thesis{font-size:clamp(1rem,1.7vw,1.2rem);line-height:1.8;color:var(--t2);max-width:48rem;margin:1.5rem 0 0}
+.framework-page .hero-actions{display:flex;gap:.65rem;flex-wrap:wrap;margin-top:2rem}
+.framework-page .cta-secondary{background:transparent;color:var(--t);border:1px solid var(--fw-line-strong)}
+.framework-page .proof-ledger{display:grid;gap:.7rem}
+.framework-page .proof-card{position:relative;background:color-mix(in srgb,var(--fw-surface) 88%,transparent);border:1px solid var(--fw-line);padding:1.2rem 1.25rem;text-align:left;box-shadow:0 20px 50px rgba(0,0,0,.15)}
+.framework-page .proof-card::before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:var(--fw-why)}
+.framework-page .proof-card.cyan::before{background:var(--fw-how)}
+.framework-page .proof-card strong{display:block;color:var(--t);font-size:.9rem;margin:.3rem 0}
+.framework-page .proof-card p{font-size:.78rem;line-height:1.65;color:var(--t2);margin:0}
+.framework-page .proof-value{font:700 1.35rem/1 'JetBrains Mono',monospace;color:var(--fw-why)}
+.framework-page .proof-card.cyan .proof-value{color:var(--fw-how)}
+.framework-page .audience-note{max-width:74rem;margin:0 auto;padding:1rem 1.25rem;background:var(--fw-inset);border:1px solid var(--fw-line);border-left:2px solid var(--fw-how);font-size:.78rem;line-height:1.7;color:var(--t2);text-align:left}
+
+/* The architecture wrapper is a keyboard-scrollable centerpiece; the list remains a complete text equivalent. */
+.framework-page .architecture-section{background:var(--bg2);padding-top:clamp(4rem,8vw,7rem)}
+.framework-page .architecture-intro{display:flex;justify-content:space-between;gap:2rem;align-items:end;text-align:left;margin-bottom:1.5rem}
+.framework-page .architecture-intro .lead{max-width:39rem;margin:0}
+.framework-page .architecture-figure{margin:0;border:1px solid var(--fw-line-strong);border-radius:1.4rem;background:var(--bg2);box-shadow:var(--panel-shadow);overflow:hidden;text-align:left}
+.framework-page .architecture-scroll{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-color:var(--fw-how) var(--fw-inset)}
+.framework-page .architecture-scroll:focus-visible{outline:2px solid var(--fw-how);outline-offset:-4px}
+.framework-page .architecture-map{display:block;width:100%;height:auto}
+.framework-page .architecture-figure figcaption{border-top:1px solid var(--fw-line);padding:1rem 1.25rem;color:var(--t2);font-size:.78rem;line-height:1.65}
+.framework-page .architecture-text{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:1rem 0 0;padding:0;list-style:none;background:var(--fw-line);border:1px solid var(--fw-line)}
+.framework-page .architecture-text li{background:var(--bg3);padding:1rem;color:var(--t2);font-size:.73rem;line-height:1.6;text-align:left}
+.framework-page .architecture-text strong{display:block;color:var(--t);font:700 .7rem/1.2 'JetBrains Mono',monospace;margin-bottom:.5rem}
+
+/* Console lanes distinguish directly operated inputs from modeled compounding without changing provenance. */
+.framework-page .lever-console{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:2rem;text-align:left}
+.framework-page .lever-lane{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-how);padding:clamp(1rem,2.5vw,1.6rem)}
+.framework-page .lever-lane.autonomous{border-top-color:var(--fw-what)}
+.framework-page .lane-head{display:flex;justify-content:space-between;gap:1rem;align-items:baseline;margin-bottom:1rem}
+.framework-page .lane-head h3{font-size:1rem;margin:0;color:var(--fw-how)}
+.framework-page .lever-lane.autonomous .lane-head h3{color:var(--fw-what)}
+.framework-page .lane-head span{font-size:.68rem;color:var(--t3)}
+.framework-page .params{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin:0}
+.framework-page .param{position:relative;background:var(--fw-inset);border:1px solid var(--fw-line);padding:1rem;text-align:left;min-width:0}
+.framework-page .param::before{content:'';position:absolute;inset:0 auto 0 0;width:2px;background:var(--fw-how)}
+.framework-page .param.modeled::before{background:var(--fw-why)}
+.framework-page .param.autonomous::before{background:var(--fw-what)}
+.framework-page .param .psym{font:700 .76rem/1.2 'JetBrains Mono',monospace;color:var(--fw-how);margin-bottom:.55rem}
+.framework-page .param.modeled .psym{color:var(--fw-why)}
+.framework-page .param.autonomous .psym{color:var(--fw-what)}
+.framework-page .param .pname{font-size:.72rem;line-height:1.62;color:var(--t2)}
+.framework-page .param .pname strong{color:var(--t)}
+.framework-page .lever-meta{display:flex;justify-content:space-between;gap:.5rem;border-top:1px solid var(--fw-line);margin-top:.7rem;padding-top:.55rem;font:600 .58rem/1.3 'JetBrains Mono',monospace;text-transform:uppercase;color:var(--t3)}
+.framework-page .wfm-panel{margin-top:1rem;background:var(--bg);border:1px solid var(--fw-line);padding:1rem}
+.framework-page .wfm-panel summary{cursor:pointer;color:var(--fw-what);font-size:.78rem;font-weight:700}
+.framework-page .constraints{display:grid;grid-template-columns:1fr;gap:.3rem;margin:1rem auto 0;max-width:100%;overflow-x:auto}
+.framework-page .cr{display:grid;grid-template-columns:1fr 1.5fr 1.5fr;gap:.5rem;align-items:center;padding:.55rem .8rem;background:var(--bg3);border:1px solid var(--fw-line);font-size:.73rem;min-width:42rem}
+.framework-page .cr.head{background:var(--bg4);font-weight:600;font-size:.64rem;text-transform:uppercase;letter-spacing:.05em;color:var(--t2)}
+.framework-page .cr .nm{font-weight:500}.framework-page .cr .fl{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--t3)}.framework-page .cr .ck{text-align:center}
+
+/* Formula plates and plot form one reference station, while receipts stay visually secondary. */
+.framework-page .cost-station{display:grid;grid-template-columns:minmax(17rem,.55fr) minmax(0,1.45fr);gap:1rem;margin-top:2rem;align-items:start}
+.framework-page .formula-rail{display:grid;gap:.65rem}
+.framework-page .formula-plate{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-how);padding:1.1rem;text-align:left;font:400 .7rem/1.85 'JetBrains Mono',monospace;color:var(--t2);overflow-x:auto}
+.framework-page .formula-plate.autonomous{border-top-color:var(--fw-why)}
+.framework-page .formula-plate.value{border-top-color:var(--fw-what)}
+.framework-page .formula-plate strong{display:block;color:var(--fw-how);font-size:.76rem;margin-bottom:.4rem}
+.framework-page .formula-plate.autonomous strong{color:var(--fw-why)}
+.framework-page .formula-plate.value strong{color:var(--fw-what)}
+.framework-page .formula-controls{display:block;border-top:1px solid var(--fw-line);margin-top:.6rem;padding-top:.5rem;color:var(--t3);font-size:.6rem}
+.framework-page .plot-panel{background:var(--fw-surface);border:1px solid var(--fw-line);padding:1rem;min-width:0}
+.framework-page .chart-wrap{height:24rem;margin:0}.framework-page .chart-wrap canvas{width:100%!important;height:100%!important}
+.framework-page .chart-toggle-row{display:flex;justify-content:center;align-items:center;gap:.45rem;margin-top:.8rem;font-size:.68rem;flex-wrap:wrap}
+.framework-page .chart-toggle-row a{padding:.25rem .45rem;border:1px solid transparent;border-radius:999px}
+.framework-page .chart-toggle-row a:focus-visible{outline:2px solid var(--fw-how);outline-offset:2px}
+.framework-page .cost-receipts.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;margin:1rem 0 0;background:var(--fw-line);border:1px solid var(--fw-line)}
+.framework-page .cost-receipts .stat{background:var(--bg3);border:0;border-radius:0;padding:.85rem .75rem;min-width:0}
+.framework-page .cost-receipts .stat .v{font-size:1.05rem}
+
+/* The workbench owns the strongest local depth because it is where HOW becomes an operator action. */
+.framework-page .framework-workbench{position:relative;background:var(--fw-surface);border:1px solid var(--fw-line-strong);border-top:3px solid var(--fw-how);padding:clamp(1rem,3vw,2rem);margin:1.25rem 0 0;text-align:left;box-shadow:0 28px 80px rgba(0,0,0,.32)}
+.framework-page .calc-mode{display:inline-flex;background:var(--fw-inset);border:1px solid var(--fw-line);padding:.25rem;gap:.25rem;margin-bottom:1.25rem}
+.framework-page .calc-mode button{border:1px solid transparent;padding:.6rem 1rem;font:700 .72rem/1 'JetBrains Mono',monospace;cursor:pointer}
+.framework-page .workbench-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(19rem,.72fr);gap:1.5rem;align-items:start}
+.framework-page .calc-inputs{min-width:0}
+.framework-page .calc-results{position:sticky;top:5rem;background:var(--bg);border:1px solid var(--fw-line);padding:1rem;min-width:0}
+.framework-page .framework-workbench .row{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+.framework-page .framework-workbench label{display:block;font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.045em;color:var(--t3);margin-bottom:.25rem}
+.framework-page .framework-workbench input[type=range]{width:100%;accent-color:var(--fw-how)}
+.framework-page .framework-workbench .val{font-size:.7rem;color:var(--fw-how);font-family:'JetBrains Mono',monospace}
+.framework-page .roi-out{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.framework-page .roi-out .o{background:var(--fw-inset);border:1px solid var(--fw-line);padding:.85rem;text-align:left;min-width:0}
+.framework-page .roi-out .o .ov{font:800 1.15rem/1.2 'JetBrains Mono',monospace;color:var(--fw-how);overflow-wrap:anywhere;transition:color .15s}
+.framework-page .roi-out .o .ov.flash{color:#818cf8}.framework-page .roi-out .o .ov.amber{color:var(--fw-why)}
+.framework-page .roi-out .o .ol{font-size:.59rem;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-top:.3rem}
+.framework-page .roi-context{font:.62rem/1.55 'JetBrains Mono',monospace;color:var(--fw-how);margin:.75rem 0;text-align:left}
+.framework-page .computation{display:none;background:var(--fw-inset);border:1px solid var(--fw-line);padding:1rem;margin-top:.75rem;font:400 .63rem/1.8 'JetBrains Mono',monospace;color:var(--t2);white-space:pre-wrap;overflow-x:auto;max-width:100%}
+.framework-page .disclosure-button{display:block;width:100%;margin:.75rem 0 0;background:transparent;border:1px solid var(--fw-line-strong);color:var(--t3);padding:.55rem 1rem;font:600 .66rem/1 'JetBrains Mono',monospace;cursor:pointer;text-align:left}
+.framework-page .disclosure-button:hover,.framework-page .disclosure-button:focus-visible{color:var(--fw-how);border-color:var(--fw-how)}
+
+/* Equal-height door cards make all three policy boundaries peers rather than treating autonomy as an add-on. */
+.framework-page .doors{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin:1.5rem 0}
+.framework-page .door-card{display:flex;flex-direction:column;position:relative;background:var(--fw-surface);border:1px solid var(--fw-line);border-top:3px solid var(--fw-how);padding:1.3rem;text-align:left;min-height:19rem}
+.framework-page .door-card.ow{border-top-color:var(--fw-why)}.framework-page .door-card.autonomous{border-top-color:var(--fw-what)}
+.framework-page .door-symbol{font:700 1.35rem/1 'JetBrains Mono',monospace;color:var(--fw-how);margin-bottom:1rem}
+.framework-page .door-card.ow .door-symbol{color:var(--fw-why)}.framework-page .door-card.autonomous .door-symbol{color:var(--fw-what)}
+.framework-page .door-card h3{font-size:.92rem;margin:0 0 .6rem;color:var(--fw-how)}
+.framework-page .door-card.ow h3{color:var(--fw-why)}.framework-page .door-card.autonomous h3{color:var(--fw-what)}
+.framework-page .door-card p,.framework-page .door-card li{font-size:.78rem;color:var(--t2);line-height:1.65;margin:.3rem 0}.framework-page .door-card ul{list-style:none;padding:0}.framework-page .door-card li::before{content:'\2192 ';color:var(--t3)}
+.framework-page .door-footer{margin-top:auto!important;padding-top:.8rem;border-top:1px solid var(--fw-line);font-weight:700;color:var(--fw-how)!important}
+.framework-page .door-card.ow .door-footer{color:var(--fw-why)!important}.framework-page .door-card.autonomous .door-footer{color:var(--fw-what)!important}
+.framework-page .door-caption{display:flex;justify-content:space-between;gap:1rem;background:var(--fw-inset);border:1px solid var(--fw-line);padding:.85rem 1rem;font-size:.72rem;color:var(--t2);text-align:left}
+.framework-page .implementation-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:1rem;background:var(--fw-line);border:1px solid var(--fw-line);counter-reset:week}
+.framework-page .implementation-step{counter-increment:week;background:var(--bg3);padding:1rem;text-align:left;font-size:.72rem;line-height:1.55;color:var(--t2)}
+.framework-page .implementation-step::before{content:'WEEK ' counter(week);display:block;color:var(--fw-what);font:700 .62rem/1 'JetBrains Mono',monospace;margin-bottom:.5rem}
+
+/* Chapter groups replace the previous undifferentiated rule wall while retaining every original rule node. */
+.framework-page .rule-groups{display:grid;gap:1.5rem;margin-top:2rem}
+.framework-page .rule-group{display:grid;grid-template-columns:13rem 1fr;gap:1rem;align-items:start;text-align:left}
+.framework-page .rule-group-head{position:sticky;top:5rem;padding:.9rem 0;border-top:2px solid var(--fw-how)}
+.framework-page .rule-group:nth-child(2) .rule-group-head{border-top-color:var(--fw-why)}.framework-page .rule-group:nth-child(3) .rule-group-head{border-top-color:var(--fw-what)}
+.framework-page .rule-group-head h3{font-size:.82rem;line-height:1.4;margin:0 0 .4rem}.framework-page .rule-group-head p{font-size:.68rem;line-height:1.5;color:var(--t3);margin:0}
+.framework-page .rules-grid{display:grid;gap:.55rem;margin:0}
+.framework-page .rule{display:grid;grid-template-columns:2.5rem 1fr;gap:1rem;padding:1rem;background:var(--fw-surface);border:1px solid var(--fw-line);font-size:.8rem;line-height:1.65;text-align:left}
+.framework-page .rule .rn{font:800 1.45rem/1 'JetBrains Mono',monospace;text-align:center;color:var(--fw-how)}
+.framework-page .rule .rn.amber{color:var(--fw-why)}.framework-page .rule .rn.purple{color:#a78bfa}
+.framework-page .rule .rt strong{color:var(--t)}.framework-page .rule .rt .rm{display:block;border-top:1px solid var(--fw-line);font:400 .65rem/1.55 'JetBrains Mono',monospace;color:var(--t3);margin-top:.65rem;padding-top:.55rem}
+.framework-page .badge-ext{display:inline-block;padding:.1rem .45rem;font-size:.58rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:.3rem;background:rgba(251,191,36,.08);color:var(--fw-why);border:1px solid rgba(251,191,36,.2)}
+.framework-page .badge-mod{background:rgba(245,158,11,.12);color:var(--fw-why);font-size:.58rem;padding:1px 6px;margin-left:4px}
+
+/* The playbook uses a repeated dossier anatomy so tactics, code, and providers scan consistently. */
+.framework-page .policy-map{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin:1.5rem 0}
+.framework-page .policy-card,.framework-page .provider-card{background:var(--fw-surface);border:1px solid var(--fw-line);border-top:2px solid var(--fw-what);padding:1rem;text-align:left}
+.framework-page .policy-card strong{display:block;color:var(--t);font-size:.76rem;margin:.35rem 0}.framework-page .policy-card span{font:700 .63rem/1 'JetBrains Mono',monospace;color:var(--fw-what)}.framework-page .policy-card p{font-size:.68rem;line-height:1.55;color:var(--t3);margin:.3rem 0 0}
+.framework-page .playbook-block{margin-top:2.5rem;text-align:left}.framework-page .playbook-block>h3{font-size:1rem;margin:0 0 .5rem;color:var(--fw-how)}
+.framework-page .tbl{overflow-x:auto}.framework-page .tbl table{min-width:36rem}
+.framework-page .routing-chain{display:flex;align-items:center;justify-content:center;gap:.45rem;flex-wrap:wrap;background:var(--fw-inset);border:1px solid var(--fw-line);padding:1rem;font:700 .66rem/1.5 'JetBrains Mono',monospace;color:var(--t2);text-align:center}
+.framework-page .routing-chain span{color:var(--fw-what)}
+.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid{grid-template-columns:repeat(3,1fr);max-width:none}
+.framework-page .provider-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
+.framework-page .provider-card{display:flex;flex-direction:column}.framework-page .provider-card h4{font-size:.8rem;color:var(--fw-what);margin:0 0 .7rem}.framework-page .provider-card p{font-size:.7rem;line-height:1.7;color:var(--t2);margin:0}
+.framework-page .escalation-receipt{background:var(--fw-surface);border:1px solid var(--fw-line-strong);border-top:2px solid var(--fw-why);padding:1.25rem}
+.framework-page .escalation-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}.framework-page .escalation-grid h4{color:var(--t);font-size:.78rem;margin:0 0 .5rem}
+.framework-page .callout-box{background:var(--fw-inset);border:1px solid var(--fw-line);padding:1rem;font-size:.78rem;color:var(--t2);line-height:1.7;text-align:center}.framework-page .callout-box strong{color:var(--fw-how)}
+.framework-page .note{font-size:.68rem;color:var(--t3);line-height:1.65;margin-top:.7rem}
+.framework-page .evidence-handoff{background:radial-gradient(circle at 80% 30%,rgba(56,189,248,.1),transparent 35%),var(--bg2)}
+.framework-page .campaign-strip{display:flex;justify-content:space-between;align-items:center;gap:1.5rem;max-width:1100px;margin:0 auto;padding:2rem;background:var(--fw-surface);border:1px solid var(--fw-line-strong);border-top:2px solid var(--fw-what)}
+.framework-page .campaign-strip strong{display:block;color:var(--t);font-size:1rem}.framework-page .campaign-strip span{font-size:.73rem;color:var(--t3)}
+
+@media(max-width:1000px){.framework-page .hero-grid,.framework-page .cost-station{grid-template-columns:1fr}.framework-page .lever-console{grid-template-columns:1fr}.framework-page .architecture-text{grid-template-columns:repeat(2,1fr)}.framework-page .cost-receipts.stats{grid-template-columns:repeat(3,1fr)}.framework-page .policy-map{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.framework-page .fsec{padding:3.5rem 1rem}.framework-page .architecture-intro{display:block}.framework-page .architecture-intro .lead{margin-top:1rem}.framework-page .architecture-scroll .architecture-map{min-width:900px}.framework-page .params,.framework-page .cache-grid,.framework-page .routing-tiers,.framework-page .budget-grid,.framework-page .framework-workbench .row{grid-template-columns:1fr}.framework-page .workbench-grid{grid-template-columns:1fr}.framework-page .calc-results{position:static}.framework-page .framework-workbench input[type=range]{min-height:44px}.framework-page .doors,.framework-page .provider-grid,.framework-page .escalation-grid{grid-template-columns:1fr}.framework-page .door-card{min-height:0}.framework-page .door-caption{display:block}.framework-page .implementation-strip{grid-template-columns:1fr}.framework-page .rule-group{grid-template-columns:1fr}.framework-page .rule-group-head{position:static}.framework-page .policy-map{grid-template-columns:repeat(2,1fr)}.framework-page .campaign-strip{align-items:flex-start;flex-direction:column;margin:0 1rem}.framework-page .chart-wrap{height:19rem}}
+@media(max-width:520px){.framework-page .hero-actions,.framework-page .calc-mode{display:grid}.framework-page .architecture-text,.framework-page .cost-receipts.stats,.framework-page .policy-map{grid-template-columns:1fr}.framework-page .roi-out{grid-template-columns:1fr}.framework-page .cr{min-width:38rem}}
+@media(prefers-reduced-motion:reduce){.framework-page *{scroll-behavior:auto!important;transition:none!important}}
+@media print{.framework-page .topbar,.framework-page .hero-actions,.framework-page .calc-mode,.framework-page .disclosure-button,.framework-page .campaign-strip .cta-btn{display:none!important}.framework-page .fsec{break-inside:auto}.framework-page .architecture-scroll{overflow:visible}.framework-page .architecture-map{min-width:0!important}.framework-page .calc-results{position:static}.framework-page .rule-group-head{position:static}}
 </style>
 <script src="data.js"></script>
 </head>
-<body>
+<body class="framework-page">
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link" style="color:var(--ac)" aria-current="page">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- SECTION: WHY -->
-<section class="fsec" id="why"><div class="inr">
-<div class="pulse">What — from information to policy</div>
-<h2>Measured information becomes<br>testable policy.</h2>
-  <p class="lead">Two facts motivate every rule below. First, <strong style="color:var(--am)">the Snowball Rule is measured, not assumed</strong> — a story's cost roughly doubles from its greenfield session ($0.16) to its cross-cutting session ($0.34). Second, <strong style="color:var(--ac)">verification is a vendor behavior, not a price point</strong> — OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120. You can't manage what you can't measure, so this framework turns the measurement into decisions.</p>
+<section class="fsec dossier-hero" id="why"><div class="inr wide">
+  <div class="hero-grid">
+    <div>
+      <div class="section-kicker kicker-why">WHY / BELIEF</div>
+      <h1>Measured information becomes testable policy.</h1>
+      <p class="thesis">You can't manage what you can't measure. This framework turns observed behavior into declared information, exposes the levers that shape cost, and makes operating policy an arm you can compare rather than a default you inherit.</p>
+      <div class="hero-actions">
+        <a href="#architecture" class="cta-btn">See the machine &darr;</a>
+        <a href="#calculator" class="cta-btn cta-secondary">Test your levers &rarr;</a>
+      </div>
+    </div>
+    <div class="proof-ledger" aria-label="Evidence motivating the framework">
+      <article class="proof-card">
+        <span class="golden-label">Snowball / Measured</span>
+        <div class="proof-value">$0.16 &rarr; $0.34</div>
+        <strong>The Snowball Rule is measured, not assumed.</strong>
+        <p>A story's cost roughly doubles from its greenfield session to its cross-cutting session.</p>
+      </article>
+      <article class="proof-card cyan">
+        <span class="golden-label">Verification / Observed</span>
+        <div class="proof-value">~10 / ~120</div>
+        <strong>Verification is a vendor behavior, not a price point.</strong>
+        <p>OpenAI's cheapest and priciest models both write ~10 tests per story; Claude's both write ~120.</p>
+      </article>
+    </div>
+  </div>
 </div></section>
+<div class="audience-note"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
 
-<!-- SECTION: The Ten Rules -->
-<section class="fsec" id="rules"><div class="inr">
-<div class="pulse">What — Proposed Control Rules</div>
-<h2>Turn observed patterns into<br>policy arms to test.</h2>
-<p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
-<div class="note" style="max-width:720px;margin:0.5rem auto 1.2rem;text-align:left;font-size:0.78rem;background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.2);border-left:3px solid var(--ac);border-radius:0 10px 10px 0;padding:1rem 1.2rem"><strong style="color:var(--ac)">Who this is for:</strong> Organizations that run AI at scale — from individual engineering sessions to compounding codebase costs, from per-team budgeting to enterprise forecasting, from augmented workforces to autonomous batch pipelines. Validated on Python/Flask REST APIs and TypeScript/Node.js. If your domain differs (Rust, Go, data pipelines, image generation), use the <a href="methodology.html" style="color:var(--ac)">methodology</a> as a guide and validate with your own data.</div>
-<div class="rules-grid">
-<div class="rule" id="rule-1"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation — producing zero code despite high token output — it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across three perturbation classes: specification corruption, objective mutation, and process perturbation.<span class="rm">Concept: Grit (Ground-Truth Integrity) · Lever: C₀</span></div></div>
-<div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions). Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
-<div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. <strong style="color:var(--t)">Measured:</strong> story cost roughly doubles across the five-session arc ($0.16 &rarr; $0.34, a 2.13&times; Snowball). The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
-<div class="rule" id="rule-4"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
-<div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
-<div class="rule" id="rule-6" style="border-left:3px solid var(--am)"><div class="rn amber">6</div><div class="rt"><strong>The Batch Discount.</strong> Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in &lt;4 hours, run in batch. Monitor queue depth. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Batch Economics &middot; Lever: b, Q</span></div></div>
-<div class="rule" id="rule-7" style="border-left:3px solid var(--am)"><div class="rn amber">7</div><div class="rt"><strong>The Budget Ceiling.</strong> Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job &times; (1 + retry_rate)). Double your budget, double your capacity &ndash; zero hiring required. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Throughput Cap &middot; Lever: W (jobs/day)</span></div></div>
-<div class="rule" id="rule-8" style="border-left:3px solid var(--am)"><div class="rn amber">8</div><div class="rt"><strong>The Cascade Rule.</strong> In autonomous workloads, failures auto-escalate through model tiers: Flash &rarr; Sonnet &rarr; Opus &rarr; Human. A 1% escalation to human review can double your total cost. Design for &lt;1% escalation. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Auto-Escalation &middot; Lever: E&#8340; (28.2&times; price ratio: DS &rarr; GPT-5.6)</span></div></div>
-<div class="rule" id="rule-9" style="border-left:3px solid var(--am)"><div class="rn purple">9</div><div class="rt"><strong>The SLA Buffer.</strong> Actual batch completion time = (Queue_length &times; Avg_job_time) + (Retry_buffer &times; retry_rate). Never batch jobs with an SLA less than 2&times; your observed queue depth. Always have an on-demand fallback. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Batch SLA &middot; Lever: Slack Buffer</span></div></div>
-<div class="rule" id="rule-10" style="border-left:3px solid var(--ac)"><div class="rn">10</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
-</div>
-<p style="font-size:0.68rem;color:var(--t3);margin-top:0.5rem">Observed from the experiment corpus (cost variation, outcome retention, recovery overhead). Derived metrics (Grit, WOC, cost per outcome). Modeling extensions (Snowball, EPM, batch, cascade, SLA, BVI) are modeled projections — not independently tested.</p>
+<!-- ARCHITECTURE: Inline source keeps the system map theme-aware, printable, and dependency-free. -->
+<section class="fsec architecture-section"><div class="inr wide">
+  <div class="architecture-intro">
+    <div>
+      <div class="section-kicker">WHY &rarr; HOW &rarr; WHAT / SYSTEM MAP</div>
+      <h2>The information-acquisition machine.</h2>
+    </div>
+    <p class="lead">The ledger makes an unmeasured gap visible. Measurement rules turn events into information. Only then can control rules become policy arms that are tested, compared, and adapted.</p>
+  </div>
+  <figure class="architecture-figure" id="architecture">
+    <div class="architecture-scroll" tabindex="0" aria-label="Scrollable architecture diagram">
+<svg class="architecture-map" xmlns="http://www.w3.org/2000/svg"
+     viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid meet"
+     role="img" aria-labelledby="architecture-title architecture-desc">
+  <title id="architecture-title">The information-acquisition machine</title>
+  <desc id="architecture-desc">An ExperimentSpec compiles into a DAG, controlled cells, jobs, and attempts. Attempts emit append-only ledger events. Measurement rules turn those events into information before a dependency gate permits policy. Policy becomes an experiment arm in a grid and campaign, outcomes are compared, and adaptation changes one variable in the next specification. The diagram also maps the machine to Why, How, What, cost levers, reversible and compounding doors, and the N by M evidence burden.</desc>
+
+  <defs>
+    <!-- Theme-aware surfaces retain standalone fallbacks when the SVG is opened directly. -->
+    <linearGradient id="ground-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101722"/>
+      <stop offset="0.55" stop-color="#0b111a"/>
+      <stop offset="1" stop-color="#070a0f"/>
+    </linearGradient>
+    <radialGradient id="why-gradient" cx="50%" cy="45%" r="68%">
+      <stop offset="0" stop-color="#f59e0b" stop-opacity="0.2"/>
+      <stop offset="0.58" stop-color="#f59e0b" stop-opacity="0.09"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0.02"/>
+    </radialGradient>
+    <linearGradient id="instrument-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#152231"/>
+      <stop offset="1" stop-color="#0d1721"/>
+    </linearGradient>
+    <linearGradient id="policy-gradient" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#152337"/>
+      <stop offset="1" stop-color="#0c1522"/>
+    </linearGradient>
+    <pattern id="dossier-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#94a3b8" stroke-opacity="0.045" stroke-width="1"/>
+    </pattern>
+    <filter id="amber-glow" x="-30%" y="-50%" width="160%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="cyan-glow" x="-30%" y="-50%" width="160%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow-neutral" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-neutral"/></marker>
+    <marker id="arrow-cyan" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-cyan"/></marker>
+    <marker id="arrow-sky" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-sky"/></marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" class="marker-amber"/></marker>
+  </defs>
+
+  <style>
+    .architecture-map{--arch-bg:var(--bg2,#0b111a);--arch-bg-deep:var(--bg,#070a0f);--arch-surface:var(--bg3,#101722);--arch-surface-raised:var(--bg4,#1b2637);--arch-line:var(--b,rgba(148,163,184,.18));--arch-line-strong:var(--ba,rgba(148,163,184,.3));--arch-text:var(--t,#f8fafc);--arch-text-soft:var(--t2,#cbd5e1);--arch-text-muted:var(--t3,#718096);--arch-cyan:var(--ac,#22d3ee);--arch-amber:var(--am,#f59e0b);--arch-sky:var(--cy,#38bdf8);--arch-success:var(--success,#22c55e);color:var(--arch-text);font-family:"JetBrains Mono","SFMono-Regular",Consolas,monospace;width:100%;height:auto;background:var(--arch-bg)}
+    .figure-ground{fill:url(#ground-gradient);stroke:var(--arch-line);stroke-width:1}.grid-texture{fill:url(#dossier-grid);opacity:.8}.region{fill:none;vector-effect:non-scaling-stroke}.region-what{stroke:var(--arch-sky);stroke-width:1.5;stroke-dasharray:10 8;opacity:.48}.region-how-outer{stroke:var(--arch-cyan);stroke-width:1.5;opacity:.52}.region-how-inner{stroke:var(--arch-cyan);stroke-width:1;opacity:.25}.region-why{fill:url(#why-gradient);stroke:var(--arch-amber);stroke-width:2}.region-label{font-size:14px;font-weight:700;letter-spacing:.18em}.region-detail{fill:var(--arch-text-muted);font-size:10px;letter-spacing:.08em}.what-label{fill:var(--arch-sky)}.how-label{fill:var(--arch-cyan)}.why-label{fill:var(--arch-amber)}.map-title{fill:var(--arch-text);font-size:21px;font-weight:700;letter-spacing:.08em}.map-subtitle{fill:var(--arch-text-muted);font-size:10px;letter-spacing:.06em}
+    .edge{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-width:1.7;vector-effect:non-scaling-stroke}.edge-neutral{stroke:var(--arch-text-muted);marker-end:url(#arrow-neutral)}.edge-cyan{stroke:var(--arch-cyan);marker-end:url(#arrow-cyan)}.edge-sky{stroke:var(--arch-sky);marker-end:url(#arrow-sky)}.edge-amber{stroke:var(--arch-amber);stroke-dasharray:7 6;marker-end:url(#arrow-amber)}.edge-faint{fill:none;stroke:var(--arch-line-strong);stroke-width:1;stroke-dasharray:3 5}.marker-neutral{fill:var(--arch-text-muted)}.marker-cyan{fill:var(--arch-cyan)}.marker-sky{fill:var(--arch-sky)}.marker-amber{fill:var(--arch-amber)}.edge-label{fill:var(--arch-text-muted);font-size:9px;letter-spacing:.04em;paint-order:stroke;stroke:var(--arch-bg);stroke-width:5px;stroke-linejoin:round}
+    .node .node-surface{stroke-width:1.4;vector-effect:non-scaling-stroke}.node-instrument .node-surface{fill:url(#instrument-gradient);stroke:var(--arch-cyan)}.node-policy .node-surface{fill:url(#policy-gradient);stroke:var(--arch-sky)}.node-adapt .node-surface{fill:var(--arch-surface);stroke:var(--arch-amber)}.node-title{fill:var(--arch-text);font-size:15px;font-weight:700;letter-spacing:.08em}.node-detail{fill:var(--arch-text-soft);font-size:10px}.node-index{fill:var(--arch-text-muted);font-size:8px;letter-spacing:.12em}
+    .concept-card{fill:var(--arch-bg-deep);fill-opacity:.7;stroke:var(--arch-line-strong);stroke-width:1}.concept-title{fill:var(--arch-cyan);font-size:11px;font-weight:700;letter-spacing:.1em}.concept-copy{fill:var(--arch-text-soft);font-size:10px}.concept-rule{stroke:var(--arch-line-strong);stroke-width:1}.why-statement{fill:var(--arch-text);font-size:21px;font-weight:700;letter-spacing:.08em}.why-substatement{fill:var(--arch-amber);font-size:15px;font-weight:700;letter-spacing:.08em}.why-caption{fill:var(--arch-text-soft);font-size:10px}.gate-diamond{fill:var(--arch-surface-raised);stroke:var(--arch-cyan);stroke-width:1.6}.gate-label{fill:var(--arch-text);font-size:9px;font-weight:700;text-anchor:middle}.gate-pass{fill:var(--arch-success)}.gate-caption{fill:var(--arch-cyan);font-size:9px;letter-spacing:.06em}
+    .door-panel{fill:var(--arch-bg-deep);fill-opacity:.82;stroke:var(--arch-line-strong);stroke-width:1}.door-key-cyan{stroke:var(--arch-cyan);stroke-width:3}.door-key-amber{stroke:var(--arch-amber);stroke-width:3}.door-title{fill:var(--arch-text);font-size:9px;font-weight:700;letter-spacing:.05em}.door-detail{fill:var(--arch-text-muted);font-size:8.5px}.brace{fill:none;stroke-width:1;vector-effect:non-scaling-stroke}.brace-cyan{stroke:var(--arch-cyan);opacity:.62}.brace-amber{stroke:var(--arch-amber);opacity:.62}.brace-label{font-size:9px;letter-spacing:.025em;text-anchor:middle}.brace-label-cyan{fill:var(--arch-cyan)}.brace-label-amber{fill:var(--arch-amber)}
+    .rail-label{fill:var(--arch-text-muted);font-size:9px;font-weight:700;letter-spacing:.1em}.rail-stage{fill:var(--arch-bg-deep);stroke:var(--arch-line-strong);stroke-width:1}.rail-stage-text{fill:var(--arch-text-soft);font-size:9px;font-weight:700;letter-spacing:.06em;text-anchor:middle}.rail-edge{fill:none;stroke:var(--arch-text-muted);stroke-width:1.2;marker-end:url(#arrow-neutral)}.rail-gate{fill:var(--arch-surface-raised);stroke:var(--arch-cyan);stroke-width:1.2}.rail-gate-caption{fill:var(--arch-cyan);font-size:8px;text-anchor:middle}.tracer{fill:none;stroke-linecap:round;stroke-width:2.4;stroke-dasharray:.8 99.2;pathLength:100;opacity:.7}.tracer-execution{stroke:var(--arch-cyan);animation:trace-forward 9s linear infinite}.tracer-feedback{stroke:var(--arch-amber);animation:trace-feedback 12s linear infinite}@keyframes trace-forward{to{stroke-dashoffset:-100}}@keyframes trace-feedback{from{stroke-dashoffset:45}to{stroke-dashoffset:-55}}
+    @media(prefers-reduced-motion:reduce){.tracer{display:none;animation:none}.architecture-map *{transition:none!important}}
+    @media(prefers-color-scheme:light){.architecture-map{--arch-bg:var(--bg2,#f1f5f9);--arch-bg-deep:var(--bg,#fff);--arch-surface:var(--bg3,#e8eef5);--arch-surface-raised:var(--bg4,#dbe5ef);--arch-line:var(--b,rgba(15,23,42,.16));--arch-line-strong:var(--ba,rgba(15,23,42,.3));--arch-text:var(--t,#0f172a);--arch-text-soft:var(--t2,#334155);--arch-text-muted:var(--t3,#64748b);--arch-cyan:var(--ac,#0891b2);--arch-amber:var(--am,#b45309);--arch-sky:var(--cy,#0284c7)}.figure-ground{fill:var(--arch-bg)}.grid-texture{opacity:.28}.node-instrument .node-surface,.node-policy .node-surface{fill:var(--arch-surface)}}
+    @media print{.figure-ground{fill:#fff;stroke:#555}.grid-texture,.tracer{display:none}.region-what{stroke:#555;stroke-dasharray:10 8}.region-how-outer,.region-how-inner,.region-why{stroke:#333;filter:none}.region-why,.node-instrument .node-surface,.node-policy .node-surface{fill:#fff}.architecture-map{--arch-text:#000;--arch-text-soft:#222;--arch-text-muted:#555;--arch-bg:#fff;--arch-bg-deep:#fff;--arch-surface:#fff;--arch-surface-raised:#eee}}
+  </style>
+
+  <!-- The dossier ground gives the formal map a bounded, printable working surface. -->
+  <rect class="figure-ground" x="1" y="1" width="1438" height="898" rx="26"/>
+  <rect class="grid-texture" x="1" y="1" width="1438" height="898" rx="26"/>
+
+  <!-- WHY, HOW, and WHAT are semantic territories, distinguished by line style as well as color. -->
+  <g class="architecture-rings">
+    <rect class="region region-what" x="24" y="24" width="1392" height="852" rx="40"/>
+    <rect class="region region-how-outer" x="168" y="104" width="1122" height="590" rx="34"/>
+    <rect class="region region-how-inner" x="176" y="112" width="1106" height="574" rx="29"/>
+    <rect class="region region-why" x="500" y="330" width="440" height="190" rx="95" filter="url(#amber-glow)"/>
+    <text class="region-label what-label" x="48" y="58">WHAT</text><text class="region-detail" x="113" y="58">DECISIONS / DOORS / CAMPAIGNS</text>
+    <text class="region-label how-label" x="190" y="137">HOW</text><text class="region-detail" x="246" y="137">INSTRUMENT / COST LEVERS / N &#x00D7; M</text>
+    <text class="region-label why-label" x="526" y="361">WHY</text>
+    <text class="map-title" x="720" y="58" text-anchor="middle">THE INFORMATION-ACQUISITION MACHINE</text>
+    <text class="map-subtitle" x="720" y="80" text-anchor="middle">EVENTS &#x2192; INFORMATION &#x2192; TESTABLE POLICY &#x2192; ADAPTATION</text>
+  </g>
+
+  <!-- Connections establish execution order first; active color begins only at measurement. -->
+  <g class="architecture-edges">
+    <path class="edge edge-neutral" d="M360 188H380"/><text class="edge-label" x="370" y="176" text-anchor="middle">compile</text>
+    <path class="edge edge-neutral" d="M560 188H582"/><text class="edge-label" x="571" y="176" text-anchor="middle">factor cross-product</text>
+    <path class="edge edge-neutral" d="M727 188H747"/><text class="edge-label" x="737" y="176" text-anchor="middle">materialize / enqueue</text>
+    <path class="edge edge-neutral" d="M892 188H912"/><text class="edge-label" x="902" y="176" text-anchor="middle">execute</text>
+    <path class="edge edge-neutral" d="M1072 188H1094"/><text class="edge-label" x="1083" y="176" text-anchor="middle">emit events</text>
+    <path class="edge edge-cyan" d="M1172 226V320"/><text class="edge-label" x="1182" y="276">instrument</text>
+    <path class="edge edge-cyan" d="M1172 390C1172 441 1158 468 1120 500"/><text class="edge-label" x="1174" y="450">derive / measurement rules</text>
+    <path class="edge edge-cyan" d="M1000 538C982 538 974 568 965 617"/><text class="edge-label" x="993" y="586" text-anchor="end">arm loss</text>
+    <path class="edge edge-neutral" d="M755 617H450"/><text class="edge-label" x="603" y="605" text-anchor="middle">compare outcomes</text>
+    <path class="edge edge-amber" d="M280 617H174V188H190"/><text class="edge-label" x="161" y="412" transform="rotate(-90 161 412)" text-anchor="middle">next specification / tweak one variable</text>
+    <path class="edge edge-cyan" d="M1120 576C1120 604 1102 612 1080 625"/><path class="edge edge-sky" d="M1080 675C1080 686 1072 692 1068 700"/>
+    <path class="edge edge-sky" d="M955 740H925"/><text class="edge-label" x="940" y="728" text-anchor="middle">arm</text>
+    <path class="edge edge-sky" d="M720 740H690"/><text class="edge-label" x="705" y="728" text-anchor="middle">grid</text>
+    <path class="edge edge-amber" d="M480 740C434 740 400 689 365 654"/><text class="edge-label" x="431" y="702" text-anchor="middle">adapt</text>
+    <!-- Faint leaders bind the ordering rail to its concrete stages without implying data flow. -->
+    <path class="edge-faint" d="M1305 820V790H1265V355H1249"/><path class="edge-faint" d="M1130 820V790H1210V538H1240"/><path class="edge-faint" d="M925 820V790H1068V780"/><path class="edge-faint" d="M740 820V790H822V780"/><path class="edge-faint" d="M550 820V790H585V780"/>
+  </g>
+
+  <!-- Every stage is an explicit title/detail pair so the system remains readable without motion. -->
+  <g class="architecture-nodes">
+    <g class="node node-instrument" aria-label="ExperimentSpec: question, workflow, factors, and rules"><title>ExperimentSpec</title><rect class="node-surface" x="190" y="150" width="170" height="76" rx="10"/><text class="node-index" x="204" y="168">01 / INTENT</text><text class="node-title" x="204" y="191">ExperimentSpec</text><text class="node-detail" x="204" y="211">question &#x00B7; workflow &#x00B7; factors &#x00B7; rules</text></g>
+    <g class="node node-instrument" aria-label="DAG: validate, cells, execute, measure, compare, and adapt"><title>DAG</title><rect class="node-surface" x="380" y="150" width="180" height="76" rx="10"/><text class="node-index" x="394" y="168">02 / ORDER</text><text class="node-title" x="394" y="191">DAG</text><text class="node-detail" x="394" y="207"><tspan x="394">validate &#x2192; cells &#x2192; execute</tspan><tspan x="394" dy="13">measure &#x2192; compare &#x2192; adapt</tspan></text></g>
+    <g class="node node-instrument" aria-label="Cells: factor cross-product"><title>Cells</title><rect class="node-surface" x="582" y="150" width="145" height="76" rx="10"/><text class="node-index" x="596" y="168">03 / DESIGN</text><text class="node-title" x="596" y="191">CELLS</text><text class="node-detail" x="596" y="211">factor cross-product</text></g>
+    <g class="node node-instrument" aria-label="Jobs: budget, deadline, and policy arm"><title>Jobs</title><rect class="node-surface" x="747" y="150" width="145" height="76" rx="10"/><text class="node-index" x="761" y="168">04 / CONTROL</text><text class="node-title" x="761" y="191">JOBS</text><text class="node-detail" x="761" y="207"><tspan x="761">budget &#x00B7; deadline</tspan><tspan x="761" dy="13">policy arm</tspan></text></g>
+    <g class="node node-instrument" aria-label="Attempts: tokens, timing, tools, and outcome"><title>Attempts</title><rect class="node-surface" x="912" y="150" width="160" height="76" rx="10"/><text class="node-index" x="926" y="168">05 / EXECUTION</text><text class="node-title" x="926" y="191">ATTEMPTS</text><text class="node-detail" x="926" y="207"><tspan x="926">tokens &#x00B7; timing &#x00B7; tools</tspan><tspan x="926" dy="13">outcome</tspan></text></g>
+    <g class="node node-instrument" aria-label="Ledger: append-only events"><title>Ledger</title><rect class="node-surface" x="1094" y="150" width="155" height="76" rx="10"/><text class="node-index" x="1108" y="168">06 / VISIBILITY</text><text class="node-title" x="1108" y="191">LEDGER</text><text class="node-detail" x="1108" y="211">append-only events</text></g>
+    <g class="node node-instrument" aria-label="Measure: measurement rules"><title>Measure</title><rect class="node-surface" x="1094" y="320" width="155" height="70" rx="10"/><text class="node-index" x="1108" y="338">07 / DERIVE</text><text class="node-title" x="1108" y="361">MEASURE</text><text class="node-detail" x="1108" y="380">measurement rules</text></g>
+    <g class="node node-instrument" aria-label="Information: first-pass, grit, cost, and uncertainty"><title>Information</title><rect class="node-surface" x="1000" y="500" width="240" height="76" rx="10" filter="url(#cyan-glow)"/><text class="node-index" x="1014" y="518">08 / DECISION INPUTS</text><text class="node-title" x="1014" y="541">INFORMATION</text><text class="node-detail" x="1014" y="561">first-pass &#x00B7; grit &#x00B7; cost &#x00B7; uncertainty</text></g>
+    <g class="node node-policy" aria-label="Compare: cost, quality, latency, SLA, and value"><title>Compare</title><rect class="node-surface" x="755" y="580" width="210" height="74" rx="10"/><text class="node-index" x="769" y="598">09 / ARM LOSS</text><text class="node-title" x="769" y="621">COMPARE</text><text class="node-detail" x="769" y="641">cost &#x00B7; quality &#x00B7; latency &#x00B7; SLA &#x00B7; value</text></g>
+    <g class="node node-adapt" aria-label="Adapt: tweak one variable"><title>Adapt</title><rect class="node-surface" x="280" y="580" width="170" height="74" rx="10"/><text class="node-index" x="294" y="598">10 / LEARNING</text><text class="node-title" x="294" y="621">ADAPT</text><text class="node-detail" x="294" y="641">tweak one variable</text></g>
+    <g class="node node-policy" aria-label="Policy: route, retry, escalate, and budget; policy is a factor level and arm"><title>Policy</title><rect class="node-surface" x="955" y="700" width="225" height="80" rx="10"/><text class="node-index" x="969" y="718">CONTROL RULE</text><text class="node-title" x="969" y="741">POLICY</text><text class="node-detail" x="969" y="758">route &#x00B7; retry &#x00B7; escalate &#x00B7; budget</text><text class="node-detail" x="969" y="772">policy = factor level / arm</text></g>
+    <g class="node node-policy" aria-label="Grid: policy as an arm"><title>Grid</title><rect class="node-surface" x="720" y="700" width="205" height="80" rx="10"/><text class="node-index" x="734" y="718">CONTROLLED TEST</text><text class="node-title" x="734" y="741">GRID</text><text class="node-detail" x="734" y="763">policy as an arm</text></g>
+    <g class="node node-policy" aria-label="Campaign: repeat the grid"><title>Campaign</title><rect class="node-surface" x="480" y="700" width="210" height="80" rx="10"/><text class="node-index" x="494" y="718">DISCIPLINE</text><text class="node-title" x="494" y="741">CAMPAIGN</text><text class="node-detail" x="494" y="763">repeat the grid</text></g>
+  </g>
+
+  <!-- Gates bind policy eligibility to measured fields and decisions to reversible or compounding doors. -->
+  <g class="architecture-gates">
+    <g aria-label="Why: measured information becomes testable policy"><text class="why-statement" x="720" y="406" text-anchor="middle">MEASURED INFORMATION</text><text class="why-substatement" x="720" y="438" text-anchor="middle">BECOMES TESTABLE POLICY</text><path d="M620 458H820" class="concept-rule"/><text class="why-caption" x="720" y="482" text-anchor="middle">unmeasured gap &#x2192; ledger visibility &#x2192; decision</text></g>
+    <g aria-label="How cost levers and calculator bind to the instrument"><rect class="concept-card" x="190" y="320" width="280" height="205" rx="12"/><text class="concept-title" x="208" y="347">HOW / COST LEVERS</text><text class="concept-copy" x="208" y="374">C&#x2080; baseline cost &#x00B7; P frontier premium</text><text class="concept-copy" x="208" y="395">e eligible share &#x00B7; r routed share</text><text class="concept-copy" x="208" y="416">&#x03B2; compounding &#x00B7; EPM effective premium</text><path class="concept-rule" d="M208 438H452"/><text class="concept-title" x="208" y="463">INTERACTIVE CALCULATOR</text><text class="concept-copy" x="208" y="486">reversible scenario test</text><text class="concept-copy" x="208" y="507">before a default becomes architecture</text></g>
+    <g aria-label="Dependency gate: required information must be a subset of produced information"><path class="gate-diamond" d="M1080 625L1110 650L1080 675L1050 650Z"/><circle class="gate-pass" cx="1080" cy="633" r="3.5"/><text class="gate-label" x="1080" y="650">requires</text><text class="gate-label" x="1080" y="662">&#x2286; produced?</text><text class="gate-caption" x="1118" y="654">information first</text></g>
+    <g aria-label="What decision surfaces: two-way route, one-way architecture, autonomous door, and provider playbook"><rect class="door-panel" x="1198" y="594" width="194" height="184" rx="12"/><line class="door-key-cyan" x1="1212" y1="611" x2="1212" y2="641"/><text class="door-title" x="1222" y="617">TWO-WAY DOOR</text><text class="door-detail" x="1222" y="633">per-task route</text><line class="door-key-amber" x1="1212" y1="652" x2="1212" y2="682"/><text class="door-title" x="1222" y="658">ONE-WAY DOOR</text><text class="door-detail" x="1222" y="674">default architecture</text><line class="door-key-cyan" x1="1212" y1="693" x2="1212" y2="723"/><text class="door-title" x="1222" y="699">AUTONOMOUS DOOR</text><text class="door-detail" x="1222" y="715">policy acts inside budget</text><line class="door-key-amber" x1="1212" y1="734" x2="1212" y2="764"/><text class="door-title" x="1222" y="740">PROVIDER PLAYBOOK</text><text class="door-detail" x="1222" y="756">route &#x00B7; reserve &#x00B7; review</text></g>
+  </g>
+
+  <!-- Symbolic N by M braces describe evidence and analysis burden without adding measured values. -->
+  <g class="architecture-burden"><path class="brace brace-cyan" d="M582 246V254Q582 264 592 264H1239Q1249 264 1249 274V282"/><path class="brace brace-cyan" d="M1249 282V306H1218V320"/><text class="brace-label brace-label-cyan" x="916" y="288">N linked sessions &#x00D7; M measurement angles = instrumented evidence surface</text><path class="brace brace-amber" d="M755 660V666Q755 676 765 676H1230Q1240 676 1240 666V660"/><path class="brace brace-amber" d="M1240 660V410H1218V390"/><text class="brace-label brace-label-amber" x="998" y="691">analysis burden = N &#x00D7; M before cross-arm aggregation</text></g>
+
+  <!-- The rail is read right-to-left, following arrows from instrumentation to campaign. -->
+  <g class="architecture-order" aria-label="Load-bearing order: instrument, derive, write policy, grid, campaign">
+    <text class="rail-label" x="62" y="842">LOAD-BEARING ORDER / FOLLOW ARROWS</text>
+    <rect class="rail-stage" x="1230" y="820" width="150" height="38" rx="9"/><text class="rail-stage-text" x="1305" y="843">INSTRUMENT</text><path class="rail-edge" d="M1230 839H1190"/>
+    <rect class="rail-stage" x="1070" y="820" width="120" height="38" rx="9"/><text class="rail-stage-text" x="1130" y="843">DERIVE</text><path class="rail-edge" d="M1070 839H1059"/>
+    <path class="rail-gate" d="M1043 824L1059 839L1043 854L1027 839Z"/><circle class="gate-pass" cx="1043" cy="839" r="3"/><path class="rail-edge" d="M1027 839H1015"/><text class="rail-gate-caption" x="1043" y="872">information first</text>
+    <rect class="rail-stage" x="835" y="820" width="180" height="38" rx="9"/><text class="rail-stage-text" x="925" y="843">WRITE POLICY</text><path class="rail-edge" d="M835 839H800"/>
+    <rect class="rail-stage" x="680" y="820" width="120" height="38" rx="9"/><text class="rail-stage-text" x="740" y="843">GRID</text><path class="rail-edge" d="M680 839H625"/>
+    <rect class="rail-stage" x="475" y="820" width="150" height="38" rx="9"/><text class="rail-stage-text" x="550" y="843">CAMPAIGN</text>
+  </g>
+  <!-- Slow tracers are redundant orientation cues; reduced-motion and print modes remove them. -->
+  <g class="architecture-motion" aria-hidden="true"><path class="tracer tracer-execution" pathLength="100" d="M190 188H1172V390C1172 441 1158 468 1120 500"/><path class="tracer tracer-feedback" pathLength="100" d="M755 617H450H280H174V188H190"/></g>
+</svg>
+    </div>
+    <figcaption>Events are not policy. Measurement creates the information that makes a policy arm writable, comparable, and adaptable.</figcaption>
+  </figure>
+  <ol class="architecture-text" aria-label="Architecture diagram text equivalent">
+    <li><strong>1 / SPECIFY AND EXECUTE</strong>ExperimentSpec records the question, workflow, factors, and rules. Compilation orders a DAG; factor cells become jobs and attempts.</li>
+    <li><strong>2 / RECORD AND MEASURE</strong>Attempts emit append-only ledger events. Declared measurement rules derive named information from those fields.</li>
+    <li><strong>3 / GATE AND COMPARE</strong>A control rule is writable only when its required information was produced. Policy then enters a grid as a testable arm.</li>
+    <li><strong>4 / CAMPAIGN AND ADAPT</strong>Compare cost, quality, latency, SLA, and value; repeat the grid as a campaign; change one variable in the next specification.</li>
+  </ol>
 </div></section>
 
 <!-- SECTION: The Levers -->
 <section class="fsec" id="levers"><div class="inr wide">
-<div class="pulse">How — Measured and Modeled Inputs</div>
+<div class="section-kicker">HOW / MEASURED AND MODELED INPUTS</div>
 <h2>Separate what is measured,<br>controlled, and modeled.</h2>
 <p class="lead">Cost parameters (C₀, P, ε, r) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) are calibrated to your codebase and energy market. Understanding which levers you control &mdash; and which compound beyond your control &mdash; is the difference between deterministic budgeting and surprise overruns.</p>
-
-<h3 style="color:var(--ac);margin:1.5rem 0 0.5rem;text-align:center">Augmented Workforce (Rules 1&ndash;5)</h3>
-<p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
-<div class="params">
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac);font-size:0.68rem">C&#8320; sub-lever</div><div class="pname"><strong>Cache Strategy.</strong> Cache write strategy: Store context at $3.75/Mtok (Anthropic). Cache read strategy: Retrieve existing context at $0.14/Mtok (DeepSeek default). Two-way door &mdash; measure your cache hit rate before committing. If &lt;50% reuse, switch to cache-read.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Measured flail rates: 8.4% (DeepSeek) to 50% (GPT-5.5). Narration penalty: 0.3% to 30%. Pay only when you need auditable reasoning.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">&beta;</div><div class="pname"><strong>Context inflation per line.</strong> Compounds quadratically through the Snowball Rule (N&sup2;). Default 0.001 — calibrate to your codebase growth rate.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div></div>
+<div class="lever-console">
+  <article class="lever-lane">
+    <div class="lane-head"><h3>Augmented Workforce (Rules 1&ndash;5)</h3><span>human + AI / per session</span></div>
+    <p class="lead" style="font-size:0.85rem">These drive the human+AI cost model. Teams using AI coding assistants interact with these every session.</p>
+    <div class="params">
+      <div class="param"><div class="psym">C&#8320;</div><div class="pname"><strong>Which model you call.</strong> $0.005 to $1.01 per session. Your primary cost lever. Two-way door &ndash; switch per task type.</div><div class="lever-meta"><span>Observed</span><span>Two-way door</span></div></div>
+      <div class="param"><div class="psym">C&#8320; sub-lever</div><div class="pname"><strong>Cache Strategy.</strong> Cache write strategy: Store context at $3.75/Mtok (Anthropic). Cache read strategy: Retrieve existing context at $0.14/Mtok (DeepSeek default). Two-way door &mdash; measure your cache hit rate before committing. If &lt;50% reuse, switch to cache-read.</div><div class="lever-meta"><span>Controlled</span><span>Two-way door</span></div></div>
+      <div class="param"><div class="psym">P</div><div class="pname"><strong>Whether it produces working code.</strong> DeepSeek: 72% general pass rate with correct env. Pin frameworks to maximize this. Drives your retry overhead.</div><div class="lever-meta"><span>Observed</span><span>Verification gate</span></div></div>
+      <div class="param"><div class="psym">&epsilon;</div><div class="pname"><strong>How much it narrates.</strong> Measured flail rates: 8.4% (DeepSeek) to 50% (GPT-5.5). Narration penalty: 0.3% to 30%. Pay only when you need auditable reasoning.</div><div class="lever-meta"><span>Measured</span><span>Selection</span></div></div>
+      <div class="param modeled"><div class="psym">&beta;</div><div class="pname"><strong>Context inflation per line.</strong> Compounds quadratically through the Snowball Rule (N&sup2;). Default 0.001 — calibrate to your codebase growth rate.</div><div class="lever-meta"><span>Modeled</span><span>One-way door</span></div></div>
+      <div class="param modeled"><div class="psym">v</div><div class="pname"><strong>Code velocity per session.</strong> How much code you generate per session. Higher velocity accelerates the N&sup2; compounding.</div><div class="lever-meta"><span>Controlled</span><span>One-way effect</span></div></div>
+      <div class="param modeled"><div class="psym">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Local energy markets determine long-term compute prices. IEA baseline: 1.6%/yr. Hedge scenario: 2.5%/yr.</div><div class="lever-meta"><span>Modeled</span><span>One-way horizon</span></div></div>
+    </div>
+  </article>
+  <article class="lever-lane autonomous">
+    <div class="lane-head"><h3>Autonomous Workloads (Rules 6&ndash;9)</h3><span>unsupervised / per job</span></div>
+    <p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
+    <div class="params">
+      <div class="param autonomous"><div class="psym">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div><div class="lever-meta"><span>Observed</span><span>Two-way route</span></div></div>
+      <div class="param modeled"><div class="psym">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div><div class="lever-meta"><span>Controlled</span><span>Autonomous door</span></div></div>
+      <div class="param modeled"><div class="psym">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 249 sessions. Drives the retry penalty R(r, E&#8340;).</div><div class="lever-meta"><span>Measured</span><span>Escalation gate</span></div></div>
+      <div class="param modeled"><div class="psym">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div><div class="lever-meta"><span>Modeled</span><span>Autonomous door</span></div></div>
+      <div class="param modeled"><div class="psym">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div><div class="lever-meta"><span>Controlled</span><span>Budget ceiling</span></div></div>
+      <div class="param autonomous"><div class="psym">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div><div class="lever-meta"><span>Modeled</span><span>One-way horizon</span></div></div>
+    </div>
+    <details class="wfm-panel">
+      <summary>Autonomous AI workforce management is call center WFM, reframed.</summary>
+      <p class="note">The equations are the same. The resource under management is the only difference.</p>
+      <div class="constraints">
+        <div class="cr head"><div class="nm">AI FinOps Concept</div><div class="fl">Workforce Management Equivalent</div><div class="fl">Shared Principle</div></div>
+        <div class="cr"><div class="nm">Budget Ceiling: T<sub>max</sub> = Budget / C<sub>job</sub></div><div class="fl">Erlang staffing: throughput from headcount</div><div class="fl">Capacity is budget-constrained, not infra-constrained</div></div>
+        <div class="cr"><div class="nm">Cascade Rule: Flash → Sonnet → Opus → Human</div><div class="fl">Tiered support: L1 → L2 → L3 → supervisor</div><div class="fl">Escalate only what can't be resolved at current tier</div></div>
+        <div class="cr"><div class="nm">SLA Buffer: 72-hour batch horizon</div><div class="fl">AHT + service level targets</div><div class="fl">Queue depth × avg completion time = SLA window</div></div>
+        <div class="cr"><div class="nm">First-Pass Rule: WOC = 1/(1+r)</div><div class="fl">First-call resolution rate (FCR)</div><div class="fl">First-attempt success is the primary quality metric</div></div>
+        <div class="cr"><div class="nm">Batch Discount: 50% cheaper deferred</div><div class="fl">Back-office batch processing</div><div class="fl">Cost of immediacy: cheaper to wait</div></div>
+      </div>
+    </details>
+  </article>
 </div>
-
-<h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Autonomous Workloads (Rules 6&ndash;9)</h3>
-<p class="lead" style="font-size:0.85rem">These drive the unsupervised batch-processing cost model. Relevant when AI operates without human-in-the-loop.</p>
-<div class="params">
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">C&#8320;</div><div class="pname"><strong>Baseline cost per job.</strong> Same model cost lever as augmented, applied to a single autonomous unit of work. $0.001 to $1.01 per job depending on model tier.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">b</div><div class="pname"><strong>Batch fraction.</strong> What % of jobs run in batch mode. Batch gives 50% discount: D(b) = 1 &minus; b&times;0.5. Trade-off: longer completion time.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">r</div><div class="pname"><strong>Retry rate.</strong> Fraction of jobs that fail first-pass and escalate. Measured average: 11.5% across 249 sessions. Drives the retry penalty R(r, E&#8340;).</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">E&#8340;</div><div class="pname"><strong>Escalation cost multiplier.</strong> How many &times; more expensive the escalation tier is vs the base model. Price ratio: 28.2&times; (DeepSeek &rarr; GPT-5.6), 68.7&times; (DS &rarr; Claude). Design for &lt;1% escalation to human.</div></div>
-<div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">W</div><div class="pname"><strong>Workload volume.</strong> Jobs per day processed autonomously. Throughput limit: T<sub>max</sub> = Budget / C<sub>job</sub>. Double the budget, double the capacity.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">EPM(t)</div><div class="pname"><strong>Energy price trajectory.</strong> Same multiplier as augmented. Applies to both the base job cost and the retry/escallation overhead.</div></div>
-  </div>
 </div></section>
-
-<div style="max-width:1100px;margin:0 auto;padding:0 2rem 2rem">
-<div class="callout-box" style="border-left-color:var(--cy);text-align:left;font-size:0.82rem">
-  <strong style="color:var(--cy)">Autonomous AI workforce management is call center WFM, reframed.</strong><br>
-  The equations are the same. The resource under management is the only difference.
-  <div class="constraints" style="margin-top:0.6rem">
-    <div class="cr head"><div class="nm">AI FinOps Concept</div><div class="fl">Workforce Management Equivalent</div><div class="fl">Shared Principle</div></div>
-    <div class="cr"><div class="nm">Budget Ceiling: T<sub>max</sub> = Budget / C<sub>job</sub></div><div class="fl">Erlang staffing: throughput from headcount</div><div class="fl">Capacity is budget-constrained, not infra-constrained</div></div>
-    <div class="cr"><div class="nm">Cascade Rule: Flash → Sonnet → Opus → Human</div><div class="fl">Tiered support: L1 → L2 → L3 → supervisor</div><div class="fl">Escalate only what can't be resolved at current tier</div></div>
-    <div class="cr"><div class="nm">SLA Buffer: 72-hour batch horizon</div><div class="fl">AHT + service level targets</div><div class="fl">Queue depth × avg completion time = SLA window</div></div>
-    <div class="cr"><div class="nm">First-Pass Rule: WOC = 1/(1+r)</div><div class="fl">First-call resolution rate (FCR)</div><div class="fl">First-attempt success is the primary quality metric</div></div>
-    <div class="cr"><div class="nm">Batch Discount: 50% cheaper deferred</div><div class="fl">Back-office batch processing</div><div class="fl">Cost of immediacy: cheaper to wait</div></div>
-  </div>
-</div>
-</div>
 
 <!-- SECTION: The Cost Model -->
 <section class="fsec" id="cost-model"><div class="inr wide">
-<div class="pulse">How — The Cost Model</div>
+<div class="section-kicker">HOW / COST MODEL</div>
 <h2>One equation. Every cost driver.<br>Any scenario. Your numbers.</h2>
 <p class="lead" style="margin-bottom:1rem">Every rule derives from these equations. Cost parameters (C₀, P) are measured from 227 experiment worktrees. Modeling parameters (β, EPM) use IEA energy projections and your codebase growth rate. See methodology for provenance detail on each parameter.</p>
-
-<div style="max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:0.8rem">
-<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--ac);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
-<strong style="color:var(--ac)">Augmented Workforce</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span><br>
-c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>
-C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>
-CostPerOutcome = C(K/P, v)/K<br>
-C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]
+<div class="cost-station">
+  <div class="formula-rail">
+    <article class="formula-plate"><strong>Augmented Workforce <span style="color:var(--t3);font-size:0.7em">(Rules 1–5)</span></strong>c(t) = C&#8320;&times;EPM(t)&times;(1+&beta;&middot;v&middot;t)<br>C(N,v) = C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<br>CostPerOutcome = C(K/P, v)/K<br>C<sub>mo</sub> = E&times;C&#8320;&times;EPM(N)&times;[N+&beta;&middot;v&middot;N(N&minus;1)/2]<span class="formula-controls">Controls: C&#8320; / P / &beta; / v / EPM</span></article>
+    <article class="formula-plate autonomous"><strong>Autonomous Workloads <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span></strong>C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>C<sub>auto</sub> = W&times;C<sub>job</sub><br>T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br><span style="color:var(--t3);font-size:0.7em">r=0.115&rarr;WOC=<span data-stat-fmt="woc">0.90</span> &middot; E&#8340;=28.2&times;</span><span class="formula-controls">Controls: C&#8320; / b / r / E&#8340; / W</span></article>
+    <article class="formula-plate value"><strong>Business Value Index <span style="color:var(--t3);font-size:0.7em">(Rule 10)</span></strong>BVI = WOC/(C<sub>job</sub>+H/W)<br><span style="color:var(--t3)">= successful outcomes per total dollar</span><br>C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H<span class="formula-controls">Controls: WOC / C<sub>job</sub> / H / W</span></article>
+  </div>
+  <div class="plot-panel">
+    <div class="chart-wrap"><canvas id="costChart"></canvas></div>
+    <div class="chart-toggle-row">
+      <span style="color:var(--t3)">Projection:</span>
+      <a href="#" onclick="rebuildChart(3);return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--ac);font-weight:700;text-decoration:none" id="yr3" role="button" aria-pressed="true">3 yr</a>
+      <a href="#" onclick="rebuildChart(10);return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--t3);text-decoration:none" id="yr10" role="button" aria-pressed="false">10 yr</a>
+      <a href="#" onclick="rebuildChart(25);return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--t3);text-decoration:none" id="yr25" role="button" aria-pressed="false">25 yr</a>
+      <span style="color:var(--t3);margin:0 0.5rem">|</span><span style="color:var(--t3)">EPM:</span>
+      <a href="#" onclick="buildChart(chartYears,'baseline','cost');updateChartToggle('vwCost','vwThroughput');return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--ac);font-weight:700;text-decoration:none" id="epmBase" role="button" aria-pressed="true">Baseline</a>
+      <a href="#" onclick="buildChart(chartYears,'sensitivity','cost');updateChartToggle('vwCost','vwThroughput');return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--t3);text-decoration:none" id="epmSens" role="button" aria-pressed="false">DS Scenarios</a>
+      <span style="color:var(--t3);margin:0 0.5rem">|</span><span style="color:var(--t3)">View:</span>
+      <a href="#" onclick="buildChart(chartYears,chartMode,'cost');return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--ac);font-weight:700;text-decoration:none" id="vwCost" role="button" aria-pressed="true">Cost</a>
+      <a href="#" onclick="buildChart(chartYears,chartMode,'throughput');updateChartToggle('vwThroughput','vwCost');return false" onkeydown="if(event.key===' '){event.preventDefault();this.click()}" style="color:var(--t3);text-decoration:none" id="vwThroughput" role="button" aria-pressed="false">Throughput</a>
+    </div>
+    <p class="note">Baseline projections at IEA EPM (1.6%/yr). Use 3yr for quarterly budgeting. Use 10yr for strategic planning. Toggle to DS Scenarios for aggressive (2.5%) and optimistic (0.8%) energy paths. Operationalizes the <strong style="color:var(--am)">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
+  </div>
 </div>
-<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--am);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
-<strong style="color:var(--am)">Autonomous Workloads</strong> <span style="color:var(--t3);font-size:0.7em">(Rules 6–9)</span><br>
-C<sub>job</sub> = C&#8320;&times;EPM&times;(1&minus;b&times;0.5)&times;(1+r&times;E&#8340;)<br>
-C<sub>auto</sub> = W&times;C<sub>job</sub><br>
-T<sub>max</sub> = Budget/C<sub>job</sub> &middot; WOC=1/(1+r)<br>
-<span style="color:var(--t3);font-size:0.7em">r=0.115&rarr;WOC=<span data-stat-fmt="woc">0.90</span> &middot; E&#8340;=28.2&times;</span>
-</div>
-<div style="background:var(--bg3);border:1px solid var(--b);border-left:3px solid var(--cy);border-radius:0 12px 12px 0;padding:1.2rem;font-family:'JetBrains Mono',monospace;font-size:0.72rem;line-height:1.9;color:var(--t2);text-align:left">
-<strong style="color:var(--cy)">Business Value Index</strong> <span style="color:var(--t3);font-size:0.7em">(Rule 10)</span><br>
-BVI = WOC/(C<sub>job</sub>+H/W)<br>
-<span style="color:var(--t3)">= successful outcomes per total dollar</span><br>
-C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
-</div>
-</div>
-<div class="chart-wrap"><canvas id="costChart" style="max-width:600px"></canvas></div>
-<div class="chart-toggle-row">
-<span style="color:var(--t3)">Projection:</span>
-<a href="#" onclick="rebuildChart(3);return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="yr3">3 yr</a>
-<a href="#" onclick="rebuildChart(10);return false" style="color:var(--t3);text-decoration:none" id="yr10">10 yr</a>
-<a href="#" onclick="rebuildChart(25);return false" style="color:var(--t3);text-decoration:none" id="yr25">25 yr</a>
-<span style="color:var(--t3);margin:0 0.5rem">|</span>
-<span style="color:var(--t3)">EPM:</span>
-<a href="#" onclick="buildChart(chartYears,'baseline','cost');updateChartToggle('vwCost','vwThroughput');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="epmBase">Baseline</a>
-<a href="#" onclick="buildChart(chartYears,'sensitivity','cost');updateChartToggle('vwCost','vwThroughput');return false" style="color:var(--t3);text-decoration:none" id="epmSens">DS Scenarios</a>
-<span style="color:var(--t3);margin:0 0.5rem">|</span>
-<span style="color:var(--t3)">View:</span>
-<a href="#" onclick="buildChart(chartYears,chartMode,'cost');return false" style="color:var(--ac);font-weight:700;text-decoration:none" id="vwCost">Cost</a>
-<a href="#" onclick="buildChart(chartYears,chartMode,'throughput');updateChartToggle('vwThroughput','vwCost');return false" style="color:var(--t3);text-decoration:none" id="vwThroughput">Throughput</a>
-</div>
-<p class="note">Baseline projections at IEA EPM (1.6%/yr). Use 3yr for quarterly budgeting. Use 10yr for strategic planning. Toggle to DS Scenarios for aggressive (2.5%) and optimistic (0.8%) energy paths. Operationalizes the <strong style="color:var(--am)">Inference Production Frontier</strong> (Zhuang et al., 2025).</p>
-<div class="stats"><div class="stat"><div class="v">—</div><div class="l">DS Monthly Cost</div><div class="s">Use calculator above — &beta;·v·N&sup2; depends on your inputs</div></div><div class="stat"><div class="v amber">—</div><div class="l">Claude Monthly Cost</div><div class="s">Use calculator above — same team, same output</div></div><div class="stat"><div class="v">1.6%</div><div class="l">EPM Annual Rate</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">2.5%</div><div class="l">Aggressive Scenario</div><div class="s">Toggle on chart to compare</div></div><div class="stat"><div class="v" style="color:var(--cy)">~667K</div><div class="l">Max Jobs/Day</div><div class="s">$10K budget, $0.015/job (no retry/batch)</div></div><div class="stat"><div class="v amber" data-stat="woc_percent">90%</div><div class="l">WOC Ratio</div><div class="s">Calculated: 1/(1+0.115)</div></div></div>
+<div class="stats cost-receipts"><div class="stat"><div class="v">—</div><div class="l">DS Monthly Cost</div><div class="s">Use calculator above — &beta;·v·N&sup2; depends on your inputs</div></div><div class="stat"><div class="v amber">—</div><div class="l">Claude Monthly Cost</div><div class="s">Use calculator above — same team, same output</div></div><div class="stat"><div class="v">1.6%</div><div class="l">EPM Annual Rate</div><div class="s">IEA baseline projection</div></div><div class="stat"><div class="v amber">2.5%</div><div class="l">Aggressive Scenario</div><div class="s">Toggle on chart to compare</div></div><div class="stat"><div class="v" style="color:var(--cy)">~667K</div><div class="l">Max Jobs/Day</div><div class="s">$10K budget, $0.015/job (no retry/batch)</div></div><div class="stat"><div class="v amber" data-stat="woc_percent">90%</div><div class="l">WOC Ratio</div><div class="s">Calculated: 1/(1+0.115)</div></div></div>
 </div></section>
 
 <!-- SECTION: Interactive Calculator -->
 <section class="fsec" id="calculator"><div class="inr wide">
-<div class="pulse">What — Project Your Costs</div>
+<div class="section-kicker">HOW / INTERACTIVE WORKBENCH</div>
 <h2>Turn the equation into<br>your quarterly budget.</h2>
 <p class="lead">Two modes: <strong style="color:var(--ac)">Augmented Workforce</strong> for teams using AI coding assistants, or <strong style="color:var(--am)">Autonomous Workloads</strong> for unsupervised batch processing. Every adjustment recalculates your projected spend in real time.</p>
-
-<div style="display:flex;justify-content:center;gap:0.5rem;margin:1rem 0">
-<button id="btnAugmented" onclick="setCalcMode('augmented')" style="background:var(--ac);color:#09090b;border:none;border-radius:100px;padding:0.5rem 1.5rem;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:inherit">Augmented Workforce</button>
-<button id="btnAutonomous" onclick="setCalcMode('autonomous')" style="background:transparent;color:var(--t2);border:1px solid var(--ba);border-radius:100px;padding:0.5rem 1.5rem;font-weight:700;font-size:0.82rem;cursor:pointer;font-family:inherit">Autonomous Workloads</button>
+<div class="framework-workbench">
+  <div class="calc-mode" aria-label="Calculator mode">
+    <button id="btnAugmented" onclick="setCalcMode('augmented')" style="background:var(--ac);color:#09090b;border:none" aria-pressed="true" aria-controls="calcAugmented">Augmented Workforce</button>
+    <button id="btnAutonomous" onclick="setCalcMode('autonomous')" style="background:transparent;color:var(--t2);border:1px solid var(--ba)" aria-pressed="false" aria-controls="calcAutonomous">Autonomous Workloads</button>
+  </div>
+  <div class="workbench-grid">
+    <div class="calc-inputs">
+      <div id="calcAugmented">
+        <div class="row"><div><label>Team Size <span class="val" id="v_eng">10</span> engineers</label><input type="range" min="1" max="100" value="10" oninput="updateROI()" id="r_eng"></div><div><label>Sessions / Engineer / Day <span class="val" id="v_ses">20</span></label><input type="range" min="1" max="100" value="20" oninput="updateROI()" id="r_ses"></div></div>
+        <div class="row"><div><label>Velocity <span class="val" id="v_vel">500</span> lines/session</label><input type="range" min="50" max="2000" value="500" oninput="updateROI()" id="r_vel"></div><div><label>Working Days / Month <span class="val" id="v_day">20</span></label><input type="range" min="15" max="25" value="20" oninput="updateROI()" id="r_day"></div></div>
+        <div class="row"><div><label>Energy Scenario <span class="val" id="v_epm">Baseline (1.00&times;)</span></label><input type="range" min="0" max="2" value="0" oninput="updateROI()" id="r_epm"></div><div><label>Engineer Loaded Cost / Month <span class="val" id="v_cost">$20,000</span></label><input type="range" min="5000" max="50000" value="20000" oninput="updateROI()" id="r_cost"></div></div>
+        <div class="row"><div><label>EPM Annual Rate <span class="val" id="v_rate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_rate"></div><div><label>Monthly AI Budget Cap <span class="val" id="v_budget">$10,000</span></label><input type="range" min="500" max="500000" value="10000" step="500" oninput="updateROI()" id="r_budget"></div></div>
+      </div>
+      <div id="calcAutonomous" style="display:none">
+        <div class="row"><div><label>Workload <span class="val" id="v_workload">5,000</span> jobs/day</label><input type="range" min="100" max="100000" value="5000" oninput="updateROI()" id="r_workload"></div><div><label>Batch Fraction <span class="val" id="v_batch">70</span>%</label><input type="range" min="0" max="100" value="70" oninput="updateROI()" id="r_batch"></div></div>
+        <div class="row"><div><label>Retry Rate <span class="val" id="v_retry">11.5</span>% (measured)</label><input type="range" min="0" max="100" value="11.5" step="0.1" oninput="updateROI()" id="r_retry"></div><div><label>Escalation Tier <span class="val" id="v_escalation">DeepSeek &rarr; GPT-5.6 (28.2&times;)</span></label><input type="range" min="1" max="4" value="2" oninput="updateROI()" id="r_escalation"></div></div>
+        <div class="row"><div><label>Baseline Cost / Job <span class="val" id="v_ac0">$0.015</span></label><input type="range" min="1" max="200" value="15" oninput="updateROI()" id="r_ac0"></div><div><label>EPM Annual Rate <span class="val" id="v_arate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_arate"></div></div>
+      </div>
+    </div>
+    <aside class="calc-results" aria-label="Calculated results">
+      <div class="roi-out" id="roi_output" aria-live="polite"></div>
+      <p class="roi-context" id="roi_context"></p>
+      <button id="howComputedToggle" class="disclosure-button" onclick="toggleHow()" aria-expanded="false" aria-controls="howComputed">Show how this is computed</button>
+      <div id="howComputed" class="computation"></div>
+    </aside>
+  </div>
 </div>
-
-<div class="roi-calc">
-<div id="calcAugmented">
-<div class="row"><div><label>Team Size <span class="val" id="v_eng">10</span> engineers</label><input type="range" min="1" max="100" value="10" oninput="updateROI()" id="r_eng"></div><div><label>Sessions / Engineer / Day <span class="val" id="v_ses">20</span></label><input type="range" min="1" max="100" value="20" oninput="updateROI()" id="r_ses"></div></div>
-<div class="row"><div><label>Velocity <span class="val" id="v_vel">500</span> lines/session</label><input type="range" min="50" max="2000" value="500" oninput="updateROI()" id="r_vel"></div><div><label>Working Days / Month <span class="val" id="v_day">20</span></label><input type="range" min="15" max="25" value="20" oninput="updateROI()" id="r_day"></div></div>
-<div class="row"><div><label>Energy Scenario <span class="val" id="v_epm">Baseline (1.00&times;)</span></label><input type="range" min="0" max="2" value="0" oninput="updateROI()" id="r_epm"></div><div><label>Engineer Loaded Cost / Month <span class="val" id="v_cost">$20,000</span></label><input type="range" min="5000" max="50000" value="20000" oninput="updateROI()" id="r_cost"></div></div>
-<div class="row"><div><label>EPM Annual Rate <span class="val" id="v_rate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_rate"></div><div><label>Monthly AI Budget Cap <span class="val" id="v_budget">$10,000</span></label><input type="range" min="500" max="500000" value="10000" step="500" oninput="updateROI()" id="r_budget"></div></div>
-</div>
-<div id="calcAutonomous" style="display:none">
-<div class="row"><div><label>Workload <span class="val" id="v_workload">5,000</span> jobs/day</label><input type="range" min="100" max="100000" value="5000" oninput="updateROI()" id="r_workload"></div><div><label>Batch Fraction <span class="val" id="v_batch">70</span>%</label><input type="range" min="0" max="100" value="70" oninput="updateROI()" id="r_batch"></div></div>
-<div class="row"><div><label>Retry Rate <span class="val" id="v_retry">11.5</span>% (measured)</label><input type="range" min="0" max="100" value="11.5" step="0.1" oninput="updateROI()" id="r_retry"></div><div><label>Escalation Tier <span class="val" id="v_escalation">DeepSeek &rarr; GPT-5.6 (28.2&times;)</span></label><input type="range" min="1" max="4" value="2" oninput="updateROI()" id="r_escalation"></div></div>
-<div class="row"><div><label>Baseline Cost / Job <span class="val" id="v_ac0">$0.015</span></label><input type="range" min="1" max="200" value="15" oninput="updateROI()" id="r_ac0"></div><div><label>EPM Annual Rate <span class="val" id="v_arate">1.6% (IEA Baseline)</span></label><input type="range" min="5" max="30" value="16" oninput="updateROI()" id="r_arate"></div></div>
-</div>
-<div class="roi-out" id="roi_output"></div>
-<p style="font-size:0.68rem;color:var(--ac);text-align:center;margin-top:0.5rem;font-family:'JetBrains Mono',monospace" id="roi_context"></p>
-<div id="howComputed" style="display:none;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:1rem;margin-top:1rem;font-family:'JetBrains Mono',monospace;font-size:0.65rem;line-height:1.8;color:var(--t2);text-align:left;overflow-x:auto"></div>
-<button onclick="toggleHow()" style="display:block;margin:1rem auto 0;background:none;border:1px solid var(--ba);color:var(--t3);padding:0.4rem 1rem;border-radius:100px;font-size:0.7rem;cursor:pointer;font-family:inherit;transition:all .2s" onmouseover="this.style.color='var(--ac)'" onmouseout="this.style.color='var(--t3)'">Show how this is computed</button></div>
 </div></section>
 
 <!-- SECTION: Decision Framework -->
 <section class="fsec" id="decisions"><div class="inr">
-<div class="pulse">What — Policy Arms</div>
+<div class="section-kicker kicker-what">WHAT / POLICY DECISIONS</div>
 <h2>Test reversible choices.<br>Model durable commitments.</h2>
 <div class="doors">
-<div class="door tw"><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--ac)">Experiment. Measure. Iterate.</p></div>
-<div class="door ow"><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:var(--am)">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting provider default architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--am)">Model cumulative cost. Project 36 months.</p></div>
-<div class="door" style="border-left:3px solid var(--cy)"><h3 style="color:var(--cy)">Autonomous Doors</h3><p>Decisions affecting <strong style="color:var(--cy)">batch routing, escalation chains, and SLA windows</strong>. Commit your autonomous workforce architecture for years.</p><ul><li>Batch vs on-demand workstream split</li><li>Escalation cascade design (which model when)</li><li>WOC ratio targets and retry budgets</li></ul><p style="margin-top:0.5rem;font-weight:600;color:var(--cy)">Design for &lt;1% human escalation. Measure WOC daily.</p></div>
+<article class="door-card tw"><div class="door-symbol" aria-hidden="true">&olarr;</div><h3>Two-Way Doors</h3><p>Decisions affecting <strong style="color:var(--ac)">C&#8320; alone</strong>. Reversible. Switch back anytime. <strong style="color:var(--ac)">Preserves your runway.</strong></p><ul><li>Switching models per task type</li><li>Toggling Silent Inference mode</li><li>Adjusting token limits or caching</li></ul><p class="door-footer">Experiment. Measure. Iterate.</p></article>
+<article class="door-card ow"><div class="door-symbol" aria-hidden="true">&#x21E5;</div><h3>One-Way Doors</h3><p>Decisions affecting <strong style="color:var(--am)">&beta;, v, or EPM</strong>. Compound through N&sup2;.</p><ul><li>Selecting provider default architecture</li><li>Multi-year reserved instances</li><li>Building proprietary agentic frameworks</li></ul><p class="door-footer">Model cumulative cost. Project 36 months.</p></article>
+<article class="door-card autonomous"><div class="door-symbol" aria-hidden="true">&#x2442;</div><h3>Autonomous Doors</h3><p>Decisions affecting <strong style="color:var(--cy)">batch routing, escalation chains, and SLA windows</strong>. Commit your autonomous workforce architecture for years.</p><ul><li>Batch vs on-demand workstream split</li><li>Escalation cascade design (which model when)</li><li>WOC ratio targets and retry budgets</li></ul><p class="door-footer">Design for &lt;1% human escalation. Measure WOC daily.</p></article>
 </div>
-<p class="note" style="max-width:600px;margin:0 auto">Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</p>
-<div class="callout-box" style="margin-top:1rem"><strong>30-day implementation:</strong> Week 1: Classify tasks by complexity. Week 2: Default-route constrained tasks to silent models. Week 3: Establish verification gates and escalation paths. Week 4: Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
+<div class="door-caption"><strong style="color:var(--cy)">policy = a factor level / arm</strong><span>Routing architecture appears two-way but becomes one-way at scale &ndash; your distribution locks you into provider model availability.</span></div>
+<p class="golden-label" style="margin:1.25rem 0 0;text-align:left">30-day implementation:</p>
+<div class="implementation-strip" aria-label="30-day implementation">
+  <div class="implementation-step">Classify tasks by complexity.</div><div class="implementation-step">Default-route constrained tasks to silent models.</div><div class="implementation-step">Establish verification gates and escalation paths.</div><div class="implementation-step">Instrument cost metrics. Use CostPerOutcome as your primary KPI.</div>
+</div>
 </div></section>
 
-<!-- SECTION: Model Cards -->
-<section class="fsec" id="model-cards"><div class="inr">
-<div class="pulse">What — Model Cards</div>
-<h2>Narration flail rates 6–50% across models.<br>See detailed model profiles &rarr;</h2>
-<div class="callout-box" style="margin-top:1rem"><a href="evidence.html" class="cta-btn">View Detailed Model Profiles →</a></div>
-<p class="note">All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
+<!-- SECTION: The Ten Rules -->
+<section class="fsec" id="rules"><div class="inr wide">
+  <div class="section-kicker kicker-what">WHAT / PROPOSED CONTROL RULES</div>
+  <h2>Turn observed patterns into<br>policy arms to test.</h2>
+  <p class="lead">These are organized across three provenance tiers. <strong style="color:var(--ac)">Observed</strong> patterns are directly visible in the measurement corpus (227 single-session perturbation experiments + 1,097 multi-session story sessions). <strong style="color:var(--am)">Derived</strong> metrics compute operational quantities from those observations. <strong style="color:var(--t3)">Modeled</strong> extensions project beyond what the experiment directly measures.</p>
+  <div class="rule-groups">
+    <section class="rule-group" aria-labelledby="selection-rules">
+      <div class="rule-group-head"><h3 id="selection-rules">Selection and verification</h3><p>Choose for resilience, explanation overhead, and working outcomes.</p></div>
+      <div class="rules-grid">
+        <div class="rule" id="rule-1"><div class="rn">1</div><div class="rt"><strong>Grit (Ground-Truth Integrity).</strong> Default to models that maintain correctness when given degraded, contradictory, or incomplete instructions. If a model flails under perturbation — producing zero code despite high token output — it has low Grit. Don't use it for unsupervised work. The 10 perturbation operators measure Grit across three perturbation classes: specification corruption, objective mutation, and process perturbation.<span class="rm">Concept: Grit (Ground-Truth Integrity) · Lever: C₀</span></div></div>
+        <div class="rule" id="rule-2"><div class="rn">2</div><div class="rt"><strong>The Explanation Tax.</strong> Rule 1 selects models that CAN code under degraded input. Rule 2 measures what their resilience COSTS — the flail rate (sessions producing zero code) and narration penalty (overhead on successful sessions). Measured: Claude 11% flail, 8% penalty. DeepSeek 8% flail, 0.0% penalty. For auditable work, the tax is insurance. For routine tasks, it's waste.<span class="rm">Concept: Explanation Tax &middot; Lever: &epsilon;</span></div></div>
+        <div class="rule" id="rule-5"><div class="rn purple">5</div><div class="rt"><strong>The First-Pass Rule.</strong> Price the outcome, not the prompt. A model at half the cost but half the pass rate costs the same per working outcome &ndash; with double the latency and retry overhead. WOC = 1/(1+r) where r is retry rate. With r=0.115: WOC=<strong><span data-stat-fmt="woc">0.90</span></strong> (11.5% overall failure rate). Above 0.85: healthy. Below 0.70: critical &ndash; fix immediately. Track WOC by task type, model, and time of day.<span class="rm">Concept: Cost-Per-Pass / First-Pass &middot; Lever: P, WOC Ratio</span></div></div>
+      </div>
+    </section>
+    <section class="rule-group" aria-labelledby="economics-rules">
+      <div class="rule-group-head"><h3 id="economics-rules">Compounding economics</h3><p>Model codebase, energy, and outcome effects before they become architecture.</p></div>
+      <div class="rules-grid">
+        <div class="rule" id="rule-3"><div class="rn amber">3</div><div class="rt"><strong>The Snowball Rule.</strong> Your codebase grows with every session. Each new line of generated code increases the context window for every future session. This isn't additive &ndash; it's quadratic. The more you build, the more each subsequent build costs. <strong style="color:var(--t)">Measured:</strong> story cost roughly doubles across the five-session arc ($0.16 &rarr; $0.34, a 2.13&times; Snowball). The &beta; term compounds per-session — model the curve before you commit to an architecture. This is a one-way door.<span class="rm">Concept: Snowball Effect (N&sup2;) &middot; Lever: &beta;, v &middot; Formula: C(N,v) = C&#8320; &times; EPM(N) &times; [N + &beta;&middot;v&middot;N(N&minus;1)/2]</span></div></div>
+        <div class="rule" id="rule-4"><div class="rn amber">4</div><div class="rt"><strong>The EPM Horizon Rule.</strong> Energy costs are the inflation rate of AI compute. Local energy markets &ndash; not global averages &ndash; determine your long-term prices. A team in Texas (ERCOT grid) faces different EPM growth than one in Frankfurt (ENTSO-E) or Singapore. Find the year your geographic energy costs flip your model selection. Hedge before that point. EPM(t) = 1.00 + r(t&minus;2024) where r depends on your region.<span class="rm">Concept: EPM Horizon &middot; Lever: EPM(t)</span></div></div>
+        <div class="rule" id="rule-10"><div class="rn">10</div><div class="rt"><strong>The Outcome Multiplier.</strong> The goal isn't to minimize cost &ndash; it's to maximize outcomes per dollar. Business Value Index = Total Successful Outcomes / Total AI + Human Cost. A 2&times; BVI means twice the work for the same cost. A 10&times; BVI unlocks new business models. <span class="badge-ext">Extension</span><span class="rm">Concept: Business Value &middot; Lever: BVI</span></div></div>
+      </div>
+    </section>
+    <section class="rule-group" aria-labelledby="autonomy-rules">
+      <div class="rule-group-head"><h3 id="autonomy-rules">Autonomous operations</h3><p>Bound batch, budget, escalation, and SLA behavior.</p></div>
+      <div class="rules-grid">
+        <div class="rule" id="rule-6"><div class="rn amber">6</div><div class="rt"><strong>The Batch Discount.</strong> Batch processing is 50% cheaper but has a 72-hour horizon. If your task doesn't need a response in &lt;4 hours, run in batch. Monitor queue depth. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Batch Economics &middot; Lever: b, Q</span></div></div>
+        <div class="rule" id="rule-7"><div class="rn amber">7</div><div class="rt"><strong>The Budget Ceiling.</strong> Your maximum throughput is set by your budget, not your infrastructure. Max jobs/day = Budget / (Cost per job &times; (1 + retry_rate)). Double your budget, double your capacity &ndash; zero hiring required. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Throughput Cap &middot; Lever: W (jobs/day)</span></div></div>
+        <div class="rule" id="rule-8"><div class="rn amber">8</div><div class="rt"><strong>The Cascade Rule.</strong> In autonomous workloads, failures auto-escalate through model tiers: Flash &rarr; Sonnet &rarr; Opus &rarr; Human. A 1% escalation to human review can double your total cost. Design for &lt;1% escalation. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Auto-Escalation &middot; Lever: E&#8340; (28.2&times; price ratio: DS &rarr; GPT-5.6)</span></div></div>
+        <div class="rule" id="rule-9"><div class="rn purple">9</div><div class="rt"><strong>The SLA Buffer.</strong> Actual batch completion time = (Queue_length &times; Avg_job_time) + (Retry_buffer &times; retry_rate). Never batch jobs with an SLA less than 2&times; your observed queue depth. Always have an on-demand fallback. <span class="badge-ext">Extension</span><span class="badge-mod">Modeled</span><span class="rm">Concept: Batch SLA &middot; Lever: Slack Buffer</span></div></div>
+      </div>
+    </section>
+  </div>
+  <p class="note">Observed from the experiment corpus (cost variation, outcome retention, recovery overhead). Derived metrics (Grit, WOC, cost per outcome). Modeling extensions (Snowball, EPM, batch, cascade, SLA, BVI) are modeled projections — not independently tested.</p>
 </div></section>
 
 <!-- SECTION: Provider Playbook -->
 <section class="fsec" id="playbook"><div class="inr wide">
-<div class="pulse">What — Candidate Policy Arms</div>
+<div class="section-kicker kicker-what">WHAT / CANDIDATE POLICY ARMS</div>
 <h2>Map provider choices to<br>cost and verification hypotheses.</h2>
 <p class="lead">Every playbook tactic below implements one or more of the 10 decision rules. Use this mapping to trace your cost savings back to the empirical evidence.</p>
-
-<div class="constraints" style="max-width:750px">
-<div class="cr head"><div class="nm">Tactic</div><div class="fl">Framework Rule</div><div class="ck">&nbsp;</div></div>
-<div class="cr"><div class="nm">Three-layer caching</div><div class="fl">Rule 1 (Grit) + Rule 2 (Explanation Tax)</div><div class="ck"></div></div>
-<div class="cr"><div class="nm">Model routing cascade</div><div class="fl">Rule 1 (Silent Inference) + Rule 5 (First-Pass)</div><div class="ck"></div></div>
-<div class="cr"><div class="nm">Budget enforcement</div><div class="fl">Rule 5 (First-Pass) + Rule 7 (Budget Ceiling)</div><div class="ck"></div></div>
-<div class="cr"><div class="nm">Batch scheduling</div><div class="fl">Rule 6 (Batch Discount) + Rule 9 (SLA Buffer)</div><div class="ck"></div></div>
-<div class="cr"><div class="nm">Escalation cascade</div><div class="fl">Rule 8 (Cascade Rule) + Rule 10 (Outcome Multiplier)</div><div class="ck"></div></div>
+<div class="policy-map" aria-label="Policy tactics mapped to framework rules">
+  <article class="policy-card"><span>RULES 1+2</span><strong>Three-layer caching</strong><p>Rule 1 (Grit) + Rule 2 (Explanation Tax)</p></article>
+  <article class="policy-card"><span>RULES 1+5</span><strong>Model routing cascade</strong><p>Rule 1 (Silent Inference) + Rule 5 (First-Pass)</p></article>
+  <article class="policy-card"><span>RULES 5+7</span><strong>Budget enforcement</strong><p>Rule 5 (First-Pass) + Rule 7 (Budget Ceiling)</p></article>
+  <article class="policy-card"><span>RULES 6+9</span><strong>Batch scheduling</strong><p>Rule 6 (Batch Discount) + Rule 9 (SLA Buffer)</p></article>
+  <article class="policy-card"><span>RULES 8+10</span><strong>Escalation cascade</strong><p>Rule 8 (Cascade Rule) + Rule 10 (Outcome Multiplier)</p></article>
 </div>
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Token Pricing (per 1M tokens)</h3>
@@ -275,7 +555,7 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Cache Strategy</h3>
 <p class="lead">Three-layer caching turns the provider economics in your favor. Each layer compounds on the one below.</p>
-<div class="params">
+<div class="params cache-grid">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Layer 1</div><div class="pname"><strong>Gateway Exact-Match.</strong> Return cached responses for identical prompts within TTL. Zero token cost. <span style="color:var(--ac);font-weight:600">80–95%</span> savings on repeated prompts.</div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Layer 2</div><div class="pname"><strong>Provider Prefix Cache.</strong> Structure prompts so repeated prefixes hit the provider-side disk cache (DeepSeek, Anthropic). <span style="color:var(--ac);font-weight:600">50–90%</span> savings on input tokens.</div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Layer 3</div><div class="pname"><strong>Semantic Cache.</strong> Match semantically similar prompts with a threshold (embedding cosine similarity &ge; 0.97). <span style="color:var(--ac);font-weight:600">20–60%</span> savings on similar-but-not-identical prompts.</div></div>
@@ -287,9 +567,9 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Simulated Model Routing</h3>
 <p class="lead">Routing here isn't a vendor diagram — it's computed. <code style="color:var(--ac)">compute_routing()</code> (in <code>src/instrument/routing.py</code>) reads the experiment corpus, groups sessions by task, and recommends per task a <strong style="color:var(--ac)">default model</strong> (cheapest that clears the correctness threshold) or an <strong style="color:var(--am)">escalation model</strong> (when a higher-correctness model leads by a meaningful margin). It then simulates single-model vs grit-routed strategies across the whole corpus.</p>
-<div class="callout-box" style="margin-top:1rem"><strong>Routing chain:</strong> request &rarr; task classifier &rarr; computed default model &rarr; verification gate &rarr; escalate-on-margin</div>
+<div class="routing-chain" style="margin-top:1rem"><strong>Routing chain:</strong> request <span>&rarr;</span> task classifier <span>&rarr;</span> computed default model <span>&rarr;</span> verification gate <span>&rarr;</span> escalate-on-margin</div>
 <div class="callout-box" style="margin-top:0.5rem;border-color:rgba(34,211,238,0.2);background:rgba(34,211,238,0.02)"><strong style="color:var(--cy)">60–80%</strong> of requests are simple (classification, formatting, lookup). These should never touch a frontier model.</div>
-<div class="params">
+<div class="params routing-tiers">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Tier 1 · Simple</div><div class="pname"><strong>~60% of volume.</strong> DeepSeek V3 / GPT-4o-mini / Claude Haiku. Classification, extraction, formatting, lookup.</div></div>
 <div class="param" style="border-left:3px solid var(--am)"><div class="psym" style="color:var(--am)">Tier 2 · Moderate</div><div class="pname"><strong>~25% of volume.</strong> DeepSeek R1 / GPT-4o / Claude Sonnet. Code generation, structured reasoning, analysis.</div></div>
 <div class="param" style="border-left:3px solid var(--cy)"><div class="psym" style="color:var(--cy)">Tier 3 · Complex</div><div class="pname"><strong>~15% of volume.</strong> GPT-5.6 / Claude Opus. Multi-step architecture, novel problem solving.</div></div>
@@ -297,22 +577,23 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Budget Enforcement</h3>
 <p class="lead">Hard caps prevent runaway costs. These tools enforce limits at the gateway layer.</p>
-<div class="params">
+<div class="params budget-grid">
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">tokencap</div><div class="pname"><strong>Token-based rate limiting</strong> per key, per model, per time window. <span style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--t2);display:block;margin-top:0.3rem">tokencap --key sk-xxx --limit 1M --window 1h --model gpt-5.6</span></div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">token-limiter</div><div class="pname"><strong>Enforce max tokens per request.</strong> Reject before the provider sees it. <span style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--t2);display:block;margin-top:0.3rem">token-limiter --model gpt-5.6 --max-input 128000 --max-output 16384</span></div></div>
 <div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">agentbudget</div><div class="pname"><strong>Per-agent cost ceilings</strong> with automatic escalation to human review. <span style="font-family:'JetBrains Mono',monospace;font-size:0.65rem;color:var(--t2);display:block;margin-top:0.3rem">agentbudget --agent coding-agent --daily-cap $5.00 --on-exceed escalate</span></div></div>
 </div>
 
 <h3 style="color:var(--ac);margin:2rem 0 0.5rem;text-align:center">Per-Provider Reference Cards</h3>
-<div class="params">
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">DeepSeek</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.435</strong> (miss) &middot; <strong>$0.0036</strong> (hit) &middot; Output: <strong>$0.87</strong><br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">OpenAI (Luna)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$0.20</strong> &middot; Output: <strong>$1.20</strong> &middot; Cache hit: <strong>$0.02</strong><br>Cache: 97.5% hit rate measured — 6.3K tokens/session<br><strong>Best:</strong> Cheapest per cell ($0.09) but minimal test coverage (7 tests/cell). Route to low-risk tasks.</div></div>
-<div class="param" style="border-left:3px solid var(--ac)"><div class="psym" style="color:var(--ac)">Anthropic (Sonnet 5)</div><div class="pname" style="font-size:0.72rem;line-height:1.7">Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 73% hit rate measured<br><strong>Best:</strong> 122 tests/cell — the deepest verification in the corpus. Reserve for safety-critical work.<br><strong style="color:var(--ac)">Subscription route:</strong> the same model runs through the Claude CLI adapter (<code style="color:var(--ac)">--backend claude_cli</code>) — subscription-safe, no per-token API spend.</div></div>
+<div class="provider-grid">
+<article class="provider-card"><h4>DeepSeek</h4><p>Input: <strong>$0.435</strong> (miss) &middot; <strong>$0.0036</strong> (hit) &middot; Output: <strong>$0.87</strong><br>Cache: 78% hit rate measured — re-reads codebase each session (35K tokens/session)<br><strong>Best:</strong> High test thoroughness (34 tests/cell) at low cost. Strong for verifiable codegen.</p></article>
+<article class="provider-card"><h4>OpenAI (Luna)</h4><p>Input: <strong>$0.20</strong> &middot; Output: <strong>$1.20</strong> &middot; Cache hit: <strong>$0.02</strong><br>Cache: 97.5% hit rate measured — 6.3K tokens/session<br><strong>Best:</strong> Cheapest per cell ($0.09) but minimal test coverage (7 tests/cell). Route to low-risk tasks.</p></article>
+<article class="provider-card"><h4>Anthropic (Sonnet 5)</h4><p>Input: <strong>$2.00</strong> &middot; Output: <strong>$10.00</strong> &middot; Cache hit: <strong>$0.20</strong><br>Cache: 73% hit rate measured<br><strong>Best:</strong> 122 tests/cell — the deepest verification in the corpus. Reserve for safety-critical work.<br><strong style="color:var(--ac)">Subscription route:</strong> the same model runs through the Claude CLI adapter (<code style="color:var(--ac)">--backend claude_cli</code>) — subscription-safe, no per-token API spend.</p></article>
 </div>
 
 <h3 style="color:var(--am);margin:2rem 0 0.5rem;text-align:center">Escalation Economics</h3>
 <p class="lead">When a cheap model fails, you pay the retry penalty — and you lose the verification the expensive model would have written. Here's what that actually costs.</p>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;max-width:700px;margin:1rem auto;text-align:left">
+<div class="escalation-receipt">
+<div class="escalation-grid">
 <div>
 <h4 style="color:var(--t);font-size:0.85rem;margin-bottom:0.5rem">Key metrics from 221 stories</h4>
 <div class="tbl"><table><tbody>
@@ -332,10 +613,19 @@ C<sub>total</sub> = C<sub>augmented</sub>+C<sub>autonomous</sub>+H
 </div>
 </div>
 <div class="callout-box" style="margin-top:1rem"><strong>The takeaway:</strong> The cascade doesn't just save money — it buys verification where it matters. Route the happy path to Luna, the refactor-heavy work to DeepSeek, and reserve Sonnet for the safety-critical edge cases that would cost more to miss than to test.</div>
+</div>
 </div></section>
 
+<!-- SECTION: Model Cards -->
+<section class="fsec evidence-handoff" id="model-cards"><div class="inr">
+  <div class="section-kicker kicker-what">WHAT / MODEL CARDS</div>
+  <h2>Narration flail rates 6–50% across models.<br>See detailed model profiles &rarr;</h2>
+  <div class="callout-box" style="margin-top:1rem"><a href="evidence.html" class="cta-btn">View Detailed Model Profiles →</a></div>
+  <p class="note">All 7 models across 3 provider families produce structurally sound code (AST-verified). Test pass rates and token economics vary dramatically by provider — not by capability.</p>
+</div></section>
 
-<div style="text-align:center;margin-top:1rem"><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div>
+<!-- CAMPAIGN: Returning to the calculator closes the measure, compare, and adapt loop. -->
+<section class="fsec"><div class="campaign-strip"><div><strong>Policy is an arm, not an endpoint.</strong><span>Choose one variable, run the next grid, and let measured information revise the campaign.</span></div><a href="#calculator" class="cta-btn">Calculate Your Costs →</a></div></section>
 
 <footer>
 <strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
@@ -353,6 +643,8 @@ function setCalcMode(m){
   document.getElementById('calcAugmented').style.display=m==='augmented'?'block':'none';
   document.getElementById('calcAutonomous').style.display=m==='autonomous'?'block':'none';
   var ba=document.getElementById('btnAugmented'),bo=document.getElementById('btnAutonomous');
+  // The accessibility state follows the same mode value that controls the visible panel.
+  ba.setAttribute('aria-pressed',m==='augmented');bo.setAttribute('aria-pressed',m==='autonomous');
   if(m==='augmented'){ba.style.background='var(--ac)';ba.style.color='#09090b';ba.style.border='none';bo.style.background='transparent';bo.style.color='var(--t2)';bo.style.border='1px solid var(--ba)';}
   else{bo.style.background='var(--am)';bo.style.color='#09090b';bo.style.border='none';ba.style.background='transparent';ba.style.color='var(--t2)';ba.style.border='1px solid var(--ba)';}
   updateROI();
@@ -364,7 +656,8 @@ function updateROI(){
     v_eng.textContent=E;v_ses.textContent=S;v_vel.textContent=V;v_day.textContent=D;v_epm.textContent=epmLabels[ei];v_cost.textContent='$'+HC.toLocaleString();v_rate.textContent=(er*100).toFixed(1)+'% (IEA Baseline)';v_budget.textContent='$'+budget.toLocaleString();
     roi_context.textContent='Augmented: '+E+' eng \u00b7 '+S+' sess/day \u00b7 V='+V+' LOC/sess \u00b7 EPM='+(er*100).toFixed(1)+'%';
     var N=S*D,B=0.001,h='',costs=[];
-    models.forEach(function(m){var cm=E*m.c*EPM*(N+B*V*N*(N-1)/2);costs.push(cm);h+='<div class="o"><div class="ov '+(cm<100?'':cm<1000?'amber':'amber')+'">$'+cm.toFixed(0)+'</div><div class="ol">'+m.n+'/mo</div></div>'});var dsCost=costs[0],clCost=costs[7],annualSave=(clCost-dsCost)*12,hrRate=HC/(D*8),hrSave=hrRate>0?((clCost-dsCost)/hrRate).toFixed(1):'0';h+='<div class="o"><div class="ov">$'+annualSave.toFixed(0)+'</div><div class="ol">Annual Savings vs Claude</div></div><div class="o"><div class="ov">'+hrSave+'h</div><div class="ol">Labor-Cost Equiv. (eng-hrs/mo)</div></div>';var runway=budget/dsCost*30;h+='<div class="o"><div class="ov '+(runway>=30?'':runway>=15?'amber':'amber')+'">'+Math.round(runway)+' days</div><div class="ol">Budget Runway</div></div>';h+='<div class="o"><div class="ov amber">$'+dsCost.toFixed(0)+'</div><div class="ol">Lowest Cost/Mo (DS)</div></div><div class="o"><div class="ov amber">$'+clCost.toFixed(0)+'</div><div class="ol">Highest Cost/Mo (Claude)</div></div>';document.getElementById('roi_output').innerHTML=h;
+    // Live data has seven entries while the fallback has eight; the final entry remains the comparison tier in either source.
+    models.forEach(function(m){var cm=E*m.c*EPM*(N+B*V*N*(N-1)/2);costs.push(cm);h+='<div class="o"><div class="ov '+(cm<100?'':cm<1000?'amber':'amber')+'">$'+cm.toFixed(0)+'</div><div class="ol">'+m.n+'/mo</div></div>'});var dsCost=costs[0],clCost=costs[costs.length-1],annualSave=(clCost-dsCost)*12,hrRate=HC/(D*8),hrSave=hrRate>0?((clCost-dsCost)/hrRate).toFixed(1):'0';h+='<div class="o"><div class="ov">$'+annualSave.toFixed(0)+'</div><div class="ol">Annual Savings vs Claude</div></div><div class="o"><div class="ov">'+hrSave+'h</div><div class="ol">Labor-Cost Equiv. (eng-hrs/mo)</div></div>';var runway=budget/dsCost*30;h+='<div class="o"><div class="ov '+(runway>=30?'':runway>=15?'amber':'amber')+'">'+Math.round(runway)+' days</div><div class="ol">Budget Runway</div></div>';h+='<div class="o"><div class="ov amber">$'+dsCost.toFixed(0)+'</div><div class="ol">Lowest Cost/Mo (DS)</div></div><div class="o"><div class="ov amber">$'+clCost.toFixed(0)+'</div><div class="ol">Highest Cost/Mo (Claude)</div></div>';document.getElementById('roi_output').innerHTML=h;
     document.getElementById('howComputed').textContent='Augmented Workforce\nPer-session: c(t) = C\u2080 \u00d7 EPM(t) \u00d7 (1 + \u03b2\u00b7v\u00b7t)\nCumulative: C(N,v) = C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nMonthly: C_mo = E \u00d7 C\u2080 \u00d7 EPM(N) \u00d7 [N + \u03b2\u00b7v\u00b7N(N-1)/2]\nWhere: E='+E+' eng, N='+N+' sess/mo, \u03b2='+B+', v='+V+', EPM='+EPM.toFixed(2);
   } else {
     var W=+r_workload.value,b=+r_batch.value/100,rr=+r_retry.value/100,ac0=+r_ac0.value/1000,er=+r_arate.value/1000;
@@ -385,12 +678,18 @@ function updateROI(){
   }
 }
 
-function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(function(id){var el=document.getElementById(id);if(el){el.style.color=id===active?'var(--ac)':'var(--t3)';el.style.fontWeight=id===active?'700':'400'}})}
+function updateChartToggle(active,other){['vwCost','vwThroughput'].forEach(function(id){var el=document.getElementById(id);if(el){el.style.color=id===active?'var(--ac)':'var(--t3)';el.style.fontWeight=id===active?'700':'400';el.setAttribute('aria-pressed',id===active)}})}
 
-function toggleHow(){var el=document.getElementById('howComputed'),btn=document.querySelector('#calculator button');if(el.style.display==='none'||!el.style.display){el.style.display='block';if(btn)btn.textContent='Hide how this is computed'}else{el.style.display='none';if(btn)btn.textContent='Show how this is computed'}}
+function toggleHow(){var el=document.getElementById('howComputed'),btn=document.getElementById('howComputedToggle'),expanded=el.style.display==='none'||!el.style.display;el.style.display=expanded?'block':'none';if(btn){btn.textContent=expanded?'Hide how this is computed':'Show how this is computed';btn.setAttribute('aria-expanded',expanded)}}
 
 var chart,chartYears=3,chartMode='baseline',chartView='cost';function rebuildChart(yr){buildChart(yr,chartMode,chartView)}function buildChart(yr,mode,view){chartYears=yr||3;if(mode)chartMode=mode;if(view)chartView=view;var ctx=document.getElementById('costChart');if(!ctx)return;var E=10,S=20,D=20,V=500,B=0.001,Ny=S*D*12;var years=Array.from({length:chartYears+1},function(_,i){return 2024+i});var cYr=function(c,rate){var cum=0;return years.map(function(y){var EPM=1.00+(rate||0.016)*(y-2024);cum+=E*c*EPM*(Ny+B*V*Ny*(Ny-1)/2);return cum})};chart&&chart.destroy();if(chartView==='throughput'){var labels=[0.01,0.05,0.1,0.15,0.2,0.25,0.3];var jobCosts=function(r){return labels.map(function(fr){return 10000/(0.015*(1-fr*0.5)*(1+r*28.2))})};var datasets=[{label:'r=5% (DeepSeek)',data:jobCosts(0.05),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.5% (measured)',data:jobCosts(0.115),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'r=11.4% (Claude)',data:jobCosts(0.114),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}];chart=new Chart(ctx,{type:'line',data:{labels:labels.map(function(l){return (l*100).toFixed(0)+'%'}),datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Retry Rate',display:true,color:'#a1a1aa'}},y:{title:{text:'Max Jobs/Day ($10K)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return (v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}}}}});return}var datasets;if(mode==='sensitivity'){datasets=[{label:'DS - Aggressive EPM (2.5%/yr)',data:cYr(0.015,0.025),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.06)',borderDash:[6,3],fill:false,tension:0.3,borderWidth:2,pointRadius:0},{label:'DS - Baseline EPM (1.6%/yr)',data:cYr(0.015,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:false,tension:0.3,borderWidth:2.5,pointRadius:0},{label:'DS - Optimistic EPM (0.8%/yr)',data:cYr(0.015,0.008),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',borderDash:[4,2],fill:false,tension:0.3,borderWidth:2,pointRadius:0}]}else{datasets=[{label:'DeepSeek v4 Pro ($0.015/sess)',data:cYr(0.015,0.016),borderColor:'#22C55E',backgroundColor:'rgba(34,197,94,0.06)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'GPT-5.6 ($0.43/sess)',data:cYr(0.43,0.016),borderColor:'#22D3EE',backgroundColor:'rgba(34,211,238,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0},{label:'Claude Fable 5 ($1.01/sess)',data:cYr(1.01,0.016),borderColor:'#F59E0B',backgroundColor:'rgba(251,191,36,0.08)',fill:true,tension:0.3,borderWidth:2,pointRadius:0}]}chart=new Chart(ctx,{type:'line',data:{labels:years,datasets:datasets},options:{responsive:true,maintainAspectRatio:false,scales:{x:{title:{text:'Year',display:true,color:'#a1a1aa'}},y:{title:{text:'Cumulative Cost (USD)',display:true,color:'#a1a1aa'},ticks:{callback:function(v){return '$'+(v/1000).toFixed(0)+'K'}}}},plugins:{legend:{labels:{color:'#a1a1aa',font:{size:10}}},tooltip:{callbacks:{label:function(ctx){return '$'+ctx.raw.toFixed(0)}}}}}})}
-document.addEventListener('DOMContentLoaded',function(){updateROI();buildChart(3)});
+document.addEventListener('DOMContentLoaded',function(){
+  updateROI();buildChart(3);
+  // Anchor controls retain their href contract, so this listener supplies button-like group state without replacing them.
+  [['yr3','yr10','yr25'],['epmBase','epmSens'],['vwCost','vwThroughput']].forEach(function(group){
+    group.forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('click',function(){group.forEach(function(peer){document.getElementById(peer).setAttribute('aria-pressed',peer===id)});if(id==='vwCost'||id==='vwThroughput')updateChartToggle(id,id==='vwCost'?'vwThroughput':'vwCost')})});
+  });
+});
 </script>
 <script src="app.js"></script>
 </body>
