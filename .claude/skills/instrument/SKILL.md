@@ -52,7 +52,7 @@ control arms. `confidence` is currently UNMEASURED in the ledger.
 the lab books driven by `spec.rules`; `compare_arms` = `routing.simulate_strategies`
 (`routing.py:98`); `adapt` = new campaign loop (tweak one factor, emit next grid).
 
-**Example spec:** `experiments/specs/agentic_dynamics_story.yaml` (one of 11 real specs in
+**Example spec:** `experiments/specs/workflow_step_routing.yaml` (one of the committed specs in
 `experiments/specs/`). The validator gates any arm consuming unmeasured information (e.g.
 `confidence`) until that information is instrumented.
 

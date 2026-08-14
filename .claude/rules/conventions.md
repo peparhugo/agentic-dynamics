@@ -24,7 +24,7 @@ Ported from `.opencode/instructions/conventions.md` (loaded unconditionally ther
   `[P]` policy/prior. Control rules are `[H]`/`[P]`; measurement rules are `[M]`/`[C]`.
 - **Policy is a factor level.** `decide(job, state) -> {route, depth, retry, escalate, budget,
   deadline}` goes in the grid as a `Factor` level, not a side-channel.
-- **Specs live in `experiments/specs/*.yaml`** (11 real specs, e.g. `agentic_dynamics_story.yaml`). `Workflow.kind` is
+- **Specs live in `experiments/specs/*.yaml`** (see the directory for the current set, e.g. `workflow_step_routing.yaml`). `Workflow.kind` is
   `story | task | experiment | agent_task`; `experiment` makes a campaign an experiment of
   experiments (same interpreter at every level).
 
