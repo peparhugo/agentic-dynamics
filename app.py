@@ -13,6 +13,8 @@ import sqlite3
 import os
 import jwt
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -172,6 +174,13 @@ def require_auth(f):
     return wrapper
 
 
+# ── Notifications ──────────────────────────────────────────────
+
+def dispatch_completion_email(user_email: str, task_title: str) -> None:
+    """Queue a notification email asynchronously via Celery."""
+    send_notification_email.delay(user_email, task_title)
+
+
 # ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
@@ -231,6 +240,7 @@ def show_task(task_id: int):
 @require_auth
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    existing = get_task(task_id, owner_id=g.user["id"])
     task = update_task(
         task_id,
         owner_id=g.user["id"],
@@ -239,6 +249,12 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if (
+        existing is not None
+        and existing["status"] != "completed"
+        and task["status"] == "completed"
+    ):
+        dispatch_completion_email(g.user["username"], task["title"])
     return jsonify(task)
 
 
