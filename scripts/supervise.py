@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -154,37 +155,42 @@ def _cell_id_for(session: dict) -> str:
     return f"live_{_slugify(model)}_{_slugify(title)}"
 
 
-def relay_once(client: OpenCodeClient, cursors: dict[str, int]) -> None:
-    """Bridge each active session's message activity into Redis (Control Room stream).
+def _relay_session(client: OpenCodeClient, sid: str, cell_id: str) -> None:
+    """Stream one native session's durable events into Redis until it ends.
 
-    Polls the message snapshot (non-blocking) rather than the SSE stream, so large
-    sessions don't force a slow full-history replay. New messages since the last poll
-    are published under ``live_<model>_<title>`` and the cell is registered in
-    ``story_status``.
+    A full-history replay on first connect is acceptable: LivePublisher caps the
+    retained list (ltrim), so the burst is bounded, and the Control Room's terminal
+    replays the same retained window. After replay the stream goes live.
     """
+    publisher = LivePublisher(cell_id)
+    if publisher.enabled:
+        publisher.set_status("running")
+    try:
+        for ev in client.iter_events(sid):
+            publisher.publish_event(ev)
+    except OpenCodeError:
+        pass
+    finally:
+        if publisher.enabled:
+            publisher.set_status("done")
+
+
+def relay_once(client: OpenCodeClient, threads: dict[str, threading.Thread], finished: set[str]) -> None:
+    """Maintain one persistent relay thread per active native session."""
     if not RELAY:
         return
-    for s in active_sessions(client):
-        sid = s.get("id", "")
+    active = {s["id"]: s for s in active_sessions(client)}
+    for sid, s in active.items():
+        if sid in threads or sid in finished:
+            continue
         cell_id = _cell_id_for(s)
-        try:
-            resp = client.messages(sid)
-        except OpenCodeError:
-            continue
-        msgs = resp.get("data") or resp.get("messages") or []
-        last_count = cursors.get(sid, 0)
-        if len(msgs) <= last_count:
-            continue
-        publisher = LivePublisher(cell_id)
-        if publisher.enabled:
-            publisher.set_status("running")
-        for m in msgs[last_count:]:
-            role = m.get("role", "?")
-            for part in m.get("parts") or m.get("content") or []:
-                text = part.get("text") if isinstance(part, dict) else part
-                if text:
-                    publisher.publish_event({"type": "text", "role": role, "part": {"text": text[:600]}})
-        cursors[sid] = len(msgs)
+        t = threading.Thread(target=_relay_session, args=(client, sid, cell_id), daemon=True)
+        t.start()
+        threads[sid] = t
+    for sid in list(threads):
+        if not threads[sid].is_alive():
+            del threads[sid]
+            finished.add(sid)
 
 
 def emit_flag(session: dict, status: str, why: str) -> None:
@@ -242,13 +248,14 @@ def main() -> None:
 
     client = OpenCodeClient(BASE_URL)
     monitor_id = ensure_monitor(client, args.location)
-    cursors: dict[str, str] = {}
+    threads: dict[str, threading.Thread] = {}
+    finished: set[str] = set()
     log(f"relaying + monitoring (assess every {POLL_INTERVAL}s); flags -> {FLAGS_FILE}")
 
     last_assess = 0.0
     while True:
         try:
-            relay_once(client, cursors)
+            relay_once(client, threads, finished)
         except Exception as e:  # noqa: BLE001
             log(f"relay error: {e!r}")
         if time.time() - last_assess >= POLL_INTERVAL:
