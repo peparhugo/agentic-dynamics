@@ -42,7 +42,7 @@ instead of **verified-against-docs**, per the same bar `opencode_docs_spec.md` u
 | `.opencode/command:agent`, `:subtask` | *(dropped, not mapped)* | opencode's `agent: build` names which opencode agent mode runs the command (opencode's built-in `build` primary mode ≈ full read/write agent — a concept with no Claude Code equivalent; Claude Code has no separate named "primary agent modes"). `subtask: true` requests running as a subagent task; the closest Claude field is a skill's `context: fork`, but fork changes user-visible behavior (separate context window) in a way this doc can't verify preserves the original commands' intent without testing. Both fields are dropped rather than guessed at — see `.claude/commands/*.md` in this repo, which ship with only `description:`. | needs-verification (dropped by choice, not confirmed absent — a future port could test `context: fork` against real command runs and promote this row) |
 | `.opencode/command` positional args `$1`/`$2`/... | `.claude/commands/*.md` `$N` | **Same token, different index base — a correctness bug if copied verbatim.** Claude Code's `$N` is explicitly 0-indexed (*"`$N` (shorthand for `$ARGUMENTS[N]`, 0-indexed)"*): `$0`/`$1` is the first/second argument. opencode's positional args in this repo's own `run-exp.md` are 1-indexed shell-style (`$2` = second argument, per the file's own usage comment). Verbatim-copying `$2` into the Claude Code port would silently read the *third* argument instead of the second. This repo's `.claude/commands/run-exp.md` uses `$1` for that reason — confirmed load-bearing, not cosmetic. | **verified-against-docs** (`/docs/en/skills`, direct quote on 0-indexing) |
 | `.opencode/skills/<name>/SKILL.md` (3: `analyze/`, `instrument/`, `lab-books/`) | `.claude/skills/<name>/SKILL.md` | Directory confirmed plural both sides. Both require `name` + `description` in frontmatter (opencode: 1–64 / 1–1024 chars, naming regex `^[a-z0-9]+(-[a-z0-9]+)*$`; Claude Code: `name` is technically optional — dir name is the command — but all 3 of this repo's skills already set it and satisfy the regex, so no rename needed either way). Claude Code additionally supports `when_to_use`, `argument-hint`, `arguments`, `disable-model-invocation`, `user-invocable`, `allowed-tools`, `model`, `effort`, `context`, `background`, `hooks`, `paths`, `shell` — none used by this repo's 3 skills, none required. | **verified-against-docs** (`/docs/en/skills`, field list quoted) |
-| `.opencode/tools/*.ts` (16 existing + 9 designed in `opencode_docs_spec.md` §3.1 = 25) | **No file-based equivalent; nominal target is `.mcp.json` + an MCP server.** | Confirmed: `.mcp.json` (project scope, `mcpServers` key) supports `stdio` (`command`/`args`/`env`), `http`/`streamable-http` (`url`/`headers`), and `ws` server shapes; `claude mcp add --transport stdio|http|sse` scaffolds an entry. **Per `opencode_docs_spec.md` D1 (reaffirmed here, not re-litigated): none of the 25 tools is ported to MCP.** Every one is a thin `Bun.$`/HTTP wrapper around a `scripts/*.py` CLI or `admin/server.py` REST endpoint; a Claude Code agent with Bash access reproduces each one by invoking the script/`curl` directly, and standing up an MCP server to re-encode 25 CLI wrappers is real infrastructure for zero behavioral gain. **No `.mcp.json` is shipped in this repo's port** — the knowledge each tool encoded (valid flags, plan names, condition lists) already lives in `.claude/rules/mental-model.md`, `.claude/agents/*.md`, and `.claude/skills/*/SKILL.md`, addressed to Bash instead of a tool call. | **verified-against-docs** (`.mcp.json` shape; `/docs/en/mcp`, direct); "don't build it" remains this doc's recommendation, not a doc-verified fact |
+| `.opencode/tools/*.ts` (16 existing + 9 designed in `opencode_docs_spec.md` §3.1 = 25) | **No MCP; ported as `.claude/skills/*/SKILL.md` files (net-new skills + fold-ins to the 3 existing skills).** | Confirmed: `.mcp.json` (project scope, `mcpServers` key) supports `stdio` (`command`/`args`/`env`), `http`/`streamable-http` (`url`/`headers`), and `ws` server shapes; `claude mcp add --transport stdio|http|sse` scaffolds an entry. **Per `opencode_docs_spec.md` D1 (reaffirmed, not reversed): none of the 25 tools is ported to MCP.** D1 rejected *MCP as the porting mechanism*, not porting the tools' knowledge at all — `docs/claude_tools_to_skills_scope.md` picked up the latter using the same file-based mechanism already used for `analyze`/`instrument`/`lab-books`: 4 net-new skill directories (`run-workflow`, `control-room`, `queue`, `review`) plus fold-ins of corrected flag knowledge into the 3 existing skills, for the tools whose exact flags/safety gates/lifecycle weren't yet documented anywhere in `.claude/`. Every one of the 25 tools is a thin `Bun.$`/HTTP wrapper around a `scripts/*.py` CLI or `admin/server.py` REST endpoint; a Claude Code agent with Bash access reproduces each one by invoking the script/`curl` directly per the skill's documented invocation — no MCP server, no new transport. **Still no `.mcp.json` shipped.** See §8 below for the full skill↔tool disposition table. | **verified-against-docs** (`.mcp.json` shape; `/docs/en/mcp`, direct); the skills-based resolution is this repo's own follow-up work (`docs/claude_tools_to_skills_scope.md`), not a doc-verified fact |
 | `opencode.json` (root config) | `.claude/settings.json` (+ `.claude/settings.local.json` for personal overrides) | Both project-root JSON, both merge across scope layers. opencode: project/global/managed/remote. Claude Code (broadest→narrowest, confirmed): managed policy → user (`~/.claude/settings.json`) → project (`.claude/settings.json`) → local (`.claude/settings.local.json`, gitignored) → CLI flags. Port field-by-field, not verbatim — schemas aren't structurally identical (rows below). | **verified-against-docs** |
 | `opencode.json:"model"` | `.claude/settings.json:"model"` | Both select a default model, but **the value spaces don't overlap**: opencode's is `provider/model` (this repo: `deepseek/deepseek-v4-pro`); Claude Code's `model` field is Claude-only (alias or full ID). **Not ported** — `.claude/settings.json` in this repo omits `model` entirely (session default applies) rather than substituting an unrelated Claude model as if it were equivalent. | **verified-against-docs** (field exists; value-space mismatch confirmed by the subagent `model:` field research, same constraint applies at the settings layer) |
 | `opencode.json:"small_model"` | *(no equivalent field; closest is an env var, and the task's own draft citing it is stale)* | **Correction to this task's own draft mapping**, which suggested `ANTHROPIC_SMALL_FAST_MODEL`: that env var is confirmed **`[DEPRECATED]`** in the current CLI docs. Its replacement is `ANTHROPIC_DEFAULT_HAIKU_MODEL` (*"Model ID that the `haiku` alias resolves to, also used for background functionality"*), plus `_NAME`/`_DESCRIPTION`/`_SUPPORTED_CAPABILITIES`/`_AWS_REGION` variants. Even the replacement is a single global env var, not a per-project settings.json key, and (same as the `model` row) it only selects a Claude model — DeepSeek Flash has no destination field. Not set in this port. | **verified-against-docs** (`/docs/en/env-vars` via CLI reference fetch; `[DEPRECATED]` tag quoted directly) |
@@ -60,8 +60,10 @@ instead of **verified-against-docs**, per the same bar `opencode_docs_spec.md` u
 For quick reference; each item is explained in its table row above.
 
 1. **`.opencode/tools/*.ts` → MCP.** Nominal target exists (`.mcp.json`); recommended
-   target is "don't build it" (D1) — Bash + the knowledge already folded into
-   `.claude/rules/`/`.claude/agents/`/`.claude/skills/` covers all 25 tools.
+   target remains "don't build an MCP server" (D1). The tools' *knowledge* — exact flags,
+   safety gates, Redis lifecycle, background-job contracts — is ported separately, as
+   `.claude/skills/*/SKILL.md` files (`docs/claude_tools_to_skills_scope.md`): Bash +
+   these skills covers all 25 tools. See §8.
 2. **`model`/`small_model` (multi-provider default model).** Claude Code's `model`
    fields (settings.json, subagent frontmatter) only accept Claude models. DeepSeek
    has no destination field anywhere in the taxonomy.
@@ -148,7 +150,8 @@ removes an agent, command, skill, or tool).
 | `.claude/rules/conventions.md` | `.opencode/instructions/conventions.md` | Verbatim body + 1-line provenance header |
 | `.claude/agents/data-analysis.md`, `instrument-dev.md`, `pipeline-ops.md` | `.opencode/agents/*.md` | `name`/`description` frontmatter only; `model`/`permission` dropped with an inline note (§2); one internal path fixed per file (`conventions.md` cross-reference) |
 | `.claude/commands/analyze.md`, `lab.md`, `new-exp.md`, `pipeline.md`, `run-exp.md` | `.opencode/commands/*.md` | `description` frontmatter only; `agent`/`subtask` dropped (§2); `run-exp.md`'s `$2` → `$1` (§2, load-bearing) |
-| `.claude/skills/analyze/SKILL.md`, `instrument/SKILL.md`, `lab-books/SKILL.md` | `.opencode/skills/*/SKILL.md` | Verbatim — no cross-references or fields needed adaptation |
+| `.claude/skills/analyze/SKILL.md`, `instrument/SKILL.md`, `lab-books/SKILL.md` | `.opencode/skills/*/SKILL.md` | Verbatim at the time of this phase — later extended with corrected `.opencode/tools/*.ts` knowledge; see §8 |
+| `.claude/skills/run-workflow/SKILL.md`, `control-room/SKILL.md`, `queue/SKILL.md`, `review/SKILL.md` | `.opencode/tools/*.ts` (9 of 25, net-new) | New phase, not part of the original taxonomy port — see §8 |
 | `.claude/settings.json` | `opencode.json`'s `permission` block + `compaction.auto` | See §2's `permission` and `compaction` rows for the exact translation; `model`, `small_model`, `compaction.reserved`/`.prune`, `subagent_depth`, `lsp`, `formatter`, `references`/`additionalDirectories` (unused) all intentionally absent |
 | `.mcp.json` | *(not generated)* | Per §2/§3 — no opencode tool warrants an MCP server; generating an empty or placeholder file would misrepresent a decision as a limitation |
 
@@ -168,3 +171,33 @@ removes an agent, command, skill, or tool).
 - [ ] If `opencode.json` gains a `references` entry (this repo doesn't use it today),
       populate `permissions.additionalDirectories` for real and re-test the
       `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD` asymmetry noted in §2.
+
+## 8. `.opencode/tools/*.ts` → skills split (later phase)
+
+A later phase, scoped and executed in `docs/claude_tools_to_skills_scope.md`, closed the
+gap this doc's §2 `.opencode/tools/*.ts` row and §3 item 1 originally left open: D1 said
+"don't build an MCP server," but the 25 tools' own knowledge (exact flags verified against
+each script's `argparse`/`sys.argv`, safety gates like `enqueue.py --clear` requiring
+`--dry-run` first, Redis queue lifecycle ordering, the `admin/server.py` read-only/observe-
+only boundary) wasn't yet captured anywhere in `.claude/`. That phase read every
+`.opencode/tools/*.ts` file and its backing `scripts/*.py`/`admin/server.py` source directly
+(not the existing skills' prose) and produced this disposition, split three ways:
+
+| Disposition | Count | Where |
+|---|---|---|
+| **NET-NEW** — dedicated skill, no existing skill covers it | 9 | `run-workflow` (`compile_experiment.ts`, `run_workflow.ts`), `control-room` (`control_room.ts`, `supervisor.ts`), `queue` (`enqueue.ts`, `worker.ts`, `monitor.ts`, `dashboard.ts`), `review` (`review.ts`) |
+| **FOLD** — existing skill already documents the script, sometimes incorrectly; corrected/extended in place | 10 | `run_experiment.ts`, `run_story.ts`, `batch.ts`, `sweep.ts` → `instrument`; `analyze_worktrees.ts`, `analyze_trajectories.ts`, `sync_data.ts`, `build_data.ts`, `validate_session.ts` → `analyze`; `run_lab.ts` → `lab-books` |
+| **SKIP** — already fully covered by a command, `AGENTS.md`, or an existing skill section; no new content needed | 6 | `pipeline.ts`, `inventory.ts`, `backfill.ts`, `archive_worktrees.ts`, `generate_manifest.ts`, `list_stories.ts` |
+
+Three corrections surfaced during the fold that predate this split and aren't caused by
+it — pre-existing wrong examples in the ported skills, fixed as part of folding in the
+tool that would have otherwise repeated them: `instrument/SKILL.md`'s
+`python scripts/run.py --config ...` examples (`config` is positional, no `--config` flag
+exists — `scripts/run.py:488`) and its `run_story.py --story ...` examples (`story` is
+also positional, not `--story` — `scripts/run_story.py:45-49`); `analyze/SKILL.md`'s
+`validate_session.py --worktree ...` example (the real flag is `--workdir` —
+`scripts/validate_session.py:83`). Full verification detail, exact invocations, and the
+per-tool reasoning: `docs/claude_tools_to_skills_scope.md`.
+
+`.opencode/tools/*.ts` itself was not touched by this split — opencode's tools stay as-is;
+only the Claude Code-side knowledge changed.
