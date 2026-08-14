@@ -31,6 +31,14 @@ from .backends import run_agentic
 from .experiment_spec import ExperimentSpec, validate_spec
 from .language import detect_language
 from .live import LivePublisher
+from .step_routing import (
+    ModelSignals,
+    RouteState,
+    RoutingPreferences,
+    resolve_pool,
+    route_step,
+    validate_workflow_routing,
+)
 from .test_runner import run_suite, suite_succeeded
 
 
@@ -200,6 +208,8 @@ def run_workflow(
     resume: bool = False,
     publish: bool = True,
     fork: bool | None = None,
+    preferences: RoutingPreferences | None = None,
+    signals: dict[str, ModelSignals] | None = None,
     run_agentic_fn: Callable[..., Any] | None = None,
 ) -> WorkflowRunResult:
     """Run a compiled ``agent_task`` spec against a goal in a git worktree.
@@ -214,8 +224,17 @@ def run_workflow(
     only) so the shared context prefix is served as provider cache reads. ``fork=None``
     falls back to the spec's ``workflow.params.fork`` flag. ``run_agentic_fn`` is
     injectable so tests can substitute a fake agent (no LLM).
+
+    Per-step routing (``docs/routing_design.md``): when the spec declares
+    ``workflow.params.model_pool``, each agent phase's model is chosen by
+    :func:`instrument.step_routing.route_step` from the phase's selector (``model`` pin /
+    ``allowed_models`` subset / full pool), scored by ``preferences`` over ``signals``.
+    The router prices the cache-prefix loss of a model switch, so the existing fork chain
+    (``fork: true``) keeps forking for free when it stays on the prior model. Without a
+    ``model_pool`` the workflow is single-model (``model``) — backward compatible.
     """
     errors = validate_spec(spec)
+    errors += validate_workflow_routing(spec, default_model=model)
     if errors:
         raise ValueError("invalid spec: " + "; ".join(errors))
 
@@ -260,8 +279,22 @@ def run_workflow(
                 break
 
     fork_enabled = fork if fork is not None else bool(spec.workflow.params.get("fork", False))
+
+    # Per-step routing context. The pool is the spec's ``model_pool`` when declared, else the
+    # single run model (backward compatible). Preferences and the signal store may be passed
+    # explicitly (tests) or carried in ``workflow.params`` (spec-driven).
+    model_pool = resolve_pool(spec, default_model=model)
+    if preferences is None:
+        preferences = RoutingPreferences.from_dict(spec.workflow.params.get("preferences"))
+    if signals is None:
+        raw_signals = spec.workflow.params.get("signals") or {}
+        signals = {m: ModelSignals.from_dict(d) for m, d in raw_signals.items()} if isinstance(
+            raw_signals, dict
+        ) else {}
+
     prev_session_id = ""
     prev_model = ""
+    prev_cache_read_tokens = 0
 
     for phase_def in phases[start_idx:]:
         name = str(phase_def.get("name", "?"))
@@ -286,8 +319,19 @@ def run_workflow(
                 prev_cell = os.environ.get("FINOPS_CELL_ID")
                 os.environ["FINOPS_CELL_ID"] = cell_id
                 try:
+                    # Select this step's model: pin wins, allowed_models restricts, else the
+                    # full pool — scored over measured signals, pricing a model switch's cache
+                    # loss (§2/§4 of docs/routing_design.md).
+                    state = RouteState(
+                        pool=model_pool,
+                        prev_model=prev_model or None,
+                        prev_session_id=prev_session_id,
+                        prev_cache_read_tokens=prev_cache_read_tokens,
+                    )
+                    model_i = route_step(phase_def, state, preferences, signals=signals)
+
                     agent_kwargs: dict[str, Any] = {
-                        "model": model,
+                        "model": model_i,
                         "backend": backend,
                         "workdir": str(wd),
                         "thinking_effort": thinking_effort,
@@ -304,7 +348,7 @@ def run_workflow(
                     if (
                         fork_enabled
                         and prev_session_id
-                        and prev_model == model
+                        and prev_model == model_i
                     ):
                         agent_kwargs["session_id"] = prev_session_id
                         agent_kwargs["fork"] = True
@@ -314,7 +358,7 @@ def run_workflow(
                         os.environ.pop("FINOPS_CELL_ID", None)
                     else:
                         os.environ["FINOPS_CELL_ID"] = prev_cell
-                pr.model = model
+                pr.model = model_i
                 pr.tokens = {
                     "in": getattr(ar, "prompt_tokens", 0),
                     "out": getattr(ar, "completion_tokens", 0),
@@ -329,7 +373,8 @@ def run_workflow(
                 if sid:
                     pr.session_id = sid
                     prev_session_id = sid
-                prev_model = model
+                prev_model = model_i
+                prev_cache_read_tokens = getattr(ar, "cache_read_tokens", 0)
                 pr.files_created = list(getattr(ar, "files_created", []) or [])
                 pr.files_modified = list(getattr(ar, "files_modified", []) or [])
                 pr.final_response = getattr(ar, "final_response", "")
