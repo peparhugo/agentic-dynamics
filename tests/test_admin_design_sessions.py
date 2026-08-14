@@ -194,6 +194,41 @@ def test_draft_state_distinguishes_parser_construction_and_validator_errors(tmp_
     assert state["capabilities"]["save"] is False
 
 
+def test_draft_state_surfaces_routing_validation_error(tmp_path):
+    """An invalid per-step selector is rejected at Save time, not at run time."""
+    manager, redis, _opencode = _manager(tmp_path)
+    created = _created(manager)
+    private = json.loads(redis.hashes[DESIGN_SESSIONS_KEY][created["portal_id"]])
+    content = _valid_spec().replace(
+        "prompt: Build it",
+        "prompt: Build it, allowed_models: [unknown/model]",
+    )
+    Path(private["draft_path"]).write_text(content)
+
+    state = manager.draft_state(created["portal_id"])
+
+    assert state["draft_state"] == "validation_errors"
+    assert state["validation"]["valid"] is False
+    assert any(
+        "unknown/model" in e and "model_pool" in e for e in state["validation"]["errors"]
+    )
+    assert state["capabilities"]["save"] is False
+
+
+def test_draft_state_routing_inactive_workflow_is_unaffected(tmp_path):
+    """A workflow with no pool/selectors/preferences still validates trivially."""
+    manager, redis, _opencode = _manager(tmp_path)
+    created = _created(manager)
+    private = json.loads(redis.hashes[DESIGN_SESSIONS_KEY][created["portal_id"]])
+    Path(private["draft_path"]).write_text(_valid_spec())
+
+    state = manager.draft_state(created["portal_id"])
+
+    assert state["draft_state"] == "valid"
+    assert state["validation"]["valid"] is True
+    assert state["capabilities"]["save"] is True
+
+
 def test_experiment_draft_calls_validator_before_matrix_preview(monkeypatch, tmp_path):
     """The real validator gate runs before the compiler's matrix expansion."""
     manager, redis, _opencode = _manager(tmp_path)
