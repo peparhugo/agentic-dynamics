@@ -22,7 +22,7 @@ python scripts/inventory.py report
 
 ```bash
 # Run a single experiment (produces JSON + markdown reports here)
-python scripts/run.py --config experiments/configs/task_manager.yaml
+python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
 ```
 
 All result files placed in this directory are `.gitignore`d. The authoritative record is the opencode SQLite database at `~/.local/share/opencode/opencode.db`, queried through the inventory CLI.

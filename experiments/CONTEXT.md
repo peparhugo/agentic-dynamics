@@ -1,6 +1,6 @@
 # `experiments/` — Experiment Ecosystem
 
-34 experiment YAML configs (+ `plans.yaml`), 224+ game reports, 19 active lab books, 6 peer reviews.
+34 experiment YAML configs (+ `plans.yaml`), 224+ game reports, 20 lab book plans (19 active scripts, 8 deprecated), 6 peer reviews.
 
 ## `experiments/specs/` — ExperimentSpec YAML (written — see the directory for the current set)
 
@@ -92,14 +92,17 @@ Each YAML defines: task description, constraints, perturbation operators, streng
 | `_trajectory_summary.json` | Per-transcript trajectory metrics |
 | `_trajectory_aggregate.json` | Per-model comparable trajectory aggregates |
 | `typescript_ssg_*.json` | Per-model SSG results (deepseek, claude, gpt5) |
-| `lab_*.json` | Lab book analysis outputs (13 files) |
+| `lab_*.json` | Lab book analysis outputs (26 files) |
 | `README.md` | Dataset access instructions (inventory CLI) |
 | `reports/` | **224+ game reports** — per-experiment Markdown + artifact directories |
 
 ## `experiments/lab_books/` — 20 Experiment Plans
 
 Methodology documents defining hypothesis, data sources, analysis steps, interpretation.
-Implemented by the 19 active `scripts/lab_*.py` scripts.
+Implemented by the 19 active `scripts/lab_*.py` scripts. Three plans (`lab_reasoning_divergence.md`,
+`lab_semantic_clusters.md`, `lab_cross_model_reasoning.md`) map to deprecated `*_DEPRECATED_bge_m3`
+scripts; two active scripts (`lab_sonar_quality.py`, `lab_think_do_coupling.py`) have no separate
+plan doc.
 
 | Document | Question |
 |----------|----------|

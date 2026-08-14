@@ -19,7 +19,7 @@
 
 | Script | Lines | Purpose |
 |--------|-------|---------|
-| `run.py` | 502 | Primary runner. `python scripts/run.py --config <yaml>`. Produces JSON + Markdown game reports. `--backend {auto,opencode,claude_cli}` routes `anthropic/*` to the Claude CLI adapter. |
+| `run.py` | 502 | Primary runner. `python scripts/run.py <config.yaml> --model <provider/model>`. Produces JSON + Markdown game reports. `--backend {auto,opencode,claude_cli}` routes `anthropic/*` to the Claude CLI adapter. |
 | `batch_run.py` | 110 | Parallel batch runs on DeepSeek via `ThreadPoolExecutor`. |
 | `multi_phase.py` | 128 | Iterative development: understand → build → refactor → add_feature. Measures compounding effects. |
 | `remaining_batch.py` | 81 | Runs remaining uncompleted experiment cells one at a time. |

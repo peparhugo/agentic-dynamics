@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>Success isn't value. An experimental instrument measuring what drives the cost and value of agentic AI outcomes.</strong><br>
-  249 sessions, 10 perturbation operators, 8 model variants. $64.98 measured API spend.
+  1,097 story sessions, 10 perturbation operators, 7 model variants across 3 providers. $288.69 measured spend.
 </p>
 
 <p align="center">
@@ -31,7 +31,7 @@ The approach: controlled perturbation as an experimental independent variable. E
 
 ---
 
-## Three Key Findings
+## Key Findings
 
 **1. Per-token price does not tell you task economics.**
 Models produce similar generated token volumes yet bill at ratios driven by provider pricing architecture, not capability.
@@ -67,12 +67,13 @@ Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy pri
 
 | Metric | Value |
 |--------|-------|
-| Experiment sessions | 249 |
+| Story sessions | 1,097 (3,370 DB sessions total) |
 | Game reports | 224 |
-| Model variants | 8 (3 provider families) |
-| Experiment configs | 34 |
+| Model variants | 7 (3 providers: DeepSeek, Anthropic, OpenAI) |
+| Experiment configs | 35 (34 task definitions + pipeline plan) |
 | Perturbation operators | 10 (specification corruption, objective mutation, process perturbation) |
-| Total experiment cost | $64.98 |
+| Lab books | 21 (19 active scripts, 8 deprecated) |
+| Total measured spend | $288.69 |
 
 ---
 
@@ -81,49 +82,78 @@ Modeling extensions: Snowball (N² codebase growth compounding), EPM (energy pri
 - [Databricks coding-agent benchmark](https://www.databricks.com/blog/benchmarking-coding-agents-databricks-multi-million-line-codebase) (July 2026) — enterprise-scale coding-agent evaluation using held-out tests
 - [FinOps Foundation: AI tools & services](https://www.finops.org/wg/finops-for-ai-tools-services-considerations/) — use-case economics and model right-sizing
 
-Run `python scripts/inventory.py list` for a live breakdown.
+Run `python scripts/inventory.py stats` for a live breakdown.
 
 ---
 
 ## Repository Structure
 
 ```
-├── src/instrument/           # Python measurement apparatus
+├── src/instrument/           # Python measurement apparatus (pip-installable, 40 modules)
 │   ├── perturb.py            # 10 perturbation operators
-│   ├── basin.py              # Attractor basin escape measurement
-│   ├── efficiency.py         # Token / cost / energy efficiency
-│   ├── solution.py           # Solution quality evaluation
-│   ├── strategy.py           # Strategy archetype classification
-│   ├── recovery.py           # Recovery classification (7 signals)
-│   ├── recovery_cost.py      # Cost of recovering from perturbation
-│   ├── trajectory.py         # Reasoning trajectory capture
-│   ├── constraint_detection.py   # Dual-signal constraint verification
+│   ├── opencode.py           # opencode session runner (the primary backend)
+│   ├── backends.py           # backend routing: opencode vs Claude CLI
+│   ├── claude_adapter.py     # Claude CLI (stream-json) → opencode events
+│   ├── streaming.py          # shared line-by-line subprocess runner
+│   ├── trajectory.py         # reasoning trajectory capture
+│   ├── solution.py           # solution quality evaluation
+│   ├── basin.py              # attractor basin escape measurement
+│   ├── efficiency.py         # token / cost / energy efficiency
+│   ├── recovery.py           # recovery classification (7 signals)
+│   ├── recovery_cost.py      # cost of recovering from perturbation
+│   ├── strategy.py           # strategy archetype classification
+│   ├── constraint_detection.py   # dual-signal constraint verification
 │   ├── semantic_validation.py    # AST analysis, marker profiling
-│   ├── game_report.py        # Markdown game report generation
-│   ├── experiment.py         # Full experiment runner
-│   ├── adapter.py            # LLM adapter instrumentation
-│   ├── opencode.py           # Opencode session runner
-│   └── lab_book.py           # YAML-frontmatter persistence
-├── scripts/
-│   ├── analyze_worktrees.py  # Post-hoc analysis → game reports
-│   ├── analyze_trajectories.py   # 255 session.jsonl transcripts
-│   ├── build_data.py         # Generate data.js for the website
-│   ├── inventory.py          # Experiment/worktree inventory CLI
-│   ├── lab_claude_audit.py   # Lab 1: Claude cost breakdown
-│   ├── lab_grit_matrix.py    # Lab 2: Grit Matrix chart data
-│   ├── lab_correctness_premium.py # Lab 3: Head-to-head correctness
-│   ├── lab_flail_triggers.py # Lab 4: Narration failure patterns
-│   ├── lab_tool_archetypes.py    # Lab 5: Write vs patch vs bash
-│   ├── lab_task_routing.py   # Lab 6: Optimal model routing
-│   ├── lab_basin_topology.py # Lab 7: Attractor basin classification
-│   ├── lab_survival_horizon.py   # Lab 8: Sessions-to-bankruptcy
-│   ├── run.py                # Single experiment runner
+│   ├── game_report.py        # markdown game report generation
+│   ├── language.py           # multi-language tree-sitter parsing (Py/TS/Go/Rust)
+│   ├── sonar.py              # SonarQube static analysis
+│   ├── embeddings.py         # embeddings + vector search (ChromaDB/Ollama)
+│   ├── graph.py              # Neo4j experiment knowledge graph
+│   ├── story.py              # multi-session story orchestrator
+│   ├── mutation.py           # semantic spec/code mutation compiler
+│   ├── commit_analysis.py    # per-commit AST/Sonar/convention analysis
+│   ├── review.py             # LLM code review pool
+│   ├── entropy.py            # architectural entropy
+│   ├── codebase_graph.py     # import-graph structural metrics
+│   ├── lsp_diagnostics.py    # language-server diagnostics
+│   ├── supervisor.py         # Redis flag/session↔cell contracts (observe-only)
+│   ├── workflow_runner.py    # agent_task workflow executor (the execute phase)
+│   ├── test_runner.py        # independent pytest/jest/go/cargo runner
+│   ├── routing.py            # per-task model routing + strategy simulation
+│   ├── signal_store.py       # per-step routing signal store
+│   ├── step_routing.py       # per-step model routing
+│   ├── live.py               # Redis pub/sub telemetry
+│   ├── experiment_spec.py    # ExperimentSpec dataclasses + YAML loader
+│   ├── compile_experiment.py # spec → DAG compiler (the cycle)
+│   ├── experiment.py         # [deprecated] full experiment runner
+│   ├── adapter.py            # [deprecated] LLM adapter instrumentation
+│   └── lab_book.py           # [deprecated] YAML-frontmatter persistence
+├── scripts/                  # 78 scripts: runners, analysis, labs, queue, admin
+│   ├── run.py                # single experiment runner
+│   ├── run_story.py          # multi-session story runner
+│   ├── pipeline.py           # YAML-driven phase orchestration (ci/deploy/...)
+│   ├── enqueue.py / worker.py / monitor.py   # Redis queue transport
+│   ├── analyze_worktrees.py  # post-hoc analysis → game reports
+│   ├── analyze_trajectories.py  # session transcript parsing
+│   ├── sync_data.py          # story results → parquet
+│   ├── build_data.py         # generate data.js for the website
+│   ├── inventory.py          # experiment/worktree inventory CLI
+│   ├── lab_*.py              # 19 active lab books (+ 8 deprecated)
 │   └── ...
 ├── experiments/
-│   ├── configs/              # 34 YAML experiment definitions
-│   ├── results/              # Game reports, summaries, lab outputs
-│   └── lab_books/            # 13 structured experiment plans
-├── firebase/public/          # Website source (8 pages, data pipeline)
+│   ├── configs/              # 35 YAML experiment definitions
+│   ├── specs/                # ExperimentSpec YAMLs (spec/compiler layer)
+│   ├── stories/              # story result JSONs
+│   ├── codebases/            # starter codebases per language
+│   ├── results/              # game reports, summaries, lab outputs
+│   ├── lab_books/            # 21 experiment plans
+│   └── reviews/              # 6 peer review documents
+├── firebase/public/          # website source (8 pages, data pipeline)
+├── admin/                    # Control Room portal (Flask + static dashboard)
+├── docs/                     # design docs, specs, review records
+├── code_reviews/             # dated architecture/design review records
+├── .opencode/                # opencode agents, skills, tools, instructions
+├── .claude/                  # parallel Claude Code surface (ported from opencode)
 ├── pyproject.toml
 ├── CONTRIBUTING.md
 └── CODE_OF_CONDUCT.md
@@ -139,15 +169,18 @@ The website at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app) 
 opencode.db ──→ inventory.py refresh          ──→ inventory.json
        │
        ├──→ analyze_worktrees.py ──→ _results_summary.json ──┐
-       │         │                                             │
+       │         │                                            │
 /tmp/exp_* ──┘   ├──→ reports/*.md (game reports)            │
-                 └──→ reports/*/session.jsonl                 │
-                                       │                      │
-                                       ↓                      ↓
-                          analyze_trajectories.py      build_data.py
-                                       │                      │
-                                       ↓                      ↓
-                          _trajectory_aggregate.json   firebase/public/data.js (~31KB)
+                 └──→ reports/*/session.jsonl                │
+                                       │                     │
+                                       ↓                     ↓
+                           analyze_trajectories.py    sync_data.py (stories → parquet)
+                                       │                     │
+                                       ↓                     ↓
+                           _trajectory_aggregate.json  build_data.py
+                                                                │
+                                                                ↓
+                                                   firebase/public/data.js (~179KB)
 ```
 
 All numbers on the website are live-generated. Every measurement is provenance-tagged: [M] measured, [C] computed, [H] heuristic, [X] external.
@@ -187,43 +220,58 @@ pip install -e .
 
 ```bash
 python scripts/run.py experiments/configs/task_manager.yaml
+python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
+python scripts/run.py experiments/configs/task_manager.yaml --backend claude_cli
+```
+
+### Run a Multi-Session Story
+
+```bash
+python scripts/run_story.py task_manager_api --model deepseek/deepseek-v4-pro --condition clean
+```
+
+### Run the Pipeline (YAML-driven phases)
+
+```bash
+python scripts/pipeline.py --plan ci          # lint → test → build
+python scripts/pipeline.py --plan full_matrix # matrix → analyze → review → deploy
+```
+
+### Parallel Queue Transport
+
+```bash
+python scripts/enqueue.py --model deepseek/deepseek-v4-flash --missing-only
+python scripts/worker.py        # run N workers in parallel
+python scripts/monitor.py       # queue dashboard
 ```
 
 ### Run Post-Hoc Analysis
 
 ```bash
-# Analyze all worktrees → game reports + _results_summary.json
-python scripts/analyze_worktrees.py
-python scripts/analyze_worktrees.py --no-tests   # Skip pytest (faster)
-python scripts/analyze_worktrees.py --worktree /tmp/exp_xyz  # Single worktree
-
-# Analyze session transcripts
-python scripts/analyze_trajectories.py
-
-# Build website data
-python scripts/build_data.py
+python scripts/analyze_worktrees.py                  # → game reports + _results_summary.json
+python scripts/analyze_trajectories.py               # → trajectory aggregates
+python scripts/sync_data.py                          # story results → parquet
+python scripts/build_data.py                         # → firebase/public/data.js
 ```
 
 ### Inspect the Inventory
 
 ```bash
-python scripts/inventory.py refresh    # Rebuild from DB + worktrees
-python scripts/inventory.py list       # List experiments
-python scripts/inventory.py stats      # Aggregate statistics
-python scripts/inventory.py report     # Evidence page numbers
+python scripts/inventory.py refresh    # rebuild from DB + worktrees
+python scripts/inventory.py list       # list experiments
+python scripts/inventory.py stats      # aggregate statistics
+python scripts/inventory.py report     # evidence page numbers
 ```
 
 ### Run Lab Book Analyses
 
 ```bash
-python scripts/lab_claude_audit.py     # Claude cost breakdown
-python scripts/lab_grit_matrix.py      # Grit Matrix chart data
-python scripts/lab_correctness_premium.py  # Head-to-head correctness
-python scripts/lab_flail_triggers.py   # Narration failure patterns
-python scripts/lab_tool_archetypes.py  # Write vs patch vs bash
-python scripts/lab_task_routing.py     # Optimal model routing
-python scripts/lab_basin_topology.py   # Attractor basin classification
-python scripts/lab_survival_horizon.py # Sessions-to-bankruptcy
+python scripts/lab_grit_matrix.py         # Grit Matrix chart data
+python scripts/lab_correctness_premium.py # head-to-head correctness
+python scripts/lab_flail_triggers.py      # failure patterns
+python scripts/lab_task_routing.py        # optimal model routing
+python scripts/lab_survival_horizon.py    # sessions-to-bankruptcy
+# ...and 14 more — see scripts/CONTEXT.md
 ```
 
 ---
@@ -252,11 +300,31 @@ python scripts/lab_survival_horizon.py # Sessions-to-bankruptcy
 
 ---
 
+## The Spec / Compiler Layer
+
+The library is transitioning from a linear pipeline to a closed loop (see
+`code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`):
+
+```
+spec (ExperimentSpec) ──compile──▶ DAG ──▶ cells ──▶ jobs ──▶ attempts
+      ▲                                          │              │
+      └──adapt (tweak one factor)── compare ◀── information ◀── measure ◀── ledger
+```
+
+The load-bearing rule: **to make policies, we need information.** Measurement rules
+produce information; control rules consume it. The compiler refuses a control rule
+(like `model_cascade`/`dynamics`) whose `requires` (e.g. `confidence`) are not yet
+instrumented. `experiment_spec.py` and `compile_experiment.py` are written; the open
+gap is instrumenting `confidence`, `perturbation_strength`, and `test_executed_success`
+before authoring the policy arms that consume them.
+
+---
+
 ## Current Scope
 
-**Validated:** Python/Flask REST APIs, CRUD apps, real-time collaboration frontends, TypeScript/Node.js (21 cross-model runs). 10 prompt-level perturbation operators. IEA-baseline energy projection (1.6%/yr). Cost measurement in tokens, dollars, and joules.
+**Validated:** Python/Flask REST APIs, CRUD apps, real-time collaboration frontends, and TypeScript/Node.js. Go and Rust configs are defined and under validation. 10 prompt-level perturbation operators. IEA-baseline energy projection (1.6%/yr). Cost measurement in tokens, dollars, and joules. Multi-session story orchestration, independent test execution, and a Redis-queue parallel transport.
 
-**In progress:** Rust, Go validation. Structural perturbation operators (dependency injection, AST corruption). Multi-language AST expansion.
+**In progress:** The spec/compiler campaign loop (adapt → next grid) and the policy arms gated on instrumenting `confidence` / `perturbation_strength` / `test_executed_success`.
 
 **Not in scope:** The instrument measures cost — it does not judge whether narration is "wasteful" or "valuable." The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.
 
@@ -270,7 +338,7 @@ python scripts/lab_survival_horizon.py # Sessions-to-bankruptcy
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},
-  note   = {v0.5. 249 experiment sessions, 8 models, 10 perturbation operators.}
+  note   = {1,097 story sessions, 7 models, 10 perturbation operators.}
 }
 ```
 

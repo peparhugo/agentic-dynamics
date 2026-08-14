@@ -15,6 +15,12 @@ Add a new experiment config in `experiments/configs/`. TypeScript/Node.js, Go, R
 ### I Have a Novel Perturbation Idea
 Add a new perturbation operator to `src/instrument/perturb.py`. The operator registry is designed for extensibility.
 
+### I Want to Add a New Story or ExperimentSpec
+Multi-session stories live in `src/instrument/story.py` (`BUILTIN_STORIES`); the spec/compiler layer (`experiments/specs/*.yaml`) declares `workflow`, `factors`, `rules`, and `adapt`. Note the load-bearing rule: a control rule (policy arm) whose `requires` are not yet instrumented will be refused by the compiler — instrument the fields first.
+
+### I Want to Add a Lab Book
+Lab books are `experiments/lab_books/lab_*.md` (the plan) + `scripts/lab_*.py` (the implementation), consuming `_results_summary.json` and trajectory data.
+
 ### I Found a Bug or Have a Feature Idea
 Open a GitHub issue. Be specific: what you expected, what happened, and how to reproduce it.
 
@@ -40,10 +46,10 @@ You need the [opencode](https://opencode.ai) CLI installed and available on your
 ### 3. Verify the Instrument Works
 
 ```bash
-python scripts/run.py --config experiments/configs/task_manager.yaml
+python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
 ```
 
-If this succeeds and produces a result JSON in `experiments/results/`, you're ready.
+If this succeeds and produces a result in `experiments/results/`, you're ready.
 
 ---
 
@@ -72,8 +78,8 @@ operators:
 
 strengths: [0.5, 0.8]
 
-model: deepseek                    # provider shorthand
-model_id: deepseek/deepseek-v4-pro # full model identifier
+# Model is passed at run time as provider/model (no shorthand):
+#   python scripts/run.py experiments/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
 ```
 
 See existing configs in `experiments/configs/` for more examples.
@@ -81,7 +87,7 @@ See existing configs in `experiments/configs/` for more examples.
 ### 2. Run It
 
 ```bash
-python scripts/run.py --config experiments/configs/your_experiment.yaml
+python scripts/run.py experiments/configs/your_experiment.yaml --model deepseek/deepseek-v4-pro
 ```
 
 ### 3. Check Results
@@ -91,7 +97,7 @@ python scripts/inventory.py refresh
 python scripts/inventory.py list
 ```
 
-Results are saved to `experiments/results/your_experiment_{model}.json`.
+Results are saved under `experiments/results/`.
 
 ### 4. Submit a PR
 
@@ -137,6 +143,13 @@ operators["my_operator"] = PerturbationOperator(
 
 ## Running Sweeps
 
+### Single Experiment (positional config, model as `provider/model`)
+
+```bash
+python scripts/run.py experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro
+python scripts/run.py experiments/configs/task_manager.yaml --model anthropic/claude-sonnet-5 --backend claude_cli
+```
+
 ### Silent Mode Sweep (Explanation Tax)
 
 Tests every model in both natural and forced-silent mode:
@@ -151,7 +164,24 @@ python scripts/sweep_silent_mode.py
 python scripts/batch_run.py
 ```
 
+### Redis Queue (parallel story cells)
+
+```bash
+python scripts/enqueue.py --model deepseek/deepseek-v4-flash --missing-only  # fill queue
+python scripts/worker.py    # BRPOP worker — run N in parallel
+python scripts/monitor.py   # queue dashboard
+```
+
+### Pipeline Plans
+
+```bash
+python scripts/pipeline.py --plan ci            # lint → test → build
+python scripts/pipeline.py --plan full_matrix   # matrix → analyze → review → deploy
+```
+
 All scripts use **title-based deduplication** — they query the opencode DB to skip sessions already completed. You can safely re-run them; completed cells are skipped.
+
+**Note on Redis:** the framework queue lives on port **6380** (`FINOPS_REDIS_PORT`). Story agents build Flask/Celery apps against port 6379 and call `flushdb()`/`flushall()` while testing, so they can never reach the framework queue. Never run the queue on 6379.
 
 ---
 
@@ -162,12 +192,17 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 - Use `dataclass` for data structures
 - Use type hints throughout
 - No new dependencies without discussion
+- Deprecated: `experiment.py`, `adapter.py`, `lab_book.py` — use `opencode.py` / `run_opencode_agentic()` instead
 
 ### Website
 - No framework — vanilla HTML/CSS/JS
 - Dark theme using CSS custom properties in `:root`
 - Use `var(--ac)` for accent, `var(--bg)`/`var(--bg2)` for backgrounds
 - JetBrains Mono for code, system font stack for body text
+
+### Agent Surfaces
+- `.opencode/` is the primary agent surface (`AGENTS.md`, `opencode.json`, instructions, skills, tools)
+- `.claude/` is a hand-ported parallel surface — keep both in sync by hand (see `docs/claude_code_port.md`); there is no build step
 
 ### Commits
 - Write descriptive commit messages

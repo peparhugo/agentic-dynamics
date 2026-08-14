@@ -1,6 +1,6 @@
 # `src/instrument/` — Measurement Apparatus
 
-38 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
+40 Python modules (+ `__init__.py`) that form the core library. Measures search dynamics (not
 outputs): basin escape rates, recovery cost, attractor strength, strategy classification.
 Pip-installable as `ai-finops-dynamics`.
 
@@ -107,6 +107,8 @@ Prompt ──→ perturb.py ──→ backends.py ──→ [LLM] ──→ traj
 | `backends.py` | 56 | Routes `anthropic/*` → Claude CLI, else opencode | `run_agentic()`, `get_backend_for_model()` |
 | `live.py` | 101 | Redis Pub/Sub telemetry (status + per-cell event stream + replay log) | `LivePublisher`, `make_publisher()` |
 | `routing.py` | 187 | Task-optimal routing: per-task model recommendation + strategy simulation | `compute_routing()`, `recommend_route()`, `simulate_strategies()` |
+| `signal_store.py` | — | Per-step routing signal store (field/id mismatches, portal validation wiring) | — |
+| `step_routing.py` | — | Per-step model routing across workflow phases | — |
 
 ### Output
 
@@ -182,7 +184,7 @@ warnings). Use `opencode.py` / `run_opencode_agentic()` for running experiments.
 1. Add the operator function in `perturb.py` (with `strength` parameter)
 2. Register it in the `__init__.py` exports
 3. Create a config YAML in `experiments/configs/` that uses it
-4. Run `python scripts/run.py --config experiments/configs/your_config.yaml`
+4. Run `python scripts/run.py experiments/configs/your_config.yaml --model deepseek/deepseek-v4-pro`
 
 ## Adding a New Metric
 

@@ -31,7 +31,8 @@ Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app). Fire
 python scripts/inventory.py refresh       # scan DB + worktrees
 python scripts/sync_data.py               # story results → sessions/stories.parquet
 python scripts/analyze_worktrees.py       # produce _results_summary.json
-python scripts/build_data.py              # generate public/data.js (~90KB)
+python scripts/build_data.py              # generate public/data.js (~179KB)
+python scripts/generate_manifest.py       # generate data_manifest.json
 ```
 
 `data.js` is the sole dynamic file. Every number on the website is live-generated from experimental data with provenance tags: `[M]` measured, `[C]` computed, `[H]` heuristic, `[X]` external. Run `build_data.py` to refresh after new experiments. Review metrics are aggregated from `experiments/results/reviews/`. The `deploy` plan in `scripts/pipeline.py` (refresh → sync → build → deploy) runs this end-to-end.
