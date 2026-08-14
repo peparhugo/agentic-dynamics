@@ -33,7 +33,7 @@ MONITOR_MODEL = os.environ.get("SUPERVISOR_MODEL", "deepseek/deepseek-v4-flash")
 POLL_INTERVAL = int(os.environ.get("SUPERVISOR_POLL_INTERVAL", "60"))
 ACTIVE_WINDOW = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))  # seconds
 BATCH_EVENTS = int(os.environ.get("SUPERVISOR_BATCH_EVENTS", "12"))
-RELAY = os.environ.get("SUPERVISOR_RELAY", "1") == "1"
+RELAY = os.environ.get("SUPERVISOR_RELAY", "0") == "1"  # off by default: FINOPS_CELL_ID supersedes it
 FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
 STATE_FILE = ROOT / "experiments" / "results" / "supervisor" / "monitor_session.json"
 
