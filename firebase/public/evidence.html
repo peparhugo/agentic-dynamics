@@ -111,7 +111,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <div class="corpus-metric"><strong data-stat="stories_total">221</strong>stories</div>
 <div class="corpus-metric"><strong data-stat="story_sessions">1,097</strong>sessions</div>
 <div class="corpus-metric"><strong data-stat="variants">7</strong>models</div>
-<div class="corpus-metric" title="[M] Sum of story session costs, verified against provider pricing"><strong>$<span data-stat="story_total_cost">288.69</span></strong>of $288.6909 total story cost</div>
+<div class="corpus-metric" title="[C] Computed: sum of story session costs"><strong>$<span data-stat="story_total_cost">288.69</span></strong>of $288.6909 total story cost</div>
 </div>
 </article>
 </div>
@@ -323,11 +323,11 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <h3 id="cross-model-rollup">Cross-Model Rollup</h3>
 <p class="lead">Measured across 224 game reports — not single-run data. DeepSeek delivers 1.26&times; more code per session at 1/69th the cost of Claude. <span title="[M] Measured via pytest/vitest on 249 sessions">88.7% overall test pass rate (1572/1772 tests)</span> from real pytest/jest execution.</p>
 <div class="tbl"><table><thead><tr><th>Metric</th><th>DeepSeek v4</th><th>GPT-5.6</th><th>Claude F5</th><th>All Models</th></tr></thead><tbody id="rollup-tbody">
-<tr><td>Per-session cost</td><td class="mono green" data-stat="rollup-ds-cost">$0.016</td><td class="mono" data-stat="rollup-g56-cost">$0.45</td><td class="mono amber" data-stat="rollup-claude-cost">$1.06</td><td class="mono" data-stat="rollup-all-cost">$0.29</td></tr>
-<tr><td>Test pass rate</td><td class="mono green" data-stat="rollup-ds-pass">87%</td><td class="mono green" data-stat="rollup-g56-pass">100%</td><td class="mono green" data-stat="rollup-claude-pass">100%</td><td class="mono green" data-stat="rollup-all-pass">93%</td></tr>
-<tr><td>Avg thinking ratio</td><td class="mono green" data-stat="rollup-ds-think">8.2%</td><td class="mono" data-stat="rollup-g56-think">6.4%</td><td class="mono amber" data-stat="rollup-claude-think">0.0%</td><td class="mono" data-stat="rollup-all-think">6.3%</td></tr>
-<tr><td>Avg LOC/session</td><td class="mono green" data-stat="rollup-ds-loc">700</td><td class="mono" data-stat="rollup-g56-loc">367</td><td class="mono" data-stat="rollup-claude-loc">554</td><td class="mono" data-stat="rollup-all-loc">573</td></tr>
-<tr><td>Constraint score</td><td class="mono green" data-stat="rollup-ds-constraint">50%</td><td class="mono" data-stat="rollup-g56-constraint">71%</td><td class="mono" data-stat="rollup-claude-constraint">39%</td><td class="mono" data-stat="rollup-all-constraint">47%</td></tr>
+<tr><td>Per-session cost</td><td class="mono green">$0.016</td><td class="mono">$0.45</td><td class="mono amber">$1.06</td><td class="mono">$0.29</td></tr>
+<tr><td>Test pass rate</td><td class="mono green">87%</td><td class="mono green">100%</td><td class="mono green">100%</td><td class="mono green">93%</td></tr>
+<tr><td>Avg thinking ratio</td><td class="mono green">8.2%</td><td class="mono">6.4%</td><td class="mono amber">0.0%</td><td class="mono">6.3%</td></tr>
+<tr><td>Avg LOC/session</td><td class="mono green">700</td><td class="mono">367</td><td class="mono">554</td><td class="mono">573</td></tr>
+<tr><td>Constraint score</td><td class="mono green">50%</td><td class="mono">71%</td><td class="mono">39%</td><td class="mono">47%</td></tr>
 </tbody></table></div>
 <div class="insight">These per-session averages from <span data-stat="reports">224</span> game reports are the most robust metric. The <span title="[C] Computed: Claude avg cost / DeepSeek avg cost">69&times; gap</span> is the measured average across the full corpus — not the architectural extreme, not a cherry-picked single run.</div>
 
@@ -336,7 +336,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 
 <!-- Current Scope & Roadmap -->
 <section class="sec chapter-marker">
-<div class="circle-label">ACT I · SCOPE AND EXPLORATION</div>
+<div class="circle-label">ACT I · WHAT · SCOPE AND EXPLORATION</div>
 <h2 id="scope-profiles-research">Scope, Profiles, and Research Notebook</h2>
 <p>Corpus scope and model profiles precede lower-confidence trajectory hypotheses, preserving their evidentiary boundary.</p>
 </section>
@@ -359,7 +359,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 <section class="fsec"><div class="inr wide">
 <div class="pulse"><span class="dot"></span> Model Cards</div>
 <h3 id="model-profiles">Detailed Model Profiles</h3>
-<p class="lead">All 8 model variants, 3 architectures. Populated from data.js with hardcoded fallbacks. Data provenance: <span data-stat="sessions">249</span> experiment sessions across <span data-stat="reports">224</span> game reports. <a href="methodology.html">See methodology</a>.</p>
+<p class="lead">All 8 model variants, 3 architectures. Populated from data.js with hardcoded fallbacks. Data provenance: <span>249</span> experiment sessions across <span data-stat="reports">224</span> game reports. <a href="methodology.html">See methodology</a>.</p>
 <div id="model-cards-root"></div>
 </div></section>
 
@@ -606,7 +606,7 @@ h2{font-size:clamp(1.5rem,3.5vw,2.4rem);font-weight:700;letter-spacing:-0.5px;li
 </script>
 <!-- ==================== CODE QUALITY UNDER PERTURBATION (SONAR DELTA) ==================== -->
 <section class="sec chapter-marker">
-<div class="circle-label">ACT I · QUALITY AND MODELED EXTENSIONS</div>
+<div class="circle-label">ACT I · WHAT · QUALITY AND MODELED EXTENSIONS</div>
 <h2 id="quality-operators-modeled">Quality, Operators, and Modeled Extensions</h2>
 <p>Measured static quality remains separate from computed operator effects and externally parameterized energy estimates.</p>
 </section>
@@ -787,7 +787,7 @@ All cost values measured directly from provider API responses via the openCode d
 <section class="sec narrative-step">
 <div class="circle-label">ACT II · HOW THE MEASUREMENT SCALES NOW</div>
 <h2 id="current-story-instrument">Act II: The Current Story Instrument</h2>
-<p class="lead">The current matrix crosses 3 codebases × 2 tiers × 2 codebase qualities × the existing conditions. Across 221 stories and 1,097 sessions, 7 models complete 5-session arcs for a CRUD API, static site generator, or notification service, with every task inheriting the prior codebase. The measured total story cost is <span class="tip" title="[M] Sum of story session costs, verified against provider pricing">$288.6909</span>, rendered as $288.69 in the live summary. This is N × M scaling: many observations examined through multiple independent measurement angles, not one composite score or a pooled benchmark. The story instrument reuses the precursor's perturbation operators and recovery signals to measure persistence, verification, review quality, solution dynamics, and compounding cost.</p>
+<p class="lead">The current matrix crosses 3 codebases × 2 tiers × 2 codebase qualities × the existing conditions. Across 221 stories and 1,097 sessions, 7 models complete 5-session arcs for a CRUD API, static site generator, or notification service, with every task inheriting the prior codebase. The measured total story cost is <span class="tip" title="[C] Computed: sum of story session costs">$288.6909</span>, rendered as $288.69 in the live summary. This is N × M scaling: many observations examined through multiple independent measurement angles, not one composite score or a pooled benchmark. The story instrument reuses the precursor's perturbation operators and recovery signals to measure persistence, verification, review quality, solution dynamics, and compounding cost.</p>
 </section>
 <details style="max-width:900px;margin:1.5rem auto;background:var(--bg3);border:1px solid var(--b);border-radius:10px;padding:0">
 <summary style="padding:1rem 1.2rem;cursor:pointer;font-weight:700;color:var(--ac);font-size:0.88rem;list-style:none;display:flex;align-items:center;gap:0.5rem"><span style="font-size:1.2rem">&#9654;</span> TL;DR &mdash; What the evidence shows</summary>
@@ -834,7 +834,7 @@ All cost values measured directly from provider API responses via the openCode d
 
 <!-- ==================== REVIEW AGENT: CODE QUALITY ==================== -->
 <section class="sec chapter-marker">
-<div class="circle-label">ACT II · INDEPENDENT MEASUREMENT</div>
+<div class="circle-label">ACT II · WHAT · INDEPENDENT MEASUREMENT</div>
 <h2 id="review-and-static-quality">Independent Review and Static Quality</h2>
 <p>Authored test volume is kept separate from second-model review, structural diffs, conventions, and SonarQube diagnostics.</p>
 </section>
@@ -886,7 +886,7 @@ All cost values measured directly from provider API responses via the openCode d
 
 <!-- ==================== FACET: BEHAVIOR / DYNAMICS ==================== -->
 <section class="sec">
-<div class="circle-label">ACT II · SOLUTION BEHAVIOR</div>
+<div class="circle-label">ACT II · WHAT · SOLUTION BEHAVIOR</div>
 <h2 id="dynamics">Solution Dynamics</h2>
 <p class="lead">Every story cell is scored across five behavioral axes: <strong style="color:var(--ac)">solution quality</strong> (correctness, constraint satisfaction, code quality, novelty vs. the seed), <strong style="color:var(--am)">basin escape</strong> (how far the final code diverged from the seed's attractor), and a <strong style="color:var(--cy)">strategy archetype</strong> — plus live LSP diagnostics (pyright / tsc) on every final codebase.</p>
 
@@ -909,7 +909,7 @@ All cost values measured directly from provider API responses via the openCode d
 
 <!-- ==================== FACET: THE ARC ==================== -->
 <section class="sec alt">
-<div class="circle-label">ACT II · LONGITUDINAL EVIDENCE · 5 LINKED SESSIONS</div>
+<div class="circle-label">ACT II · WHAT · LONGITUDINAL EVIDENCE · 5 LINKED SESSIONS</div>
 <h2 id="arc">The Five-Session Arc</h2>
 <p class="lead">The defining feature of the story instrument is the arc: each session commits onto the last, so the codebase — and the context the next session must read — grows. The Snowball Rule is measurable: <strong style="color:var(--am)">session cost roughly doubles from greenfield to cross-cutting</strong> ($0.16 → $0.34), tokens rise from 18.7K to 34.9K, and tests accumulate from 4.4 to 14.8 as the surface area to verify expands.</p>
 
