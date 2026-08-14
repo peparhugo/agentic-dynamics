@@ -133,6 +133,25 @@ from .semantic_validation import analyze_ast, analyze_markers
 # Deprecated: SegmentClassification, classify_trajectory_segments, recovery_token_ratio — not used by current scripts
 from .solution import SolutionMetrics, evaluate_solution
 from .sonar import SonarMetrics, compute_sonar_diff, run_sonar_analysis, sonar_quality_score
+
+# v1.0: per-step routing — preference-scored, cache-aware model selection per workflow step
+from .step_routing import (
+    FORBIDDEN_SIGNALS,
+    MEASURED_SIGNALS,
+    ModelSignals,
+    Objective,
+    RouteState,
+    RoutingPreferences,
+    StepSelector,
+    build_signal_store,
+    cache_switch_penalty,
+    parse_step_selector,
+    resolve_pool,
+    route_step,
+    validate_preferences,
+    validate_step_selector,
+    validate_workflow_routing,
+)
 from .story import (
     BUILTIN_STORIES,
     PerturbationCondition,
@@ -185,6 +204,12 @@ __all__ = [
     "get_backend_for_model", "resolve_backend", "run_agentic",
     "LivePublisher", "make_publisher",
     "compute_routing", "normalize_task", "recommend_route", "simulate_strategies",
+    # v1.0 per-step routing
+    "route_step", "ModelSignals", "RouteState", "RoutingPreferences", "Objective",
+    "StepSelector", "MEASURED_SIGNALS", "FORBIDDEN_SIGNALS",
+    "parse_step_selector", "validate_step_selector", "validate_preferences",
+    "validate_workflow_routing", "resolve_pool", "cache_switch_penalty",
+    "build_signal_store",
     # v0.6
     "LanguageProfile", "CodebaseAST", "detect_language", "parse_codebase",
     "get_parser", "collect_functions", "collect_imports",
