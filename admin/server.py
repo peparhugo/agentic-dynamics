@@ -12,6 +12,15 @@ Endpoints:
 
 Run:
     python3 admin/server.py      # default port 8000 (FINOPS_PORT override)
+
+Deployment note: ``app.run(threaded=True)`` is Flask's built-in single-process
+development server, intended for a local operator tool rather than production.
+Each SSE client (``/api/status``, ``/api/events/<cell_id>``) holds one request
+thread plus one Redis Pub/Sub subscription for the life of the tab, so there is
+no connection cap. For multi-operator use, front it with a threaded gunicorn:
+
+    gunicorn --worker-class gthread --threads 4 --workers 1 \
+      --bind 127.0.0.1:8000 'admin.server:app'
 """
 
 from __future__ import annotations
@@ -25,6 +34,7 @@ import sys
 import time
 from contextlib import suppress
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
@@ -62,7 +72,7 @@ app = Flask(__name__, static_folder="static", static_url_path="/static")
 _design_manager: DesignSessionManager | None = None
 
 
-def _redis():
+def _redis() -> redis.Redis:
     import redis
 
     return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True)
@@ -73,7 +83,11 @@ def _design_sessions() -> DesignSessionManager:
     global _design_manager
     if _design_manager is None:
         configured = os.environ.get("FINOPS_DESIGN_WORKDIRS")
-        paths = [Path(item) for item in configured.split(os.pathsep) if item] if configured else [ROOT]
+        paths = (
+            [Path(item) for item in configured.split(os.pathsep) if item]
+            if configured
+            else [ROOT]
+        )
         workdirs = {
             "repository" if index == 0 else f"repository-{index + 1}": path
             for index, path in enumerate(paths)
@@ -110,7 +124,9 @@ def _design_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
     return body, None
 
 
-def _idempotent_design_response(operation: str, body: dict, action):
+def _idempotent_design_response(
+    operation: str, body: dict, action
+) -> tuple[Response, int] | Response:
     """Reserve and replay one JSON mutation result using Redis atomic ``SET NX``."""
     supplied_key = request.headers["Idempotency-Key"]
     request_digest = hashlib.sha256(
@@ -131,10 +147,16 @@ def _idempotent_design_response(operation: str, body: dict, action):
             existing_raw = redis_client.get(cache_key)
             existing = json.loads(existing_raw) if existing_raw else {}
             if existing.get("request_digest") != request_digest:
-                return jsonify({"error": "Idempotency-Key was already used with a different request"}), 409
+                return (
+                    jsonify({"error": "Idempotency-Key was already used with a different request"}),
+                    409,
+                )
             if existing.get("state") == "complete":
                 return jsonify(existing.get("body", {})), int(existing.get("status", 200))
-            return jsonify({"error": "matching mutation is still in progress", "retryable": True}), 409
+            return (
+                jsonify({"error": "matching mutation is still in progress", "retryable": True}),
+                409,
+            )
     except Exception as error:
         return jsonify({"error": f"idempotency store unavailable: {error}"}), 503
 
@@ -155,7 +177,7 @@ def _idempotent_design_response(operation: str, body: dict, action):
     return response
 
 
-def _design_error(error: Exception):
+def _design_error(error: Exception) -> tuple[Response, int]:
     """Translate expected manager failures without leaking server internals."""
     if isinstance(error, KeyError):
         return jsonify({"error": "design session not found"}), 404
@@ -166,16 +188,20 @@ def _design_error(error: Exception):
     return jsonify({"error": str(error), "code": "design_session_error"}), 503
 
 
-def _sse(generator):
+def _sse(generator) -> Response:
     """Return a response configured for an unbuffered SSE connection."""
     return Response(
         generator,
         mimetype="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
     )
 
 
-def _reported_number(value):
+def _reported_number(value) -> float | None:
     """Return valid reported telemetry as a float, or ``None``.
 
     Telemetry is observational rather than billing data, so malformed values
@@ -188,7 +214,7 @@ def _reported_number(value):
     return number if math.isfinite(number) and number >= 0 else None
 
 
-def _event_timestamp(event, part):
+def _event_timestamp(event, part) -> str | int | float | None:
     """Return a supplied event timestamp without inventing server time."""
     for container in (event, part):
         for key in ("timestamp", "time", "created_at", "createdAt"):
@@ -198,14 +224,14 @@ def _event_timestamp(event, part):
     return None
 
 
-def _identity_number(value):
+def _identity_number(value) -> str:
     """Format a telemetry number identically to the browser identity helper."""
     if value is None:
         return ""
     return f"{value:.12f}".rstrip("0").rstrip(".") or "0"
 
 
-def _step_sample(payload):
+def _step_sample(payload) -> dict[str, Any] | None:
     """Extract one defensive token/cost sample from a raw event payload.
 
     Both current events (fields under ``part``) and retained legacy events
@@ -271,13 +297,16 @@ def _step_sample(payload):
     }
 
 
-def _retained_telemetry(redis_client, cell_ids):
+def _retained_telemetry(redis_client, cell_ids) -> dict[str, Any]:
     """Build an additive retained-window snapshot from existing event logs.
 
     Each log is independently optional. A transient per-cell read failure does
     not erase the baseline matrix response; ``available`` records that the
     telemetry extension is incomplete while the legacy status data remains
     usable.
+
+    All log reads are issued in a single non-transactional pipeline so the
+    fleet snapshot costs one round trip, not one per cell.
     """
     cells = {}
     total_cost = 0.0
@@ -285,13 +314,24 @@ def _retained_telemetry(redis_client, cell_ids):
     output_tokens = 0.0
     cost_samples = input_samples = output_samples = 0
     available = True
+    capped = False
 
-    for cell_id in cell_ids:
-        try:
-            history = redis_client.lrange(f"{EVENT_LOG_PREFIX}{cell_id}", 0, -1)
-        except Exception:
-            history = []
+    keys = [f"{EVENT_LOG_PREFIX}{cell_id}" for cell_id in cell_ids]
+    try:
+        pipe = redis_client.pipeline(transaction=False)
+        for key in keys:
+            pipe.lrange(key, 0, -1)
+        histories = pipe.execute()
+    except Exception:
+        # A connection-level failure marks telemetry incomplete but must not
+        # erase the legacy matrix response (same contract as today).
+        histories = [None] * len(cell_ids)
+
+    for cell_id, history in zip(cell_ids, histories):
+        if history is None:
             available = False
+            history = []
+        capped = capped or len(history) >= EVENT_LOG_MAX
 
         samples = []
         for payload in reversed(history):
@@ -310,8 +350,12 @@ def _retained_telemetry(redis_client, cell_ids):
                 output_samples += 1
 
         cell_costs = [sample["cost"] for sample in samples if sample["cost"] is not None]
-        cell_inputs = [sample["input_tokens"] for sample in samples if sample["input_tokens"] is not None]
-        cell_outputs = [sample["output_tokens"] for sample in samples if sample["output_tokens"] is not None]
+        cell_inputs = [
+            sample["input_tokens"] for sample in samples if sample["input_tokens"] is not None
+        ]
+        cell_outputs = [
+            sample["output_tokens"] for sample in samples if sample["output_tokens"] is not None
+        ]
         cells[cell_id] = {
             "reported_cost": sum(cell_costs) if cell_costs else None,
             "input_tokens": sum(cell_inputs) if cell_inputs else None,
@@ -331,12 +375,13 @@ def _retained_telemetry(redis_client, cell_ids):
         "input_tokens": input_tokens if input_samples else None,
         "output_tokens": output_tokens if output_samples else None,
         "cost_samples": cost_samples,
+        "history_capped": capped,
         "cells": cells,
     }
 
 
 @app.get("/api/matrix")
-def api_matrix():
+def api_matrix() -> Response:
     """Return the legacy fleet matrix plus additive retained telemetry."""
     try:
         r = _redis()
@@ -377,7 +422,7 @@ def api_matrix():
 
 
 @app.get("/api/status")
-def api_status():
+def api_status() -> Response:
     """Stream status transitions while preserving the existing SSE payload."""
     def gen():
         r = _redis()
@@ -403,7 +448,7 @@ def api_status():
 
 
 @app.get("/api/events/<cell_id>")
-def api_events(cell_id):
+def api_events(cell_id) -> Response:
     """Replay retained cell events, mark the boundary, then stream live data.
 
     The named boundary is additive: clients listening through ``onmessage``
@@ -446,7 +491,7 @@ def api_events(cell_id):
 
 
 @app.get("/api/routing")
-def api_routing():
+def api_routing() -> Response:
     summary_path = (
         Path(__file__).resolve().parent.parent / "experiments" / "results" / "_results_summary.json"
     )
@@ -455,13 +500,18 @@ def api_routing():
         entries = data.get("entries", [])
     except (OSError, json.JSONDecodeError):
         return jsonify(
-            {"_meta": {"tasks_analyzed": 0}, "per_task": [], "strategies": {}, "note": "no results summary yet"}
+            {
+                "_meta": {"tasks_analyzed": 0},
+                "per_task": [],
+                "strategies": {},
+                "note": "no results summary yet",
+            }
         )
     return jsonify(compute_routing(entries))
 
 
 @app.post("/api/experiments")
-def api_experiments():
+def api_experiments() -> Response:
     # Never default to a costly action: require an explicit JSON body + action.
     body = request.get_json(silent=True)
     if not isinstance(body, dict) or "action" not in body:
@@ -484,7 +534,7 @@ def api_experiments():
 
 
 @app.get("/api/design-sessions")
-def api_design_sessions():
+def api_design_sessions() -> Response:
     """List only portal-owned design sessions and approved workdir labels."""
     try:
         return jsonify(_design_sessions().list_sessions())
@@ -493,7 +543,7 @@ def api_design_sessions():
 
 
 @app.post("/api/design-sessions")
-def api_create_design_session():
+def api_create_design_session() -> Response:
     """Create a native design conversation and submit its artifact prompt."""
     body, failure = _design_mutation_body()
     if failure:
@@ -501,7 +551,10 @@ def api_create_design_session():
     assert body is not None
     intent = body.get("intent", "")
     if not isinstance(intent, str) or len(intent) > MAX_DESIGN_PROMPT_CHARS:
-        return jsonify({"error": f"intent must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+        return (
+            jsonify({"error": f"intent must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}),
+            400,
+        )
     def create():
         session = _design_sessions().create(
             kind=body.get("kind", ""),
@@ -515,7 +568,7 @@ def api_create_design_session():
 
 
 @app.get("/api/design-sessions/<portal_id>/spec")
-def api_design_session_spec(portal_id):
+def api_design_session_spec(portal_id) -> Response:
     """Return the coherent draft, validation, matrix, save, and capability state."""
     try:
         return jsonify(_design_sessions().draft_state(portal_id))
@@ -524,7 +577,7 @@ def api_design_session_spec(portal_id):
 
 
 @app.post("/api/design-sessions/<portal_id>/input")
-def api_design_session_input(portal_id):
+def api_design_session_input(portal_id) -> Response:
     """Map Send and Steer to native durable prompt admission."""
     body, failure = _design_mutation_body()
     if failure:
@@ -532,16 +585,25 @@ def api_design_session_input(portal_id):
     assert body is not None
     prompt = body.get("prompt", "")
     if not isinstance(prompt, str) or len(prompt) > MAX_DESIGN_PROMPT_CHARS:
-        return jsonify({"error": f"prompt must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+        return (
+            jsonify({"error": f"prompt must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}),
+            400,
+        )
     return _idempotent_design_response(
         f"input:{portal_id}",
         body,
-        lambda: jsonify(_design_sessions().send_input(portal_id, prompt=prompt, delivery=body.get("delivery", "queue"))),
+        lambda: jsonify(
+            _design_sessions().send_input(
+                portal_id,
+                prompt=prompt,
+                delivery=body.get("delivery", "queue"),
+            )
+        ),
     )
 
 
 @app.post("/api/design-sessions/<portal_id>/interrupt")
-def api_design_session_interrupt(portal_id):
+def api_design_session_interrupt(portal_id) -> Response:
     """Interrupt native work without changing the browser attachment."""
     _body, failure = _design_mutation_body()
     if failure:
@@ -555,7 +617,7 @@ def api_design_session_interrupt(portal_id):
 
 
 @app.post("/api/design-sessions/<portal_id>/save")
-def api_design_session_save(portal_id):
+def api_design_session_save(portal_id) -> Response:
     """Atomically save a revalidated draft under experiments/specs."""
     body, failure = _design_mutation_body()
     if failure:
@@ -575,7 +637,7 @@ def api_design_session_save(portal_id):
 
 
 @app.post("/api/design-sessions/<portal_id>/run")
-def api_design_session_run(portal_id):
+def api_design_session_run(portal_id) -> Response:
     """Launch an explicitly confirmed saved workflow under a new stream ID."""
     body, failure = _design_mutation_body()
     if failure:
@@ -611,7 +673,7 @@ def api_design_session_run(portal_id):
 
 
 @app.get("/")
-def index():
+def index() -> Response:
     return app.send_static_file("index.html")
 
 

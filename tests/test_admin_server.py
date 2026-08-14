@@ -59,6 +59,27 @@ class FakeRedis:
     def pubsub(self):
         return self.pubsub_client
 
+    def pipeline(self, transaction=False):
+        assert transaction is False
+        return FakePipeline(self)
+
+
+class FakePipeline:
+    """Record pipelined log reads and replay their per-key results in order."""
+
+    def __init__(self, redis):
+        self._redis = redis
+        self._keys = []
+
+    def lrange(self, key, start, end):
+        assert (start, end) == (0, -1)
+        self._redis.requested_logs.append(key)
+        self._keys.append(key)
+        return self
+
+    def execute(self):
+        return [self._redis.logs.get(key, []) for key in self._keys]
+
 
 def _step(cost=None, input_tokens=None, output_tokens=None, **extra):
     """Return a realistic serialized ``step_finish`` event for fixtures."""
@@ -172,3 +193,58 @@ def test_index_and_existing_static_asset_routes_remain_available():
 
     assert client.get("/").status_code == 200
     assert client.get("/static/app.js").status_code == 200
+
+
+def test_matrix_pipeline_failure_keeps_telemetry_additive(monkeypatch):
+    """A whole-connection pipeline failure degrades without dropping the matrix."""
+    class FailingPipeline:
+        def lrange(self, _key, _start, _end):
+            return self
+
+        def execute(self):
+            raise RuntimeError("connection lost")
+
+    class PipelineRedis(FakeRedis):
+        def pipeline(self, transaction=False):
+            assert transaction is False
+            return FailingPipeline()
+
+    redis = PipelineRedis(statuses={"alpha": "running"})
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    response = server.app.test_client().get("/api/matrix")
+
+    assert response.status_code == 200
+    telemetry = response.get_json()["telemetry"]
+    assert telemetry["available"] is False
+    assert telemetry["history_capped"] is False
+    assert telemetry["cells"]["alpha"]["samples"] == []
+
+
+def test_matrix_flags_history_capped_when_window_full(monkeypatch):
+    """A cell at the retained-window bound surfaces the fleet truncation flag."""
+    monkeypatch.setattr(server, "EVENT_LOG_MAX", 3)
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        logs={"events_log:alpha": [_step(0.01, 1, 1) for _ in range(3)]},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    telemetry = server.app.test_client().get("/api/matrix").get_json()["telemetry"]
+
+    assert telemetry["history_capped"] is True
+    assert telemetry["cells"]["alpha"]["history_capped"] is True
+
+
+def test_matrix_history_capped_false_when_window_open(monkeypatch):
+    """The fleet truncation flag stays false when no cell has hit the bound."""
+    monkeypatch.setattr(server, "EVENT_LOG_MAX", 3)
+    redis = FakeRedis(
+        statuses={"alpha": "running"},
+        logs={"events_log:alpha": [_step(0.01, 1, 1) for _ in range(2)]},
+    )
+    monkeypatch.setattr(server, "_redis", lambda: redis)
+
+    telemetry = server.app.test_client().get("/api/matrix").get_json()["telemetry"]
+
+    assert telemetry["history_capped"] is False

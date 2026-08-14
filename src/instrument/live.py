@@ -96,9 +96,14 @@ class LivePublisher:
         channel = f"{EVENT_CHANNEL_PREFIX}{self.cell_id}"
         log_key = f"{EVENT_LOG_PREFIX}{self.cell_id}"
         try:
-            self._r.publish(channel, payload)
+            # Persist before publishing so "delivered live" implies "already
+            # retained": a poll that starts after a publish is guaranteed to
+            # observe the entry (or it was evicted from the shared bounded
+            # window, which the fleet flag labels). The reverse failure mode
+            # (lpush succeeds, publish fails) degrades to a bounded poll pickup.
             self._r.lpush(log_key, payload)
             self._r.ltrim(log_key, 0, EVENT_LOG_MAX - 1)
+            self._r.publish(channel, payload)
         except Exception:
             self._disabled = True
 
