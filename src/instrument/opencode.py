@@ -349,7 +349,21 @@ def run_opencode_agentic(
 
 
 def _init_git_workdir(workdir: str) -> None:
-    """Initialize a git repo in the workdir for version-control tracking."""
+    """Initialize a git repo in the workdir for version-control tracking.
+
+    Idempotent (docs/routing_next_steps.md item 5.2): when the worktree already has history
+    (``git rev-parse HEAD`` succeeds), this is a no-op — a killed run's leftover work must not
+    be swept into a misnamed "Initial" commit, and resume's ``[workflow] <phase>`` commit
+    detection must not be confused. The genuinely-new-repo path initializes, sets the runner
+    identity, and only commits when something is actually staged (an empty "Initial" commit is
+    skipped).
+    """
+    has_head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=workdir, capture_output=True
+    ).returncode == 0
+    if has_head:
+        return
+
     subprocess.run(["git", "init"], cwd=workdir, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "experiment@instrument.local"],
@@ -360,6 +374,11 @@ def _init_git_workdir(workdir: str) -> None:
         ["git", "config", "user.name", "Experiment Runner"], cwd=workdir, capture_output=True
     )
     subprocess.run(["git", "add", "-A"], cwd=workdir, capture_output=True)
+    staged = subprocess.run(
+        ["git", "status", "--porcelain"], cwd=workdir, capture_output=True, text=True
+    )
+    if not staged.stdout.strip():
+        return
     subprocess.run(["git", "commit", "-m", "Initial"], cwd=workdir, capture_output=True)
 
 
