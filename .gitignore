@@ -23,6 +23,11 @@ experiments/codebases/.mutation_cache/
 # Generated per-story analysis artifacts (rebuilt by analyze_stories.py)
 experiments/results/analysis/
 
+# Workflow run ledgers + supervisor runtime state (machine-local, not provenance)
+experiments/results/workflows/
+experiments/results/supervisor/monitor_session.json
+experiments/results/verified_tests.json
+
 # Local message/chat databases (runtime artifacts)
 messages.db
 
