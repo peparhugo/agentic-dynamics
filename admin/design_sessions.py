@@ -37,6 +37,7 @@ from instrument.live import (
     STATUS_CHANNEL,
     STATUS_KEY,
 )
+from instrument.supervisor import register_event_mapping
 
 try:  # Package import under pytest; sibling import for ``python admin/server.py``.
     from admin.opencode_client import OpenCodeClient, OpenCodeError
@@ -343,6 +344,7 @@ class DesignSessionManager:
         """Publish once into the existing bounded Redis transcript transport."""
         payload = json.dumps(event, separators=(",", ":"), default=str)
         redis_client = self.redis_factory()
+        register_event_mapping(redis_client, session["stream_id"], event)
         log_key = f"{EVENT_LOG_PREFIX}{session['stream_id']}"
         redis_client.lpush(log_key, payload)
         redis_client.ltrim(log_key, 0, EVENT_LOG_MAX - 1)

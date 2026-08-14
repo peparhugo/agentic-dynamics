@@ -15,6 +15,8 @@ import json
 import os
 from typing import Any
 
+from .supervisor import register_event_mapping, register_session_mapping
+
 REDIS_HOST = os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1")
 REDIS_PORT = int(os.environ.get("FINOPS_REDIS_PORT", "6380"))
 REDIS_DB = int(os.environ.get("FINOPS_REDIS_DB", "1"))
@@ -51,8 +53,15 @@ class LivePublisher:
     server costs one attempt, not one per event.
     """
 
-    def __init__(self, cell_id: str | None = None) -> None:
+    def __init__(
+        self,
+        cell_id: str | None = None,
+        *,
+        mapping_source: str = "publisher_index",
+    ) -> None:
+        """Connect one cell publisher and record how it owns native sessions."""
         self.cell_id = cell_id or os.environ.get("FINOPS_CELL_ID", "").strip()
+        self.mapping_source = mapping_source
         self._r = _connect() if self.cell_id else None
         self._disabled = self._r is None
 
@@ -96,6 +105,14 @@ class LivePublisher:
         channel = f"{EVENT_CHANNEL_PREFIX}{self.cell_id}"
         log_key = f"{EVENT_LOG_PREFIX}{self.cell_id}"
         try:
+            # Mapping is observation metadata only. The helper is best-effort so
+            # an indexing outage never suppresses the underlying event stream.
+            register_event_mapping(
+                self._r,
+                self.cell_id,
+                event,
+                source=self.mapping_source,
+            )
             # Persist before publishing so "delivered live" implies "already
             # retained": a poll that starts after a publish is guaranteed to
             # observe the entry (or it was evicted from the shared bounded
@@ -106,6 +123,17 @@ class LivePublisher:
             self._r.publish(channel, payload)
         except Exception:
             self._disabled = True
+
+    def register_session(self, session_id: str) -> None:
+        """Register a known native identity before its first event arrives."""
+        if not self.enabled:
+            return
+        register_session_mapping(
+            self._r,
+            session_id,
+            self.cell_id,
+            source=self.mapping_source,
+        )
 
 
 def make_publisher() -> LivePublisher | None:

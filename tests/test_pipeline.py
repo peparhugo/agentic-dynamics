@@ -565,7 +565,9 @@ class TestResolveCwd:
     def test_root_default(self):
         phase = PlanPhase(id="a", kind="shell")
         result = _resolve_cwd(phase, {})
-        assert result.endswith("ai-finops-framework")
+        # Worktrees intentionally have branch-specific directory names, so the
+        # contract is the repository root rather than one clone basename.
+        assert Path(result) == Path(__file__).resolve().parent.parent
 
 
 class TestDetectConflicts:

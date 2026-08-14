@@ -137,3 +137,28 @@ def test_spend_rail_surfaces_retained_window_truncation():
     assert "history_capped" in app
     assert "RETAINED WINDOW · TRUNCATED" in app
     assert "#spend-provenance" in app
+
+
+def test_supervisor_surface_preserves_human_action_and_single_terminal_boundaries():
+    """The no-build client exposes deliberate controls without a second terminal."""
+    html = (STATIC / "index.html").read_text()
+    app = (STATIC / "app.js").read_text()
+    css = (STATIC / "style.css").read_text()
+
+    for required in (
+        'id="supervisor-rail"',
+        'id="supervisor-flag-list"',
+        'id="supervisor-control-panel"',
+        'id="supervisor-steer-form"',
+        'id="supervisor-interrupt-door"',
+        'id="confirm-supervisor-interrupt"',
+        "Supervisor flags. You decide.",
+    ):
+        assert required in html
+    assert html.count('id="transcript-feed"') == 1
+    assert 'fetch("/api/flags?limit=50")' in app
+    assert "selectSupervisorFlag" in app
+    assert "delivery" not in app[app.index("async function submitSupervisorSteer"):app.index("function openSupervisorInterruptDoor")]
+    assert "confirmation !== `INTERRUPT ${flag.session_id}`" in app
+    assert "grid-template-areas:" in css
+    assert '"attention"' in css

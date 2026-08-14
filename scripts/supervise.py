@@ -12,6 +12,7 @@ No steering, no interrupt: flags only. A human decides the intervention.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import sys
@@ -27,6 +28,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from opencode_client import OpenCodeClient, OpenCodeError  # noqa: E402
 
 from instrument.live import LivePublisher  # noqa: E402
+from instrument.supervisor import (  # noqa: E402
+    SUPERVISOR_FLAGS_KEY,
+    SUPERVISOR_FLAGS_MAX,
+    SUPERVISOR_SESSION_CELLS_KEY,
+    canonical_json,
+    parse_mapping,
+)
 
 BASE_URL = os.environ.get("OPENCODE_BASE_URL", "http://127.0.0.1:4096")
 MONITOR_MODEL = os.environ.get("SUPERVISOR_MODEL", "deepseek/deepseek-v4-flash")
@@ -50,7 +58,21 @@ MONITOR_ROLE = (
 
 
 def now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    """Return canonical UTC for durable flag and mapping metadata."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _redis():
+    """Construct the framework Redis client lazily so file-only mode still works."""
+    import redis
+
+    return redis.Redis(
+        host=os.environ.get("FINOPS_REDIS_HOST", "127.0.0.1"),
+        port=int(os.environ.get("FINOPS_REDIS_PORT", "6380")),
+        db=int(os.environ.get("FINOPS_REDIS_DB", "1")),
+        decode_responses=True,
+        socket_connect_timeout=2,
+    )
 
 
 def log(msg: str) -> None:
@@ -149,10 +171,12 @@ def _slugify(value: str) -> str:
 
 
 def _cell_id_for(session: dict) -> str:
-    """A readable Redis cell id for a native session, e.g. live_gpt_5_6_sol_facelift."""
+    """Build a readable, collision-resistant Redis cell ID for one relay."""
     model = (session.get("model") or {}).get("id", "?")
     title = session.get("title") or ""
-    return f"live_{_slugify(model)}_{_slugify(title)}"
+    native_id = str(session.get("id", ""))
+    suffix = hashlib.sha256(native_id.encode()).hexdigest()[:8]
+    return f"live_{_slugify(model)}_{_slugify(title)}_{suffix}"
 
 
 def _relay_session(client: OpenCodeClient, sid: str, cell_id: str) -> None:
@@ -162,7 +186,8 @@ def _relay_session(client: OpenCodeClient, sid: str, cell_id: str) -> None:
     retained list (ltrim), so the burst is bounded, and the Control Room's terminal
     replays the same retained window. After replay the stream goes live.
     """
-    publisher = LivePublisher(cell_id)
+    publisher = LivePublisher(cell_id, mapping_source="supervisor_relay")
+    publisher.register_session(sid)
     if publisher.enabled:
         publisher.set_status("running")
     try:
@@ -194,6 +219,7 @@ def relay_once(client: OpenCodeClient, threads: dict[str, threading.Thread], fin
 
 
 def emit_flag(session: dict, status: str, why: str) -> None:
+    """Persist one assessment durably, then update the bounded Redis hot path."""
     flag = {
         "at": now(),
         "session_id": session.get("id", ""),
@@ -202,9 +228,29 @@ def emit_flag(session: dict, status: str, why: str) -> None:
         "status": status,
         "why": why,
     }
+    redis_client = None
+    try:
+        redis_client = _redis()
+        mapping = parse_mapping(redis_client.hget(SUPERVISOR_SESSION_CELLS_KEY, flag["session_id"]))
+        if mapping:
+            # The immutable snapshot keeps file fallback reviewable after a
+            # Redis restart without guessing a stream from title or model.
+            flag["review"] = mapping
+            flag["last_activity_at"] = mapping.get("last_activity_at")
+    except Exception:
+        redis_client = None
+
+    payload = canonical_json(flag)
     FLAGS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with open(FLAGS_FILE, "a") as f:
-        f.write(json.dumps(flag) + "\n")
+    with open(FLAGS_FILE, "a", encoding="utf-8") as f:
+        f.write(payload + "\n")
+    try:
+        redis_client = redis_client or _redis()
+        redis_client.lpush(SUPERVISOR_FLAGS_KEY, payload)
+        redis_client.ltrim(SUPERVISOR_FLAGS_KEY, 0, SUPERVISOR_FLAGS_MAX - 1)
+    except Exception:
+        # JSONL and stdout remain useful when framework Redis is unavailable.
+        pass
     print(f"[FLAG] {status}: {flag['title']} — {why}", flush=True)
 
 

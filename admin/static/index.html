@@ -92,6 +92,19 @@
       </section>
 
       <aside id="session-controls" class="pane control-pane" aria-labelledby="control-title">
+        <details id="supervisor-rail" class="supervisor-rail" open>
+          <summary>
+            <span><span class="eyebrow">Supervisor</span><strong>NEEDS ATTENTION</strong></span>
+            <span id="supervisor-count" class="attention-count">--</span>
+          </summary>
+          <p id="supervisor-delay" class="supervisor-delay" hidden>Supervisor data delayed</p>
+          <div id="supervisor-flag-list" class="supervisor-flag-list" aria-busy="true">
+            <p class="empty-state">Loading supervisor flags…</p>
+          </div>
+          <footer>Supervisor flags. You decide.</footer>
+        </details>
+
+        <div class="control-content">
         <header class="pane-header control-header">
           <div>
             <div id="control-mode" class="eyebrow">Read-only attachment</div>
@@ -153,6 +166,45 @@
           <p class="boundary-copy">Watching does not send input or control the experiment.</p>
         </section>
 
+        <section id="supervisor-control-panel" class="supervisor-control-panel" hidden>
+          <a class="mobile-anchor" href="#transcript-panel">Jump to observed activity</a>
+          <p class="supervisor-boundary">Supervisor flags. You decide.</p>
+          <dl class="control-facts supervisor-facts">
+            <div><dt>Session</dt><dd><span id="supervisor-title">--</span><br><span id="supervisor-session-id">--</span></dd></div>
+            <div><dt>Model / assessment</dt><dd><span id="supervisor-model">--</span><br><span id="supervisor-status">ATTENTION</span></dd></div>
+            <div><dt>Reason</dt><dd id="supervisor-reason">--</dd></div>
+            <div><dt>Review stream</dt><dd id="supervisor-review">Review unavailable</dd></div>
+            <div><dt>Last activity</dt><dd id="supervisor-activity">unavailable</dd></div>
+          </dl>
+          <form id="supervisor-steer-form" class="control-form composer-form">
+            <label>
+              <span>Steer this session</span>
+              <textarea id="supervisor-steer-prompt" rows="5" maxlength="12000" required></textarea>
+            </label>
+            <p class="control-guidance">Delivered as a steer to the active session; the supervisor will not send this.</p>
+            <button id="supervisor-steer" class="primary-action" type="submit" disabled>Steer selected session</button>
+            <output id="supervisor-steer-result" class="inline-result" aria-live="polite"></output>
+          </form>
+          <div class="supervisor-stream-actions">
+            <button id="supervisor-interrupt" class="danger-action" type="button" disabled>Interrupt</button>
+            <button id="detach-supervisor" type="button">Detach</button>
+          </div>
+          <section id="supervisor-interrupt-door" class="interrupt-door" aria-labelledby="interrupt-door-title" hidden>
+            <h3 id="interrupt-door-title">ONE-WAY DOOR</h3>
+            <p>Active generation and tool execution will stop. Detach is the non-destructive alternative.</p>
+            <p>Type <code id="supervisor-confirmation-phrase">INTERRUPT</code> to continue.</p>
+            <label>
+              <span class="sr-only">Interrupt confirmation</span>
+              <input id="supervisor-interrupt-confirmation" type="text" autocomplete="off">
+            </label>
+            <div class="form-actions">
+              <button id="cancel-supervisor-interrupt" type="button">Cancel</button>
+              <button id="confirm-supervisor-interrupt" class="danger-action" type="button" disabled>Interrupt permanently</button>
+            </div>
+          </section>
+          <output id="supervisor-interrupt-result" class="inline-result supervisor-result" aria-live="polite"></output>
+        </section>
+
         <section id="design-control-panel" class="design-control-panel" hidden>
           <a class="mobile-anchor" href="#transcript-panel">Jump to design terminal</a>
           <dl class="control-facts design-facts">
@@ -210,6 +262,7 @@
           <h3 id="recent-designs-title">RECENT DESIGN SESSIONS</h3>
           <div id="recent-design-list"><p class="empty-state">No portal-owned design sessions yet.</p></div>
         </section>
+        </div>
       </aside>
     </main>
 
