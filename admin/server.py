@@ -33,6 +33,7 @@ import subprocess
 import sys
 import time
 from contextlib import suppress
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -49,6 +50,13 @@ from instrument.live import (
     STATUS_KEY,
 )
 from instrument.routing import compute_routing
+from instrument.supervisor import (
+    SUPERVISOR_FLAGS_KEY,
+    SUPERVISOR_FLAGS_MAX,
+    SUPERVISOR_SESSION_CELLS_KEY,
+    normalize_flag,
+    parse_mapping,
+)
 
 try:  # Package imports under pytest and WSGI.
     from admin.design_sessions import DESIGN_SESSIONS_KEY, DesignSessionManager
@@ -67,6 +75,9 @@ MAX_DESIGN_REQUEST_BYTES = 64 * 1024
 MAX_DESIGN_PROMPT_CHARS = 12_000
 IDEMPOTENCY_TTL_SECONDS = 24 * 60 * 60
 ROOT = Path(__file__).resolve().parent.parent
+SUPERVISOR_FLAGS_FILE = ROOT / "experiments" / "results" / "supervisor" / "flags.jsonl"
+SUPERVISOR_FILE_TAIL_BYTES = 512 * 1024
+SUPERVISOR_ACTIVE_WINDOW_SECONDS = int(os.environ.get("SUPERVISOR_ACTIVE_WINDOW", "900"))
 
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 _design_manager: DesignSessionManager | None = None
@@ -99,6 +110,177 @@ def _design_sessions() -> DesignSessionManager:
             workdirs=workdirs,
         )
     return _design_manager
+
+
+def _opencode_client() -> OpenCodeClient:
+    """Construct the server-side control client without exposing its URL."""
+    return OpenCodeClient(os.environ.get("OPENCODE_SERVER_URL", "http://127.0.0.1:4096"))
+
+
+def _utc_now() -> str:
+    """Return a canonical UTC timestamp for API envelopes."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _read_flag_tail(path: Path) -> tuple[list[str] | None, str | None]:
+    """Read a bounded newest-first tail from the append-only JSONL audit file."""
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+            start = max(0, size - SUPERVISOR_FILE_TAIL_BYTES)
+            handle.seek(start)
+            raw = handle.read(SUPERVISOR_FILE_TAIL_BYTES)
+    except FileNotFoundError:
+        return None, "supervisor flag fallback file is not present"
+    except OSError as error:
+        return None, f"supervisor flag fallback is unreadable: {error}"
+
+    text = raw.decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    if start > 0 and lines:
+        # The first item may begin in the middle of a JSON record.
+        lines = lines[1:]
+    return list(reversed(lines[-SUPERVISOR_FLAGS_MAX:])), None
+
+
+def _mapping_is_stale(mapping: dict[str, str]) -> bool:
+    """Return whether an exact mapping has exceeded the active window."""
+    activity = mapping.get("last_activity_at")
+    if not activity:
+        return False
+    try:
+        observed = datetime.fromisoformat(activity.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if observed.tzinfo is None:
+        observed = observed.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - observed).total_seconds() > SUPERVISOR_ACTIVE_WINDOW_SECONDS
+
+
+def _review_for_flag(redis_client, flag: dict[str, Any], warnings: list[str]) -> dict[str, Any]:
+    """Resolve current exact mapping first, then an immutable flag snapshot."""
+    current = None
+    if redis_client is not None:
+        try:
+            current = parse_mapping(
+                redis_client.hget(SUPERVISOR_SESSION_CELLS_KEY, flag["session_id"])
+            )
+        except Exception as error:
+            warnings.append(f"session mapping unavailable: {error}")
+
+    if current and current["session_id"] == flag["session_id"]:
+        return {
+            "state": "stale" if _mapping_is_stale(current) else "mapped",
+            "cell_id": current["cell_id"],
+            "source": current["source"],
+            "mapped_at": current["mapped_at"],
+            "last_activity_at": current.get("last_activity_at"),
+        }
+
+    snapshot = parse_mapping(flag.get("review")) or parse_mapping(flag.get("mapping"))
+    if snapshot and snapshot["session_id"] != flag["session_id"]:
+        snapshot = None
+    if snapshot:
+        return {
+            "state": "snapshot",
+            "cell_id": snapshot["cell_id"],
+            "source": snapshot["source"],
+            "mapped_at": snapshot["mapped_at"],
+            "last_activity_at": snapshot.get("last_activity_at"),
+        }
+    return {"state": "unavailable", "cell_id": None, "source": None, "mapped_at": None}
+
+
+def _load_supervisor_flags(limit: int) -> tuple[dict[str, Any], int]:
+    """Load, validate, deduplicate, and enrich retained supervisor flags."""
+    warnings: list[str] = []
+    redis_client = None
+    redis_readable = False
+    file_readable = False
+    raw_records: list[str] = []
+    source = "none"
+    try:
+        redis_client = _redis()
+        raw_records = redis_client.lrange(SUPERVISOR_FLAGS_KEY, 0, SUPERVISOR_FLAGS_MAX - 1)
+        redis_readable = True
+        if raw_records:
+            source = "redis"
+    except Exception as error:
+        warnings.append(f"supervisor Redis unavailable: {error}")
+
+    if not raw_records:
+        file_records, file_warning = _read_flag_tail(SUPERVISOR_FLAGS_FILE)
+        if file_records is not None:
+            file_readable = True
+            raw_records = file_records
+            if raw_records:
+                source = "file"
+            elif not redis_readable:
+                source = "file"
+        elif file_warning:
+            warnings.append(file_warning)
+
+    flags: list[dict[str, Any]] = []
+    seen_sessions: set[str] = set()
+    malformed = 0
+    for raw in raw_records:
+        try:
+            decoded = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            malformed += 1
+            continue
+        flag = normalize_flag(decoded)
+        if flag is None:
+            malformed += 1
+            continue
+        if flag["session_id"] in seen_sessions:
+            continue
+        seen_sessions.add(flag["session_id"])
+        review = _review_for_flag(redis_client, flag, warnings)
+        flag["review"] = {key: value for key, value in review.items() if key != "last_activity_at"}
+        flag["last_activity_at"] = review.get("last_activity_at") or flag.get("last_activity_at")
+        flags.append(flag)
+        if len(flags) >= limit:
+            break
+    if malformed:
+        warnings.append(f"skipped {malformed} malformed supervisor flag record(s)")
+
+    if source == "file":
+        degraded = True
+    elif source == "redis":
+        degraded = False
+    else:
+        degraded = not redis_readable
+    unavailable = not redis_readable and not file_readable
+    envelope = {
+        "generated_at": _utc_now(),
+        "source": source,
+        "degraded": degraded,
+        "warnings": list(dict.fromkeys(warnings)),
+        "flags": flags,
+    }
+    return envelope, 503 if unavailable else 200
+
+
+def _authorize_supervisor_action(
+    session_id: str,
+    cell_id: str,
+) -> tuple[dict[str, Any] | None, tuple[Response, int] | None]:
+    """Revalidate retained ownership and exact stream mapping at side-effect time."""
+    envelope, status = _load_supervisor_flags(SUPERVISOR_FLAGS_MAX)
+    if status == 503:
+        return None, (jsonify({"error": "supervisor control state unavailable"}), 503)
+    flag = next((item for item in envelope["flags"] if item["session_id"] == session_id), None)
+    if flag is None:
+        return None, (jsonify({"error": "retained supervisor flag not found"}), 404)
+    review = flag.get("review") or {}
+    mapped_cell = review.get("cell_id")
+    if review.get("state") == "unavailable" or not mapped_cell:
+        return None, (jsonify({"error": "supervisor session mapping not found"}), 404)
+    if cell_id != mapped_cell:
+        return None, (jsonify({"error": "supervisor session mapping changed"}), 409)
+    return flag, None
 
 
 def _design_mutation_body() -> tuple[dict | None, tuple[Response, int] | None]:
@@ -447,6 +629,18 @@ def api_status() -> Response:
     return _sse(gen())
 
 
+@app.get("/api/flags")
+def api_flags() -> Response:
+    """Return newest retained supervisor assessments with exact review metadata."""
+    try:
+        requested_limit = int(request.args.get("limit", "50"))
+    except ValueError:
+        requested_limit = 50
+    limit = min(100, max(1, requested_limit))
+    envelope, status = _load_supervisor_flags(limit)
+    return jsonify(envelope), status
+
+
 @app.get("/api/events/<cell_id>")
 def api_events(cell_id) -> Response:
     """Replay retained cell events, mark the boundary, then stream live data.
@@ -600,6 +794,58 @@ def api_design_session_input(portal_id) -> Response:
             )
         ),
     )
+
+
+@app.post("/api/flags/<session_id>/steer")
+def api_supervisor_steer(session_id: str) -> Response:
+    """Admit an explicit human prompt to one currently flagged native session."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    cell_id = body.get("cell_id")
+    prompt = body.get("prompt")
+    if not isinstance(cell_id, str) or not cell_id:
+        return jsonify({"error": "cell_id is required"}), 400
+    if not isinstance(prompt, str) or not prompt.strip():
+        return jsonify({"error": "nonblank prompt is required"}), 400
+    if len(prompt) > MAX_DESIGN_PROMPT_CHARS:
+        return jsonify({"error": f"prompt must be at most {MAX_DESIGN_PROMPT_CHARS} characters"}), 400
+
+    def steer() -> tuple[Response, int] | Response:
+        """Recheck ownership immediately before the OpenCode side effect."""
+        _flag, denied = _authorize_supervisor_action(session_id, cell_id)
+        if denied:
+            return denied
+        _opencode_client().send_input(session_id, prompt.strip(), delivery="steer")
+        return jsonify({"action": "steer", "admitted": True, "session_id": session_id})
+
+    return _idempotent_design_response(f"supervisor-steer:{session_id}", body, steer)
+
+
+@app.post("/api/flags/<session_id>/interrupt")
+def api_supervisor_interrupt(session_id: str) -> Response:
+    """Interrupt one flagged native session after exact server confirmation."""
+    body, failure = _design_mutation_body()
+    if failure:
+        return failure
+    assert body is not None
+    cell_id = body.get("cell_id")
+    confirmation = body.get("confirmation")
+    if not isinstance(cell_id, str) or not cell_id:
+        return jsonify({"error": "cell_id is required"}), 400
+    if confirmation != f"INTERRUPT {session_id}":
+        return jsonify({"error": f"confirmation must equal INTERRUPT {session_id}"}), 400
+
+    def interrupt() -> tuple[Response, int] | Response:
+        """Recheck ownership immediately before the irreversible request."""
+        _flag, denied = _authorize_supervisor_action(session_id, cell_id)
+        if denied:
+            return denied
+        _opencode_client().interrupt(session_id)
+        return jsonify({"action": "interrupt", "accepted": True, "session_id": session_id})
+
+    return _idempotent_design_response(f"supervisor-interrupt:{session_id}", body, interrupt)
 
 
 @app.post("/api/design-sessions/<portal_id>/interrupt")

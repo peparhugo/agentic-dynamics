@@ -14,6 +14,7 @@
   const REPLAY_RACE_TAIL = 500
   const REPLAY_RACE_WINDOW_MS = 250
   const MATRIX_POLL_MS = 5000
+  const FLAGS_POLL_MS = 5000
   const DESIGN_LIST_POLL_MS = 10000
   const DRAFT_POLL_MS = 3000
   const BURN_WINDOW_MS = 60000
@@ -74,6 +75,16 @@
     draftState: null,
     draftSignature: null,
     draftFresh: false,
+    supervisorFlags: new Map(),
+    supervisorState: "loading",
+    supervisorWarnings: [],
+    supervisorRequestInFlight: false,
+    supervisorSelection: null,
+    supervisorMutationPending: false,
+    supervisorInterrupted: false,
+    supervisorSteerKey: null,
+    supervisorSteerSignature: null,
+    supervisorInterruptKey: null,
   }
 
   /** Query one required shell element. */
@@ -110,6 +121,25 @@
     if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value >= 10_000_000 ? 1 : 2)}M`
     if (value >= 1_000) return `${(value / 1_000).toFixed(value >= 100_000 ? 0 : 1)}K`
     return Math.round(value).toLocaleString()
+  }
+
+  /** Format a server timestamp as a stable human-readable age. */
+  function formatAge(value) {
+    if (!value) return "unavailable"
+    const timestamp = new Date(value).getTime()
+    if (!Number.isFinite(timestamp)) return "unavailable"
+    const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000))
+    if (seconds < 60) return `${seconds}s ago`
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+    return `${Math.floor(seconds / 86400)}d ago`
+  }
+
+  /** Keep heuristic supervisor statuses separate from fleet lifecycle states. */
+  function supervisorStatus(value) {
+    if (value === "off_track") return { label: "OFF TRACK", className: "off-track" }
+    if (value === "stalled") return { label: "STALLED", className: "stalled" }
+    return { label: "ATTENTION", className: "attention" }
   }
 
   /** Return normalized status counts for both cards and the command rail. */
@@ -324,9 +354,103 @@
     renderRail()
   }
 
+  /** Render the bounded flag rail while preserving keyboard focus by session ID. */
+  function renderSupervisorFlags() {
+    const list = $("#supervisor-flag-list")
+    const focusedSessionId = document.activeElement?.classList.contains("supervisor-flag")
+      ? document.activeElement.dataset.sessionId
+      : null
+    list.setAttribute("aria-busy", String(state.supervisorState === "loading"))
+    list.replaceChildren()
+    const flags = Array.from(state.supervisorFlags.values())
+    $("#supervisor-count").textContent = String(flags.length)
+    const delayed = state.supervisorState === "degraded" || state.supervisorState === "unavailable"
+    const delay = $("#supervisor-delay")
+    delay.hidden = !delayed
+    delay.textContent = state.supervisorState === "unavailable"
+      ? "Supervisor data unavailable; showing last useful rows"
+      : `Supervisor data delayed${state.supervisorWarnings.length ? ` · ${state.supervisorWarnings[0]}` : ""}`
+
+    if (flags.length === 0) {
+      const text = delayed
+        ? "Supervisor state unavailable; no retained rows to show"
+        : state.supervisorState === "loading"
+          ? "Loading supervisor flags…"
+          : "Supervisor / no sessions need attention"
+      list.appendChild(element("p", delayed ? "error-state" : "empty-state", text))
+    }
+    for (const flag of flags) {
+      const status = supervisorStatus(flag.status)
+      const button = element(
+        "button",
+        `supervisor-flag flag-${status.className}${state.supervisorSelection?.session_id === flag.session_id ? " selected" : ""}`,
+      )
+      button.type = "button"
+      button.dataset.sessionId = flag.session_id
+      button.setAttribute("aria-pressed", String(state.supervisorSelection?.session_id === flag.session_id))
+      button.setAttribute(
+        "aria-label",
+        `${status.label}: ${flag.title || flag.session_id}. ${flag.why}. ${flag.review?.state === "unavailable" ? "Review unavailable." : "Review available."}`,
+      )
+      const heading = element("span", "supervisor-flag-heading")
+      heading.appendChild(element("span", `flag-status flag-status-${status.className}`, status.label))
+      heading.appendChild(element("strong", "supervisor-flag-title", flag.title || flag.session_id.slice(0, 18)))
+      button.appendChild(heading)
+      button.appendChild(element("span", "supervisor-flag-reason", flag.why))
+      const activity = flag.last_activity_at ? `last activity ${formatAge(flag.last_activity_at)}` : "last activity unavailable"
+      button.appendChild(element("span", "supervisor-flag-meta", `${flag.model} · flagged ${formatAge(flag.at)} · ${activity}`))
+      if (flag.review?.state === "unavailable") {
+        button.appendChild(element("span", "review-unavailable", "Review unavailable"))
+      }
+      button.addEventListener("click", () => selectSupervisorFlag(flag.session_id))
+      list.appendChild(button)
+    }
+    if (focusedSessionId) {
+      Array.from(list.querySelectorAll(".supervisor-flag"))
+        .find((button) => button.dataset.sessionId === focusedSessionId)
+        ?.focus({ preventScroll: true })
+    }
+  }
+
   /** Return the selected portal-owned design session, if design mode is active. */
   function selectedDesignSession() {
     return state.selectedType === "design" ? state.designSessions.get(state.selectedId) || null : null
+  }
+
+  /** Return the frozen supervisor action target selected by the operator. */
+  function selectedSupervisorFlag() {
+    return state.supervisorSelection
+  }
+
+  /** Render facts and capabilities for a selected supervisor assessment. */
+  function renderSupervisorControls(flag) {
+    const review = flag.review || { state: "unavailable" }
+    const retained = state.supervisorFlags.has(flag.session_id)
+    const reviewable = retained
+      && !flag.mapping_changed
+      && Boolean(review.cell_id)
+      && review.state !== "unavailable"
+    $("#supervisor-title").textContent = flag.title || flag.session_id
+    $("#supervisor-session-id").textContent = flag.session_id
+    $("#supervisor-model").textContent = flag.model
+    $("#supervisor-status").textContent = supervisorStatus(flag.status).label
+    $("#supervisor-reason").textContent = flag.why
+    $("#supervisor-review").textContent = reviewable
+      ? `${review.state} · ${review.cell_id} · ${review.source || "exact mapping"}`
+      : flag.mapping_changed
+        ? "Actions unavailable: exact stream mapping changed after selection"
+        : retained
+        ? "Review unavailable: no exact Redis stream mapping"
+        : "Actions unavailable: flag is no longer retained"
+    $("#supervisor-activity").textContent = flag.last_activity_at
+      ? `${formatAge(flag.last_activity_at)} · ${flag.last_activity_at}`
+      : "unavailable"
+    const target = flag.title || flag.session_id.slice(0, 18)
+    const steer = $("#supervisor-steer")
+    steer.textContent = `Steer ${target}`
+    steer.disabled = !reviewable || state.supervisorMutationPending
+    $("#supervisor-interrupt").disabled = !reviewable || state.supervisorMutationPending || state.supervisorInterrupted
+    $("#detach-supervisor").disabled = !state.attached
   }
 
   /** Render recent portal-owned sessions without mixing them into fleet cells. */
@@ -393,19 +517,42 @@
   /** Synchronize terminal and control headers with either selection kind. */
   function renderSelection() {
     const cellId = state.selectedId
-    const design = selectedDesignSession()
-    $("#cell-control-panel").hidden = Boolean(design)
+    const supervisor = selectedSupervisorFlag()
+    // An unmapped supervisor selection owns the action pane while the prior
+    // design stream may remain attached behind it for non-destructive review.
+    const design = supervisor ? null : selectedDesignSession()
+    $("#cell-control-panel").hidden = Boolean(design || supervisor)
     $("#design-control-panel").hidden = !design
+    $("#supervisor-control-panel").hidden = !supervisor
     $("#transcript-mode").textContent = design ? "Design / Terminal" : "Cell / Transcript"
-    $("#control-mode").textContent = design ? "Portal-owned session" : "Read-only attachment"
-    $("#ownership-badge").textContent = design ? "INTERACTIVE" : "READ ONLY"
-    $("#ownership-badge").className = design ? "interactive-badge" : "readonly-badge"
+    $("#control-mode").textContent = design
+      ? "Portal-owned session"
+      : supervisor
+        ? "Human-reviewed supervisor flag"
+        : "Read-only attachment"
+    $("#ownership-badge").textContent = design ? "INTERACTIVE" : supervisor ? "HUMAN ACTION" : "READ ONLY"
+    $("#ownership-badge").className = design || supervisor ? "interactive-badge" : "readonly-badge"
     if (design) {
       $("#transcript-title").textContent = design.title
       $("#selected-status").textContent = design.lifecycle_state.toUpperCase()
       $("#selected-status").className = "status-word status-running"
       $("#selected-stream-state").textContent = state.streamState.toUpperCase()
       renderDesignControls(design)
+      renderRecentDesigns()
+      return
+    }
+    if (supervisor) {
+      const reviewing = state.selectedType === "supervisor" && state.selectedId === supervisor.review?.cell_id
+      if (reviewing) {
+        $("#transcript-mode").textContent = "Supervisor / Observed activity"
+        $("#transcript-title").textContent = supervisor.title || supervisor.session_id
+        const assessment = supervisorStatus(supervisor.status)
+        $("#selected-status").textContent = assessment.label
+        $("#selected-status").className = `status-word flag-status-${assessment.className}`
+        $("#selected-stream-state").textContent = state.streamState.toUpperCase()
+      }
+      renderSupervisorControls(supervisor)
+      renderSupervisorFlags()
       renderRecentDesigns()
       return
     }
@@ -726,6 +873,8 @@
       state.eventSource = null
       state.selectedId = cellId
       state.selectedType = "cell"
+      state.supervisorSelection = null
+      state.supervisorInterrupted = false
       state.draftState = null
       state.draftSignature = null
       state.draftFresh = false
@@ -764,6 +913,8 @@
       state.eventSource = null
       state.selectedId = portalId
       state.selectedType = "design"
+      state.supervisorSelection = null
+      state.supervisorInterrupted = false
       state.selectedSessionIds = session.opencode_session_id ? [session.opencode_session_id] : []
       state.rows = []
       state.buffer = []
@@ -798,6 +949,66 @@
     void loadDraftState()
     if (state.draftPollTimer) window.clearInterval(state.draftPollTimer)
     state.draftPollTimer = window.setInterval(loadDraftState, DRAFT_POLL_MS)
+  }
+
+  /** Select a flag and hand its exact mapped cell to the sole detail stream. */
+  function selectSupervisorFlag(sessionId) {
+    const current = state.supervisorFlags.get(sessionId)
+    if (!current) return
+    const reviewable = Boolean(current.review?.cell_id) && current.review.state !== "unavailable"
+    state.supervisorSelection = {
+      ...current,
+      review: { ...(current.review || {}) },
+      mapping_changed: false,
+    }
+    state.supervisorInterrupted = false
+    state.supervisorSteerKey = null
+    state.supervisorSteerSignature = null
+    state.supervisorInterruptKey = null
+    $("#supervisor-steer-prompt").value = ""
+    $("#supervisor-steer-result").textContent = ""
+    $("#supervisor-interrupt-result").textContent = ""
+    closeSupervisorInterruptDoor(false)
+
+    if (!reviewable) {
+      // The existing transcript intentionally stays attached. A guessed cell
+      // would be more dangerous than showing only the assessment details.
+      renderSupervisorFlags()
+      renderSelection()
+      announce(`Selected supervisor flag for ${sessionId}; review unavailable`)
+      return
+    }
+
+    if (state.eventSource) state.eventSource.close()
+    state.eventSource = null
+    state.selectedId = current.review.cell_id
+    state.selectedType = "supervisor"
+    state.selectedSessionIds = [current.session_id]
+    state.rows = []
+    state.buffer = []
+    state.eventLedgerCounts = new Map()
+    state.eventLedgerOrder = []
+    state.replaySkipCounts = new Map()
+    state.replaySeenCounts = new Map()
+    state.replayTail = []
+    state.raceDuplicateCounts = new Map()
+    state.paused = false
+    state.follow = true
+    state.attached = false
+    state.streamState = "disconnected"
+    state.draftState = null
+    state.draftSignature = null
+    state.draftFresh = false
+    if (state.draftPollTimer) window.clearInterval(state.draftPollTimer)
+    state.draftPollTimer = null
+    $("#pause-button").textContent = "Pause"
+    try { window.localStorage.removeItem("control-room-selected-design") } catch (_error) {}
+    renderFleet()
+    renderSupervisorFlags()
+    renderSelection()
+    renderTranscript(false)
+    connectSelectedStream()
+    announce(`Reviewing observed activity for ${sessionId}`)
   }
 
   /** Detach the browser only; no process or Redis control request is made. */
@@ -883,6 +1094,58 @@
       renderFleet()
     } finally {
       state.matrixRequestInFlight = false
+    }
+  }
+
+  /** Poll heuristic flags without coupling observation to session controls. */
+  async function loadSupervisorFlags() {
+    if (state.supervisorRequestInFlight) return
+    state.supervisorRequestInFlight = true
+    try {
+      const response = await fetch("/api/flags?limit=50")
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.warnings?.[0] || "Supervisor data unavailable")
+      const incoming = new Map()
+      for (const flag of Array.isArray(data.flags) ? data.flags : []) {
+        if (!flag || typeof flag.session_id !== "string") continue
+        incoming.set(flag.session_id, flag)
+        const prior = state.supervisorFlags.get(flag.session_id)
+        if (!prior) announce(`Supervisor flagged ${flag.title || flag.session_id}`)
+        else if (prior.status !== flag.status || prior.why !== flag.why) {
+          announce(`Supervisor assessment changed for ${flag.title || flag.session_id}`)
+        }
+      }
+      state.supervisorFlags = incoming
+      state.supervisorWarnings = Array.isArray(data.warnings) ? data.warnings : []
+      state.supervisorState = data.degraded ? "degraded" : "live"
+      if (state.supervisorSelection && incoming.has(state.supervisorSelection.session_id)) {
+        const refreshed = incoming.get(state.supervisorSelection.session_id)
+        // Keep the exact action target and attached cell frozen. Polling may
+        // refresh explanatory fields but may never silently remap an action.
+        state.supervisorSelection = {
+          ...state.supervisorSelection,
+          at: refreshed.at,
+          title: refreshed.title,
+          model: refreshed.model,
+          status: refreshed.status,
+          why: refreshed.why,
+          last_activity_at: refreshed.last_activity_at,
+          mapping_changed: Boolean(
+            state.supervisorSelection.review?.cell_id
+            && refreshed.review?.cell_id
+            && state.supervisorSelection.review.cell_id !== refreshed.review.cell_id
+          ),
+        }
+      }
+      renderSupervisorFlags()
+      renderSelection()
+    } catch (error) {
+      state.supervisorState = "unavailable"
+      state.supervisorWarnings = [error.message || "Supervisor data unavailable"]
+      renderSupervisorFlags()
+      announce("Supervisor data unavailable; showing last useful rows", true)
+    } finally {
+      state.supervisorRequestInFlight = false
     }
   }
 
@@ -1042,6 +1305,117 @@
       throw error
     }
     return data
+  }
+
+  /** Call a supervisor mutation with an operator-owned retry key. */
+  async function supervisorMutation(path, body, idempotencyKey) {
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify(body),
+    })
+    let data
+    try {
+      data = await response.json()
+    } catch (_error) {
+      throw new Error(`Control Room returned an unreadable response (${response.status})`)
+    }
+    if (!response.ok) {
+      const error = new Error(data.error || `Request failed (${response.status})`)
+      error.status = response.status
+      throw error
+    }
+    return data
+  }
+
+  /** Admit a deliberate steer while preserving failed input for retry. */
+  async function submitSupervisorSteer(event) {
+    event.preventDefault()
+    const flag = selectedSupervisorFlag()
+    const prompt = $("#supervisor-steer-prompt").value
+    if (!flag || !flag.review?.cell_id || !prompt.trim() || state.supervisorMutationPending) return
+    const signature = JSON.stringify([flag.session_id, flag.review.cell_id, prompt])
+    if (state.supervisorSteerSignature !== signature) {
+      state.supervisorSteerSignature = signature
+      state.supervisorSteerKey = mutationKey()
+    }
+    const selectedSession = flag.session_id
+    state.supervisorMutationPending = true
+    $("#supervisor-steer-result").textContent = "Admitting steer…"
+    renderSupervisorControls(flag)
+    try {
+      await supervisorMutation(
+        `/api/flags/${encodeURIComponent(flag.session_id)}/steer`,
+        { cell_id: flag.review.cell_id, prompt },
+        state.supervisorSteerKey,
+      )
+      if (selectedSupervisorFlag()?.session_id !== selectedSession) return
+      $("#supervisor-steer-result").textContent = "Steer admitted"
+      $("#supervisor-steer-prompt").value = ""
+      state.supervisorSteerKey = null
+      state.supervisorSteerSignature = null
+      announce(`Steer admitted for ${selectedSession}`)
+    } catch (error) {
+      if (selectedSupervisorFlag()?.session_id !== selectedSession) return
+      $("#supervisor-steer-result").textContent = `Steer failed · ${error.message}`
+      announce($("#supervisor-steer-result").textContent, true)
+    } finally {
+      state.supervisorMutationPending = false
+      if (selectedSupervisorFlag()) renderSupervisorControls(selectedSupervisorFlag())
+    }
+  }
+
+  /** Open the local one-way door; this function performs no network request. */
+  function openSupervisorInterruptDoor() {
+    const flag = selectedSupervisorFlag()
+    if (!flag?.review?.cell_id || state.supervisorMutationPending || state.supervisorInterrupted) return
+    const phrase = `INTERRUPT ${flag.session_id}`
+    $("#supervisor-confirmation-phrase").textContent = phrase
+    $("#supervisor-interrupt-confirmation").value = ""
+    $("#confirm-supervisor-interrupt").disabled = true
+    $("#supervisor-interrupt-door").hidden = false
+    $("#supervisor-interrupt-confirmation").focus()
+  }
+
+  /** Close the local interrupt door and optionally restore initiating focus. */
+  function closeSupervisorInterruptDoor(restoreFocus = true) {
+    $("#supervisor-interrupt-door").hidden = true
+    $("#supervisor-interrupt-confirmation").value = ""
+    $("#confirm-supervisor-interrupt").disabled = true
+    if (restoreFocus) $("#supervisor-interrupt").focus()
+  }
+
+  /** Submit the exact typed confirmation for server-side revalidation. */
+  async function confirmSupervisorInterrupt() {
+    const flag = selectedSupervisorFlag()
+    if (!flag?.review?.cell_id || state.supervisorMutationPending || state.supervisorInterrupted) return
+    const confirmation = $("#supervisor-interrupt-confirmation").value
+    if (confirmation !== `INTERRUPT ${flag.session_id}`) return
+    state.supervisorInterruptKey ||= mutationKey()
+    const selectedSession = flag.session_id
+    state.supervisorMutationPending = true
+    $("#confirm-supervisor-interrupt").disabled = true
+    $("#supervisor-interrupt-result").textContent = "Requesting permanent interrupt…"
+    renderSupervisorControls(flag)
+    try {
+      await supervisorMutation(
+        `/api/flags/${encodeURIComponent(flag.session_id)}/interrupt`,
+        { cell_id: flag.review.cell_id, confirmation },
+        state.supervisorInterruptKey,
+      )
+      if (selectedSupervisorFlag()?.session_id !== selectedSession) return
+      state.supervisorInterrupted = true
+      closeSupervisorInterruptDoor(false)
+      $("#supervisor-interrupt-result").textContent = "Interrupt accepted; terminal remains attached"
+      announce(`Interrupt accepted for ${selectedSession}`)
+    } catch (error) {
+      if (selectedSupervisorFlag()?.session_id !== selectedSession) return
+      $("#supervisor-interrupt-result").textContent = `Interrupt failed · ${error.message}`
+      announce($("#supervisor-interrupt-result").textContent, true)
+    } finally {
+      state.supervisorMutationPending = false
+      if (selectedSupervisorFlag()) renderSupervisorControls(selectedSupervisorFlag())
+    }
   }
 
   /** Fill both approved-workdir controls from backend-owned labels. */
@@ -1262,10 +1636,39 @@
       ? `updated ${Math.max(0, Math.floor((Date.now() - state.lastMatrixAt) / 1000))}s ago`
       : state.matrixState
     renderRail()
+    renderSupervisorFlags()
+    if (selectedSupervisorFlag()) renderSupervisorControls(selectedSupervisorFlag())
   }
 
   /** Register all local controls after the immediate shell has rendered. */
   function bindControls() {
+    $("#supervisor-steer-form").addEventListener("submit", submitSupervisorSteer)
+    $("#supervisor-steer-prompt").addEventListener("input", () => {
+      state.supervisorSteerKey = null
+      state.supervisorSteerSignature = null
+    })
+    $("#supervisor-steer-prompt").addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && event.ctrlKey) {
+        event.preventDefault()
+        $("#supervisor-steer-form").requestSubmit()
+      }
+    })
+    $("#supervisor-interrupt").addEventListener("click", openSupervisorInterruptDoor)
+    $("#cancel-supervisor-interrupt").addEventListener("click", () => closeSupervisorInterruptDoor())
+    $("#supervisor-interrupt-confirmation").addEventListener("input", (event) => {
+      const flag = selectedSupervisorFlag()
+      $("#confirm-supervisor-interrupt").disabled = !flag
+        || event.target.value !== `INTERRUPT ${flag.session_id}`
+        || state.supervisorMutationPending
+    })
+    $("#supervisor-interrupt-door").addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        closeSupervisorInterruptDoor()
+      }
+    })
+    $("#confirm-supervisor-interrupt").addEventListener("click", confirmSupervisorInterrupt)
+    $("#detach-supervisor").addEventListener("click", detachSelectedStream)
     $("#new-workflow-design").addEventListener("click", () => openDesignStart("workflow"))
     $("#new-experiment-design").addEventListener("click", () => openDesignStart("experiment"))
     $("#cancel-design-start").addEventListener("click", () => {
@@ -1410,9 +1813,11 @@
   renderSelection()
   tick()
   loadMatrix()
+  loadSupervisorFlags()
   loadDesignSessions({ restore: true })
   connectStatusStream()
   window.setInterval(loadMatrix, MATRIX_POLL_MS)
+  window.setInterval(loadSupervisorFlags, FLAGS_POLL_MS)
   window.setInterval(loadDesignSessions, DESIGN_LIST_POLL_MS)
   window.setInterval(tick, 1000)
 })(window.ControlRoomCore)

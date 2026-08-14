@@ -28,6 +28,7 @@ class OllamaAnalyzer:
         self._client = ollama
 
     def _ask(self, prompt: str) -> str:
+        """Return visible model output, including reasoning-only Ollama replies."""
         try:
             response = self._client.chat(
                 model=self.model,
@@ -37,7 +38,13 @@ class OllamaAnalyzer:
                 ],
                 options={"temperature": 0.3, "num_predict": 1024},
             )
-            return response.message.content.strip()
+            content = response.message.content.strip()
+            if content:
+                return content
+            # Reasoning models may exhaust their prediction budget before
+            # producing final content while still returning useful thinking.
+            thinking = str(getattr(response.message, "thinking", "") or "").strip()
+            return thinking or "[Analysis error: Ollama returned an empty response]"
         except Exception as e:
             return f"[Analysis error: {e}]"
 

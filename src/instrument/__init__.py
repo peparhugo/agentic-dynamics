@@ -149,6 +149,12 @@ from .story import (
 # Deprecated: StrategyType — not used by current scripts
 from .strategy import StrategyReport, classify_strategy
 from .streaming import StreamResult, stream_subprocess
+from .supervisor import (
+    SUPERVISOR_FLAGS_KEY,
+    SUPERVISOR_SESSION_CELLS_KEY,
+    normalize_flag,
+    register_session_mapping,
+)
 from .test_runner import run_suite, test_executed_success
 
 # v1.0: the execute phase — run an agent_task workflow in a worktree
@@ -206,4 +212,6 @@ __all__ = [
     "first_pass_quality",
     "PhaseResult", "WorkflowRunResult", "run_workflow",
     "run_suite", "test_executed_success",
+    "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
+    "normalize_flag", "register_session_mapping",
 ]

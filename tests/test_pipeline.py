@@ -560,8 +560,8 @@ class TestResolveCwd:
     def test_root_default(self):
         phase = PlanPhase(id="a", kind="shell")
         result = _resolve_cwd(phase, {})
-        # Feature worktrees have arbitrary basenames; the default must be this repository root.
-        assert result == str(Path(__file__).resolve().parent.parent)
+        # Feature worktrees have arbitrary basenames; the default is this repository root.
+        assert Path(result) == Path(__file__).resolve().parent.parent
 
 
 class TestDetectConflicts:
