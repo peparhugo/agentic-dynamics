@@ -1,19 +1,19 @@
 {
-  "generated_at": "2026-08-13T17:37:33.026070+00:00",
+  "generated_at": "2026-08-14T13:10:46.072953+00:00",
   "counts": {
-    "db_sessions_total": 3206,
-    "db_sessions_experiments": 1049,
-    "worktrees_total": 80,
-    "worktrees_experiments": 13,
-    "worktrees_other": 67,
-    "result_files": 26,
+    "db_sessions_total": 3370,
+    "db_sessions_experiments": 1078,
+    "worktrees_total": 205,
+    "worktrees_experiments": 27,
+    "worktrees_other": 178,
+    "result_files": 33,
     "config_files": 35
   },
   "costs": {
-    "total_all_sessions": 224.6905,
-    "total_experiment_sessions": 16.2937,
-    "tokens_all_sessions": 95477382,
-    "tokens_experiment_sessions": 32469641
+    "total_all_sessions": 229.2975,
+    "total_experiment_sessions": 16.3784,
+    "tokens_all_sessions": 110907448,
+    "tokens_experiment_sessions": 33198950
   },
   "model_breakdown": {
     "deepseek/deepseek-v4-pro": {
@@ -32,14 +32,14 @@
       "tokens": 1075066
     },
     "deepseek/deepseek-v4-flash": {
-      "sessions": 364,
-      "cost": 2.8275,
-      "tokens": 10401607
+      "sessions": 390,
+      "cost": 2.9122,
+      "tokens": 10776162
     },
     "openai/gpt-5.6-sol": {
-      "sessions": 154,
+      "sessions": 157,
       "cost": 0.0,
-      "tokens": 7175998
+      "tokens": 7530752
     },
     "openai/gpt-5.6-terra": {
       "sessions": 150,
@@ -85,6 +85,14 @@
       "operators": []
     },
     {
+      "file": "experiments/results/lab_cache_economics.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
       "file": "experiments/results/lab_cascades.json",
       "experiment": null,
       "model": null,
@@ -94,6 +102,14 @@
     },
     {
       "file": "experiments/results/lab_claude_audit.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
+      "file": "experiments/results/lab_condition_effects.json",
       "experiment": null,
       "model": null,
       "num_runs": 0,
@@ -157,6 +173,14 @@
       "operators": []
     },
     {
+      "file": "experiments/results/lab_quality_frontier.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
       "file": "experiments/results/lab_reasoning_divergence.json",
       "experiment": null,
       "model": null,
@@ -182,6 +206,14 @@
     },
     {
       "file": "experiments/results/lab_stability.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
+      "file": "experiments/results/lab_story_arc.json",
       "experiment": null,
       "model": null,
       "num_runs": 0,
@@ -221,6 +253,22 @@
       "operators": []
     },
     {
+      "file": "experiments/results/lab_verification_frontier.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
+      "file": "experiments/results/lab_verification_value.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
+    },
+    {
       "file": "experiments/results/lab_volatility.json",
       "experiment": null,
       "model": null,
@@ -235,13 +283,13 @@
       "num_runs": 7,
       "total_cost": 0.8173,
       "operators": [
-        "shift_framing",
-        "baseline",
-        "invert_constraint",
-        "inject_phantom_success",
-        "inject_competing_goal",
+        "inject_alien_vocab",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "baseline",
+        "inject_competing_goal",
+        "invert_constraint",
+        "shift_framing",
+        "inject_phantom_success"
       ]
     },
     {
@@ -251,13 +299,13 @@
       "num_runs": 7,
       "total_cost": 0.0039,
       "operators": [
-        "shift_framing",
-        "baseline",
-        "invert_constraint",
-        "inject_phantom_success",
-        "inject_competing_goal",
+        "inject_alien_vocab",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "baseline",
+        "inject_competing_goal",
+        "invert_constraint",
+        "shift_framing",
+        "inject_phantom_success"
       ]
     },
     {
@@ -267,14 +315,22 @@
       "num_runs": 7,
       "total_cost": 0.1044,
       "operators": [
-        "shift_framing",
-        "baseline",
-        "invert_constraint",
-        "inject_phantom_success",
-        "inject_competing_goal",
+        "inject_alien_vocab",
         "remove_critical_constraint",
-        "inject_alien_vocab"
+        "baseline",
+        "inject_competing_goal",
+        "invert_constraint",
+        "shift_framing",
+        "inject_phantom_success"
       ]
+    },
+    {
+      "file": "experiments/results/verified_tests.json",
+      "experiment": null,
+      "model": null,
+      "num_runs": 0,
+      "total_cost": 0,
+      "operators": []
     }
   ],
   "configs": [
@@ -793,6 +849,28 @@
   ],
   "experiment_worktrees": [
     {
+      "path": "/tmp/exp_01i2sdb6",
+      "name": "exp_01i2sdb6",
+      "mtime": "2026-08-14T06:57:57.875096+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f0035effeYKCy41GxUddap2",
+        "directory": "/tmp/exp_01i2sdb6",
+        "title": "meta_batch_20260814_065744",
+        "cost": 0.0012311488,
+        "tokens_input": 6196,
+        "tokens_output": 694,
+        "tokens_reasoning": 340,
+        "tokens_cache_read": 26496,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690665634,
+        "time_updated": 1786690677732
+      }
+    },
+    {
       "path": "/tmp/exp_08lutfhw",
       "name": "exp_08lutfhw",
       "mtime": "2026-08-12T00:18:40.699104+00:00",
@@ -812,6 +890,72 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786493922138,
         "time_updated": 1786493933087
+      }
+    },
+    {
+      "path": "/tmp/exp_2tnqgnya",
+      "name": "exp_2tnqgnya",
+      "mtime": "2026-08-14T06:52:39.716629+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f55959ffeG2bgV1gNZ7xJv1",
+        "directory": "/tmp/exp_2tnqgnya",
+        "title": "meta_batch_20260814_065154",
+        "cost": 0.0036391936000000004,
+        "tokens_input": 14212,
+        "tokens_output": 1667,
+        "tokens_reasoning": 2971,
+        "tokens_cache_read": 125312,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690315942,
+        "time_updated": 1786690359609
+      }
+    },
+    {
+      "path": "/tmp/exp_58nmmni8",
+      "name": "exp_58nmmni8",
+      "mtime": "2026-08-14T06:50:32.270874+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f6d7b0ffeCrS3ggBNgnjOqB",
+        "directory": "/tmp/exp_58nmmni8",
+        "title": "meta_batch_20260814_065016",
+        "cost": 0.0012045152,
+        "tokens_input": 5984,
+        "tokens_output": 559,
+        "tokens_reasoning": 491,
+        "tokens_cache_read": 25984,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690218064,
+        "time_updated": 1786690232109
+      }
+    },
+    {
+      "path": "/tmp/exp_c4nsvumt",
+      "name": "exp_c4nsvumt",
+      "mtime": "2026-08-14T02:51:39.060137+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d18c9cffeHXFJfV52N17O0d",
+        "directory": "/tmp/exp_c4nsvumt",
+        "title": "meta_batch_20260814_025123",
+        "cost": 0.0011722368000000002,
+        "tokens_input": 5990,
+        "tokens_output": 575,
+        "tokens_reasoning": 358,
+        "tokens_cache_read": 25856,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675884899,
+        "time_updated": 1786675898942
       }
     },
     {
@@ -837,6 +981,28 @@
       }
     },
     {
+      "path": "/tmp/exp_f7ymq5nu",
+      "name": "exp_f7ymq5nu",
+      "mtime": "2026-08-14T02:54:15.617476+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001cf30d1ffeJwPWM7IAM1puHL",
+        "directory": "/tmp/exp_f7ymq5nu",
+        "title": "meta_batch_20260814_025357",
+        "cost": 0.0011756752,
+        "tokens_input": 5954,
+        "tokens_output": 550,
+        "tokens_reasoning": 412,
+        "tokens_cache_read": 25984,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786676039470,
+        "time_updated": 1786676055503
+      }
+    },
+    {
       "path": "/tmp/exp_figf_rbj",
       "name": "exp_figf_rbj",
       "mtime": "2026-08-10T14:10:38.408239+00:00",
@@ -856,6 +1022,72 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786371023138,
         "time_updated": 1786371038308
+      }
+    },
+    {
+      "path": "/tmp/exp_gh11ypja",
+      "name": "exp_gh11ypja",
+      "mtime": "2026-08-14T06:15:19.334595+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00117da9dffeTRHKpw16WlUAzf",
+        "directory": "/tmp/exp_gh11ypja",
+        "title": "meta_batch_20260814_061413",
+        "cost": 0.0033159951999999996,
+        "tokens_input": 12170,
+        "tokens_output": 1764,
+        "tokens_reasoning": 3062,
+        "tokens_cache_read": 93184,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786688054626,
+        "time_updated": 1786688119177
+      }
+    },
+    {
+      "path": "/tmp/exp_gmltwshb",
+      "name": "exp_gmltwshb",
+      "mtime": "2026-08-14T02:41:35.354374+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001dac435ffe9XyouMTCoMMPYS",
+        "directory": "/tmp/exp_gmltwshb",
+        "title": "meta_batch_20260814_024119",
+        "cost": 0.001254568,
+        "tokens_input": 5964,
+        "tokens_output": 725,
+        "tokens_reasoning": 588,
+        "tokens_cache_read": 18560,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675280842,
+        "time_updated": 1786675295211
+      }
+    },
+    {
+      "path": "/tmp/exp_gt_fahyz",
+      "name": "exp_gt_fahyz",
+      "mtime": "2026-08-14T05:45:59.308783+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00131ed90ffeoo3nOjayrRKtO8",
+        "directory": "/tmp/exp_gt_fahyz",
+        "title": "meta_batch_20260814_054544",
+        "cost": 0.0011684568,
+        "tokens_input": 5973,
+        "tokens_output": 521,
+        "tokens_reasoning": 407,
+        "tokens_cache_read": 25856,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786686345839,
+        "time_updated": 1786686359194
       }
     },
     {
@@ -881,6 +1113,72 @@
       }
     },
     {
+      "path": "/tmp/exp_j4urvhjs",
+      "name": "exp_j4urvhjs",
+      "mtime": "2026-08-14T07:27:09.944539+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000d54a62ffediEHvGqwBH4T2c",
+        "directory": "/tmp/exp_j4urvhjs",
+        "title": "meta_batch_20260814_072655",
+        "cost": 0.001252412,
+        "tokens_input": 6163,
+        "tokens_output": 661,
+        "tokens_reasoning": 468,
+        "tokens_cache_read": 26240,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786692416926,
+        "time_updated": 1786692429813
+      }
+    },
+    {
+      "path": "/tmp/exp_jed4fz0e",
+      "name": "exp_jed4fz0e",
+      "mtime": "2026-08-14T06:05:32.547991+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001200158ffeqlmI79cLxKWwT2",
+        "directory": "/tmp/exp_jed4fz0e",
+        "title": "meta_batch_20260814_060518",
+        "cost": 0.0011297943999999999,
+        "tokens_input": 5905,
+        "tokens_output": 408,
+        "tokens_reasoning": 494,
+        "tokens_cache_read": 18048,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687520424,
+        "time_updated": 1786687532407
+      }
+    },
+    {
+      "path": "/tmp/exp_jh1cnd0i",
+      "name": "exp_jh1cnd0i",
+      "mtime": "2026-08-14T02:59:16.436022+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001ca9336ffebh3YpKrhYZH54F",
+        "directory": "/tmp/exp_jh1cnd0i",
+        "title": "meta_batch_20260814_025900",
+        "cost": 0.0011865168,
+        "tokens_input": 5992,
+        "tokens_output": 565,
+        "tokens_reasoning": 418,
+        "tokens_cache_read": 25856,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786676341961,
+        "time_updated": 1786676356279
+      }
+    },
+    {
       "path": "/tmp/exp_jongrfel",
       "name": "exp_jongrfel",
       "mtime": "2026-08-10T02:22:51.742235+00:00",
@@ -900,6 +1198,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786328560175,
         "time_updated": 1786328571632
+      }
+    },
+    {
+      "path": "/tmp/exp_k_fof39y",
+      "name": "exp_k_fof39y",
+      "mtime": "2026-08-14T04:04:12.998338+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0018f0f9cffeboC3jBCMr8hVKD",
+        "directory": "/tmp/exp_k_fof39y",
+        "title": "meta_batch_20260814_040400",
+        "cost": 0.0010966144,
+        "tokens_input": 5790,
+        "tokens_output": 470,
+        "tokens_reasoning": 371,
+        "tokens_cache_read": 18048,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786680242275,
+        "time_updated": 1786680252880
       }
     },
     {
@@ -947,6 +1267,28 @@
       }
     },
     {
+      "path": "/tmp/exp_n3w0zwsy",
+      "name": "exp_n3w0zwsy",
+      "mtime": "2026-08-14T07:19:40.268390+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000dc1c11ffe0w7DPxv3deP1IZ",
+        "directory": "/tmp/exp_n3w0zwsy",
+        "title": "meta_batch_20260814_071928",
+        "cost": 0.0010955560000000001,
+        "tokens_input": 5897,
+        "tokens_output": 469,
+        "tokens_reasoning": 316,
+        "tokens_cache_read": 17920,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786691970031,
+        "time_updated": 1786691980113
+      }
+    },
+    {
       "path": "/tmp/exp_q0znao73",
       "name": "exp_q0znao73",
       "mtime": "2026-08-10T05:04:33.640692+00:00",
@@ -988,6 +1330,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786338196911,
         "time_updated": 1786338232339
+      }
+    },
+    {
+      "path": "/tmp/exp_s3t2y4p6",
+      "name": "exp_s3t2y4p6",
+      "mtime": "2026-08-14T03:13:42.992825+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001bd5d70ffeTKo9Ah4rvLbi9g",
+        "directory": "/tmp/exp_s3t2y4p6",
+        "title": "meta_batch_20260814_031326",
+        "cost": 0.0012094152,
+        "tokens_input": 6013,
+        "tokens_output": 570,
+        "tokens_reasoning": 483,
+        "tokens_cache_read": 25984,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786677207695,
+        "time_updated": 1786677222844
       }
     },
     {
@@ -1103,6 +1467,20 @@
       }
     },
     {
+      "path": "/tmp/exp_03jnkzea",
+      "name": "exp_03jnkzea",
+      "mtime": "2026-08-14T06:10:04.391663+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_05vtj9m4",
+      "name": "exp_05vtj9m4",
+      "mtime": "2026-08-14T07:22:19.157616+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_0bkzignp",
       "name": "exp_0bkzignp",
       "mtime": "2026-08-10T04:33:21.087892+00:00",
@@ -1147,6 +1525,28 @@
       }
     },
     {
+      "path": "/tmp/exp_0eu_7fw2",
+      "name": "exp_0eu_7fw2",
+      "mtime": "2026-08-14T02:40:57.951006+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001dba2e2ffetGHbkHgmNHVUFU",
+        "directory": "/tmp/exp_0eu_7fw2",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_024022",
+        "cost": 0.0021323232,
+        "tokens_input": 8602,
+        "tokens_output": 1452,
+        "tokens_reasoning": 1609,
+        "tokens_cache_read": 25344,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675223837,
+        "time_updated": 1786675257803
+      }
+    },
+    {
       "path": "/tmp/exp_0ez6iulf",
       "name": "exp_0ez6iulf",
       "mtime": "2026-08-12T21:07:19.402773+00:00",
@@ -1183,9 +1583,66 @@
       }
     },
     {
+      "path": "/tmp/exp_1cvjs0fp",
+      "name": "exp_1cvjs0fp",
+      "mtime": "2026-08-14T06:43:22.550492+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_1en39wgq",
+      "name": "exp_1en39wgq",
+      "mtime": "2026-08-14T03:05:42.529189+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_1iiw8yu_",
       "name": "exp_1iiw8yu_",
       "mtime": "2026-08-13T17:16:25.016331+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_24r66ser",
+      "name": "exp_24r66ser",
+      "mtime": "2026-08-13T21:37:00.634013+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_2fm6vk3y",
+      "name": "exp_2fm6vk3y",
+      "mtime": "2026-08-14T02:53:12.602547+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d0eb0affegqa2x8vAfzJeTv",
+        "directory": "/tmp/exp_2fm6vk3y",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_025204",
+        "cost": 0.007884324,
+        "tokens_input": 39645,
+        "tokens_output": 3754,
+        "tokens_reasoning": 1721,
+        "tokens_cache_read": 286080,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675926261,
+        "time_updated": 1786675992372
+      }
+    },
+    {
+      "path": "/tmp/exp_2mehov7a",
+      "name": "exp_2mehov7a",
+      "mtime": "2026-08-14T02:44:32.371378+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_2wzxkvzb",
+      "name": "exp_2wzxkvzb",
+      "mtime": "2026-08-14T02:47:49.284039+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -1197,11 +1654,170 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_33bteq87",
+      "name": "exp_33bteq87",
+      "mtime": "2026-08-14T04:19:54.375067+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_3_1psv2a",
+      "name": "exp_3_1psv2a",
+      "mtime": "2026-08-14T07:34:03.793946+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_4h596w7_",
+      "name": "exp_4h596w7_",
+      "mtime": "2026-08-14T03:33:43.170133+00:00",
+      "total_files": 21,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001ab244dffeCk38FNMj3Kmc3P",
+        "directory": "/tmp/exp_4h596w7_",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_033320",
+        "cost": 0.0018632263999999999,
+        "tokens_input": 8583,
+        "tokens_output": 1259,
+        "tokens_reasoning": 853,
+        "tokens_cache_read": 25088,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786678401970,
+        "time_updated": 1786678425943
+      }
+    },
+    {
+      "path": "/tmp/exp_55194bjw",
+      "name": "exp_55194bjw",
+      "mtime": "2026-08-14T06:51:54.589423+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f5db01ffeqsLS733fc1rNaZ",
+        "directory": "/tmp/exp_55194bjw",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_065121",
+        "cost": 0.0027315624,
+        "tokens_input": 11587,
+        "tokens_output": 1605,
+        "tokens_reasoning": 1703,
+        "tokens_cache_read": 65408,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690282750,
+        "time_updated": 1786690314464
+      }
+    },
+    {
+      "path": "/tmp/exp_570fim5a",
+      "name": "exp_570fim5a",
+      "mtime": "2026-08-14T07:14:57.833320+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_5oghbmfp",
       "name": "exp_5oghbmfp",
       "mtime": "2026-08-13T17:21:10.925130+00:00",
       "total_files": 20,
       "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_5zhfl34u",
+      "name": "exp_5zhfl34u",
+      "mtime": "2026-08-14T04:00:00.346413+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_61vkom9y",
+      "name": "exp_61vkom9y",
+      "mtime": "2026-08-14T02:52:11.855580+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_62q13z78",
+      "name": "exp_62q13z78",
+      "mtime": "2026-08-14T07:25:45.322017+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000d6ce54ffeZevEdril5QWFvE",
+        "directory": "/tmp/exp_62q13z78",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_072516",
+        "cost": 0.0020756119999999997,
+        "tokens_input": 8607,
+        "tokens_output": 1527,
+        "tokens_reasoning": 1224,
+        "tokens_cache_read": 35840,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786692317611,
+        "time_updated": 1786692345180
+      }
+    },
+    {
+      "path": "/tmp/exp_6u9qtivi",
+      "name": "exp_6u9qtivi",
+      "mtime": "2026-08-14T05:39:06.099427+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_6zs1n0d_",
+      "name": "exp_6zs1n0d_",
+      "mtime": "2026-08-14T06:14:13.203662+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001184223ffeXN4VyJU37ZDM7s",
+        "directory": "/tmp/exp_6zs1n0d_",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_061346",
+        "cost": 0.0020830544,
+        "tokens_input": 9150,
+        "tokens_output": 1402,
+        "tokens_reasoning": 1090,
+        "tokens_cache_read": 37248,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786688028124,
+        "time_updated": 1786688053090
+      }
+    },
+    {
+      "path": "/tmp/exp_715mmb6k",
+      "name": "exp_715mmb6k",
+      "mtime": "2026-08-14T07:12:54.183478+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7e15l6o9",
+      "name": "exp_7e15l6o9",
+      "mtime": "2026-08-14T07:18:16.837846+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000dd90d6ffeV4nXNYdMXPH4rY",
+        "directory": "/tmp/exp_7e15l6o9",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_071753",
+        "cost": 0.0018461464,
+        "tokens_input": 8471,
+        "tokens_output": 1311,
+        "tokens_reasoning": 796,
+        "tokens_cache_read": 25088,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786691874601,
+        "time_updated": 1786691896696
+      }
     },
     {
       "path": "/tmp/exp_7eb8xtbf",
@@ -1226,11 +1842,163 @@
       }
     },
     {
+      "path": "/tmp/exp_7h7ijk3k",
+      "name": "exp_7h7ijk3k",
+      "mtime": "2026-08-14T07:22:18.785623+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_7kyy8e0d",
       "name": "exp_7kyy8e0d",
       "mtime": "2026-08-12T15:56:27.997554+00:00",
       "total_files": 1,
       "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7lh1nu0a",
+      "name": "exp_7lh1nu0a",
+      "mtime": "2026-08-13T21:46:55.628806+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_7y9uvrtv",
+      "name": "exp_7y9uvrtv",
+      "mtime": "2026-08-14T06:44:13.853577+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_88raadwu",
+      "name": "exp_88raadwu",
+      "mtime": "2026-08-14T07:22:19.221615+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_8dkl7ejl",
+      "name": "exp_8dkl7ejl",
+      "mtime": "2026-08-14T06:50:16.707149+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f93cbeffe46xH0H3Om5hlHr",
+        "directory": "/tmp/exp_8dkl7ejl",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_064738",
+        "cost": 0.010642805600000001,
+        "tokens_input": 35269,
+        "tokens_output": 5072,
+        "tokens_reasoning": 7388,
+        "tokens_cache_read": 791552,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690061121,
+        "time_updated": 1786690216580
+      }
+    },
+    {
+      "path": "/tmp/exp_8orahpet",
+      "name": "exp_8orahpet",
+      "mtime": "2026-08-14T06:49:55.899516+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f7848cffevgTnRa8r3lg8oe",
+        "directory": "/tmp/exp_8orahpet",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_064932",
+        "cost": 0.0019156648,
+        "tokens_input": 8525,
+        "tokens_output": 1432,
+        "tokens_reasoning": 895,
+        "tokens_cache_read": 25216,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690173811,
+        "time_updated": 1786690195773
+      }
+    },
+    {
+      "path": "/tmp/exp_8u75nmuv",
+      "name": "exp_8u75nmuv",
+      "mtime": "2026-08-14T02:46:41.929182+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_9bd9nnk_",
+      "name": "exp_9bd9nnk_",
+      "mtime": "2026-08-14T02:40:22.487605+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001dc129fffegHD2xJfwQ2uxOP",
+        "directory": "/tmp/exp_9bd9nnk_",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_023953",
+        "cost": 0.0019899880000000003,
+        "tokens_input": 8473,
+        "tokens_output": 1260,
+        "tokens_reasoning": 1361,
+        "tokens_cache_read": 24960,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675195232,
+        "time_updated": 1786675222360
+      }
+    },
+    {
+      "path": "/tmp/exp_9gv3qhgk",
+      "name": "exp_9gv3qhgk",
+      "mtime": "2026-08-14T06:47:38.933937+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f9ab72ffeGNunzOjpGOUt9O",
+        "directory": "/tmp/exp_9gv3qhgk",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_064710",
+        "cost": 0.00195958,
+        "tokens_input": 8681,
+        "tokens_output": 1222,
+        "tokens_reasoning": 1084,
+        "tokens_cache_read": 35200,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690032782,
+        "time_updated": 1786690058754
+      }
+    },
+    {
+      "path": "/tmp/exp_9rm5s52u",
+      "name": "exp_9rm5s52u",
+      "mtime": "2026-08-14T06:01:00.612243+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_9w88if58",
+      "name": "exp_9w88if58",
+      "mtime": "2026-08-14T05:44:50.521621+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001334156ffenyxFIWFsoudYNF",
+        "directory": "/tmp/exp_9w88if58",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_054417",
+        "cost": 0.0021785736,
+        "tokens_input": 8571,
+        "tokens_output": 1434,
+        "tokens_reasoning": 1800,
+        "tokens_cache_read": 26112,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786686258858,
+        "time_updated": 1786686290384
+      }
     },
     {
       "path": "/tmp/exp__bncuzzz",
@@ -1262,9 +2030,38 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp__jddehco",
+      "name": "exp__jddehco",
+      "mtime": "2026-08-14T06:05:00.916490+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00120befcffe9VO1YPV8Sg47KZ",
+        "directory": "/tmp/exp__jddehco",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_060430",
+        "cost": 0.001975596,
+        "tokens_input": 8311,
+        "tokens_output": 1273,
+        "tokens_reasoning": 1480,
+        "tokens_cache_read": 14720,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687471875,
+        "time_updated": 1786687500792
+      }
+    },
+    {
       "path": "/tmp/exp__jfy_3fv",
       "name": "exp__jfy_3fv",
       "mtime": "2026-08-12T18:16:30.777121+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp__l2jqldv",
+      "name": "exp__l2jqldv",
+      "mtime": "2026-08-14T02:42:32.505407+00:00",
       "total_files": 0,
       "py_files": 0
     },
@@ -1291,6 +2088,20 @@
       }
     },
     {
+      "path": "/tmp/exp_a37oobgu",
+      "name": "exp_a37oobgu",
+      "mtime": "2026-08-14T06:01:00.544244+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_a4h42rqq",
+      "name": "exp_a4h42rqq",
+      "mtime": "2026-08-14T07:34:03.725947+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_adof8r9d",
       "name": "exp_adof8r9d",
       "mtime": "2026-08-10T04:33:05.808148+00:00",
@@ -1313,10 +2124,39 @@
       }
     },
     {
+      "path": "/tmp/exp_ae97yvjr",
+      "name": "exp_ae97yvjr",
+      "mtime": "2026-08-14T02:50:53.296915+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d27002ffe5M1rLxHn3xQmMi",
+        "directory": "/tmp/exp_ae97yvjr",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_025024",
+        "cost": 0.0019119967999999998,
+        "tokens_input": 8472,
+        "tokens_output": 1111,
+        "tokens_reasoning": 1223,
+        "tokens_cache_read": 25856,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675826685,
+        "time_updated": 1786675853086
+      }
+    },
+    {
       "path": "/tmp/exp_akuk_b2u",
       "name": "exp_akuk_b2u",
       "mtime": "2026-08-13T17:34:22.505851+00:00",
       "total_files": 2,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ark3dnej",
+      "name": "exp_ark3dnej",
+      "mtime": "2026-08-14T03:57:56.448404+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -1339,6 +2179,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786370595865,
         "time_updated": 1786370607591
+      }
+    },
+    {
+      "path": "/tmp/exp_blqt8xpj",
+      "name": "exp_blqt8xpj",
+      "mtime": "2026-08-14T04:03:43.526814+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0018fda2effeLyz93qhfF4pUsc",
+        "directory": "/tmp/exp_blqt8xpj",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_040309",
+        "cost": 0.0020988239999999996,
+        "tokens_input": 8444,
+        "tokens_output": 1326,
+        "tokens_reasoning": 1679,
+        "tokens_cache_read": 26880,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786680190417,
+        "time_updated": 1786680223415
       }
     },
     {
@@ -1393,6 +2255,79 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_c2bby39s",
+      "name": "exp_c2bby39s",
+      "mtime": "2026-08-14T02:57:52.453531+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001cc18aeffe5jpKHOJZKkj7zj",
+        "directory": "/tmp/exp_c2bby39s",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_025720",
+        "cost": 0.0021220136,
+        "tokens_input": 8927,
+        "tokens_output": 1388,
+        "tokens_reasoning": 1370,
+        "tokens_cache_read": 35712,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786676242257,
+        "time_updated": 1786676272310
+      }
+    },
+    {
+      "path": "/tmp/exp_c3wr6oil",
+      "name": "exp_c3wr6oil",
+      "mtime": "2026-08-13T21:39:25.987777+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_c7d8aqs0",
+      "name": "exp_c7d8aqs0",
+      "mtime": "2026-08-14T06:13:46.712090+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00118ce44ffe367k8fSjWwKjk1",
+        "directory": "/tmp/exp_c7d8aqs0",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_061310",
+        "cost": 0.0023955344,
+        "tokens_input": 8536,
+        "tokens_output": 1814,
+        "tokens_reasoning": 2197,
+        "tokens_cache_read": 27648,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687992252,
+        "time_updated": 1786688026564
+      }
+    },
+    {
+      "path": "/tmp/exp_c8hdpxey",
+      "name": "exp_c8hdpxey",
+      "mtime": "2026-08-14T02:52:04.799700+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d1c844ffeyd2H76p2acgrYG",
+        "directory": "/tmp/exp_c8hdpxey",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_025108",
+        "cost": 0.0026056352,
+        "tokens_input": 10432,
+        "tokens_output": 1964,
+        "tokens_reasoning": 1642,
+        "tokens_cache_read": 48384,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675869627,
+        "time_updated": 1786675924667
+      }
+    },
+    {
       "path": "/tmp/exp_c_kl8epb",
       "name": "exp_c_kl8epb",
       "mtime": "2026-08-10T14:04:42.166008+00:00",
@@ -1412,6 +2347,86 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786370660751,
         "time_updated": 1786370682060
+      }
+    },
+    {
+      "path": "/tmp/exp_ca82u869",
+      "name": "exp_ca82u869",
+      "mtime": "2026-08-14T04:04:00.894534+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0018f539bffe1OfA4nObO04SRo",
+        "directory": "/tmp/exp_ca82u869",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_040343",
+        "cost": 0.0017329312000000001,
+        "tokens_input": 8886,
+        "tokens_output": 926,
+        "tokens_reasoning": 573,
+        "tokens_cache_read": 24704,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786680224869,
+        "time_updated": 1786680240738
+      }
+    },
+    {
+      "path": "/tmp/exp_cbxizg5o",
+      "name": "exp_cbxizg5o",
+      "mtime": "2026-08-14T03:57:56.516403+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_cn50z8rf",
+      "name": "exp_cn50z8rf",
+      "mtime": "2026-08-14T06:04:30.464970+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001212d29ffeOYizFgiGezfqb0",
+        "directory": "/tmp/exp_cn50z8rf",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_060402",
+        "cost": 0.0019349399999999998,
+        "tokens_input": 8553,
+        "tokens_output": 1213,
+        "tokens_reasoning": 1165,
+        "tokens_cache_read": 25600,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687443670,
+        "time_updated": 1786687470356
+      }
+    },
+    {
+      "path": "/tmp/exp_cxrvv_n5",
+      "name": "exp_cxrvv_n5",
+      "mtime": "2026-08-14T02:42:32.573406+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_dcgp_gxa",
+      "name": "exp_dcgp_gxa",
+      "mtime": "2026-08-14T07:26:29.445246+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000d65ca6ffe7wPKCNq4GYssEX",
+        "directory": "/tmp/exp_dcgp_gxa",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_072545",
+        "cost": 0.0026593559999999994,
+        "tokens_input": 9269,
+        "tokens_output": 1409,
+        "tokens_reasoning": 2667,
+        "tokens_cache_read": 78720,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786692346713,
+        "time_updated": 1786692389311
       }
     },
     {
@@ -1441,6 +2456,20 @@
       "name": "exp_djf0gxyu",
       "mtime": "2026-08-12T15:56:33.345463+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_dq1kdu2o",
+      "name": "exp_dq1kdu2o",
+      "mtime": "2026-08-14T05:41:10.797330+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_dvbvs9ll",
+      "name": "exp_dvbvs9ll",
+      "mtime": "2026-08-14T02:37:13.386793+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -1516,6 +2545,34 @@
       }
     },
     {
+      "path": "/tmp/exp_ewbc5lo0",
+      "name": "exp_ewbc5lo0",
+      "mtime": "2026-08-14T02:46:41.997180+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_eyrb805_",
+      "name": "exp_eyrb805_",
+      "mtime": "2026-08-14T07:14:57.765321+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_fbqadyck",
+      "name": "exp_fbqadyck",
+      "mtime": "2026-08-14T05:58:55.894154+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_fdkre3a3",
+      "name": "exp_fdkre3a3",
+      "mtime": "2026-08-14T07:31:03.856849+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_fj4_44r4",
       "name": "exp_fj4_44r4",
       "mtime": "2026-08-13T17:20:43.157473+00:00",
@@ -1536,6 +2593,49 @@
         "time_created": 1786641613938,
         "time_updated": 1786641643034
       }
+    },
+    {
+      "path": "/tmp/exp_fs_lado8",
+      "name": "exp_fs_lado8",
+      "mtime": "2026-08-14T02:59:00.568306+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001cb03f8ffeBRhsKbZ7zCQNzX",
+        "directory": "/tmp/exp_fs_lado8",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_025831",
+        "cost": 0.0021100408,
+        "tokens_input": 9407,
+        "tokens_output": 1324,
+        "tokens_reasoning": 1141,
+        "tokens_cache_read": 36736,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786676313095,
+        "time_updated": 1786676340450
+      }
+    },
+    {
+      "path": "/tmp/exp_fu9ui1pt",
+      "name": "exp_fu9ui1pt",
+      "mtime": "2026-08-14T05:39:06.167426+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_g2x1gmo5",
+      "name": "exp_g2x1gmo5",
+      "mtime": "2026-08-14T03:05:42.461190+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_h0jc8hze",
+      "name": "exp_h0jc8hze",
+      "mtime": "2026-08-13T21:37:00.570014+00:00",
+      "total_files": 0,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_h6rhoo_u",
@@ -1582,6 +2682,35 @@
       }
     },
     {
+      "path": "/tmp/exp_hdeqgvhz",
+      "name": "exp_hdeqgvhz",
+      "mtime": "2026-08-14T05:58:55.962153+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_heroo9pl",
+      "name": "exp_heroo9pl",
+      "mtime": "2026-08-14T06:47:10.574439+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000fa27deffeGx3tfWupo20Bxx",
+        "directory": "/tmp/exp_heroo9pl",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_064638",
+        "cost": 0.0020601336000000002,
+        "tokens_input": 8733,
+        "tokens_output": 1547,
+        "tokens_reasoning": 1087,
+        "tokens_cache_read": 35712,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690000930,
+        "time_updated": 1786690030380
+      }
+    },
+    {
       "path": "/tmp/exp_hgp0nwu2",
       "name": "exp_hgp0nwu2",
       "mtime": "2026-08-10T04:40:03.673164+00:00",
@@ -1604,9 +2733,23 @@
       }
     },
     {
+      "path": "/tmp/exp_hl119rkj",
+      "name": "exp_hl119rkj",
+      "mtime": "2026-08-14T02:54:17.425446+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_huxg3_kh",
       "name": "exp_huxg3_kh",
       "mtime": "2026-08-12T16:36:34.990179+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_hw4xzuk3",
+      "name": "exp_hw4xzuk3",
+      "mtime": "2026-08-14T02:37:13.454792+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -1713,10 +2856,60 @@
       "py_files": 0
     },
     {
+      "path": "/tmp/exp_irbnwp8b",
+      "name": "exp_irbnwp8b",
+      "mtime": "2026-08-14T05:41:10.865329+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_ivtf4vp4",
       "name": "exp_ivtf4vp4",
       "mtime": "2026-08-12T16:36:28.614284+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ivzeqbk3",
+      "name": "exp_ivzeqbk3",
+      "mtime": "2026-08-14T07:22:18.717624+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_j2tf156t",
+      "name": "exp_j2tf156t",
+      "mtime": "2026-08-14T07:19:28.664593+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000dd349affeGnd6tTF5jv4xgg",
+        "directory": "/tmp/exp_j2tf156t",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_071816",
+        "cost": 0.0024495072,
+        "tokens_input": 11682,
+        "tokens_output": 1474,
+        "tokens_reasoning": 911,
+        "tokens_cache_read": 52224,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786691898213,
+        "time_updated": 1786691968505
+      }
+    },
+    {
+      "path": "/tmp/exp_j4yskc8k",
+      "name": "exp_j4yskc8k",
+      "mtime": "2026-08-14T04:00:00.410412+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_j5zdtenu",
+      "name": "exp_j5zdtenu",
+      "mtime": "2026-08-14T02:44:32.303379+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -1742,10 +2935,53 @@
       }
     },
     {
+      "path": "/tmp/exp_j7529fke",
+      "name": "exp_j7529fke",
+      "mtime": "2026-08-14T06:57:44.251333+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f064e7ffewIxug1L5jDu5Vj",
+        "directory": "/tmp/exp_j7529fke",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_065719",
+        "cost": 0.0020273176,
+        "tokens_input": 9025,
+        "tokens_output": 1418,
+        "tokens_reasoning": 940,
+        "tokens_cache_read": 36992,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690640665,
+        "time_updated": 1786690664104
+      }
+    },
+    {
       "path": "/tmp/exp_jjhxlbij",
       "name": "exp_jjhxlbij",
       "mtime": "2026-08-12T18:16:30.845120+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_jql_lsep",
+      "name": "exp_jql_lsep",
+      "mtime": "2026-08-14T02:47:49.356038+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_jyp92_g2",
+      "name": "exp_jyp92_g2",
+      "mtime": "2026-08-14T06:53:06.568156+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_knvlle1p",
+      "name": "exp_knvlle1p",
+      "mtime": "2026-08-13T22:58:03.023500+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -1771,6 +3007,20 @@
       }
     },
     {
+      "path": "/tmp/exp_l4ohjk94",
+      "name": "exp_l4ohjk94",
+      "mtime": "2026-08-14T06:44:13.925576+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_l7c7q2ue",
+      "name": "exp_l7c7q2ue",
+      "mtime": "2026-08-14T06:46:19.471345+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_l8xloo4l",
       "name": "exp_l8xloo4l",
       "mtime": "2026-08-13T17:33:56.710246+00:00",
@@ -1793,6 +3043,35 @@
       }
     },
     {
+      "path": "/tmp/exp_lcjtb9dk",
+      "name": "exp_lcjtb9dk",
+      "mtime": "2026-08-14T06:51:21.378009+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f728b2ffeqO4QJqze5CjCCB",
+        "directory": "/tmp/exp_lcjtb9dk",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_064955",
+        "cost": 0.009998822400000001,
+        "tokens_input": 51592,
+        "tokens_output": 2883,
+        "tokens_reasoning": 4617,
+        "tokens_cache_read": 241408,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690197326,
+        "time_updated": 1786690281225
+      }
+    },
+    {
+      "path": "/tmp/exp_li5e97gj",
+      "name": "exp_li5e97gj",
+      "mtime": "2026-08-14T03:08:08.746633+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_m80_wobp",
       "name": "exp_m80_wobp",
       "mtime": "2026-08-10T13:55:47.266837+00:00",
@@ -1813,6 +3092,13 @@
         "time_created": 1786370138167,
         "time_updated": 1786370147153
       }
+    },
+    {
+      "path": "/tmp/exp_msbdomlv",
+      "name": "exp_msbdomlv",
+      "mtime": "2026-08-13T22:58:03.091499+00:00",
+      "total_files": 1,
+      "py_files": 0
     },
     {
       "path": "/tmp/exp_n4k7x3oo",
@@ -1859,6 +3145,151 @@
       }
     },
     {
+      "path": "/tmp/exp_nchem9qn",
+      "name": "exp_nchem9qn",
+      "mtime": "2026-08-14T03:30:39.572240+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_ncxoicdm",
+      "name": "exp_ncxoicdm",
+      "mtime": "2026-08-14T07:12:54.251476+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_nmz5bu4b",
+      "name": "exp_nmz5bu4b",
+      "mtime": "2026-08-14T06:53:06.636155+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_nt673pqf",
+      "name": "exp_nt673pqf",
+      "mtime": "2026-08-14T03:12:16.242328+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001bf1e64ffe5cgOIV6F81I3Vf",
+        "directory": "/tmp/exp_nt673pqf",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_031131",
+        "cost": 0.0033934320000000005,
+        "tokens_input": 14956,
+        "tokens_output": 1868,
+        "tokens_reasoning": 2159,
+        "tokens_cache_read": 61440,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786677092763,
+        "time_updated": 1786677136090
+      }
+    },
+    {
+      "path": "/tmp/exp_nu49k4pn",
+      "name": "exp_nu49k4pn",
+      "mtime": "2026-08-14T07:17:53.254258+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000de00a5ffeMFnwXCscQd2Wsm",
+        "directory": "/tmp/exp_nu49k4pn",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_071724",
+        "cost": 0.0021215879999999998,
+        "tokens_input": 9147,
+        "tokens_output": 1336,
+        "tokens_reasoning": 1194,
+        "tokens_cache_read": 47360,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786691845978,
+        "time_updated": 1786691873096
+      }
+    },
+    {
+      "path": "/tmp/exp_o8zmn8j8",
+      "name": "exp_o8zmn8j8",
+      "mtime": "2026-08-14T04:03:09.071371+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00190560affebiVw58Akm4faG5",
+        "directory": "/tmp/exp_o8zmn8j8",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_040237",
+        "cost": 0.0020140736,
+        "tokens_input": 8450,
+        "tokens_output": 1466,
+        "tokens_reasoning": 1241,
+        "tokens_cache_read": 26112,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786680158709,
+        "time_updated": 1786680188954
+      }
+    },
+    {
+      "path": "/tmp/exp_oif7b1op",
+      "name": "exp_oif7b1op",
+      "mtime": "2026-08-14T02:52:11.923579+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_oqrzui64",
+      "name": "exp_oqrzui64",
+      "mtime": "2026-08-14T02:51:23.448402+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d1ff45ffeBH8C0oqcdz4gkY",
+        "directory": "/tmp/exp_oqrzui64",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_025053",
+        "cost": 0.0020062839999999997,
+        "tokens_input": 8959,
+        "tokens_output": 1479,
+        "tokens_reasoning": 842,
+        "tokens_cache_read": 36480,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675855546,
+        "time_updated": 1786675883295
+      }
+    },
+    {
+      "path": "/tmp/exp_p4o_wka4",
+      "name": "exp_p4o_wka4",
+      "mtime": "2026-08-14T05:34:02.096507+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_p6ddsfzy",
+      "name": "exp_p6ddsfzy",
+      "mtime": "2026-08-14T03:13:26.277114+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001bdcecbffeURl6yqJg4tXHmd",
+        "directory": "/tmp/exp_p6ddsfzy",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_031257",
+        "cost": 0.0019876024,
+        "tokens_input": 8945,
+        "tokens_output": 1235,
+        "tokens_reasoning": 1025,
+        "tokens_cache_read": 36608,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786677178676,
+        "time_updated": 1786677206169
+      }
+    },
+    {
       "path": "/tmp/exp_pmmasen8",
       "name": "exp_pmmasen8",
       "mtime": "2026-08-10T01:02:57.399211+00:00",
@@ -1878,6 +3309,28 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786323755525,
         "time_updated": 1786323777272
+      }
+    },
+    {
+      "path": "/tmp/exp_pn9i0zz6",
+      "name": "exp_pn9i0zz6",
+      "mtime": "2026-08-14T05:45:44.496948+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00132639affePc1I9PxqxHXLpo",
+        "directory": "/tmp/exp_pn9i0zz6",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_054514",
+        "cost": 0.0021902888,
+        "tokens_input": 9459,
+        "tokens_output": 1484,
+        "tokens_reasoning": 1120,
+        "tokens_cache_read": 48896,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786686315621,
+        "time_updated": 1786686344369
       }
     },
     {
@@ -1903,6 +3356,28 @@
       }
     },
     {
+      "path": "/tmp/exp_q4oro7t2",
+      "name": "exp_q4oro7t2",
+      "mtime": "2026-08-14T06:57:19.267767+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f131f6ffefibgd7K9QnJUdt",
+        "directory": "/tmp/exp_q4oro7t2",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_065626",
+        "cost": 0.0106231216,
+        "tokens_input": 59532,
+        "tokens_output": 2977,
+        "tokens_reasoning": 1582,
+        "tokens_cache_read": 361472,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690588169,
+        "time_updated": 1786690639119
+      }
+    },
+    {
       "path": "/tmp/exp_qkc3lf50",
       "name": "exp_qkc3lf50",
       "mtime": "2026-08-13T17:35:07.181165+00:00",
@@ -1925,11 +3400,54 @@
       }
     },
     {
+      "path": "/tmp/exp_qu4skmr_",
+      "name": "exp_qu4skmr_",
+      "mtime": "2026-08-14T06:43:22.482493+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_r4ypmym9",
       "name": "exp_r4ypmym9",
       "mtime": "2026-08-12T16:33:41.789036+00:00",
       "total_files": 1,
       "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_r52xn0v0",
+      "name": "exp_r52xn0v0",
+      "mtime": "2026-08-14T02:54:17.357447+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_r6yd10es",
+      "name": "exp_r6yd10es",
+      "mtime": "2026-08-14T03:08:08.678634+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_rr4jrmj3",
+      "name": "exp_rr4jrmj3",
+      "mtime": "2026-08-14T05:45:14.301277+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_00132c056ffeuM3m2PrUBmLymK",
+        "directory": "/tmp/exp_rr4jrmj3",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_054450",
+        "cost": 0.001803144,
+        "tokens_input": 8340,
+        "tokens_output": 1069,
+        "tokens_reasoning": 1060,
+        "tokens_cache_read": 14080,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786686291881,
+        "time_updated": 1786686314153
+      }
     },
     {
       "path": "/tmp/exp_s1b2dffm",
@@ -1976,6 +3494,13 @@
       }
     },
     {
+      "path": "/tmp/exp_slwr_yzn",
+      "name": "exp_slwr_yzn",
+      "mtime": "2026-08-14T06:46:19.371346+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_stizxtuh",
       "name": "exp_stizxtuh",
       "mtime": "2026-08-10T01:07:47.274863+00:00",
@@ -1998,6 +3523,28 @@
       }
     },
     {
+      "path": "/tmp/exp_t2_hf0d9",
+      "name": "exp_t2_hf0d9",
+      "mtime": "2026-08-14T06:56:26.760679+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000f196aaffewHmke4uKtdIX6q",
+        "directory": "/tmp/exp_t2_hf0d9",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_065600",
+        "cost": 0.0019506256,
+        "tokens_input": 8682,
+        "tokens_output": 1391,
+        "tokens_reasoning": 871,
+        "tokens_cache_read": 36352,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786690562389,
+        "time_updated": 1786690586613
+      }
+    },
+    {
       "path": "/tmp/exp_tipktaru",
       "name": "exp_tipktaru",
       "mtime": "2026-08-12T00:18:10.675503+00:00",
@@ -2017,6 +3564,42 @@
         "model_id": "deepseek-v4-flash",
         "time_created": 1786493875484,
         "time_updated": 1786493890561
+      }
+    },
+    {
+      "path": "/tmp/exp_ts4owz79",
+      "name": "exp_ts4owz79",
+      "mtime": "2026-08-14T04:19:54.307068+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_twp_1m8f",
+      "name": "exp_twp_1m8f",
+      "mtime": "2026-08-14T06:10:04.323664+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_u3frqla8",
+      "name": "exp_u3frqla8",
+      "mtime": "2026-08-14T07:26:55.532791+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_000d5b08effeptArh3Z5hquuyx",
+        "directory": "/tmp/exp_u3frqla8",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_072629",
+        "cost": 0.0020047272,
+        "tokens_input": 9003,
+        "tokens_output": 1258,
+        "tokens_reasoning": 1038,
+        "tokens_cache_read": 36224,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786692390769,
+        "time_updated": 1786692415417
       }
     },
     {
@@ -2064,6 +3647,72 @@
       }
     },
     {
+      "path": "/tmp/exp_v_cgeiat",
+      "name": "exp_v_cgeiat",
+      "mtime": "2026-08-14T02:53:57.049792+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001cfdfb8ffecOEc8xwdcW5EMZ",
+        "directory": "/tmp/exp_v_cgeiat",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_025312",
+        "cost": 0.002464784,
+        "tokens_input": 9028,
+        "tokens_output": 1728,
+        "tokens_reasoning": 2164,
+        "tokens_cache_read": 39680,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675994695,
+        "time_updated": 1786676036800
+      }
+    },
+    {
+      "path": "/tmp/exp_vrvo3bw1",
+      "name": "exp_vrvo3bw1",
+      "mtime": "2026-08-14T02:41:19.386644+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001db184effet1BgYqOajOymoc",
+        "directory": "/tmp/exp_vrvo3bw1",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_024057",
+        "cost": 0.0018287135999999998,
+        "tokens_input": 8984,
+        "tokens_output": 1057,
+        "tokens_reasoning": 625,
+        "tokens_cache_read": 35712,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675259313,
+        "time_updated": 1786675279276
+      }
+    },
+    {
+      "path": "/tmp/exp_w6q6g9ds",
+      "name": "exp_w6q6g9ds",
+      "mtime": "2026-08-14T02:50:24.377406+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001d2e6faffeVF82H3MSV2ICtK",
+        "directory": "/tmp/exp_w6q6g9ds",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_024953",
+        "cost": 0.0019764248,
+        "tokens_input": 8551,
+        "tokens_output": 1291,
+        "tokens_reasoning": 1240,
+        "tokens_cache_read": 25216,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786675796230,
+        "time_updated": 1786675824191
+      }
+    },
+    {
       "path": "/tmp/exp_w8e8__z7",
       "name": "exp_w8e8__z7",
       "mtime": "2026-08-10T02:23:07.389981+00:00",
@@ -2108,9 +3757,81 @@
       }
     },
     {
+      "path": "/tmp/exp_xdhy0rg3",
+      "name": "exp_xdhy0rg3",
+      "mtime": "2026-08-14T00:17:52.379020+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_xf0rtl32",
+      "name": "exp_xf0rtl32",
+      "mtime": "2026-08-14T06:05:18.988205+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_0012047c2ffe4wADIisW4mcViL",
+        "directory": "/tmp/exp_xf0rtl32",
+        "title": "meta_compare_exp_0s36_d3n_vs_exp_0s36_d3n_20260814_060500",
+        "cost": 0.0017037328000000002,
+        "tokens_input": 8890,
+        "tokens_output": 983,
+        "tokens_reasoning": 411,
+        "tokens_cache_read": 24576,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687502397,
+        "time_updated": 1786687518852
+      }
+    },
+    {
+      "path": "/tmp/exp_xf7ifi8g",
+      "name": "exp_xf7ifi8g",
+      "mtime": "2026-08-14T03:30:39.504240+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_xhtgrn13",
       "name": "exp_xhtgrn13",
       "mtime": "2026-08-13T13:06:30.918756+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_xjdhrdo4",
+      "name": "exp_xjdhrdo4",
+      "mtime": "2026-08-14T00:17:52.443019+00:00",
+      "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_xnh96f7_",
+      "name": "exp_xnh96f7_",
+      "mtime": "2026-08-14T02:58:31.724824+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001cb9d41ffevhW4WgrUjf2Euk",
+        "directory": "/tmp/exp_xnh96f7_",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_025752",
+        "cost": 0.0022671488,
+        "tokens_input": 8696,
+        "tokens_output": 1505,
+        "tokens_reasoning": 1883,
+        "tokens_cache_read": 36096,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786676273854,
+        "time_updated": 1786676311604
+      }
+    },
+    {
+      "path": "/tmp/exp_xotwj6qn",
+      "name": "exp_xotwj6qn",
+      "mtime": "2026-08-14T07:31:03.924848+00:00",
       "total_files": 1,
       "py_files": 0
     },
@@ -2119,6 +3840,35 @@
       "name": "exp_xwv606md",
       "mtime": "2026-08-12T21:07:19.470772+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_y3em423k",
+      "name": "exp_y3em423k",
+      "mtime": "2026-08-14T06:13:10.648671+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001193d56ffegyuxa3hknsJn4z",
+        "directory": "/tmp/exp_y3em423k",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_061242",
+        "cost": 0.0020581064000000002,
+        "tokens_input": 8521,
+        "tokens_output": 1730,
+        "tokens_reasoning": 1109,
+        "tokens_cache_read": 25088,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786687963817,
+        "time_updated": 1786687990504
+      }
+    },
+    {
+      "path": "/tmp/exp_y57csizh",
+      "name": "exp_y57csizh",
+      "mtime": "2026-08-13T21:39:25.919778+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -2144,10 +3894,46 @@
       }
     },
     {
+      "path": "/tmp/exp_yct6_oos",
+      "name": "exp_yct6_oos",
+      "mtime": "2026-08-14T03:12:57.273617+00:00",
+      "total_files": 22,
+      "py_files": 0,
+      "session": {
+        "id": "ses_001be6eeaffeD989Yo9rCpaPcL",
+        "directory": "/tmp/exp_yct6_oos",
+        "title": "meta_analyze_exp_0s36_d3n_20260814_031216",
+        "cost": 0.0021274512,
+        "tokens_input": 9694,
+        "tokens_output": 1284,
+        "tokens_reasoning": 1220,
+        "tokens_cache_read": 24704,
+        "tokens_cache_write": 0,
+        "provider": "deepseek",
+        "model_id": "deepseek-v4-flash",
+        "time_created": 1786677137685,
+        "time_updated": 1786677177125
+      }
+    },
+    {
+      "path": "/tmp/exp_ytbkm0zd",
+      "name": "exp_ytbkm0zd",
+      "mtime": "2026-08-14T05:34:02.028508+00:00",
+      "total_files": 0,
+      "py_files": 0
+    },
+    {
       "path": "/tmp/exp_yyigzy9l",
       "name": "exp_yyigzy9l",
       "mtime": "2026-08-12T16:50:13.577751+00:00",
       "total_files": 1,
+      "py_files": 0
+    },
+    {
+      "path": "/tmp/exp_z9_rz0y5",
+      "name": "exp_z9_rz0y5",
+      "mtime": "2026-08-13T21:46:55.560807+00:00",
+      "total_files": 0,
       "py_files": 0
     },
     {
@@ -9523,6 +11309,209 @@
       "model_id": "deepseek-v4-flash",
       "cost": 0.004166304799999999,
       "tokens_output": 3322
+    },
+    {
+      "title": "API spec mutation: false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0007260232,
+      "tokens_output": 194
+    },
+    {
+      "title": "Mutation compiler false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 9.41248e-05,
+      "tokens_output": 72
+    },
+    {
+      "title": "meta_batch_20260814_024119",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001254568,
+      "tokens_output": 725
+    },
+    {
+      "title": "API mutation with false premise",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0028875056,
+      "tokens_output": 163
+    },
+    {
+      "title": "Map Flask APIs payloads (@explore subagent)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 5325
+    },
+    {
+      "title": "Find session control APIs (@explore subagent)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 6683
+    },
+    {
+      "title": "meta_batch_20260814_025123",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011722368000000002,
+      "tokens_output": 575
+    },
+    {
+      "title": "API spec mutation task",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0027990256,
+      "tokens_output": 171
+    },
+    {
+      "title": "meta_batch_20260814_025357",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011756752,
+      "tokens_output": 550
+    },
+    {
+      "title": "Mutation compiler false premise injection",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001739696,
+      "tokens_output": 25
+    },
+    {
+      "title": "meta_batch_20260814_025900",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011865168,
+      "tokens_output": 565
+    },
+    {
+      "title": "meta_batch_20260814_031326",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0012094152,
+      "tokens_output": 570
+    },
+    {
+      "title": "meta_batch_20260814_040400",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010966144,
+      "tokens_output": 470
+    },
+    {
+      "title": "[task_manager_api] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.002140516,
+      "tokens_output": 1815
+    },
+    {
+      "title": "[task_manager_api] Session 2: feature_addition",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0042201432,
+      "tokens_output": 4973
+    },
+    {
+      "title": "[task_manager_api] Session 3: integration",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0067490136,
+      "tokens_output": 3134
+    },
+    {
+      "title": "[task_manager_api] Session 4: refactor",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0051886912,
+      "tokens_output": 4691
+    },
+    {
+      "title": "[task_manager_api] Session 5: cross_cutting",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.028509644799999997,
+      "tokens_output": 14767
+    },
+    {
+      "title": "[static_site_gen] Session 1: greenfield",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.006703737600000001,
+      "tokens_output": 9168
+    },
+    {
+      "title": "meta_batch_20260814_054544",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011684568,
+      "tokens_output": 521
+    },
+    {
+      "title": "Map admin API SSE (@explore subagent)",
+      "provider": "openai",
+      "model_id": "gpt-5.6-sol",
+      "cost": 0.0,
+      "tokens_output": 11861
+    },
+    {
+      "title": "meta_batch_20260814_060518",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0011297943999999999,
+      "tokens_output": 408
+    },
+    {
+      "title": "meta_batch_20260814_061413",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0033159951999999996,
+      "tokens_output": 1764
+    },
+    {
+      "title": "API spec mutation test",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001796256,
+      "tokens_output": 35
+    },
+    {
+      "title": "meta_batch_20260814_065016",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0012045152,
+      "tokens_output": 559
+    },
+    {
+      "title": "meta_batch_20260814_065154",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0036391936000000004,
+      "tokens_output": 1667
+    },
+    {
+      "title": "meta_batch_20260814_065744",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0012311488,
+      "tokens_output": 694
+    },
+    {
+      "title": "meta_batch_20260814_071928",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.0010955560000000001,
+      "tokens_output": 469
+    },
+    {
+      "title": "meta_batch_20260814_072655",
+      "provider": "deepseek",
+      "model_id": "deepseek-v4-flash",
+      "cost": 0.001252412,
+      "tokens_output": 661
     }
   ]
 }
