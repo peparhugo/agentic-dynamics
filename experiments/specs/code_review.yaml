@@ -1,0 +1,54 @@
+name: code_review
+question: "Can an agent produce a grounded code + architecture review of a task's worktree?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: code_review
+        kind: agent
+        prompt: |
+          Perform a thorough code review of the following and write docs/code_review.md.
+
+          SUBJECT:
+          {goal}
+
+          METHOD:
+          - Read the actual code in this worktree (admin/, src/, scripts/ — whatever the subject covers).
+            Cite file paths and line numbers for every claim. Do not speculate about code you have not read.
+          - Look for: correctness bugs, edge cases, resource leaks, race conditions, error handling gaps,
+            and conformance to the repo's stated conventions.
+          - Ground in the repo's own signals where they exist (src/instrument/review.py, commit_analysis,
+            lsp_diagnostics) rather than opinion alone.
+
+          DELIVER exactly one file, docs/code_review.md, with severity-tagged findings (CRITICAL / MAJOR /
+          MINOR / NIT), each with file:line evidence and a concrete fix.
+      - name: architecture_review
+        kind: agent
+        prompt: |
+          Perform an architecture review of the following and write docs/architecture_review.md.
+
+          SUBJECT:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          METHOD:
+          - Assess: module boundaries, coupling/cohesion, data flow (the SSE + Redis telemetry path), the
+            client-vs-server split, and how the change fits (or fights) the repo's information-acquisition
+            architecture (instrument → derive → policy → grid → campaign).
+          - Cite file paths. Distinguish "violates an explicit constraint" from "stylistic preference".
+
+          DELIVER exactly one file, docs/architecture_review.md, with: (1) architecture summary,
+          (2) strengths, (3) risks/debt, (4) recommended changes ranked by impact vs effort.
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
