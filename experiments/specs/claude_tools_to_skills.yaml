@@ -1,0 +1,111 @@
+name: claude_tools_to_skills
+question: "Can the opencode tools (.opencode/tools/*.ts) be reframed as Claude Code skills that run the underlying scripts, without duplicating what the existing ported skills and commands already cover?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Read the tool surface and the existing Claude port, then write
+          docs/claude_tools_to_skills_scope.md.
+
+          GOAL:
+          {goal}
+
+          READ THESE (ground truth — do not rely on memory):
+          - .opencode/tools/*.ts (25 files) — extract each tool's description, args schema, and the
+            exact script/command it shells to.
+          - The scripts/*.py those tools invoke — confirm the EXACT argparse/sys.argv flags. A tool's
+            declared args do NOT always match the script: compile_experiment.py has no CLI (the tool
+            runs an inline `python3 -c` snippet), and some scripts parse sys.argv manually.
+          - .claude/skills/*/SKILL.md and .claude/commands/*.md (existing port: skills = analyze,
+            instrument, lab-books; commands = analyze, lab, new-exp, pipeline, run-exp) — check for
+            NAME COLLISIONS and REDUNDANT COVERAGE.
+
+          STARTING HYPOTHESIS (verify and correct it — this is the disposition to confirm, not gospel):
+          - NET-NEW skills (genuinely uncovered; no existing skill/command covers these):
+            1. run-workflow  <- run_workflow.ts + compile_experiment.ts  (spec -> DAG -> execute)
+            2. control-room  <- control_room.ts + supervisor.ts           (read-only / flag-only boundary)
+            3. queue         <- enqueue.ts + worker.ts + monitor.ts + dashboard.ts  (Redis lifecycle)
+            4. review        <- review.ts  (review_all / review_stories / trigger / enqueue / finalize)
+          - FOLD into existing skills (edit the existing SKILL.md, no new file):
+            - instrument skill <- run_experiment.ts, run_story.ts, batch.ts, sweep.ts, list_stories.ts
+            - analyze skill   <- analyze_worktrees.ts, analyze_trajectories.ts, sync_data.ts,
+                                 build_data.ts, validate_session.ts
+            - lab-books skill <- run_lab.ts
+          - SKIP (leave as documented scripts; already covered or trivial):
+            - pipeline.ts (covered by the `pipeline` command), inventory.ts, backfill.ts,
+              archive_worktrees.ts, generate_manifest.ts, list_stories.ts
+
+          DELIVER exactly one file, docs/claude_tools_to_skills_scope.md:
+          (1) the final skill -> tool disposition table (net-new / fold-into / skip, each with a reason),
+          (2) for each net-new skill, the exact CLI invocation + every flag + default + enum, VERIFIED
+              against the script (quote the argparse/add_argument line or the manual sys.argv parse),
+          (3) every correction you made to the hypothesis (collision found, redundancy found, wrong
+              script, missing flag),
+          (4) a numbered acceptance list the build phase can check off and verify can test.
+      - name: build
+        kind: agent
+        prompt: |
+          Execute the port per docs/claude_tools_to_skills_scope.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Write each net-new skill to .claude/skills/<name>/SKILL.md with frontmatter:
+            name (lowercase-hyphenated, matches the folder), description (what it does AND when to use
+            it, front-loading the script filename and trigger keywords), disable-model-invocation: false,
+            user-invocable: false, argument-hint.
+          - Skill body: (a) what the script does + when to use it, (b) exact invocation with every flag,
+            default, and enum, (c) ordering where it matters (queue: enqueue -> worker -> monitor;
+            review: all/stories vs trigger/enqueue/finalize), (d) the boundary where it matters
+            (control-room: read-only GET only, never steer/interrupt — state this in the body).
+          - Do NOT fabricate flags: every flag must trace to the script's argparse/sys.argv. Where a
+            tool's args do not match the script (compile_experiment has no CLI — document the exact
+            inline `python3 -c` snippet the tool runs), document the mismatch; do not invent a CLI.
+          - Fold edits: append a short "Tool invocations" section to the existing skill (instrument,
+            analyze, lab-books) listing the wrapped scripts + flags. Preserve all existing content.
+          - Update docs/claude_code_port.md: flip the D1 "don't build it" row to "ported as skills",
+            add the skill -> tool disposition table (net-new / fold / skip), and note the split.
+          - Do NOT touch .opencode/ — the opencode tools stay as-is. Do NOT add an MCP server.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the port is correct and self-consistent, and write
+          docs/claude_tools_to_skills_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS (report PASS/FAIL for each):
+          - Every net-new skill's flags match the underlying script's argparse/sys.argv
+            (grep the script for add_argument / --flag; quote the line).
+          - No skill name collides with an existing .claude/skills/*/ or .claude/commands/*.md name.
+          - No tool is double-covered (in a net-new skill AND redundantly in an existing skill/command).
+          - Fold edits are additive — existing skill content preserved verbatim.
+          - docs/claude_code_port.md D1 row now says "ported as skills" and carries the disposition table.
+          - Every script referenced by a skill exists in scripts/.
+          - Dry-run each net-new skill's invocation where a cheap flag exists (--dry-run/--check).
+
+          DELIVER exactly one file, docs/claude_tools_to_skills_verify.md: PASS/FAIL per check + a
+          summary of anything still inconsistent (there should be none).
+factors:
+  - {name: model, levels: [anthropic/claude-fable-5]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: verified_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 6.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
