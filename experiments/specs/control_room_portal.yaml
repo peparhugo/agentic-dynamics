@@ -1,0 +1,41 @@
+name: control_room_portal
+question: "Does the agent_task workflow produce a working, measured enhancement to the control plane?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/scope.md scoping the following feature.
+          Goal: {goal}
+          Ground the scope in the existing code (admin/server.py, admin/static/). Do not invent new infrastructure.
+          Deliver exactly one file: docs/scope.md containing problem, constraints, and a concrete acceptance list.
+      - name: ux_design
+        kind: agent
+        prompt: |
+          Write docs/ux.md designing the user experience for: {goal}
+          Prior phases: {prior_phases}
+          Reference the existing admin/static/ (index.html, app.js, style.css).
+          Deliver exactly one file: docs/ux.md with layout, interaction flow, and visual language.
+      - name: implement
+        kind: agent
+        prompt: |
+          Implement the feature per docs/scope.md and docs/ux.md.
+          Goal: {goal}
+          Prior phases: {prior_phases}
+          Modify admin/ only. Keep the Flask SSE backend and Redis keys intact. Add tests.
+      - name: verify
+        kind: test
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: verified_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

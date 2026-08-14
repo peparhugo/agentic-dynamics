@@ -149,6 +149,14 @@ from .story import (
 # Deprecated: StrategyType — not used by current scripts
 from .strategy import StrategyReport, classify_strategy
 from .streaming import StreamResult, stream_subprocess
+from .test_runner import run_suite, test_executed_success
+
+# v1.0: the execute phase — run an agent_task workflow in a worktree
+from .workflow_runner import (
+    PhaseResult,
+    WorkflowRunResult,
+    run_workflow,
+)
 
 __all__ = [
     "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for",
@@ -196,4 +204,6 @@ __all__ = [
     "DAG", "Phase", "SpecError", "RuleResult", "MEASUREMENT_RULES",
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",
+    "PhaseResult", "WorkflowRunResult", "run_workflow",
+    "run_suite", "test_executed_success",
 ]
