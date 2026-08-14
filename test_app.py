@@ -50,8 +50,11 @@ def test_list_tasks_ordered_by_created_at_desc(client):
     create_task(client, "third")
     resp = client.get("/tasks", headers=auth_headers(client))
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    body = resp.get_json()
+    tasks = body["data"]
     assert len(tasks) == 3
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
     assert [t["title"] for t in tasks] == ["third", "second", "first"]
     assert [t["created_at"] for t in tasks] == sorted(
         [t["created_at"] for t in tasks], reverse=True
@@ -165,8 +168,8 @@ def test_users_see_only_their_own_tasks(client):
     a1 = client.post("/tasks", json={"title": "alice task"}, headers=alice).get_json()
     b1 = client.post("/tasks", json={"title": "bob task"}, headers=bob).get_json()
 
-    alice_tasks = client.get("/tasks", headers=alice).get_json()
-    bob_tasks = client.get("/tasks", headers=bob).get_json()
+    alice_tasks = client.get("/tasks", headers=alice).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob).get_json()["data"]
     assert [t["title"] for t in alice_tasks] == ["alice task"]
     assert [t["title"] for t in bob_tasks] == ["bob task"]
 

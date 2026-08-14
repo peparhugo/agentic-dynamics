@@ -4,6 +4,7 @@ import tempfile
 fd, path = tempfile.mkstemp(suffix=".db")
 os.close(fd)
 os.environ["DATABASE"] = path
+os.environ.setdefault("RATELIMIT_STORAGE_URI", "redis://localhost:6379")
 
 import pytest
 
@@ -23,6 +24,13 @@ def reset_db():
         conn.execute("DELETE FROM users")
         conn.commit()
     yield
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    app_module.limiter.reset()
+    yield
+    app_module.limiter.reset()
 
 
 @pytest.fixture()

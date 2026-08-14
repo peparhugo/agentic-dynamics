@@ -11,6 +11,9 @@ from werkzeug.security import check_password_hash
 import os
 import jwt
 
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 from repositories import get_db, UserRepository, TaskRepository
 from tasks import send_notification_email
 
@@ -20,6 +23,42 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 user_repo = UserRepository()
 task_repo = TaskRepository()
+
+
+# ── Rate limiting ──────────────────────────────────────────────
+
+def rate_limit_key() -> str:
+    """Identify a caller for rate limiting: authenticated user or IP."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth[len("Bearer "):]
+        try:
+            payload = jwt.decode(
+                token, app.config["SECRET_KEY"], algorithms=["HS256"]
+            )
+        except jwt.PyJWTError:
+            pass
+        else:
+            user_id = payload.get("sub")
+            if user_id is not None:
+                return f"user:{user_id}"
+    return f"ip:{get_remote_address()}"
+
+
+def app_rate_limit() -> str:
+    """Rate limit applied to every endpoint, per authenticated user."""
+    return os.environ.get("RATELIMIT_APP_LIMIT", "100 per minute")
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    storage_uri=os.environ.get(
+        "RATELIMIT_STORAGE_URI", "redis://localhost:6379"
+    ),
+    application_limits=[app_rate_limit],
+    headers_enabled=True,
+)
+limiter.init_app(app)
 
 
 def init_db():
@@ -115,7 +154,32 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(task_repo.get_tasks_by_owner(owner_id=g.user["id"]))
+    cursor_raw = request.args.get("cursor")
+    cursor = None
+    if cursor_raw is not None and cursor_raw != "":
+        try:
+            cursor = int(cursor_raw)
+        except ValueError:
+            return jsonify({"error": "invalid cursor"}), 400
+
+    limit_raw = request.args.get("limit", "20")
+    try:
+        limit = int(limit_raw)
+    except ValueError:
+        return jsonify({"error": "invalid limit"}), 400
+    limit = max(1, min(limit, 100))
+
+    items, next_cursor = task_repo.get_tasks_page(
+        owner_id=g.user["id"], cursor=cursor, limit=limit
+    )
+    total = task_repo.count_tasks_by_owner(g.user["id"])
+    return jsonify(
+        {
+            "data": items,
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.route("/tasks", methods=["POST"])

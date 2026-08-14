@@ -129,6 +129,37 @@ class TaskRepository(BaseRepository):
         """Fetch all tasks for an owner, newest first."""
         return self.get_many(owner_id=owner_id, order_by="created_at DESC")
 
+    def get_tasks_page(
+        self, owner_id: int, cursor: int | None = None, limit: int = 20
+    ) -> tuple[list[dict], int | None]:
+        """Fetch a cursor-paginated page of tasks for an owner, newest first.
+
+        Returns (items, next_cursor). next_cursor is the id of the last item
+        on the page when more pages exist, otherwise None.
+        """
+        params: list = [owner_id]
+        query = f"SELECT * FROM {self.table} WHERE owner_id = ?"
+        if cursor is not None:
+            query += " AND id < ?"
+            params.append(cursor)
+        query += " ORDER BY created_at DESC, id DESC LIMIT ?"
+        params.append(limit + 1)
+        with self._db:
+            rows = self._db.execute(query, params).fetchall()
+        items = self._rows_to_dicts(rows[:limit])
+        has_more = len(rows) > limit
+        next_cursor = items[-1]["id"] if (has_more and items) else None
+        return items, next_cursor
+
+    def count_tasks_by_owner(self, owner_id: int) -> int:
+        """Return the total number of tasks owned by owner_id."""
+        with self._db:
+            row = self._db.execute(
+                f"SELECT COUNT(*) FROM {self.table} WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()
+        return row[0]
+
     def get_task(self, task_id: int, owner_id: int | None = None) -> dict | None:
         """Fetch a single task, optionally scoped to an owner."""
         if owner_id is None:
