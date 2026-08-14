@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build data.js for the AI FinOps Dynamics website.
+"""Build data.js for the Agentic Dynamics website.
 
 Reads inventory.json, _results_summary.json, and opencode.db,
 produces a single data.js with window.DYNAMICS_DATA containing
@@ -1164,7 +1164,7 @@ def build():
 
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="Build data.js for the AI FinOps Dynamics website")
+    parser = argparse.ArgumentParser(description="Build data.js for the Agentic Dynamics website")
     parser.add_argument("--dry-run", action="store_true", help="Print instead of writing")
     args = parser.parse_args()
 

@@ -1,4 +1,4 @@
-# AI FinOps Dynamics
+# Agentic Dynamics
 
 <p align="center">
   <strong>Success isn't value. An experimental instrument measuring what drives the cost and value of agentic AI outcomes.</strong><br>
@@ -6,13 +6,17 @@
 </p>
 
 <p align="center">
-  <a href="https://ai-finops-rulebook.web.app"><img src="https://img.shields.io/badge/website-ai--finops--rulebook.web.app-%236366F1" alt="Website"></a>
+  <a href="https://ai-finops-rulebook.web.app"><img src="https://img.shields.io/badge/website-Agentic%20Dynamics-%236366F1" alt="Website"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="License"></a>
 </p>
 
 ---
 
 ## What This Is
+
+**Agentic Dynamics is the empirical study of how AI agents behave, adapt, interact, recover, and produce outcomes across changing tasks, environments, workflows, and time.**
+
+Economics, verification, recovery, resilience, behavior, coordination, and governance are dimensions and research areas within Agentic Dynamics. This repository currently measures a bounded subset through coding-agent experiments; it does not yet claim broad evidence about swarms or organizational outcomes.
 
 A measurement instrument that deliberately degrades engineering specifications — missing constraints, false premises, contradictory requirements, alien vocabulary — then runs coding agents against them and measures the full chain:
 
@@ -168,8 +172,8 @@ All numbers on the website are live-generated. Every measurement is provenance-t
 **Prerequisites:** Python 3.10+, [opencode](https://opencode.ai) CLI, LLM API credentials.
 
 ```bash
-git clone https://github.com/peparhugo/ai-finops-framework.git
-cd ai-finops-framework
+git clone https://github.com/peparhugo/agentic-dynamics.git
+cd agentic-dynamics
 pip install -e .
 ```
 
@@ -254,15 +258,15 @@ python scripts/lab_survival_horizon.py # Sessions-to-bankruptcy
 
 **In progress:** Rust, Go validation. Structural perturbation operators (dependency injection, AST corruption). Multi-language AST expansion.
 
-**Not in scope:** The framework measures cost — it does not judge whether narration is "wasteful" or "valuable." The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.
+**Not in scope:** The instrument measures cost — it does not judge whether narration is "wasteful" or "valuable." The instrument is model-agnostic. DeepSeek was chosen as the anchor case study, not an endorsement.
 
 ---
 
 ## Citation
 
 ```bibtex
-@misc{ai-finops-dynamics-2026,
-  title  = {AI FinOps Dynamics: An experimental instrument for the economics of agentic AI},
+@misc{agentic-dynamics-2026,
+  title  = {Agentic Dynamics: An experimental instrument for the economics of agentic AI},
   author = {Hugo Pepar},
   year   = {2026},
   url    = {https://ai-finops-rulebook.web.app},

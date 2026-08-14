@@ -13,7 +13,7 @@ Hosted at [ai-finops-rulebook.web.app](https://ai-finops-rulebook.web.app). Fire
 
 | File | Page | Content |
 |------|------|---------|
-| `index.html` | Home | AI FinOps Dynamics hero + key findings |
+| `index.html` | Home | Agentic Dynamics hero + key findings |
 | `framework.html` | Operational Framework | 10 principles, levers, interactive calculator, provider playbook |
 | `evidence.html` | The Evidence | Grit spectrum, cost ranking, AST analysis, perturbation response |
 | `story.html` | The Story | How a $20 API key became an experimental instrument |

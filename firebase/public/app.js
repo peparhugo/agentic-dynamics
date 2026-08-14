@@ -1,4 +1,4 @@
-/* === AI FinOps Dynamics — Shared JavaScript === */
+/* === Agentic Dynamics — Shared JavaScript === */
 /* v0.5 */
 
 /* --- Theme Toggle --- */

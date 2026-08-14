@@ -1,0 +1,152 @@
+name: agentic_dynamics_rebrand
+question: "Can sol rebrand the repository and public website around the field of Agentic Dynamics without changing the instrument or its evidence?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: html
+    fork: true
+    phases:
+      - name: scope
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Audit the repository's active README and Firebase website, then write the implementation
+          brief to docs/agentic_dynamics_rebrand_plan.md.
+
+          RETRY BEHAVIOR:
+          - If docs/agentic_dynamics_rebrand_plan.md already exists and contains the canonical
+            identity, file allowlist, page-level passage plan, preserved references, and immutable
+            values required below, treat the scope phase as complete. Read it, report that it is
+            reusable, and do not repeat the repository audit or modify any files.
+
+          GOAL:
+          {goal}
+
+          CANONICAL IDENTITY:
+          - Field name: **Agentic Dynamics**.
+          - Definition: "Agentic Dynamics is the empirical study of how AI agents behave, adapt,
+            interact, recover, and produce outcomes across changing tasks, environments, workflows,
+            and time."
+          - Intended GitHub repository slug: `agentic-dynamics`.
+          - Keep the existing Firebase host `https://ai-finops-rulebook.web.app`. Do not acquire,
+            configure, or refer to a new custom domain.
+
+          STRICT SCOPE:
+          - Public repository identity in README.md.
+          - Active public repository metadata and contributor links in CITATION.cff,
+            CONTRIBUTING.md, CODE_OF_CONDUCT.md, and pyproject.toml.
+          - Public website identity and field-defining prose in firebase/public/.
+          - Supporting website metadata and assets only where required to prevent the old public
+            identity from remaining visible.
+          - The external GitHub repository rename is NOT part of this workflow. The implementation
+            may update public links to the intended future repository URL, but must record the actual
+            GitHub rename as a manual follow-up.
+
+          OUT OF SCOPE:
+          - Do not rename the Python distribution, import namespace, environment variables, Redis
+            keys, Docker services, Firebase project, source modules, experiment directories, or data
+            contracts such as window.DYNAMICS_DATA.
+          - Do not rewrite historical experiment results, transcripts, reviews, reports, generated
+            inventory, superseded plans, or Git history.
+          - Do not change experimental measurements, formulas, provenance classes, or generated data
+            values. Generic references to FinOps and the FinOps Foundation may remain when they refer
+            to the economics subfield or external related work.
+
+          READ FIRST:
+          - README.md
+          - firebase/CONTEXT.md
+          - all eight firebase/public/*.html pages
+          - firebase/public/app.js and firebase/public/base.css
+          - scripts/build_data.py only to identify whether it emits public brand text
+
+          The brief must list the exact files and passages to change, identify references that must
+          remain, define the page-level narrative, and list all values/provenance markers that must
+          not change.
+
+          DELIVER exactly one file: docs/agentic_dynamics_rebrand_plan.md.
+      - name: implement
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Implement the Agentic Dynamics rebrand according to
+          docs/agentic_dynamics_rebrand_plan.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          REQUIRED OUTCOME:
+          - README.md introduces Agentic Dynamics as the umbrella field using the canonical
+            definition. It accurately describes the current instrument and evidence; it does not
+            claim that the corpus already measures broad swarm behavior or organizational outcomes.
+          - Economics, verification, recovery, resilience, behavior, coordination, and governance
+            are presented as dimensions or research areas within Agentic Dynamics.
+          - README clone, website, repository, and citation links consistently use the intended
+            `peparhugo/agentic-dynamics` repository while the website remains
+            `https://ai-finops-rulebook.web.app`.
+          - Every page under firebase/public/ uses Agentic Dynamics in titles, descriptions, Open
+            Graph text, visible field definitions, and footers where the old umbrella name appears.
+          - The story page explains that the work began as an AI FinOps question and broadened into
+            Agentic Dynamics. Do not erase that history.
+          - AI FinOps remains only where it denotes economics, an external discipline, or historical
+            origin. Replace umbrella labels such as "AI FinOps Concept" with accurate local labels.
+          - Update public repository links in the Firebase pages to the intended new GitHub URL.
+          - Keep `ai-finops-rulebook.web.app`, `window.DYNAMICS_DATA`, data-stat keys, measured values,
+            formulas, and provenance tags unchanged.
+          - Update shared website branding comments and any generator-owned public branding text that
+            would otherwise restore the old identity on the next data build. Do not alter behavior.
+          - Refresh the Open Graph image only if the repository's existing local tooling can do so
+            deterministically; otherwise record it as a manual follow-up rather than introducing a
+            new image dependency.
+
+          EDITING CONSTRAINTS:
+          - Make the smallest coherent change. Do not reorganize the source tree or redesign the site.
+          - Do not blanket-replace every occurrence of "FinOps".
+          - Preserve all measurements and claim provenance. Do not invent findings.
+          - Do not modify files outside README.md, CITATION.cff, CONTRIBUTING.md,
+            CODE_OF_CONDUCT.md, pyproject.toml, firebase/, scripts/build_data.py, and the two
+            workflow documents created by this spec.
+
+          DELIVER the completed README and Firebase website rebrand.
+      - name: verify
+        kind: agent
+        timeout: 5400
+        prompt: |
+          Verify the Agentic Dynamics rebrand and write
+          docs/agentic_dynamics_rebrand_verify.md.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Agentic Dynamics is the canonical field name in README.md and all eight public HTML pages.
+          - The canonical definition is represented accurately and consistently.
+          - Remaining occurrences of AI FinOps are individually justified as economics, related work,
+            or historical origin; no page still presents AI FinOps Dynamics as the umbrella field.
+          - Public GitHub links target `https://github.com/peparhugo/agentic-dynamics`.
+          - Website and Open Graph URLs still target `https://ai-finops-rulebook.web.app`.
+          - `window.DYNAMICS_DATA`, all data-stat/data-anal keys, measured values, formulas, and
+            provenance tags remain intact.
+          - Every local HTML href resolves, ignoring fragment-only, mailto, and external links.
+          - Run the repository's relevant data-integrity tests and report the exact commands/results.
+          - List manual follow-ups: actual GitHub repository rename and, only if not regenerated,
+            Open Graph image refresh.
+
+          DELIVER exactly one file: docs/agentic_dynamics_rebrand_verify.md containing PASS/FAIL per
+          check, commands run, changed-file summary, and manual follow-ups. Fix any in-scope failure
+          before reporting the final result.
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 15.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}

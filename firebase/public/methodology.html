@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>The Instrument — AI FinOps Dynamics</title>
-<meta name="description" content="How the measurement instrument works. 249 sessions, 8 models, 10 perturbation operators, 7 recovery signals. The experimental apparatus behind AI FinOps Dynamics.">
-<meta property="og:title" content="The Instrument — AI FinOps Dynamics">
-<meta property="og:description" content="How the measurement instrument works — 10 perturbation operators, pipeline, methodology">
+<title>The Instrument — Agentic Dynamics</title>
+<meta name="description" content="How the Agentic Dynamics measurement instrument works. 249 sessions, 8 models, 10 perturbation operators, 7 recovery signals.">
+<meta property="og:title" content="The Instrument — Agentic Dynamics">
+<meta property="og:description" content="How the Agentic Dynamics measurement instrument works — 10 perturbation operators, pipeline, methodology">
 <meta property="og:url" content="https://ai-finops-rulebook.web.app/methodology.html">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://ai-finops-rulebook.web.app/og-image.png">
@@ -36,7 +36,7 @@
 </head>
 <body>
 
-<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/ai-finops-framework" target="_blank" class="topbar-link">GitHub</a></nav>
+<nav class="topbar"><a href="/" class="topbar-link">Home</a><a href="methodology.html" class="topbar-link" style="color:var(--ac)">Instrument</a><a href="evidence.html" class="topbar-link">Evidence</a><a href="framework.html" class="topbar-link">Framework</a><a href="story.html" class="topbar-link">Story</a><a href="https://github.com/peparhugo/agentic-dynamics" target="_blank" class="topbar-link">GitHub</a></nav>
 
 <!-- Hero -->
 <section class="sec" style="padding-top:6rem">
@@ -63,7 +63,7 @@
 
 <div class="highlight-box" style="border-left-color:var(--cy);margin-bottom:2rem">
 <strong>&#9881; Just want to run the instrument?</strong><br>
-<code style="display:block;margin:0.5rem 0;font-size:0.75rem;word-break:break-all">git clone https://github.com/peparhugo/ai-finops-framework && cd ai-finops-framework && pip install -e . && python scripts/run.py --config experiments/configs/task_manager.yaml</code>
+<code style="display:block;margin:0.5rem 0;font-size:0.75rem;word-break:break-all">git clone https://github.com/peparhugo/agentic-dynamics && cd agentic-dynamics && pip install -e . && python scripts/run.py --config experiments/configs/task_manager.yaml</code>
 For the full methodology — perturbation operators, recovery signals, strategy archetypes — read on.
 </div>
 
@@ -170,7 +170,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <p class="lead">Every session is measured along three resource axes — tokens, dollars, and joules. These measurements are the empirical foundation for every parameter in the unified cost equation.</p>
 <div class="cards">
 <div class="card"><div class="ctitle">Token Efficiency</div><div class="cdesc">Input tokens, output tokens, and reasoning tokens tracked per session. The code-to-reasoning token ratio is the primary cost-driver signal. Provider architecture internals (parameter counts, GPU TDP) are not independently verifiable for closed models.</div></div>
-<div class="card"><div class="ctitle">finops</div><div class="cdesc">USD cost computed from provider pricing at time of inference. Builds-per-dollar, cost-per-pass, and Explanation Tax all derived directly from session cost data. Not estimated — measured.</div></div>
+<div class="card"><div class="ctitle">Cost Measurement</div><div class="cdesc">USD cost computed from provider pricing at time of inference. Builds-per-dollar, cost-per-pass, and Explanation Tax all derived directly from session cost data. Not estimated — measured.</div></div>
 <div class="card"><div class="ctitle">Energy Efficiency</div><div class="cdesc">Joule estimates computed from GPU TDP, active parameters, and token counts. DeepSeek H800 TDP: 350W. Claude H100 TDP: 700W. Architectural efficiency compounds with token efficiency — The 69× cost gap is driven by per-token output pricing: Claude charges ~$15/Mtok for output tokens; DeepSeek charges ~$1.10/Mtok. Generated token volumes are near-identical (~11K output+reasoning tokens per session for both). The pricing architecture is the dominant lever, not token efficiency..</div></div>
 </div>
 <div class="eq">
@@ -201,7 +201,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <p class="lead">The instrument is open source. Every experiment is a YAML config. Every run is seeded for reproducibility. Here's how to run your own.</p>
 
 <div class="cards">
-<div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/ai-finops-framework<br>cd ai-finops-framework<br>pip install -e .</code></div></div>
+<div class="card"><div class="ctitle">1. Clone &amp; Install</div><div class="cdesc"><code style="color:var(--ac)">git clone https://github.com/peparhugo/agentic-dynamics<br>cd agentic-dynamics<br>pip install -e .</code></div></div>
 <div class="card"><div class="ctitle">2. Run a Config</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run.py --config experiments/configs/task_manager.yaml --model deepseek/deepseek-v4-pro</code><br><br>Choose from 34 configs in <code>experiments/configs/</code>. Each defines the task, model, perturbation operators, and strengths.</div></div>
 <div class="card"><div class="ctitle">3. Run a Story</div><div class="cdesc"><code style="color:var(--ac)">python scripts/run_story.py task_manager_api --model anthropic/claude-sonnet-5 --backend claude_cli</code><br><br>Five-session stories with git commits between sessions. <code>--backend claude_cli</code> runs Claude on your subscription; <code>--model anthropic/*</code> auto-routes the same way. Scale with <code>scripts/enqueue.py</code> + <code>scripts/worker.py</code>.</div></div>
 <div class="card"><div class="ctitle">4. Watch It Live</div><div class="cdesc"><code style="color:var(--ac)">python admin/server.py</code><br><br>Live control plane: experiment matrix, per-cell event streams, routing board. Or <code>scripts/monitor.py</code> for a terminal dashboard.</div></div>
@@ -247,12 +247,12 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <div class="stat"><div class="v">1.80&times;</div><div class="l">2050 EPM Horizon</div></div>
 <div class="stat"><div class="v">$<span data-stat="cost">64.98</span></div><div class="l">Total Experiment Cost</div></div>
 </div>
-<div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">Explore AI FinOps Dynamics &rarr;</a></div>
+<div style="margin-top:2rem"><a href="/" class="cta-btn" style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.7rem 1.8rem;background:var(--ac);color:#09090b;border-radius:100px;font-weight:700;font-size:0.85rem;text-decoration:none;transition:all .25s;border:none;cursor:pointer">Explore Agentic Dynamics &rarr;</a></div>
 </section>
 
 <section class="sec alt wide">
 <h2>Where This Work Fits in the Literature</h2>
-<p class="lead">The concepts in AI FinOps Dynamics connect to established academic and industry research. Each coined term maps to a known body of work.</p>
+<p class="lead">The concepts in Agentic Dynamics connect to established academic and industry research. Each coined term maps to a known body of work.</p>
 <div class="tbl"><table><thead><tr><th>Our Concept</th><th>Industry / Academic Term</th><th>Reference</th></tr></thead><tbody>
 <tr><td><strong style="color:var(--ac)">Silent Inference</strong></td><td>Cost-Aware Architecture</td><td>Multi-agent systems literature</td></tr>
 <tr><td><strong style="color:var(--am)">Explanation Tax</strong></td><td>Reasoning Token Overhead / CoT Costs</td><td><a href="https://arxiv.org/abs/2501.12948" target="_blank" style="color:var(--ac)">DeepSeek-R1 Technical Report, 2025</a></td></tr>
@@ -260,7 +260,7 @@ For the full methodology — perturbation operators, recovery signals, strategy 
 <tr><td><strong style="color:var(--am)">Snowball Rule (N&sup2;)</strong></td><td>Inference Production Frontier</td><td><a href="https://arxiv.org/abs/2510.26136" target="_blank" style="color:var(--ac)">Zhuang et al., arXiv:2510.26136, 2025</a></td></tr>
 <tr><td><strong style="color:var(--ac)">EPM</strong></td><td>4Ms Framework</td><td><a href="https://cloud.google.com/blog/topics/systems/4ms-of-ai-efficiency" target="_blank" style="color:var(--ac)">Google Cloud, 2025</a></td></tr>
 <tr><td>Prompt &amp; Plan Caching</td><td>Cache Saver Framework</td><td><a href="https://aclanthology.org/2025.findings-emnlp.1" target="_blank" style="color:var(--ac)">Potamitis et al., EMNLP 2025</a></td></tr>
-<tr><td>Grit (Ground-Truth Integrity)</td><td>Efficiency Frontier for Coding Models</td><td><a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" target="_blank" style="color:var(--ac)">Wendell et al., Databricks Blog, Aug 2026</a></td></tr>
+<tr><td>Grit (Ground-Truth Integrity)</td><td>Complementary to the Efficiency Frontier for Coding Models</td><td><a href="https://www.databricks.com/blog/managing-ai-coding-costs-scale" target="_blank" style="color:var(--ac)">Wendell et al., Databricks Blog, Aug 2026</a></td></tr>
 <tr><td>Behavioral Attraction Basins</td><td>Manifold of Failure</td><td><a href="https://arxiv.org/abs/2602.22291" target="_blank" style="color:var(--ac)">Munshi et al., arXiv:2602.22291, 2026</a></td></tr>
 <tr><td>Semantic &amp; Cascade Routing</td><td>SATER / Speculative Cascades</td><td><a href="https://arxiv.org/abs/2510.05164" target="_blank" style="color:var(--ac)">Shen et al., arXiv:2510.05164, 2025</a></td></tr>
 </tbody></table></div>
@@ -278,10 +278,10 @@ Known methodological constraints: <strong>insert_contradiction</strong> domain m
 <div style="text-align:center;margin-top:1rem"><a href="evidence.html" class="cta-btn">View the Evidence →</a></div>
 
 <footer>
-<strong>AI FinOps Dynamics · v0.9 · August 2026</strong><br>
+<strong>Agentic Dynamics · v0.9 · August 2026</strong><br>
 <span data-stat="sessions">347</span> story sessions · <span data-stat="variants">3</span> models · <span data-stat="stories_total">71</span> stories · $<span data-stat="cost">12.54</span> measured<br>
-<a href="https://github.com/peparhugo/ai-finops-framework">GitHub</a> ·
-  <a href="/">Framework</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
+<a href="https://github.com/peparhugo/agentic-dynamics">GitHub</a> ·
+  <a href="/">Home</a> · <a href="story.html">Story</a> · <a href="methodology.html">Methodology</a> · <a href="evidence.html">Evidence</a>
 </footer>
 
 <script src="app.js"></script>

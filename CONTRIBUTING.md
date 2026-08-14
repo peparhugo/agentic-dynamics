@@ -1,4 +1,4 @@
-# Contributing to AI FinOps Dynamics
+# Contributing to Agentic Dynamics
 
 Thanks for your interest in contributing. This is a research instrument — every contribution adds data points that make the cost model more robust and the instrument more universal.
 
@@ -28,8 +28,8 @@ The site lives in `firebase/public/`. Pure HTML/CSS/JS — no build step. Edit a
 ### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/ai-finops-framework.git
-cd ai-finops-framework
+git clone https://github.com/YOUR_USERNAME/agentic-dynamics.git
+cd agentic-dynamics
 pip install -e .
 ```
 
@@ -187,4 +187,4 @@ All scripts use **title-based deduplication** — they query the opencode DB to 
 
 ## Questions?
 
-Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/ai-finops-framework/issues). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.
+Open a GitHub issue or reach out on the [project discussions](https://github.com/peparhugo/agentic-dynamics/issues). If you want to coordinate on a specific pillar, mention it in the issue and we'll help you get set up.

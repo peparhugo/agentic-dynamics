@@ -1,14 +1,15 @@
 cff-version: 1.2.0
-title: "AI FinOps Dynamics: An experimental instrument for the economics of agentic AI"
+title: "Agentic Dynamics: An experimental instrument for the economics of agentic AI"
 message: "If you use this instrument or dataset in your research, please cite it as follows."
 type: software
 authors:
   - given-names: Hugo
     family-names: Pepar
-repository-code: "https://github.com/peparhugo/ai-finops-framework"
+repository-code: "https://github.com/peparhugo/agentic-dynamics"
 url: "https://ai-finops-rulebook.web.app"
 abstract: "Success isn't value. An open experimental instrument that deliberately degrades engineering specifications, runs coding agents against them, and measures what happens to agent decisions, test-executed outcomes, cost, and durable value. 249 instrumented sessions across 8 model variants using 10 perturbation operators."
 keywords:
+  - "Agentic Dynamics"
   - "AI FinOps"
   - "agentic AI"
   - "LLM evaluation"
