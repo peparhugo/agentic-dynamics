@@ -84,6 +84,19 @@ from .game_report import GameReport
 # Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
 from .graph import Neo4jClient
 
+# v1.0: canonical identity + authority contract for the runtime-RAG knowledge base
+from .knowledge import (
+    EVIDENCE_CLASSES,
+    OPERATIONS,
+    SCHEMA_VERSION,
+    Authority,
+    KnowledgeEvent,
+    KnowledgeRecord,
+    compute_content_hash,
+    compute_entity_id,
+    compute_knowledge_id,
+)
+
 # v0.6: Multi-language analysis + mutation compiler + story orchestrator
 from .language import (
     CodebaseAST,
@@ -247,6 +260,10 @@ __all__ = [
     "compile_spec", "experiment_matrix", "compare_arms", "evaluate_rules",
     "first_pass_quality",
     "PhaseResult", "WorkflowRunResult", "run_workflow",
+    # v1.0 knowledge identity + authority contract
+    "Authority", "KnowledgeRecord", "KnowledgeEvent",
+    "compute_entity_id", "compute_knowledge_id", "compute_content_hash",
+    "SCHEMA_VERSION", "OPERATIONS", "EVIDENCE_CLASSES",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
