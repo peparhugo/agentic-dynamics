@@ -10,6 +10,9 @@
 (function startControlRoom(core) {
   const SVG_NS = "http://www.w3.org/2000/svg"
   const MAX_TRANSCRIPT_ROWS = 500
+  const MAX_LIVE_SAMPLES_PER_CELL = 500
+  const REPLAY_RACE_TAIL = 500
+  const REPLAY_RACE_WINDOW_MS = 250
   const MATRIX_POLL_MS = 5000
   const BURN_WINDOW_MS = 60000
   const STATUS_SYMBOLS = {
@@ -23,15 +26,21 @@
 
   const state = {
     cells: {},
+    statusOverrides: new Map(),
     telemetry: { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null },
     liveSamplesByCell: new Map(),
     burnSamples: [],
-    burnSeen: new Set(),
     selectedId: null,
     selectedSessionIds: [],
     rows: [],
     buffer: [],
-    seenEvents: new Set(),
+    eventLedgerCounts: new Map(),
+    eventLedgerOrder: [],
+    replaySkipCounts: new Map(),
+    replaySeenCounts: new Map(),
+    replayTail: [],
+    raceDuplicateCounts: new Map(),
+    raceDedupeExpiresAt: 0,
     paused: false,
     follow: true,
     followBeforePause: true,
@@ -47,8 +56,12 @@
     lastMatrixAt: null,
     lastEventAt: null,
     firstMatrixLoaded: false,
+    matrixRequestSequence: 0,
+    matrixRequestInFlight: false,
     routingLoaded: false,
     routingOpen: false,
+    routingReturnFocus: null,
+    queuePending: false,
   }
 
   /** Query one required shell element. */
@@ -166,9 +179,8 @@
     const retained = Array.isArray(state.telemetry.cells?.[cellId]?.samples)
       ? state.telemetry.cells[cellId].samples
       : []
-    const combined = new Map(retained.filter((sample) => sample?.identity).map((sample) => [sample.identity, sample]))
-    for (const sample of state.liveSamplesByCell.get(cellId)?.values() || []) combined.set(sample.identity, sample)
-    return Array.from(combined.values())
+    const live = state.liveSamplesByCell.get(cellId) || []
+    return retained.concat(live)
   }
 
   /** Build a defensive, decorative token/cost sparkline and text alternative. */
@@ -225,6 +237,14 @@
   function renderFleet() {
     const grid = $("#fleet-grid")
     grid.setAttribute("aria-busy", state.matrixState === "connecting" ? "true" : "false")
+    // Preserve the immediate skeleton until the first matrix request settles.
+    if (!state.firstMatrixLoaded && state.matrixState === "connecting" && Object.keys(state.cells).length === 0) {
+      renderRail()
+      return
+    }
+    const focusedCellId = document.activeElement?.classList.contains("cell-select")
+      ? document.activeElement.dataset.cellId
+      : null
     grid.replaceChildren()
     const search = state.search.toLowerCase()
     const ids = core.sortCellIds(state.cells).filter((cellId) => {
@@ -247,7 +267,9 @@
       const card = element("article", `cell-card status-${status}${selected ? " selected" : ""}`)
       const button = element("button", "cell-select")
       button.type = "button"
+      button.dataset.cellId = cellId
       button.setAttribute("aria-label", status === "running" ? `Watch running cell ${cellId}` : `Inspect cell ${cellId}`)
+      button.setAttribute("aria-pressed", String(selected))
       button.addEventListener("click", () => selectCell(cellId, true))
 
       const heading = element("div", "cell-heading")
@@ -268,6 +290,13 @@
         card.appendChild(jump)
       }
       grid.appendChild(card)
+    }
+
+    // A status or telemetry update must not eject a keyboard operator from the fleet.
+    if (focusedCellId) {
+      const focusedReplacement = Array.from(grid.querySelectorAll(".cell-select"))
+        .find((button) => button.dataset.cellId === focusedCellId)
+      focusedReplacement?.focus({ preventScroll: true })
     }
 
     const counts = statusCounts()
@@ -351,23 +380,82 @@
     return node
   }
 
-  /** Add one event sample to live overlays and the rolling burn ledger. */
+  /** Add one event sample to bounded live overlays and the rolling burn ledger. */
   function recordLiveSample(cellId, sample) {
-    if (!state.liveSamplesByCell.has(cellId)) state.liveSamplesByCell.set(cellId, new Map())
-    state.liveSamplesByCell.get(cellId).set(sample.identity, sample)
-    const scopedIdentity = `${cellId}|${sample.identity}`
-    if (sample.cost !== null && !state.burnSeen.has(scopedIdentity)) {
-      state.burnSeen.add(scopedIdentity)
+    const current = state.liveSamplesByCell.get(cellId) || []
+    // The next matrix request that starts after this observation owns the
+    // replacement snapshot. Request sequence is unambiguous even when two
+    // legitimate events have byte-identical telemetry.
+    const observed = { ...sample, observed_after_matrix_request: state.matrixRequestSequence }
+    state.liveSamplesByCell.set(
+      cellId,
+      core.boundedAppend(current, [observed], MAX_LIVE_SAMPLES_PER_CELL),
+    )
+    if (sample.cost !== null) {
       state.burnSamples.push({ identity: sample.identity, cost: sample.cost, receivedAt: Date.now() })
     }
   }
 
-  /** Normalize, deduplicate, account for, and optionally buffer a stream event. */
+  /** Remember the latest event occurrences within the retained-log bound. */
+  function rememberEvent(rawIdentity) {
+    state.eventLedgerOrder.push(rawIdentity)
+    state.eventLedgerCounts.set(rawIdentity, (state.eventLedgerCounts.get(rawIdentity) || 0) + 1)
+    while (state.eventLedgerOrder.length > MAX_TRANSCRIPT_ROWS) {
+      const oldest = state.eventLedgerOrder.shift()
+      const remaining = (state.eventLedgerCounts.get(oldest) || 1) - 1
+      if (remaining > 0) state.eventLedgerCounts.set(oldest, remaining)
+      else state.eventLedgerCounts.delete(oldest)
+    }
+  }
+
+  /** Initialize one replay pass from the occurrences already presented. */
+  function beginReplay() {
+    state.replayMode = true
+    state.replaySkipCounts = new Map(state.eventLedgerCounts)
+    state.replaySeenCounts = new Map()
+    state.replayTail = []
+    state.raceDuplicateCounts = new Map()
+    state.raceDedupeExpiresAt = 0
+  }
+
+  /** Return whether this retained occurrence was already presented earlier. */
+  function isKnownReplayOccurrence(rawIdentity) {
+    const occurrence = (state.replaySeenCounts.get(rawIdentity) || 0) + 1
+    state.replaySeenCounts.set(rawIdentity, occurrence)
+    return occurrence <= (state.replaySkipCounts.get(rawIdentity) || 0)
+  }
+
+  /**
+   * Suppress only the immediate subscribe-before-history overlap.
+   *
+   * Redis subscription starts before history is read, so a just-published
+   * event can occur once in replay and once in the queued live messages. The
+   * short, bounded tail avoids suppressing legitimate identical future events.
+   */
+  function isReplayRaceDuplicate(rawIdentity) {
+    if (Date.now() > state.raceDedupeExpiresAt) {
+      state.raceDuplicateCounts.clear()
+      return false
+    }
+    const remaining = state.raceDuplicateCounts.get(rawIdentity) || 0
+    if (remaining === 0) return false
+    if (remaining === 1) state.raceDuplicateCounts.delete(rawIdentity)
+    else state.raceDuplicateCounts.set(rawIdentity, remaining - 1)
+    return true
+  }
+
+  /** Normalize, reconcile, account for, and optionally buffer a stream event. */
   function receiveEvent(raw) {
     if (!state.selectedId) return
+    const rawIdentity = String(raw ?? "")
+    if (state.replayMode) {
+      state.replayTail = core.boundedAppend(state.replayTail, [rawIdentity], REPLAY_RACE_TAIL)
+      if (isKnownReplayOccurrence(rawIdentity)) return
+    } else if (isReplayRaceDuplicate(rawIdentity)) {
+      return
+    }
     const row = core.normalizeTranscriptEvent(raw, state.selectedId)
-    if (state.seenEvents.has(row.key)) return
-    state.seenEvents.add(row.key)
+    rememberEvent(rawIdentity)
     state.lastEventAt = Date.now()
     state.streamState = "live"
     if (row.sessionId && !state.selectedSessionIds.includes(row.sessionId)) state.selectedSessionIds.push(row.sessionId)
@@ -397,7 +485,7 @@
     const selectedAtConnect = state.selectedId
     state.streamState = "connecting"
     state.attached = true
-    state.replayMode = true
+    beginReplay()
     state.eventSource = core.replaceEventSource(
       state.eventSource,
       EventSource,
@@ -407,12 +495,17 @@
     source.onopen = () => {
       if (source !== state.eventSource) return
       state.streamState = "live"
-      state.replayMode = true
+      beginReplay()
       renderSelection()
     }
     source.addEventListener("replay_complete", () => {
       if (source !== state.eventSource) return
       state.replayMode = false
+      state.raceDuplicateCounts = new Map()
+      for (const identity of state.replayTail) {
+        state.raceDuplicateCounts.set(identity, (state.raceDuplicateCounts.get(identity) || 0) + 1)
+      }
+      state.raceDedupeExpiresAt = Date.now() + REPLAY_RACE_WINDOW_MS
       state.streamState = "live"
       renderSelection()
     })
@@ -421,10 +514,15 @@
     }
     source.onerror = () => {
       if (source !== state.eventSource || !state.attached) return
-      state.streamState = "reconnecting"
-      state.replayMode = true
+      state.streamState = source.readyState === EventSource.CLOSED ? "unavailable" : "reconnecting"
+      beginReplay()
       renderSelection()
-      announce(`Event stream reconnecting for ${selectedAtConnect}`, true)
+      announce(
+        state.streamState === "unavailable"
+          ? `Event stream unavailable for ${selectedAtConnect}`
+          : `Event stream reconnecting for ${selectedAtConnect}`,
+        true,
+      )
     }
     renderSelection()
     renderTranscript(false)
@@ -440,7 +538,12 @@
       state.selectedSessionIds = []
       state.rows = []
       state.buffer = []
-      state.seenEvents = new Set()
+      state.eventLedgerCounts = new Map()
+      state.eventLedgerOrder = []
+      state.replaySkipCounts = new Map()
+      state.replaySeenCounts = new Map()
+      state.replayTail = []
+      state.raceDuplicateCounts = new Map()
       state.paused = false
       state.follow = true
       state.attached = false
@@ -465,33 +568,62 @@
     announce(`Detached from ${state.selectedId}`)
   }
 
-  /** Drop live overlays once the replacement snapshot contains their identity. */
-  function pruneReconciledSamples() {
+  /** Drop overlays once a matrix request started after they were observed. */
+  function pruneReconciledSamples(snapshotRequestSequence) {
     for (const [cellId, samples] of state.liveSamplesByCell.entries()) {
-      const retained = new Set((state.telemetry.cells?.[cellId]?.samples || []).map((sample) => sample.identity))
-      for (const identity of samples.keys()) if (retained.has(identity)) samples.delete(identity)
-      if (samples.size === 0) state.liveSamplesByCell.delete(cellId)
+      // Samples arriving during this request remain until the next snapshot,
+      // because the current Redis read may have happened before their publish.
+      const remaining = samples.filter(
+        (sample) => sample.observed_after_matrix_request >= snapshotRequestSequence,
+      )
+      if (remaining.length > 0) state.liveSamplesByCell.set(cellId, remaining)
+      else state.liveSamplesByCell.delete(cellId)
     }
+  }
+
+  /** Merge newer status-stream transitions over a potentially older snapshot. */
+  function applyStatusOverrides(snapshotCells) {
+    const cells = { ...snapshotCells }
+    for (const [cellId, override] of state.statusOverrides.entries()) {
+      if (core.normalizeStatus(cells[cellId]) === core.normalizeStatus(override.status)) {
+        state.statusOverrides.delete(cellId)
+        continue
+      }
+      if (override.remainingSnapshots > 0) {
+        cells[cellId] = override.status
+        override.remainingSnapshots -= 1
+      } else {
+        // Repeated matrix disagreement wins if the status stream missed a later transition.
+        state.statusOverrides.delete(cellId)
+      }
+    }
+    return cells
   }
 
   /** Replace the retained snapshot while preserving last-known state on errors. */
   async function loadMatrix() {
+    // One request at a time prevents both stale overwrites and slow-endpoint starvation.
+    if (state.matrixRequestInFlight) return
+    state.matrixRequestInFlight = true
+    const requestSequence = ++state.matrixRequestSequence
     try {
       const response = await fetch("/api/matrix")
       const data = await response.json()
       if (!response.ok || data.error) {
         state.matrixState = response.status === 503 ? "unavailable" : "disconnected"
+        state.firstMatrixLoaded = true
         announce(response.status === 503 ? "Redis unavailable" : "Fleet snapshot unavailable", true)
         renderFleet()
         return
       }
-      state.cells = data.cells && typeof data.cells === "object" ? data.cells : {}
+      const snapshotCells = data.cells && typeof data.cells === "object" ? data.cells : {}
+      state.cells = applyStatusOverrides(snapshotCells)
       state.telemetry = data.telemetry && typeof data.telemetry === "object"
         ? data.telemetry
         : { cells: {}, reported_cost: null, input_tokens: null, output_tokens: null }
       state.matrixState = state.telemetry.available === false ? "disconnected" : "live"
       state.lastMatrixAt = Date.now()
-      pruneReconciledSamples()
+      pruneReconciledSamples(requestSequence)
       renderFleet()
       renderSelection()
 
@@ -503,8 +635,11 @@
       state.firstMatrixLoaded = true
     } catch (_error) {
       state.matrixState = "disconnected"
+      state.firstMatrixLoaded = true
       announce("Fleet snapshot disconnected; showing last known data", true)
       renderFleet()
+    } finally {
+      state.matrixRequestInFlight = false
     }
   }
 
@@ -522,6 +657,9 @@
         if (typeof message.cell_id !== "string" || typeof message.status !== "string") return
         const previous = core.normalizeStatus(state.cells[message.cell_id])
         state.cells[message.cell_id] = message.status
+        // Keep the transition through up to two stale matrix polls; a matching
+        // snapshot clears it immediately, while queue removal cannot leave a ghost.
+        state.statusOverrides.set(message.cell_id, { status: message.status, remainingSnapshots: 2 })
         const next = core.normalizeStatus(message.status)
         if (previous !== next) announce(`${message.cell_id} is now ${next}`)
         renderFleet()
@@ -538,12 +676,17 @@
   }
 
   /** Build a semantic routing table using text nodes rather than HTML strings. */
-  function routingTable(headers, rows) {
+  function routingTable(captionText, headers, rows) {
     const wrap = element("div", "table-scroll")
     const table = element("table", "routing-table")
+    table.appendChild(element("caption", "sr-only", captionText))
     const head = element("thead")
     const headRow = element("tr")
-    headers.forEach((header) => headRow.appendChild(element("th", "", header)))
+    headers.forEach((header) => {
+      const cell = element("th", "", header)
+      cell.scope = "col"
+      headRow.appendChild(cell)
+    })
     head.appendChild(headRow)
     table.appendChild(head)
     const body = element("tbody")
@@ -572,6 +715,7 @@
       } else {
         content.appendChild(element("h3", "", "Per-task routing"))
         content.appendChild(routingTable(
+          "Per-task model routing recommendations",
           ["Task", "Route", "Target", "Best correctness", "Best efficiency"],
           perTask.map((task) => {
             const route = task.routing === "escalate" ? "escalate" : "default"
@@ -590,7 +734,11 @@
           const correctness = core.safeNumber(strategy?.avg_correctness)
           return [name, strategy?.n ?? 0, cost === null ? "unavailable" : formatCost(cost), correctness === null ? "unavailable" : `${(correctness * 100).toFixed(0)}%`]
         })
-        content.appendChild(routingTable(["Strategy", "N", "Total cost", "Avg correctness"], strategyRows))
+        content.appendChild(routingTable(
+          "Routing strategy simulation",
+          ["Strategy", "N", "Total cost", "Avg correctness"],
+          strategyRows,
+        ))
       }
       state.routingLoaded = true
     } catch (_error) {
@@ -599,8 +747,11 @@
   }
 
   /** Call only the existing queue endpoint and report the completed action. */
-  async function runQueueAction(action, button) {
-    button.disabled = true
+  async function runQueueAction(action) {
+    if (state.queuePending) return
+    state.queuePending = true
+    const queueButtons = [$("#enqueue-button"), $("#clear-queue-button")]
+    queueButtons.forEach((control) => { control.disabled = true })
     const result = $("#queue-result")
     result.textContent = `${action === "clear" ? "Clearing" : "Enqueuing"}…`
     try {
@@ -612,12 +763,14 @@
       const data = await response.json()
       if (!response.ok || !data.ok) throw new Error(data.error || data.output || "Action failed")
       result.textContent = data.output || `${action} completed`
-      await loadMatrix()
+      // Refresh opportunistically without tying control availability to a slow observer request.
+      void loadMatrix()
     } catch (error) {
       result.textContent = error.message || "Queue action failed"
       announce(result.textContent, true)
     } finally {
-      button.disabled = false
+      state.queuePending = false
+      queueButtons.forEach((control) => { control.disabled = false })
     }
   }
 
@@ -713,13 +866,24 @@
       state.routingOpen = !state.routingOpen
       $("#routing-drawer").hidden = !state.routingOpen
       $("#routing-toggle").setAttribute("aria-expanded", String(state.routingOpen))
-      if (state.routingOpen && !state.routingLoaded) loadRouting()
+      if (state.routingOpen) {
+        state.routingReturnFocus = $("#routing-toggle")
+        if (!state.routingLoaded) loadRouting()
+        $("#routing-refresh").focus()
+      }
+    })
+    $("#routing-drawer").addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return
+      state.routingOpen = false
+      $("#routing-drawer").hidden = true
+      $("#routing-toggle").setAttribute("aria-expanded", "false")
+      state.routingReturnFocus?.focus()
     })
     $("#routing-refresh").addEventListener("click", loadRouting)
-    $("#enqueue-button").addEventListener("click", (event) => runQueueAction("enqueue", event.currentTarget))
-    $("#clear-queue-button").addEventListener("click", (event) => {
+    $("#enqueue-button").addEventListener("click", () => runQueueAction("enqueue"))
+    $("#clear-queue-button").addEventListener("click", () => {
       const warning = "This clears queued metadata; it does not cancel running work."
-      if (window.confirm(warning)) runQueueAction("clear", event.currentTarget)
+      if (window.confirm(warning)) runQueueAction("clear")
     })
   }
 

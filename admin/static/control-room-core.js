@@ -40,7 +40,7 @@
     }
   }
 
-  /** Produce a short stable key used to suppress retained replay duplicates. */
+  /** Produce a short stable presentation key for transcript rows. */
   function eventKey(cellId, raw) {
     const text = `${cellId}\u0000${String(raw ?? "")}`
     let hash = 2166136261
@@ -173,7 +173,7 @@
     if (type === "text") {
       return { ...common, kind: "agent", label: "AGENT", text: readable(part.text) }
     }
-    if (type === "tool_use") {
+    if (type === "tool_use" || type === "tool") {
       const tool = part.tool || part.name || "unknown"
       const toolState = part.state && typeof part.state === "object" ? part.state : {}
       const status = toolState.status || part.status || "observed"
@@ -219,20 +219,8 @@
   /** Merge live, not-yet-polled samples over the authoritative snapshot. */
   function reconcileTelemetry(snapshot, liveSamplesByCell) {
     const telemetry = snapshot && typeof snapshot === "object" ? snapshot : {}
-    const cells = telemetry.cells && typeof telemetry.cells === "object" ? telemetry.cells : {}
     const overlays = []
-    for (const [cellId, samples] of liveSamplesByCell.entries()) {
-      // Identity is intentionally cell-scoped because separate workers can
-      // report numerically identical steps at the same provider timestamp.
-      const retainedIds = new Set(
-        (Array.isArray(cells[cellId]?.samples) ? cells[cellId].samples : [])
-          .map((sample) => sample?.identity)
-          .filter(Boolean),
-      )
-      for (const sample of samples.values()) {
-        if (!retainedIds.has(sample.identity)) overlays.push(sample)
-      }
-    }
+    for (const samples of liveSamplesByCell.values()) overlays.push(...samples)
     const sumField = (base, field) => {
       const values = overlays.map((sample) => safeNumber(sample[field])).filter((value) => value !== null)
       const validBase = safeNumber(base)
