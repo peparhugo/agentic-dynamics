@@ -3,35 +3,160 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>dynamic-code · control plane</title>
+  <meta name="color-scheme" content="dark">
+  <title>Control Room · dynamic-code</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-  <header>
-    <h1>dynamic-code</h1>
-    <span class="subtitle">control plane</span>
-  </header>
-  <nav>
-    <button data-view="matrix" class="active">Matrix</button>
-    <button data-view="inspector">Cell Inspector</button>
-    <button data-view="routing">Routing</button>
-  </nav>
-  <main>
-    <section id="view-matrix" class="view active">
-      <div id="summary"></div>
-      <div id="matrix"></div>
-    </section>
-    <section id="view-inspector" class="view">
-      <div class="toolbar">
-        <select id="cell-select"></select>
-        <button id="clear-transcript">Clear</button>
+  <div class="app-shell">
+    <header class="command-rail" aria-label="Live reported telemetry">
+      <div class="rail-identity">
+        <div class="eyebrow">dynamic-code</div>
+        <h1>CONTROL ROOM</h1>
+        <div class="rail-status-line">
+          <span id="overall-state" class="state-badge state-connecting">CONNECTING</span>
+          <time id="utc-clock" datetime="">--:--:-- UTC</time>
+        </div>
       </div>
-      <pre id="transcript"></pre>
+
+      <section class="rail-metric rail-spend" aria-labelledby="spend-label">
+        <div id="spend-label" class="metric-label">Reported spend</div>
+        <output id="reported-spend" class="metric-value cost-value">WAITING FOR COST TELEMETRY</output>
+        <span id="spend-provenance" class="provenance">RETAINED WINDOW</span>
+      </section>
+
+      <section class="rail-metric rail-burn" aria-labelledby="burn-label">
+        <div id="burn-label" class="metric-label">Reported burn · rolling 60s</div>
+        <output id="burn-rate" class="metric-value cost-value">WAITING FOR LIVE COST</output>
+        <svg id="burn-trace" class="burn-trace" viewBox="0 0 120 24" role="img" aria-label="No live cost samples"></svg>
+      </section>
+
+      <section class="rail-counters" aria-label="Token, fleet, and Redis state">
+        <div><span class="metric-label">Input</span><strong id="input-tokens" title="Unavailable">--</strong></div>
+        <div><span class="metric-label">Output</span><strong id="output-tokens" title="Unavailable">--</strong></div>
+        <div><span class="metric-label">Running</span><strong id="running-count">--</strong></div>
+        <div><span class="metric-label">Redis</span><strong id="redis-state">CONNECTING</strong></div>
+      </section>
+    </header>
+
+    <main class="workspace">
+      <section id="fleet" class="pane fleet-pane" aria-labelledby="fleet-title">
+        <header class="pane-header fleet-header">
+          <div>
+            <div class="eyebrow">Fleet</div>
+            <h2 id="fleet-title"><span id="fleet-total">--</span> CELLS</h2>
+          </div>
+          <span id="matrix-age" class="last-update">connecting</span>
+        </header>
+        <div class="fleet-controls" aria-label="Fleet filters">
+          <div class="filter-group" role="group" aria-label="Status filter">
+            <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">All</button>
+            <button class="filter-chip" type="button" data-filter="running" aria-pressed="false">Running</button>
+            <button class="filter-chip" type="button" data-filter="risk" aria-pressed="false">Risk</button>
+          </div>
+          <label class="search-label">
+            <span class="sr-only">Search full cell ID</span>
+            <input id="cell-search" type="search" placeholder="Search cell ID" autocomplete="off">
+          </label>
+        </div>
+        <div id="fleet-grid" class="fleet-grid" aria-busy="true">
+          <div class="skeleton-card" aria-hidden="true"></div>
+          <div class="skeleton-card" aria-hidden="true"></div>
+          <div class="skeleton-card" aria-hidden="true"></div>
+        </div>
+        <div id="fleet-counts" class="fleet-counts" aria-label="Fleet status counts"></div>
+      </section>
+
+      <section id="transcript-panel" class="pane transcript-pane" aria-labelledby="transcript-title">
+        <header class="pane-header transcript-header">
+          <div class="transcript-identity">
+            <div class="eyebrow">Cell / Transcript</div>
+            <h2 id="transcript-title">NO CELL SELECTED</h2>
+            <div class="inline-state">
+              <span id="selected-status" class="status-word status-unknown">UNKNOWN</span>
+              <span>stream: <strong id="selected-stream-state">DISCONNECTED</strong></span>
+            </div>
+          </div>
+          <a class="mobile-anchor" href="#fleet">Back to fleet</a>
+          <div class="transcript-controls" aria-label="Local transcript controls">
+            <button id="follow-button" type="button" aria-pressed="true">Follow: on</button>
+            <button id="pause-button" type="button">Pause</button>
+            <button id="clear-button" type="button">Clear view</button>
+          </div>
+        </header>
+        <div id="transcript-feed" class="transcript-feed" role="log" aria-label="Selected cell event transcript" tabindex="0">
+          <div class="terminal-empty">Select a fleet card to inspect retained events and watch live work.</div>
+        </div>
+        <button id="jump-live" class="jump-live" type="button" hidden>Jump to live</button>
+        <p id="transcript-note" class="pane-note">Clear view affects this browser only; Redis history and the experiment are unchanged.</p>
+      </section>
+
+      <aside class="pane control-pane" aria-labelledby="control-title">
+        <header class="pane-header control-header">
+          <div>
+            <div class="eyebrow">Read-only attachment</div>
+            <h2 id="control-title">SESSION CONTROL</h2>
+          </div>
+          <span class="readonly-badge">READ ONLY</span>
+        </header>
+        <dl class="control-facts">
+          <div>
+            <dt>Cell</dt>
+            <dd id="control-cell">No cell selected</dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd id="control-status">UNKNOWN</dd>
+          </div>
+          <div>
+            <dt>Stream</dt>
+            <dd id="control-stream">DISCONNECTED</dd>
+          </div>
+          <div>
+            <dt>OpenCode session</dt>
+            <dd id="control-session">Session identity not observed yet</dd>
+          </div>
+        </dl>
+        <button id="copy-session" class="secondary-action" type="button" hidden>Copy session ID</button>
+        <button id="watch-button" class="primary-action" type="button" disabled>Select a cell</button>
+        <p id="control-guidance" class="control-guidance">Select a cell to inspect telemetry.</p>
+        <p class="boundary-copy">Watching does not send input or control the experiment.</p>
+      </aside>
+    </main>
+
+    <footer class="bottom-rail">
+      <button id="routing-toggle" class="drawer-toggle" type="button" aria-expanded="false" aria-controls="routing-drawer">
+        ROUTING BOARD <span aria-hidden="true">⌃</span>
+      </button>
+      <details class="utility-menu">
+        <summary>Queue actions</summary>
+        <div class="utility-popover">
+          <button id="enqueue-button" type="button">Enqueue experiment</button>
+          <button id="clear-queue-button" class="danger-action" type="button">Clear queued work</button>
+          <output id="queue-result" aria-live="polite"></output>
+        </div>
+      </details>
+      <span class="bottom-provenance">telemetry: retained window</span>
+    </footer>
+
+    <section id="routing-drawer" class="routing-drawer" aria-labelledby="routing-title" hidden>
+      <header class="drawer-header">
+        <div>
+          <div class="eyebrow">Model operations</div>
+          <h2 id="routing-title">ROUTING BOARD</h2>
+        </div>
+        <button id="routing-refresh" type="button">Refresh</button>
+      </header>
+      <div id="routing-content" class="routing-content">
+        <p class="empty-state">Open the drawer to load routing data.</p>
+      </div>
     </section>
-    <section id="view-routing" class="view">
-      <div id="routing"></div>
-    </section>
-  </main>
+  </div>
+
+  <div id="polite-status" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <div id="alert-status" class="sr-only" role="alert" aria-live="assertive" aria-atomic="true"></div>
+
+  <script src="/static/control-room-core.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>
