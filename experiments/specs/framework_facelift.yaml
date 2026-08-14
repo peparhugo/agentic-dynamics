@@ -1,0 +1,99 @@
+name: framework_facelift
+question: "Can the operational framework page be visually modernized without altering its measured content?"
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    phases:
+      - name: scope
+        kind: agent
+        prompt: |
+          Write docs/facelift.md: the visual-redesign plan for the framework page.
+
+          GOAL:
+          {goal}
+
+          CONTEXT — this is a FACE LIFT, not a rewrite:
+          - firebase/public/framework.html (~59KB) is the "Operational Framework" page. It already has
+            strong content: a cost model (C₀, P, ε, r, β, EPM), an interactive calculator, one-way vs
+            two-way door framing, an autonomous-workload door, and a provider playbook (pricing, cache
+            strategy, simulated routing, budget enforcement, reference cards, escalation economics).
+          - The page was recently prose-refreshed to read "Measured information becomes testable policy",
+            but its VISUAL presentation is dense and dated: heavy inline styles, long unbroken sections,
+            and a calculator that feels bolted-on rather than designed.
+          - The site's design system lives in firebase/public/base.css (dark dossier aesthetic: JetBrains
+            Mono accents, panel cards, amber/coral/cyan accent colors, .cta-btn, .section-kicker,
+            responsive breakpoints). app.js powers the calculator (model_costs, escalation_tiers from
+            window.DYNAMICS_DATA) and other interactivity.
+
+          DESIGN GOALS (the face lift):
+          - Modernize layout and visual hierarchy: clear section rhythm, card-based groupings, generous
+            spacing, consistent use of the base.css design tokens (var(--ac), var(--am), var(--cy),
+            var(--bg3), panel shadows) instead of one-off inline styles.
+          - Make the interactive calculator feel like a centerpiece, not a form: labeled input groups,
+            live-output readouts, a cleaner "how this is computed" toggle.
+          - Make the one-way/two-way/autonomous doors a visual set-piece (three aligned cards with clear
+            accent colors), and the provider playbook a scannable card grid rather than stacked headings.
+          - Keep it dark-dossier: no new fonts, no external libraries beyond what the site already loads.
+
+          HARD CONSTRAINTS:
+          - Preserve every number, every data-stat="..." binding, every provenance tag ([M]/[C]/[H]/[X]),
+            and the calculator's model_costs/escalation_tiers fallback values verbatim.
+          - Do not change base.css, app.js, or data.js. The face lift is framework.html's markup + a
+            <style> block scoped to this page only.
+          - All existing <a href> anchors (e.g. #calculator, #playbook) and nav must keep working.
+
+          DELIVER exactly one file, docs/facelift.md: (1) the current-problems list, (2) the proposed
+          section-by-section visual changes, (3) the design-token mapping (which var() to use where),
+          (4) an explicit register of every number/data-stat that must NOT change.
+      - name: rewrite
+        kind: agent
+        prompt: |
+          Implement the face lift per docs/facelift.md, editing firebase/public/framework.html only.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          HARD RULES:
+          - Edit framework.html markup + a scoped <style> block. Do NOT touch base.css, app.js, or data.js.
+          - Preserve every number, data-stat binding, provenance tag, and the calculator fallback values.
+          - The calculator must still read window.DYNAMICS_DATA.calculator.model_costs / escalation_tiers
+            and still call the same app.js functions (toggleHow, etc.) — do not break its JS contract.
+          - Keep all nav links and #anchors working. Dark dossier aesthetic, design-token driven.
+
+          DELIVER the face-lifted framework.html.
+      - name: verify
+        kind: agent
+        prompt: |
+          Verify the face lift is data-safe and still functional.
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          CHECKS:
+          - Every data-stat="..." key in the edited framework.html resolves in firebase/public/data.js.
+          - No measured number or calculator fallback (model_costs, escalation_tiers) changed vs the
+            prior committed version (git diff against HEAD~1 for framework.html).
+          - The page still references every app.js function it did before (toggleHow, etc.), and no
+            <script> tag was removed or reordered.
+          - All internal <a href="#..."> anchors resolve to an id present in the page.
+          - The page renders with no unclosed tags (basic structural check).
+
+          DELIVER exactly one file, docs/verify.md: PASS/FAIL per check + a summary of any number that
+          changed (there should be none).
+factors:
+  - {name: model, levels: [openai/gpt-5.6-sol]}
+design: factorial
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
