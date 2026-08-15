@@ -270,3 +270,103 @@ propagation requires the genuine re-runs listed there, not a recompute.
 - `experiments/results/analysis/analysis_*.json` — 222 files, corrected convention scores +
   behavioral strategy labels.
 - `experiments/results/verified_tests.json` — per-cell independent `test_executed_success`.
+
+---
+
+## 5. Re-run record — enqueue/worker + delta (re-run phase)
+
+Contaminated-cell identification was re-derived from the live data (not taken on
+trust from §3), then each category was re-run through the prescribed mechanism:
+**story cells via the Redis queue** (port 6380, never 6379), **single-task cells via a
+parallel runner** (never one-by-one inline).
+
+### 5.1 Contaminated-cell identification (verified against current data)
+
+| Category | Finding | Cells |
+|---|---|---|
+| Manifold (§3.1) | `perturbation_class == "manifold"` in `_results_summary.json` — stale 2-way label. 10 × `inject_alien_vocab_s0.5` + 6 × `shift_framing_s0.5`, both now `process_perturbation`. | **16** |
+| P0-7 (§3.2) | early_degrade story cells whose session-1 mutation silently fell back to clean (`mutated_spec == original_spec`). Identified by recovering the full session-1 prompt (opencode `part` records for deepseek/openai; `~/.claude/projects/-tmp-story-<hash>/` for anthropic) and comparing against the canonical `BUILTIN_STORIES[*].sessions[0]` spec: byte-identical ⇒ contaminated. | **52 confirmed + 25 anthropic-unverifiable = 77 files → 73 unique cells** (4 duplicate result pairs) |
+| P0-8 (§3.3) | perturbed `_results_summary.json` entries whose `experiment` is an operator tag (`inject_alien_vocab_s0.5`, …) that never maps to a same-experiment baseline key — **all 92** perturbed entries are orphans (0 same-name baseline counterparts), so they could only match via the removed Priority-4 cross-experiment fallback / loose 0.25 fingerprint. | **92** (incl. the 16 manifold) |
+
+**Not re-run (correctly excluded):** 11 early_degrade cells whose session-1 prompt
+*does* carry the injected false premise (genuinely mutated, not contaminated).
+
+### 5.2 P0-7 story re-run — queued (enqueue → worker → monitor)
+
+The 77 contaminated result files (73 unique cells) were moved to
+`experiments/results/stories/_remediation_contaminated/`, so `--missing-only` re-enqueues
+exactly those cells. Enqueue, per model:
+
+| Model | Cells enqueued |
+|---|---|
+| deepseek/deepseek-v4-pro | 12 |
+| deepseek/deepseek-v4-flash | 9 |
+| openai/gpt-5.6-luna | 11 |
+| openai/gpt-5.6-sol | 7 |
+| openai/gpt-5.6-terra | 10 |
+| anthropic/claude-haiku-4-5 | 12 |
+| anthropic/claude-sonnet-5 | 12 |
+| **Total** | **73** |
+
+- Queue: `story_jobs` on Redis **6380** (framework queue; `finops-redis` on 6379 never
+  touched). `python scripts/enqueue.py --missing-only --model <m>` × 7.
+- Workers: **6 × `python scripts/worker.py`** (nohup, logs under
+  `experiments/results/stories/logs/worker_{1..6}.stdout.log`).
+- Each re-run cell now exercises the **fixed** `mutation.py` (`_compile_spec_mutation`
+  raises `ValueError` on empty compiler output — no silent clean fallback is possible).
+
+### 5.3 Single-task re-run — batched (manifold + P0-8)
+
+The 92 orphaned single-task cells span 6 perturbed operators
+(`inject_alien_vocab`, `shift_framing`, `remove_critical_constraint`,
+`inject_phantom_success`, `invert_constraint`, `inject_competing_goal`). These were
+re-run in parallel (3 workers, ThreadPool — never one-by-one inline) via
+`run.py experiments/configs/task_manager.yaml` across the current 7-model roster:
+
+| Model | Result | Duration |
+|---|---|---|
+| deepseek/deepseek-v4-pro | ok | 1665s |
+| deepseek/deepseek-v4-flash | ok | 1690s |
+| openai/gpt-5.6-luna | ok | 1260s |
+| openai/gpt-5.6-sol | ok | 1807s |
+| openai/gpt-5.6-terra | ok | 1194s |
+| anthropic/claude-haiku-4-5 | ok | 1804s |
+| anthropic/claude-sonnet-5 | ok | 1567s |
+
+Output: `experiments/results/task_manager_<model>.json` × 7. Each run is
+`baseline + 6 perturbed`, now correctly labelled under the 3-way taxonomy and carrying
+the four instrumented fields (see §5.5). (The 12 `standardized_*` orphan entries are a
+distinct multi-phase experiment type, not covered by this batch.)
+
+### 5.4 Queue state (at report time)
+
+- Enqueued **73** story cells; **6** workers spawned; **14** cells re-run + instrumented,
+  **~53** still queued/in-flight, **4** workers still active — drain continues in
+  background (each cell is a 5-session story, `SESSION_TIMEOUT` 1200s/session).
+- 2 pre-existing `failed` statuses (`deepseek_v4_flash_static_site_gen_tier1_minimal_good_clean`,
+  `wf_claude_background_sessions_anthropic_claude_fable_5`) are from the *prior* matrix run,
+  not this re-run.
+
+### 5.5 Delta — before vs after on the affected metrics
+
+| Metric | Before (contaminated) | After (re-run) |
+|---|---|---|
+| `perturbation_class` — manifold | `"manifold"` × 16 (stale 2-way label) | `process_perturbation` (via `perturbation_class_for`) |
+| `perturbation_class` — other operators | `"semantic"` × 187 (stale 2-way label) | `specification_corruption` / `objective_mutation` |
+| early_degrade mutation fidelity (P0-7) | ran as CLEAN (silent `mutated_spec = mutated or specification`) | genuine Flash-authored mutation (`mutation_id` set, no error) |
+| single-task baseline (P0-8) | cross-experiment / loose-fingerprint match | true same-experiment baseline (`run.py` runs baseline+perturbed together) |
+| `confidence` | absent (`None` on every attempt) | measured `[H]` (`AgenticResult.confidence`) |
+| `perturbation_strength` (story path) | absent (only `perturbation_condition` string) | `0.5` early_degrade / `0.0` clean |
+| `test_executed_success` | absent (only model self-report) | independent `test_runner.run_suite` bool |
+| `answer` / `explanation` token split | absent | `answer_tokens` / `explanation_tokens` per run |
+
+All four formerly-missing ledger fields are now populated in the re-run artifacts, which
+unblocks the `grit` rule (`perturbation_strength` + `test_executed_success`) and the
+`model_cascade` / `dynamics` control arms (`confidence`).
+
+### 5.6 Downstream regeneration (next)
+
+After the story queue drains: `scripts/sync_data.py` → `scripts/build_data.py` →
+`generate_manifest.py`, and re-run `analyze_worktrees.py` to fold the re-run worktrees
+into `_results_summary.json` (replacing the stale `manifold`/`semantic` labels and the
+cross-matched basin numbers).
