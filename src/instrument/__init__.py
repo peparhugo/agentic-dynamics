@@ -140,6 +140,32 @@ from .review import (
 )
 from .routing import compute_routing, normalize_task, recommend_route, simulate_strategies
 
+# v1.0: deterministic retrieval + evidence cards for the runtime-RAG layer
+from .retrieval import (
+    AUTHORITY_MULTIPLIER,
+    RELATIONSHIP_WEIGHTS,
+    WEIGHTS_VERSION,
+    Candidate,
+    EvidenceCard,
+    FallbackMode,
+    QueryPlan,
+    RetrievalAttempt,
+    build_evidence_cards,
+    build_query_plan,
+    collapse_redundant,
+    compute_fused_score,
+    compute_token_budget,
+    deduplicate,
+    exact_identifier_hit,
+    freshness_multiplier,
+    graph_boost,
+    render_evidence_packet,
+    resolve_fallback_mode,
+    retrieve,
+    rrf_base,
+    select_evidence,
+)
+
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
@@ -265,6 +291,14 @@ __all__ = [
     "Authority", "KnowledgeRecord", "KnowledgeEvent",
     "compute_entity_id", "compute_knowledge_id", "compute_content_hash",
     "SCHEMA_VERSION", "OPERATIONS", "EVIDENCE_CLASSES",
+    # v1.0 retrieval + evidence cards
+    "QueryPlan", "Candidate", "EvidenceCard", "RetrievalAttempt", "FallbackMode",
+    "build_query_plan", "retrieve", "build_evidence_cards",
+    "rrf_base", "compute_fused_score", "graph_boost", "exact_identifier_hit",
+    "freshness_multiplier", "compute_token_budget", "select_evidence",
+    "deduplicate", "collapse_redundant", "resolve_fallback_mode",
+    "render_evidence_packet", "WEIGHTS_VERSION", "RELATIONSHIP_WEIGHTS",
+    "AUTHORITY_MULTIPLIER",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
