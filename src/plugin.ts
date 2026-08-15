@@ -8,6 +8,19 @@ export interface BuildContext {
   filename?: string;
   page?: Page;
   pages: Page[];
+  /** Incremental state consumed by the built-in renderer. */
+  skipRender?: boolean;
+  cachedHtml?: string;
+  cachedRenderTimeMs?: number;
+  renderedHtml?: string;
+  renderTimeMs?: number;
+  stats: BuildStats;
+}
+
+export interface BuildStats {
+  pagesBuilt: number;
+  pagesSkipped: number;
+  timeSavedMs: number;
 }
 
 export interface Plugin {

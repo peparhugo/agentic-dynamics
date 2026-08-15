@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { buildSite } from './site';
+import type { BuildStats } from './plugin';
 import { startDevServer } from './server';
 
 function usage(): string {
-  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>]';
+  return 'Usage: ssg <build|serve> [--content <dir>] [--output <dir>] [--templates <dir>] [--port <port>] [--incremental] [--clean]';
 }
 
 interface CliOptions {
@@ -11,13 +12,17 @@ interface CliOptions {
   outputDir?: string;
   templateDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function parseArguments(args: string[]): CliOptions {
   const options: CliOptions = {};
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
+    if (argument === '--incremental' || argument === '--clean') {
+      options[argument.slice(2) as 'incremental' | 'clean'] = true;
+    } else if (argument === '--content' || argument === '--output' || argument === '--templates' || argument === '--port') {
       const value = args[index + 1];
       if (!value) throw new Error(`Missing value for ${argument}`);
       if (argument === '--content') options.contentDir = value;
@@ -41,8 +46,10 @@ async function main(): Promise<void> {
   if (command !== 'build' && command !== 'serve') throw new Error(usage());
   const options = parseArguments(args);
   if (command === 'build') {
-    const pages = await buildSite(options);
+    let stats: BuildStats | undefined;
+    const pages = await buildSite({ ...options, onStats: (buildStats) => { stats = buildStats; } });
     process.stdout.write(`Built ${pages.length} page(s).\n`);
+    if (stats) process.stdout.write(`Pages built: ${stats.pagesBuilt}, pages skipped: ${stats.pagesSkipped}, time saved: ${stats.timeSavedMs}ms.\n`);
     return;
   }
 

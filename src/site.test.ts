@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import WebSocket from 'ws';
@@ -21,6 +21,48 @@ describe('parsePage', () => {
 });
 
 describe('buildSite', () => {
+  it('incrementally skips unchanged pages and invalidates cached output for source and template changes', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'ssg-incremental-'));
+    const content = join(root, 'content');
+    const templates = join(root, 'templates');
+    const output = join(root, 'output');
+    await mkdir(join(templates, 'layouts'), { recursive: true });
+    await mkdir(content);
+    const first = join(content, 'first.md');
+    const second = join(content, 'second.md');
+    await writeFile(first, '---\ntitle: First\n---\n\nOne');
+    await writeFile(second, '---\ntitle: Second\n---\n\nTwo');
+    await writeFile(join(templates, 'default.hbs'), '<article>{{title}} {{{content}}}</article>');
+    await writeFile(join(templates, 'layouts', 'default.hbs'), '<html>{{{body}}}</html>');
+
+    const initialStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, onStats: (stats) => initialStats.push(stats) });
+    expect(initialStats[0]).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(readFile(join(root, '.ssg-cache.json'), 'utf8')).resolves.toContain('first.md');
+
+    const unchangedStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, onStats: (stats) => unchangedStats.push(stats) });
+    expect(unchangedStats[0]).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await writeFile(first, '---\ntitle: Updated\n---\n\nOne');
+    const changedStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, onStats: (stats) => changedStats.push(stats) });
+    expect(changedStats[0]).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(readFile(join(output, 'first.html'), 'utf8')).resolves.toContain('Updated');
+
+    await rm(join(output, 'second.html'));
+    const restoredStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, onStats: (stats) => restoredStats.push(stats) });
+    expect(restoredStats[0]).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('Second');
+
+    await writeFile(join(templates, 'default.hbs'), '<section>{{title}} {{{content}}}</section>');
+    const templateStats: { pagesBuilt: number; pagesSkipped: number }[] = [];
+    await buildSite({ contentDir: content, outputDir: output, templateDir: templates, incremental: true, onStats: (stats) => templateStats.push(stats) });
+    expect(templateStats[0]).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(readFile(join(output, 'second.html'), 'utf8')).resolves.toContain('<section>Second');
+  });
+
   it('runs configured plugin hooks in order and lets plugins modify pages before rendering', async () => {
     const root = await mkdtemp(join(tmpdir(), 'ssg-plugin-'));
     const content = join(root, 'content');

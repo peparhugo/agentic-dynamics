@@ -75,8 +75,18 @@ export class TemplatePlugin implements Plugin {
   async onFile(context: Parameters<NonNullable<Plugin['onFile']>>[0]): Promise<void> {
     if (!context.page) return;
     const target = join(context.outputDir, `${context.page.slug}.html`);
+    if (context.skipRender) {
+      context.stats.pagesSkipped += 1;
+      context.stats.timeSavedMs += context.cachedRenderTimeMs ?? 0;
+      return;
+    }
     await mkdir(resolve(target, '..'), { recursive: true });
-    await writeFile(target, await renderPage(context.page, context.templateDir, this.handlebars), 'utf8');
+    const startedAt = Date.now();
+    const html = context.cachedHtml ?? await renderPage(context.page, context.templateDir, this.handlebars);
+    context.renderedHtml = html;
+    context.renderTimeMs = Date.now() - startedAt;
+    context.stats.pagesBuilt += 1;
+    await writeFile(target, html, 'utf8');
   }
 
   async afterBuild(context: Parameters<NonNullable<Plugin['afterBuild']>>[0]): Promise<void> {
