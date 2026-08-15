@@ -7,6 +7,54 @@ from websockets.asyncio.client import connect
 from app import NotificationServer
 
 
+class FakeRedis:
+    """Small shared async Redis double exercising pub/sub and hash state."""
+
+    def __init__(self):
+        self.hashes = {}
+        self.subscribers = {}
+
+    def pubsub(self):
+        return FakePubSub(self)
+
+    async def publish(self, channel, data):
+        for subscriber in list(self.subscribers.get(channel, [])):
+            await subscriber.messages.put({"data": data})
+
+    async def hset(self, key, field, value):
+        self.hashes.setdefault(key, {})[field] = value
+
+    async def hdel(self, key, field):
+        self.hashes.get(key, {}).pop(field, None)
+
+    async def hexists(self, key, field):
+        return field in self.hashes.get(key, {})
+
+    async def hget(self, key, field):
+        return self.hashes.get(key, {}).get(field)
+
+
+class FakePubSub:
+    def __init__(self, broker):
+        self.broker = broker
+        self.channels = set()
+        self.messages = asyncio.Queue()
+
+    async def subscribe(self, channel):
+        self.channels.add(channel)
+        self.broker.subscribers.setdefault(channel, []).append(self)
+
+    async def get_message(self, ignore_subscribe_messages=True, timeout=0):
+        try:
+            return await asyncio.wait_for(self.messages.get(), timeout)
+        except asyncio.TimeoutError:
+            return None
+
+    async def aclose(self):
+        for channel in self.channels:
+            self.broker.subscribers[channel].remove(self)
+
+
 @pytest.fixture
 async def notification_server():
     server = NotificationServer()
@@ -184,3 +232,59 @@ async def test_unsubscribe_and_channel_endpoints(notification_server):
             "channel": "alerts",
             "subscribers": [first_id],
         }
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_persists_paginated_history(tmp_path):
+    database_url = f"sqlite:///{tmp_path / 'messages.db'}"
+    server = NotificationServer(database_url=database_url)
+    listener = await server.start(port=0)
+    port = listener.sockets[0].getsockname()[1]
+    uri = f"ws://127.0.0.1:{port}"
+    try:
+        async with connect(uri) as client:
+            await receive_json(client)
+            for text in ("one", "two", "three"):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": text}}))
+                await receive_json(client)
+
+            history = await get_json(port, "/messages?limit=2&offset=1")
+            assert [message["payload"] for message in history["messages"]] == [
+                {"text": "two"},
+                {"text": "three"},
+            ]
+            assert all(message["id"] and message["timestamp"] for message in history["messages"])
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_between_server_instances_and_tracks_clients(tmp_path):
+    broker = FakeRedis()
+    first = NotificationServer(redis_client=broker, database_url=f"sqlite:///{tmp_path / 'first.db'}")
+    second = NotificationServer(redis_client=broker, database_url=f"sqlite:///{tmp_path / 'second.db'}")
+    first_listener = await first.start(port=0)
+    second_listener = await second.start(port=0)
+    first_uri = f"ws://127.0.0.1:{first_listener.sockets[0].getsockname()[1]}"
+    second_uri = f"ws://127.0.0.1:{second_listener.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(first_uri) as publisher, connect(second_uri) as subscriber:
+            await receive_json(publisher)
+            client_id = (await receive_json(subscriber))["payload"]["client_id"]
+            await subscriber.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+            for _ in range(20):
+                state = await broker.hget("notifications:clients", client_id)
+                if state == json.dumps({"channels": ["alerts"]}):
+                    break
+                await asyncio.sleep(0.01)
+            assert json.loads(await broker.hget("notifications:clients", client_id)) == {"channels": ["alerts"]}
+
+            await publisher.send(
+                json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": "shared"}})
+            )
+            message = await receive_json(subscriber)
+            assert message["payload"] == {"text": "shared"}
+            assert message["channel"] == "alerts"
+    finally:
+        await first.stop()
+        await second.stop()
