@@ -1,9 +1,17 @@
 import path from 'path';
 import { writeFile } from './files';
 import { PageData } from './page';
+import { getEngine, loadTemplate, loadLayout, loadPartials } from './template';
 
-export async function generatePageHtml(page: PageData, outputDir: string): Promise<void> {
-  const html = createPageHtml(page);
+export async function generatePageHtml(page: PageData, outputDir: string, templateDir?: string): Promise<void> {
+  let html: string;
+
+  if (templateDir) {
+    html = await createPageHtmlWithTemplate(page, templateDir);
+  } else {
+    html = createPageHtml(page);
+  }
+
   const filePath = path.join(outputDir, `${page.slug}.html`);
   await writeFile(filePath, html);
 }
@@ -12,6 +20,27 @@ export async function generateIndexHtml(pages: PageData[], outputDir: string): P
   const html = createIndexHtml(pages);
   const filePath = path.join(outputDir, 'index.html');
   await writeFile(filePath, html);
+}
+
+async function createPageHtmlWithTemplate(page: PageData, templateDir: string): Promise<string> {
+  await loadPartials(templateDir);
+  const eng = getEngine();
+
+  let html = page.html;
+
+  // Apply template if specified
+  if (page.template) {
+    const templateContent = await loadTemplate(page.template, templateDir);
+    html = eng.render(templateContent, { ...page, body: page.html });
+  }
+
+  // Apply layout if specified
+  if (page.layout) {
+    const layout = await loadLayout(page.layout, templateDir);
+    html = eng.render(layout, { ...page, body: html });
+  }
+
+  return html;
 }
 
 function createPageHtml(page: PageData): string {

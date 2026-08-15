@@ -7,7 +7,7 @@ import { readMarkdownFiles } from './files';
 import { processMarkdownFile } from './page';
 import { generatePageHtml, generateIndexHtml } from './generator';
 
-async function build(contentDir: string, outputDir: string): Promise<void> {
+async function build(contentDir: string, outputDir: string, templateDir?: string): Promise<void> {
   console.log(`Reading markdown files from: ${contentDir}`);
   const files = await readMarkdownFiles(contentDir);
 
@@ -22,7 +22,7 @@ async function build(contentDir: string, outputDir: string): Promise<void> {
   for (const file of files) {
     const page = await processMarkdownFile(file.name, file.content);
     pages.push(page);
-    await generatePageHtml(page, outputDir);
+    await generatePageHtml(page, outputDir, templateDir);
     console.log(`✓ Generated ${page.slug}.html`);
   }
 
@@ -49,14 +49,20 @@ yargs(hideBin(process.argv))
           describe: 'Output directory',
           type: 'string',
           default: './dist'
+        })
+        .option('templates', {
+          alias: 't',
+          describe: 'Templates directory',
+          type: 'string'
         });
     },
     async (argv) => {
       const contentDir = path.resolve(argv.content as string);
       const outputDir = path.resolve(argv.output as string);
+      const templateDir = argv.templates ? path.resolve(argv.templates as string) : undefined;
 
       try {
-        await build(contentDir, outputDir);
+        await build(contentDir, outputDir, templateDir);
       } catch (error) {
         console.error('Error:', (error as Error).message);
         process.exit(1);

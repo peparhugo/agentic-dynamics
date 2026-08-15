@@ -37,6 +37,34 @@ describe('generator', () => {
       expect(exists).toBe(true);
     });
 
+    it('should generate page HTML file with templates', async () => {
+      const templatesDir = path.join(testDir, 'templates');
+      await fs.mkdir(path.join(templatesDir, 'layouts'), { recursive: true });
+
+      const layoutContent = '<!DOCTYPE html><html><body>{{{body}}}</body></html>';
+      await fs.writeFile(
+        path.join(templatesDir, 'layouts', 'default.hbs'),
+        layoutContent
+      );
+
+      const page: PageData = {
+        slug: 'test-post',
+        title: 'Test Post',
+        layout: 'default',
+        html: '<p>Content with template</p>'
+      };
+
+      await generatePageHtml(page, testDir, templatesDir);
+
+      const filePath = path.join(testDir, 'test-post.html');
+      const exists = await fs.stat(filePath).then(() => true).catch(() => false);
+      expect(exists).toBe(true);
+
+      const content = await fs.readFile(filePath, 'utf-8');
+      expect(content).toContain('<!DOCTYPE html>');
+      expect(content).toContain('<p>Content with template</p>');
+    });
+
     it('should include title in page HTML', async () => {
       const page: PageData = {
         slug: 'test',
