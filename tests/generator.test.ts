@@ -65,4 +65,51 @@ describe('buildSite', () => {
     expect(page).toContain('<header>Header</header><h2>EJS page</h2>');
     expect(page).toContain('<p>Hello</p>');
   });
+
+  it('builds only changed pages and restores unchanged pages from the cache', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{body}}}</main>');
+    await fs.writeFile(path.join(content, 'one.md'), '---\ntitle: One\n---\n\nFirst');
+    await fs.writeFile(path.join(content, 'two.md'), '---\ntitle: Two\n---\n\nSecond');
+
+    expect((await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true })))
+      .toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    const cache = path.join(output, '.ssg-cache.json');
+    expect(JSON.parse(await fs.readFile(cache, 'utf8')).pages['one.md'].data.title).toBe('One');
+
+    const second = await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(second).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+
+    await fs.writeFile(path.join(content, 'one.md'), '---\ntitle: Updated\n---\n\nChanged');
+    const third = await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    expect(third).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    expect(await fs.readFile(path.join(output, 'one.html'), 'utf8')).toContain('Updated');
+    expect(await fs.readFile(path.join(output, 'two.html'), 'utf8')).toContain('Second');
+  });
+
+  it('invalidates every page when a template changes and removes deleted pages', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(templates, { recursive: true });
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<main>{{{body}}}</main>');
+    await fs.writeFile(path.join(content, 'one.md'), '# One');
+    await fs.writeFile(path.join(content, 'two.md'), '# Two');
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+
+    await fs.writeFile(path.join(templates, 'default.hbs'), '<aside>Changed</aside>{{{body}}}');
+    expect(await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true }))
+      .toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+
+    await fs.rm(path.join(content, 'two.md'));
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output, incremental: true });
+    await expect(fs.access(path.join(output, 'two.html'))).rejects.toThrow();
+  });
 });

@@ -3,7 +3,7 @@ import { buildSite } from './generator';
 import { serveSite } from './dev-server';
 
 function usage(): void {
-  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  console.error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>] [--incremental] [--clean]');
   console.error('       ssg serve [--content <dir>] [--output <dir>] [--templates <dir>] [--port <number>]');
 }
 
@@ -13,9 +13,14 @@ export async function main(args: string[] = process.argv.slice(2)): Promise<void
     process.exitCode = 1;
     return;
   }
-  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number } = {};
+  const options: { contentDir?: string; outputDir?: string; templatesDir?: string; port?: number; incremental?: boolean; clean?: boolean } = {};
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
+    if (option === '--incremental' || option === '--clean') {
+      if (args[0] !== 'build') { usage(); process.exitCode = 1; return; }
+      options[option === '--incremental' ? 'incremental' : 'clean'] = true;
+      continue;
+    }
     if (option !== '--content' && option !== '--output' && option !== '--templates'
       && (option !== '--port' || args[0] !== 'serve')) {
       usage(); process.exitCode = 1; return;
@@ -31,7 +36,10 @@ export async function main(args: string[] = process.argv.slice(2)): Promise<void
     else options.templatesDir = value;
   }
   if (args[0] === 'serve') await serveSite(options);
-  else await buildSite(options);
+  else {
+    const stats = await buildSite(options);
+    console.log(`Build complete: ${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped, ${stats.timeSaved}ms saved`);
+  }
 }
 
 if (require.main === module) {

@@ -18,6 +18,8 @@ export interface BuildOptions {
   defaultTemplate?: string;
   configFile?: string;
   plugins?: Plugin[];
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export interface PluginContext {
