@@ -756,40 +756,65 @@ class Neo4jClient:
         return list(visited.values())
 
     def find_exact(
-        self, label: str, property_name: str, value: Any, *, limit: int = 10
+        self, label: str, property_name: str, value: Any, *, limit: int = 10,
+        commit: str | None = None,
     ) -> list[dict[str, Any]]:
         """Exact-property lookup on a node label (no hand-written Cypher).
 
         ``label`` and ``property_name`` are validated identifiers; ``value`` is
         parameterized. Returns matching nodes as ``{"id", "labels",
         "properties"}`` dicts.
+
+        ``commit`` is an optional HARD commit pre-filter: when supplied, a matched
+        node is returned only if its ``commit_sha`` equals ``commit`` or is absent
+        (``IS NULL``). A node with a non-matching, non-null ``commit_sha`` is
+        excluded. Omitted → no filter (back-compatible).
         """
         _validate_identifier(label, "label")
         _validate_identifier(property_name, "property")
-        records = self._run(
-            f"MATCH (n:{label}) WHERE n.{property_name} = $value "
-            "RETURN elementId(n) AS node_id, labels(n) AS labels, properties(n) AS properties "
-            "LIMIT $limit",
-            {"value": value, "limit": limit},
+        params: dict[str, Any] = {"value": value, "limit": limit}
+        query = f"MATCH (n:{label}) WHERE n.{property_name} = $value "
+        if commit:
+            # Hard commit pre-filter: only current (or unknown/absent) commits pass.
+            query += "AND (n.commit_sha = $commit OR n.commit_sha IS NULL) "
+            params["commit"] = commit
+        query += (
+            "RETURN elementId(n) AS node_id, labels(n) AS labels, "
+            "properties(n) AS properties LIMIT $limit"
         )
+        records = self._run(query, params)
         return [self._node_dict(rec) for rec in records]
 
     def search_fulltext(
-        self, index_name: str, query: str, *, limit: int = 10
+        self, index_name: str, query: str, *, limit: int = 10, commit: str | None = None
     ) -> list[dict[str, Any]]:
         """Full-text search against a named native full-text index.
 
         ``index_name`` references an index created by ``create_knowledge_schema``
         (e.g. ``"step_text_ft"``). Returns matching nodes as ``{"id", "labels",
         "properties", "score"}`` dicts, highest score first.
+
+        ``commit`` is an optional HARD commit pre-filter: when supplied, a matched
+        node is returned only if its ``commit_sha`` equals ``commit`` or is absent
+        (``IS NULL`` — e.g. ``Step`` nodes carry no commit). A node with a
+        non-matching, non-null ``commit_sha`` is excluded. Omitted → no filter
+        (back-compatible).
         """
         _validate_identifier(index_name, "index")
-        records = self._run(
+        params: dict[str, Any] = {"index": index_name, "query": query, "limit": limit}
+        query_str = (
             "CALL db.index.fulltext.queryNodes($index, $query) "
             "YIELD node, score "
+        )
+        if commit:
+            # Hard commit pre-filter on the lexical leg — mirrors the dense leg's
+            # where filter and the fusion-time exclusion in freshness_multiplier.
+            query_str += "WHERE node.commit_sha = $commit OR node.commit_sha IS NULL "
+            params["commit"] = commit
+        query_str += (
             "RETURN elementId(node) AS node_id, labels(node) AS labels, "
             "properties(node) AS properties, score "
-            "LIMIT $limit",
-            {"index": index_name, "query": query, "limit": limit},
+            "LIMIT $limit"
         )
+        records = self._run(query_str, params)
         return [self._node_dict(rec, with_score=True) for rec in records]

@@ -287,14 +287,30 @@ def freshness_multiplier(
 ) -> float | None:
     """Return the freshness multiplier, or ``None`` to *exclude* the candidate.
 
-    POLICY is never retrieved (returns None). Advisory evidence older than 90 days
-    is excluded; advisory within 30/90 days and exact-commit matches get their
-    multipliers. Source/measured/derived current artifacts are 1.00.
+    POLICY is never retrieved (returns None). When ``current_commit`` is known, a
+    SOURCE/MEASURED/DERIVED candidate carrying a *different, non-empty*
+    ``commit_sha`` is a HARD exclusion — the worktree and commit are hard filters:
+    another branch's code can be semantically similar and operationally wrong. A
+    candidate with an *empty* ``commit_sha`` is treated as current/unknown and stays
+    eligible. The exact-commit boost (``EXACT_COMMIT_MULTIPLIER``) is preserved.
+    Advisory freshness windows (30/90-day) are unchanged.
     """
     if authority is Authority.POLICY:
         return None
+    # Hard commit pre-filter (the safety rationale). Only enforced when the current
+    # commit is known AND the candidate names a *different*, non-empty commit; an
+    # empty commit_sha is unknown/current and therefore eligible.
+    if (
+        current_commit
+        and authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED)
+        and commit_sha
+        and commit_sha != current_commit
+    ):
+        return None
+    # Exact-commit match remains a soft boost (eligible, scored above current).
     if current_commit and commit_sha and commit_sha == current_commit:
         return EXACT_COMMIT_MULTIPLIER
+    # Current/unknown source/measured/derived evidence is neutral (1.00).
     if authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED):
         return 1.00
     if authority is Authority.ADVISORY:
@@ -744,7 +760,11 @@ def retrieve(
         return dense_store.search(plan.dense_query, top_k=top_k, where=_dense_filter(filters))
 
     def _lexical_leg():
-        return graph_client.search_fulltext("step_text_ft", plan.lexical_query, limit=top_k)
+        # The lexical leg applies the same hard commit pre-filter as the dense leg:
+        # nodes with a non-matching, non-null commit_sha are dropped in the store.
+        return graph_client.search_fulltext(
+            "step_text_ft", plan.lexical_query, limit=top_k, commit=commit_sha
+        )
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         futures = {}
@@ -888,13 +908,32 @@ def retrieve(
 
 
 def _dense_filter(filters: dict[str, Any]) -> dict[str, Any]:
-    """Build the Chroma ``where`` metadata filter from hard scope filters."""
-    where: dict[str, Any] = {}
+    """Build the Chroma ``where`` metadata filter from hard scope filters.
+
+    Chroma requires a ``where`` dict to carry exactly one top-level key, so multiple
+    conditions are combined under ``$and`` (a bare multi-key dict is rejected by
+    ``validate_where``). The commit scope is a HARD pre-filter: a stored chunk is
+    eligible only when its ``commit_sha`` is empty (unknown/current) or equals the
+    worktree's commit — stale-commit docs never surface from the dense leg at all.
+    """
+    conditions: list[dict[str, Any]] = []
     if filters.get("repository_id"):
-        where["repository_id"] = filters["repository_id"]
+        conditions.append({"repository_id": filters["repository_id"]})
     if filters.get("acl_scope"):
-        where["acl_scope"] = filters["acl_scope"]
-    return where
+        conditions.append({"acl_scope": filters["acl_scope"]})
+    commit = filters.get("commit_sha")
+    if commit:
+        conditions.append({
+            "$or": [
+                {"commit_sha": ""},
+                {"commit_sha": commit},
+            ]
+        })
+    if not conditions:
+        return {}
+    if len(conditions) == 1:
+        return conditions[0]
+    return {"$and": conditions}
 
 
 def render_evidence_packet(selected: list[Candidate]) -> str:

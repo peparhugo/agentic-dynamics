@@ -349,6 +349,9 @@ class TestSearchHelpers(_Neo4jTestBase):
         yield
         self.client._run("MATCH (k:Knowledge {knowledge_id: 'kf_001'}) DETACH DELETE k")
         self.client._run("MATCH (s:Step {step_id: 'ft_1'}) DETACH DELETE s")
+        self.client._run(
+            "MATCH (s:Step) WHERE s.step_id IN ['ft_c1', 'ft_c2', 'ft_c3'] DETACH DELETE s"
+        )
 
     def test_find_exact_returns_matching_node(self):
         self.client._run(
@@ -371,3 +374,37 @@ class TestSearchHelpers(_Neo4jTestBase):
         res = self.client.search_fulltext("step_text_ft", "websocket")
         assert len(res) >= 1
         assert any(r["properties"].get("step_id") == "ft_1" for r in res)
+
+    def test_search_fulltext_commit_filter_excludes_stale_commit(self):
+        self.client.create_knowledge_schema()
+        # Three matches on the same text: one on the current commit, one on a stale
+        # commit, and one with no commit_sha at all (absent → IS NULL → eligible).
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_c1'}) "
+            "SET s.text = 'websocket live reload protocol', s.commit_sha = 'abc'"
+        )
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_c2'}) "
+            "SET s.text = 'websocket live reload protocol', s.commit_sha = 'xyz'"
+        )
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_c3'}) "
+            "SET s.text = 'websocket live reload protocol'"
+        )
+
+        res = self.client.search_fulltext("step_text_ft", "websocket", commit="abc")
+        ids = {r["properties"].get("step_id") for r in res}
+        assert "ft_c1" in ids          # current commit passes
+        assert "ft_c3" in ids          # absent commit_sha passes (IS NULL)
+        assert "ft_c2" not in ids      # stale commit is pre-filtered out
+
+    def test_search_fulltext_no_commit_is_back_compatible(self):
+        self.client.create_knowledge_schema()
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_c2'}) "
+            "SET s.text = 'websocket live reload protocol', s.commit_sha = 'xyz'"
+        )
+        # Omitting commit keeps the historical no-filter behavior: the stale-commit
+        # node is still returned.
+        res = self.client.search_fulltext("step_text_ft", "websocket")
+        assert any(r["properties"].get("step_id") == "ft_c2" for r in res)

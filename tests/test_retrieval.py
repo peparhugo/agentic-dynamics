@@ -35,6 +35,7 @@ from instrument.retrieval import (
     resolve_fallback_mode,
     rrf_base,
     select_evidence,
+    _dense_filter,
 )
 
 NOW = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
@@ -185,12 +186,66 @@ def test_fused_score_conflict_penalty():
 
 
 def test_freshness_exact_commit_and_source():
+    # Exact commit match keeps its soft boost.
     assert freshness_multiplier(
         authority=Authority.SOURCE, commit_sha="abc", observed_at=None, current_commit="abc"
     ) == pytest.approx(EXACT_COMMIT_MULTIPLIER)
+    # A different, non-empty commit is a HARD exclusion (the safety rationale).
     assert freshness_multiplier(
         authority=Authority.SOURCE, commit_sha="xyz", observed_at=None, current_commit="abc"
+    ) is None
+
+
+def test_freshness_non_matching_commit_excluded_for_all_non_advisory():
+    # SOURCE / MEASURED / DERIVED are all hard-excluded on a different commit.
+    for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED):
+        assert freshness_multiplier(
+            authority=authority, commit_sha="xyz", observed_at=None, current_commit="abc"
+        ) is None
+
+
+def test_freshness_empty_commit_is_eligible():
+    # An empty commit_sha is treated as current/unknown → eligible at 1.00.
+    for authority in (Authority.SOURCE, Authority.MEASURED, Authority.DERIVED):
+        assert freshness_multiplier(
+            authority=authority, commit_sha="", observed_at=None, current_commit="abc"
+        ) == pytest.approx(1.0)
+
+
+def test_freshness_no_current_commit_keeps_soft_behavior():
+    # Without a known current commit the hard filter is not enforced (back-compat).
+    assert freshness_multiplier(
+        authority=Authority.SOURCE, commit_sha="xyz", observed_at=None, current_commit=""
     ) == pytest.approx(1.0)
+
+
+def test_freshness_advisory_ignores_commit_scope():
+    # Advisory evidence is time-bucketed, not commit-scoped: a non-matching commit
+    # does not hard-exclude it — its freshness window still applies (unchanged).
+    observed = (NOW - timedelta(days=10)).isoformat()
+    assert freshness_multiplier(
+        authority=Authority.ADVISORY, commit_sha="xyz", observed_at=observed,
+        current_commit="abc", now=NOW,
+    ) == pytest.approx(ADVISORY_FRESH_30D)
+
+
+def test_dense_filter_commit_scope_prefilter():
+    # Commit scope alone → $or (empty is unknown/current, or exact match).
+    assert _dense_filter({"commit_sha": "abc"}) == {
+        "$or": [{"commit_sha": ""}, {"commit_sha": "abc"}]
+    }
+    # No commit scope → no filter at all.
+    assert _dense_filter({"commit_sha": ""}) == {}
+    assert _dense_filter({}) == {}
+    # A single non-commit condition stays unwrapped.
+    assert _dense_filter({"repository_id": "repo"}) == {"repository_id": "repo"}
+    # Multiple conditions combine under $and (Chroma allows exactly one top-level key).
+    assert _dense_filter({"repository_id": "repo", "commit_sha": "abc"}) == {
+        "$and": [
+            {"repository_id": "repo"},
+            {"$or": [{"commit_sha": ""}, {"commit_sha": "abc"}]},
+        ]
+    }
 
 
 def test_freshness_advisory_age_buckets():
