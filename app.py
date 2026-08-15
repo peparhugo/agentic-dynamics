@@ -1,4 +1,4 @@
-"""Async WebSocket notification server with a small HTTP health endpoint."""
+"""Async pluggable notification server with a small HTTP health endpoint."""
 
 from __future__ import annotations
 
@@ -8,8 +8,9 @@ import json
 import os
 import sqlite3
 import uuid
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Awaitable, Callable
 from urllib.parse import unquote, urlsplit
 
 import redis.asyncio as redis
@@ -37,8 +38,96 @@ def _message(message_type: str, payload: dict[str, Any], channel: str | None = N
     return json.dumps(message)
 
 
+class BaseTransport(ABC):
+    """Interface used by the notification core to communicate with clients."""
+
+    def __init__(self) -> None:
+        self.clients: dict[str, Any] = {}
+
+    @abstractmethod
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        """Register a newly connected client."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Unregister a client."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: str) -> bool:
+        """Send a message, returning false if the client is disconnected."""
+
+    @abstractmethod
+    async def broadcast(self, message: str, client_ids: set[str]) -> set[str]:
+        """Send a message and return clients that could not receive it."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of :class:`BaseTransport`."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._server: Server | None = None
+
+    async def on_connect(self, client_id: str, connection: ServerConnection) -> None:
+        self.clients[client_id] = connection
+
+    async def on_disconnect(self, client_id: str) -> None:
+        self.clients.pop(client_id, None)
+
+    async def send_message(self, client_id: str, message: str) -> bool:
+        connection = self.clients.get(client_id)
+        if connection is None:
+            return False
+        try:
+            await connection.send(message)
+        except websockets.exceptions.ConnectionClosed:
+            self.clients.pop(client_id, None)
+            return False
+        return True
+
+    async def broadcast(self, message: str, client_ids: set[str]) -> set[str]:
+        disconnected: set[str] = set()
+        for client_id in list(client_ids):
+            if not await self.send_message(client_id, message):
+                disconnected.add(client_id)
+        return disconnected
+
+    async def start(
+        self,
+        handler: Callable[[str, str], Awaitable[None]],
+        host: str,
+        port: int,
+        process_request: Callable[[ServerConnection, Request], Awaitable[Response | None]],
+        on_connect: Callable[[str], Awaitable[None]],
+        on_disconnect: Callable[[str], Awaitable[None]],
+    ) -> None:
+        async def connection_handler(connection: ServerConnection) -> None:
+            client_id = str(uuid.uuid4())
+            await self.on_connect(client_id, connection)
+            await on_connect(client_id)
+            try:
+                async for raw in connection:
+                    await handler(client_id, raw)
+            finally:
+                await self.on_disconnect(client_id)
+                await on_disconnect(client_id)
+
+        self._server = await serve(
+            connection_handler,
+            host,
+            port,
+            process_request=process_request,
+        )
+
+    async def stop(self) -> None:
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+
+
 class NotificationServer:
-    """Manage WebSocket clients and route notification messages."""
+    """Manage clients and route notification messages through a transport."""
 
     def __init__(
         self,
@@ -46,13 +135,20 @@ class NotificationServer:
         port: int = 8765,
         redis_url: str | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.port = port
-        self.clients: dict[str, ServerConnection] = {}
+        transport_name = os.getenv("TRANSPORT", "websocket").lower()
+        if transport is None:
+            if transport_name != "websocket":
+                raise ValueError(f"unsupported transport: {transport_name}")
+            transport = WebSocketTransport()
+        self.transport = transport
+        self.clients = transport.clients
         self.channels: dict[str, set[str]] = {}
         self._client_channels: dict[str, set[str]] = {}
-        self._server: Server | None = None
+        self._server: Any = None
         self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
         self.database_url = database_url or os.getenv("DATABASE_URL", "messages.db")
         self._redis: redis.Redis | None = None
@@ -160,22 +256,14 @@ class NotificationServer:
             body,
         )
 
-    async def _send_error(self, websocket: ServerConnection, detail: str) -> None:
-        await websocket.send(_message("system", {"error": detail}))
+    async def _send_error(self, client_id: str, detail: str) -> None:
+        await self.transport.send_message(client_id, _message("system", {"error": detail}))
 
     async def _broadcast(self, message: str, channel: str | None = None) -> None:
-        disconnected: list[str] = []
         recipient_ids = (
             self.channels.get(channel, set()) if channel is not None else set(self.clients)
         )
-        for client_id in list(recipient_ids):
-            websocket = self.clients.get(client_id)
-            if websocket is None:
-                continue
-            try:
-                await websocket.send(message)
-            except websockets.exceptions.ConnectionClosed:
-                disconnected.append(client_id)
+        disconnected = await self.transport.broadcast(message, set(recipient_ids))
         for client_id in disconnected:
             self._remove_client(client_id)
 
@@ -185,9 +273,10 @@ class NotificationServer:
         elif event.get("kind") == "direct":
             target = self.clients.get(event.get("target_client_id"))
             if target is not None:
-                try:
-                    await target.send(event["message"])
-                except websockets.exceptions.ConnectionClosed:
+                delivered = await self.transport.send_message(
+                    event["target_client_id"], event["message"]
+                )
+                if not delivered:
                     self._remove_client(event["target_client_id"])
 
     async def _redis_listener(self) -> None:
@@ -228,22 +317,22 @@ class NotificationServer:
             if not client_channels:
                 self._client_channels.pop(client_id)
 
-    async def _handle_message(self, client_id: str, websocket: ServerConnection, raw: str) -> None:
+    async def _handle_message(self, client_id: str, raw: str) -> None:
         try:
             incoming = json.loads(raw)
         except json.JSONDecodeError:
-            await self._send_error(websocket, "message must be valid JSON")
+            await self._send_error(client_id, "message must be valid JSON")
             return
 
         message_type = incoming.get("type") if isinstance(incoming, dict) else None
         payload = incoming.get("payload") if isinstance(incoming, dict) else None
         if message_type not in SUPPORTED_TYPES:
-            await self._send_error(websocket, "unsupported message type")
+            await self._send_error(client_id, "unsupported message type")
             return
         if message_type in {"subscribe", "unsubscribe"} and payload is None:
             payload = {}
         if not isinstance(payload, dict):
-            await self._send_error(websocket, "payload must be an object")
+            await self._send_error(client_id, "payload must be an object")
             return
 
         channel = incoming.get("channel")
@@ -251,7 +340,7 @@ class NotificationServer:
             channel = payload.get("channel")
         if message_type in {"subscribe", "unsubscribe"}:
             if not isinstance(channel, str) or not channel:
-                await self._send_error(websocket, "channel must be a non-empty string")
+                await self._send_error(client_id, "channel must be a non-empty string")
                 return
             self._set_subscription(client_id, channel, message_type == "subscribe")
             if self._redis is not None:
@@ -262,7 +351,7 @@ class NotificationServer:
             return
 
         if channel is not None and not isinstance(channel, str):
-            await self._send_error(websocket, "channel must be a string")
+            await self._send_error(client_id, "channel must be a string")
             return
 
         outgoing = _message(message_type, payload, channel)
@@ -277,25 +366,21 @@ class NotificationServer:
         if not target_exists and self._redis is not None:
             target_exists = bool(await self._redis.exists(f"notification-server:client:{target_id}"))
         if not target_exists:
-            await self._send_error(websocket, "target client not found")
+            await self._send_error(client_id, "target client not found")
             return
         await self._publish_or_deliver({"kind": "direct", "server_id": self._server_id, "target_client_id": target_id, "message": outgoing})
 
-    async def _handler(self, websocket: ServerConnection) -> None:
-        client_id = str(uuid.uuid4())
-        self.clients[client_id] = websocket
+    async def _on_disconnect(self, client_id: str) -> None:
+        self._remove_client(client_id)
+        if self._redis is not None:
+            await self._redis.delete(f"notification-server:client:{client_id}")
+
+    async def _on_connect(self, client_id: str) -> None:
         if self._redis is not None:
             await self._redis.hset(
                 f"notification-server:client:{client_id}",
                 mapping={"server_id": self._server_id, "channels": "[]"},
             )
-        try:
-            async for raw in websocket:
-                await self._handle_message(client_id, websocket, raw)
-        finally:
-            self._remove_client(client_id)
-            if self._redis is not None:
-                await self._redis.delete(f"notification-server:client:{client_id}")
 
     async def start(self) -> None:
         """Start serving. The returned server runs until :meth:`stop` is called."""
@@ -305,21 +390,27 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.subscribe(REDIS_CHANNEL)
             self._redis_task = asyncio.create_task(self._redis_listener())
-        self._server = await serve(
-            self._handler,
+        start = getattr(self.transport, "start", None)
+        if start is None:
+            raise TypeError("transport must provide start()")
+        await start(
+            self._handle_message,
             self.host,
             self.port,
-            process_request=self._process_request,
+            self._process_request,
+            self._on_connect,
+            self._on_disconnect,
         )
-        sockets = self._server.sockets
+        self._server = getattr(self.transport, "_server", self.transport)
+        sockets = getattr(self._server, "sockets", None)
         if sockets:
             self.port = sockets[0].getsockname()[1]
 
     async def stop(self) -> None:
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
+        stop = getattr(self.transport, "stop", None)
+        if stop is not None:
+            await stop()
+        self._server = None
         if self._redis_task is not None:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
