@@ -1,9 +1,12 @@
 """
-WebSocket-based notification server backed by Redis pub/sub and SQLite.
+Pluggable-transport notification server backed by Redis pub/sub and SQLite.
 
 Features
 --------
-- Accept WebSocket connections and assign each client a globally-unique ID.
+- Accept client connections through a pluggable transport layer and assign
+  each client a globally-unique ID.  The default transport is WebSocket; the
+  ``TRANSPORT`` env var (or the ``transport`` constructor argument) selects an
+  alternative such as SSE, polling, or raw TCP.
 - Distribute messages through Redis pub/sub channels (the shared backbone):
   the server publishes; a subscriber "worker" on every instance delivers.
 - Broadcast a message to all connected clients.
@@ -21,6 +24,7 @@ Configuration
 - ``REDIS_URL``     — Redis broker connection string.  When unset, an
   in-process fakeredis instance is used.
 - ``DATABASE_URL``  — SQLite path for message history (default ``messages.db``).
+- ``TRANSPORT``     — transport name (default ``websocket``).
 
 Message format
 --------------
@@ -33,28 +37,22 @@ Supported ``type`` values: ``broadcast``, ``direct``, ``system``,
 
 Wire format
 -----------
-The ``websockets`` library base64-encodes every frame on the wire.  We follow
-that contract explicitly: every outgoing JSON message is base64-encoded before
-it is sent and every incoming frame is base64-decoded before it is parsed as
-JSON.
+The default ``WebSocketTransport`` base64-encodes every frame on the wire.  We
+follow that contract explicitly: every outgoing JSON message is base64-encoded
+before it is sent and every incoming frame is base64-decoded before it is
+parsed as JSON.
 """
 
 from __future__ import annotations
 
 import asyncio
-import base64
 import itertools
 import json
 import os
 import threading
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Dict, List
 from urllib.parse import parse_qs, unquote, urlsplit
-
-from websockets.asyncio.server import ServerConnection, serve
-from websockets.datastructures import Headers
-from websockets.http11 import Request, Response
 
 from broker import (
     BROADCAST_CHANNEL,
@@ -64,41 +62,43 @@ from broker import (
     MessageBroker,
 )
 from store import MessageStore
+from transport import (
+    BaseTransport,
+    WebSocketTransport,
+    create_transport,
+    decode_message,
+    encode_message,
+    utcnow,
+)
 
-
-def utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def encode_message(message: Dict[str, Any]) -> str:
-    """Serialize a message to the on-the-wire base64 string."""
-    raw = json.dumps(message).encode("utf-8")
-    return base64.b64encode(raw).decode("ascii")
-
-
-def decode_message(raw: str) -> Dict[str, Any]:
-    """Parse a base64 on-the-wire string back into a message dict."""
-    data = base64.b64decode(raw.encode("ascii"))
-    return json.loads(data.decode("utf-8"))
+__all__ = [
+    "NotificationServer",
+    "ClientRegistry",
+    "BaseTransport",
+    "WebSocketTransport",
+    "decode_message",
+    "encode_message",
+    "utcnow",
+]
 
 
 class ClientRegistry:
     """Thread-safe registry of connected clients and their subscriptions."""
 
     def __init__(self) -> None:
-        self._clients: Dict[int, ServerConnection] = {}
+        self._clients: Dict[int, Any] = {}
         self._channels: Dict[str, set] = {}
         self._lock = threading.Lock()
         self._counter = itertools.count(1)
 
-    def register(self, websocket: ServerConnection, client_id: int | None = None) -> int:
+    def register(self, connection: Any, client_id: int | None = None) -> int:
         with self._lock:
             if client_id is None:
                 client_id = next(self._counter)
-            self._clients[client_id] = websocket
+            self._clients[client_id] = connection
             return client_id
 
-    def unregister(self, client_id: int) -> ServerConnection | None:
+    def unregister(self, client_id: int) -> Any | None:
         with self._lock:
             connection = self._clients.pop(client_id, None)
             for members in self._channels.values():
@@ -107,7 +107,7 @@ class ClientRegistry:
                 del self._channels[name]
             return connection
 
-    def get(self, client_id: int) -> ServerConnection | None:
+    def get(self, client_id: int) -> Any | None:
         with self._lock:
             return self._clients.get(client_id)
 
@@ -115,7 +115,7 @@ class ClientRegistry:
         with self._lock:
             return len(self._clients)
 
-    def snapshot(self) -> Dict[int, ServerConnection]:
+    def snapshot(self) -> Dict[int, Any]:
         with self._lock:
             return dict(self._clients)
 
@@ -144,7 +144,11 @@ class ClientRegistry:
 
 
 class NotificationServer:
-    """Asyncio WebSocket notification server with a Redis pub/sub backbone."""
+    """Asyncio notification server with a Redis pub/sub backbone.
+
+    The network-facing behaviour is delegated to a pluggable
+    :class:`BaseTransport` implementation (WebSocket by default).
+    """
 
     def __init__(
         self,
@@ -152,21 +156,28 @@ class NotificationServer:
         store: MessageStore | None = None,
         redis_url: str | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | str | type | None = None,
     ) -> None:
         self.clients = ClientRegistry()
         self.instance_id = uuid.uuid4().hex
         self.broker = broker if broker is not None else MessageBroker(redis_url=redis_url)
         self.store = store if store is not None else MessageStore(database_url)
-        self._server = None
+        self.transport = self._select_transport(transport)
         self._subscriber_task = None
 
+    def _select_transport(self, transport: BaseTransport | str | type | None) -> BaseTransport:
+        if transport is None:
+            return create_transport(os.environ.get("TRANSPORT"), self)
+        if isinstance(transport, BaseTransport):
+            return transport
+        if isinstance(transport, str):
+            return create_transport(transport, self)
+        if isinstance(transport, type) and issubclass(transport, BaseTransport):
+            return transport(self)
+        raise TypeError(f"unsupported transport: {transport!r}")
+
     async def start(self, host: str = "127.0.0.1", port: int = 8765) -> None:
-        self._server = await serve(
-            self._handle_connection,
-            host,
-            port,
-            process_request=self._process_request,
-        )
+        await self.transport.start(host, port)
         self._subscriber_task = asyncio.create_task(self._subscriber_loop())
 
     async def stop(self) -> None:
@@ -177,16 +188,11 @@ class NotificationServer:
             except (asyncio.CancelledError, Exception):
                 pass
             self._subscriber_task = None
-        if self._server is not None:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
+        await self.transport.stop()
 
     @property
     def port(self) -> int | None:
-        if self._server is None or not self._server.sockets:
-            return None
-        return self._server.sockets[0].getsockname()[1]
+        return self.transport.port
 
     # ── Redis worker (subscriber) ─────────────────────────────
 
@@ -224,63 +230,33 @@ class NotificationServer:
 
     # ── HTTP handler ──────────────────────────────────────────
 
-    def _process_request(
-        self, connection: ServerConnection, request: Request
-    ) -> Response | None:
-        parts = urlsplit(request.path)
-        path = parts.path
-        json_headers = Headers([("Content-Type", "application/json")])
+    def _handle_http_request(self, path: str) -> str | None:
+        """Return a JSON response body for ``path``, or ``None`` if unhandled."""
+        parts = urlsplit(path)
+        route = parts.path
 
-        if path == "/health":
-            body = json.dumps({"connected_clients": self.clients.count()}).encode("utf-8")
-            return Response(200, "OK", json_headers, body)
+        if route == "/health":
+            return json.dumps({"connected_clients": self.clients.count()})
 
-        if path == "/channels":
-            body = json.dumps({"channels": self.clients.channels()}).encode("utf-8")
-            return Response(200, "OK", json_headers, body)
+        if route == "/channels":
+            return json.dumps({"channels": self.clients.channels()})
 
-        if path.startswith("/channels/") and path.endswith("/subscribers"):
-            name = unquote(path[len("/channels/"):-len("/subscribers")])
-            body = json.dumps(
+        if route.startswith("/channels/") and route.endswith("/subscribers"):
+            name = unquote(route[len("/channels/"):-len("/subscribers")])
+            return json.dumps(
                 {"channel": name, "subscribers": self.clients.subscribers(name)}
-            ).encode("utf-8")
-            return Response(200, "OK", json_headers, body)
+            )
 
-        if path == "/messages":
+        if route == "/messages":
             query = parse_qs(parts.query)
             limit = query.get("limit", ["50"])[0]
             offset = query.get("offset", ["0"])[0]
             messages = self.store.query(limit=limit, offset=offset)
-            body = json.dumps({"messages": messages}).encode("utf-8")
-            return Response(200, "OK", json_headers, body)
+            return json.dumps({"messages": messages})
 
         return None
 
-    # ── WebSocket handler ──────────────────────────────────────
-
-    async def _handle_connection(self, websocket: ServerConnection) -> None:
-        client_id = await self.broker.next_client_id()
-        self.clients.register(websocket, client_id)
-        await self.broker.register_client(client_id, self.instance_id)
-        try:
-            await websocket.send(
-                encode_message(
-                    {
-                        "type": "system",
-                        "payload": {"client_id": client_id, "message": "connected"},
-                        "timestamp": utcnow(),
-                    }
-                )
-            )
-            async for raw in websocket:
-                try:
-                    message = decode_message(raw)
-                except (ValueError, TypeError):
-                    continue
-                await self._handle_message(client_id, message)
-        finally:
-            self.clients.unregister(client_id)
-            await self.broker.unregister_client(client_id)
+    # ── Message handling ──────────────────────────────────────
 
     async def _handle_message(self, sender_id: int, message: Dict[str, Any]) -> None:
         mtype = message.get("type")
@@ -325,30 +301,24 @@ class NotificationServer:
     # ── Local delivery (invoked by the worker) ────────────────
 
     async def broadcast(self, message: Dict[str, Any]) -> None:
-        encoded = encode_message(message)
-        for websocket in self.clients.snapshot().values():
-            try:
-                await websocket.send(encoded)
-            except Exception:
-                continue
+        await self.transport.broadcast(message)
 
     async def send_to_channel(self, channel: str, message: Dict[str, Any]) -> None:
-        encoded = encode_message(message)
         for client_id in self.clients.subscribers(channel):
-            websocket = self.clients.get(client_id)
-            if websocket is None:
+            connection = self.clients.get(client_id)
+            if connection is None:
                 continue
             try:
-                await websocket.send(encoded)
+                await self.transport.send_message(connection, message)
             except Exception:
                 continue
 
     async def _deliver_to_client(self, client_id: int, message: Dict[str, Any]) -> None:
-        websocket = self.clients.get(client_id)
-        if websocket is None:
+        connection = self.clients.get(client_id)
+        if connection is None:
             return
         try:
-            await websocket.send(encode_message(message))
+            await self.transport.send_message(connection, message)
         except Exception:
             pass
 
