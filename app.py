@@ -7,11 +7,13 @@ import asyncio
 import json
 import os
 import sqlite3
+import time
 import uuid
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from collections import deque
+from datetime import datetime, timedelta, timezone
 from typing import Any, Awaitable, Callable
-from urllib.parse import unquote, urlsplit
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import redis.asyncio as redis
 import websockets
@@ -136,6 +138,8 @@ class NotificationServer:
         redis_url: str | None = None,
         database_url: str | None = None,
         transport: BaseTransport | None = None,
+        rate_limit: int | None = None,
+        message_ttl_days: float | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -151,12 +155,28 @@ class NotificationServer:
         self._server: Any = None
         self.redis_url = redis_url if redis_url is not None else os.getenv("REDIS_URL")
         self.database_url = database_url or os.getenv("DATABASE_URL", "messages.db")
+        self.rate_limit = rate_limit if rate_limit is not None else self._env_number("RATE_LIMIT", 100, int)
+        self.message_ttl_days = (
+            message_ttl_days
+            if message_ttl_days is not None
+            else self._env_number("MESSAGE_TTL_DAYS", 7, float)
+        )
         self._redis: redis.Redis | None = None
         self._pubsub: redis.client.PubSub | None = None
         self._redis_task: asyncio.Task[None] | None = None
+        self._cleanup_task: asyncio.Task[None] | None = None
+        self._local_rate_limits: dict[str, deque[float]] = {}
         self._server_id = str(uuid.uuid4())
         self._database = self._sqlite_path(self.database_url)
         self._init_database()
+
+    @staticmethod
+    def _env_number(name: str, default: int | float, converter: Callable[[str], Any]) -> int | float:
+        try:
+            value = converter(os.getenv(name, str(default)))
+            return value if value >= 0 else default
+        except (TypeError, ValueError):
+            return default
 
     @staticmethod
     def _sqlite_path(database_url: str) -> str:
@@ -215,6 +235,73 @@ class NotificationServer:
             for row in rows
         ]
 
+    async def _get_history(self, channel: str, since: str | None, limit: int) -> tuple[list[dict[str, Any]], bool]:
+        return await asyncio.to_thread(self._get_history_sync, channel, since, limit)
+
+    def _get_history_sync(
+        self, channel: str, since: str | None, limit: int
+    ) -> tuple[list[dict[str, Any]], bool]:
+        with sqlite3.connect(self._database) as connection:
+            connection.row_factory = sqlite3.Row
+            if since is None:
+                rows = connection.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "WHERE channel = ? ORDER BY timestamp, id LIMIT ?",
+                    (channel, limit + 1),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id, channel, type, payload, timestamp FROM messages "
+                    "WHERE channel = ? AND timestamp > ? ORDER BY timestamp, id LIMIT ?",
+                    (channel, since, limit + 1),
+                ).fetchall()
+        has_more = len(rows) > limit
+        messages = [
+            {
+                "id": row["id"],
+                "channel": row["channel"],
+                "type": row["type"],
+                "payload": json.loads(row["payload"]),
+                "timestamp": row["timestamp"],
+            }
+            for row in rows[:limit]
+        ]
+        return messages, has_more
+
+    async def _cleanup_expired_messages(self) -> None:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=float(self.message_ttl_days))
+        cutoff_text = cutoff.isoformat().replace("+00:00", "Z")
+        await asyncio.to_thread(self._cleanup_expired_messages_sync, cutoff_text)
+
+    def _cleanup_expired_messages_sync(self, cutoff: str) -> None:
+        with sqlite3.connect(self._database) as connection:
+            connection.execute("DELETE FROM messages WHERE timestamp < ?", (cutoff,))
+
+    async def _cleanup_loop(self) -> None:
+        while True:
+            await asyncio.sleep(86400)
+            await self._cleanup_expired_messages()
+
+    async def _check_rate_limit(self, client_id: str) -> bool:
+        if self.rate_limit <= 0:
+            return True
+        if self._redis is not None:
+            key = f"notification-server:rate:{client_id}"
+            pipeline = self._redis.pipeline(transaction=True)
+            pipeline.incr(key)
+            pipeline.expire(key, 60)
+            count, _ = await pipeline.execute()
+            return int(count) <= self.rate_limit
+
+        now = time.monotonic()
+        timestamps = self._local_rate_limits.setdefault(client_id, deque())
+        while timestamps and now - timestamps[0] >= 60:
+            timestamps.popleft()
+        if len(timestamps) >= self.rate_limit:
+            return False
+        timestamps.append(now)
+        return True
+
     @property
     def client_count(self) -> int:
         return len(self.clients)
@@ -235,13 +322,30 @@ class NotificationServer:
                 {"channel": name, "subscribers": sorted(self.channels.get(name, set()))}
             ).encode()
         elif path == "/messages":
-            query = dict(part.split("=", 1) for part in urlsplit(request.path).query.split("&") if "=" in part)
+            query = {key: values[-1] for key, values in parse_qs(urlsplit(request.path).query).items()}
             try:
                 limit = max(0, min(1000, int(query.get("limit", "50"))))
                 offset = max(0, int(query.get("offset", "0")))
             except ValueError:
                 return Response(400, "Bad Request", Headers(), b"invalid limit or offset")
             body = json.dumps({"messages": await self._get_messages(limit, offset)}).encode()
+        elif path == "/history":
+            query = parse_qs(urlsplit(request.path).query)
+            channel = query.get("channel", [None])[-1]
+            if not channel:
+                return Response(400, "Bad Request", Headers(), b"channel is required")
+            since = query.get("since", [None])[-1]
+            if since is not None:
+                try:
+                    datetime.fromisoformat(since.replace("Z", "+00:00"))
+                except ValueError:
+                    return Response(400, "Bad Request", Headers(), b"invalid since timestamp")
+            try:
+                limit = max(0, min(1000, int(query.get("limit", ["50"])[-1])))
+            except ValueError:
+                return Response(400, "Bad Request", Headers(), b"invalid limit")
+            history, has_more = await self._get_history(channel, since, limit)
+            body = json.dumps({"messages": history, "has_more": has_more}).encode()
         else:
             return None
         return Response(
@@ -318,6 +422,9 @@ class NotificationServer:
                 self._client_channels.pop(client_id)
 
     async def _handle_message(self, client_id: str, raw: str) -> None:
+        if not await self._check_rate_limit(client_id):
+            await self._send_error(client_id, "rate limit exceeded")
+            return
         try:
             incoming = json.loads(raw)
         except json.JSONDecodeError:
@@ -372,6 +479,7 @@ class NotificationServer:
 
     async def _on_disconnect(self, client_id: str) -> None:
         self._remove_client(client_id)
+        self._local_rate_limits.pop(client_id, None)
         if self._redis is not None:
             await self._redis.delete(f"notification-server:client:{client_id}")
 
@@ -390,6 +498,8 @@ class NotificationServer:
             self._pubsub = self._redis.pubsub()
             await self._pubsub.subscribe(REDIS_CHANNEL)
             self._redis_task = asyncio.create_task(self._redis_listener())
+        await self._cleanup_expired_messages()
+        self._cleanup_task = asyncio.create_task(self._cleanup_loop())
         start = getattr(self.transport, "start", None)
         if start is None:
             raise TypeError("transport must provide start()")
@@ -415,6 +525,10 @@ class NotificationServer:
             self._redis_task.cancel()
             await asyncio.gather(self._redis_task, return_exceptions=True)
             self._redis_task = None
+        if self._cleanup_task is not None:
+            self._cleanup_task.cancel()
+            await asyncio.gather(self._cleanup_task, return_exceptions=True)
+            self._cleanup_task = None
         if self._pubsub is not None:
             await self._pubsub.close()
             self._pubsub = None
@@ -424,6 +538,7 @@ class NotificationServer:
         self.clients.clear()
         self.channels.clear()
         self._client_channels.clear()
+        self._local_rate_limits.clear()
 
     async def __aenter__(self) -> "NotificationServer":
         await self.start()

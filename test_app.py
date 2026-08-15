@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import urllib.request
+from urllib.parse import urlencode
 
 import pytest
 import websockets
@@ -18,6 +19,14 @@ async def messages(port: int, limit: int = 50, offset: int = 0) -> dict:
     response = await asyncio.to_thread(
         urllib.request.urlopen,
         f"http://127.0.0.1:{port}/messages?limit={limit}&offset={offset}",
+    )
+    return json.loads(response.read())
+
+
+async def history(port: int, **params: str | int) -> dict:
+    query = urlencode(params)
+    response = await asyncio.to_thread(
+        urllib.request.urlopen, f"http://127.0.0.1:{port}/history?{query}"
     )
     return json.loads(response.read())
 
@@ -86,6 +95,50 @@ async def test_messages_are_persisted_and_paginated(tmp_path):
         assert result["messages"][0]["channel"] == "updates"
         assert result["messages"][0]["payload"] == {"id": 1}
         assert await messages(server.port, offset=1) == {"messages": []}
+
+
+@pytest.mark.asyncio
+async def test_history_filters_by_channel_and_supports_since_and_has_more(tmp_path):
+    async with NotificationServer(port=0, database_url=str(tmp_path / "messages.db")) as server:
+        async with websockets.connect(f"ws://127.0.0.1:{server.port}") as client:
+            await client.send(json.dumps({"type": "subscribe", "channel": "one"}))
+            for channel, message_id in (("one", 1), ("two", 2), ("one", 3)):
+                await client.send(
+                    json.dumps(
+                        {"type": "broadcast", "channel": channel, "payload": {"id": message_id}}
+                    )
+                )
+                if channel == "one":
+                    await client.recv()
+
+        first_page = await history(server.port, channel="one", limit=1)
+        assert [message["payload"]["id"] for message in first_page["messages"]] == [1]
+        assert first_page["has_more"] is True
+
+        second_page = await history(
+            server.port, channel="one", since=first_page["messages"][0]["timestamp"]
+        )
+        assert [message["payload"]["id"] for message in second_page["messages"]] == [3]
+        assert second_page["has_more"] is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_returns_error_without_dropping_message(tmp_path):
+    async with NotificationServer(
+        port=0, database_url=str(tmp_path / "messages.db"), rate_limit=2
+    ) as server:
+        async with websockets.connect(f"ws://127.0.0.1:{server.port}") as client:
+            for message_id in (1, 2):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"id": message_id}}))
+                assert json.loads(await client.recv())["payload"]["id"] == message_id
+
+            await client.send(json.dumps({"type": "broadcast", "payload": {"id": 3}}))
+            error = json.loads(await client.recv())
+            assert error == {
+                "type": "system",
+                "payload": {"error": "rate limit exceeded"},
+                "timestamp": error["timestamp"],
+            }
 
 
 @pytest.mark.asyncio
