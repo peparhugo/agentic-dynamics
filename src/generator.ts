@@ -1,12 +1,22 @@
 import path from 'path';
 import { writeFile } from './files';
 import { PageData } from './page';
+import { PluginManager, PluginContext } from './plugin';
 import { getEngine, loadTemplate, loadLayout, loadPartials } from './template';
 
-export async function generatePageHtml(page: PageData, outputDir: string, templateDir?: string): Promise<void> {
+export async function generatePageHtml(
+  page: PageData,
+  outputDir: string,
+  templateDir?: string,
+  pluginManager?: PluginManager
+): Promise<void> {
   let html: string;
 
-  if (templateDir) {
+  if (pluginManager) {
+    const context: PluginContext = { contentDir: '', outputDir, templateDir };
+    const processedPage = await pluginManager.runOnFile(page, context);
+    html = processedPage.html;
+  } else if (templateDir) {
     html = await createPageHtmlWithTemplate(page, templateDir);
   } else {
     html = createPageHtml(page);
@@ -28,13 +38,11 @@ async function createPageHtmlWithTemplate(page: PageData, templateDir: string): 
 
   let html = page.html;
 
-  // Apply template if specified
   if (page.template) {
     const templateContent = await loadTemplate(page.template, templateDir);
     html = eng.render(templateContent, { ...page, body: page.html });
   }
 
-  // Apply layout if specified
   if (page.layout) {
     const layout = await loadLayout(page.layout, templateDir);
     html = eng.render(layout, { ...page, body: html });

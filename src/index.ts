@@ -3,35 +3,10 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import path from 'path';
-import { readMarkdownFiles } from './files';
-import { processMarkdownFile } from './page';
-import { generatePageHtml, generateIndexHtml } from './generator';
+import { build } from './build';
 import { serve } from './serve';
 
-async function build(contentDir: string, outputDir: string, templateDir?: string): Promise<void> {
-  console.log(`Reading markdown files from: ${contentDir}`);
-  const files = await readMarkdownFiles(contentDir);
-
-  if (files.length === 0) {
-    console.log('No markdown files found.');
-    return;
-  }
-
-  console.log(`Found ${files.length} markdown file(s).`);
-
-  const pages = [];
-  for (const file of files) {
-    const page = await processMarkdownFile(file.name, file.content);
-    pages.push(page);
-    await generatePageHtml(page, outputDir, templateDir);
-    console.log(`✓ Generated ${page.slug}.html`);
-  }
-
-  await generateIndexHtml(pages, outputDir);
-  console.log(`✓ Generated index.html`);
-
-  console.log(`\nBuild complete! Output: ${outputDir}`);
-}
+export { build } from './build';
 
 yargs(hideBin(process.argv))
   .command(

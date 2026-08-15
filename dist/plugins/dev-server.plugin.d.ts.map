@@ -1,0 +1,1 @@
+{"version":3,"file":"dev-server.plugin.d.ts","sourceRoot":"","sources":["../../src/plugins/dev-server.plugin.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,MAAM,EAAiB,MAAM,WAAW,CAAC;AASlD,UAAU,eAAe;IACvB,IAAI,EAAE,MAAM,CAAC;IACb,SAAS,CAAC,EAAE,MAAM,OAAO,CAAC,IAAI,CAAC,CAAC;CACjC;AAqDD,wBAAgB,qBAAqB,CAAC,MAAM,EAAE,eAAe,GAAG,MAAM,CAiFrE"}

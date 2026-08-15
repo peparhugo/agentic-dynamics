@@ -7,8 +7,20 @@ exports.generatePageHtml = generatePageHtml;
 exports.generateIndexHtml = generateIndexHtml;
 const path_1 = __importDefault(require("path"));
 const files_1 = require("./files");
-async function generatePageHtml(page, outputDir) {
-    const html = createPageHtml(page);
+const template_1 = require("./template");
+async function generatePageHtml(page, outputDir, templateDir, pluginManager) {
+    let html;
+    if (pluginManager) {
+        const context = { contentDir: '', outputDir, templateDir };
+        const processedPage = await pluginManager.runOnFile(page, context);
+        html = processedPage.html;
+    }
+    else if (templateDir) {
+        html = await createPageHtmlWithTemplate(page, templateDir);
+    }
+    else {
+        html = createPageHtml(page);
+    }
     const filePath = path_1.default.join(outputDir, `${page.slug}.html`);
     await (0, files_1.writeFile)(filePath, html);
 }
@@ -16,6 +28,20 @@ async function generateIndexHtml(pages, outputDir) {
     const html = createIndexHtml(pages);
     const filePath = path_1.default.join(outputDir, 'index.html');
     await (0, files_1.writeFile)(filePath, html);
+}
+async function createPageHtmlWithTemplate(page, templateDir) {
+    await (0, template_1.loadPartials)(templateDir);
+    const eng = (0, template_1.getEngine)();
+    let html = page.html;
+    if (page.template) {
+        const templateContent = await (0, template_1.loadTemplate)(page.template, templateDir);
+        html = eng.render(templateContent, { ...page, body: page.html });
+    }
+    if (page.layout) {
+        const layout = await (0, template_1.loadLayout)(page.layout, templateDir);
+        html = eng.render(layout, { ...page, body: html });
+    }
+    return html;
 }
 function createPageHtml(page) {
     const tagsList = page.tags && Array.isArray(page.tags)
