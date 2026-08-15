@@ -41,7 +41,6 @@ import re
 import subprocess
 import sys
 import time
-from collections import Counter
 from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
@@ -49,7 +48,6 @@ from typing import Any
 from urllib.parse import urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 from flask import Flask, Response, jsonify, make_response, request
 
@@ -69,10 +67,11 @@ from instrument.supervisor import (
     normalize_flag,
     parse_mapping,
 )
-from reinterleave_queue import (
-    _read_queue as _read_queue_cells,
-    _write_queue as _write_queue_cells,
+from instrument.queue_reinterleave import (
+    provider_summary,
+    read_queue,
     reinterleave_cells,
+    write_queue,
 )
 
 try:  # Package imports under pytest and WSGI.
@@ -914,9 +913,8 @@ def api_queue_reinterleave() -> Response:
 
     Queue-level control (unlike the flagged session interrupts): it needs no
     supervisor flag because it reorders *future* picks without touching any
-    running session. The reorder logic is reused verbatim from
-    ``scripts/reinterleave_queue.py`` (``reinterleave_cells`` plus the shared
-    read/write helpers) so the admin surface and the CLI can never drift.
+    running session. The reorder logic is shared with the CLI via
+    ``instrument.queue_reinterleave`` so the two surfaces can never drift.
     """
     body, failure = _design_mutation_body()
     if failure:
@@ -925,36 +923,17 @@ def api_queue_reinterleave() -> Response:
 
     def reinterleave() -> tuple[Response, int]:
         r = _redis()
-        before = _read_queue_cells(r)
+        before = read_queue(r)
         after = reinterleave_cells(before)
-        _write_queue_cells(r, after)
+        write_queue(r, after)
         return jsonify({
             "ok": True,
             "count": len(before),
-            "before": _provider_summary(before),
-            "after": _provider_summary(after),
+            "before": provider_summary(before),
+            "after": provider_summary(after),
         }), 200
 
     return _idempotent_design_response("queue-reinterleave", body, reinterleave)
-
-
-def _provider_summary(cells: list[dict[str, Any]]) -> dict[str, Any]:
-    """Summarize a cell list by provider for the reinterleave response.
-
-    Mirrors ``reinterleave_queue.py``'s ``--json`` report so the admin surface
-    and the CLI stay consistent: counts per provider, the consumption order of
-    provider labels, and the longest run of consecutive same-provider cells.
-    """
-    providers = [cell["model"].split("/", 1)[0] for cell in cells]
-    longest = current = 1 if providers else 0
-    for previous, next_ in zip(providers, providers[1:]):
-        current = current + 1 if previous == next_ else 1
-        longest = max(longest, current)
-    return {
-        "by_provider": dict(Counter(providers)),
-        "order": providers,
-        "longest_provider_run": longest,
-    }
 
 
 @app.get("/api/design-sessions")

@@ -1,14 +1,10 @@
 """Tests for reinterleave_queue.py — round-robin provider interleave."""
 
-import sys
 from collections import Counter
-from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-
-from reinterleave_queue import reinterleave_cells  # noqa: E402
+from instrument.queue_reinterleave import reinterleave_cells
 
 
 def _cell(provider: str, idx: int) -> dict:
@@ -44,8 +40,8 @@ def test_consecutive_providers_always_differ() -> None:
     out = reinterleave_cells(jobs)
 
     providers = [c["model"].split("/", 1)[0] for c in out]
-    for a, b in zip(providers, providers[1:]):
-        assert a != b, f"adjacent same-provider run: {a} at {providers.index(a)}"
+    for i, (a, b) in enumerate(zip(providers, providers[1:])):
+        assert a != b, f"adjacent same-provider run: {a} at positions {i}-{i + 1}"
 
 
 def test_imbalanced_still_never_adjacent() -> None:
