@@ -14,10 +14,23 @@ export function run(argv: string[]): void {
     .option('--content <dir>', 'content directory', './content')
     .option('--output <dir>', 'output directory', './dist')
     .option('--templates <dir>', 'templates directory', './templates')
-    .action((opts: { content: string; output: string; templates: string }) => {
-      const result = buildSite({ contentDir: opts.content, outputDir: opts.output, templatesDir: opts.templates });
+    .option('--incremental', 'skip rebuilding pages whose source and templates are unchanged', false)
+    .option('--clean', 'ignore the existing build cache and rebuild every page', false)
+    .action((opts: { content: string; output: string; templates: string; incremental: boolean; clean: boolean }) => {
+      const result = buildSite({
+        contentDir: opts.content,
+        outputDir: opts.output,
+        templatesDir: opts.templates,
+        incremental: opts.incremental,
+        clean: opts.clean,
+      });
       // eslint-disable-next-line no-console
       console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
+      if (result.stats) {
+        const { built, skipped, timeSavedMs } = result.stats;
+        // eslint-disable-next-line no-console
+        console.log(`Incremental build: ${built} built, ${skipped} skipped (~${timeSavedMs}ms saved)`);
+      }
     });
 
   program
