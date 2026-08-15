@@ -14,6 +14,17 @@ By default, Markdown is read recursively from `./content` and HTML is written to
 npx ssg build --content ./posts --output ./public
 ```
 
+Reuse unchanged page output with an incremental build:
+
+```sh
+npx ssg build --incremental
+npx ssg build --incremental --clean
+```
+
+Incremental builds store source hashes, parsed frontmatter, and rendered HTML in
+`<output>/.ssg-cache.json`. A missing cache or `--clean` performs a clean build.
+The build summary reports pages built, pages skipped, and estimated time saved.
+
 Start a development server at `http://localhost:3000` with live reload:
 
 ```sh
@@ -80,4 +91,6 @@ The lifecycle is `onStart`, `beforeBuild`, `onFile` for every page,
 `afterBuild`, and `onEnd`. `MarkdownPlugin`, `TemplatePlugin`, and
 `DevServerPlugin` are exported for custom integrations. The normal build API
 installs Markdown and template handling automatically; configured plugins run
-after those built-ins, with generated files written during `afterBuild`.
+after those built-ins, with generated files written during `afterBuild`. During
+an incremental build, `onFile` runs only for pages invalidated by source or
+template changes; the other lifecycle hooks continue to run for every build.

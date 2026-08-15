@@ -5,10 +5,12 @@ export { DevServerPlugin } from './plugins/dev-server';
 export type {
   BuildContext,
   BuildOptions,
+  BuildStats,
   Frontmatter,
   GeneratedPage,
   ParsedMarkdown,
   Plugin,
   PluginHook,
+  IncrementalBuildState,
   SsgConfig,
 } from './types';

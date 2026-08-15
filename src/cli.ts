@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './index';
+import { SSGEngine } from './index';
 import { startDevServer } from './server';
 
 interface CliOptions {
@@ -7,11 +7,13 @@ interface CliOptions {
   outputDir?: string;
   templatesDir?: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 function usage(): string {
   return `Usage:
-  ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
+  ssg build [--incremental] [--clean] [--content <dir>] [--output <dir>] [--templates <dir>]
   ssg serve [--port <number>] [--content <dir>] [--output <dir>] [--templates <dir>]`;
 }
 
@@ -23,6 +25,11 @@ export function parseArguments(args: string[]): CliOptions {
   for (let index = 1; index < args.length; index += 1) {
     const option = args[index];
     const value = args[index + 1];
+    if ((option === '--incremental' || option === '--clean') && command === 'build') {
+      if (option === '--incremental') options.incremental = true;
+      else options.clean = true;
+      continue;
+    }
     if (option === '--port' && command === 'serve' && value && !value.startsWith('--')) {
       const port = Number(value);
       if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -50,8 +57,11 @@ export async function run(args = process.argv.slice(2)): Promise<void> {
     await startDevServer(options);
     return;
   }
-  const pages = await buildSite(options);
-  process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}.\n`);
+  const engine = new SSGEngine(options);
+  const pages = await engine.build();
+  const { pagesBuilt, pagesSkipped, timeSaved, duration } = engine.stats;
+  process.stdout.write(`Generated ${pages.length} page${pages.length === 1 ? '' : 's'}. `
+    + `Built ${pagesBuilt}, skipped ${pagesSkipped}, time saved ${timeSaved}ms (${duration}ms total).\n`);
 }
 
 if (require.main === module) {

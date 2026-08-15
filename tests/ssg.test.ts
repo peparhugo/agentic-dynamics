@@ -2,7 +2,7 @@ import { promises as fs } from 'node:fs';
 import { get } from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, parseMarkdown, renderPage, type Plugin } from '../src';
+import { buildSite, parseMarkdown, renderPage, SSGEngine, type Plugin } from '../src';
 import { parseArguments } from '../src/cli';
 import { startDevServer, type DevServer } from '../src/server';
 import WebSocket from 'ws';
@@ -201,6 +201,77 @@ describe('buildSite', () => {
       'first:start', 'second:start', 'first:file', 'second:file', 'first:end', 'second:end',
     ]);
   });
+
+  it('skips unchanged pages during incremental builds and caches their rendered data', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    await fs.mkdir(contentDir);
+    await fs.writeFile(path.join(contentDir, 'one.md'), '---\ntitle: One\n---\nFirst');
+    await fs.writeFile(path.join(contentDir, 'two.md'), '---\ntitle: Two\n---\nSecond');
+    const built: string[] = [];
+    const plugin: Plugin = { onFile: (page) => { built.push(path.basename(page.sourcePath)); } };
+
+    const first = new SSGEngine({ contentDir, outputDir, incremental: true, plugins: [plugin] });
+    await first.build();
+    expect(first.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    expect(built).toEqual(['one.md', 'two.md']);
+
+    built.length = 0;
+    const second = new SSGEngine({ contentDir, outputDir, incremental: true, plugins: [plugin] });
+    const pages = await second.build();
+    expect(second.stats).toMatchObject({ pagesBuilt: 0, pagesSkipped: 2 });
+    expect(built).toEqual([]);
+    expect(pages.map((page) => page.title)).toEqual(['One', 'Two']);
+    const manifest = JSON.parse(await fs.readFile(path.join(outputDir, '.ssg-cache.json'), 'utf8'));
+    expect(manifest.pages['one.md']).toEqual(expect.objectContaining({
+      sourceHash: expect.any(String),
+      page: expect.objectContaining({ renderedHtml: expect.stringContaining('First') }),
+    }));
+  });
+
+  it('rebuilds only changed sources and removes deleted page output', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    await fs.mkdir(contentDir);
+    const one = path.join(contentDir, 'one.md');
+    const two = path.join(contentDir, 'two.md');
+    await fs.writeFile(one, 'First');
+    await fs.writeFile(two, 'Second');
+    await buildSite({ contentDir, outputDir, incremental: true });
+
+    await fs.writeFile(one, 'First changed');
+    const engine = new SSGEngine({ contentDir, outputDir, incremental: true });
+    await engine.build();
+    expect(engine.stats).toMatchObject({ pagesBuilt: 1, pagesSkipped: 1 });
+    await expect(fs.readFile(path.join(outputDir, 'one.html'), 'utf8')).resolves.toContain('First changed');
+
+    await fs.rm(two);
+    await new SSGEngine({ contentDir, outputDir, incremental: true }).build();
+    await expect(fs.access(path.join(outputDir, 'two.html'))).rejects.toThrow();
+  });
+
+  it('invalidates every page when templates change and supports clean builds', async () => {
+    const contentDir = path.join(temporaryDirectory, 'content');
+    const outputDir = path.join(temporaryDirectory, 'site');
+    const templatesDir = path.join(temporaryDirectory, 'templates');
+    await fs.mkdir(contentDir);
+    await fs.mkdir(templatesDir);
+    await fs.writeFile(path.join(contentDir, 'one.md'), 'One');
+    await fs.writeFile(path.join(contentDir, 'two.md'), 'Two');
+    const template = path.join(templatesDir, 'default.hbs');
+    await fs.writeFile(template, '<main>{{{content}}}</main>');
+    await buildSite({ contentDir, outputDir, templatesDir, incremental: true });
+
+    await fs.writeFile(template, '<article>{{{content}}}</article>');
+    const changedTemplate = new SSGEngine({ contentDir, outputDir, templatesDir, incremental: true });
+    await changedTemplate.build();
+    expect(changedTemplate.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+    await expect(fs.readFile(path.join(outputDir, 'one.html'), 'utf8')).resolves.toContain('<article>');
+
+    const clean = new SSGEngine({ contentDir, outputDir, templatesDir, incremental: true, clean: true });
+    await clean.build();
+    expect(clean.stats).toMatchObject({ pagesBuilt: 2, pagesSkipped: 0 });
+  });
 });
 
 describe('parseArguments', () => {
@@ -210,6 +281,11 @@ describe('parseArguments', () => {
       outputDir: 'public',
       templatesDir: 'views',
     });
+  });
+
+  it('accepts incremental and clean build flags', () => {
+    expect(parseArguments(['build', '--incremental', '--clean'])).toEqual({ incremental: true, clean: true });
+    expect(() => parseArguments(['serve', '--incremental'])).toThrow('Unknown');
   });
 
   it('accepts serve options and validates the port', () => {

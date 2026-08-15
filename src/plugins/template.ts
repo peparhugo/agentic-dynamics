@@ -151,15 +151,16 @@ export class TemplatePlugin implements Plugin {
   private partials = new Map<string, string>();
 
   async beforeBuild(context: BuildContext): Promise<void> {
-    await fs.rm(context.options.outputDir, { recursive: true, force: true });
+    if (context.incremental.cleanBuild) await fs.rm(context.options.outputDir, { recursive: true, force: true });
     await fs.mkdir(context.options.outputDir, { recursive: true });
     this.partials = await loadPartials(path.join(context.options.templatesDir, 'partials'));
   }
 
   async afterBuild(context: BuildContext): Promise<void> {
-    await Promise.all(context.pages.map(async (page) => {
+    await Promise.all(context.pages.filter((page) => context.incremental.changedSources.has(page.sourcePath)).map(async (page) => {
       await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
       const html = await renderPageTemplate(page, context.pages, context.options.templatesDir, this.partials);
+      page.renderedHtml = html;
       await fs.writeFile(page.outputPath, html, 'utf8');
     }));
     await fs.writeFile(path.join(context.options.outputDir, 'index.html'), renderIndex(context.pages), 'utf8');
