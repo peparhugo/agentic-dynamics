@@ -7,6 +7,11 @@ import { Page } from '../src/types';
  * Templates are loaded during `beforeBuild`; each page is rendered in the
  * `onFile` hook and the index is rendered in `afterBuild`. Rendered output is
  * contributed to the engine's output files so the engine can write it to disk.
+ *
+ * On incremental builds the page source hash (computed by the markdown plugin)
+ * and a template fingerprint are compared against the cached manifest. When
+ * both match, the cached rendered HTML is reused and the page counts as
+ * skipped; otherwise the page is re-rendered and its output cached.
  */
 export declare class TemplatePlugin implements Plugin {
     readonly name = "templates";

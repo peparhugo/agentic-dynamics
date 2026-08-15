@@ -1,4 +1,4 @@
-import { build } from './generator';
+import { buildWithStats } from './generator';
 import { startDevServer } from './serve';
 import { BuildOptions } from './types';
 
@@ -24,6 +24,8 @@ Options:
   --content <dir>   Content directory containing Markdown files (default: ./content)
   --output <dir>    Output directory for generated HTML (default: ./dist)
   --templates <dir> Templates directory with .hbs templates, layouts/, and partials/ (default: ./templates)
+  --incremental     Only rebuild pages whose source or template changed (build)
+  --clean           Ignore any existing cache and force a full rebuild (build)
   --port <number>   Port for the dev server (default: 3000)
   --help            Show this help message`;
 }
@@ -64,6 +66,10 @@ export function parseArgs(argv: string[]): CliArgs {
       if (!options.templatesDir) {
         throw new Error('--templates requires a directory argument');
       }
+    } else if (flag === '--incremental') {
+      options.incremental = true;
+    } else if (flag === '--clean') {
+      options.clean = true;
     } else if (flag === '--port') {
       const raw = inlineValue ?? argv[++i];
       if (!raw) {
@@ -106,8 +112,14 @@ export async function main(argv: string[]): Promise<void> {
     return new Promise<void>(() => {});
   }
 
-  const pages = await build(options);
+  const { pages, stats } = await buildWithStats(options);
   process.stdout.write(
     `Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${options.outputDir}\n`
   );
+  if (options.incremental) {
+    process.stdout.write(
+      `Incremental: ${stats.built} built, ${stats.skipped} skipped, ` +
+        `saved ${Math.round(stats.timeSavedMs)}ms\n`
+    );
+  }
 }

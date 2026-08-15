@@ -20,6 +20,8 @@ Options:
   --content <dir>   Content directory containing Markdown files (default: ./content)
   --output <dir>    Output directory for generated HTML (default: ./dist)
   --templates <dir> Templates directory with .hbs templates, layouts/, and partials/ (default: ./templates)
+  --incremental     Only rebuild pages whose source or template changed (build)
+  --clean           Ignore any existing cache and force a full rebuild (build)
   --port <number>   Port for the dev server (default: 3000)
   --help            Show this help message`;
 }
@@ -57,6 +59,12 @@ function parseArgs(argv) {
             if (!options.templatesDir) {
                 throw new Error('--templates requires a directory argument');
             }
+        }
+        else if (flag === '--incremental') {
+            options.incremental = true;
+        }
+        else if (flag === '--clean') {
+            options.clean = true;
         }
         else if (flag === '--port') {
             const raw = inlineValue ?? argv[++i];
@@ -96,6 +104,10 @@ async function main(argv) {
         process.stdout.write(`Watching ${options.contentDir} and ${options.templatesDir} for changes\n`);
         return new Promise(() => { });
     }
-    const pages = await (0, generator_1.build)(options);
+    const { pages, stats } = await (0, generator_1.buildWithStats)(options);
     process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${options.outputDir}\n`);
+    if (options.incremental) {
+        process.stdout.write(`Incremental: ${stats.built} built, ${stats.skipped} skipped, ` +
+            `saved ${Math.round(stats.timeSavedMs)}ms\n`);
+    }
 }

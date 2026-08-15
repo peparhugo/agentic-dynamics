@@ -6,6 +6,9 @@ export interface TemplateBundle {
     templates: Map<string, Handlebars.TemplateDelegate>;
     layouts: Map<string, Handlebars.TemplateDelegate>;
     partials: Map<string, Handlebars.TemplateDelegate>;
+    templatesSource: Map<string, string>;
+    layoutsSource: Map<string, string>;
+    partialsSource: Map<string, string>;
     defaultTemplate: string | null;
     defaultLayout: string | null;
     hasIndexTemplate: boolean;
@@ -33,3 +36,10 @@ export declare function renderPageTemplate(page: Page, bundle: TemplateBundle): 
  * so callers can fall back to the built-in index renderer.
  */
 export declare function renderIndexTemplate(pages: Page[], bundle: TemplateBundle): string | null;
+/**
+ * Fingerprint of the templates a page renders through: its page template, its
+ * layout, and every registered partial (partials are global). When no template
+ * directory is configured the page output depends only on its source, so the
+ * hash is empty.
+ */
+export declare function computePageTemplateHash(page: Page, bundle: TemplateBundle): string;

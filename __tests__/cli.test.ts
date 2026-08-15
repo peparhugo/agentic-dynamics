@@ -34,6 +34,18 @@ describe('parseArgs', () => {
     expect(options.templatesDir).toBe('theme');
   });
 
+  it('parses --incremental and --clean flags', () => {
+    const { options } = parseArgs(['build', '--incremental', '--clean']);
+    expect(options.incremental).toBe(true);
+    expect(options.clean).toBe(true);
+  });
+
+  it('does not enable incremental by default', () => {
+    const { options } = parseArgs(['build']);
+    expect(options.incremental).toBeUndefined();
+    expect(options.clean).toBeUndefined();
+  });
+
   it('throws for unknown arguments', () => {
     expect(() => parseArgs(['build', '--bogus'])).toThrow('unknown argument');
   });

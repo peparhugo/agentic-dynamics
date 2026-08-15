@@ -1,6 +1,7 @@
-import { BuildOptions, Page } from './types';
+import { BuildOptions, BuildStats, Page } from './types';
 import type { SsgEngine } from './engine';
 import type { TemplateBundle } from './templates';
+import type { SsgCache } from './cache';
 /**
  * Configuration loaded from `ssg.config.ts`.
  *
@@ -23,6 +24,10 @@ export interface PluginContext {
     outputFiles: Map<string, string>;
     templateBundle?: TemplateBundle;
     engine: SsgEngine;
+    /** Incremental build cache; present only for incremental builds. */
+    cache?: SsgCache;
+    /** Build statistics accumulated across pages. */
+    stats?: BuildStats;
 }
 /**
  * A plugin participating in the SSG lifecycle.

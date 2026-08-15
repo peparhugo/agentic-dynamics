@@ -1,14 +1,22 @@
 export { parseMarkdown } from './markdown';
-export { build } from './generator';
+export { build, buildWithStats } from './generator';
+export type { BuildResult } from './generator';
 export { parseFrontmatter, parseYamlBlock } from './frontmatter';
 export { renderIndexHtml, renderPageHtml } from './render';
-export { loadTemplates, renderPageTemplate, renderIndexTemplate } from './templates';
+export {
+  loadTemplates,
+  renderPageTemplate,
+  renderIndexTemplate,
+  computePageTemplateHash,
+} from './templates';
 export type { TemplateBundle } from './templates';
 export { parseArgs, main, HelpError } from './cli';
 export type { CliArgs } from './cli';
 export { startDevServer, injectReloadScript, reloadClientScript } from './serve';
 export type { DevServer, ServeOptions } from './serve';
-export type { Page, BuildOptions, ParsedFrontmatter } from './types';
+export type { Page, BuildOptions, BuildStats, ParsedFrontmatter } from './types';
+export { SsgCache, hashContent, DEFAULT_CACHE_FILE } from './cache';
+export type { CacheEntry, CacheManifest } from './cache';
 export { SsgEngine } from './engine';
 export { PluginPipeline } from './plugin';
 export type { Plugin, PluginContext, SsgConfig } from './plugin';

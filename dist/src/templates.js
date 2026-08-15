@@ -39,6 +39,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.loadTemplates = loadTemplates;
 exports.renderPageTemplate = renderPageTemplate;
 exports.renderIndexTemplate = renderIndexTemplate;
+exports.computePageTemplateHash = computePageTemplateHash;
+const crypto_1 = require("crypto");
 const fs_1 = require("fs");
 const path = __importStar(require("path"));
 const handlebars_1 = __importDefault(require("handlebars"));
@@ -56,9 +58,10 @@ async function dirExists(dir) {
     }
 }
 async function readTemplateMap(dir, hbs) {
-    const map = new Map();
+    const compiled = new Map();
+    const sources = new Map();
     if (!(await dirExists(dir))) {
-        return map;
+        return { compiled, sources };
     }
     const entries = await fs_1.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
@@ -71,9 +74,10 @@ async function readTemplateMap(dir, hbs) {
         }
         const name = entry.name.slice(0, -ext.length);
         const source = await fs_1.promises.readFile(path.join(dir, entry.name), 'utf8');
-        map.set(name, hbs.compile(source));
+        compiled.set(name, hbs.compile(source));
+        sources.set(name, source);
     }
-    return map;
+    return { compiled, sources };
 }
 /**
  * Load the template tree at `templatesDir`.
@@ -96,27 +100,37 @@ async function loadTemplates(templatesDir) {
             templates: new Map(),
             layouts: new Map(),
             partials: new Map(),
+            templatesSource: new Map(),
+            layoutsSource: new Map(),
+            partialsSource: new Map(),
             defaultTemplate: null,
             defaultLayout: null,
             hasIndexTemplate: false,
         };
     }
     const hbs = handlebars_1.default.create();
-    const templates = await readTemplateMap(templatesDir, hbs);
-    const layouts = await readTemplateMap(path.join(templatesDir, 'layouts'), hbs);
-    const partials = await readTemplateMap(path.join(templatesDir, 'partials'), hbs);
-    for (const [name, template] of partials) {
+    const templateResult = await readTemplateMap(templatesDir, hbs);
+    const layoutResult = await readTemplateMap(path.join(templatesDir, 'layouts'), hbs);
+    const partialResult = await readTemplateMap(path.join(templatesDir, 'partials'), hbs);
+    for (const [name, template] of partialResult.compiled) {
         hbs.registerPartial(name, template);
     }
     return {
         exists: true,
         hbs,
-        templates,
-        layouts,
-        partials,
-        defaultTemplate: templates.has(DEFAULT_TEMPLATE_NAME) ? DEFAULT_TEMPLATE_NAME : null,
-        defaultLayout: layouts.has(DEFAULT_LAYOUT_NAME) ? DEFAULT_LAYOUT_NAME : null,
-        hasIndexTemplate: templates.has(INDEX_TEMPLATE_NAME),
+        templates: templateResult.compiled,
+        layouts: layoutResult.compiled,
+        partials: partialResult.compiled,
+        templatesSource: templateResult.sources,
+        layoutsSource: layoutResult.sources,
+        partialsSource: partialResult.sources,
+        defaultTemplate: templateResult.compiled.has(DEFAULT_TEMPLATE_NAME)
+            ? DEFAULT_TEMPLATE_NAME
+            : null,
+        defaultLayout: layoutResult.compiled.has(DEFAULT_LAYOUT_NAME)
+            ? DEFAULT_LAYOUT_NAME
+            : null,
+        hasIndexTemplate: templateResult.compiled.has(INDEX_TEMPLATE_NAME),
     };
 }
 function normalizeTemplateName(value) {
@@ -195,4 +209,37 @@ function renderIndexTemplate(pages, bundle) {
         return layout({ ...context, body });
     }
     return body;
+}
+/**
+ * Fingerprint of the templates a page renders through: its page template, its
+ * layout, and every registered partial (partials are global). When no template
+ * directory is configured the page output depends only on its source, so the
+ * hash is empty.
+ */
+function computePageTemplateHash(page, bundle) {
+    if (!bundle.exists) {
+        return '';
+    }
+    const hash = (0, crypto_1.createHash)('sha256');
+    let templateName = bundle.defaultTemplate;
+    if (page.template) {
+        templateName = normalizeTemplateName(page.template);
+    }
+    if (templateName) {
+        const source = bundle.templatesSource.get(templateName);
+        if (source != null) {
+            hash.update(source);
+        }
+    }
+    const layoutName = resolveLayoutName(page, bundle);
+    if (layoutName) {
+        const source = bundle.layoutsSource.get(layoutName);
+        if (source != null) {
+            hash.update(source);
+        }
+    }
+    for (const source of bundle.partialsSource.values()) {
+        hash.update(source);
+    }
+    return hash.digest('hex');
 }

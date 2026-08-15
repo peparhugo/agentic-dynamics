@@ -1,7 +1,8 @@
 import { promises as fs } from 'fs';
 import * as path from 'path';
+import { DEFAULT_CACHE_FILE, SsgCache } from './cache';
 import { Plugin, PluginContext, PluginPipeline, SsgConfig } from './plugin';
-import { BuildOptions, Page } from './types';
+import { BuildOptions, BuildStats, Page } from './types';
 
 const DEFAULT_TEMPLATES_DIR = 'templates';
 
@@ -59,6 +60,8 @@ async function dirExists(dir: string): Promise<boolean> {
 export class SsgEngine {
   private readonly pipeline: PluginPipeline;
   private readonly context: PluginContext;
+  private readonly stats: BuildStats = { built: 0, skipped: 0, timeSavedMs: 0 };
+  private cache: SsgCache | undefined;
 
   constructor(plugins: Plugin[], options: BuildOptions, config: SsgConfig = {}) {
     const normalized: BuildOptions = {
@@ -72,6 +75,7 @@ export class SsgEngine {
       pages: [],
       outputFiles: new Map<string, string>(),
       engine: this,
+      stats: this.stats,
     };
   }
 
@@ -79,13 +83,49 @@ export class SsgEngine {
     return this.context;
   }
 
+  /** Build statistics accumulated since the last build/rebuild. */
+  getStats(): BuildStats {
+    return { ...this.stats };
+  }
+
+  private resolveCacheFile(): string {
+    return this.context.options.cacheFile ?? path.resolve(process.cwd(), DEFAULT_CACHE_FILE);
+  }
+
+  private async beginBuild(): Promise<void> {
+    this.stats.built = 0;
+    this.stats.skipped = 0;
+    this.stats.timeSavedMs = 0;
+    this.cache = undefined;
+    this.context.cache = undefined;
+
+    if (!this.context.options.incremental) {
+      return;
+    }
+    const cacheFile = this.resolveCacheFile();
+    if (this.context.options.clean) {
+      this.cache = new SsgCache(cacheFile);
+    } else {
+      this.cache = await SsgCache.load(cacheFile);
+    }
+    this.context.cache = this.cache;
+  }
+
+  private async finishBuild(): Promise<void> {
+    if (this.context.cache) {
+      await this.context.cache.save();
+    }
+  }
+
   /**
    * Run a full build lifecycle (used by the `build` command).
    */
   async build(): Promise<Page[]> {
+    await this.beginBuild();
     await this.pipeline.run('onStart', this.context);
     const pages = await this.collectPages();
     await this.pipeline.run('onEnd', this.context);
+    await this.finishBuild();
     await this.writeOutputs();
     return pages;
   }
@@ -95,7 +135,9 @@ export class SsgEngine {
    * to refresh the site on file changes).
    */
   async rebuild(): Promise<Page[]> {
+    await this.beginBuild();
     const pages = await this.collectPages();
+    await this.finishBuild();
     await this.writeOutputs();
     return pages;
   }

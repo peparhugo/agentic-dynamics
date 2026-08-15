@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import Handlebars from 'handlebars';
@@ -14,6 +15,9 @@ export interface TemplateBundle {
   templates: Map<string, Handlebars.TemplateDelegate>;
   layouts: Map<string, Handlebars.TemplateDelegate>;
   partials: Map<string, Handlebars.TemplateDelegate>;
+  templatesSource: Map<string, string>;
+  layoutsSource: Map<string, string>;
+  partialsSource: Map<string, string>;
   defaultTemplate: string | null;
   defaultLayout: string | null;
   hasIndexTemplate: boolean;
@@ -31,10 +35,14 @@ async function dirExists(dir: string): Promise<boolean> {
 async function readTemplateMap(
   dir: string,
   hbs: typeof Handlebars
-): Promise<Map<string, Handlebars.TemplateDelegate>> {
-  const map = new Map<string, Handlebars.TemplateDelegate>();
+): Promise<{
+  compiled: Map<string, Handlebars.TemplateDelegate>;
+  sources: Map<string, string>;
+}> {
+  const compiled = new Map<string, Handlebars.TemplateDelegate>();
+  const sources = new Map<string, string>();
   if (!(await dirExists(dir))) {
-    return map;
+    return { compiled, sources };
   }
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -47,9 +55,10 @@ async function readTemplateMap(
     }
     const name = entry.name.slice(0, -ext.length);
     const source = await fs.readFile(path.join(dir, entry.name), 'utf8');
-    map.set(name, hbs.compile(source));
+    compiled.set(name, hbs.compile(source));
+    sources.set(name, source);
   }
-  return map;
+  return { compiled, sources };
 }
 
 /**
@@ -73,6 +82,9 @@ export async function loadTemplates(templatesDir: string): Promise<TemplateBundl
       templates: new Map(),
       layouts: new Map(),
       partials: new Map(),
+      templatesSource: new Map(),
+      layoutsSource: new Map(),
+      partialsSource: new Map(),
       defaultTemplate: null,
       defaultLayout: null,
       hasIndexTemplate: false,
@@ -80,23 +92,30 @@ export async function loadTemplates(templatesDir: string): Promise<TemplateBundl
   }
 
   const hbs = Handlebars.create();
-  const templates = await readTemplateMap(templatesDir, hbs);
-  const layouts = await readTemplateMap(path.join(templatesDir, 'layouts'), hbs);
-  const partials = await readTemplateMap(path.join(templatesDir, 'partials'), hbs);
+  const templateResult = await readTemplateMap(templatesDir, hbs);
+  const layoutResult = await readTemplateMap(path.join(templatesDir, 'layouts'), hbs);
+  const partialResult = await readTemplateMap(path.join(templatesDir, 'partials'), hbs);
 
-  for (const [name, template] of partials) {
+  for (const [name, template] of partialResult.compiled) {
     hbs.registerPartial(name, template);
   }
 
   return {
     exists: true,
     hbs,
-    templates,
-    layouts,
-    partials,
-    defaultTemplate: templates.has(DEFAULT_TEMPLATE_NAME) ? DEFAULT_TEMPLATE_NAME : null,
-    defaultLayout: layouts.has(DEFAULT_LAYOUT_NAME) ? DEFAULT_LAYOUT_NAME : null,
-    hasIndexTemplate: templates.has(INDEX_TEMPLATE_NAME),
+    templates: templateResult.compiled,
+    layouts: layoutResult.compiled,
+    partials: partialResult.compiled,
+    templatesSource: templateResult.sources,
+    layoutsSource: layoutResult.sources,
+    partialsSource: partialResult.sources,
+    defaultTemplate: templateResult.compiled.has(DEFAULT_TEMPLATE_NAME)
+      ? DEFAULT_TEMPLATE_NAME
+      : null,
+    defaultLayout: layoutResult.compiled.has(DEFAULT_LAYOUT_NAME)
+      ? DEFAULT_LAYOUT_NAME
+      : null,
+    hasIndexTemplate: templateResult.compiled.has(INDEX_TEMPLATE_NAME),
   };
 }
 
@@ -191,4 +210,43 @@ export function renderIndexTemplate(
     return layout({ ...context, body });
   }
   return body;
+}
+
+/**
+ * Fingerprint of the templates a page renders through: its page template, its
+ * layout, and every registered partial (partials are global). When no template
+ * directory is configured the page output depends only on its source, so the
+ * hash is empty.
+ */
+export function computePageTemplateHash(page: Page, bundle: TemplateBundle): string {
+  if (!bundle.exists) {
+    return '';
+  }
+
+  const hash = createHash('sha256');
+
+  let templateName = bundle.defaultTemplate;
+  if (page.template) {
+    templateName = normalizeTemplateName(page.template);
+  }
+  if (templateName) {
+    const source = bundle.templatesSource.get(templateName);
+    if (source != null) {
+      hash.update(source);
+    }
+  }
+
+  const layoutName = resolveLayoutName(page, bundle);
+  if (layoutName) {
+    const source = bundle.layoutsSource.get(layoutName);
+    if (source != null) {
+      hash.update(source);
+    }
+  }
+
+  for (const source of bundle.partialsSource.values()) {
+    hash.update(source);
+  }
+
+  return hash.digest('hex');
 }

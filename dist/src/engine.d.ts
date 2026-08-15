@@ -1,5 +1,5 @@
 import { Plugin, PluginContext, SsgConfig } from './plugin';
-import { BuildOptions, Page } from './types';
+import { BuildOptions, BuildStats, Page } from './types';
 /**
  * Core SSG engine.
  *
@@ -11,8 +11,15 @@ import { BuildOptions, Page } from './types';
 export declare class SsgEngine {
     private readonly pipeline;
     private readonly context;
+    private readonly stats;
+    private cache;
     constructor(plugins: Plugin[], options: BuildOptions, config?: SsgConfig);
     getContext(): PluginContext;
+    /** Build statistics accumulated since the last build/rebuild. */
+    getStats(): BuildStats;
+    private resolveCacheFile;
+    private beginBuild;
+    private finishBuild;
     /**
      * Run a full build lifecycle (used by the `build` command).
      */

@@ -36,6 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SsgEngine = void 0;
 const fs_1 = require("fs");
 const path = __importStar(require("path"));
+const cache_1 = require("./cache");
 const plugin_1 = require("./plugin");
 const DEFAULT_TEMPLATES_DIR = 'templates';
 const CONTENT_EXTENSIONS = ['.md', '.markdown', '.mdown'];
@@ -86,6 +87,7 @@ async function dirExists(dir) {
  */
 class SsgEngine {
     constructor(plugins, options, config = {}) {
+        this.stats = { built: 0, skipped: 0, timeSavedMs: 0 };
         const normalized = {
             ...options,
             templatesDir: options.templatesDir ?? DEFAULT_TEMPLATES_DIR,
@@ -97,18 +99,51 @@ class SsgEngine {
             pages: [],
             outputFiles: new Map(),
             engine: this,
+            stats: this.stats,
         };
     }
     getContext() {
         return this.context;
     }
+    /** Build statistics accumulated since the last build/rebuild. */
+    getStats() {
+        return { ...this.stats };
+    }
+    resolveCacheFile() {
+        return this.context.options.cacheFile ?? path.resolve(process.cwd(), cache_1.DEFAULT_CACHE_FILE);
+    }
+    async beginBuild() {
+        this.stats.built = 0;
+        this.stats.skipped = 0;
+        this.stats.timeSavedMs = 0;
+        this.cache = undefined;
+        this.context.cache = undefined;
+        if (!this.context.options.incremental) {
+            return;
+        }
+        const cacheFile = this.resolveCacheFile();
+        if (this.context.options.clean) {
+            this.cache = new cache_1.SsgCache(cacheFile);
+        }
+        else {
+            this.cache = await cache_1.SsgCache.load(cacheFile);
+        }
+        this.context.cache = this.cache;
+    }
+    async finishBuild() {
+        if (this.context.cache) {
+            await this.context.cache.save();
+        }
+    }
     /**
      * Run a full build lifecycle (used by the `build` command).
      */
     async build() {
+        await this.beginBuild();
         await this.pipeline.run('onStart', this.context);
         const pages = await this.collectPages();
         await this.pipeline.run('onEnd', this.context);
+        await this.finishBuild();
         await this.writeOutputs();
         return pages;
     }
@@ -117,7 +152,9 @@ class SsgEngine {
      * to refresh the site on file changes).
      */
     async rebuild() {
+        await this.beginBuild();
         const pages = await this.collectPages();
+        await this.finishBuild();
         await this.writeOutputs();
         return pages;
     }
