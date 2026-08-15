@@ -17,6 +17,7 @@ from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
@@ -141,11 +142,11 @@ def _require_user() -> tuple[int | None, Any | None]:
     return user_id, None
 
 
-def _task_or_404(task_id: int, tasks: list[dict], user_id: int):
-    task = next((task for task in tasks if task.get("id") == task_id and task.get("owner_id") == user_id), None)
-    if task is None:
-        return None, (jsonify(error="task not found"), 404)
-    return task, None
+def _repositories() -> tuple[TaskRepository, UserRepository]:
+    return (
+        TaskRepository(_read_data, _write_data, _storage_lock),
+        UserRepository(_read_data, _write_data, _storage_lock),
+    )
 
 
 @app.post("/auth/register")
@@ -159,19 +160,13 @@ def register():
     if email is not None and (not isinstance(email, str) or not email.strip()):
         return jsonify(error="email must be a non-empty string"), 400
 
-    with _storage_lock:
-        data = _read_data()
-        if any(user.get("username") == username.strip() for user in data["users"]):
-            return jsonify(error="username already exists"), 409
-        user = {
-            "id": max((user.get("id", 0) for user in data["users"]), default=0) + 1,
-            "username": username.strip(),
-            "password_hash": generate_password_hash(password),
-        }
-        if email is not None:
-            user["email"] = email.strip()
-        data["users"].append(user)
-        _write_data(data)
+    _, users = _repositories()
+    user_attributes = {"username": username.strip(), "password_hash": generate_password_hash(password)}
+    if email is not None:
+        user_attributes["email"] = email.strip()
+    user = users.create_if_username_available(user_attributes)
+    if user is None:
+        return jsonify(error="username already exists"), 409
     return jsonify({"id": user["id"], "username": user["username"]}), 201
 
 
@@ -182,8 +177,8 @@ def login():
     password = data.get("password") if data else None
     if not isinstance(username, str) or not isinstance(password, str):
         return jsonify(error="username and password are required"), 400
-    with _storage_lock:
-        user = next((user for user in _read_data()["users"] if user.get("username") == username), None)
+    _, users = _repositories()
+    user = users.get_by_username(username)
     if user is None or not check_password_hash(user.get("password_hash", ""), password):
         return jsonify(error="invalid credentials"), 401
     return jsonify(token=_create_token(user["id"]))
@@ -199,12 +194,10 @@ def create_task():
     if not isinstance(title, str) or not title.strip():
         return jsonify(error="title is required"), 400
 
-    with _storage_lock:
-        data = _read_data()
-        tasks = data["tasks"]
-        task = {"id": max((item.get("id", 0) for item in tasks), default=0) + 1, "title": title.strip(), "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(), "owner_id": user_id}
-        tasks.append(task)
-        _write_data(data)
+    tasks, _ = _repositories()
+    task = tasks.create(
+        {"title": title.strip(), "status": "pending", "created_at": datetime.now(timezone.utc).isoformat(), "owner_id": user_id}
+    )
     return jsonify(task), 201
 
 
@@ -213,8 +206,8 @@ def list_tasks():
     user_id, error = _require_user()
     if error:
         return error
-    with _storage_lock:
-        tasks = [task for task in _read_data()["tasks"] if task.get("owner_id") == user_id]
+    tasks, _ = _repositories()
+    tasks = tasks.list_for_owner(user_id)
     return jsonify(sorted(tasks, key=lambda task: task["created_at"], reverse=True))
 
 
@@ -223,9 +216,11 @@ def get_task(task_id: int):
     user_id, error = _require_user()
     if error:
         return error
-    with _storage_lock:
-        task, error = _task_or_404(task_id, _read_data()["tasks"], user_id)
-    return error if error else jsonify(task)
+    tasks, _ = _repositories()
+    task = tasks.get_for_owner(task_id, user_id)
+    if task is None:
+        return jsonify(error="task not found"), 404
+    return jsonify(task)
 
 
 @app.put("/tasks/<int:task_id>")
@@ -241,20 +236,19 @@ def update_task(task_id: int):
     if "status" in data and not isinstance(data["status"], str):
         return jsonify(error="status must be a string"), 400
 
-    with _storage_lock:
-        stored_data = _read_data()
-        task, error = _task_or_404(task_id, stored_data["tasks"], user_id)
-        if error:
-            return error
-        was_completed = task.get("status") == "completed"
-        if "title" in data:
-            task["title"] = data["title"].strip()
-        if "status" in data:
-            task["status"] = data["status"]
-        _write_data(stored_data)
-        should_notify = not was_completed and task.get("status") == "completed"
-        user = next((item for item in stored_data["users"] if item.get("id") == user_id), None)
-        user_email = user.get("email", user.get("username")) if user else None
+    tasks, users = _repositories()
+    changes = {}
+    if "title" in data:
+        changes["title"] = data["title"].strip()
+    if "status" in data:
+        changes["status"] = data["status"]
+    result = tasks.update_for_owner(task_id, user_id, changes)
+    if result is None:
+        return jsonify(error="task not found"), 404
+    task, was_completed = result
+    should_notify = not was_completed and task.get("status") == "completed"
+    user = users.get_by_id(user_id)
+    user_email = user.get("email", user.get("username")) if user else None
     if should_notify and user_email:
         send_notification_email.delay(user_email, task["title"])
     return jsonify(task)
