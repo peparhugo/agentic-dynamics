@@ -7,7 +7,7 @@
     "total_lines_added": 779,
     "total_lines_removed": 361,
     "net_lines": 418,
-    "average_convention_score": 0.818
+    "average_convention_score": 0.833
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 247
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": -2,
-        "complexity_delta": 5,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "test_app.py: Classes should use PascalCase",
           "test_app.py: Module-level constants should be UPPER_CASE",
@@ -66,14 +66,14 @@
         "lines_removed": 13
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 29,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "test_app.py: Classes should use PascalCase",
           "test_app.py: Module-level constants should be UPPER_CASE",
@@ -104,14 +104,14 @@
         "lines_removed": 52
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 41,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "test_app.py: Classes should use PascalCase",
           "test_app.py: Module-level constants should be UPPER_CASE",
@@ -142,14 +142,14 @@
         "lines_removed": 49
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": -12,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "test_app.py: Classes should use PascalCase",
           "test_app.py: Module-level constants should be UPPER_CASE",
@@ -180,14 +180,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 20,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.818,
+        "score": 0.833,
         "violations": [
           "test_app.py: Classes should use PascalCase",
           "test_app.py: Module-level constants should be UPPER_CASE",
@@ -203,9 +203,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 18,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -276,7 +276,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8365,
+      "strategy_score": 0.9865,
       "exploration_premium": 1.0263,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.63) and found a novel correct solution (novelty=0.91, correctness=100%). Cost: $0.8864, ~0J.",

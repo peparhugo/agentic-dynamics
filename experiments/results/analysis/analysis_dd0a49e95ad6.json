@@ -7,7 +7,7 @@
     "total_lines_added": 1334,
     "total_lines_removed": 9,
     "net_lines": 1325,
-    "average_convention_score": 0.773
+    "average_convention_score": 0.792
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 9,
-        "complexity_delta": 32,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.773,
+        "score": 0.792,
         "violations": [
           "app.py: Classes should use PascalCase",
           "example_client.py: Classes should use PascalCase",
@@ -75,7 +75,7 @@
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.773,
+        "score": 0.792,
         "violations": [
           "app.py: Classes should use PascalCase",
           "example_client.py: Classes should use PascalCase",
@@ -108,14 +108,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.773,
+        "score": 0.792,
         "violations": [
           "app.py: Classes should use PascalCase",
           "example_client.py: Classes should use PascalCase",
@@ -148,14 +148,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.773,
+        "score": 0.792,
         "violations": [
           "app.py: Classes should use PascalCase",
           "example_client.py: Classes should use PascalCase",
@@ -188,14 +188,14 @@
         "lines_removed": 0
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
         "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.773,
+        "score": 0.792,
         "violations": [
           "app.py: Classes should use PascalCase",
           "example_client.py: Classes should use PascalCase",
@@ -213,7 +213,7 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
       "errors": 0,
       "warnings": 0
@@ -285,12 +285,12 @@
       "run_id": ""
     },
     "strategy": {
-      "strategy": "wasteful",
-      "strategy_score": 0.2971,
+      "strategy": "conservative",
+      "strategy_score": 0.3971,
       "exploration_premium": 0.0,
       "thermal_efficiency": 0.0,
-      "verdict": "WASTEFUL \u2014 model burned 0 tokens ($0.3752, ~0J, 0% thinking) achieving only 0% correctness. High reasoning overhead without convergence.",
-      "recommendation": "Reduce perturbation strength or avoid this operator class.",
+      "verdict": "CONSERVATIVE \u2014 model maintained sound reasoning (correctness=0%, quality=0.31) with moderate resource use ($0.3752, ~0J). Model absorbed the perturbation without divergence.",
+      "recommendation": "Reliable but not novel. Good for production, not for exploration.",
       "operator": "",
       "perturbation_class": "",
       "model": "anthropic/claude-haiku-4-5",

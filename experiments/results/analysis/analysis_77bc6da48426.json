@@ -7,7 +7,7 @@
     "total_lines_added": 911,
     "total_lines_removed": 458,
     "net_lines": 453,
-    "average_convention_score": 0.475
+    "average_convention_score": 0.5
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 106
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": -3,
-        "complexity_delta": 7,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.475,
+        "score": 0.5,
         "violations": [
           "index.ts: Functions should use camelCase",
           "index.ts: Classes should use PascalCase",
@@ -97,14 +97,14 @@
         "lines_removed": 5
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 9,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.475,
+        "score": 0.5,
         "violations": [
           "index.ts: Functions should use camelCase",
           "index.ts: Classes should use PascalCase",
@@ -166,14 +166,14 @@
         "lines_removed": 4
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 4,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.475,
+        "score": 0.5,
         "violations": [
           "index.ts: Functions should use camelCase",
           "index.ts: Classes should use PascalCase",
@@ -235,14 +235,14 @@
         "lines_removed": 335
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 41,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.475,
+        "score": 0.5,
         "violations": [
           "index.ts: Functions should use camelCase",
           "index.ts: Classes should use PascalCase",
@@ -304,14 +304,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 4,
-        "complexity_delta": 3,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.475,
+        "score": 0.5,
         "violations": [
           "index.ts: Functions should use camelCase",
           "index.ts: Classes should use PascalCase",
@@ -358,9 +358,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 1,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -431,7 +431,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8431,
+      "strategy_score": 0.9931,
       "exploration_premium": 10.824,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.79) and found a novel correct solution (novelty=0.95, correctness=100%). Cost: $0.0881, ~0J.",

@@ -7,7 +7,7 @@
     "total_lines_added": 1907,
     "total_lines_removed": 205,
     "net_lines": 1702,
-    "average_convention_score": 0.682
+    "average_convention_score": 0.708
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 108
       },
       "sonar": {
-        "available": true,
-        "bugs_delta": 1,
-        "smells_delta": -1,
-        "complexity_delta": 20,
+        "available": false,
+        "bugs_delta": 0,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.682,
+        "score": 0.708,
         "violations": [
           "conftest.py: Classes should use PascalCase",
           "conftest.py: Module-level constants should be UPPER_CASE",
@@ -77,14 +77,14 @@
         "lines_removed": 8
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 31,
+        "smells_delta": 0,
+        "complexity_delta": 0,
         "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.682,
+        "score": 0.708,
         "violations": [
           "conftest.py: Classes should use PascalCase",
           "conftest.py: Module-level constants should be UPPER_CASE",
@@ -126,14 +126,14 @@
         "lines_removed": 14
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 2,
-        "complexity_delta": 61,
-        "duplications_delta": 3.4
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.682,
+        "score": 0.708,
         "violations": [
           "conftest.py: Classes should use PascalCase",
           "conftest.py: Module-level constants should be UPPER_CASE",
@@ -175,14 +175,14 @@
         "lines_removed": 63
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
         "smells_delta": 0,
-        "complexity_delta": 5,
-        "duplications_delta": -0.2999999999999998
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.682,
+        "score": 0.708,
         "violations": [
           "conftest.py: Classes should use PascalCase",
           "conftest.py: Module-level constants should be UPPER_CASE",
@@ -224,14 +224,14 @@
         "lines_removed": 12
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 1,
-        "complexity_delta": 30,
-        "duplications_delta": -0.8999999999999999
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.682,
+        "score": 0.708,
         "violations": [
           "conftest.py: Classes should use PascalCase",
           "conftest.py: Module-level constants should be UPPER_CASE",
@@ -258,9 +258,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "pyright",
-      "errors": 45,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -331,7 +331,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8425,
+      "strategy_score": 0.9925,
       "exploration_premium": 21.1786,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.77) and found a novel correct solution (novelty=0.95, correctness=100%). Cost: $0.0449, ~0J.",

@@ -216,3 +216,57 @@ result until its fields exist — no code change needed there beyond the field n
 - **Regenerate downstream:** after re-runs, `scripts/sync_data.py` → `scripts/build_data.py`
   → `generate_manifest.py` so `data.js` stops emitting `manifold` labels and cross-matched
   basin numbers.
+
+---
+
+## 4. Recompute results (instrument phase follow-through)
+
+Recomputation over the *existing* worktrees + opencode DB (no new LLM runs). State
+verified on disk before running: **222/222 story worktrees present** in `/tmp/story_*`
+(vs the scope phase's conservative "84 archived"), but **single-task `exp_*` worktrees
+are gone** — only 1 of the 227 `_results_summary.json` cells still has its worktree; the
+663 remaining `/tmp/exp_*` dirs are meta-analysis sessions (`meta_analyze_*`,
+`meta_compare_*`, `meta_batch_*`), not perturbation cells.
+
+### 4.1 `analyze_stories.py` — regenerated (222 cells, 0 errors)
+
+| Metric | Before | After | Δ |
+|---|---|---|---|
+| analysis artifacts | 221 | 222 | +1 (previously-unanalyzed story) |
+| strategy archetype | conservative 20 · exploratory 194 · **wasteful 7** | conservative 27 · exploratory 194 · wasteful 0 | **7 reclassified** (wasteful→conservative) |
+| commit convention scores | mean 0.6944 (n=1098) | mean 0.7177 (n=1097) | 1097 corrected (P0-9 re-weighting) |
+| basin verdicts | — | — | 0 changes (story `deep.basin` never sets `perturbation_class`) |
+| AST diff counts | — | — | 1 story changed (P0-10 Go/Rust patterns; stories are Py/TS) |
+
+- **P0-4 (strategy):** the 7 `wasteful` cells were mis-labelled by the old absolute-USD
+  thresholds; the behavioral `classify_strategy` reclassifies them `conservative`.
+- **P0-9 (convention rubric):** `score_conventions` now weights forbidden-patterns as
+  `violations_weight` (not `structure_weight`); every commit's score shifted (0.694 → 0.718).
+- **P0-5/P0-11:** story `compute_deep_metrics` does not emit a `perturbation_class`, so the
+  3-way verdict and the `[M]→[H]` tag corrections manifest only on the single-task path
+  (see §4.3) — no story-side delta.
+
+### 4.2 `verify_tests.py` — honest `test_executed_success` (222 cells)
+
+`experiments/results/verified_tests.json` (written; was previously absent).
+
+- **test_executed_success = 148/222 (66.7%)**, with_errors = 43.
+- **20 pass-rate corrections**: cells the model self-reported as passing now fail under the
+  independent harness (agent-authored tests were over-optimistic).
+- By story: task_manager_api 63/79 · notification_service 60/73 · static_site_gen 25/70.
+- **34 static_site_gen cells unverifiable** (`jest.js not found in node_modules` — no `npm
+  install` in the TS worktrees); 2 timed out (300s); 6 ran no tests.
+
+### 4.3 `analyze_worktrees.py` — NOT re-run (deliberate)
+
+Running it would **overwrite `_results_summary.json`** (227 perturbation cells) with ~88
+meta-analysis sessions, because it discovers `/tmp/exp_*` and the single-task worktrees are
+gone. `_results_summary.json` was left byte-identical (md5 unchanged). The single-task
+cells therefore remain **STALE-IN-DATA** as documented in §3 — their P0-4/P0-5/P0-11/P0-12
+propagation requires the genuine re-runs listed there, not a recompute.
+
+### 4.4 Regenerated artifacts
+
+- `experiments/results/analysis/analysis_*.json` — 222 files, corrected convention scores +
+  behavioral strategy labels.
+- `experiments/results/verified_tests.json` — per-cell independent `test_executed_success`.

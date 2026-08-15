@@ -7,7 +7,7 @@
     "total_lines_added": 4553,
     "total_lines_removed": 204,
     "net_lines": 4349,
-    "average_convention_score": 0.497
+    "average_convention_score": 0.535
   },
   "commits": [
     {
@@ -28,14 +28,14 @@
         "lines_removed": 200
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 8,
-        "complexity_delta": 141,
-        "duplications_delta": 2.9
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.497,
+        "score": 0.535,
         "violations": [
           "build.test.ts: Classes should use PascalCase",
           "build.test.ts: Interfaces should use PascalCase",
@@ -85,14 +85,14 @@
         "lines_removed": 4
       },
       "sonar": {
-        "available": true,
+        "available": false,
         "bugs_delta": 0,
-        "smells_delta": 6,
-        "complexity_delta": 179,
-        "duplications_delta": 1.8
+        "smells_delta": 0,
+        "complexity_delta": 0,
+        "duplications_delta": 0.0
       },
       "convention": {
-        "score": 0.497,
+        "score": 0.535,
         "violations": [
           "build.test.ts: Classes should use PascalCase",
           "build.test.ts: Interfaces should use PascalCase",
@@ -127,9 +127,9 @@
   ],
   "deep": {
     "lsp": {
-      "available": true,
+      "available": false,
       "tool": "tsc",
-      "errors": 101,
+      "errors": 0,
       "warnings": 0
     },
     "solution": {
@@ -200,7 +200,7 @@
     },
     "strategy": {
       "strategy": "exploratory",
-      "strategy_score": 0.8427,
+      "strategy_score": 0.9927,
       "exploration_premium": 6.1997,
       "thermal_efficiency": 0.0,
       "verdict": "EXPLORATORY \u2014 model escaped attractor (escape=0.76) and found a novel correct solution (novelty=0.95, correctness=100%). Cost: $0.1535, ~0J.",
