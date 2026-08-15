@@ -42,7 +42,17 @@ workflow:
           - experiments/results/lab_*.json             (prior lab findings)
           - src/instrument/experiment_spec.py          (LEDGER_FIELDS — what is measured)
           - code_reviews/2026-08-15_self-healing-remediation-finding.md  (the prior art)
-          - the knowledge base, if present (rag_knowledge_base branch)
+          - the merged knowledge base:
+            - src/instrument/retrieval.build_evidence_cards(
+              src/instrument/signal_store.load_results())  — the offline finding cards over the
+              measured corpus + instrumented ledger. These cards are the finding unit the
+              `recommend` phase should consume: one line per run, carrying [H] confidence and
+              perturbation_strength when measured, and gated by [M] test_executed_success so a
+              failed/unverified run is flagged (never reads as verified).
+            - src/instrument/graph.Neo4jClient.search_fulltext  — the lexical KB (full-text index
+              over Step.text), only when the store is populated; do not block on Neo4j being down.
+            - src/instrument/embeddings.ChromaStore  — the dense KB (chunk index), only when the
+              store is populated; do not block on Chroma being down.
 
           REQUIREMENTS:
           - Enumerate the highest-value gaps: contamination (stale labels / silent-fallback
