@@ -1,7 +1,7 @@
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSite, parseArgs, parseMarkdown } from '../index';
+import { buildSite, injectLiveReload, parseArgs, parseMarkdown } from '../index';
 
 describe('markdown parsing', () => {
   it('parses simple YAML frontmatter and merges it with gray-matter output', () => {
@@ -65,6 +65,16 @@ describe('buildSite', () => {
 
 describe('CLI arguments', () => {
   it('parses build directory options', () => {
-    expect(parseArgs(['--content', 'articles', '--output', 'site', '--templates', 'theme'])).toEqual({ contentDir: 'articles', outputDir: 'site', templatesDir: 'theme' });
+    expect(parseArgs(['--content', 'articles', '--output', 'site', '--templates', 'theme', '--port', '4000'])).toEqual({ contentDir: 'articles', outputDir: 'site', templatesDir: 'theme', port: 4000 });
+  });
+
+  it('validates the serve port', () => {
+    expect(() => parseArgs(['--port', '0'])).toThrow('--port requires a valid port');
+  });
+
+  it('injects the reload client before the closing body tag', () => {
+    const page = injectLiveReload('<html><body><h1>Page</h1></body></html>');
+    expect(page).toContain("new WebSocket('ws://' + location.host + '/_ssg_live_reload')");
+    expect(page.indexOf('new WebSocket')).toBeLessThan(page.indexOf('</body>'));
   });
 });
