@@ -1,7 +1,10 @@
 import json
+import os
 
 import pytest
 from werkzeug.security import check_password_hash
+
+os.environ.setdefault("RATELIMIT_STORAGE_URI", "memory://")
 
 import app as task_app
 
@@ -14,6 +17,7 @@ def client(tmp_path, monkeypatch):
         JWT_SECRET_KEY="test-secret",
         JWT_EXPIRATION_SECONDS=3600,
     )
+    task_app.limiter.reset()
     task_app.init_db()
     return task_app.app.test_client()
 
@@ -186,7 +190,7 @@ def test_list_tasks_newest_first(client, monkeypatch):
     response = client.get("/tasks", headers=headers)
 
     assert response.status_code == 200
-    assert [task["title"] for task in response.get_json()] == ["Newer", "Older"]
+    assert [task["title"] for task in response.get_json()["data"]] == ["Newer", "Older"]
 
 
 def test_update_title_and_status(client):
@@ -265,10 +269,77 @@ def test_users_only_see_and_update_their_own_tasks(client):
     bob_headers = auth_headers(client, "bob", "bob-password")
     bob_task = client.post("/tasks", json={"title": "Bob task"}, headers=bob_headers).get_json()
 
-    assert client.get("/tasks", headers=alice_headers).get_json() == [alice_task]
-    assert client.get("/tasks", headers=bob_headers).get_json() == [bob_task]
+    assert client.get("/tasks", headers=alice_headers).get_json()["data"] == [alice_task]
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"] == [bob_task]
     assert client.get(f"/tasks/{alice_task['id']}", headers=bob_headers).status_code == 404
     assert client.put(
         f"/tasks/{alice_task['id']}", json={"status": "done"}, headers=bob_headers
     ).status_code == 404
     assert client.get(f"/tasks/{alice_task['id']}", headers=alice_headers).get_json()["status"] == "pending"
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_headers(client)
+    for number in range(25):
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=headers)
+
+    first_page = client.get("/tasks", headers=headers).get_json()
+    second_page = client.get(
+        "/tasks", query_string={"cursor": first_page["next_cursor"]}, headers=headers
+    ).get_json()
+
+    assert len(first_page["data"]) == 20
+    assert first_page["total"] == 25
+    assert first_page["next_cursor"] == str(first_page["data"][-1]["id"])
+    assert len(second_page["data"]) == 5
+    assert second_page["next_cursor"] is None
+    assert second_page["total"] == 25
+    assert {task["id"] for task in first_page["data"]}.isdisjoint(
+        task["id"] for task in second_page["data"]
+    )
+
+
+def test_list_tasks_honors_limit_and_caps_it_at_100(client):
+    headers = auth_headers(client)
+    for number in range(101):
+        task_app.create_task(f"Task {number}", owner_id=1)
+
+    limited = client.get("/tasks?limit=2", headers=headers).get_json()
+    capped = client.get("/tasks?limit=1000", headers=headers).get_json()
+
+    assert len(limited["data"]) == 2
+    assert len(capped["data"]) == 100
+    assert limited["total"] == capped["total"] == 101
+
+
+@pytest.mark.parametrize("query", ["cursor=invalid", "cursor=0", "limit=invalid", "limit=0"])
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    response = client.get(f"/tasks?{query}", headers=auth_headers(client))
+
+    assert response.status_code == 400
+
+
+def test_rate_limit_applies_per_authenticated_user(client):
+    alice_headers = auth_headers(client, "alice", "alice-password")
+    bob_headers = auth_headers(client, "bob", "bob-password")
+
+    for _ in range(100):
+        assert client.get("/tasks/999", headers=alice_headers).status_code == 404
+
+    limited = client.get("/tasks/999", headers=alice_headers)
+
+    assert limited.status_code == 429
+    assert limited.get_json() == {"error": "rate limit exceeded"}
+    assert int(limited.headers["Retry-After"]) >= 0
+    assert client.get("/tasks/999", headers=bob_headers).status_code == 404
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    credentials = {"username": "alice", "password": "wrong"}
+    for _ in range(100):
+        assert client.post("/auth/login", json=credentials).status_code == 401
+
+    response = client.post("/auth/login", json=credentials)
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers

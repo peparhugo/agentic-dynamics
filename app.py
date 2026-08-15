@@ -13,6 +13,9 @@ from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.errors import RateLimitExceeded
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 
 from notification_tasks import send_notification_email
@@ -23,6 +26,9 @@ app = Flask(__name__)
 app.config.update(
     JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", "development-secret-change-me"),
     JWT_EXPIRATION_SECONDS=3600,
+    RATELIMIT_STORAGE_URI=os.environ.get(
+        "RATELIMIT_STORAGE_URI", "redis://localhost:6379/1"
+    ),
 )
 
 # Kept as a module setting so deployments and tests can select their data file.
@@ -129,6 +135,40 @@ def decode_token(token: str) -> int | None:
     return user_id
 
 
+def _rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if separator == " " and scheme.lower() == "bearer" and token:
+        user_id = decode_token(token)
+        if user_id is not None:
+            return f"user:{user_id}"
+
+    if request.endpoint in {"register", "login"}:
+        data = request.get_json(silent=True)
+        if isinstance(data, dict) and isinstance(data.get("username"), str):
+            username = data["username"].strip()
+            if username:
+                return f"username:{username}"
+    return f"address:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    default_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    headers_enabled=True,
+    retry_after="delta-seconds",
+    in_memory_fallback=["100 per minute"],
+    in_memory_fallback_enabled=True,
+)
+
+
+@app.errorhandler(RateLimitExceeded)
+def rate_limit_exceeded(_error):
+    return jsonify({"error": "rate limit exceeded"}), 429
+
+
 def jwt_required(view):
     @wraps(view)
     def authenticated_view(*args, **kwargs):
@@ -184,7 +224,23 @@ def login():
 @app.get("/tasks")
 @jwt_required
 def list_tasks():
-    return jsonify(_task_repository().list_for_owner(g.current_user["id"]))
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+    except ValueError:
+        return jsonify({"error": "cursor and limit must be integers"}), 400
+    if cursor is not None and cursor < 1:
+        return jsonify({"error": "cursor must be a positive integer"}), 400
+    if limit < 1:
+        return jsonify({"error": "limit must be a positive integer"}), 400
+    limit = min(limit, 100)
+
+    tasks, next_cursor, total = _task_repository().paginate_for_owner(
+        g.current_user["id"], cursor=cursor, limit=limit
+    )
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @app.post("/tasks")
