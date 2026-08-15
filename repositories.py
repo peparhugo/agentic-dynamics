@@ -145,11 +145,26 @@ class TaskRepository(BaseRepository):
     def create_for_owner(self, title: str, owner_id: int) -> dict[str, Any]:
         return self.create({"title": title, "owner_id": owner_id})
 
-    def list_for_owner(self, owner_id: int) -> list[dict[str, Any]]:
+    def list_for_owner(
+        self, owner_id: int, *, cursor: int | None = None, limit: int = 20
+    ) -> tuple[list[dict[str, Any]], int | None, int]:
         tasks = [
             task for task in self.get_all() if task.get("owner_id") == owner_id
         ]
-        return sorted(tasks, key=lambda task: task["created_at"], reverse=True)
+        tasks.sort(key=lambda task: task["created_at"], reverse=True)
+        total = len(tasks)
+        start = 0
+        if cursor is not None:
+            try:
+                start = next(
+                    index for index, task in enumerate(tasks) if task["id"] == cursor
+                ) + 1
+            except StopIteration as exc:
+                raise ValueError("invalid cursor") from exc
+
+        page = tasks[start : start + limit]
+        next_cursor = page[-1]["id"] if start + limit < total else None
+        return page, next_cursor, total
 
     def get_for_owner(
         self, task_id: int, owner_id: int

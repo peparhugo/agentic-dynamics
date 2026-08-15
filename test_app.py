@@ -1,13 +1,17 @@
 import json
+import os
 from unittest.mock import patch
 
 import pytest
 
-from app import app
+os.environ["RATELIMIT_STORAGE_URI"] = "memory://"
+
+from app import app, limiter
 
 
 @pytest.fixture
 def client(tmp_path):
+    limiter.reset()
     app.config.update(
         TESTING=True,
         DATA_FILE=str(tmp_path / "tasks.json"),
@@ -127,8 +131,77 @@ def test_list_is_newest_first(client):
     first = client.post("/tasks", json={"title": "First"}, headers=headers).get_json()
     second = client.post("/tasks", json={"title": "Second"}, headers=headers).get_json()
 
-    tasks = client.get("/tasks", headers=headers).get_json()
+    tasks = client.get("/tasks", headers=headers).get_json()["data"]
     assert [task["id"] for task in tasks] == [second["id"], first["id"]]
+
+
+def test_list_tasks_uses_cursor_pagination(client):
+    headers = auth_headers(client)
+    created = [
+        client.post("/tasks", json={"title": f"Task {index}"}, headers=headers).get_json()
+        for index in range(25)
+    ]
+
+    default_page = client.get("/tasks", headers=headers).get_json()
+    assert len(default_page["data"]) == 20
+    assert default_page["next_cursor"] == str(created[5]["id"])
+
+    first_page = client.get("/tasks?limit=10", headers=headers).get_json()
+    assert [task["id"] for task in first_page["data"]] == [
+        task["id"] for task in reversed(created[-10:])
+    ]
+    assert first_page["next_cursor"] == str(created[-10]["id"])
+    assert first_page["total"] == 25
+
+    second_page = client.get(
+        f"/tasks?limit=10&cursor={first_page['next_cursor']}", headers=headers
+    ).get_json()
+    assert [task["id"] for task in second_page["data"]] == [
+        task["id"] for task in reversed(created[5:15])
+    ]
+    assert second_page["next_cursor"] == str(created[5]["id"])
+    assert second_page["total"] == 25
+
+    final_page = client.get(
+        f"/tasks?limit=10&cursor={second_page['next_cursor']}", headers=headers
+    ).get_json()
+    assert [task["id"] for task in final_page["data"]] == [5, 4, 3, 2, 1]
+    assert final_page["next_cursor"] is None
+    assert final_page["total"] == 25
+
+
+@pytest.mark.parametrize(
+    "query", ["limit=0", "limit=101", "limit=nope", "cursor=0", "cursor=999"]
+)
+def test_list_tasks_rejects_invalid_pagination(client, query):
+    headers = auth_headers(client)
+
+    response = client.get(f"/tasks?{query}", headers=headers)
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "invalid cursor or limit"}
+
+
+def test_authenticated_user_is_limited_to_100_requests_per_minute(client):
+    headers = auth_headers(client)
+
+    for _ in range(50):
+        assert client.get("/tasks", headers=headers).status_code == 200
+        assert client.get("/tasks/999", headers=headers).status_code == 404
+
+    response = client.get("/tasks", headers=headers)
+    assert response.status_code == 429
+    assert response.get_json() == {"error": "rate limit exceeded"}
+    assert int(response.headers["Retry-After"]) >= 0
+
+
+def test_auth_endpoints_are_rate_limited(client):
+    for _ in range(100):
+        assert client.post("/auth/login", json={}).status_code == 400
+
+    response = client.post("/auth/login", json={})
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers
 
 
 def test_update_title_and_status(client):
@@ -230,8 +303,8 @@ def test_users_only_see_and_update_their_own_tasks(client):
         "/tasks", json={"title": "Bob task"}, headers=bob_headers
     ).get_json()
 
-    assert client.get("/tasks", headers=alice_headers).get_json() == [alice_task]
-    assert client.get("/tasks", headers=bob_headers).get_json() == [bob_task]
+    assert client.get("/tasks", headers=alice_headers).get_json()["data"] == [alice_task]
+    assert client.get("/tasks", headers=bob_headers).get_json()["data"] == [bob_task]
     assert client.get(
         f"/tasks/{alice_task['id']}", headers=bob_headers
     ).status_code == 404
@@ -257,7 +330,7 @@ def test_legacy_tasks_are_migrated_without_data_loss(client):
     with open(app.config["DATA_FILE"], encoding="utf-8") as store:
         migrated_tasks = json.load(store)
     assert migrated_tasks == [{**legacy_task, "owner_id": None}]
-    assert client.get("/tasks", headers=headers).get_json() == []
+    assert client.get("/tasks", headers=headers).get_json()["data"] == []
 
     new_task = client.post(
         "/tasks", json={"title": "New"}, headers=headers

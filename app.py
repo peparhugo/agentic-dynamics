@@ -7,6 +7,8 @@ from threading import RLock
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from jwt import InvalidTokenError
 
 from notification_tasks import send_notification_email
@@ -20,6 +22,10 @@ app.config.update(
     USER_DATA_FILE=os.environ.get("USERS_FILE"),
     JWT_SECRET=os.environ.get("JWT_SECRET", os.urandom(32).hex()),
     JWT_EXPIRATION_SECONDS=3600,
+    RATELIMIT_STORAGE_URI=os.environ.get(
+        "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+    ),
+    RATELIMIT_HEADERS_ENABLED=True,
 )
 
 _storage_lock = RLock()
@@ -39,6 +45,28 @@ def _users_file() -> Path:
 
 task_repository = TaskRepository(_data_file, _storage_lock)
 user_repository = UserRepository(_users_file, _storage_lock)
+
+
+def _rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(
+                token, app.config["JWT_SECRET"], algorithms=["HS256"]
+            )
+            return f"user:{int(payload['sub'])}"
+        except (InvalidTokenError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    app=app,
+    application_limits=["100 per minute"],
+    storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+)
 
 
 def init_storage() -> None:
@@ -132,7 +160,27 @@ def login():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    return jsonify(task_repository.list_for_owner(g.user_id))
+    cursor_value = request.args.get("cursor")
+    limit_value = request.args.get("limit", "20")
+    try:
+        cursor = int(cursor_value) if cursor_value is not None else None
+        limit = int(limit_value)
+        if cursor is not None and cursor <= 0:
+            raise ValueError
+        if not 1 <= limit <= 100:
+            raise ValueError
+        tasks, next_cursor, total = task_repository.list_for_owner(
+            g.user_id, cursor=cursor, limit=limit
+        )
+    except ValueError:
+        return jsonify({"error": "invalid cursor or limit"}), 400
+    return jsonify(
+        {
+            "data": tasks,
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.post("/tasks")
@@ -187,6 +235,11 @@ def edit_task(task_id: int):
 @app.errorhandler(404)
 def route_not_found(_error):
     return jsonify({"error": "not found"}), 404
+
+
+@app.errorhandler(429)
+def rate_limit_exceeded(_error):
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 init_storage()
