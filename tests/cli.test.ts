@@ -22,6 +22,22 @@ describe('parseArgs', () => {
     expect(opts.contentDir).toBe('in');
     expect(opts.outputDir).toBe('out');
   });
+
+  it('parses serve command with a custom port', () => {
+    const opts = parseArgs(['node', 'ssg', 'serve', '--port', '8080']);
+    expect(opts.command).toBe('serve');
+    expect(opts.port).toBe(8080);
+  });
+
+  it('parses --port=value syntax', () => {
+    const opts = parseArgs(['node', 'ssg', 'serve', '--port=4000']);
+    expect(opts.port).toBe(4000);
+  });
+
+  it('defaults serve port to 3000', () => {
+    const opts = parseArgs(['node', 'ssg', 'serve']);
+    expect(opts.port).toBe(3000);
+  });
 });
 
 describe('run', () => {
@@ -43,7 +59,7 @@ describe('run', () => {
   });
 
   it('returns 1 for an unknown command', () => {
-    const code = run(['node', 'ssg', 'serve']);
+    const code = run(['node', 'ssg', 'deploy']);
     expect(code).toBe(1);
   });
 
