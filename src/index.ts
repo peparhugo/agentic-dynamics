@@ -1,7 +1,11 @@
 export { build } from './ssg';
 export { parseMarkdown } from './frontmatter';
 export { TemplateEngine } from './templates';
-export { startDevServer, injectLiveReloadScript, LIVE_RELOAD_PATH } from './server';
+export { startDevServer, injectLiveReloadScript, LIVE_RELOAD_PATH, DevServerPlugin } from './server';
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/template';
+export { loadPlugins, createBuiltInPlugins } from './config';
 export type { DevServerHandle } from './server';
 export type { TemplateContext } from './templates';
+export type { Plugin, PluginContext, PluginLifecycleHook } from './plugin';
 export type { Frontmatter, Page, BuildOptions, BuildResult, ServeOptions } from './types';
