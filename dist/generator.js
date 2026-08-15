@@ -2,13 +2,18 @@ import fs from 'fs';
 import { PluginManager } from './plugin.js';
 import { MarkdownPlugin } from './plugins/markdown-plugin.js';
 import { TemplatePlugin } from './plugins/template-plugin.js';
+import { CacheManager } from './cache.js';
 export async function generate(options) {
-    const { contentDir, outputDir } = options;
+    const { contentDir, outputDir, incremental = false, clean = false } = options;
     const templatesDir = options.templatesDir || './templates';
     const layoutsDir = options.layoutsDir || './templates/layouts';
     const partialsDir = options.partialsDir || './templates/partials';
     if (!fs.existsSync(outputDir)) {
         fs.mkdirSync(outputDir, { recursive: true });
+    }
+    const cacheManager = new CacheManager(outputDir);
+    if (clean) {
+        cacheManager.clear();
     }
     const pluginManager = new PluginManager();
     pluginManager.addPlugin(new MarkdownPlugin());
@@ -19,7 +24,11 @@ export async function generate(options) {
         templatesDir,
         layoutsDir,
         partialsDir,
-        pages: []
+        pages: [],
+        cacheManager,
+        incremental,
+        pagesBuilt: 0,
+        pagesSkipped: 0
     };
     await pluginManager.callHook('onStart', context);
     await pluginManager.callHook('beforeBuild', context);
@@ -28,6 +37,9 @@ export async function generate(options) {
     }
     await pluginManager.callHook('afterBuild', context);
     await pluginManager.callHook('onEnd', context);
-    console.log(`Generated site with ${context.pages.length} page(s) in ${outputDir}`);
+    cacheManager.save();
+    const stats = cacheManager.getStats(context.pagesBuilt, context.pagesSkipped);
+    console.log(`Generated site with ${context.pages.length} page(s) in ${outputDir} (${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped)`);
+    return stats;
 }
 //# sourceMappingURL=generator.js.map

@@ -12,6 +12,10 @@ export interface BuildContext {
   layoutsDir?: string;
   partialsDir?: string;
   pages: PageData[];
+  cacheManager?: any;
+  incremental?: boolean;
+  pagesBuilt: number;
+  pagesSkipped: number;
   [key: string]: any;
 }
 

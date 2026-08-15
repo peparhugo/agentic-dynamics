@@ -33,7 +33,9 @@ export async function serve(options, test) {
         templatesDir,
         layoutsDir,
         partialsDir,
-        pages: []
+        pages: [],
+        pagesBuilt: 0,
+        pagesSkipped: 0
     };
     await pluginManager.callHook('onStart', context);
     return {

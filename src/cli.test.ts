@@ -109,4 +109,46 @@ describe('parseArgs', () => {
 
     expect(isNaN(args.port!)).toBe(true);
   });
+
+  it('parses --incremental flag', () => {
+    const args = parseArgs(['build', '--incremental']);
+
+    expect(args.command).toBe('build');
+    expect(args.incremental).toBe(true);
+  });
+
+  it('parses --clean flag', () => {
+    const args = parseArgs(['build', '--clean']);
+
+    expect(args.command).toBe('build');
+    expect(args.clean).toBe(true);
+  });
+
+  it('parses both --incremental and --clean flags', () => {
+    const args = parseArgs(['build', '--incremental', '--clean']);
+
+    expect(args.incremental).toBe(true);
+    expect(args.clean).toBe(true);
+  });
+
+  it('parses flags with other options', () => {
+    const args = parseArgs(['build', '--content', './pages', '--incremental', '--output', './dist']);
+
+    expect(args.command).toBe('build');
+    expect(args.contentDir).toBe('./pages');
+    expect(args.outputDir).toBe('./dist');
+    expect(args.incremental).toBe(true);
+  });
+
+  it('defaults incremental to false', () => {
+    const args = parseArgs(['build']);
+
+    expect(args.incremental).toBeUndefined();
+  });
+
+  it('defaults clean to false', () => {
+    const args = parseArgs(['build']);
+
+    expect(args.clean).toBeUndefined();
+  });
 });

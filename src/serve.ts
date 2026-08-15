@@ -54,7 +54,9 @@ export async function serve(options: ServeOptions, test?: boolean): Promise<Serv
     templatesDir,
     layoutsDir,
     partialsDir,
-    pages: []
+    pages: [],
+    pagesBuilt: 0,
+    pagesSkipped: 0
   };
 
   await pluginManager.callHook('onStart', context);

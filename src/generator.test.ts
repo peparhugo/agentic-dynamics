@@ -384,4 +384,204 @@ Content`);
     expect(html).toContain('Test Page');
     expect(html).toContain('Author: John Doe');
   });
+
+  it('performs incremental build skipping unchanged files', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page1.md'), `---
+title: Page One
+---
+Content 1`);
+    fs.writeFileSync(path.join(contentDir, 'page2.md'), `---
+title: Page Two
+---
+Content 2`);
+
+    const stats1 = await generate({ contentDir, outputDir, incremental: true });
+
+    expect(stats1.pagesBuilt).toBe(2);
+    expect(stats1.pagesSkipped).toBe(0);
+
+    const stats2 = await generate({ contentDir, outputDir, incremental: true });
+
+    expect(stats2.pagesBuilt).toBe(0);
+    expect(stats2.pagesSkipped).toBe(2);
+
+    expect(fs.existsSync(path.join(outputDir, 'page1.html'))).toBe(true);
+    expect(fs.existsSync(path.join(outputDir, 'page2.html'))).toBe(true);
+  });
+
+  it('rebuilds changed files in incremental mode', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Original
+---
+Content`);
+
+    const stats1 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats1.pagesBuilt).toBe(1);
+
+    const html1 = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(html1).toContain('Original');
+
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Updated
+---
+Content`);
+
+    const stats2 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats2.pagesBuilt).toBe(1);
+    expect(stats2.pagesSkipped).toBe(0);
+
+    const html2 = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(html2).toContain('Updated');
+  });
+
+  it('clears cache with --clean flag', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Test
+---
+Content`);
+
+    await generate({ contentDir, outputDir, incremental: true });
+
+    const cachePath = path.join(outputDir, '.ssg-cache.json');
+    expect(fs.existsSync(cachePath)).toBe(true);
+
+    const stats = await generate({ contentDir, outputDir, incremental: true, clean: true });
+
+    expect(stats.pagesBuilt).toBe(1);
+    expect(stats.pagesSkipped).toBe(0);
+  });
+
+  it('rebuilds all pages when cache is missing', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Test
+---
+Content`);
+
+    const stats1 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats1.pagesBuilt).toBe(1);
+
+    const cachePath = path.join(outputDir, '.ssg-cache.json');
+    fs.rmSync(cachePath, { force: true });
+
+    const stats2 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats2.pagesBuilt).toBe(1);
+  });
+
+  it('detects template changes in incremental builds', async () => {
+    const templatesDir = path.join(tempDir, 'templates');
+    const layoutsDir = path.join(templatesDir, 'layouts');
+    const partialsDir = path.join(templatesDir, 'partials');
+
+    fs.mkdirSync(layoutsDir, { recursive: true });
+    fs.mkdirSync(partialsDir, { recursive: true });
+
+    const layout1 = `<div>LAYOUT1: {{{body}}}</div>`;
+    fs.writeFileSync(path.join(layoutsDir, 'default.hbs'), layout1);
+    fs.writeFileSync(path.join(partialsDir, 'nav.hbs'), '<nav></nav>');
+
+    const indexLayout = `<html><body>{{{body}}}</body></html>`;
+    const indexTemplate = `{{{body}}}`;
+    fs.writeFileSync(path.join(layoutsDir, 'index.hbs'), indexLayout);
+    fs.writeFileSync(path.join(templatesDir, 'index.hbs'), indexTemplate);
+
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Test
+---
+Content`);
+
+    const stats1 = await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir,
+      incremental: true
+    });
+
+    expect(stats1.pagesBuilt).toBeGreaterThan(0);
+
+    const html1 = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(html1).toContain('LAYOUT1');
+
+    const layout2 = `<div>LAYOUT2: {{{body}}}</div>`;
+    fs.writeFileSync(path.join(layoutsDir, 'default.hbs'), layout2);
+
+    const stats2 = await generate({
+      contentDir,
+      outputDir,
+      templatesDir,
+      layoutsDir,
+      partialsDir,
+      incremental: true
+    });
+
+    expect(stats2.pagesBuilt).toBeGreaterThan(0);
+
+    const html2 = fs.readFileSync(path.join(outputDir, 'page.html'), 'utf-8');
+    expect(html2).toContain('LAYOUT2');
+  });
+
+  it('returns build stats', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page1.md'), `---
+title: Page One
+---
+Content 1`);
+    fs.writeFileSync(path.join(contentDir, 'page2.md'), `---
+title: Page Two
+---
+Content 2`);
+
+    const stats = await generate({ contentDir, outputDir });
+
+    expect(stats).toHaveProperty('pagesBuilt');
+    expect(stats).toHaveProperty('pagesSkipped');
+    expect(stats).toHaveProperty('timeSaved');
+    expect(typeof stats.pagesBuilt).toBe('number');
+    expect(typeof stats.pagesSkipped).toBe('number');
+    expect(typeof stats.timeSaved).toBe('number');
+  });
+
+  it('includes build stats in console output', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page.md'), `---
+title: Test
+---
+Content`);
+
+    const logSpy = jest.spyOn(console, 'log').mockImplementation();
+
+    await generate({ contentDir, outputDir, incremental: true });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('built'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('skipped'));
+
+    logSpy.mockRestore();
+  });
+
+  it('tracks pages built separately from skipped', async () => {
+    fs.writeFileSync(path.join(contentDir, 'page1.md'), `---
+title: Page One
+---
+Content 1`);
+    fs.writeFileSync(path.join(contentDir, 'page2.md'), `---
+title: Page Two
+---
+Content 2`);
+
+    const stats1 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats1.pagesBuilt).toBe(2);
+    expect(stats1.pagesSkipped).toBe(0);
+
+    const stats2 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats2.pagesBuilt).toBe(0);
+    expect(stats2.pagesSkipped).toBe(2);
+
+    fs.writeFileSync(path.join(contentDir, 'page1.md'), `---
+title: Page One Updated
+---
+Content 1 Updated`);
+
+    const stats3 = await generate({ contentDir, outputDir, incremental: true });
+    expect(stats3.pagesBuilt).toBe(1);
+    expect(stats3.pagesSkipped).toBe(1);
+  });
 });

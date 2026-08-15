@@ -2,6 +2,7 @@ import fs from 'fs';
 import { PageData, BuildContext, PluginManager } from './plugin.js';
 import { MarkdownPlugin } from './plugins/markdown-plugin.js';
 import { TemplatePlugin } from './plugins/template-plugin.js';
+import { CacheManager, BuildStats } from './cache.js';
 
 export interface GeneratorOptions {
   contentDir: string;
@@ -9,18 +10,26 @@ export interface GeneratorOptions {
   templatesDir?: string;
   layoutsDir?: string;
   partialsDir?: string;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
-export { PageData };
+export { PageData, BuildStats };
 
-export async function generate(options: GeneratorOptions): Promise<void> {
-  const { contentDir, outputDir } = options;
+export async function generate(options: GeneratorOptions): Promise<BuildStats> {
+  const { contentDir, outputDir, incremental = false, clean = false } = options;
   const templatesDir = options.templatesDir || './templates';
   const layoutsDir = options.layoutsDir || './templates/layouts';
   const partialsDir = options.partialsDir || './templates/partials';
 
   if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
+  }
+
+  const cacheManager = new CacheManager(outputDir);
+
+  if (clean) {
+    cacheManager.clear();
   }
 
   const pluginManager = new PluginManager();
@@ -33,7 +42,11 @@ export async function generate(options: GeneratorOptions): Promise<void> {
     templatesDir,
     layoutsDir,
     partialsDir,
-    pages: []
+    pages: [],
+    cacheManager,
+    incremental,
+    pagesBuilt: 0,
+    pagesSkipped: 0
   };
 
   await pluginManager.callHook('onStart', context);
@@ -46,5 +59,13 @@ export async function generate(options: GeneratorOptions): Promise<void> {
   await pluginManager.callHook('afterBuild', context);
   await pluginManager.callHook('onEnd', context);
 
-  console.log(`Generated site with ${context.pages.length} page(s) in ${outputDir}`);
+  cacheManager.save();
+
+  const stats = cacheManager.getStats(context.pagesBuilt, context.pagesSkipped);
+
+  console.log(
+    `Generated site with ${context.pages.length} page(s) in ${outputDir} (${stats.pagesBuilt} built, ${stats.pagesSkipped} skipped)`
+  );
+
+  return stats;
 }

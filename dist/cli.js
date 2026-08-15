@@ -15,6 +15,12 @@ export function parseArgs(argv) {
         else if (arg === '--port' && i + 1 < argv.length) {
             args.port = parseInt(argv[++i], 10);
         }
+        else if (arg === '--incremental') {
+            args.incremental = true;
+        }
+        else if (arg === '--clean') {
+            args.clean = true;
+        }
         else if (arg === 'build') {
             args.command = 'build';
         }

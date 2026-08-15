@@ -3,6 +3,8 @@ export interface CliArgs {
   contentDir: string;
   outputDir: string;
   port?: number;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseArgs(argv: string[]): CliArgs {
@@ -21,6 +23,10 @@ export function parseArgs(argv: string[]): CliArgs {
       args.outputDir = argv[++i];
     } else if (arg === '--port' && i + 1 < argv.length) {
       args.port = parseInt(argv[++i], 10);
+    } else if (arg === '--incremental') {
+      args.incremental = true;
+    } else if (arg === '--clean') {
+      args.clean = true;
     } else if (arg === 'build') {
       args.command = 'build';
     } else if (arg === 'serve') {

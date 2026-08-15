@@ -22,13 +22,19 @@ export class TemplatePlugin {
         }
     }
     async onFile(page, context) {
-        const { outputDir } = context;
+        const { outputDir, cacheManager } = context;
         const html = this.generatePageHtml(page, this.templateEngine);
         const outputPath = path.join(outputDir, `${page.slug}.html`);
         if (!fs.existsSync(outputDir)) {
             fs.mkdirSync(outputDir, { recursive: true });
         }
         fs.writeFileSync(outputPath, html, 'utf-8');
+        if (cacheManager) {
+            const layoutName = page.metadata.layout || 'default.hbs';
+            const layoutPath = path.join(context.layoutsDir || './templates/layouts', layoutName);
+            cacheManager.updateEntry(`${page.slug}.html`, html, layoutPath);
+        }
+        context.pagesBuilt = (context.pagesBuilt || 0) + 1;
     }
     async afterBuild(context) {
         const { outputDir, pages } = context;

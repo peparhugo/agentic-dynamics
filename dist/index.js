@@ -6,7 +6,9 @@ const args = parseArgs(process.argv.slice(2));
 if (args.command === 'build') {
     generate({
         contentDir: args.contentDir,
-        outputDir: args.outputDir
+        outputDir: args.outputDir,
+        incremental: args.incremental,
+        clean: args.clean
     }).catch(error => {
         console.error('Error:', error.message);
         process.exit(1);

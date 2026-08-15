@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { parseMarkdownWithYaml } from '../parser.js';
 import { Plugin, PageData, BuildContext } from '../plugin.js';
+import { CacheManager } from '../cache.js';
 
 function slugFromFilename(filename: string): string {
   return filename.replace(/\.md$/, '');
@@ -15,7 +16,7 @@ export class MarkdownPlugin implements Plugin {
   }
 
   async beforeBuild(context: BuildContext): Promise<void> {
-    const { contentDir, pages } = context;
+    const { contentDir, pages, cacheManager, incremental, layoutsDir = './templates/layouts' } = context;
 
     if (!fs.existsSync(contentDir)) {
       throw new Error(`Content directory not found: ${contentDir}`);
@@ -32,8 +33,21 @@ export class MarkdownPlugin implements Plugin {
       const content = fs.readFileSync(filePath, 'utf-8');
       const parsed = await parseMarkdownWithYaml(content);
 
+      const slug = slugFromFilename(file);
+
+      if (incremental && cacheManager instanceof CacheManager) {
+        const layoutName = parsed.metadata.layout || 'default.hbs';
+        const layoutPath = path.join(layoutsDir, layoutName);
+
+        if (!cacheManager.hasChanged(`${slug}.md`, content, layoutPath)) {
+          context.pagesSkipped = (context.pagesSkipped || 0) + 1;
+          continue;
+        }
+        cacheManager.updateEntry(`${slug}.md`, content, layoutPath);
+      }
+
       const page: PageData = {
-        slug: slugFromFilename(file),
+        slug,
         filename: file,
         content: parsed.content,
         metadata: parsed.metadata
