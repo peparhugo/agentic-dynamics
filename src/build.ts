@@ -1,9 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { parseFrontmatter } from './frontmatter';
-import { renderMarkdown } from './markdown';
-import { getTemplateEngine } from './templates';
+import { loadConfig } from './config';
+import { SSGEngine, findMarkdownFiles } from './engine';
+import { PluginContext } from './plugin';
 import { Page } from './types';
+
+export { findMarkdownFiles };
 
 export interface BuildOptions {
   contentDir: string;
@@ -16,57 +18,40 @@ export interface BuildResult {
   outputDir: string;
 }
 
-function defaultTemplatesDir(): string {
+export function defaultTemplatesDir(): string {
   return path.resolve(process.cwd(), 'templates');
 }
 
-function slugify(filename: string): string {
-  return filename.replace(/\.md$/i, '');
-}
-
-function normalizeTags(tags: unknown): string[] {
-  if (Array.isArray(tags)) return tags.map((tag) => String(tag));
-  if (typeof tags === 'string' && tags.length > 0) return [tags];
-  return [];
-}
-
-export function findMarkdownFiles(contentDir: string): string[] {
-  if (!fs.existsSync(contentDir)) {
-    throw new Error(`Content directory not found: ${contentDir}`);
-  }
-  return fs
-    .readdirSync(contentDir)
-    .filter((file) => file.toLowerCase().endsWith('.md'))
-    .sort();
-}
-
 export function buildPage(contentDir: string, filename: string, templatesDir: string = defaultTemplatesDir()): Page {
-  const filePath = path.join(contentDir, filename);
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  const { data, content } = parseFrontmatter(raw);
-  const body = renderMarkdown(content);
-  const slug = slugify(filename);
-  const title = typeof data.title === 'string' && data.title.length > 0 ? data.title : slug;
-  const date = typeof data.date === 'string' ? data.date : undefined;
-  const tags = normalizeTags(data.tags);
-  const outputPath = `${slug}.html`;
-  const templateName = typeof data.template === 'string' && data.template.trim().length > 0 ? data.template.trim() : 'default';
-  const engine = getTemplateEngine(templatesDir);
-  const html = engine.renderPage({ title, date, tags, body }, templateName);
-  return { slug, title, date, tags, html, outputPath, template: templateName };
+  const engine = new SSGEngine(loadConfig(process.cwd()).plugins);
+  const ctx: PluginContext = { contentDir, templatesDir };
+  return engine.buildFile(contentDir, filename, ctx);
+}
+
+/**
+ * Runs a full build pass through the plugin pipeline and writes the
+ * resulting pages to `ctx.outputDir`. Shared by the one-shot `build()` below
+ * and by the dev server, which reruns it on every watched file change using
+ * the same engine instance (so plugins like the dev server's own reload
+ * broadcast fire on every pass).
+ */
+export function buildAndWrite(engine: SSGEngine, ctx: PluginContext): Page[] {
+  const outputDir = ctx.outputDir;
+  if (!outputDir) {
+    throw new Error('outputDir is required to write build output');
+  }
+  fs.mkdirSync(outputDir, { recursive: true });
+  const pages = engine.runBuild(ctx);
+  for (const page of pages) {
+    fs.writeFileSync(path.join(outputDir, page.outputPath), page.html, 'utf-8');
+  }
+  return pages;
 }
 
 export function build(options: BuildOptions): BuildResult {
   const { contentDir, outputDir, templatesDir = defaultTemplatesDir() } = options;
-  const files = findMarkdownFiles(contentDir);
-  const pages = files.map((file) => buildPage(contentDir, file, templatesDir));
-
-  fs.mkdirSync(outputDir, { recursive: true });
-  for (const page of pages) {
-    fs.writeFileSync(path.join(outputDir, page.outputPath), page.html, 'utf-8');
-  }
-  const engine = getTemplateEngine(templatesDir);
-  fs.writeFileSync(path.join(outputDir, 'index.html'), engine.renderIndex(pages), 'utf-8');
-
+  const engine = new SSGEngine(loadConfig(process.cwd()).plugins);
+  const ctx: PluginContext = { contentDir, outputDir, templatesDir };
+  const pages = buildAndWrite(engine, ctx);
   return { pages, outputDir };
 }

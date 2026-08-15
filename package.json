@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "A static site generator CLI",
   "bin": {
-    "ssg": "./dist-bin/cli.js"
+    "ssg": "./dist-bin/src/cli.js"
   },
-  "main": "dist-bin/index.js",
+  "main": "dist-bin/src/index.js",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "test": "jest",

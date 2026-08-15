@@ -1,4 +1,8 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src"]
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist-bin"
+  },
+  "include": ["src", "plugins", "ssg.config.ts"]
 }
