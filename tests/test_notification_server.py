@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from websockets.asyncio.client import connect
 
-from app import NotificationServer
+from app import InMemoryBroker, NotificationServer, RedisBroker
 
 
 @pytest_asyncio.fixture
@@ -124,3 +124,51 @@ async def test_unsubscribe_removes_channel_and_unscoped_messages_still_broadcast
         await first.send(json.dumps({"type": "broadcast", "payload": {"message": "everyone"}}))
         assert (await receive_json(first))["payload"]["message"] == "everyone"
         assert (await receive_json(second))["payload"]["message"] == "everyone"
+
+
+@pytest.mark.asyncio
+async def test_messages_endpoint_persists_published_messages(tmp_path):
+    server = NotificationServer(database_url=f"sqlite:///{tmp_path / 'history.sqlite'}")
+    await server.start(port=0)
+    try:
+        uri = f"ws://127.0.0.1:{server.port}"
+        async with connect(uri) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "payload": {"channel": "audit"}}))
+            await receive_json(client)
+            await client.send(json.dumps({"type": "broadcast", "payload": {"channel": "audit", "message": "saved"}}))
+            await receive_json(client)
+
+        page = await get_json(server, "/messages?limit=1&offset=0")
+        assert len(page["messages"]) == 1
+        message = page["messages"][0]
+        assert message["type"] == "broadcast"
+        assert message["channel"] == "audit"
+        assert message["payload"]["message"] == "saved"
+        assert message["id"]
+        assert message["timestamp"]
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_pubsub_delivers_across_server_instances():
+    fakeredis = pytest.importorskip("fakeredis.aioredis")
+    redis = fakeredis.FakeRedis()
+    first_server = NotificationServer(broker=RedisBroker(redis))
+    second_server = NotificationServer(broker=RedisBroker(redis))
+    await first_server.start(port=0)
+    await second_server.start(port=0)
+    try:
+        first_uri = f"ws://127.0.0.1:{first_server.port}"
+        second_uri = f"ws://127.0.0.1:{second_server.port}"
+        async with connect(first_uri) as first, connect(second_uri) as second:
+            await receive_json(first)
+            await receive_json(second)
+            await first.send(json.dumps({"type": "broadcast", "payload": {"message": "shared"}}))
+            assert (await receive_json(first))["payload"]["message"] == "shared"
+            assert (await receive_json(second))["payload"]["message"] == "shared"
+    finally:
+        await first_server.stop()
+        await second_server.stop()
+        await redis.aclose()
