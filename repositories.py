@@ -94,6 +94,35 @@ class TaskRepository(BaseRepository):
         mine = [t for t in store["tasks"] if t.get("owner_id") == owner_id]
         return sorted(mine, key=lambda t: t["created_at"], reverse=True)
 
+    def paginate_for_owner(
+        self, owner_id: int, cursor: int | None = None, limit: int | None = None
+    ) -> tuple[list, int]:
+        """Cursor-based page of the owner's tasks, most recent first.
+
+        Returns a ``(page, total)`` tuple where ``total`` is the number of
+        tasks owned by the user (unaffected by pagination). ``cursor`` is the
+        id of the last item on the previous page; items are ordered by
+        ``created_at`` descending (ties broken by id) so ids only move
+        forward across pages. An unknown cursor yields an empty page.
+        """
+        store = self.read_store()
+        mine = [t for t in store["tasks"] if t.get("owner_id") == owner_id]
+        mine.sort(key=lambda t: (t["created_at"], t["id"]), reverse=True)
+        total = len(mine)
+
+        start = 0
+        if cursor is not None:
+            idx = next(
+                (i for i, t in enumerate(mine) if t["id"] == cursor), None
+            )
+            if idx is None:
+                return [], total
+            start = idx + 1
+
+        if limit is not None:
+            return mine[start : start + limit], total
+        return mine[start:], total
+
     def get_for_owner(self, task_id: int, owner_id: int) -> dict | None:
         store = self.read_store()
         for task in store["tasks"]:

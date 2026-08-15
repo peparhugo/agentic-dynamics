@@ -113,7 +113,7 @@ def test_list_tasks_ordered_desc(client, auth):
     client.post("/tasks", json={"title": "second"}, headers=auth)
     resp = client.get("/tasks", headers=auth)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    titles = [t["title"] for t in resp.get_json()["data"]]
     assert titles == ["second", "first"]
 
 
@@ -170,8 +170,8 @@ def test_users_only_see_own_tasks(client, auth, bob_auth):
     client.post("/tasks", json={"title": "alice task"}, headers=auth)
     client.post("/tasks", json={"title": "bob task"}, headers=bob_auth)
 
-    alice_titles = [t["title"] for t in client.get("/tasks", headers=auth).get_json()]
-    bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_auth).get_json()]
+    alice_titles = [t["title"] for t in client.get("/tasks", headers=auth).get_json()["data"]]
+    bob_titles = [t["title"] for t in client.get("/tasks", headers=bob_auth).get_json()["data"]]
 
     assert alice_titles == ["alice task"]
     assert bob_titles == ["bob task"]

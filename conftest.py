@@ -8,6 +8,10 @@ def client(tmp_path):
     app_module.DATA_FILE = str(tmp_path / "tasks.json")
     app_module.init_store()
     app_module.app.config["TESTING"] = True
+    try:
+        app_module.limiter.reset()
+    except Exception:
+        pass
     with app_module.app.test_client() as c:
         yield c
 

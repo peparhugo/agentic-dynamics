@@ -18,6 +18,8 @@ from datetime import datetime, timedelta
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash
 
 from email_tasks import send_notification_email
@@ -34,6 +36,54 @@ _lock = threading.Lock()
 
 task_repo = TaskRepository(data_file=lambda: DATA_FILE, lock=_lock)
 user_repo = UserRepository(data_file=lambda: DATA_FILE, lock=_lock)
+
+
+# ── Rate limiting ─────────────────────────────────────────────
+#
+# Every request is limited to RATE_LIMIT per minute, keyed per
+# authenticated user (falling back to the client IP for anonymous
+# requests such as /auth/*). Redis is the storage backend.
+
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+
+def _rate_limit_key() -> str:
+    header = request.headers.get("Authorization", "")
+    if header.startswith("Bearer "):
+        try:
+            payload = jwt.decode(
+                header[7:], app.config["SECRET_KEY"], algorithms=["HS256"]
+            )
+            return f"{DATA_FILE}:user:{payload.get('sub')}"
+        except jwt.PyJWTError:
+            pass
+    return f"{DATA_FILE}:ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    _rate_limit_key,
+    app=app,
+    storage_uri=os.environ.get(
+        "RATELIMIT_STORAGE_URI", "redis://localhost:6379"
+    ),
+    application_limits=[RATE_LIMIT],
+)
+
+
+@app.errorhandler(429)
+def handle_rate_limit_exceeded(e):
+    response = jsonify({"error": "rate limit exceeded"})
+    response.status_code = 429
+    retry_after = None
+    limit = getattr(e, "limit", None)
+    if limit is not None:
+        try:
+            retry_after = max(int(limit.limit.get_expiry()), 1)
+        except Exception:
+            retry_after = None
+    if retry_after:
+        response.headers["Retry-After"] = str(retry_after)
+    return response
 
 
 def init_store() -> None:
@@ -150,7 +200,32 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @auth_required
 def list_tasks():
-    return jsonify(task_repo.list_for_owner(g.current_user["id"]))
+    raw_limit = request.args.get("limit", "20")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        limit = 20
+    if limit < 1:
+        limit = 20
+    limit = min(limit, 100)
+
+    cursor = request.args.get("cursor")
+    cursor_id = None
+    if cursor is not None:
+        try:
+            cursor_id = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    page, total = task_repo.paginate_for_owner(
+        g.current_user["id"], cursor=cursor_id, limit=limit + 1
+    )
+    has_more = len(page) > limit
+    page = page[:limit]
+    next_cursor = str(page[-1]["id"]) if (has_more and page) else None
+    return jsonify(
+        {"data": page, "next_cursor": next_cursor, "total": total}
+    )
 
 
 @app.route("/tasks", methods=["POST"])
