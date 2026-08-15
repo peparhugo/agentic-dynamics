@@ -105,6 +105,40 @@ workflow:
             needed again.
 
           DELIVER the respawned worker count.
+      - name: endpoint
+        kind: agent
+        timeout: 7200
+        prompt: |
+          Add the admin-server queue-steer endpoint (the missing first-class control surface).
+
+          GOAL:
+          {goal}
+
+          PRIOR PHASES:
+          {prior_phases}
+
+          READ FIRST:
+          - admin/server.py (route table + conventions: _idempotent_design_response,
+            _design_mutation_body, redis_client; see the existing POST /api/experiments and
+            /api/flags/<session_id>/interrupt)
+          - scripts/reinterleave_queue.py (produced by the reinterleave phase — reuse its logic,
+            do not duplicate it)
+          - tests/test_admin_server.py (existing endpoint tests to extend)
+
+          REQUIREMENTS:
+          - Add `POST /api/queue/reinterleave` to admin/server.py. It must:
+            * re-interleave story_jobs round-robin by provider (reuse
+              scripts/reinterleave_queue.py's function or a shared helper — no duplicated logic);
+            * require NO supervisor flag (it is a queue-level operation, unlike the flagged
+              session interrupt);
+            * return the before/after provider order and counts;
+            * follow the server's idempotency + body-validation conventions;
+            * NOT start the server or mutate the live queue during the phase (test-only).
+          - Add a test in tests/test_admin_server.py: re-interleave correctness (consecutive
+            elements are different providers), job preservation (no loss/dup), and route
+            registration.
+
+          DELIVER the endpoint, its test, and the run output.
       - name: verify
         kind: agent
         timeout: 3600
