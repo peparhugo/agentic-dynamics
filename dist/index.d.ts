@@ -2,5 +2,7 @@ export { build } from './build';
 export { parseFrontmatter, normalizeTags } from './frontmatter';
 export { markdownToHtml } from './markdown';
 export { renderIndex, renderPage } from './render';
+export { TemplateEngine } from './templates';
+export type { TemplateContext } from './templates';
 export type { Frontmatter, ParsedMarkdown } from './frontmatter';
 export type { BuildOptions, Page } from './types';

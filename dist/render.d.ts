@@ -1,3 +1,4 @@
 import type { Page } from './types';
-export declare function renderPage(page: Page): string;
-export declare function renderIndex(pages: Page[]): string;
+import { TemplateEngine } from './templates';
+export declare function renderPage(page: Page, engine?: TemplateEngine): string;
+export declare function renderIndex(pages: Page[], engine?: TemplateEngine): string;

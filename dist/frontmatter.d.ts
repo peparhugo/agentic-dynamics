@@ -2,6 +2,9 @@ export interface Frontmatter {
     title?: string;
     date?: string;
     tags?: string[] | string;
+    template?: string;
+    layout?: string;
+    [key: string]: unknown;
 }
 export interface ParsedMarkdown {
     data: Frontmatter;

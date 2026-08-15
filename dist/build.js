@@ -9,6 +9,7 @@ const path_1 = __importDefault(require("path"));
 const frontmatter_1 = require("./frontmatter");
 const markdown_1 = require("./markdown");
 const render_1 = require("./render");
+const templates_1 = require("./templates");
 const MARKDOWN_EXT = /\.(md|markdown)$/i;
 async function findMarkdownFiles(dir) {
     const results = [];
@@ -45,6 +46,9 @@ function titleFor(slug, data) {
 async function build(options) {
     const contentDir = path_1.default.resolve(options.content);
     const outputDir = path_1.default.resolve(options.output);
+    const templatesDir = options.templates ?? './templates';
+    const engine = new templates_1.TemplateEngine(templatesDir);
+    await engine.load();
     const files = (await findMarkdownFiles(contentDir)).sort();
     const pages = [];
     for (const file of files) {
@@ -60,14 +64,17 @@ async function build(options) {
             contentHtml,
             sourcePath: file,
             outputPath: path_1.default.join(outputDir, `${slug}.html`),
+            template: data.template,
+            layout: data.layout,
+            data,
         });
     }
     await fs_1.promises.mkdir(outputDir, { recursive: true });
     for (const page of pages) {
         await fs_1.promises.mkdir(path_1.default.dirname(page.outputPath), { recursive: true });
-        await fs_1.promises.writeFile(page.outputPath, (0, render_1.renderPage)(page), 'utf8');
+        await fs_1.promises.writeFile(page.outputPath, (0, render_1.renderPage)(page, engine), 'utf8');
     }
-    await fs_1.promises.writeFile(path_1.default.join(outputDir, 'index.html'), (0, render_1.renderIndex)(pages), 'utf8');
+    await fs_1.promises.writeFile(path_1.default.join(outputDir, 'index.html'), (0, render_1.renderIndex)(pages, engine), 'utf8');
     return pages;
 }
 //# sourceMappingURL=build.js.map

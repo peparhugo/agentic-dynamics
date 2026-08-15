@@ -30,15 +30,29 @@ function parseFrontmatter(raw) {
     const yaml = match[1];
     const body = raw.slice(match[0].length);
     const parsed = (0, gray_matter_1.default)(`---\n${yaml}\n---\n`);
-    const data = parsed.data ?? {};
-    return {
-        data: {
-            title: data.title,
-            date: normalizeDate(data.date),
-            tags: data.tags,
-        },
-        body,
-    };
+    const source = parsed.data ?? {};
+    const data = {};
+    for (const [key, value] of Object.entries(source)) {
+        if (key === 'date') {
+            data.date = normalizeDate(value);
+        }
+        else if (key === 'title' && typeof value === 'string') {
+            data.title = value;
+        }
+        else if (key === 'tags') {
+            data.tags = value;
+        }
+        else if (key === 'template' && typeof value === 'string') {
+            data.template = value;
+        }
+        else if (key === 'layout' && typeof value === 'string') {
+            data.layout = value;
+        }
+        else {
+            data[key] = value;
+        }
+    }
+    return { data, body };
 }
 function normalizeTags(tags) {
     if (tags == null) {

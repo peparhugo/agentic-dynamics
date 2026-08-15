@@ -13,6 +13,7 @@
   "license": "MIT",
   "dependencies": {
     "gray-matter": "^4.0.3",
+    "handlebars": "^4.7.9",
     "markdown-it": "^15.0.0"
   },
   "devDependencies": {

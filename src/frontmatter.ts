@@ -4,6 +4,9 @@ export interface Frontmatter {
   title?: string;
   date?: string;
   tags?: string[] | string;
+  template?: string;
+  layout?: string;
+  [key: string]: unknown;
 }
 
 const FRONTMATTER_RE = /^\uFEFF?---[ \t]*\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/;
@@ -39,15 +42,26 @@ export function parseFrontmatter(raw: string): ParsedMarkdown {
   const body = raw.slice(match[0].length);
 
   const parsed = matter(`---\n${yaml}\n---\n`);
-  const data = parsed.data ?? {};
-  return {
-    data: {
-      title: data.title,
-      date: normalizeDate(data.date),
-      tags: data.tags,
-    },
-    body,
-  };
+  const source = parsed.data ?? {};
+
+  const data: Frontmatter = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key === 'date') {
+      data.date = normalizeDate(value);
+    } else if (key === 'title' && typeof value === 'string') {
+      data.title = value;
+    } else if (key === 'tags') {
+      data.tags = value as Frontmatter['tags'];
+    } else if (key === 'template' && typeof value === 'string') {
+      data.template = value;
+    } else if (key === 'layout' && typeof value === 'string') {
+      data.layout = value;
+    } else {
+      data[key] = value;
+    }
+  }
+
+  return { data, body };
 }
 
 export function normalizeTags(tags: Frontmatter['tags']): string[] {

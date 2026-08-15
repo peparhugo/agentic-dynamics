@@ -3,6 +3,7 @@ import path from 'path';
 import { parseFrontmatter, normalizeTags } from './frontmatter';
 import { markdownToHtml } from './markdown';
 import { renderIndex, renderPage } from './render';
+import { TemplateEngine } from './templates';
 import type { BuildOptions, Page } from './types';
 
 const MARKDOWN_EXT = /\.(md|markdown)$/i;
@@ -44,6 +45,10 @@ function titleFor(slug: string, data: { title?: string }): string {
 export async function build(options: BuildOptions): Promise<Page[]> {
   const contentDir = path.resolve(options.content);
   const outputDir = path.resolve(options.output);
+  const templatesDir = options.templates ?? './templates';
+
+  const engine = new TemplateEngine(templatesDir);
+  await engine.load();
 
   const files = (await findMarkdownFiles(contentDir)).sort();
 
@@ -62,6 +67,9 @@ export async function build(options: BuildOptions): Promise<Page[]> {
       contentHtml,
       sourcePath: file,
       outputPath: path.join(outputDir, `${slug}.html`),
+      template: data.template,
+      layout: data.layout,
+      data,
     });
   }
 
@@ -69,10 +77,10 @@ export async function build(options: BuildOptions): Promise<Page[]> {
 
   for (const page of pages) {
     await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
-    await fs.writeFile(page.outputPath, renderPage(page), 'utf8');
+    await fs.writeFile(page.outputPath, renderPage(page, engine), 'utf8');
   }
 
-  await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages), 'utf8');
+  await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages, engine), 'utf8');
 
   return pages;
 }

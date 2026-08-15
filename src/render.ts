@@ -1,4 +1,5 @@
 import type { Page } from './types';
+import { TemplateEngine } from './templates';
 
 function escapeHtml(value: string): string {
   return value
@@ -9,29 +10,7 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function layout(title: string, body: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${escapeHtml(title)}</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 48rem; margin: 0 auto; padding: 2rem 1rem; line-height: 1.6; }
-    a { color: #2563eb; }
-    .tags span { background: #e5e7eb; border-radius: 9999px; padding: 0.15rem 0.6rem; font-size: 0.8rem; margin-right: 0.35rem; }
-    .meta { color: #6b7280; font-size: 0.9rem; }
-  </style>
-</head>
-<body>
-  <p><a href="index.html">&larr; All pages</a></p>
-${body}
-</body>
-</html>
-`;
-}
-
-export function renderPage(page: Page): string {
+function buildMeta(page: Page): string {
   const metaParts: string[] = [];
   if (page.date) {
     metaParts.push(escapeHtml(page.date));
@@ -43,19 +22,31 @@ export function renderPage(page: Page): string {
         .join('')}</span>`
     );
   }
-
-  const body = `
-  <article>
-    <h1>${escapeHtml(page.title)}</h1>
-    ${metaParts.length > 0 ? `<p class="meta">${metaParts.join(' · ')}</p>` : ''}
-    ${page.contentHtml}
-  </article>
-`;
-
-  return layout(page.title, body);
+  return metaParts.join(' · ');
 }
 
-export function renderIndex(pages: Page[]): string {
+function pageContext(page: Page): Record<string, unknown> {
+  return {
+    ...(page.data ?? {}),
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    slug: page.slug,
+    contentHtml: page.contentHtml,
+    content: page.contentHtml,
+    meta: buildMeta(page),
+  };
+}
+
+export function renderPage(page: Page, engine?: TemplateEngine): string {
+  const e = engine ?? new TemplateEngine('./templates');
+  const context = pageContext(page);
+  const body = e.render(page.template ?? 'default', context);
+  return e.renderLayout(page.layout ?? 'default', { ...context, body });
+}
+
+export function renderIndex(pages: Page[], engine?: TemplateEngine): string {
+  const e = engine ?? new TemplateEngine('./templates');
   const sorted = [...pages].sort((a, b) => a.title.localeCompare(b.title));
 
   const items = sorted
@@ -82,5 +73,5 @@ ${items}
   </ul>
 `;
 
-  return layout('All pages', body);
+  return e.renderLayout('default', { title: 'All pages', body });
 }
