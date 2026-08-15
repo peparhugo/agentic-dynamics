@@ -1,5 +1,7 @@
 import asyncio
+from datetime import datetime, timedelta, timezone
 import json
+from urllib.parse import quote
 
 import pytest
 from websockets.asyncio.client import connect
@@ -12,6 +14,8 @@ class FakeRedis:
 
     def __init__(self):
         self.hashes = {}
+        self.counters = {}
+        self.expirations = {}
         self.subscribers = {}
 
     def pubsub(self):
@@ -32,6 +36,13 @@ class FakeRedis:
 
     async def hget(self, key, field):
         return self.hashes.get(key, {}).get(field)
+
+    async def incr(self, key):
+        self.counters[key] = self.counters.get(key, 0) + 1
+        return self.counters[key]
+
+    async def expire(self, key, seconds):
+        self.expirations[key] = seconds
 
 
 class FakePubSub:
@@ -244,6 +255,7 @@ async def test_messages_endpoint_persists_paginated_history(tmp_path):
     try:
         async with connect(uri) as client:
             await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
             for text in ("one", "two", "three"):
                 await client.send(json.dumps({"type": "broadcast", "payload": {"text": text}}))
                 await receive_json(client)
@@ -254,6 +266,58 @@ async def test_messages_endpoint_persists_paginated_history(tmp_path):
                 {"text": "three"},
             ]
             assert all(message["id"] and message["timestamp"] for message in history["messages"])
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_history_returns_channel_messages_since_timestamp_with_pagination(tmp_path):
+    server = NotificationServer(database_url=f"sqlite:///{tmp_path / 'history.db'}")
+    listener = await server.start(port=0)
+    port = listener.sockets[0].getsockname()[1]
+    uri = f"ws://127.0.0.1:{port}"
+    since = quote((datetime.now(timezone.utc) - timedelta(minutes=1)).isoformat(), safe="")
+    try:
+        async with connect(uri) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "subscribe", "channel": "alerts"}))
+            for text in ("one", "two", "three"):
+                await client.send(
+                    json.dumps({"type": "broadcast", "channel": "alerts", "payload": {"text": text}})
+                )
+                await receive_json(client)
+
+            history = await get_json(port, f"/history?channel=alerts&since={since}&limit=2")
+            assert [message["payload"] for message in history["messages"]] == [
+                {"text": "one"},
+                {"text": "two"},
+            ]
+            assert history["has_more"] is True
+    finally:
+        await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_uses_redis_counter_and_returns_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("RATE_LIMIT", "2")
+    broker = FakeRedis()
+    server = NotificationServer(redis_client=broker, database_url=f"sqlite:///{tmp_path / 'rate.db'}")
+    listener = await server.start(port=0)
+    uri = f"ws://127.0.0.1:{listener.sockets[0].getsockname()[1]}"
+    try:
+        async with connect(uri) as client:
+            client_id = (await receive_json(client))["payload"]["client_id"]
+            for text in ("one", "two"):
+                await client.send(json.dumps({"type": "broadcast", "payload": {"text": text}}))
+                assert (await receive_json(client))["payload"] == {"text": text}
+            await client.send(json.dumps({"type": "broadcast", "payload": {"text": "three"}}))
+            error = await receive_json(client)
+
+            assert error["payload"] == {"event": "error", "detail": "rate limit exceeded"}
+            counter_keys = [key for key in broker.counters if client_id in key]
+            assert len(counter_keys) == 1
+            assert broker.counters[counter_keys[0]] == 3
+            assert broker.expirations[counter_keys[0]] == 60
     finally:
         await server.stop()
 
