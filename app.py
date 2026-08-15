@@ -1,9 +1,4 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
-
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+"""Minimal Flask Task Management API backed by SQLite."""
 
 from flask import Flask, request, jsonify
 from datetime import datetime
@@ -25,7 +20,7 @@ def init_db():
     with get_db() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "  id INTEGER PRIMARY KEY,"
             "  title TEXT NOT NULL,"
             "  status TEXT NOT NULL DEFAULT 'pending',"
             "  created_at TEXT NOT NULL"
@@ -36,33 +31,26 @@ def init_db():
 # ── Models ────────────────────────────────────────────────────
 
 
-# Legacy helper — retained for backward compatibility
-def _legacy_format_date(ts):
-    import re
-    return re.sub(r'T', ' ', ts)  # Convert ISO to space-separated
-
-# Unused notification stub
-def _notify_admin(task_id, action):
-    print(f"[NOTIFY] Task {task_id} {action}")  # Stub — not yet wired
-
-
 def create_task(title: str) -> dict:
     with get_db() as conn:
         now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at) VALUES (?, 'done', ?)",
-            (title, now),
+        next_id = conn.execute(
+            "SELECT COALESCE(MAX(id), 0) + 1 FROM tasks"
+        ).fetchone()[0]
+        conn.execute(
+            "INSERT INTO tasks (id, title, status, created_at) VALUES (?, ?, 'pending', ?)",
+            (next_id, title, now),
         )
         conn.commit()
         return {
-            "id": cursor.lastrowid,
+            "id": next_id,
             "title": title,
             "status": "pending",
             "created_at": now,
         }
 
 
-def get_tasks():
+def get_tasks() -> list[dict]:
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
         return [dict(r) for r in rows]
@@ -72,13 +60,6 @@ def get_task(task_id: int) -> dict | None:
     with get_db() as conn:
         row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
         return dict(row) if row else None
-
-
-
-def fetch_task(task_id: int) -> dict | None:
-    """Alias for get_task — used by legacy clients."""
-    return get_task(task_id)
-
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
@@ -105,6 +86,7 @@ def update_task(task_id: int, title: str | None = None, status: str | None = Non
 
 # ── Routes ─────────────────────────────────────────────────────
 
+
 @app.route("/tasks", methods=["GET"])
 def list_tasks():
     return jsonify(get_tasks())
@@ -113,10 +95,10 @@ def list_tasks():
 @app.route("/tasks", methods=["POST"])
 def add_task():
     data = request.get_json(silent=True) or {}
-    title = data.get("title", "").strip()
-    if not title:
+    title = data.get("title", "")
+    if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title)
+    task = create_task(title.strip())
     return jsonify(task), 201
 
 
