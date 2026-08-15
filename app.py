@@ -12,6 +12,7 @@ import sqlite3
 import os
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 
@@ -25,6 +26,10 @@ try:
     celery_app = _celery_app
 except Exception:
     pass
+
+# Initialize repositories (without database path - will use current app.DATABASE)
+user_repo = UserRepository()
+task_repo = TaskRepository()
 
 
 def get_db():
@@ -62,36 +67,16 @@ def register_user(username: str, password: str, email: str | None = None) -> dic
     """Register a new user. Returns user dict or (error, message) tuple."""
     if not username or not password:
         return ("validation_error", "username and password required")
-    with get_db() as conn:
-        try:
-            password_hash = generate_password_hash(password)
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, password_hash, email),
-            )
-            conn.commit()
-            return {
-                "id": cursor.lastrowid,
-                "username": username,
-                "email": email,
-            }
-        except sqlite3.IntegrityError:
-            return ("conflict_error", "username already exists")
+    password_hash = generate_password_hash(password)
+    return user_repo.create(username, password_hash, email)
 
 
 def authenticate_user(username: str, password: str) -> dict | None:
     """Authenticate user and return user dict if valid."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?",
-            (username,),
-        ).fetchone()
-        if row and check_password_hash(row["password_hash"], password):
-            try:
-                email = row["email"]
-            except IndexError:
-                email = None
-            return {"id": row["id"], "username": row["username"], "email": email}
+    user = user_repo.find_by_username(username)
+    if user and check_password_hash(user["password_hash"], password):
+        email = user.get("email")
+        return {"id": user["id"], "username": user["username"], "email": email}
     return None
 
 
@@ -136,48 +121,20 @@ def require_auth(f):
 # ── Models ────────────────────────────────────────────────────
 
 def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
+    return task_repo.create(title, owner_id)
 
 
 def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
+    return task_repo.find_all_by_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-        return dict(row) if row else None
+    return task_repo.find_by_id(task_id, owner_id)
 
 
 def get_user_email(user_id: int) -> str | None:
     """Get user email by user_id."""
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT email FROM users WHERE id = ?",
-            (user_id,),
-        ).fetchone()
-        return row["email"] if row else None
+    return user_repo.get_email(user_id)
 
 
 def send_task_notification_email(user_email: str, task_title: str):
@@ -200,22 +157,7 @@ def update_task(task_id: int, owner_id: int, title: str | None = None, status: s
         return None
     if status is not None and not is_valid_status(status):
         return ("invalid_status", status)
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-    updated_task = get_task(task_id, owner_id)
+    updated_task = task_repo.update(task_id, owner_id, title, status)
 
     # Trigger email notification if status changed to "done"
     if status == "done" and task.get("status") != "done":
