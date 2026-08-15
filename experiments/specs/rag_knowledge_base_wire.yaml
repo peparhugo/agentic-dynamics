@@ -1,0 +1,173 @@
+name: rag_knowledge_base_wire
+question: >-
+  Close the three functional gaps found in the rag_knowledge_base_build review
+  (code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md + follow-up code review):
+  (1) the workflow hook is not wired to the stores, so rag_augment retrieves nothing;
+  (2) commit_sha is a soft freshness boost instead of the hard scope filter the design
+  requires; (3) the graph-expansion leg is a stub (hardcoded seed score, missing
+  relationship/depth, and a canonical-id vs elementId mismatch). Build order follows the
+  seam outward: wire stores first, then harden the commit filter, then repair graph
+  expansion, then wire the remaining pure functions, then independent verification.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true   # requested: chain the agent phases' sessions so shared repo context is cache-reads
+    context:
+      brief: >-
+        This is a repair pass on branch feature/rag-kb-build (not main). The modules
+        knowledge.py / retrieval.py / prompt_constructor.py / knowledge_stream.py already
+        exist and are unit-tested; do NOT rewrite them. You are closing the integration
+        gaps the review found. Keep every existing safety contract intact: no `confidence`,
+        no Elasticsearch, no cross-item constructor fork, Redis only on 6380 DB 2, and
+        rag_augment stays default-off byte-identical. Read the review doc and the files you
+        touch before editing. Isolation: this repair runs against the SHARED Neo4j (7687), ChromaDB
+        (8000), Redis (6380 DB 2), and Ollama (11434) — do not start a queue/kb_worker against 6380
+        during the run, and treat Neo4j as shared (MERGE only, never clear_all); Chroma and Redis DB 2
+        use isolated namespaces already. Verify no concurrent writer before starting.
+      prior_art:
+        - code_reviews/2026-08-15_rag-knowledge-base-proposal-review.md   # the synthesis
+        - src/instrument/workflow_runner.py  # _default_retrieve_fn / _augment_prompt / hook
+        - src/instrument/retrieval.py        # retrieve / freshness_multiplier / collapse_redundant
+        - src/instrument/graph.py            # expand_candidates / _neighbors / _get_node
+        - src/instrument/embeddings.py       # ChromaStore (collection_name, search where=)
+    phases:
+      - name: wire_seam
+        kind: agent
+        prompt: |
+          Wire the stores into the augmentation seam so `rag_augment: true` actually retrieves.
+          Today `_default_retrieve_fn()` (workflow_runner.py) returns the bare `retrieve`, and the
+          hook calls it without `dense_store`/`graph_client`, so both legs skip and every phase
+          degrades to `no_rag`.
+
+          REQUIREMENTS:
+          - Change the default retrieval wiring to lazily construct the two stores and bind them:
+              ChromaStore(collection_name="knowledge_chunks_v1")  -> dense_store
+              Neo4jClient()                                       -> graph_client
+            e.g. via functools.partial(retrieve, dense_store=..., graph_client=...).
+          - Construct lazily and ONLY on the rag_augment path (import inside the function); never at
+            import time, so the optional deps (chromadb/neo4j) stay optional and core startup is free.
+          - Graceful degradation: if a store cannot connect (infra down), return a retrieve_fn that
+            still yields a RetrievalAttempt with fallback_mode no_rag — augmentation must NEVER
+            crash the phase. Reuse retrieve()'s existing per-leg try/except.
+          - Respect the env endpoint conventions already in place: CHROMA_HOST/CHROMA_PORT for
+            Chroma; the Neo4j client's existing URI/auth env for the graph.
+          - Do NOT touch the default-off path: rag_augment=False must remain byte-identical to
+            _build_phase_prompt.
+
+          TESTS: extend tests/test_workflow_runner.py — with rag_augment=True and an injected fake
+          retrieve_fn that records its call, assert the hook invokes it between route_step and
+          run_agent and produces evidence; assert default-off still byte-identical. Add a test that a
+          failing store connection degrades to no_rag without raising. Run green.
+      - name: commit_filter
+        kind: agent
+        prompt: |
+          Promote commit scope from a soft freshness boost to a HARD pre-filter.
+
+          TODAY (bug): retrieval.freshness_multiplier gives a non-matching-commit SOURCE/MEASURED/
+          DERIVED candidate a multiplier of 1.00 (kept) and only boosts the exact commit to 1.10.
+          The design's core safety rationale — "the worktree and commit are hard filters; another
+          branch's code can be semantically similar and operationally wrong" — is not enforced.
+
+          REQUIREMENTS:
+          - In retrieval.py freshness_multiplier: when `current_commit` is set, EXCLUDE (return None)
+            any SOURCE/MEASURED/DERIVED candidate whose commit_sha is non-empty AND != current_commit.
+            Keep the exact-commit boost 1.10. A candidate with an EMPTY commit_sha is treated as
+            current/unknown and stays eligible (document this rule in the docstring).
+          - In retrieval.py _dense_filter: add commit_sha to the Chroma `where` metadata filter
+            (include records whose commit_sha is empty OR equals current) so stale-commit docs never
+            come back from the dense leg at all.
+          - In graph.py search_fulltext / find_exact: accept an optional commit filter and apply it
+            in the query (n.commit_sha = $commit OR n.commit_sha IS NULL) so the lexical leg also
+            pre-filters. Keep the existing no-filter behavior when commit is not supplied (back-compat).
+          - Preserve advisory freshness windows (30/90-day) unchanged.
+
+          TESTS: update tests/test_retrieval.py — non-matching commit excluded; empty commit eligible;
+          exact-commit boost still applied; advisory windows unchanged. Add a graph.py test for the
+          commit filter on search_fulltext. Run green.
+      - name: graph_expansion
+        kind: agent
+        prompt: |
+          Repair the graph-expansion leg. It is currently a stub AND has an id-space bug.
+
+          TODAY: in retrieval.py the expanded node is scored with
+          `graph_boost(1.0, 1, props.get("__relationship__", "DEFINES"))` — hardcoded seed score,
+          hardcoded depth, and a relationship property that expand_candidates never sets. Worse, the
+          seeds passed in are canonical knowledge_ids, but graph.py `_get_node`/`_neighbors` match on
+          `elementId(n)`, so seed lookup fails and the leg returns nothing.
+
+          REQUIREMENTS:
+          - In graph.py expand_candidates/_neighbors: return, per visited node, the canonical id
+            (prefer knowledge_id/doc_id/step_id/entity_id from properties, fall back to elementId),
+            the traversed relationship type, the depth, the path of node ids, and the origin seed id.
+            Change `_neighbors` to `MATCH (n)-[r:REL]-(m) ... RETURN ... type(r) AS rel_type`.
+          - In retrieval.py: drive expansion with the REAL seed score and the returned relationship +
+            depth: `graph_boost(seed.fused_score, depth, rel_type)` (0.7**depth * relationship_weight
+            * seed_score). Populate Candidate.graph_depth, graph_path, relationship_weight, and
+            graph_boost accordingly. Keep expansion bounds (depth<=2, <=8/seed/hop, <=40 nodes, 300ms)
+            and the ALLOWED_EXPANSION_RELS allowlist.
+          - Ensure a seed whose canonical id cannot be resolved by the graph client is skipped cleanly,
+            not treated as a zero-score hit.
+
+          TESTS: extend tests/test_graph.py (expand_candidates returns rel_type/depth/path/origin and
+          canonical ids) and tests/test_retrieval.py (expansion score == seed_score * weight *
+          0.7**depth; canonical-id resolution). Run green.
+      - name: retrieval_wiring
+        kind: agent
+        prompt: |
+          Wire the remaining pure functions into the pipeline and add integration coverage.
+
+          TODAY: collapse_redundant (cosine > 0.92 dedupe) is defined and exported but never called in
+          retrieve(); the pipeline only runs deduplicate (content-hash). Retrieve() is never exercised
+          end-to-end against the other modules.
+
+          REQUIREMENTS:
+          - In retrieval.py retrieve(): after deduplicate(), compute pairwise cosine similarities among
+            the surviving candidates (via embeddings.EmbeddingClient when available; otherwise an empty
+            dict, which makes collapse_redundant a no-op — record which path was taken) and call
+            collapse_redundant before graph expansion. Keep conflict retention (both sides of a
+            contradiction survive).
+          - Add an end-to-end integration test (tests/test_retrieval.py) that runs retrieve() against
+            fake dense + graph store doubles returning a small candidate set, and asserts: candidates
+            are fused, deduped, expanded, budgeted, and selected; fallback_mode reflects which legs
+            survived; a fully-down store set yields no_rag with empty evidence. Do NOT require live
+            Chroma/Neo4j (use doubles; mirror existing conftest skip patterns).
+          - Update src/instrument/CONTEXT.md (retrieval data flow + the two fixed gaps) so the module
+            map reflects the wired pipeline.
+
+          TESTS: run the new integration test plus tests/test_retrieval.py green.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full `pytest .` suite. The full suite hits shared
+          Neo4j/Chroma/Redis and spawns unrelated subprocesses (opencode/claude/admin); that gate is a
+          deliberately separate CI pass, never inside the worktree. On top of feature/rag-kb-build run
+          only the seven RAG-relevant files:
+
+            pytest tests/test_knowledge.py tests/test_retrieval.py tests/test_prompt_constructor.py \
+                   tests/test_knowledge_stream.py tests/test_graph.py tests/test_embeddings.py \
+                   tests/test_workflow_runner.py -q
+
+          ISOLATION (load-bearing):
+          - Neo4j (7687) is the SHARED graph: prefer a throwaway graph via NEO4J_URI if available;
+            otherwise accept that test_graph.py loaders MERGE nodes into it (idempotent, never
+            clear_all) — never run DETACH DELETE against it.
+          - Redis tests flush ONLY DB 2 (kb:v1:*); DB 1 is the framework queue and is read-only.
+            Safe only while no kb_worker.py is consuming DB 2 — verify none is running first.
+          - Chroma tests use throwaway test_* collections and self-clean; session_embeddings and
+            knowledge_chunks_v1 are never touched.
+          Then an import smoke test (python -c "import instrument; import instrument.retrieval,
+          instrument.prompt_constructor, instrument.knowledge_stream") and re-assert the default-off
+          (rag_augment=False) prompt path is unchanged. Leave all seven files green.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 10.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
