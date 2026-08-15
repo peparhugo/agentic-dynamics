@@ -53,7 +53,7 @@ from .constraint_detection import detect_constraints
 from .efficiency import EfficiencyMetrics, compute_cost_estimate, compute_efficiency
 
 # Deprecated: EmbeddingClient, extract_session_text — not used by current scripts
-from .embeddings import ChromaStore, extract_session_steps
+from .embeddings import ChromaStore, ChromaStoreError, extract_session_steps, step_doc_id
 from .entropy import (
     EntropyProfile,
     compute_entropy,
@@ -82,7 +82,7 @@ from .game_report import GameReport
 # Deprecated: InstrumentedAdapter, InvokeTimeoutError — old pipeline; run_opencode_agentic replaces adapter.py
 # Deprecated: ExperimentConfig, ExperimentRun, ExperimentResult, run_experiment — old pipeline; not used by current scripts
 # Deprecated: build_hypothesis, build_methodology, persist_to_lab_book — lab scripts bypass this module
-from .graph import Neo4jClient
+from .graph import ALLOWED_EXPANSION_RELS, Neo4jClient
 
 # v1.0: canonical identity + authority contract for the runtime-RAG knowledge base
 from .knowledge import (
@@ -217,7 +217,8 @@ __all__ = [
     "detect_constraints",
     "analyze_markers", "analyze_ast",
     "ChromaStore", "extract_session_steps",
-    "Neo4jClient",
+    "ChromaStoreError", "step_doc_id",
+    "Neo4jClient", "ALLOWED_EXPANSION_RELS",
     "OllamaAnalyzer", "load_summary_data",
     "OpencodeAnalyzer", "REPORTS_DIR",
     "run_opencode_agentic", "AgenticResult", "normalize_opencode_event",

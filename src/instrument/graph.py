@@ -7,14 +7,69 @@ perturbation operators, strategies, and basin topologies.
 from __future__ import annotations
 
 import json
+import re
 import sys
+import time
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from neo4j import GraphDatabase
 
+if TYPE_CHECKING:
+    from .codebase_graph import CodebaseGraph
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# Allowlisted relationship types for bounded graph expansion. Retrieval may only
+# traverse these types; any other relationship (ad-hoc links, ``MENTIONS``, etc.)
+# is invisible to expansion, so retrieved evidence cannot sneak in through an
+# unvetted edge.
+ALLOWED_EXPANSION_RELS = frozenset(
+    {
+        "DEFINES",
+        "IMPORTS",
+        "CALLS",
+        "TESTED_BY",
+        "PRODUCED_BY",
+        "PRECEDES",
+        "SUPERSEDES",
+        "CONTRADICTS",
+    }
+)
+
+# Knowledge-base schema statements. ``Knowledge.knowledge_id`` is unique (the
+# immutable version); ``Knowledge.entity_id`` is indexed but NOT unique (many
+# versions share one logical entity). ``Step.doc_id`` and ``Step.text`` repair the
+# dense↔graph join documented in the RAG review.
+_KNOWLEDGE_CONSTRAINTS = [
+    "CREATE CONSTRAINT knowledge_id_unique IF NOT EXISTS "
+    "FOR (k:Knowledge) REQUIRE k.knowledge_id IS UNIQUE",
+    "CREATE CONSTRAINT step_id_unique IF NOT EXISTS FOR (s:Step) REQUIRE s.step_id IS UNIQUE",
+    "CREATE CONSTRAINT code_module_path_unique IF NOT EXISTS "
+    "FOR (c:CodeModule) REQUIRE c.module_path IS UNIQUE",
+]
+_KNOWLEDGE_INDEXES = [
+    "CREATE INDEX knowledge_entity_id IF NOT EXISTS FOR (k:Knowledge) ON (k.entity_id)",
+    "CREATE INDEX step_doc_id IF NOT EXISTS FOR (s:Step) ON (s.doc_id)",
+    "CREATE INDEX code_module_name IF NOT EXISTS FOR (c:CodeModule) ON (c.name)",
+]
+_KNOWLEDGE_FULLTEXT = [
+    "CREATE FULLTEXT INDEX step_text_ft IF NOT EXISTS FOR (s:Step) ON EACH [s.text]",
+]
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _validate_identifier(name: str, kind: str) -> None:
+    """Reject anything that is not a plain identifier (Cypher injection guard).
+
+    Labels, property names, and index names are interpolated into Cypher (Neo4j
+    cannot parameterize them); validating them here keeps the typed helpers safe
+    without forcing hand-written Cypher at call sites.
+    """
+    if not _IDENTIFIER_RE.match(name):
+        raise ValueError(f"invalid {kind} identifier: {name!r}")
 
 
 class _BufferedResult:
@@ -73,6 +128,20 @@ class Neo4jClient:
 
     def clear_all(self) -> None:
         self._run("MATCH (n) DETACH DELETE n")
+
+    def create_knowledge_schema(self) -> None:
+        """Create the knowledge-base constraints, indexes, and full-text index.
+
+        Idempotent (``IF NOT EXISTS``). Each statement is attempted independently
+        so a statement an older server rejects does not abort the rest — mirroring
+        ``create_schema()``. Includes the native full-text index over
+        ``Step.text`` that lexical retrieval (``search_fulltext``) queries.
+        """
+        for stmt in _KNOWLEDGE_CONSTRAINTS + _KNOWLEDGE_INDEXES + _KNOWLEDGE_FULLTEXT:
+            try:
+                self._run(stmt)
+            except Exception:
+                pass
 
     def load_operators(self) -> None:
         operators = [
@@ -452,9 +521,8 @@ class Neo4jClient:
         avoiding ChromaDB dependency. Each step becomes a :Step node with
         :HAS_STEP and :NEXT relationships.
         """
-        from pathlib import Path
         sys.path.insert(0, str(PROJECT_ROOT / "src"))
-        from instrument.embeddings import extract_session_steps
+        from instrument.embeddings import extract_session_steps, step_doc_id
 
         reports_dir = PROJECT_ROOT / "experiments" / "results" / "reports"
         session_files = sorted(reports_dir.glob("*/session.jsonl"))
@@ -489,17 +557,25 @@ class Neo4jClient:
             for step in steps:
                 si = step["step_index"]
                 step_id = f"{sid}_s{si:04d}"
+                # doc_id MUST equal the canonical Chroma id (step_doc_id) so the
+                # dense and graph indexes join on the same value — the previous
+                # code hardcoded doc_id='' and never stored text, silently
+                # breaking the join. step_id stays the Neo4j-internal key.
+                doc_id = step_doc_id(sid, si)
                 self._run("""
                     MERGE (st:Step {step_id: $step_id})
                     SET st.session_id = $sid,
                         st.step_index = $step_index,
                         st.tool_after = $tool_after,
-                        st.doc_id = ''
+                        st.doc_id = $doc_id,
+                        st.text = $text
                 """, {
                     "step_id": step_id,
                     "sid": sid,
                     "step_index": si,
                     "tool_after": step.get("tool_after", ""),
+                    "doc_id": doc_id,
+                    "text": step.get("text", ""),
                 })
                 step_count += 1
 
@@ -522,3 +598,198 @@ class Neo4jClient:
                 prev_step_id = step_id
 
         return {"sessions": len(sessions), "steps": step_count, "relationships": rel_count}
+
+    def load_codebase_graph(
+        self, graph: CodebaseGraph, worktree_name: str
+    ) -> dict[str, int]:
+        """Persist an in-memory import graph as :CodeModule nodes and edges.
+
+        Writes one :CodeModule per module, bidirectional ``IMPORTS`` /
+        ``IMPORTED_BY`` edges between them, and links the owning experiment run
+        via ``(ExperimentRun)-[:TOUCHED]->(CodeModule)``. Persisting this graph —
+        currently thrown away by ``codebase_graph.build_graph`` — lets retrieval
+        answer "what else touched this module".
+        """
+        counts = {"modules": 0, "imports": 0, "imported_by": 0, "touched": 0}
+
+        # Ensure the owning run exists so every TOUCHED edge has a source.
+        self._run(
+            "MERGE (r:ExperimentRun {worktree_name: $wt})",
+            {"wt": worktree_name},
+        )
+
+        for path, module in graph.modules.items():
+            name = Path(path).name
+            self._run(
+                """
+                MERGE (c:CodeModule {module_path: $path})
+                SET c.name = $name,
+                    c.language = $language,
+                    c.loc = $loc,
+                    c.node_type = 'module'
+                """,
+                {"path": path, "name": name, "language": graph.language, "loc": module.loc},
+            )
+            counts["modules"] += 1
+            self._run(
+                "MATCH (r:ExperimentRun {worktree_name: $wt}) "
+                "MATCH (c:CodeModule {module_path: $path}) "
+                "MERGE (r)-[:TOUCHED]->(c)",
+                {"wt": worktree_name, "path": path},
+            )
+            counts["touched"] += 1
+
+        for path, module in graph.modules.items():
+            for target in module.imports_from:
+                if target not in graph.modules:
+                    continue
+                self._run(
+                    "MATCH (a:CodeModule {module_path: $a}) "
+                    "MATCH (b:CodeModule {module_path: $b}) "
+                    "MERGE (a)-[:IMPORTS]->(b)",
+                    {"a": path, "b": target},
+                )
+                counts["imports"] += 1
+                self._run(
+                    "MATCH (a:CodeModule {module_path: $a}) "
+                    "MATCH (b:CodeModule {module_path: $b}) "
+                    "MERGE (b)-[:IMPORTED_BY]->(a)",
+                    {"a": path, "b": target},
+                )
+                counts["imported_by"] += 1
+
+        return counts
+
+    @staticmethod
+    def _node_dict(record: Any, *, with_score: bool = False) -> dict[str, Any]:
+        """Normalize a search record into ``{"id", "labels", "properties"}``."""
+        out: dict[str, Any] = {
+            "id": record["node_id"],
+            "labels": list(record["labels"]),
+            "properties": dict(record["properties"]),
+        }
+        if with_score:
+            out["score"] = record["score"]
+        return out
+
+    def _get_node(self, node_id: str) -> dict[str, Any] | None:
+        """Return a single node by ``elementId``, or None if absent."""
+        rec = self._run_value(
+            "MATCH (n) WHERE elementId(n) = $id "
+            "RETURN elementId(n) AS node_id, labels(n) AS labels, properties(n) AS properties",
+            {"id": node_id},
+        )
+        if rec is None:
+            return None
+        return {
+            "id": rec["node_id"],
+            "labels": list(rec["labels"]),
+            "properties": dict(rec["properties"]),
+        }
+
+    def _neighbors(self, node_id: str, rels: str, limit: int) -> list[dict[str, Any]]:
+        """Return up to ``limit`` neighbors of ``node_id`` over ``rels`` (allowlist).
+
+        ``rels`` is a ``|``-joined allowlist built from ``ALLOWED_EXPANSION_RELS``
+        (fixed, safe identifiers), so it is safe to interpolate into the pattern.
+        """
+        records = self._run(
+            f"MATCH (n)-[r:{rels}]-(m) WHERE elementId(n) = $id "
+            "RETURN DISTINCT elementId(m) AS node_id, labels(m) AS labels, "
+            "properties(m) AS properties LIMIT $limit",
+            {"id": node_id, "limit": limit},
+        )
+        return [
+            {
+                "id": rec["node_id"],
+                "labels": list(rec["labels"]),
+                "properties": dict(rec["properties"]),
+            }
+            for rec in records
+        ]
+
+    def expand_candidates(
+        self,
+        seed_ids: list[str],
+        *,
+        max_depth: int = 2,
+        max_neighbors: int = 8,
+        max_nodes: int = 40,
+        timeout_ms: int = 300,
+    ) -> list[dict[str, Any]]:
+        """Return the bounded, allowlisted neighborhood of one or more seed nodes.
+
+        BFS over ``ALLOWED_EXPANSION_RELS`` only, bounded by depth
+        (<= ``max_depth``), neighbors per node per hop (<= ``max_neighbors``),
+        total nodes (<= ``max_nodes``), and wall-clock time (<= ``timeout_ms``).
+        ``seed_ids`` are Neo4j ``elementId`` values (as returned by
+        ``find_exact`` / ``search_fulltext``). Returns visited nodes as
+        ``{"id", "labels", "properties"}`` dicts, seeds first. Pure read.
+        """
+        rels = "|".join(sorted(ALLOWED_EXPANSION_RELS))
+        deadline = time.monotonic() + timeout_ms / 1000.0
+
+        visited: dict[str, dict[str, Any]] = {}
+        for seed in seed_ids:
+            if len(visited) >= max_nodes:
+                break
+            node = self._get_node(seed)
+            if node is not None:
+                visited[seed] = node
+
+        frontier = list(visited.keys())
+        for _ in range(max_depth):
+            if time.monotonic() > deadline or len(visited) >= max_nodes:
+                break
+            next_frontier: list[str] = []
+            for node_id in frontier:
+                if time.monotonic() > deadline or len(visited) >= max_nodes:
+                    break
+                for neighbor in self._neighbors(node_id, rels, max_neighbors):
+                    if neighbor["id"] not in visited:
+                        visited[neighbor["id"]] = neighbor
+                        next_frontier.append(neighbor["id"])
+                    if len(visited) >= max_nodes:
+                        break
+            frontier = next_frontier
+
+        return list(visited.values())
+
+    def find_exact(
+        self, label: str, property_name: str, value: Any, *, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Exact-property lookup on a node label (no hand-written Cypher).
+
+        ``label`` and ``property_name`` are validated identifiers; ``value`` is
+        parameterized. Returns matching nodes as ``{"id", "labels",
+        "properties"}`` dicts.
+        """
+        _validate_identifier(label, "label")
+        _validate_identifier(property_name, "property")
+        records = self._run(
+            f"MATCH (n:{label}) WHERE n.{property_name} = $value "
+            "RETURN elementId(n) AS node_id, labels(n) AS labels, properties(n) AS properties "
+            "LIMIT $limit",
+            {"value": value, "limit": limit},
+        )
+        return [self._node_dict(rec) for rec in records]
+
+    def search_fulltext(
+        self, index_name: str, query: str, *, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        """Full-text search against a named native full-text index.
+
+        ``index_name`` references an index created by ``create_knowledge_schema``
+        (e.g. ``"step_text_ft"``). Returns matching nodes as ``{"id", "labels",
+        "properties", "score"}`` dicts, highest score first.
+        """
+        _validate_identifier(index_name, "index")
+        records = self._run(
+            "CALL db.index.fulltext.queryNodes($index, $query) "
+            "YIELD node, score "
+            "RETURN elementId(node) AS node_id, labels(node) AS labels, "
+            "properties(node) AS properties, score "
+            "LIMIT $limit",
+            {"index": index_name, "query": query, "limit": limit},
+        )
+        return [self._node_dict(rec, with_score=True) for rec in records]

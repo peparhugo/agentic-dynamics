@@ -6,12 +6,33 @@ Replaces the trigram heuristic in trajectory.py with real cosine distance.
 
 from __future__ import annotations
 
+import hashlib
 import math
-import time
+import os
 from pathlib import Path
 from typing import Any
 
 import ollama
+
+# ── Endpoint configuration (mirrors live.py's FINOPS_REDIS_* pattern) ──
+# The store is no longer hardcoded to localhost:8000 — which collides with
+# ``admin/server.py`` — because CHROMA_HOST / CHROMA_PORT override it. The
+# default values are read once at import (as in live.py), but ``ChromaStore.__init__``
+# re-checks the environment so a test or a forked worker can still override them.
+CHROMA_HOST = os.environ.get("CHROMA_HOST", "localhost")
+CHROMA_PORT = int(os.environ.get("CHROMA_PORT", "8000"))
+
+
+def step_doc_id(session_id: str, step_index: int) -> str:
+    """Return the canonical Chroma document id for one reasoning step.
+
+    Single source of truth for the step-document id scheme. Both
+    ``ChromaStore.index_session_steps`` (dense index) and
+    ``graph.Neo4jClient.build_step_graph`` (graph index) must use it so the
+    Chroma ``doc_id`` and the Neo4j ``Step.doc_id`` agree — that shared value is
+    the cross-store join between the two indexes.
+    """
+    return f"{session_id}_step_{step_index:04d}"
 
 
 class EmbeddingClient:
@@ -75,15 +96,46 @@ class EmbeddingClient:
         return sum(per_step_dists) / len(per_step_dists)
 
 
+class ChromaStoreError(RuntimeError):
+    """Raised when a Chroma store operation fails.
+
+    The canonical methods (``upsert`` / ``delete`` / ``search`` / ``inventory``)
+    propagate this explicitly instead of swallowing failures and returning a
+    partial count — an index outage must be visible, not silently masked.
+    """
+
+
 class ChromaStore:
-    """Vector store for experiment session embeddings."""
+    """Vector store for experiment session embeddings and knowledge chunks.
+
+    ``collection_name`` names the logical collection; it defaults to
+    ``session_embeddings`` (the existing contract) so historical callers are
+    unchanged, while runtime-RAG instantiates a separate collection
+    (``ChromaStore(collection_name="knowledge_chunks_v1")``) for isolation.
+    """
 
     COLLECTION_NAME = "session_embeddings"
 
-    def __init__(self, host: str = "localhost", port: int = 8000):
+    def __init__(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        collection_name: str | None = None,
+    ):
         import chromadb
-        self._client = chromadb.HttpClient(host=host, port=port)
+
+        # Env-driven defaults (re-checked here, not only at import) so a caller or
+        # test can override CHROMA_HOST/CHROMA_PORT without reloading the module.
+        self._client = chromadb.HttpClient(
+            host=host if host is not None else os.environ.get("CHROMA_HOST", CHROMA_HOST),
+            port=port if port is not None else int(os.environ.get("CHROMA_PORT", str(CHROMA_PORT))),
+        )
         self._embedder = EmbeddingClient()
+        # Instance shadow of the class default: ``collection_name`` is the
+        # per-instance override while ``COLLECTION_NAME`` stays the documented
+        # default. This preserves the historical ``store.COLLECTION_NAME = "x"``
+        # mutation used by existing callers.
+        self.COLLECTION_NAME = collection_name or self.COLLECTION_NAME
         self._collection = None
 
     @property
@@ -95,6 +147,46 @@ class ChromaStore:
             )
         return self._collection
 
+    def upsert(
+        self,
+        ids: list[str],
+        documents: list[str],
+        metadatas: list[dict[str, Any]] | None = None,
+        embeddings: list[list[float]] | None = None,
+    ) -> int:
+        """Idempotently upsert documents keyed by their canonical ids.
+
+        This is the storage-neutral primitive: ids are the canonical
+        ``knowledge_id`` (or ``step_doc_id``) values that also key Neo4j nodes and
+        Redis stream events. Embeddings are computed via the configured embedder
+        when not supplied. Propagates ``ChromaStoreError`` on failure.
+        """
+        if not ids:
+            return 0
+        if embeddings is None:
+            embeddings = [self._embedder.embed(doc) for doc in documents]
+        if metadatas is None:
+            metadatas = [{} for _ in ids]
+        try:
+            self.collection.upsert(
+                ids=list(ids),
+                documents=list(documents),
+                metadatas=list(metadatas),
+                embeddings=list(embeddings),
+            )
+        except Exception as exc:
+            raise ChromaStoreError(f"upsert of {len(ids)} docs failed: {exc}") from exc
+        return len(ids)
+
+    def delete(self, ids: list[str]) -> None:
+        """Delete documents by canonical id. Propagates ``ChromaStoreError``."""
+        if not ids:
+            return
+        try:
+            self.collection.delete(ids=list(ids))
+        except Exception as exc:
+            raise ChromaStoreError(f"delete of {len(ids)} ids failed: {exc}") from exc
+
     def index_session_steps(
         self,
         session_id: str,
@@ -104,7 +196,11 @@ class ChromaStore:
         """Index individual reasoning steps from a session.
 
         Each step gets its own embedding document with position metadata,
-        enabling step-level comparison across sessions.
+        enabling step-level comparison across sessions. Uses the canonical
+        ``step_doc_id`` scheme so the dense index joins the graph index on the
+        same id. Legacy-resilient: returns 0 (rather than raising) on a store
+        failure so batch indexing of many sessions survives a transient outage —
+        prefer the explicit ``upsert`` for canonical knowledge writes.
         """
         meta = metadata or {}
         docs: list[str] = []
@@ -117,7 +213,7 @@ class ChromaStore:
                 continue
             step_idx = step.get("step_index", 0)
             docs.append(text)
-            ids.append(f"{session_id}_step_{step_idx:04d}")
+            ids.append(step_doc_id(session_id, step_idx))
             metas.append({
                 **meta,
                 "embedding_source": "reasoning_step",
@@ -130,17 +226,8 @@ class ChromaStore:
             return 0
 
         try:
-            all_embeds = []
-            for doc in docs:
-                all_embeds.append(self._embedder.embed(doc))
-            self.collection.upsert(
-                ids=ids,
-                documents=docs,
-                metadatas=metas,
-                embeddings=all_embeds,
-            )
-            return len(docs)
-        except Exception:
+            return self.upsert(ids, docs, metas)
+        except ChromaStoreError:
             return 0
 
     def search(
@@ -149,20 +236,28 @@ class ChromaStore:
         top_k: int = 10,
         filter_model: str | None = None,
         filter_strategy: str | None = None,
+        where: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        where = {}
+        """Semantic search over the collection, with optional metadata filters.
+
+        ``filter_model`` / ``filter_strategy`` are conveniences merged into the
+        raw Chroma ``where`` metadata filter, which is also accepted directly for
+        arbitrary filter expressions (e.g. ``{"authority": "source"}``).
+        Propagates store failures.
+        """
+        merged: dict[str, Any] = dict(where) if where else {}
         if filter_model:
-            where["model"] = filter_model
+            merged["model"] = filter_model
         if filter_strategy:
-            where["strategy"] = filter_strategy
+            merged["strategy"] = filter_strategy
 
         query_embed = self._embedder.embed(query)
-        kwargs = {
+        kwargs: dict[str, Any] = {
             "query_embeddings": [query_embed],
             "n_results": top_k,
         }
-        if where:
-            kwargs["where"] = where
+        if merged:
+            kwargs["where"] = merged
 
         results = self.collection.query(**kwargs)
 
@@ -176,6 +271,21 @@ class ChromaStore:
                     "distance": results["distances"][0][i] if results["distances"] else 0.0,
                 })
         return hits
+
+    def inventory(self) -> dict[str, Any]:
+        """Return the collection's id inventory plus a reconciliation checkpoint.
+
+        The checkpoint is a sha256 over the sorted canonical ids, so any
+        add/remove changes it — letting a reconciler detect drift between Chroma,
+        Neo4j, and the change stream without a server-side cursor. Propagates
+        ``ChromaStoreError`` on failure.
+        """
+        try:
+            ids = sorted(self.collection.get(include=[])["ids"])
+        except Exception as exc:
+            raise ChromaStoreError(f"inventory read failed: {exc}") from exc
+        checkpoint = hashlib.sha256("\x1f".join(ids).encode("utf-8")).hexdigest()
+        return {"count": len(ids), "ids": ids, "checkpoint": checkpoint}
 
     def count(self) -> int:
         return self.collection.count()

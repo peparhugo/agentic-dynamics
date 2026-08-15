@@ -3,7 +3,8 @@
 import pytest
 import socket
 from pathlib import Path
-from instrument.graph import Neo4jClient, _BufferedResult
+from instrument.graph import ALLOWED_EXPANSION_RELS, Neo4jClient, _BufferedResult
+from instrument.embeddings import step_doc_id
 
 try:
     s = socket.create_connection(("localhost", 7687), timeout=2); s.close()
@@ -12,6 +13,20 @@ except Exception:
     _NEO4J_OK = False
 
 pytestmark = pytest.mark.skipif(not _NEO4J_OK, reason="Neo4j not available on localhost:7687")
+
+
+class _Neo4jTestBase:
+    """Shared autouse fixture: one Neo4jClient per test, closed on teardown."""
+
+    @pytest.fixture(autouse=True)
+    def _setup_client(self):
+        self.client = Neo4jClient(
+            uri="bolt://localhost:7687",
+            user="neo4j",
+            password="password123",
+        )
+        yield
+        self.client.close()
 
 
 class TestBufferedResult:
@@ -129,3 +144,230 @@ class TestNeo4jClient:
         assert counts["models"] > 0
         assert counts["runs"] > 0
         assert counts["run_on_rels"] > 0
+
+
+class TestKnowledgeSchema(_Neo4jTestBase):
+    """Knowledge constraints/indexes + native full-text index."""
+
+    def test_create_knowledge_schema_idempotent(self):
+        self.client.create_knowledge_schema()
+        self.client.create_knowledge_schema()  # IF NOT EXISTS — safe to re-run
+
+    def test_knowledge_constraints_exist(self):
+        self.client.create_knowledge_schema()
+        recs = self.client._run(
+            "SHOW CONSTRAINTS YIELD name RETURN name"
+        )
+        names = {r["name"] for r in recs}
+        assert "knowledge_id_unique" in names
+        assert "step_id_unique" in names
+        assert "code_module_path_unique" in names
+
+    def test_knowledge_indexes_exist(self):
+        self.client.create_knowledge_schema()
+        recs = self.client._run("SHOW INDEXES YIELD name RETURN name")
+        names = {r["name"] for r in recs}
+        assert "knowledge_entity_id" in names
+        assert "step_doc_id" in names
+        assert "code_module_name" in names
+
+    def test_fulltext_index_exists(self):
+        self.client.create_knowledge_schema()
+        recs = self.client._run("SHOW FULLTEXT INDEXES YIELD name RETURN name")
+        names = {r["name"] for r in recs}
+        assert "step_text_ft" in names
+
+    def test_knowledge_id_uniqueness_enforced(self):
+        self.client.create_knowledge_schema()
+        self.client._run(
+            "MERGE (k:Knowledge {knowledge_id: 'ks_dup'}) SET k.entity_id = 'ent_x'"
+        )
+        # A second insert with the same knowledge_id must fail on the constraint.
+        with pytest.raises(Exception):
+            self.client._run(
+                "CREATE (k:Knowledge {knowledge_id: 'ks_dup', entity_id: 'ent_y'})"
+            )
+        self.client._run("MATCH (k:Knowledge {knowledge_id: 'ks_dup'}) DETACH DELETE k")
+
+
+class TestBuildStepGraph(_Neo4jTestBase):
+    """doc_id/text regression — the dense↔graph join repair."""
+
+    def test_step_doc_id_matches_embeddings_scheme(self):
+        # The canonical id formatter is shared by embeddings and graph.
+        assert step_doc_id("sess_1", 0) == "sess_1_step_0000"
+        assert step_doc_id("sess_1", 12) == "sess_1_step_0012"
+
+    def test_build_step_graph_populates_doc_id_and_text(self):
+        counts = self.client.build_step_graph(max_steps=5)
+        assert counts["steps"] > 0
+        recs = self.client._run(
+            "MATCH (s:Step) WHERE s.doc_id IS NOT NULL AND s.doc_id <> '' "
+            "RETURN s.session_id AS session_id, s.step_index AS step_index, "
+            "s.doc_id AS doc_id, s.text AS text LIMIT 10"
+        )
+        rows = list(recs)
+        assert len(rows) > 0
+        for row in rows:
+            # The graph doc_id MUST equal the canonical Chroma id for the same
+            # (session, step) — the cross-store join both indexes share.
+            assert row["doc_id"] == step_doc_id(row["session_id"], row["step_index"])
+            assert row["text"]  # text is now populated (previously never set)
+
+
+class TestCodeModuleGraph(_Neo4jTestBase):
+    """CodeModule nodes + IMPORTS/IMPORTED_BY/TOUCHED edges."""
+
+    _A = "codemodule_test_a.py"
+    _B = "codemodule_test_b.py"
+    _WT = "wt_codemodule_test"
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, _setup_client):
+        yield
+        self.client._run(
+            "MATCH (n:CodeModule) WHERE n.module_path IN [$a, $b] DETACH DELETE n",
+            {"a": self._A, "b": self._B},
+        )
+        self.client._run(
+            "MATCH (r:ExperimentRun {worktree_name: $wt}) DETACH DELETE r",
+            {"wt": self._WT},
+        )
+
+    def test_load_codebase_graph_writes_nodes_and_edges(self):
+        from instrument.codebase_graph import CodebaseGraph, ModuleNode
+
+        graph = CodebaseGraph(language="python")
+        graph.modules = {
+            self._A: ModuleNode(path=self._A, loc=10, imports_from=[self._B]),
+            self._B: ModuleNode(path=self._B, loc=5, imports_from=[]),
+        }
+
+        counts = self.client.load_codebase_graph(graph, self._WT)
+        assert counts["modules"] == 2
+        assert counts["imports"] == 1
+        assert counts["imported_by"] == 1
+        assert counts["touched"] == 2
+
+        # TOUCHED: the run links every module it touched.
+        recs = self.client._run(
+            "MATCH (r:ExperimentRun {worktree_name: $wt})-[:TOUCHED]->(c:CodeModule) "
+            "RETURN count(c) AS c",
+            {"wt": self._WT},
+        )
+        assert recs.single()["c"] == 2
+
+        # IMPORTS: a -> b, IMPORTED_BY: b -> a.
+        recs = self.client._run(
+            "MATCH (a:CodeModule {module_path: $a})-[:IMPORTS]->(b:CodeModule {module_path: $b}) "
+            "RETURN count(*) AS c",
+            {"a": self._A, "b": self._B},
+        )
+        assert recs.single()["c"] == 1
+        recs = self.client._run(
+            "MATCH (b:CodeModule {module_path: $b})-[:IMPORTED_BY]->(a:CodeModule {module_path: $a}) "
+            "RETURN count(*) AS c",
+            {"a": self._A, "b": self._B},
+        )
+        assert recs.single()["c"] == 1
+
+
+class TestExpandCandidates(_Neo4jTestBase):
+    """Bounded, allowlisted graph expansion."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, _setup_client):
+        self.client._run("MATCH (n:__TestExpand) DETACH DELETE n")
+        yield
+        self.client._run("MATCH (n:__TestExpand) DETACH DELETE n")
+
+    def _seed_element_id(self, name: str) -> str:
+        rec = self.client._run_value(
+            "MATCH (n:__TestExpand {name: $name}) RETURN elementId(n) AS eid",
+            {"name": name},
+        )
+        assert rec is not None
+        return rec["eid"]
+
+    def _build_star(self):
+        self.client._run(
+            "CREATE (a:__TestExpand {name: 'a'}) "
+            "CREATE (b:__TestExpand {name: 'b'}) "
+            "CREATE (c:__TestExpand {name: 'c'}) "
+            "CREATE (d:__TestExpand {name: 'd'}) "
+            "CREATE (e:__TestExpand {name: 'e'}) "
+            "MERGE (a)-[:DEFINES]->(b) "
+            "MERGE (a)-[:DEFINES]->(c) "
+            "MERGE (a)-[:MENTIONS]->(d) "
+            "MERGE (c)-[:DEFINES]->(e)"
+        )
+
+    def test_expand_respects_allowlist(self):
+        self._build_star()
+        seed = self._seed_element_id("a")
+        nodes = self.client.expand_candidates([seed], max_depth=2)
+        names = {n["properties"].get("name") for n in nodes}
+        assert {"a", "b", "c", "e"} <= names
+        assert "d" not in names  # MENTIONS is not on the allowlist
+
+    def test_expand_respects_depth(self):
+        self._build_star()
+        seed = self._seed_element_id("a")
+        nodes = self.client.expand_candidates([seed], max_depth=1)
+        names = {n["properties"].get("name") for n in nodes}
+        assert {"a", "b", "c"} <= names
+        assert "e" not in names  # two hops away, excluded at max_depth=1
+
+    def test_expand_respects_neighbor_and_node_bounds(self):
+        self.client._run(
+            "CREATE (a:__TestExpand {name: 'hub'}) "
+            "WITH a UNWIND range(1, 10) AS i "
+            "CREATE (n:__TestExpand {name: 'leaf_' + toString(i)}) "
+            "MERGE (a)-[:DEFINES]->(n)"
+        )
+        seed = self._seed_element_id("hub")
+        nodes = self.client.expand_candidates(
+            [seed], max_depth=1, max_neighbors=3, max_nodes=4
+        )
+        # hub + up to 3 neighbors, capped at 4 total nodes.
+        assert len(nodes) == 4
+        names = {n["properties"].get("name") for n in nodes}
+        assert "hub" in names
+
+    def test_allowlisted_relationships_are_fixed(self):
+        assert ALLOWED_EXPANSION_RELS == {
+            "DEFINES", "IMPORTS", "CALLS", "TESTED_BY",
+            "PRODUCED_BY", "PRECEDES", "SUPERSEDES", "CONTRADICTS",
+        }
+
+
+class TestSearchHelpers(_Neo4jTestBase):
+    """Exact-property + full-text search (typed, no hand-written Cypher)."""
+
+    @pytest.fixture(autouse=True)
+    def _cleanup(self, _setup_client):
+        yield
+        self.client._run("MATCH (k:Knowledge {knowledge_id: 'kf_001'}) DETACH DELETE k")
+        self.client._run("MATCH (s:Step {step_id: 'ft_1'}) DETACH DELETE s")
+
+    def test_find_exact_returns_matching_node(self):
+        self.client._run(
+            "MERGE (k:Knowledge {knowledge_id: 'kf_001'}) SET k.entity_id = 'ent_1'"
+        )
+        res = self.client.find_exact("Knowledge", "knowledge_id", "kf_001")
+        assert len(res) == 1
+        assert res[0]["properties"]["knowledge_id"] == "kf_001"
+        assert "Knowledge" in res[0]["labels"]
+
+    def test_find_exact_rejects_non_identifier(self):
+        with pytest.raises(ValueError):
+            self.client.find_exact("Knowledge; DROP", "knowledge_id", "x")
+
+    def test_search_fulltext_returns_matching_step(self):
+        self.client.create_knowledge_schema()
+        self.client._run(
+            "MERGE (s:Step {step_id: 'ft_1'}) SET s.text = 'websocket live reload protocol'"
+        )
+        res = self.client.search_fulltext("step_text_ft", "websocket")
+        assert len(res) >= 1
+        assert any(r["properties"].get("step_id") == "ft_1" for r in res)

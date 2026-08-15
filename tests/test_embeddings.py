@@ -5,7 +5,13 @@ import pytest
 import socket
 from pathlib import Path
 from unittest.mock import patch, MagicMock
-from instrument.embeddings import EmbeddingClient, ChromaStore, extract_session_text
+from instrument.embeddings import (
+    ChromaStore,
+    ChromaStoreError,
+    EmbeddingClient,
+    extract_session_text,
+    step_doc_id,
+)
 
 # Skip entire module if Ollama or ChromaDB is unreachable
 try:
@@ -198,3 +204,99 @@ class TestExtractSessionText:
         fake_path = Path("/nonexistent/session.jsonl")
         with pytest.raises(FileNotFoundError):
             extract_session_text(fake_path)
+
+
+class TestCanonicalChromaStore:
+    """Generic canonical upsert/delete/inventory, collection isolation, env endpoint."""
+
+    def test_step_doc_id_canonical_format(self):
+        # The canonical step-document id scheme shared with the graph index.
+        assert step_doc_id("sess", 0) == "sess_step_0000"
+        assert step_doc_id("sess", 12) == "sess_step_0012"
+        assert step_doc_id("sess", 9999) == "sess_step_9999"
+
+    def test_default_collection_name_unchanged(self):
+        store = ChromaStore()
+        assert store.COLLECTION_NAME == "session_embeddings"
+
+    def test_collection_isolation(self):
+        a = ChromaStore(collection_name="test_iso_a")
+        b = ChromaStore(collection_name="test_iso_b")
+        try:
+            a.upsert(["k1"], ["alpha doc"], metadatas=[{"authority": "source"}],
+                     embeddings=[[0.1, 0.2, 0.3]])
+            b.upsert(["k2"], ["beta doc"], metadatas=[{"authority": "advisory"}],
+                     embeddings=[[0.3, 0.2, 0.1]])
+            assert a.count() == 1
+            assert b.count() == 1
+            assert a.inventory()["ids"] == ["k1"]
+            assert b.inventory()["ids"] == ["k2"]
+        finally:
+            a._client.delete_collection("test_iso_a")
+            b._client.delete_collection("test_iso_b")
+
+    def test_upsert_delete_inventory_round_trip(self):
+        store = ChromaStore(collection_name="test_roundtrip")
+        try:
+            ids = [step_doc_id("sess_1", i) for i in range(3)]
+            n = store.upsert(
+                ids,
+                [f"document {i}" for i in range(3)],
+                metadatas=[{"authority": "source", "i": i} for i in range(3)],
+                embeddings=[[0.1, 0.2, 0.3] for _ in range(3)],
+            )
+            assert n == 3
+            inv = store.inventory()
+            assert inv["count"] == 3
+            assert set(inv["ids"]) == set(ids)
+            checkpoint_before = inv["checkpoint"]
+
+            store.delete([ids[0]])
+            assert store.count() == 2
+            assert store.inventory()["ids"] == sorted(ids[1:])
+            # Removing a doc changes the reconciliation checkpoint.
+            assert store.inventory()["checkpoint"] != checkpoint_before
+        finally:
+            store._client.delete_collection("test_roundtrip")
+
+    def test_search_with_where_filter(self):
+        store = ChromaStore(collection_name="test_where")
+        try:
+            store.upsert(
+                ["w1", "w2"],
+                [
+                    "live reload websocket protocol for a static site generator",
+                    "quantum physics entanglement of distant particles",
+                ],
+                metadatas=[{"authority": "source"}, {"authority": "advisory"}],
+            )
+            hits = store.search("websocket live reload", top_k=5, where={"authority": "source"})
+            assert hits
+            assert all(h["metadata"].get("authority") == "source" for h in hits)
+        finally:
+            store._client.delete_collection("test_where")
+
+    def test_upsert_propagates_store_failure(self):
+        store = ChromaStore(collection_name="test_err")
+        try:
+            with pytest.raises(ChromaStoreError):
+                store.upsert(["a"], [], embeddings=[[0.1, 0.2, 0.3]])
+        finally:
+            store._client.delete_collection("test_err")
+
+    def test_env_endpoint(self, monkeypatch):
+        monkeypatch.setenv("CHROMA_HOST", "chroma.test")
+        monkeypatch.setenv("CHROMA_PORT", "9999")
+        captured: dict = {}
+
+        import chromadb
+
+        class FakeHttpClient:
+            def __init__(self, host, port):
+                captured["host"] = host
+                captured["port"] = port
+
+        monkeypatch.setattr(chromadb, "HttpClient", FakeHttpClient)
+        ChromaStore()
+        assert captured["host"] == "chroma.test"
+        assert captured["port"] == 9999
