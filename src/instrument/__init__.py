@@ -166,6 +166,28 @@ from .retrieval import (
     select_evidence,
 )
 
+# v1.0: the prompt-constructor agent (typed plan, validator, deterministic renderer)
+from .prompt_constructor import (
+    DEFAULT_CONSTRUCTOR_MODEL,
+    SCHEMA_VERSION as PROMPT_PLAN_SCHEMA_VERSION,
+    AcceptanceCheck,
+    AugmentedPrompt,
+    ConstructionRequest,
+    EvidenceClaim,
+    EvidenceUnit,
+    HardConstraint,
+    ModelPromptConstructor,
+    PromptConstructor,
+    PromptPlan,
+    RelevantTarget,
+    build_constructor_prompt,
+    build_deterministic_plan,
+    construction_cache_key,
+    hash_work_item,
+    render_prompt,
+    validate_plan,
+)
+
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
@@ -299,6 +321,13 @@ __all__ = [
     "deduplicate", "collapse_redundant", "resolve_fallback_mode",
     "render_evidence_packet", "WEIGHTS_VERSION", "RELATIONSHIP_WEIGHTS",
     "AUTHORITY_MULTIPLIER",
+    # v1.0 prompt-constructor
+    "PromptConstructor", "ModelPromptConstructor",
+    "ConstructionRequest", "AugmentedPrompt", "PromptPlan", "EvidenceUnit",
+    "HardConstraint", "RelevantTarget", "EvidenceClaim", "AcceptanceCheck",
+    "build_constructor_prompt", "build_deterministic_plan", "validate_plan",
+    "render_prompt", "construction_cache_key", "hash_work_item",
+    "DEFAULT_CONSTRUCTOR_MODEL", "PROMPT_PLAN_SCHEMA_VERSION",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",
