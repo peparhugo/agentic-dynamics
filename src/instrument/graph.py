@@ -12,8 +12,6 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from neo4j import GraphDatabase
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -38,6 +36,8 @@ class Neo4jClient:
 
     def __init__(self, uri: str = "bolt://localhost:7687", user: str = "neo4j",
                  password: str = "password123"):  # local dev only — override via ENV for prod
+        from neo4j import GraphDatabase
+
         self._driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
