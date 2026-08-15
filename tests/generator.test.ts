@@ -35,4 +35,40 @@ describe('buildSite', () => {
     expect(index).toContain('href="first.html"');
     expect(index).toContain('First post');
   });
+
+  it('renders a page template in the default layout with partials', () => {
+    const content = join(root, 'content');
+    const output = join(root, 'site');
+    const templates = join(root, 'templates');
+    mkdirSync(content);
+    mkdirSync(join(templates, 'layouts'), { recursive: true });
+    mkdirSync(join(templates, 'partials'));
+    writeFileSync(join(content, 'post.md'), '---\ntitle: Templated post\n---\n# Hello');
+    writeFileSync(join(templates, 'default.hbs'), '<article><h1>{{title}}</h1>{{{content}}}</article>');
+    writeFileSync(join(templates, 'layouts', 'default.hbs'), '<html><body>{{> header}}{{{body}}}{{> footer}}</body></html>');
+    writeFileSync(join(templates, 'partials', 'header.hbs'), '<header>Site header</header>');
+    writeFileSync(join(templates, 'partials', 'footer.hbs'), '<footer>Site footer</footer>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    const page = readFileSync(join(output, 'post.html'), 'utf8');
+    expect(page).toContain('<header>Site header</header>');
+    expect(page).toContain('<article><h1>Templated post</h1><h1>Hello</h1>');
+    expect(page).toContain('<footer>Site footer</footer>');
+  });
+
+  it('uses frontmatter-selected templates and layouts', () => {
+    const content = join(root, 'content');
+    const output = join(root, 'site');
+    const templates = join(root, 'templates');
+    mkdirSync(content);
+    mkdirSync(join(templates, 'layouts'), { recursive: true });
+    writeFileSync(join(content, 'post.md'), '---\ntitle: Custom\ntemplate: card\nlayout: shell\n---\nBody');
+    writeFileSync(join(templates, 'card.hbs'), '<section data-slug="{{slug}}">{{title}}: {{{content}}}</section>');
+    writeFileSync(join(templates, 'layouts', 'shell.hbs'), '<main>{{{body}}}</main>');
+
+    buildSite({ contentDir: content, outputDir: output, templatesDir: templates });
+
+    expect(readFileSync(join(output, 'post.html'), 'utf8')).toBe('<main><section data-slug="post">Custom: <p>Body</p>\n</section></main>');
+  });
 });

@@ -9,8 +9,12 @@ function optionValue(args: string[], option: string): string | undefined {
 }
 
 function main(args: string[]): void {
-  if (args[0] !== 'build') throw new Error('Usage: ssg build [--content <dir>] [--output <dir>]');
-  const pages = buildSite({ contentDir: optionValue(args, '--content'), outputDir: optionValue(args, '--output') });
+  if (args[0] !== 'build') throw new Error('Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]');
+  const pages = buildSite({
+    contentDir: optionValue(args, '--content'),
+    outputDir: optionValue(args, '--output'),
+    templatesDir: optionValue(args, '--templates'),
+  });
   console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'}.`);
 }
 

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, relative } from 'node:path';
 import matter from 'gray-matter';
+import Handlebars from 'handlebars';
 import { marked } from 'marked';
 
 export interface Page {
@@ -9,6 +10,8 @@ export interface Page {
   tags: string[];
   slug: string;
   html: string;
+  template?: string;
+  layout?: string;
 }
 
 type Frontmatter = Record<string, string | string[]>;
@@ -48,6 +51,8 @@ export function parsePage(source: string, filePath: string): Page {
     tags,
     slug: name,
     html: marked.parse(parsed.content) as string,
+    template: typeof data.template === 'string' ? data.template : undefined,
+    layout: typeof data.layout === 'string' ? data.layout : undefined,
   };
 }
 
@@ -72,15 +77,58 @@ function renderPage(page: Page): string {
   return document(page.title, `<article>\n<h1>${escapeHtml(page.title)}</h1>${metadata ? `\n<p>${escapeHtml(metadata)}</p>` : ''}\n${page.html}</article>`);
 }
 
+function hbsFile(directory: string, name: string): string {
+  return join(directory, `${name.endsWith('.hbs') ? name : `${name}.hbs`}`);
+}
+
+function registerPartials(partialsDir: string): void {
+  if (!existsSync(partialsDir)) return;
+  for (const path of hbsFiles(partialsDir)) {
+    const name = relative(partialsDir, path).replace(/\\/g, '/').replace(/\.hbs$/i, '');
+    Handlebars.registerPartial(name, readFileSync(path, 'utf8'));
+  }
+}
+
+function hbsFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) return hbsFiles(path);
+    return entry.isFile() && extname(entry.name).toLowerCase() === '.hbs' ? [path] : [];
+  });
+}
+
+function renderTemplate(path: string, context: Page & { body?: string; content?: string }): string {
+  return Handlebars.compile(readFileSync(path, 'utf8'))(context);
+}
+
+function renderTemplatedPage(page: Page, templatesDir: string): string {
+  const templatePath = hbsFile(templatesDir, page.template ?? 'default');
+  if (!existsSync(templatePath)) {
+    if (!page.template) return renderPage(page);
+    throw new Error(`Template does not exist: ${templatePath}`);
+  }
+
+  const body = renderTemplate(templatePath, { ...page, content: page.html });
+  const layoutPath = hbsFile(join(templatesDir, 'layouts'), page.layout ?? 'default');
+  if (!existsSync(layoutPath)) {
+    if (!page.layout) return body;
+    throw new Error(`Layout does not exist: ${layoutPath}`);
+  }
+  return renderTemplate(layoutPath, { ...page, body, content: page.html });
+}
+
 export interface BuildOptions {
   contentDir?: string;
   outputDir?: string;
+  templatesDir?: string;
 }
 
-export function buildSite({ contentDir = './content', outputDir = './dist' }: BuildOptions = {}): Page[] {
+export function buildSite({ contentDir = './content', outputDir = './dist', templatesDir = './templates' }: BuildOptions = {}): Page[] {
   if (!existsSync(contentDir)) throw new Error(`Content directory does not exist: ${contentDir}`);
   rmSync(outputDir, { recursive: true, force: true });
   mkdirSync(outputDir, { recursive: true });
+  Handlebars.partials = {};
+  registerPartials(join(templatesDir, 'partials'));
 
   const pages = markdownFiles(contentDir).map((path) => {
     const page = parsePage(readFileSync(path, 'utf8'), path);
@@ -88,7 +136,7 @@ export function buildSite({ contentDir = './content', outputDir = './dist' }: Bu
     page.slug = relativePath.replace(/\\/g, '/');
     const outputPath = join(outputDir, `${relativePath}.html`);
     mkdirSync(join(outputPath, '..'), { recursive: true });
-    writeFileSync(outputPath, renderPage(page));
+    writeFileSync(outputPath, renderTemplatedPage(page, templatesDir));
     return page;
   }).sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''));
 
