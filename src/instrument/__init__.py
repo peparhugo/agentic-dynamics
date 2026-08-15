@@ -188,6 +188,29 @@ from .prompt_constructor import (
     validate_plan,
 )
 
+# v1.0: durable ingestion over Redis Streams (DB 2, pointer-only events)
+from .knowledge_stream import (
+    CONSUMER_GROUPS,
+    DEAD_LETTER_KEY,
+    STREAM_KEY,
+    StreamEntry,
+    acknowledge,
+    claim_pending,
+    connect,
+    create_consumer_group,
+    dead_letter,
+    decode_event,
+    default_extract,
+    delivery_count,
+    pending_count,
+    process_entry,
+    publish_event,
+    read_artifact,
+    read_events,
+    reconcile_missing,
+    verify_content_hash,
+)
+
 # Deprecated: analyze_escape, MarkerProfile, marker_validation_summary — not used by current scripts
 from .semantic_validation import analyze_ast, analyze_markers
 
@@ -329,6 +352,12 @@ __all__ = [
     "build_constructor_prompt", "build_deterministic_plan", "validate_plan",
     "render_prompt", "construction_cache_key", "hash_work_item",
     "DEFAULT_CONSTRUCTOR_MODEL", "PROMPT_PLAN_SCHEMA_VERSION",
+    # v1.0 durable ingestion (Redis Streams, DB 2)
+    "StreamEntry", "connect", "publish_event", "create_consumer_group",
+    "read_events", "acknowledge", "pending_count", "delivery_count",
+    "claim_pending", "dead_letter", "decode_event", "default_extract",
+    "process_entry", "read_artifact", "verify_content_hash", "reconcile_missing",
+    "CONSUMER_GROUPS", "STREAM_KEY", "DEAD_LETTER_KEY",
     "run_suite", "suite_succeeded",
     "SUPERVISOR_FLAGS_KEY", "SUPERVISOR_SESSION_CELLS_KEY",
     "normalize_flag", "register_session_mapping",

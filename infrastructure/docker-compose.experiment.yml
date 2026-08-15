@@ -16,6 +16,21 @@ services:
 
   # queue (6380) is the FRAMEWORK queue — story_jobs/story_status live here, isolated
   # from the agents so their flushdb()/flushall() can never wipe the experiment queue.
+  #
+  # DB reservation (framework instance, port 6380):
+  #   DB 1  — story_jobs / story_status / live.py pub-sub telemetry
+  #   DB 2  — knowledge-base ingestion Streams (kb:v1:*), RESERVED for
+  #           src/instrument/knowledge_stream.py. Keep this DB free of the dashboard's
+  #           keys; the stream (kb:v1:changes) and dead-letter (kb:v1:dead_letter) are
+  #           durable ingestion state and must not share a DB with best-effort telemetry.
+  #   NEVER use port 6379 (finops-redis) for framework or knowledge state — story agents
+  #   run flushdb()/flushall() against it as a test sandbox.
+  #
+  # Persistence: the knowledge stream and the framework queue are durable state and
+  # should survive a container restart. Enable AOF (appendonly yes) for this instance so
+  # stream entries and queue jobs are not lost on a crash; RDB alone would lose the most
+  # recent XADD/BRPOP state between snapshots. (No behavior change here — this is the
+  # operational note for where AOF must be turned on.)
   queue:
     image: redis:7-alpine
     container_name: finops-queue
