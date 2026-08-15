@@ -9,7 +9,6 @@ Produces:
     experiments/results/{name}_comparison.md   — multi-model comparison table
 """
 
-import hashlib
 import json
 import os
 import sys
@@ -19,7 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from instrument import (
-    build_operators, perturb_prompt, derive_seed,
+    build_operators, resolve_perturbed_prompt,
     evaluate_solution, compute_efficiency,
     classify_strategy, measure_basin_escape,
     BasinMetrics, GameReport,
@@ -51,6 +50,10 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
     seed_variants = cfg.get("seed_variants", [0])
     if seed_variant is not None:
         seed_variants = [seed_variant]
+    # Perturbation source: "deterministic" (seeded operators) or "flash" (a cheap model
+    # authors the perturbation and it is pinned as a reusable, variant-indexed artifact).
+    perturbation_mode = cfg.get("perturbation_mode", "deterministic")
+    perturbation_cache_dir = Path(cfg.get("perturbation_cache_dir", "experiments/results/perturbations"))
     model_id = model_override or cfg.get("model_id", "deepseek/deepseek-v4-pro")
     if model_override:
         model_label = model_override.split("/")[-1].replace(" ", "_").lower()
@@ -105,7 +108,9 @@ def run_experiment(config_path: str, model_override: str = "", limit: int = 0,
                                        output_token_limit=output_token_limit,
                                        silent_mode=silent_mode,
                                        standardize=standardize, enforce_pytest=enforce_pytest,
-                                       backend=backend, rep=rep, seed_variant=variant)
+                                       backend=backend, rep=rep, seed_variant=variant,
+                                       perturbation_mode=perturbation_mode,
+                                       perturbation_cache_dir=perturbation_cache_dir)
                     all_runs.append(r)
                     time.sleep(2)
 
@@ -188,14 +193,15 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
                    thinking_effort="", thinking_budget_tokens=0,
                    output_token_limit=0, silent_mode=None,
                    standardize=True, enforce_pytest=True, backend="auto",
-                   rep=0, seed_variant=0):
+                   rep=0, seed_variant=0, perturbation_mode="deterministic",
+                   perturbation_cache_dir=None):
     pert_class = ops[op_name].perturbation_class if op_name in ops else "?"
-    # Seed is a pure function of the cell (task|operator|strength|seed_variant),
-    # independent of loop order/model/run_idx — see derive_seed in perturb.py.
-    # repetition re-measures the SAME starting point; seed_variant deviates it.
-    seed = derive_seed(task, op_name, strength, seed_variant)
-    perturbed, _ = perturb_prompt(task, op_name, strength=strength, rng_seed=seed)
-    perturbed_prompt_sha256 = hashlib.sha256(perturbed.encode("utf-8")).hexdigest()
+    # The starting point is either a deterministic seeded draw (derive_seed + operator)
+    # or a flash-authored, pinned artifact — same (prompt, sha256, provenance) contract.
+    perturbed, perturbed_prompt_sha256, provenance = resolve_perturbed_prompt(
+        task, op_name, strength, seed_variant=seed_variant, mode=perturbation_mode,
+        cache_dir=perturbation_cache_dir,
+    )
 
     print(f"[{run_idx}/{total}] {op_name} s={strength} ({pert_class})...",
           end=" ", flush=True)
@@ -258,9 +264,10 @@ def _run_perturbed(task, constraints, op_name, strength, baseline,
     return {
         "type": "perturbed", "model": model_id,
         "operator": op_name, "perturbation_class": pert_class, "strength": strength,
-        "rng_seed": seed,
         "seed_variant": seed_variant,
         "repetition": rep,
+        "perturbation_mode": perturbation_mode,
+        "provenance": provenance,
         "perturbed_prompt": perturbed,
         "perturbed_prompt_sha256": perturbed_prompt_sha256,
         "correctness": sol.correctness_score,

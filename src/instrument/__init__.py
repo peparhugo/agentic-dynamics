@@ -114,6 +114,12 @@ from .ollama_analyzer import OllamaAnalyzer, load_summary_data
 from .opencode import AgenticResult, normalize_opencode_event, run_opencode_agentic
 from .opencode_analyzer import REPORTS_DIR, OpencodeAnalyzer
 from .perturb import PERTURBATION_CLASSES, build_operators, derive_seed, perturb_prompt, perturbation_class_for
+from .prompt_perturbation import (
+    FLASH_MODEL,
+    PromptPerturbation,
+    compile_prompt_perturbation,
+    resolve_perturbed_prompt,
+)
 
 # Deprecated: RecoveryCost, recovery_summary_table — not used by current scripts
 from .recovery_cost import compute_recovery_cost
@@ -194,6 +200,7 @@ from .workflow_runner import (
 
 __all__ = [
     "build_operators", "perturb_prompt", "PERTURBATION_CLASSES", "perturbation_class_for", "derive_seed",
+    "compile_prompt_perturbation", "resolve_perturbed_prompt", "PromptPerturbation", "FLASH_MODEL",
     "BasinMetrics", "measure_basin_escape",
     "SolutionMetrics", "evaluate_solution",
     "EfficiencyMetrics", "compute_efficiency", "compute_cost_estimate",
