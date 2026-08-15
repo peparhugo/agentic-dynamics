@@ -1,7 +1,5 @@
-import json
 import logging
 import os
-import tempfile
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -10,9 +8,9 @@ from threading import RLock
 import jwt
 from flask import Flask, g, jsonify, request
 from jwt import InvalidTokenError
-from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
@@ -39,97 +37,19 @@ def _users_file() -> Path:
     return task_file.with_name(f"{task_file.stem}.users.json")
 
 
-def _write_json(path: Path, data: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as store:
-            json.dump(data, store, indent=2)
-            store.write("\n")
-        os.replace(temporary_name, path)
-    except BaseException:
-        try:
-            os.unlink(temporary_name)
-        except FileNotFoundError:
-            pass
-        raise
-
-
-def _read_json(path: Path, storage_name: str) -> list[dict]:
-    try:
-        with path.open(encoding="utf-8") as store:
-            data = json.load(store)
-    except (json.JSONDecodeError, OSError) as exc:
-        raise RuntimeError(f"{storage_name} storage is unreadable") from exc
-    if not isinstance(data, list):
-        raise RuntimeError(f"{storage_name} storage is invalid")
-    return data
+task_repository = TaskRepository(_data_file, _storage_lock)
+user_repository = UserRepository(_users_file, _storage_lock)
 
 
 def init_storage() -> None:
     """Create stores and migrate tasks written before ownership was added."""
-    with _storage_lock:
-        task_file = _data_file()
-        user_file = _users_file()
-        task_file.parent.mkdir(parents=True, exist_ok=True)
-        user_file.parent.mkdir(parents=True, exist_ok=True)
-        if not task_file.exists():
-            _write_json(task_file, [])
-        if not user_file.exists():
-            _write_json(user_file, [])
-
-        tasks = _read_json(task_file, "task")
-        migrated = False
-        for task in tasks:
-            if isinstance(task, dict) and "owner_id" not in task:
-                task["owner_id"] = None
-                migrated = True
-        if migrated:
-            _write_json(task_file, tasks)
+    task_repository.initialize()
+    user_repository.initialize()
 
 
-def _read_tasks() -> list[dict]:
+@app.before_request
+def ensure_storage_initialized() -> None:
     init_storage()
-    with _storage_lock:
-        return _read_json(_data_file(), "task")
-
-
-def _write_tasks(tasks: list[dict]) -> None:
-    _write_json(_data_file(), tasks)
-
-
-def _read_users() -> list[dict]:
-    init_storage()
-    with _storage_lock:
-        return _read_json(_users_file(), "user")
-
-
-def create_user(username: str, password: str) -> dict | None:
-    with _storage_lock:
-        users = _read_users()
-        if any(user["username"] == username for user in users):
-            return None
-        user = {
-            "id": max((user["id"] for user in users), default=0) + 1,
-            "username": username,
-            "password_hash": generate_password_hash(password, method="scrypt"),
-        }
-        users.append(user)
-        _write_json(_users_file(), users)
-        return user
-
-
-def authenticate_user(username: str, password: str) -> dict | None:
-    user = next(
-        (user for user in _read_users() if user["username"] == username), None
-    )
-    if user is None or not check_password_hash(user["password_hash"], password):
-        return None
-    return user
-
-
-def get_user(user_id: int) -> dict | None:
-    return next((user for user in _read_users() if user["id"] == user_id), None)
 
 
 def _issue_token(user_id: int) -> str:
@@ -157,69 +77,12 @@ def require_auth(view):
         except (InvalidTokenError, KeyError, TypeError, ValueError):
             return jsonify({"error": "invalid token"}), 401
 
-        if not any(user["id"] == user_id for user in _read_users()):
+        if user_repository.get_by_id(user_id) is None:
             return jsonify({"error": "invalid token"}), 401
         g.user_id = user_id
         return view(*args, **kwargs)
 
     return authenticated_view
-
-
-def create_task(title: str, owner_id: int) -> dict:
-    with _storage_lock:
-        tasks = _read_tasks()
-        task = {
-            "id": max((task["id"] for task in tasks), default=0) + 1,
-            "title": title,
-            "status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "owner_id": owner_id,
-        }
-        tasks.append(task)
-        _write_tasks(tasks)
-        return task
-
-
-def get_tasks(owner_id: int) -> list[dict]:
-    tasks = [task for task in _read_tasks() if task.get("owner_id") == owner_id]
-    return sorted(tasks, key=lambda task: task["created_at"], reverse=True)
-
-
-def get_task(task_id: int, owner_id: int) -> dict | None:
-    return next(
-        (
-            task
-            for task in _read_tasks()
-            if task["id"] == task_id and task.get("owner_id") == owner_id
-        ),
-        None,
-    )
-
-
-def update_task(
-    task_id: int,
-    owner_id: int,
-    title: str | None = None,
-    status: str | None = None,
-) -> dict | None:
-    with _storage_lock:
-        tasks = _read_tasks()
-        task = next(
-            (
-                task
-                for task in tasks
-                if task["id"] == task_id and task.get("owner_id") == owner_id
-            ),
-            None,
-        )
-        if task is None:
-            return None
-        if title is not None:
-            task["title"] = title
-        if status is not None:
-            task["status"] = status
-        _write_tasks(tasks)
-        return task
 
 
 def _json_body() -> dict | None:
@@ -249,7 +112,7 @@ def register():
     if credentials is None:
         return jsonify({"error": "username and password are required"}), 400
     username, password = credentials
-    user = create_user(username, password)
+    user = user_repository.create_user(username, password)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify({"id": user["id"], "username": user["username"]}), 201
@@ -260,7 +123,7 @@ def login():
     credentials = _credentials()
     if credentials is None:
         return jsonify({"error": "username and password are required"}), 400
-    user = authenticate_user(*credentials)
+    user = user_repository.authenticate(*credentials)
     if user is None:
         return jsonify({"error": "invalid username or password"}), 401
     return jsonify({"token": _issue_token(user["id"])})
@@ -269,7 +132,7 @@ def login():
 @app.get("/tasks")
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    return jsonify(task_repository.list_for_owner(g.user_id))
 
 
 @app.post("/tasks")
@@ -279,13 +142,13 @@ def add_task():
     title = data.get("title") if data is not None else None
     if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    return jsonify(create_task(title.strip(), g.user_id)), 201
+    return jsonify(task_repository.create_for_owner(title.strip(), g.user_id)), 201
 
 
 @app.get("/tasks/<int:task_id>")
 @require_auth
 def show_task(task_id: int):
-    task = get_task(task_id, g.user_id)
+    task = task_repository.get_for_owner(task_id, g.user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -294,7 +157,7 @@ def show_task(task_id: int):
 @app.put("/tasks/<int:task_id>")
 @require_auth
 def edit_task(task_id: int):
-    existing_task = get_task(task_id, g.user_id)
+    existing_task = task_repository.get_for_owner(task_id, g.user_id)
     if existing_task is None:
         return jsonify({"error": "task not found"}), 404
 
@@ -309,11 +172,11 @@ def edit_task(task_id: int):
         return jsonify({"error": "status must be a string"}), 400
 
     title = data["title"].strip() if "title" in data else None
-    task = update_task(
+    task = task_repository.update_for_owner(
         task_id, g.user_id, title=title, status=data.get("status")
     )
     if existing_task["status"] != "completed" and task["status"] == "completed":
-        owner = get_user(g.user_id)
+        owner = user_repository.get_by_id(g.user_id)
         try:
             send_notification_email.delay(owner["username"], task["title"])
         except Exception:
