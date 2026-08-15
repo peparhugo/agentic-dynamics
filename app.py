@@ -7,156 +7,13 @@ import os
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from threading import RLock
 from typing import Any, Callable
 
 from flask import Flask, g, jsonify, request
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 from notification_tasks import send_notification_email
-
-
-class TaskStore:
-    """A small, thread-safe JSON file store for tasks."""
-
-    def __init__(self, path: str | Path) -> None:
-        self.path = Path(path)
-        self._lock = RLock()
-        self.initialize()
-
-    def initialize(self) -> None:
-        with self._lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            if not self.path.exists():
-                self._write([])
-                return
-
-            tasks = self._read()
-            if any("owner_id" not in task for task in tasks):
-                for task in tasks:
-                    task.setdefault("owner_id", None)
-                self._write(tasks)
-
-    def _read(self) -> list[dict[str, Any]]:
-        with self.path.open(encoding="utf-8") as file:
-            data = json.load(file)
-        if not isinstance(data, list):
-            raise ValueError("task storage must contain a JSON array")
-        return data
-
-    def _write(self, tasks: list[dict[str, Any]]) -> None:
-        temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        with temporary_path.open("w", encoding="utf-8") as file:
-            json.dump(tasks, file, indent=2)
-            file.write("\n")
-            file.flush()
-            os.fsync(file.fileno())
-        os.replace(temporary_path, self.path)
-
-    def create(self, title: str, owner_id: int) -> dict[str, Any]:
-        with self._lock:
-            tasks = self._read()
-            task = {
-                "id": max((task["id"] for task in tasks), default=0) + 1,
-                "title": title,
-                "status": "pending",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "owner_id": owner_id,
-            }
-            tasks.append(task)
-            self._write(tasks)
-            return task
-
-    def list(self, owner_id: int) -> list[dict[str, Any]]:
-        with self._lock:
-            return sorted(
-                (task for task in self._read() if task.get("owner_id") == owner_id),
-                key=lambda task: task["created_at"],
-                reverse=True,
-            )
-
-    def get(self, task_id: int, owner_id: int) -> dict[str, Any] | None:
-        with self._lock:
-            return next(
-                (
-                    task
-                    for task in self._read()
-                    if task["id"] == task_id and task.get("owner_id") == owner_id
-                ),
-                None,
-            )
-
-    def update(
-        self, task_id: int, owner_id: int, changes: dict[str, str]
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            tasks = self._read()
-            for task in tasks:
-                if task["id"] == task_id and task.get("owner_id") == owner_id:
-                    task.update(changes)
-                    self._write(tasks)
-                    return task
-            return None
-
-
-class UserStore:
-    """A thread-safe JSON file store for users."""
-
-    def __init__(self, path: str | Path) -> None:
-        self.path = Path(path)
-        self._lock = RLock()
-        self.initialize()
-
-    def initialize(self) -> None:
-        with self._lock:
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            if not self.path.exists():
-                self._write([])
-
-    def _read(self) -> list[dict[str, Any]]:
-        with self.path.open(encoding="utf-8") as file:
-            data = json.load(file)
-        if not isinstance(data, list):
-            raise ValueError("user storage must contain a JSON array")
-        return data
-
-    def _write(self, users: list[dict[str, Any]]) -> None:
-        temporary_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
-        with temporary_path.open("w", encoding="utf-8") as file:
-            json.dump(users, file, indent=2)
-            file.write("\n")
-            file.flush()
-            os.fsync(file.fileno())
-        os.replace(temporary_path, self.path)
-
-    def create(
-        self, username: str, password: str, email: str | None = None
-    ) -> dict[str, Any] | None:
-        with self._lock:
-            users = self._read()
-            if any(user["username"] == username for user in users):
-                return None
-            user = {
-                "id": max((user["id"] for user in users), default=0) + 1,
-                "username": username,
-                "email": email or username,
-                "password_hash": generate_password_hash(password),
-            }
-            users.append(user)
-            self._write(users)
-            return user
-
-    def get_by_username(self, username: str) -> dict[str, Any] | None:
-        with self._lock:
-            return next(
-                (user for user in self._read() if user["username"] == username), None
-            )
-
-    def get(self, user_id: int) -> dict[str, Any] | None:
-        with self._lock:
-            return next(
-                (user for user in self._read() if user["id"] == user_id), None
-            )
+from repositories import TaskRepository, UserRepository
 
 
 def _base64url_encode(value: bytes) -> str:
@@ -244,10 +101,10 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
                 Path(config["TASKS_FILE"]).with_name("users.json")
             )
 
-    task_store = TaskStore(app.config["TASKS_FILE"])
-    user_store = UserStore(app.config["USERS_FILE"])
-    app.extensions["task_store"] = task_store
-    app.extensions["user_store"] = user_store
+    task_repository = TaskRepository(app.config["TASKS_FILE"])
+    user_repository = UserRepository(app.config["USERS_FILE"])
+    app.extensions["task_repository"] = task_repository
+    app.extensions["user_repository"] = user_repository
 
     def require_auth(view: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(view)
@@ -277,8 +134,10 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if email is not None and (not isinstance(email, str) or not email.strip()):
             return jsonify(error="email must be a non-empty string"), 400
 
-        user = user_store.create(
-            username.strip(), password, email.strip() if email is not None else None
+        user = user_repository.create(
+            username=username.strip(),
+            password=password,
+            email=email.strip() if email is not None else None,
         )
         if user is None:
             return jsonify(error="username already exists"), 409
@@ -292,7 +151,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if not isinstance(username, str) or not isinstance(password, str):
             return jsonify(error="username and password are required"), 400
 
-        user = user_store.get_by_username(username.strip())
+        user = user_repository.get_by_username(username.strip())
         if user is None or not check_password_hash(user["password_hash"], password):
             return jsonify(error="invalid username or password"), 401
         token = create_token(
@@ -310,17 +169,19 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if not isinstance(title, str) or not title.strip():
             return jsonify(error="title is required"), 400
 
-        return jsonify(task_store.create(title.strip(), g.user_id)), 201
+        return jsonify(
+            task_repository.create(title=title.strip(), owner_id=g.user_id)
+        ), 201
 
     @app.get("/tasks")
     @require_auth
     def list_tasks():
-        return jsonify(task_store.list(g.user_id))
+        return jsonify(task_repository.list(g.user_id))
 
     @app.get("/tasks/<int:task_id>")
     @require_auth
     def get_task(task_id: int):
-        task = task_store.get(task_id, g.user_id)
+        task = task_repository.get(task_id, g.user_id)
         if task is None:
             return jsonify(error="task not found"), 404
         return jsonify(task)
@@ -344,8 +205,8 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
         if not changes:
             return jsonify(error="title or status is required"), 400
 
-        existing_task = task_store.get(task_id, g.user_id)
-        task = task_store.update(task_id, g.user_id, changes)
+        existing_task = task_repository.get(task_id, g.user_id)
+        task = task_repository.update(task_id, g.user_id, changes)
         if task is None:
             return jsonify(error="task not found"), 404
         if (
@@ -353,7 +214,7 @@ def create_app(config: dict[str, Any] | None = None) -> Flask:
             and existing_task["status"] != "completed"
             and task["status"] == "completed"
         ):
-            owner = user_store.get(g.user_id)
+            owner = user_repository.get(g.user_id)
             if owner is not None:
                 try:
                     send_notification_email.delay(
