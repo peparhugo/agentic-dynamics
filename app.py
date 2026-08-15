@@ -20,6 +20,8 @@ from functools import wraps
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 
 app = Flask(__name__)
 DATA_FILE = Path(os.environ.get("TASKS_FILE", "tasks.json"))
@@ -155,15 +157,21 @@ def register():
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
+    email = data.get("email") if isinstance(data.get("email"), str) else username
     with _file_lock:
         storage = _read_data()
         if any(user["username"] == username for user in storage["users"]):
             return jsonify({"error": "username already exists"}), 409
-        user = {"id": storage["next_user_id"], "username": username, "password_hash": generate_password_hash(password)}
+        user = {
+            "id": storage["next_user_id"],
+            "username": username,
+            "email": email,
+            "password_hash": generate_password_hash(password),
+        }
         storage["next_user_id"] += 1
         storage["users"].append(user)
         _write_data(storage)
-    return jsonify({"id": user["id"], "username": user["username"]}), 201
+    return jsonify({"id": user["id"], "username": user["username"], "email": user["email"]}), 201
 
 
 @app.post("/auth/login")
@@ -238,11 +246,14 @@ def update_task(task_id):
         task = next((task for task in storage["tasks"] if task["id"] == task_id and task.get("owner_id") == g.user["id"]), None)
         if task is None:
             return jsonify({"error": "task not found"}), 404
+        previous_status = task.get("status")
         if "title" in data:
             task["title"] = data["title"].strip()
         if "status" in data:
             task["status"] = data["status"]
         _write_data(storage)
+    if data.get("status") == "completed" and previous_status != "completed":
+        send_notification_email.delay(g.user.get("email", g.user["username"]), task["title"])
     return _task_response(task)
 
 

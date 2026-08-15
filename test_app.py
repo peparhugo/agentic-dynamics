@@ -3,6 +3,7 @@ import json
 import pytest
 
 import app as task_app
+from celery_config import celery_app
 
 
 @pytest.fixture
@@ -49,6 +50,40 @@ def test_get_and_update_task(auth_client):
     assert response.json["title"] == "New title"
     assert response.json["status"] == "complete"
     assert auth_client.get(f"/tasks/{created['id']}").json == response.json
+
+
+def test_completing_task_queues_notification(auth_client, monkeypatch):
+    created = auth_client.post("/tasks", json={"title": "Ship it"}).json
+    queued = []
+
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda email, title: queued.append((email, title)),
+    )
+
+    response = auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    assert response.status_code == 200
+    assert queued == [("alice", "Ship it")]
+
+
+def test_notification_is_only_queued_on_transition_to_completed(auth_client, monkeypatch):
+    created = auth_client.post("/tasks", json={"title": "Ship it"}).json
+    queued = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: queued.append(args))
+
+    auth_client.put(f"/tasks/{created['id']}", json={"title": "Renamed"})
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+    auth_client.put(f"/tasks/{created['id']}", json={"status": "completed"})
+
+    assert queued == [("alice", "Renamed")]
+
+
+def test_celery_uses_redis_and_notification_route():
+    assert celery_app.conf.broker_url == "redis://localhost:6379/0"
+    assert celery_app.conf.result_backend == "redis://localhost:6379/0"
+    assert celery_app.conf.task_routes["notifications.send_notification_email"]["queue"] == "notifications"
 
 
 def test_missing_task_returns_json_404(auth_client):
