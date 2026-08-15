@@ -5,6 +5,7 @@ export interface CliOptions {
   command: string;
   contentDir: string;
   outputDir: string;
+  templatesDir: string;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -12,6 +13,7 @@ export function parseArgs(argv: string[]): CliOptions {
   let command = 'build';
   let contentDir = './content';
   let outputDir = './dist';
+  let templatesDir = './templates';
   const positionals: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -20,10 +22,14 @@ export function parseArgs(argv: string[]): CliOptions {
       contentDir = args[++i] ?? contentDir;
     } else if (arg === '--output' || arg === '-o') {
       outputDir = args[++i] ?? outputDir;
+    } else if (arg === '--templates' || arg === '-t') {
+      templatesDir = args[++i] ?? templatesDir;
     } else if (arg.startsWith('--content=')) {
       contentDir = arg.slice('--content='.length);
     } else if (arg.startsWith('--output=')) {
       outputDir = arg.slice('--output='.length);
+    } else if (arg.startsWith('--templates=')) {
+      templatesDir = arg.slice('--templates='.length);
     } else if (!arg.startsWith('-')) {
       positionals.push(arg);
     }
@@ -33,7 +39,7 @@ export function parseArgs(argv: string[]): CliOptions {
     command = positionals[0];
   }
 
-  return { command, contentDir, outputDir };
+  return { command, contentDir, outputDir, templatesDir };
 }
 
 export function run(argv: string[]): number {
@@ -45,7 +51,11 @@ export function run(argv: string[]): number {
   }
 
   try {
-    const result = build({ contentDir: opts.contentDir, outputDir: opts.outputDir });
+    const result = build({
+      contentDir: opts.contentDir,
+      outputDir: opts.outputDir,
+      templatesDir: opts.templatesDir,
+    });
     console.log(`Generated ${result.pages.length} page(s) in ${opts.outputDir}`);
     return 0;
   } catch (err) {

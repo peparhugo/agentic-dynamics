@@ -2,18 +2,24 @@ import fs from 'fs';
 import path from 'path';
 import { marked } from 'marked';
 import { parseMarkdown } from './frontmatter';
+import { TemplateEngine, TemplateContext } from './templates';
 import type { BuildOptions, BuildResult, Page } from './types';
 
 const MARKDOWN_EXTENSIONS = ['.md', '.markdown'];
+const DEFAULT_TEMPLATES_DIR = './templates';
 
 export function build(options: BuildOptions): BuildResult {
   const { contentDir, outputDir } = options;
+  const templatesDir = options.templatesDir ?? DEFAULT_TEMPLATES_DIR;
   const pages = readPages(contentDir);
 
   fs.mkdirSync(outputDir, { recursive: true });
 
+  const engine = new TemplateEngine({ templatesDir });
+  const useTemplates = engine.hasTemplatesDir();
+
   for (const page of pages) {
-    const pageHtml = renderPage(page);
+    const pageHtml = useTemplates ? renderPageWithTemplate(page, engine) : renderPage(page);
     fs.writeFileSync(path.join(outputDir, `${page.slug}.html`), pageHtml);
   }
 
@@ -47,6 +53,9 @@ function readPages(contentDir: string): Page[] {
       tags: normalizeTags(data.tags),
       html: marked.parse(content) as string,
       sourcePath: filePath,
+      template: typeof data.template === 'string' && data.template.trim() !== '' ? data.template.trim() : undefined,
+      layout: typeof data.layout === 'string' && data.layout.trim() !== '' ? data.layout.trim() : undefined,
+      data,
     });
   }
 
@@ -76,6 +85,20 @@ function normalizeTags(tags: unknown): string[] {
       .filter(Boolean);
   }
   return [];
+}
+
+function renderPageWithTemplate(page: Page, engine: TemplateEngine): string {
+  const context: TemplateContext = {
+    ...page.data,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    slug: page.slug,
+    body: page.html,
+    content: page.html,
+  };
+
+  return engine.render(page.template, page.layout, context);
 }
 
 function renderPage(page: Page): string {
