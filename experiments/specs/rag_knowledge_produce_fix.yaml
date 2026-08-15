@@ -1,0 +1,148 @@
+name: rag_knowledge_produce_fix
+question: >-
+  Fix the producer-side pointer contract so the async knowledge spine actually populates. Today
+  kb_produce.py emits KnowledgeEvents whose content_hash = sha256(card.text) while source_uri points
+  at the whole _results_summary.json, so the consumer's read_artifact + verify_content_hash always
+  fail, every event retries, and nothing lands in the stores. Also add structured confidence /
+  perturbation_strength to KnowledgeRecord (they are currently dropped to prose), then clear the
+  stuck stream, re-emit, drain, and verify the stores actually populate.
+version: "0.1"
+workflow:
+  kind: agent_task
+  params:
+    language: python
+    fork: true
+    context:
+      brief: >-
+        The producer code is well-tested but its event contract is broken at the producer->consumer
+        boundary, and the unit tests enshrine the bug (test_content_hash_recomputes_from_text asserts
+        content_hash == sha256(text), which is exactly the contract violation). This pass makes the
+        pointer contract real, then re-runs the heartbeat properly. Do NOT rewrite retrieval /
+        constructor / identity; touch only the producer path + the consumer extractor + the record
+        schema. Async stays the architecture.
+      isolation: >-
+        Redis 127.0.0.1:FINOPS_REDIS_PORT (6380) DB 2 ONLY, keys kb:v1:*. Never 6379, never DB 1.
+        Neo4j (7687) SHARED — MERGE-only, never clear_all. Chroma uses knowledge_chunks_v1 only,
+        never session_embeddings. Verify no other kb_worker.py is running before draining.
+      prior_art:
+        - src/instrument/knowledge.py           # KnowledgeRecord.to_dict/from_dict, compute_content_hash
+        - src/instrument/knowledge_ingestion.py # build_record / record_to_event (the bug)
+        - src/instrument/knowledge_stream.py    # process_entry(extractor=...), read_artifact, verify_content_hash
+        - scripts/kb_produce.py                 # emit_records (writes nothing durable — the gap)
+        - scripts/kb_worker.py                  # process_batch (does not pass an extractor — the gap)
+        - tests/test_knowledge_ingestion.py     # test_content_hash_recomputes_from_text (enshrines the bug)
+    phases:
+      - name: contract
+        kind: agent
+        prompt: >
+          Fix the pointer contract end-to-end so a producer-emitted event actually verifies and lands.
+
+          THE BUG: record_to_event sets source_uri = file://experiments/results/_results_summary.json
+          (the aggregate) and content_hash = sha256(card.text) (the one-line finding). The consumer
+          (knowledge_stream.process_entry) does read_artifact(source_uri) -> verify_content_hash(sha256(
+          artifact_bytes), content_hash) -> extractor. Hashing a per-finding text against the whole file
+          can never match, so every event retries and nothing lands.
+
+          REQUIREMENTS:
+          - In knowledge_ingestion.py: add record_to_artifact(record) -> bytes (the JSON serialization via
+            KnowledgeRecord.to_dict), and change record_to_event so that content_hash = sha256(artifact_bytes)
+            and source_uri = file://experiments/results/kb/<knowledge_id>.json (a per-record durable artifact).
+          - In kb_produce.py: before emitting each record, write the artifact bytes to
+            experiments/results/kb/<knowledge_id>.json (create the dir if needed); keep the checkpoint
+            HGET/HSET idempotence exactly as-is.
+          - In knowledge_ingestion.py (or knowledge_stream.py — your call, document it): add
+            extract_record(event, artifact_bytes) -> KnowledgeRecord that parses the JSON and reconstructs
+            the FULL record (authority=MEASURED and every field, via KnowledgeRecord.from_dict) — this is
+            the domain-specific extractor that supersedes default_extract for the measured-result path.
+          - In kb_worker.py: pass that extractor into process_entry (process_entry(..., extractor=ki.extract_record))
+            so the consumers reconstruct the real record instead of default_extract's DERIVED placeholder.
+          - Update tests/test_knowledge_ingestion.py: FIX test_content_hash_recomputes_from_text to assert the
+            ARTIFACT hash (sha256(record_to_artifact(record))) equals record.content_hash — not sha256(text).
+          - Add an INTEGRATION test that drives the boundary: emit one event via the producer path, run
+            process_entry with extract_record against a store double, and assert the upserted record has
+            authority=MEASURED and the finding text. This is the test the original run was missing.
+
+          Run tests/test_knowledge_ingestion.py tests/test_knowledge_stream.py green.
+      - name: schema
+        kind: agent
+        prompt: >
+          Add the two structured ledger signals to KnowledgeRecord, and tighten timestamp/tracing.
+
+          READ FIRST: src/instrument/knowledge.py (KnowledgeRecord is a frozen dataclass; to_dict/from_dict
+          exist), src/instrument/knowledge_ingestion.py (build_record currently renders confidence and
+          perturbation_strength only INTO the prose text).
+
+          REQUIREMENTS:
+          - Add confidence: float | None = None and perturbation_strength: float | None = None to
+            KnowledgeRecord (additive; update to_dict/from_dict). These are measured-or-None, exactly like
+            test_executed_success is bool-or-None.
+          - In build_record: set confidence and perturbation_strength from the entry (via retrieval._finite_float
+            or an equivalent), so they are STRUCTURED on the record — not only in the rendered text. Keep the
+            prose rendering as-is (it already shows "confidence —" when absent).
+          - In extract_record (from the contract phase): reconstruct the two new fields from the artifact.
+          - observed_at: prefer the entry's run timestamp when present (probe the actual _results_summary.json
+            entry schema for a timestamp/ended_at/observed_at field; do not fabricate) — else fall back to now.
+            valid_from/indexed_at may stay as the producer now.
+          - record_to_event: set event_id = record.knowledge_id (a deterministic tracing id; document that it
+            is NOT the idempotence key).
+          - Tests: assert the two new fields round-trip through to_dict/from_dict and the artifact, and that
+            absent values stay None (never 0.0). Run green.
+      - name: run
+        kind: agent
+        prompt: >
+          Clear the stuck stream, then re-run the heartbeat and VERIFY the stores actually populate this time.
+
+          CONTEXT: 201 events from the broken run are pending in kb:v1:changes, and the checkpoint hash
+          already carries 201 knowledge_ids — all with the old (broken) contract. Clear them before re-emitting.
+
+          ORDER (strict; stop and report at the first failure):
+          1. Clear the stale state on Redis DB 2: DEL kb:v1:changes and kb:v1:dead_letter, DEL kb:v1:checkpoints
+             (or HSET-clear it). Confirm XLEN==0 and HLEN==0 before proceeding. Do NOT touch DB 1 or 6379.
+          2. python scripts/kb_produce.py --dry-run   -> confirm the would-emit count.
+          3. python scripts/kb_produce.py             -> full emit; confirm kb:v1:changes XLEN matches the count.
+          4. Drain each consumer once:
+               python scripts/kb_worker.py --group kb-chroma-v1 --once
+               python scripts/kb_worker.py --group kb-neo4j-v1 --once
+               python scripts/kb_worker.py --group kb-ledger-v1 --once
+             Watch for "retry" / "dead_letter" outcomes — there must be NONE now. If a consumer retries,
+             STOP and report the exception rather than letting it silently fail again.
+          5. VERIFY (the step the original run skipped): stream pending == 0; Neo4j Knowledge node count
+             increased by the emitted count; Chroma knowledge_chunks_v1 count matches; checkpoint hash has
+             one entry per emitted knowledge_id; dead-letter XLEN == 0.
+          6. Report the full pipeline record: emitted, per-consumer upserted, end-to-end lag, dead-lettered (0).
+
+          ISOLATION (load-bearing): Redis DB 2 only; Neo4j SHARED (MERGE-only); Chroma knowledge_chunks_v1 only.
+          Confirm no other kb_worker.py is running before step 4.
+      - name: verify
+        kind: agent
+        prompt: >
+          Scoped verification — do NOT run the full pytest suite. Run
+          tests/test_knowledge_ingestion.py tests/test_knowledge.py tests/test_retrieval.py
+          tests/test_knowledge_stream.py -q, plus an import smoke of instrument.knowledge_ingestion and
+          scripts/kb_produce.py. Re-assert idempotence: a second --dry-run after the run phase must report
+          0 would-emit. Leave green.
+      - name: docs
+        kind: agent
+        prompt: >
+          Sync the agent-facing surfaces (standard closing step — do not skip). Update BOTH surfaces in
+          lockstep:
+          - .opencode/instructions/mental-model.md AND .claude/rules/mental-model.md: note the producer
+            contract fix — KnowledgeEvent now points at a per-record artifact
+            (experiments/results/kb/<knowledge_id>.json) with content_hash = sha256(artifact), and
+            knowledge_ingestion.extract_record is the measured-result extractor.
+          - src/instrument/CONTEXT.md (Runtime RAG section): update the knowledge_ingestion.py row with
+            extract_record + record_to_artifact, and add the structured confidence/perturbation_strength
+            fields to the KnowledgeRecord description.
+          - scripts/CONTEXT.md: update the kb_produce.py row (it now writes per-record artifacts).
+          Keep the two surfaces in lockstep.
+factors:
+  - {name: model, levels: [deepseek/deepseek-v4-pro]}
+design: factorial
+rules: []
+metrics:
+  - {name: cost_per_phase, agg: distribution, over: cell}
+  - {name: tokens_per_phase, agg: distribution, over: cell}
+  - {name: test_executed_success, agg: mean, over: cell}
+comparison: {kind: effect_size, arm_factor: model, loss: {cost: 1.0, quality: -5.0}}
+stop: {budget_usd: 8.0, max_attempts: 1}
+adapt: {strategy: manual, selection: highest_regret}
