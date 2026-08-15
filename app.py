@@ -1,9 +1,4 @@
-"""
-Codebase seed — Minimal Flask Todo API (tier 1, good seams)
-
-A single-file Flask app with clean structure: models, routes, error handling.
-Designed as a baseline for multi-session stories.
-"""
+"""Minimal Flask Todo API."""
 
 from flask import Flask, request, jsonify, g
 from datetime import datetime
@@ -13,13 +8,13 @@ import binascii
 import hashlib
 import hmac
 import json
-import sqlite3
 import os
+from sqlite3 import IntegrityError
 from werkzeug.security import check_password_hash, generate_password_hash
 from tasks import send_notification_email
+from repositories import TaskRepository, UserRepository, get_connection, initialize_database
 
 app = Flask(__name__)
-
 DATABASE = os.environ.get("DATABASE", "todos.db")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_LIFETIME_SECONDS = 3600
@@ -27,72 +22,22 @@ VALID_STATUSES = {"pending", "done", "completed"}
 
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return get_connection(DATABASE)
 
 
 def init_db():
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'completed')),"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER REFERENCES users(id)"
-            ")"
-        )
-        # Existing databases predate ownership.  ALTER TABLE preserves those rows;
-        # legacy rows stay unowned and are therefore not exposed by the API.
-        columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
-        if "owner_id" not in columns:
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
-        schema = conn.execute(
-            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'"
-        ).fetchone()[0]
-        if "'completed'" not in schema:
-            # SQLite cannot alter a CHECK constraint, so rebuild old task tables.
-            conn.execute("DROP INDEX IF EXISTS idx_tasks_owner_id")
-            conn.execute("ALTER TABLE tasks RENAME TO tasks_old")
-            conn.execute(
-                "CREATE TABLE tasks ("
-                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-                "  title TEXT NOT NULL,"
-                "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'completed')),"
-                "  created_at TEXT NOT NULL,"
-                "  owner_id INTEGER REFERENCES users(id)"
-                ")"
-            )
-            conn.execute(
-                "INSERT INTO tasks (id, title, status, created_at, owner_id) "
-                "SELECT id, title, status, created_at, owner_id FROM tasks_old"
-            )
-            conn.execute("DROP TABLE tasks_old")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)")
+    initialize_database(DATABASE)
 
 
 def create_user(username: str, password: str) -> dict:
-    password_hash = generate_password_hash(password)
-    with get_db() as conn:
-        cursor = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
-        )
-        conn.commit()
-        return {"id": cursor.lastrowid, "username": username}
+    return UserRepository(DATABASE).create({
+        "username": username,
+        "password_hash": generate_password_hash(password),
+    })
 
 
 def find_user(username: str):
-    with get_db() as conn:
-        return conn.execute("SELECT * FROM users WHERE username = ?", (username,)).fetchone()
+    return UserRepository(DATABASE).find_by_username(username)
 
 
 def _b64encode(value: bytes) -> str:
@@ -139,8 +84,7 @@ def require_auth(view):
             user_id = decode_token(authorization[7:].strip())
         except (ValueError, TypeError, KeyError, json.JSONDecodeError, UnicodeDecodeError, binascii.Error):
             return jsonify({"error": "invalid or expired token"}), 401
-        with get_db() as conn:
-            user = conn.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+        user = UserRepository(DATABASE).find_public_by_id(user_id)
         if user is None:
             return jsonify({"error": "invalid or expired token"}), 401
         g.user = user
@@ -148,62 +92,29 @@ def require_auth(view):
     return wrapped
 
 
-# ── Models ────────────────────────────────────────────────────
-
 def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, 'pending', ?, ?)",
-            (title, now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-        }
+    return TaskRepository(DATABASE).create_for_owner(title, owner_id)
 
 
 def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute("SELECT id, title, status, created_at FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)).fetchall()
-        return [dict(r) for r in rows]
+    return TaskRepository(DATABASE).list_for_owner(owner_id)
 
 
 def get_task(task_id: int, owner_id: int) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT id, title, status, created_at FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)).fetchone()
-        return dict(row) if row else None
+    return TaskRepository(DATABASE).get_for_owner(task_id, owner_id)
 
 
 def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.extend((task_id, owner_id))
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ? AND owner_id = ?", params
-            )
-            conn.commit()
-    return get_task(task_id, owner_id)
+    values = {}
+    if title is not None:
+        values["title"] = title
+    if status is not None:
+        values["status"] = status
+    return TaskRepository(DATABASE).update_for_owner(task_id, owner_id, values)
 
 
 init_db()
 
-
-# ── Routes ─────────────────────────────────────────────────────
 
 @app.route("/auth/register", methods=["POST"])
 def register():
@@ -217,7 +128,7 @@ def register():
         return jsonify({"error": "username already exists"}), 409
     try:
         user = create_user(username, password)
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
 
@@ -232,6 +143,7 @@ def login():
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"]), "user": {"id": user["id"], "username": user["username"]}})
 
+
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
@@ -245,8 +157,7 @@ def add_task():
     title = data.get("title") if isinstance(data, dict) else None
     if not isinstance(title, str) or not title.strip():
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title.strip(), g.user["id"])
-    return jsonify(task), 201
+    return jsonify(create_task(title.strip(), g.user["id"])), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
@@ -271,11 +182,7 @@ def edit_task(task_id: int):
         return jsonify({"error": "invalid status"}), 422
     if "title" in data and not isinstance(data["title"], str):
         return jsonify({"error": "title must be a string"}), 400
-    task = update_task(
-        task_id, g.user["id"],
-        title=data.get("title"),
-        status=data.get("status"),
-    )
+    task = update_task(task_id, g.user["id"], title=data.get("title"), status=data.get("status"))
     if existing_task["status"] != "completed" and data.get("status") == "completed":
         send_notification_email.delay(g.user["username"], task["title"])
     return jsonify(task)
