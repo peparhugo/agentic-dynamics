@@ -5,4 +5,7 @@ export { renderIndexHtml, renderPageHtml } from './render';
 export { loadTemplates, renderPageTemplate, renderIndexTemplate } from './templates';
 export type { TemplateBundle } from './templates';
 export { parseArgs, main, HelpError } from './cli';
+export type { CliArgs } from './cli';
+export { startDevServer, injectReloadScript, reloadClientScript } from './serve';
+export type { DevServer, ServeOptions } from './serve';
 export type { Page, BuildOptions, ParsedFrontmatter } from './types';

@@ -4,24 +4,33 @@ exports.HelpError = void 0;
 exports.parseArgs = parseArgs;
 exports.main = main;
 const generator_1 = require("./generator");
+const serve_1 = require("./serve");
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
+const DEFAULT_TEMPLATES_DIR = 'templates';
+const DEFAULT_PORT = 3000;
 function usage() {
-    return `Usage: ssg build [--content <dir>] [--output <dir>]
+    return `Usage: ssg <command> [options]
 
-Build a static site from Markdown files.
+Commands:
+  build   Build a static site from Markdown files
+  serve   Run a live-reload development server
 
 Options:
-  --content <dir>  Content directory containing Markdown files (default: ./content)
-  --output <dir>   Output directory for generated HTML (default: ./dist)
-  --help           Show this help message`;
+  --content <dir>   Content directory containing Markdown files (default: ./content)
+  --output <dir>    Output directory for generated HTML (default: ./dist)
+  --templates <dir> Templates directory with .hbs templates, layouts/, and partials/ (default: ./templates)
+  --port <number>   Port for the dev server (default: 3000)
+  --help            Show this help message`;
 }
 function parseArgs(argv) {
     const options = {
         contentDir: DEFAULT_CONTENT_DIR,
         outputDir: DEFAULT_OUTPUT_DIR,
+        templatesDir: DEFAULT_TEMPLATES_DIR,
     };
     let command = 'build';
+    let port;
     let seenPositional = false;
     for (let i = 0; i < argv.length; i++) {
         const arg = argv[i];
@@ -43,6 +52,23 @@ function parseArgs(argv) {
                 throw new Error('--output requires a directory argument');
             }
         }
+        else if (flag === '--templates') {
+            options.templatesDir = inlineValue ?? argv[++i];
+            if (!options.templatesDir) {
+                throw new Error('--templates requires a directory argument');
+            }
+        }
+        else if (flag === '--port') {
+            const raw = inlineValue ?? argv[++i];
+            if (!raw) {
+                throw new Error('--port requires a number argument');
+            }
+            const parsed = Number(raw);
+            if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+                throw new Error('--port must be an integer between 0 and 65535');
+            }
+            port = parsed;
+        }
         else if (arg.startsWith('-')) {
             throw new Error(`unknown argument: ${arg}`);
         }
@@ -54,16 +80,22 @@ function parseArgs(argv) {
             command = arg;
         }
     }
-    if (command !== 'build') {
+    if (command !== 'build' && command !== 'serve') {
         throw new Error(`unknown command: ${command}`);
     }
-    return { command, options };
+    return { command, options, port };
 }
 class HelpError extends Error {
 }
 exports.HelpError = HelpError;
 async function main(argv) {
-    const { options } = parseArgs(argv);
+    const { command, options, port } = parseArgs(argv);
+    if (command === 'serve') {
+        const dev = await (0, serve_1.startDevServer)({ ...options, port });
+        process.stdout.write(`Dev server running at http://localhost:${dev.port}\n`);
+        process.stdout.write(`Watching ${options.contentDir} and ${options.templatesDir} for changes\n`);
+        return new Promise(() => { });
+    }
     const pages = await (0, generator_1.build)(options);
     process.stdout.write(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${options.outputDir}\n`);
 }

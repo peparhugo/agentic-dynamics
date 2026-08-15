@@ -38,6 +38,8 @@ const fs_1 = require("fs");
 const path = __importStar(require("path"));
 const markdown_1 = require("./markdown");
 const render_1 = require("./render");
+const templates_1 = require("./templates");
+const DEFAULT_TEMPLATES_DIR = 'templates';
 const CONTENT_EXTENSIONS = ['.md', '.markdown', '.mdown'];
 function slugify(filename) {
     const base = filename.replace(/\.(md|markdown|mdown)$/i, '');
@@ -88,15 +90,28 @@ async function dirExists(dir) {
         return false;
     }
 }
+function renderPageForBuild(page, bundle) {
+    if (!bundle.exists) {
+        if (page.template) {
+            throw new Error(`template not found: "${page.template}" (no templates directory configured)`);
+        }
+        return (0, render_1.renderPageHtml)(page);
+    }
+    return (0, templates_1.renderPageTemplate)(page, bundle);
+}
+function renderIndexForBuild(pages, bundle) {
+    return (0, templates_1.renderIndexTemplate)(pages, bundle) ?? (0, render_1.renderIndexHtml)(pages);
+}
 async function build(options) {
-    const { contentDir, outputDir } = options;
+    const { contentDir, outputDir, templatesDir = DEFAULT_TEMPLATES_DIR } = options;
     const pages = await readPages(contentDir);
     await fs_1.promises.mkdir(outputDir, { recursive: true });
+    const bundle = await (0, templates_1.loadTemplates)(templatesDir);
     for (const page of pages) {
-        const html = (0, render_1.renderPageHtml)(page);
+        const html = renderPageForBuild(page, bundle);
         await fs_1.promises.writeFile(path.join(outputDir, `${page.slug}.html`), html, 'utf8');
     }
-    const indexHtml = (0, render_1.renderIndexHtml)(pages);
+    const indexHtml = renderIndexForBuild(pages, bundle);
     await fs_1.promises.writeFile(path.join(outputDir, 'index.html'), indexHtml, 'utf8');
     return pages;
 }

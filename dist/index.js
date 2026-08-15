@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.HelpError = exports.main = exports.parseArgs = exports.renderPageHtml = exports.renderIndexHtml = exports.parseYamlBlock = exports.parseFrontmatter = exports.build = exports.parseMarkdown = void 0;
+exports.reloadClientScript = exports.injectReloadScript = exports.startDevServer = exports.HelpError = exports.main = exports.parseArgs = exports.renderIndexTemplate = exports.renderPageTemplate = exports.loadTemplates = exports.renderPageHtml = exports.renderIndexHtml = exports.parseYamlBlock = exports.parseFrontmatter = exports.build = exports.parseMarkdown = void 0;
 var markdown_1 = require("./markdown");
 Object.defineProperty(exports, "parseMarkdown", { enumerable: true, get: function () { return markdown_1.parseMarkdown; } });
 var generator_1 = require("./generator");
@@ -11,7 +11,15 @@ Object.defineProperty(exports, "parseYamlBlock", { enumerable: true, get: functi
 var render_1 = require("./render");
 Object.defineProperty(exports, "renderIndexHtml", { enumerable: true, get: function () { return render_1.renderIndexHtml; } });
 Object.defineProperty(exports, "renderPageHtml", { enumerable: true, get: function () { return render_1.renderPageHtml; } });
+var templates_1 = require("./templates");
+Object.defineProperty(exports, "loadTemplates", { enumerable: true, get: function () { return templates_1.loadTemplates; } });
+Object.defineProperty(exports, "renderPageTemplate", { enumerable: true, get: function () { return templates_1.renderPageTemplate; } });
+Object.defineProperty(exports, "renderIndexTemplate", { enumerable: true, get: function () { return templates_1.renderIndexTemplate; } });
 var cli_1 = require("./cli");
 Object.defineProperty(exports, "parseArgs", { enumerable: true, get: function () { return cli_1.parseArgs; } });
 Object.defineProperty(exports, "main", { enumerable: true, get: function () { return cli_1.main; } });
 Object.defineProperty(exports, "HelpError", { enumerable: true, get: function () { return cli_1.HelpError; } });
+var serve_1 = require("./serve");
+Object.defineProperty(exports, "startDevServer", { enumerable: true, get: function () { return serve_1.startDevServer; } });
+Object.defineProperty(exports, "injectReloadScript", { enumerable: true, get: function () { return serve_1.injectReloadScript; } });
+Object.defineProperty(exports, "reloadClientScript", { enumerable: true, get: function () { return serve_1.reloadClientScript; } });

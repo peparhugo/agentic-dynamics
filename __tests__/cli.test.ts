@@ -39,10 +39,55 @@ describe('parseArgs', () => {
   });
 
   it('throws for an unknown command', () => {
-    expect(() => parseArgs(['serve'])).toThrow('unknown command');
+    expect(() => parseArgs(['deploy'])).toThrow('unknown command');
   });
 
   it('throws HelpError for --help', () => {
     expect(() => parseArgs(['--help'])).toThrow(HelpError);
+  });
+
+  it('parses the serve command with defaults', () => {
+    const { command, options, port } = parseArgs(['serve']);
+    expect(command).toBe('serve');
+    expect(options.contentDir).toBe('content');
+    expect(options.outputDir).toBe('dist');
+    expect(options.templatesDir).toBe('templates');
+    expect(port).toBeUndefined();
+  });
+
+  it('parses --port for the serve command', () => {
+    const { command, port } = parseArgs(['serve', '--port', '8080']);
+    expect(command).toBe('serve');
+    expect(port).toBe(8080);
+  });
+
+  it('supports --port with = syntax', () => {
+    const { port } = parseArgs(['serve', '--port=9090']);
+    expect(port).toBe(9090);
+  });
+
+  it('rejects an invalid --port value', () => {
+    expect(() => parseArgs(['serve', '--port', 'abc'])).toThrow(
+      '--port must be an integer'
+    );
+  });
+
+  it('combines serve with content, output, templates, and port', () => {
+    const { command, options, port } = parseArgs([
+      'serve',
+      '--content',
+      'pages',
+      '--output',
+      'public',
+      '--templates',
+      'theme',
+      '--port',
+      '4000',
+    ]);
+    expect(command).toBe('serve');
+    expect(options.contentDir).toBe('pages');
+    expect(options.outputDir).toBe('public');
+    expect(options.templatesDir).toBe('theme');
+    expect(port).toBe(4000);
   });
 });

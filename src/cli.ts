@@ -1,24 +1,30 @@
 import { build } from './generator';
+import { startDevServer } from './serve';
 import { BuildOptions } from './types';
 
 const DEFAULT_CONTENT_DIR = 'content';
 const DEFAULT_OUTPUT_DIR = 'dist';
 const DEFAULT_TEMPLATES_DIR = 'templates';
+const DEFAULT_PORT = 3000;
 
 export interface CliArgs {
   command: string;
   options: BuildOptions;
+  port?: number;
 }
 
 function usage(): string {
-  return `Usage: ssg build [--content <dir>] [--output <dir>] [--templates <dir>]
+  return `Usage: ssg <command> [options]
 
-Build a static site from Markdown files.
+Commands:
+  build   Build a static site from Markdown files
+  serve   Run a live-reload development server
 
 Options:
   --content <dir>   Content directory containing Markdown files (default: ./content)
   --output <dir>    Output directory for generated HTML (default: ./dist)
   --templates <dir> Templates directory with .hbs templates, layouts/, and partials/ (default: ./templates)
+  --port <number>   Port for the dev server (default: 3000)
   --help            Show this help message`;
 }
 
@@ -29,6 +35,7 @@ export function parseArgs(argv: string[]): CliArgs {
     templatesDir: DEFAULT_TEMPLATES_DIR,
   };
   let command = 'build';
+  let port: number | undefined;
   let seenPositional = false;
 
   for (let i = 0; i < argv.length; i++) {
@@ -57,6 +64,16 @@ export function parseArgs(argv: string[]): CliArgs {
       if (!options.templatesDir) {
         throw new Error('--templates requires a directory argument');
       }
+    } else if (flag === '--port') {
+      const raw = inlineValue ?? argv[++i];
+      if (!raw) {
+        throw new Error('--port requires a number argument');
+      }
+      const parsed = Number(raw);
+      if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
+        throw new Error('--port must be an integer between 0 and 65535');
+      }
+      port = parsed;
     } else if (arg.startsWith('-')) {
       throw new Error(`unknown argument: ${arg}`);
     } else {
@@ -68,17 +85,26 @@ export function parseArgs(argv: string[]): CliArgs {
     }
   }
 
-  if (command !== 'build') {
+  if (command !== 'build' && command !== 'serve') {
     throw new Error(`unknown command: ${command}`);
   }
 
-  return { command, options };
+  return { command, options, port };
 }
 
 export class HelpError extends Error {}
 
 export async function main(argv: string[]): Promise<void> {
-  const { options } = parseArgs(argv);
+  const { command, options, port } = parseArgs(argv);
+
+  if (command === 'serve') {
+    const dev = await startDevServer({ ...options, port });
+    process.stdout.write(`Dev server running at http://localhost:${dev.port}\n`);
+    process.stdout.write(
+      `Watching ${options.contentDir} and ${options.templatesDir} for changes\n`
+    );
+    return new Promise<void>(() => {});
+  }
 
   const pages = await build(options);
   process.stdout.write(

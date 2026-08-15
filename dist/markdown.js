@@ -30,6 +30,9 @@ function parseMarkdown(source, sourcePath, slug) {
         content: gm.content,
         html,
         sourcePath,
+        data: merged,
+        template: readString(merged.template),
+        layout: readString(merged.layout),
     };
 }
 function readString(value) {
