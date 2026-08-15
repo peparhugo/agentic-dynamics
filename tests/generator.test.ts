@@ -24,4 +24,45 @@ describe('buildSite', () => {
     expect(index).toContain('hello.html');
     expect(index).toContain('notes/second.html');
   });
+
+  it('renders a selected Handlebars template inside a layout with partials', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(path.join(templates, 'layouts'), { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(content, 'hello.md'), '---\ntitle: Hello\ntemplate: article\nlayout: site\n---\n\nWelcome');
+    await fs.writeFile(path.join(templates, 'article.hbs'), '{{> nav}}<section>{{{body}}}</section>');
+    await fs.writeFile(path.join(templates, 'layouts', 'site.hbs'), '<html><body>{{> header}}{{{body}}}{{> footer}}</body></html>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.hbs'), '<header>{{title}}</header>');
+    await fs.writeFile(path.join(templates, 'partials', 'footer.hbs'), '<footer>Footer</footer>');
+    await fs.writeFile(path.join(templates, 'partials', 'nav.hbs'), '<nav>Nav</nav>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+
+    const page = await fs.readFile(path.join(output, 'hello.html'), 'utf8');
+    expect(page).toContain('<header>Hello</header>');
+    expect(page).toContain('<nav>Nav</nav><section><article>');
+    expect(page).toContain('<footer>Footer</footer>');
+  });
+
+  it('supports EJS templates and includes', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ssg-'));
+    const content = path.join(root, 'content');
+    const templates = path.join(root, 'templates');
+    const output = path.join(root, 'output');
+    await fs.mkdir(content, { recursive: true });
+    await fs.mkdir(path.join(templates, 'partials'), { recursive: true });
+    await fs.writeFile(path.join(content, 'hello.md'), '---\ntitle: EJS page\ntemplate: page.ejs\n---\n\nHello');
+    await fs.writeFile(path.join(templates, 'page.ejs'), '<%- include("partials/header") %><h2><%= title %></h2><%- body %>');
+    await fs.writeFile(path.join(templates, 'partials', 'header.ejs'), '<header>Header</header>');
+
+    await buildSite({ contentDir: content, templatesDir: templates, outputDir: output });
+
+    const page = await fs.readFile(path.join(output, 'hello.html'), 'utf8');
+    expect(page).toContain('<header>Header</header><h2>EJS page</h2>');
+    expect(page).toContain('<p>Hello</p>');
+  });
 });
