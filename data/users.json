@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "username": "alice",
+    "password_hash": "scrypt:32768:8:1$OPvw7kkvAvnRacFq$d7028e57812212bb142bac623ef2a04c447c2c6b297f15d9d8909ed3fb6ca76decda8c10c768ab3ce74d9e68d1e5d2941f91b06608fd7a21b7e1658a6367d87c",
+    "email": null
+  },
+  {
+    "id": 2,
+    "username": "bob",
+    "password_hash": "scrypt:32768:8:1$RYMtd49HdQJ7MjfL$9e0cc1763f5dcc6b84b67a2b6df146b7c7ecb973529825afec26954d96e240f96a508e52c0d62fb5359a90ac33d3d069d38c90b22e4aa00c3d575d50a4fde9c8",
+    "email": null
+  },
+  {
+    "id": 3,
+    "username": "charlie",
+    "password_hash": "scrypt:32768:8:1$29QMtES2fJjdV06Y$ab6365b6193b264c9ec9dfd622748937de84c2c88d22f3ec48b4d677c076b6be4ab3599653ce6418473abd185d796226d3e4d98c41f3341e29c6f1918f51e007",
+    "email": null
+  },
+  {
+    "id": 4,
+    "username": "testuser",
+    "password_hash": "scrypt:32768:8:1$0E2kMBkBHLFczIcK$266e30db92cfb1b5064745a9e31721ac0dd6cafa46669bce548abc678c461a88af350d4b78d6cafd95dd7a97627f338de7cfddb2d7a5c0ac088dbfc3aa7e6c2b",
+    "email": "testuser@example.com"
+  },
+  {
+    "id": 5,
+    "username": "nomail",
+    "password_hash": "scrypt:32768:8:1$RG8hgqXI3AN5N6gi$d0784c46f7823f4d62e3b2f89e4fbf6dbf96783d1b1d9258bd890dcaa89da4366056b6219df4fe0b06ed3d79a61cd5afa826ee59a0583641762e3ba5aaf8965c",
+    "email": null
+  }
+]

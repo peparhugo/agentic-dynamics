@@ -11,6 +11,7 @@ from pathlib import Path
 import jwt
 from werkzeug.security import generate_password_hash, check_password_hash
 from celery_tasks import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
@@ -21,97 +22,80 @@ TASKS_FILE = os.path.join(STORAGE_DIR, "tasks.json")
 USERS_FILE = os.path.join(STORAGE_DIR, "users.json")
 
 
-# ── Storage Layer ────────────────────────────────────────────────
+def _get_storage_dir():
+    """Get current storage directory (for test patching support)."""
+    import sys
+    module = sys.modules[__name__]
+    return module.STORAGE_DIR
+
+
+# Initialize repositories
+task_repo = TaskRepository(_get_storage_dir)
+user_repo = UserRepository(_get_storage_dir)
+
+
+# ── Storage Layer (delegating to repositories) ────────────────────────────────────────────────
 
 def _ensure_storage():
     """Ensure storage directory and file exist."""
-    Path(STORAGE_DIR).mkdir(parents=True, exist_ok=True)
-    if not os.path.exists(TASKS_FILE):
-        with open(TASKS_FILE, 'w') as f:
-            json.dump([], f)
-    if not os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'w') as f:
-            json.dump([], f)
+    task_repo._ensure_storage()
+    user_repo._ensure_storage()
 
 
 def _load_tasks():
     """Load all tasks from JSON file."""
-    _ensure_storage()
-    try:
-        with open(TASKS_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    return task_repo.get_all()
 
 
 def _save_tasks(tasks):
     """Save all tasks to JSON file."""
-    _ensure_storage()
-    with open(TASKS_FILE, 'w') as f:
-        json.dump(tasks, f, indent=2)
+    task_repo._save_all(tasks)
 
 
 def _get_next_id():
     """Get the next auto-increment ID."""
-    tasks = _load_tasks()
-    if not tasks:
-        return 1
-    return max(t['id'] for t in tasks) + 1
+    return task_repo.get_next_id()
 
 
-# ── User Management ──────────────────────────────────────────────
+# ── User Management (delegating to repositories) ──────────────────────────
 
 def _load_users():
     """Load all users from JSON file."""
-    _ensure_storage()
-    try:
-        with open(USERS_FILE, 'r') as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return []
+    return user_repo.get_all()
 
 
 def _save_users(users):
     """Save all users to JSON file."""
-    _ensure_storage()
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+    user_repo._save_all(users)
 
 
 def _get_user_by_username(username):
     """Get user by username."""
-    users = _load_users()
-    return next((u for u in users if u['username'] == username), None)
+    return user_repo.get_by_username(username)
 
 
 def _get_user_by_id(user_id):
     """Get user by ID."""
-    users = _load_users()
-    return next((u for u in users if u['id'] == user_id), None)
+    return user_repo.get_by_id(user_id)
 
 
 def _get_next_user_id():
     """Get the next user ID."""
-    users = _load_users()
-    if not users:
-        return 1
-    return max(u['id'] for u in users) + 1
+    return user_repo.get_next_id()
 
 
 def _create_user(username, password, email=None):
     """Create a new user with hashed password and optional email."""
-    if _get_user_by_username(username):
+    if user_repo.get_by_username(username):
         return None, "Username already exists"
 
-    users = _load_users()
     new_user = {
-        'id': _get_next_user_id(),
+        'id': user_repo.get_next_id(),
         'username': username,
         'password_hash': generate_password_hash(password),
         'email': email
     }
-    users.append(new_user)
-    _save_users(users)
+    user_repo.create(new_user)
     return new_user, None
 
 
@@ -146,7 +130,7 @@ def _get_auth_user():
     if user_id is None:
         return None
 
-    return _get_user_by_id(user_id)
+    return user_repo.get_by_id(user_id)
 
 
 def _require_auth(f):
@@ -162,8 +146,8 @@ def _require_auth(f):
 
 def _migrate_tasks_to_add_owner():
     """Migrate existing tasks to have owner_id and add email field to users."""
-    tasks = _load_tasks()
-    users = _load_users()
+    tasks = task_repo.get_all()
+    users = user_repo.get_all()
 
     tasks_migrated = False
     if tasks and not all('owner_id' in t for t in tasks):
@@ -171,14 +155,20 @@ def _migrate_tasks_to_add_owner():
         if users:
             default_user_id = users[0]['id']
         else:
-            user, _ = _create_user('admin', 'admin', 'admin@example.com')
-            default_user_id = user['id']
+            new_user = {
+                'id': user_repo.get_next_id(),
+                'username': 'admin',
+                'password_hash': generate_password_hash('admin'),
+                'email': 'admin@example.com'
+            }
+            user_repo.create(new_user)
+            default_user_id = new_user['id']
 
         for task in tasks:
             if 'owner_id' not in task:
                 task['owner_id'] = default_user_id
 
-        _save_tasks(tasks)
+        task_repo._save_all(tasks)
         tasks_migrated = True
 
     users_migrated = False
@@ -186,7 +176,7 @@ def _migrate_tasks_to_add_owner():
         for user in users:
             if 'email' not in user:
                 user['email'] = f"{user['username']}@example.com"
-        _save_users(users)
+        user_repo._save_all(users)
         users_migrated = True
 
     return tasks_migrated or users_migrated
@@ -205,14 +195,21 @@ def register():
     if not username or not password:
         return jsonify({"error": "missing username or password"}), 400
 
-    user, error = _create_user(username, password, email)
-    if error:
-        return jsonify({"error": error}), 409
+    if user_repo.get_by_username(username):
+        return jsonify({"error": "Username already exists"}), 409
+
+    new_user = {
+        'id': user_repo.get_next_id(),
+        'username': username,
+        'password_hash': generate_password_hash(password),
+        'email': email
+    }
+    user_repo.create(new_user)
 
     return jsonify({
-        "id": user['id'],
-        "username": user['username'],
-        "email": user.get('email')
+        "id": new_user['id'],
+        "username": new_user['username'],
+        "email": new_user.get('email')
     }), 201
 
 
@@ -226,7 +223,7 @@ def login():
     if not username or not password:
         return jsonify({"error": "missing username or password"}), 400
 
-    user = _get_user_by_username(username)
+    user = user_repo.get_by_username(username)
     if not user or not check_password_hash(user['password_hash'], password):
         return jsonify({"error": "invalid username or password"}), 401
 
@@ -244,16 +241,14 @@ def create_task(user):
     if not title:
         return jsonify({"error": "missing title"}), 400
 
-    tasks = _load_tasks()
     new_task = {
-        'id': _get_next_id(),
+        'id': task_repo.get_next_id(),
         'title': title,
         'status': 'pending',
         'owner_id': user['id'],
         'created_at': datetime.utcnow().isoformat()
     }
-    tasks.append(new_task)
-    _save_tasks(tasks)
+    task_repo.create(new_task)
 
     return jsonify(new_task), 201
 
@@ -262,8 +257,7 @@ def create_task(user):
 @_require_auth
 def list_tasks(user):
     """List tasks for current user ordered by created_at descending."""
-    tasks = _load_tasks()
-    user_tasks = [t for t in tasks if t.get('owner_id') == user['id']]
+    user_tasks = task_repo.get_by_owner(user['id'])
     sorted_tasks = sorted(user_tasks, key=lambda x: x['created_at'], reverse=True)
     return jsonify(sorted_tasks)
 
@@ -272,8 +266,7 @@ def list_tasks(user):
 @_require_auth
 def get_task(user, task_id):
     """Get a single task by ID."""
-    tasks = _load_tasks()
-    task = next((t for t in tasks if t['id'] == task_id), None)
+    task = task_repo.get_by_id(task_id)
 
     if task is None:
         return jsonify({"error": "task not found"}), 404
@@ -289,8 +282,7 @@ def get_task(user, task_id):
 def update_task(user, task_id):
     """Update task title and/or status."""
     data = request.get_json(silent=True) or {}
-    tasks = _load_tasks()
-    task = next((t for t in tasks if t['id'] == task_id), None)
+    task = task_repo.get_by_id(task_id)
 
     if task is None:
         return jsonify({"error": "task not found"}), 404
@@ -316,7 +308,7 @@ def update_task(user, task_id):
             if user_email:
                 send_notification_email.delay(user_email, task['title'])
 
-    _save_tasks(tasks)
+    task_repo.update(task_id, task)
     return jsonify(task)
 
 
