@@ -3,6 +3,7 @@ import asyncio
 
 import aiohttp
 import pytest
+from redis.asyncio import Redis
 from websockets.asyncio.client import connect
 
 from app import NotificationServer
@@ -146,3 +147,50 @@ async def test_unsubscribed_channel_is_removed(server):
     await client.recv()
     assert server.channels == {}
     await client.close()
+
+
+@pytest.mark.asyncio
+async def test_messages_are_persisted_and_paginated(tmp_path):
+    server = NotificationServer(database_url=f"sqlite:///{tmp_path / 'messages.db'}")
+    await server.start(websocket_port=0, health_port=0)
+    client, _ = await connect_client(server)
+    await client.send(json.dumps({"type": "broadcast", "payload": {"text": "saved"}}))
+    assert json.loads(await client.recv())["payload"] == {"text": "saved"}
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"http://127.0.0.1:{server.health_port}/messages?limit=1&offset=0"
+        ) as response:
+            body = await response.json()
+    assert body["messages"][0]["type"] == "broadcast"
+    assert body["messages"][0]["payload"] == {"text": "saved"}
+    await client.close()
+    await server.stop()
+
+
+@pytest.mark.asyncio
+async def test_redis_delivers_between_server_instances(tmp_path):
+    redis = Redis.from_url("redis://localhost:6379/0")
+    try:
+        await asyncio.wait_for(redis.ping(), timeout=1)
+    except Exception:
+        await redis.aclose()
+        pytest.skip("Redis is not running")
+    await redis.flushdb()
+    first = NotificationServer(
+        redis_url="redis://localhost:6379/0", database_url=f"sqlite:///{tmp_path / 'first.db'}"
+    )
+    second = NotificationServer(
+        redis_url="redis://localhost:6379/0", database_url=f"sqlite:///{tmp_path / 'second.db'}"
+    )
+    await first.start(websocket_port=0, health_port=0)
+    await second.start(websocket_port=0, health_port=0)
+    sender, _ = await connect_client(first)
+    receiver, _ = await connect_client(second)
+    await sender.send(json.dumps({"type": "broadcast", "payload": {"text": "shared"}}))
+    assert json.loads(await receiver.recv())["payload"] == {"text": "shared"}
+    await sender.close()
+    await receiver.close()
+    await first.stop()
+    await second.stop()
+    await redis.aclose()
