@@ -12,6 +12,8 @@ from functools import wraps
 
 import jwt
 from flask import Flask, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import storage
@@ -20,6 +22,9 @@ from tasks import send_notification_email
 
 JWT_ALGORITHM = "HS256"
 JWT_EXP_HOURS = 24
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
 
 
 def create_app():
@@ -31,6 +36,41 @@ def create_app():
 
     app.config["JWT_SECRET_KEY"] = os.environ.get(
         "JWT_SECRET_KEY", "dev-secret-key-change-in-production-32bytes-min"
+    )
+
+    def rate_limit_key():
+        """Key rate-limit buckets by authenticated user, falling back to IP.
+
+        This runs ahead of the `require_auth` decorator (Flask-Limiter checks
+        limits before the view function executes), so it decodes the JWT
+        itself rather than relying on `g.user_id`. An invalid/missing token
+        still gets rate limited, just by IP instead of by user.
+        """
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            token = auth_header[len("Bearer "):].strip()
+            if token:
+                try:
+                    payload = jwt.decode(
+                        token, app.config["JWT_SECRET_KEY"], algorithms=[JWT_ALGORITHM]
+                    )
+                    return f"user:{payload['sub']}"
+                except jwt.InvalidTokenError:
+                    pass
+        return f"ip:{get_remote_address()}"
+
+    app.config["RATE_LIMIT_PER_MINUTE"] = int(
+        os.environ.get("RATE_LIMIT_PER_MINUTE", "100")
+    )
+
+    limiter = Limiter(
+        app=app,
+        key_func=rate_limit_key,
+        application_limits=[f"{app.config['RATE_LIMIT_PER_MINUTE']} per minute"],
+        storage_uri=os.environ.get(
+            "RATELIMIT_STORAGE_URI", "redis://localhost:6379/2"
+        ),
+        headers_enabled=True,
     )
 
     def generate_token(user):
@@ -74,6 +114,10 @@ def create_app():
     @app.errorhandler(405)
     def method_not_allowed(_e):
         return jsonify({"error": "Method not allowed"}), 405
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(_e):
+        return jsonify({"error": "Rate limit exceeded"}), 429
 
     @app.route("/auth/register", methods=["POST"])
     def register():
@@ -124,7 +168,27 @@ def create_app():
     @app.route("/tasks", methods=["GET"])
     @require_auth
     def list_tasks():
-        return jsonify(task_repo.list_all(g.user_id)), 200
+        cursor_param = request.args.get("cursor")
+        cursor = None
+        if cursor_param is not None:
+            try:
+                cursor = int(cursor_param)
+            except ValueError:
+                return jsonify({"error": "cursor must be an integer"}), 400
+
+        limit = DEFAULT_PAGE_LIMIT
+        limit_param = request.args.get("limit")
+        if limit_param is not None:
+            try:
+                limit = int(limit_param)
+            except ValueError:
+                return jsonify({"error": "limit must be an integer"}), 400
+            if limit < 1:
+                return jsonify({"error": "limit must be a positive integer"}), 400
+            limit = min(limit, MAX_PAGE_LIMIT)
+
+        page = task_repo.list_page(g.user_id, cursor=cursor, limit=limit)
+        return jsonify(page), 200
 
     @app.route("/tasks/<int:task_id>", methods=["GET"])
     @require_auth

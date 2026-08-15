@@ -2,8 +2,13 @@ import json
 from unittest.mock import patch
 
 import pytest
+import redis
 
 from app import create_app
+
+# Dedicated Redis DB for the rate-limiter storage in tests, flushed before
+# every test so requests made by one test never count against another.
+RATELIMIT_TEST_STORAGE_URI = "redis://localhost:6379/15"
 
 
 @pytest.fixture
@@ -11,6 +16,8 @@ def client(tmp_path, monkeypatch):
     storage_file = tmp_path / "tasks.json"
     monkeypatch.setenv("TASKS_FILE", str(storage_file))
     monkeypatch.setenv("JWT_SECRET_KEY", "test-secret-key-at-least-32-bytes-long")
+    monkeypatch.setenv("RATELIMIT_STORAGE_URI", RATELIMIT_TEST_STORAGE_URI)
+    redis.Redis.from_url(RATELIMIT_TEST_STORAGE_URI).flushdb()
     flask_app = create_app()
     flask_app.config["TESTING"] = True
     with flask_app.test_client() as c:
@@ -187,8 +194,8 @@ def test_users_only_see_own_tasks(client):
     alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
     bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
 
-    assert [t["title"] for t in alice_tasks] == ["alice task"]
-    assert [t["title"] for t in bob_tasks] == ["bob task"]
+    assert [t["title"] for t in alice_tasks["data"]] == ["alice task"]
+    assert [t["title"] for t in bob_tasks["data"]] == ["bob task"]
 
 
 def test_cannot_get_other_users_task(client):
@@ -265,7 +272,7 @@ def test_list_tasks_empty(auth_client):
     c, headers = auth_client
     resp = c.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    assert resp.get_json() == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc(auth_client):
@@ -276,8 +283,11 @@ def test_list_tasks_ordered_desc(auth_client):
 
     resp = c.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["third", "second", "first"]
+    assert body["total"] == 3
+    assert body["next_cursor"] is None
 
 
 def test_get_task_success(auth_client):
@@ -494,7 +504,7 @@ def test_migration_preserves_legacy_tasks_without_owner(tmp_path, monkeypatch):
         assert create_resp.status_code == 201
 
         list_resp = c.get("/tasks", headers=auth_headers(token))
-        titles = [t["title"] for t in list_resp.get_json()]
+        titles = [t["title"] for t in list_resp.get_json()["data"]]
         assert titles == ["new task"]
 
         legacy_resp = c.get("/tasks/1", headers=auth_headers(token))

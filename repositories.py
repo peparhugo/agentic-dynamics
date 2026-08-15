@@ -60,6 +60,31 @@ class TaskRepository(BaseRepository):
         tasks = [t for t in data["tasks"] if t.get("owner_id") == owner_id]
         return sorted(tasks, key=lambda t: (t["created_at"], t["id"]), reverse=True)
 
+    def list_page(self, owner_id, cursor=None, limit=20):
+        """Cursor-paginate a user's tasks, newest first.
+
+        `cursor` is the id of the last item returned in the previous page;
+        the next page starts right after it in the sorted order. An unknown
+        cursor yields an empty page rather than an error, since the item it
+        pointed to may simply have been deleted since.
+        """
+        tasks = self.list_all(owner_id)
+        total = len(tasks)
+
+        start = 0
+        if cursor is not None:
+            start = total
+            for i, task in enumerate(tasks):
+                if task["id"] == cursor:
+                    start = i + 1
+                    break
+
+        page = tasks[start:start + limit]
+        has_more = (start + len(page)) < total
+        next_cursor = page[-1]["id"] if page and has_more else None
+
+        return {"data": page, "next_cursor": next_cursor, "total": total}
+
     def update(self, task_id, title=None, status=None):
         with storage.lock:
             data = storage.read_data()
