@@ -12,6 +12,8 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notification_tasks import send_notification_email
+
 
 app = Flask(__name__)
 
@@ -154,6 +156,10 @@ def _get_user(username: str) -> dict | None:
     return next((user for user in _read_store()["users"] if user["username"] == username), None)
 
 
+def _get_user_by_id(user_id: int) -> dict | None:
+    return next((user for user in _read_store()["users"] if user["id"] == user_id), None)
+
+
 def require_auth(view):
     @wraps(view)
     def wrapped(*args, **kwargs):
@@ -172,8 +178,11 @@ def register():
     data = _json_body()
     username = data.get("username")
     password = data.get("password")
+    email = data.get("email")
     if not isinstance(username, str) or not username.strip() or not isinstance(password, str) or not password:
         return jsonify({"error": "username and password are required"}), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a non-empty string"}), 400
     username = username.strip()
     store = _read_store()
     if any(user["username"] == username for user in store["users"]):
@@ -183,6 +192,8 @@ def register():
         "username": username,
         "password_hash": generate_password_hash(password),
     }
+    if email is not None:
+        user["email"] = email.strip()
     store["next_user_id"] += 1
     store["users"].append(user)
     _write_store(store)
@@ -243,9 +254,14 @@ def edit_task(user_id: int, task_id: int):
     if "status" in data and not isinstance(status, str):
         return jsonify({"error": "status must be a string"}), 400
 
+    previous_task = get_task(task_id, user_id)
     task = update_task(task_id, user_id, title.strip() if title is not None else None, status)
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if previous_task is not None and previous_task["status"] != "completed" and task["status"] == "completed":
+        owner = _get_user_by_id(user_id)
+        if owner is not None and owner.get("email"):
+            send_notification_email.delay(owner["email"], task["title"])
     return jsonify(task)
 
 

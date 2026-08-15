@@ -12,8 +12,11 @@ def client(tmp_path, monkeypatch):
     return task_app.app.test_client()
 
 
-def auth_headers(client, username="alice", password="secret"):
-    assert client.post("/auth/register", json={"username": username, "password": password}).status_code == 201
+def auth_headers(client, username="alice", password="secret", email=None):
+    registration_data = {"username": username, "password": password}
+    if email is not None:
+        registration_data["email"] = email
+    assert client.post("/auth/register", json=registration_data).status_code == 201
     response = client.post("/auth/login", json={"username": username, "password": password})
     return {"Authorization": f"Bearer {response.json['token']}"}
 
@@ -58,6 +61,31 @@ def test_get_and_update_task(client):
     assert response.json["title"] == "Updated"
     assert response.json["status"] == "done"
     assert client.get(f"/tasks/{task['id']}", headers=headers).json == response.json
+
+
+def test_completing_task_enqueues_notification(client, monkeypatch):
+    headers = auth_headers(client, "owner", email="owner@example.com")
+    task = client.post("/tasks", json={"title": "Notify me"}, headers=headers).json
+    delay_calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: delay_calls.append(args))
+
+    response = client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert response.status_code == 200
+    assert delay_calls == [("owner@example.com", "Notify me")]
+
+
+def test_notification_is_not_enqueued_without_completion_transition(client, monkeypatch):
+    headers = auth_headers(client, "owner", email="owner@example.com")
+    task = client.post("/tasks", json={"title": "No duplicate"}, headers=headers).json
+    delay_calls = []
+    monkeypatch.setattr(task_app.send_notification_email, "delay", lambda *args: delay_calls.append(args))
+
+    client.put(f"/tasks/{task['id']}", json={"status": "done"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+    client.put(f"/tasks/{task['id']}", json={"status": "completed"}, headers=headers)
+
+    assert delay_calls == [("owner@example.com", "No duplicate")]
 
 
 def test_missing_task_returns_json_not_found_error(client):
