@@ -27,6 +27,7 @@ def app(data_file, users_file):
             "TASKS_FILE": str(data_file),
             "USERS_FILE": str(users_file),
             "JWT_SECRET_KEY": "test-secret-key-at-least-32-bytes-long",
+            "RATELIMIT_STORAGE_URI": "memory://",
         }
     )
 
@@ -207,7 +208,45 @@ def test_list_tasks_newest_first(client, auth):
     response = client.get("/tasks", headers=auth)
 
     assert response.status_code == 200
-    assert response.json == [second, first]
+    assert response.json == {
+        "data": [second, first],
+        "next_cursor": None,
+        "total": 2,
+    }
+
+
+def test_list_tasks_uses_cursor_pagination(client, auth):
+    tasks = [
+        client.post("/tasks", json={"title": f"Task {number}"}, headers=auth).json
+        for number in range(25)
+    ]
+
+    first_page = client.get("/tasks", headers=auth)
+    assert first_page.status_code == 200
+    assert first_page.json["data"] == list(reversed(tasks[5:]))
+    assert first_page.json["next_cursor"] == str(tasks[5]["id"])
+    assert first_page.json["total"] == 25
+
+    second_page = client.get(
+        f"/tasks?cursor={first_page.json['next_cursor']}&limit=10", headers=auth
+    )
+    assert second_page.status_code == 200
+    assert second_page.json == {
+        "data": list(reversed(tasks[:5])),
+        "next_cursor": None,
+        "total": 25,
+    }
+
+
+@pytest.mark.parametrize(
+    "query",
+    ["cursor=invalid", "cursor=0", "limit=invalid", "limit=0", "limit=101"],
+)
+def test_list_tasks_rejects_invalid_pagination(client, auth, query):
+    response = client.get(f"/tasks?{query}", headers=auth)
+
+    assert response.status_code == 400
+    assert "error" in response.json
 
 
 def test_get_task_and_missing_task(client, auth):
@@ -305,8 +344,8 @@ def test_users_only_see_and_modify_their_own_tasks(client):
         "/tasks", json={"title": "Bob task"}, headers=bob_auth
     ).json
 
-    assert client.get("/tasks", headers=alice_auth).json == [alice_task]
-    assert client.get("/tasks", headers=bob_auth).json == [bob_task]
+    assert client.get("/tasks", headers=alice_auth).json["data"] == [alice_task]
+    assert client.get("/tasks", headers=bob_auth).json["data"] == [bob_task]
     assert client.get(f"/tasks/{alice_task['id']}", headers=bob_auth).status_code == 404
     assert (
         client.put(
@@ -324,6 +363,7 @@ def test_tasks_and_users_persist_between_app_instances(data_file, users_file):
         "TASKS_FILE": str(data_file),
         "USERS_FILE": str(users_file),
         "JWT_SECRET_KEY": "persistent-secret-at-least-32-bytes-long",
+        "RATELIMIT_STORAGE_URI": "memory://",
     }
     first_client = create_app(config).test_client()
     headers, _ = register_and_login(first_client)
@@ -336,4 +376,48 @@ def test_tasks_and_users_persist_between_app_instances(data_file, users_file):
         "/auth/login", json={"username": "alice", "password": "correct horse"}
     )
     second_headers = {"Authorization": f"Bearer {logged_in.json['token']}"}
-    assert second_client.get("/tasks", headers=second_headers).json == [created]
+    assert second_client.get("/tasks", headers=second_headers).json["data"] == [created]
+
+
+def test_authenticated_user_is_rate_limited_with_retry_after(
+    data_file, users_file
+):
+    limited_app = create_app(
+        {
+            "TESTING": True,
+            "TASKS_FILE": str(data_file),
+            "USERS_FILE": str(users_file),
+            "JWT_SECRET_KEY": "rate-limit-secret-at-least-32-bytes",
+            "RATELIMIT_STORAGE_URI": "memory://",
+            "RATELIMIT_DEFAULT": "2 per minute",
+        }
+    )
+    limited_client = limited_app.test_client()
+    headers, _ = register_and_login(limited_client)
+
+    assert limited_client.get("/tasks", headers=headers).status_code == 200
+    assert limited_client.get("/tasks", headers=headers).status_code == 200
+    response = limited_client.get("/tasks", headers=headers)
+
+    assert response.status_code == 429
+    assert int(response.headers["Retry-After"]) > 0
+
+
+def test_auth_endpoints_are_rate_limited(data_file, users_file):
+    limited_app = create_app(
+        {
+            "TESTING": True,
+            "TASKS_FILE": str(data_file),
+            "USERS_FILE": str(users_file),
+            "RATELIMIT_STORAGE_URI": "memory://",
+            "RATELIMIT_DEFAULT": "2 per minute",
+        }
+    )
+    limited_client = limited_app.test_client()
+
+    assert limited_client.post("/auth/login", json={}).status_code == 400
+    assert limited_client.post("/auth/login", json={}).status_code == 400
+    response = limited_client.post("/auth/login", json={})
+
+    assert response.status_code == 429
+    assert "Retry-After" in response.headers

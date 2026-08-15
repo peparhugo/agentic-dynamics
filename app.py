@@ -6,6 +6,8 @@ from pathlib import Path
 
 import jwt
 from flask import Flask, current_app, g, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from notification_tasks import send_notification_email
@@ -59,6 +61,22 @@ def _authentication_required(view):
     return wrapped
 
 
+def _rate_limit_key() -> str:
+    authorization = request.headers.get("Authorization", "")
+    scheme, separator, token = authorization.partition(" ")
+    if separator and scheme.lower() == "bearer" and token:
+        try:
+            payload = jwt.decode(
+                token,
+                current_app.config["JWT_SECRET_KEY"],
+                algorithms=["HS256"],
+            )
+            return f"user:{int(payload['sub'])}"
+        except (jwt.PyJWTError, KeyError, TypeError, ValueError):
+            pass
+    return f"ip:{get_remote_address()}"
+
+
 def create_app(config: dict | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
@@ -67,6 +85,11 @@ def create_app(config: dict | None = None) -> Flask:
         ),
         JWT_SECRET_KEY=os.environ.get("JWT_SECRET_KEY", _default_jwt_secret),
         JWT_EXPIRATION_SECONDS=3600,
+        RATELIMIT_DEFAULT="100 per minute",
+        RATELIMIT_STORAGE_URI=os.environ.get(
+            "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+        ),
+        RATELIMIT_HEADERS_ENABLED=True,
     )
     if config:
         app.config.update(config)
@@ -80,6 +103,13 @@ def create_app(config: dict | None = None) -> Flask:
     )
     app.extensions["task_repository"] = task_repository
     app.extensions["user_repository"] = user_repository
+
+    Limiter(
+        key_func=_rate_limit_key,
+        app=app,
+        default_limits=[app.config["RATELIMIT_DEFAULT"]],
+        storage_uri=app.config["RATELIMIT_STORAGE_URI"],
+    )
 
     @app.post("/auth/register")
     def register():
@@ -145,8 +175,22 @@ def create_app(config: dict | None = None) -> Flask:
     @app.get("/tasks")
     @_authentication_required
     def list_tasks():
-        tasks = task_repository.list_for_owner(g.current_user["id"])
-        return jsonify(tasks)
+        cursor_value = request.args.get("cursor")
+        limit_value = request.args.get("limit", "20")
+        try:
+            cursor = int(cursor_value) if cursor_value is not None else None
+            limit = int(limit_value)
+        except ValueError:
+            return jsonify(error="cursor and limit must be integers"), 400
+        if cursor is not None and cursor < 1:
+            return jsonify(error="cursor must be a positive integer"), 400
+        if not 1 <= limit <= 100:
+            return jsonify(error="limit must be between 1 and 100"), 400
+
+        tasks, next_cursor, total = task_repository.paginate_for_owner(
+            g.current_user["id"], cursor, limit
+        )
+        return jsonify(data=tasks, next_cursor=next_cursor, total=total)
 
     @app.get("/tasks/<int:task_id>")
     @_authentication_required
