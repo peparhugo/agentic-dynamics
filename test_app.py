@@ -1,5 +1,7 @@
 import pytest
+from unittest.mock import Mock
 
+import app as app_module
 from app import app, init_db
 
 
@@ -49,6 +51,35 @@ def test_get_update_and_missing_task(auth_client):
     missing = auth_client.get("/tasks/99")
     assert missing.status_code == 404
     assert missing.get_json() == {"error": "task not found"}
+
+
+def test_completing_task_queues_owner_notification(client, monkeypatch):
+    client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "secret", "email": "alice@example.com"},
+    )
+    token = client.post("/auth/login", json={"username": "alice", "password": "secret"}).get_json()["token"]
+    client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+    client.post("/tasks", json={"title": "Ship feature"})
+    queue = Mock()
+    monkeypatch.setattr(app_module.send_notification_email, "delay", queue)
+
+    response = client.put("/tasks/1", json={"status": "completed"})
+
+    assert response.status_code == 200
+    queue.assert_called_once_with("alice@example.com", "Ship feature")
+
+
+def test_notification_only_runs_on_completion_transition(auth_client, monkeypatch):
+    auth_client.post("/tasks", json={"title": "Ship feature"})
+    queue = Mock()
+    monkeypatch.setattr(app_module.send_notification_email, "delay", queue)
+
+    auth_client.put("/tasks/1", json={"status": "in progress"})
+    auth_client.put("/tasks/1", json={"status": "completed"})
+    auth_client.put("/tasks/1", json={"title": "Updated title"})
+
+    queue.assert_called_once_with("alice", "Ship feature")
 
 
 def test_tasks_require_a_valid_token(client):

@@ -15,6 +15,8 @@ from functools import wraps
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from notifications import send_notification_email
+
 
 app = Flask(__name__)
 app.config["TASKS_FILE"] = os.environ.get("TASKS_FILE", "tasks.json")
@@ -152,6 +154,8 @@ def register():
             "username": username,
             "password_hash": generate_password_hash(password),
         }
+        if isinstance(data.get("email"), str) and data["email"].strip():
+            user["email"] = data["email"].strip()
         store["next_user_id"] += 1
         store["users"].append(user)
         _write_store(store)
@@ -224,6 +228,7 @@ def update_task(task_id):
                      if task["id"] == task_id and task.get("owner_id") == g.current_user["id"]), None)
         if task is None:
             return _not_found()
+        was_completed = task.get("status") == "completed"
         if "title" in data:
             if not isinstance(data["title"], str) or not data["title"].strip():
                 return jsonify({"error": "title must be a non-empty string"}), 400
@@ -232,7 +237,19 @@ def update_task(task_id):
             if not isinstance(data["status"], str) or not data["status"].strip():
                 return jsonify({"error": "status must be a non-empty string"}), 400
             task["status"] = data["status"].strip()
+        became_completed = task["status"] == "completed" and not was_completed
         _write_store(store)
+        owner = next(
+            (user for user in store["users"] if user["id"] == task.get("owner_id")),
+            None,
+        )
+    if became_completed:
+        user_email = (owner or {}).get("email") or (owner or {}).get("username")
+        try:
+            send_notification_email.delay(user_email, task["title"])
+        except Exception:
+            # A broker outage must not turn a successful task update into an error.
+            app.logger.exception("Unable to queue task completion notification")
     return jsonify(task)
 
 
