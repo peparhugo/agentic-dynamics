@@ -9,6 +9,8 @@ import jwt
 from flask import Flask, g, request, jsonify
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from celery_config import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "tasks.db")
@@ -43,7 +45,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL
+            password_hash TEXT NOT NULL,
+            email TEXT
         )
         """
     )
@@ -55,7 +58,22 @@ def init_db():
         conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
         conn.commit()
 
+    # Migration: add email to existing users table without breaking data.
+    columns = _table_columns(conn, "users")
+    if "email" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+
     conn.close()
+
+
+def _user_email(conn, user_id):
+    row = conn.execute(
+        "SELECT username, email FROM users WHERE id = ?", (user_id,)
+    ).fetchone()
+    if row is None:
+        return None
+    return row["email"] or f"{row['username']}@example.com"
 
 
 def task_to_dict(row):
@@ -110,9 +128,12 @@ def register():
         return jsonify({"error": "username already exists"}), 409
 
     password_hash = generate_password_hash(password)
+    email = data.get("email")
+    if email is not None:
+        email = str(email).strip() or None
     cur = conn.execute(
-        "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-        (username, password_hash),
+        "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+        (username, password_hash, email),
     )
     conn.commit()
     user_id = cur.lastrowid
@@ -214,13 +235,20 @@ def update_task(task_id):
         conn.close()
         return jsonify({"error": "status is required"}), 400
 
+    was_completed = row["status"] == "completed"
+
     conn.execute(
         "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
         (title, status, task_id),
     )
     conn.commit()
     updated = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
+    owner_email = _user_email(conn, g.user_id)
     conn.close()
+
+    if status == "completed" and not was_completed:
+        send_notification_email.delay(owner_email, title)
+
     return jsonify(task_to_dict(updated))
 
 

@@ -160,3 +160,85 @@ def test_users_only_see_their_own_tasks(client):
 
     assert client.get("/tasks/2", headers=alice).status_code == 404
     assert client.get("/tasks/2", headers=bob).status_code == 200
+
+
+def test_completing_task_triggers_notification_email(client, monkeypatch):
+    import app as app_module
+
+    sent = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda user_email, task_title: sent.append((user_email, task_title)),
+    )
+
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "notify me"}, headers=headers)
+    resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    assert sent == [("alice@example.com", "notify me")]
+
+
+def test_non_completed_status_does_not_trigger_notification(client, monkeypatch):
+    import app as app_module
+
+    sent = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda user_email, task_title: sent.append((user_email, task_title)),
+    )
+
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "keep pending"}, headers=headers)
+    resp = client.put("/tasks/1", json={"status": "done"}, headers=headers)
+
+    assert resp.status_code == 200
+    assert sent == []
+
+
+def test_already_completed_task_does_not_re_notify(client, monkeypatch):
+    import app as app_module
+
+    sent = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda user_email, task_title: sent.append((user_email, task_title)),
+    )
+
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "done once"}, headers=headers)
+    client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+    assert sent == [("alice@example.com", "done once")]
+
+    client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+    assert sent == [("alice@example.com", "done once")]
+
+
+def test_notification_uses_registered_email(client, monkeypatch):
+    import app as app_module
+
+    sent = []
+    monkeypatch.setattr(
+        app_module.send_notification_email,
+        "delay",
+        lambda user_email, task_title: sent.append((user_email, task_title)),
+    )
+
+    client.post(
+        "/auth/register",
+        json={"username": "carol", "password": "pw", "email": "carol@corp.com"},
+    )
+    resp = client.post(
+        "/auth/login", json={"username": "carol", "password": "pw"}
+    )
+    headers = {"Authorization": "Bearer " + resp.get_json()["token"]}
+
+    client.post("/tasks", json={"title": "email me"}, headers=headers)
+    resp = client.put("/tasks/1", json={"status": "completed"}, headers=headers)
+
+    assert resp.status_code == 200
+    assert sent == [("carol@corp.com", "email me")]
