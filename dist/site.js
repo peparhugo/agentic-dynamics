@@ -6,26 +6,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildSite = buildSite;
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const markdown_1 = require("./markdown");
-const templates_1 = require("./templates");
-function escapeHtml(value) {
-    return String(value).replace(/[&<>"']/g, (ch) => {
-        switch (ch) {
-            case '&':
-                return '&amp;';
-            case '<':
-                return '&lt;';
-            case '>':
-                return '&gt;';
-            case '"':
-                return '&quot;';
-            case "'":
-                return '&#39;';
-            default:
-                return ch;
-        }
-    });
-}
+const config_1 = require("./config");
+const markdown_plugin_1 = require("./plugins/markdown-plugin");
+const template_plugin_1 = require("./plugins/template-plugin");
+const render_1 = require("./render");
 function listMarkdownFiles(dir) {
     const files = [];
     if (!fs_1.default.existsSync(dir)) {
@@ -48,96 +32,7 @@ function slugForFile(filePath, contentDir) {
     const withoutExtension = relative.replace(/\.md$/i, '');
     return withoutExtension.split(path_1.default.sep).join('/');
 }
-function renderIndex(posts) {
-    const items = posts
-        .map((post) => {
-        const href = `${post.slug}.html`;
-        const title = escapeHtml(post.title || post.slug);
-        const date = post.date
-            ? `<time datetime="${escapeHtml(post.date)}">${escapeHtml(post.date)}</time>`
-            : '';
-        const tags = post.tags.length
-            ? `<span class="tags">${post.tags.map(escapeHtml).join(', ')}</span>`
-            : '';
-        const meta = [date, tags].filter(Boolean).join(' ');
-        return `<li><a href="${href}">${title}</a>${meta ? ` — ${meta}` : ''}</li>`;
-    })
-        .join('\n    ');
-    return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Site Index</title>
-</head>
-<body>
-  <header><h1>Site Index</h1></header>
-  <main>
-    <ul>
-    ${items || '<li>(no pages)</li>'}
-    </ul>
-  </main>
-</body>
-</html>
-`;
-}
-function renderPage(post) {
-    const title = escapeHtml(post.title || post.slug);
-    const date = post.date
-        ? `<time datetime="${escapeHtml(post.date)}">${escapeHtml(post.date)}</time>`
-        : '';
-    const tags = post.tags.length
-        ? `<p class="tags">Tags: ${post.tags.map(escapeHtml).join(', ')}</p>`
-        : '';
-    return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title}</title>
-</head>
-<body>
-  <header>
-    <a href="index.html">← Index</a>
-    <h1>${title}</h1>
-    ${date ? `<p>${date}</p>` : ''}
-    ${tags}
-  </header>
-  <main>
-${post.html}
-  </main>
-</body>
-</html>
-`;
-}
-function postToContext(post) {
-    return {
-        title: post.title,
-        date: post.date,
-        tags: post.tags,
-        slug: post.slug,
-        content: post.content,
-        body: post.html,
-    };
-}
-function buildSite(options) {
-    const { contentDir, outputDir } = options;
-    const templatesDir = options.templatesDir ?? path_1.default.join(process.cwd(), 'templates');
-    const engine = new templates_1.TemplateEngine(templatesDir);
-    const markdownFiles = listMarkdownFiles(contentDir);
-    const posts = markdownFiles.map((filePath) => {
-        const source = fs_1.default.readFileSync(filePath, 'utf-8');
-        const { meta, content, html } = (0, markdown_1.parseMarkdown)(source);
-        return {
-            slug: slugForFile(filePath, contentDir),
-            title: meta.title || slugForFile(filePath, contentDir),
-            date: meta.date,
-            tags: meta.tags,
-            template: meta.template,
-            content,
-            html,
-        };
-    });
+function sortPosts(posts) {
     posts.sort((a, b) => {
         const dateA = a.date ? Date.parse(a.date) : NaN;
         const dateB = b.date ? Date.parse(b.date) : NaN;
@@ -152,17 +47,91 @@ function buildSite(options) {
         }
         return a.title.localeCompare(b.title);
     });
+}
+function runHooksSync(plugins, method) {
+    for (const plugin of plugins) {
+        const hook = plugin[method];
+        if (typeof hook !== 'function') {
+            continue;
+        }
+        const result = hook.call(plugin);
+        if (result != null && typeof result.then === 'function') {
+            throw new Error(`Plugin "${plugin.name ?? 'unnamed'}" returned a Promise from "${method}". ` +
+                'Asynchronous plugin hooks are not supported by the synchronous build pipeline.');
+        }
+    }
+}
+function runFileHooksSync(plugins, page) {
+    for (const plugin of plugins) {
+        const hook = plugin.onFile;
+        if (typeof hook !== 'function') {
+            continue;
+        }
+        const result = hook.call(plugin, page);
+        if (result != null && typeof result.then === 'function') {
+            throw new Error(`Plugin "${plugin.name ?? 'unnamed'}" returned a Promise from "onFile". ` +
+                'Asynchronous plugin hooks are not supported by the synchronous build pipeline.');
+        }
+    }
+}
+/**
+ * Build a static site by running the plugin pipeline.
+ *
+ * The built-in `MarkdownPlugin` and `TemplatePlugin` always run first (in that
+ * order), followed by any plugins passed via `options.plugins` and any plugins
+ * declared in the project's `ssg.config.ts`.
+ */
+function buildSite(options) {
+    const { contentDir, outputDir } = options;
+    const templatesDir = options.templatesDir ?? path_1.default.join(process.cwd(), 'templates');
+    const configDir = options.configDir ?? process.cwd();
+    const plugins = [
+        new markdown_plugin_1.MarkdownPlugin(),
+        new template_plugin_1.TemplatePlugin(templatesDir),
+        ...(options.plugins ?? []),
+        ...(0, config_1.loadPlugins)(configDir),
+    ];
+    runHooksSync(plugins, 'onStart');
+    runHooksSync(plugins, 'beforeBuild');
+    const markdownFiles = listMarkdownFiles(contentDir);
+    const pages = markdownFiles.map((filePath) => {
+        const slug = slugForFile(filePath, contentDir);
+        const source = fs_1.default.readFileSync(filePath, 'utf-8');
+        return {
+            slug,
+            title: '',
+            date: undefined,
+            tags: [],
+            template: undefined,
+            content: source,
+            html: '',
+        };
+    });
+    for (const page of pages) {
+        runFileHooksSync(plugins, page);
+    }
+    sortPosts(pages);
     fs_1.default.mkdirSync(outputDir, { recursive: true });
     const filesWritten = [];
     const indexPath = path_1.default.join(outputDir, 'index.html');
-    fs_1.default.writeFileSync(indexPath, renderIndex(posts));
+    fs_1.default.writeFileSync(indexPath, (0, render_1.renderIndex)(pages));
     filesWritten.push(indexPath);
-    for (const post of posts) {
-        const pagePath = path_1.default.join(outputDir, `${post.slug}.html`);
+    for (const page of pages) {
+        const pagePath = path_1.default.join(outputDir, `${page.slug}.html`);
         fs_1.default.mkdirSync(path_1.default.dirname(pagePath), { recursive: true });
-        const rendered = engine.render(post.template, postToContext(post));
-        fs_1.default.writeFileSync(pagePath, rendered ?? renderPage(post));
+        fs_1.default.writeFileSync(pagePath, page.rendered ?? '');
         filesWritten.push(pagePath);
     }
+    runHooksSync(plugins, 'afterBuild');
+    runHooksSync(plugins, 'onEnd');
+    const posts = pages.map((page) => ({
+        slug: page.slug,
+        title: page.title,
+        date: page.date,
+        tags: page.tags,
+        template: page.template,
+        content: page.content,
+        html: page.html,
+    }));
     return { posts, filesWritten, outputDir };
 }

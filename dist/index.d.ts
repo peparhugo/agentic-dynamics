@@ -6,3 +6,8 @@ export type { PageContext } from './templates';
 export type { PageMeta, ParsedMarkdown, Post } from './types';
 export { startServer, injectLiveReloadScript, LIVE_RELOAD_PATH } from './serve';
 export type { ServeOptions, ServeHandle } from './serve';
+export type { Plugin, Page, MaybePromise } from './plugin';
+export { PluginPipeline } from './plugin';
+export { MarkdownPlugin, TemplatePlugin, DevServerPlugin } from './plugins';
+export { loadConfig, loadPlugins, installTypeScriptRequireHook } from './config';
+export type { SsgConfig } from './config';

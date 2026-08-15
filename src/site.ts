@@ -1,39 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 
-import { parseMarkdown } from './markdown';
-import { TemplateEngine, PageContext } from './templates';
+import { loadPlugins } from './config';
+import { Page, Plugin } from './plugin';
+import { MarkdownPlugin } from './plugins/markdown-plugin';
+import { TemplatePlugin } from './plugins/template-plugin';
+import { renderIndex } from './render';
 import { Post } from './types';
 
 export interface BuildOptions {
   contentDir: string;
   outputDir: string;
   templatesDir?: string;
+  /** Extra plugins appended after the built-in plugins. */
+  plugins?: Plugin[];
+  /** Directory searched for `ssg.config.ts`. Defaults to `process.cwd()`. */
+  configDir?: string;
 }
 
 export interface BuildResult {
   posts: Post[];
   filesWritten: string[];
   outputDir: string;
-}
-
-function escapeHtml(value: string): string {
-  return String(value).replace(/[&<>"']/g, (ch) => {
-    switch (ch) {
-      case '&':
-        return '&amp;';
-      case '<':
-        return '&lt;';
-      case '>':
-        return '&gt;';
-      case '"':
-        return '&quot;';
-      case "'":
-        return '&#39;';
-      default:
-        return ch;
-    }
-  });
 }
 
 function listMarkdownFiles(dir: string): string[] {
@@ -59,103 +47,7 @@ function slugForFile(filePath: string, contentDir: string): string {
   return withoutExtension.split(path.sep).join('/');
 }
 
-function renderIndex(posts: Post[]): string {
-  const items = posts
-    .map((post) => {
-      const href = `${post.slug}.html`;
-      const title = escapeHtml(post.title || post.slug);
-      const date = post.date
-        ? `<time datetime="${escapeHtml(post.date)}">${escapeHtml(post.date)}</time>`
-        : '';
-      const tags = post.tags.length
-        ? `<span class="tags">${post.tags.map(escapeHtml).join(', ')}</span>`
-        : '';
-      const meta = [date, tags].filter(Boolean).join(' ');
-      return `<li><a href="${href}">${title}</a>${meta ? ` — ${meta}` : ''}</li>`;
-    })
-    .join('\n    ');
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Site Index</title>
-</head>
-<body>
-  <header><h1>Site Index</h1></header>
-  <main>
-    <ul>
-    ${items || '<li>(no pages)</li>'}
-    </ul>
-  </main>
-</body>
-</html>
-`;
-}
-
-function renderPage(post: Post): string {
-  const title = escapeHtml(post.title || post.slug);
-  const date = post.date
-    ? `<time datetime="${escapeHtml(post.date)}">${escapeHtml(post.date)}</time>`
-    : '';
-  const tags = post.tags.length
-    ? `<p class="tags">Tags: ${post.tags.map(escapeHtml).join(', ')}</p>`
-    : '';
-
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${title}</title>
-</head>
-<body>
-  <header>
-    <a href="index.html">← Index</a>
-    <h1>${title}</h1>
-    ${date ? `<p>${date}</p>` : ''}
-    ${tags}
-  </header>
-  <main>
-${post.html}
-  </main>
-</body>
-</html>
-`;
-}
-
-function postToContext(post: Post): PageContext {
-  return {
-    title: post.title,
-    date: post.date,
-    tags: post.tags,
-    slug: post.slug,
-    content: post.content,
-    body: post.html,
-  };
-}
-
-export function buildSite(options: BuildOptions): BuildResult {
-  const { contentDir, outputDir } = options;
-  const templatesDir = options.templatesDir ?? path.join(process.cwd(), 'templates');
-  const engine = new TemplateEngine(templatesDir);
-  const markdownFiles = listMarkdownFiles(contentDir);
-
-  const posts: Post[] = markdownFiles.map((filePath) => {
-    const source = fs.readFileSync(filePath, 'utf-8');
-    const { meta, content, html } = parseMarkdown(source);
-    return {
-      slug: slugForFile(filePath, contentDir),
-      title: meta.title || slugForFile(filePath, contentDir),
-      date: meta.date,
-      tags: meta.tags,
-      template: meta.template,
-      content,
-      html,
-    };
-  });
-
+function sortPosts(posts: Post[]): void {
   posts.sort((a, b) => {
     const dateA = a.date ? Date.parse(a.date) : NaN;
     const dateB = b.date ? Date.parse(b.date) : NaN;
@@ -170,22 +62,112 @@ export function buildSite(options: BuildOptions): BuildResult {
     }
     return a.title.localeCompare(b.title);
   });
+}
+
+type LifecycleHook = 'onStart' | 'beforeBuild' | 'afterBuild' | 'onEnd';
+
+function runHooksSync(plugins: Plugin[], method: LifecycleHook): void {
+  for (const plugin of plugins) {
+    const hook = plugin[method] as (() => unknown) | undefined;
+    if (typeof hook !== 'function') {
+      continue;
+    }
+    const result = hook.call(plugin);
+    if (result != null && typeof (result as Promise<unknown>).then === 'function') {
+      throw new Error(
+        `Plugin "${plugin.name ?? 'unnamed'}" returned a Promise from "${method}". ` +
+          'Asynchronous plugin hooks are not supported by the synchronous build pipeline.',
+      );
+    }
+  }
+}
+
+function runFileHooksSync(plugins: Plugin[], page: Page): void {
+  for (const plugin of plugins) {
+    const hook = plugin.onFile as ((page: Page) => unknown) | undefined;
+    if (typeof hook !== 'function') {
+      continue;
+    }
+    const result = hook.call(plugin, page);
+    if (result != null && typeof (result as Promise<unknown>).then === 'function') {
+      throw new Error(
+        `Plugin "${plugin.name ?? 'unnamed'}" returned a Promise from "onFile". ` +
+          'Asynchronous plugin hooks are not supported by the synchronous build pipeline.',
+      );
+    }
+  }
+}
+
+/**
+ * Build a static site by running the plugin pipeline.
+ *
+ * The built-in `MarkdownPlugin` and `TemplatePlugin` always run first (in that
+ * order), followed by any plugins passed via `options.plugins` and any plugins
+ * declared in the project's `ssg.config.ts`.
+ */
+export function buildSite(options: BuildOptions): BuildResult {
+  const { contentDir, outputDir } = options;
+  const templatesDir = options.templatesDir ?? path.join(process.cwd(), 'templates');
+  const configDir = options.configDir ?? process.cwd();
+
+  const plugins: Plugin[] = [
+    new MarkdownPlugin(),
+    new TemplatePlugin(templatesDir),
+    ...(options.plugins ?? []),
+    ...loadPlugins(configDir),
+  ];
+
+  runHooksSync(plugins, 'onStart');
+  runHooksSync(plugins, 'beforeBuild');
+
+  const markdownFiles = listMarkdownFiles(contentDir);
+  const pages: Page[] = markdownFiles.map((filePath) => {
+    const slug = slugForFile(filePath, contentDir);
+    const source = fs.readFileSync(filePath, 'utf-8');
+    return {
+      slug,
+      title: '',
+      date: undefined,
+      tags: [],
+      template: undefined,
+      content: source,
+      html: '',
+    };
+  });
+
+  for (const page of pages) {
+    runFileHooksSync(plugins, page);
+  }
+
+  sortPosts(pages);
 
   fs.mkdirSync(outputDir, { recursive: true });
 
   const filesWritten: string[] = [];
 
   const indexPath = path.join(outputDir, 'index.html');
-  fs.writeFileSync(indexPath, renderIndex(posts));
+  fs.writeFileSync(indexPath, renderIndex(pages));
   filesWritten.push(indexPath);
 
-  for (const post of posts) {
-    const pagePath = path.join(outputDir, `${post.slug}.html`);
+  for (const page of pages) {
+    const pagePath = path.join(outputDir, `${page.slug}.html`);
     fs.mkdirSync(path.dirname(pagePath), { recursive: true });
-    const rendered = engine.render(post.template, postToContext(post));
-    fs.writeFileSync(pagePath, rendered ?? renderPage(post));
+    fs.writeFileSync(pagePath, page.rendered ?? '');
     filesWritten.push(pagePath);
   }
+
+  runHooksSync(plugins, 'afterBuild');
+  runHooksSync(plugins, 'onEnd');
+
+  const posts: Post[] = pages.map((page) => ({
+    slug: page.slug,
+    title: page.title,
+    date: page.date,
+    tags: page.tags,
+    template: page.template,
+    content: page.content,
+    html: page.html,
+  }));
 
   return { posts, filesWritten, outputDir };
 }
