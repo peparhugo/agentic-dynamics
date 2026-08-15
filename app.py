@@ -8,6 +8,8 @@ import sqlite3
 import os
 import jwt
 
+from notifications import send_notification_email
+
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
@@ -40,6 +42,7 @@ def init_db():
             ")"
         )
         _migrate_add_owner_id(conn)
+        _migrate_add_email(conn)
 
 
 def _migrate_add_owner_id(conn: sqlite3.Connection) -> None:
@@ -54,18 +57,36 @@ def _migrate_add_owner_id(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
+def _migrate_add_email(conn: sqlite3.Connection) -> None:
+    """Add the users.email column if it doesn't already exist.
+
+    Existing users (registered before email existed) are left with email = NULL;
+    notification sending falls back to a derived address for them.
+    """
+    columns = [row["name"] for row in conn.execute("PRAGMA table_info(users)")]
+    if "email" not in columns:
+        conn.execute("ALTER TABLE users ADD COLUMN email TEXT")
+        conn.commit()
+
+
 # ── User model ────────────────────────────────────────────────
 
 
-def create_user(username: str, password: str) -> dict:
+def create_user(username: str, password: str, email: str | None = None) -> dict:
     password_hash = generate_password_hash(password)
+    email = email or f"{username}@example.com"
     with get_db() as conn:
         cur = conn.execute(
-            "INSERT INTO users (username, password_hash) VALUES (?, ?)",
-            (username, password_hash),
+            "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
+            (username, password_hash, email),
         )
         conn.commit()
-        return {"id": cur.lastrowid, "username": username}
+        return {"id": cur.lastrowid, "username": username, "email": email}
+
+
+def get_user_email(user: dict) -> str:
+    """Return the user's notification email, deriving one for legacy users without it."""
+    return user.get("email") or f"{user['username']}@example.com"
 
 
 def get_user_by_username(username: str) -> dict | None:
@@ -188,14 +209,17 @@ def register():
     data = request.get_json(silent=True) or {}
     username = data.get("username", "")
     password = data.get("password", "")
+    email = data.get("email")
     if not isinstance(username, str) or not username.strip():
         return jsonify({"error": "username is required"}), 400
     if not isinstance(password, str) or not password:
         return jsonify({"error": "password is required"}), 400
+    if email is not None and (not isinstance(email, str) or not email.strip()):
+        return jsonify({"error": "email must be a non-empty string"}), 400
     username = username.strip()
     if get_user_by_username(username) is not None:
         return jsonify({"error": "username already taken"}), 409
-    user = create_user(username, password)
+    user = create_user(username, password, email.strip() if email else None)
     return jsonify(user), 201
 
 
@@ -246,6 +270,9 @@ def show_task(task_id: int):
 @login_required
 def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
+    existing = get_task(task_id, g.current_user["id"])
+    if existing is None:
+        return jsonify({"error": "task not found"}), 404
     task = update_task(
         task_id,
         g.current_user["id"],
@@ -254,6 +281,8 @@ def edit_task(task_id: int):
     )
     if task is None:
         return jsonify({"error": "task not found"}), 404
+    if existing["status"] != "completed" and task["status"] == "completed":
+        send_notification_email.delay(get_user_email(g.current_user), task["title"])
     return jsonify(task)
 
 

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 import app as app_module
@@ -274,3 +276,80 @@ def test_migration_preserves_existing_tasks_without_owner(client, tmp_path):
 
     assert row["title"] == "legacy task"
     assert row["owner_id"] is None
+
+
+# ── Notifications: completion trigger ────────────────────────
+
+
+def test_completing_task_triggers_notification_email(client, auth_headers):
+    created = client.post("/tasks", json={"title": "Ship report"}, headers=auth_headers).get_json()
+    with patch("app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_called_once_with("alice@example.com", "Ship report")
+
+
+def test_notification_uses_registered_email(client):
+    client.post(
+        "/auth/register",
+        json={"username": "carol", "password": "pw", "email": "carol@example.org"},
+    )
+    token = client.post(
+        "/auth/login", json={"username": "carol", "password": "pw"}
+    ).get_json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    created = client.post("/tasks", json={"title": "ship it"}, headers=headers).get_json()
+    with patch("app.send_notification_email") as mock_task:
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=headers)
+    mock_task.delay.assert_called_once_with("carol@example.org", "ship it")
+
+
+def test_updating_title_only_does_not_trigger_notification(client, auth_headers):
+    created = client.post("/tasks", json={"title": "task"}, headers=auth_headers).get_json()
+    with patch("app.send_notification_email") as mock_task:
+        client.put(f"/tasks/{created['id']}", json={"title": "renamed"}, headers=auth_headers)
+    mock_task.delay.assert_not_called()
+
+
+def test_changing_status_to_non_completed_does_not_trigger_notification(client, auth_headers):
+    created = client.post("/tasks", json={"title": "task"}, headers=auth_headers).get_json()
+    with patch("app.send_notification_email") as mock_task:
+        client.put(f"/tasks/{created['id']}", json={"status": "in_progress"}, headers=auth_headers)
+    mock_task.delay.assert_not_called()
+
+
+def test_recompleting_task_does_not_retrigger_notification(client, auth_headers):
+    created = client.post("/tasks", json={"title": "task"}, headers=auth_headers).get_json()
+    client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_headers)
+    with patch("app.send_notification_email") as mock_task:
+        client.put(f"/tasks/{created['id']}", json={"status": "completed"}, headers=auth_headers)
+    mock_task.delay.assert_not_called()
+
+
+def test_updating_nonexistent_task_does_not_trigger_notification(client, auth_headers):
+    with patch("app.send_notification_email") as mock_task:
+        resp = client.put("/tasks/999", json={"status": "completed"}, headers=auth_headers)
+    assert resp.status_code == 404
+    mock_task.delay.assert_not_called()
+
+
+def test_completing_other_users_task_does_not_trigger_notification(client, auth_headers):
+    created = client.post("/tasks", json={"title": "alice task"}, headers=auth_headers).get_json()
+    bob_headers = other_auth_headers(client)
+    with patch("app.send_notification_email") as mock_task:
+        resp = client.put(
+            f"/tasks/{created['id']}", json={"status": "completed"}, headers=bob_headers
+        )
+    assert resp.status_code == 404
+    mock_task.delay.assert_not_called()
+
+
+def test_send_notification_email_task_returns_sent_payload():
+    result = app_module.send_notification_email.run("alice@example.com", "Ship report")
+    assert result == {
+        "user_email": "alice@example.com",
+        "task_title": "Ship report",
+        "sent": True,
+    }
