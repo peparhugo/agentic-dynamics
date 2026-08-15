@@ -22,6 +22,12 @@ rules:
 The compiler refuses `dynamics`/`model_cascade` until `confidence` is instrumented (measure
 before policy). Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 
+The runtime-RAG workflow family is a committed spec set — `rag_knowledge_base.yaml` →
+`rag_knowledge_base_build.yaml` → `rag_knowledge_base_wire.yaml` → `rag_knowledge_base_reconcile.yaml`
+→ `rag_knowledge_produce.yaml` — the async knowledge spine from design through retrieval/wiring,
+reconciliation, and the producer edge (`scripts/kb_produce.py` → `knowledge_ingestion` →
+`knowledge_stream`).
+
 ## `experiments/configs/` — 34 Experiment Definitions
 
 Each YAML defines: task description, constraints, perturbation operators, strength levels, model, turns.

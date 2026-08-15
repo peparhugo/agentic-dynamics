@@ -8,7 +8,7 @@ permission:
   task: allow
 ---
 
-You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 42 modules in `src/instrument/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py`).
+You are the **Instrument Development Agent** for AI FinOps Dynamics. Your domain is the measurement apparatus: 43 modules in `src/instrument/`, including `experiment_spec.py`, `compile_experiment.py` (both written), and the runtime-RAG layer (`knowledge.py` / `retrieval.py` / `prompt_constructor.py` / `knowledge_stream.py` / `knowledge_ingestion.py`).
 
 ## What You Know (no need to rediscover)
 
@@ -53,6 +53,7 @@ Design: `code_reviews/2026-08-14_experiment-spec-and-compiler-design.md`.
 - `retrieval.py` (1087L) — deterministic retrieval (dense Chroma + lexical Neo4j full-text → RRF fusion): `QueryPlan`, `Candidate`, `RetrievalAttempt`, `FallbackMode`, `build_query_plan()`, `retrieve()`, `select_evidence()`, `build_evidence_cards()`
 - `prompt_constructor.py` (610L) — typed prompt-constructor (one flash-model call + validator): `PromptConstructor`, `ModelPromptConstructor`, `ConstructionRequest`, `AugmentedPrompt`, `PromptPlan`, `render_prompt()`
 - `knowledge_stream.py` (329L) — durable Redis Streams ingestion (DB 2 on 6380): `connect()`, `publish_event()`, `process_entry()`, `reconcile_missing()`, `CONSUMER_GROUPS` (`kb-chroma-v1` / `kb-neo4j-v1` / `kb-ledger-v1`)
+- `knowledge_ingestion.py` (278L) — producer-side measured-finding derivation (richer extractor over `_results_summary.json`): `EXTRACTOR_VERSION` (`"measured-finding/v1"`), `derive_records()`, `build_record()`, `record_to_event()`
 
 ### The load-bearing rule (enforced by the validator, not convention)
 `RuleSpec` declares `requires` (information it consumes) and `produces` (information it emits).

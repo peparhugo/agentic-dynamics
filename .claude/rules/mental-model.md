@@ -194,12 +194,21 @@ PromptConstructor, ModelPromptConstructor, PromptPlan, AugmentedPrompt, render_p
 connect(), publish_event(), process_entry(), reconcile_missing()
   CONSUMER_GROUPS: kb-chroma-v1 | kb-neo4j-v1 | kb-ledger-v1
 
+# knowledge_ingestion.py — producer-side measured-finding derivation (richer extractor)
+EXTRACTOR_VERSION = "measured-finding/v1"
+derive_records(entries, *, repository_id=REPOSITORY_ID) -> list[KnowledgeRecord]
+build_record(entry, *, repository_id=REPOSITORY_ID, now=None) -> KnowledgeRecord
+record_to_event(record, *, now=None) -> KnowledgeEvent
+
 # workflow_runner.py — the rag_augment seam (default OFF)
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
              construct_fn=None, rag_params=None) -> WorkflowRunResult
 
 # one agent phase (only when rag_augment enabled):
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
+
+# producer data flow (batch ingestion): measured result ──▶ derive_records ──▶
+#   record_to_event ──▶ KnowledgeEvent ──▶ publish_event ──▶ stream ──▶ consumers
 ```
 
 ### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
