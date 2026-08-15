@@ -366,3 +366,102 @@ def test_migration_assigns_owner_to_existing_tasks(tmp_path):
         users = json.load(f)
     assert users[0]["username"] == "legacy"
     assert users[0]["id"] == tasks[0]["owner_id"]
+
+
+# ── Notification trigger ────────────────────────────────────────
+
+
+class _FakeCeleryTask:
+    def __init__(self):
+        self.calls = []
+
+    def delay(self, *args, **kwargs):
+        self.calls.append((args, kwargs))
+
+
+def test_completing_task_queues_notification(client, monkeypatch):
+    token = _token(client, "alice")
+    created = _create(client, token, "Finish report").get_json()
+    fake = _FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    assert len(fake.calls) == 1
+    args, kwargs = fake.calls[0]
+    assert kwargs == {}
+    assert args[0] == "alice@example.com"
+    assert args[1] == "Finish report"
+
+
+def test_updating_to_non_completed_does_not_queue_notification(client, monkeypatch):
+    token = _token(client, "alice")
+    created = _create(client, token, "Do chores").get_json()
+    fake = _FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    resp = client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "in_progress"},
+        headers=_auth(token),
+    )
+    assert resp.status_code == 200
+    assert fake.calls == []
+
+
+def test_completing_already_completed_task_does_not_requeue(client, monkeypatch):
+    token = _token(client, "alice")
+    created = _create(client, token, "Ship it").get_json()
+    fake = _FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=_auth(token),
+    )
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=_auth(token),
+    )
+    assert len(fake.calls) == 1
+
+
+def test_notification_uses_registered_email(client, monkeypatch):
+    client.post(
+        "/auth/register",
+        json={"username": "alice", "password": "secret-password", "email": "alice@acme.test"},
+    )
+    resp = _login(client, "alice")
+    token = resp.get_json()["token"]
+    created = _create(client, token, "Notify me").get_json()
+    fake = _FakeCeleryTask()
+    monkeypatch.setattr(app_module, "send_notification_email", fake)
+
+    client.put(
+        f"/tasks/{created['id']}",
+        json={"status": "completed"},
+        headers=_auth(token),
+    )
+    assert len(fake.calls) == 1
+    args, _ = fake.calls[0]
+    assert args[0] == "alice@acme.test"
+
+
+def test_send_notification_email_task_runs_locally():
+    from tasks import send_notification_email
+
+    result = send_notification_email.apply(
+        args=["alice@example.com", "Build the thing"]
+    )
+    assert result.successful()
+    assert result.get() == {
+        "sent": True,
+        "to": "alice@example.com",
+        "task_title": "Build the thing",
+    }

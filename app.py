@@ -9,6 +9,8 @@ import bcrypt
 import jwt
 from flask import Flask, jsonify, request
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 app.config["STORAGE_FILE"] = os.environ.get("TASKS_DB", "tasks.json")
 app.config["USERS_FILE"] = os.environ.get("USERS_DB", "users.json")
@@ -77,6 +79,13 @@ def _find_user_by_username(users, username):
 
 def _find_user_by_id(users, user_id):
     return next((u for u in users if u["id"] == user_id), None)
+
+
+def _user_email(user):
+    email = (user.get("email") or "").strip()
+    if email:
+        return email
+    return f"{user.get('username', 'user')}@example.com"
 
 
 def hash_password(password):
@@ -167,10 +176,12 @@ def register():
         users = _read_users()
         if _find_user_by_username(users, username) is not None:
             return jsonify({"error": "username already taken"}), 409
+        email = (data.get("email") or "").strip() or None
         user = {
             "id": _next_id(users),
             "username": username,
             "password_hash": hash_password(password),
+            "email": email,
             "created_at": datetime.utcnow().isoformat(),
         }
         users.append(user)
@@ -192,6 +203,15 @@ def login():
         return jsonify({"error": "invalid credentials"}), 401
     token = create_token(user["id"], user["username"])
     return jsonify({"token": token, "username": user["username"]})
+
+
+def trigger_completion_notification(task):
+    with _lock:
+        owner = _find_user_by_id(_read_users(), task.get("owner_id"))
+    if owner is None:
+        return
+    email = _user_email(owner)
+    send_notification_email.delay(email, task.get("title", ""))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -248,6 +268,7 @@ def update_task(user, task_id):
         task = _find_task(tasks, task_id)
         if task is None or task.get("owner_id") != user["id"]:
             return jsonify({"error": "task not found"}), 404
+        was_completed = task.get("status") == "completed"
         if "title" in data:
             title = (data.get("title") or "").strip()
             if not title:
@@ -259,6 +280,8 @@ def update_task(user, task_id):
                 return jsonify({"error": "status is required"}), 400
             task["status"] = status
         _write_tasks(tasks)
+    if not was_completed and task.get("status") == "completed":
+        trigger_completion_notification(task)
     return jsonify(task)
 
 
