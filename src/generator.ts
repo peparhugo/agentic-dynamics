@@ -4,9 +4,11 @@ import { TemplatePlugin } from './plugins/template-plugin';
 import type { Plugin, PluginFactory, SSGConfig } from './plugins/types';
 import { renderPage, renderIndex } from './render';
 import { escapeHtml } from './escape';
+import type { BuildStats } from './cache';
 import type { Page } from './types';
 
 export { escapeHtml, renderPage, renderIndex };
+export type { BuildStats } from './cache';
 
 export interface BuildOptions {
   contentDir: string;
@@ -15,6 +17,17 @@ export interface BuildOptions {
   defaultTemplate?: string;
   defaultLayout?: string;
   config?: SSGConfig;
+  /** Only rebuild pages whose source or template inputs changed. */
+  incremental?: boolean;
+  /** Ignore the build cache and rebuild every page. */
+  clean?: boolean;
+  /** Location of the build cache manifest (default: `<outputDir>/.ssg-cache.json`). */
+  cacheFile?: string;
+}
+
+export interface BuildResult {
+  pages: Page[];
+  stats: BuildStats;
 }
 
 /**
@@ -27,10 +40,10 @@ export interface BuildOptions {
  * The build runs through the core SSG engine with the built-in markdown and
  * template plugins; additional plugins can be supplied for custom processing.
  */
-export function buildSite(
+export function buildSiteWithResult(
   options: BuildOptions,
   extraPlugins: Array<Plugin | PluginFactory> = []
-): Page[] {
+): BuildResult {
   const engine = new SsgEngine(
     {
       contentDir: options.contentDir,
@@ -40,8 +53,19 @@ export function buildSite(
       defaultLayout: options.defaultLayout,
       config: options.config,
       command: 'build',
+      incremental: options.incremental,
+      clean: options.clean,
+      cacheFile: options.cacheFile,
     },
     [new MarkdownPlugin(), new TemplatePlugin(), ...extraPlugins]
   );
-  return engine.runSync();
+  const pages = engine.runSync();
+  return { pages, stats: engine.stats };
+}
+
+export function buildSite(
+  options: BuildOptions,
+  extraPlugins: Array<Plugin | PluginFactory> = []
+): Page[] {
+  return buildSiteWithResult(options, extraPlugins).pages;
 }

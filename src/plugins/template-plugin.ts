@@ -49,8 +49,15 @@ export class TemplatePlugin implements Plugin {
   afterBuild(context: PluginContext): void {
     const engine = this.engine;
     for (const page of context.pages) {
-      const html =
-        engine && engine.hasContent() ? engine.renderPage(page) : renderPage(page);
+      let html =
+        typeof page.renderedHtml === 'string' && page.renderedHtml.length > 0
+          ? page.renderedHtml
+          : engine && engine.hasContent()
+            ? engine.renderPage(page)
+            : renderPage(page);
+      if (page.renderedHtml === undefined || page.renderedHtml.length === 0) {
+        page.renderedHtml = html;
+      }
       fs.writeFileSync(path.join(context.outputDir, `${page.slug}.html`), html);
     }
     const indexHtml =

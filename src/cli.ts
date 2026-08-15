@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { buildSite } from './generator';
+import { buildSite, buildSiteWithResult } from './generator';
 import { startDevServer } from './dev-server';
 import { loadConfig, pluginsFromConfig } from './load-plugins';
 import type { SSGConfig } from './plugins/types';
@@ -19,6 +19,8 @@ export interface CliOptions {
   outputDirSet?: boolean;
   templateDirSet?: boolean;
   portSet?: boolean;
+  incremental?: boolean;
+  clean?: boolean;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -56,6 +58,10 @@ export function parseArgs(argv: string[]): CliOptions {
       opts.port = Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
       opts.portSet = true;
       i += 1;
+    } else if (arg === '--incremental') {
+      opts.incremental = true;
+    } else if (arg === '--clean') {
+      opts.clean = true;
     }
   }
   return opts;
@@ -79,6 +85,8 @@ export function printHelp(): void {
       '  --output <dir>     Output directory (default: ./dist)',
       '  --templates <dir>  Template directory (default: ./templates)',
       '  --port <number>    Port for the dev server (default: 3000)',
+      '  --incremental      Rebuild only pages whose source or template changed',
+      '  --clean            Ignore the build cache and rebuild every page',
       '  -h, --help         Show this help',
       '',
     ].join('\n')
@@ -177,7 +185,9 @@ export function main(argv: string[]): number {
     const config = loadConfig();
     const plugins = pluginsFromConfig(config);
     const dirs = applyConfig(opts, config);
-    const pages = buildSite(
+    const incremental = opts.incremental === true || config?.incremental === true;
+    const clean = opts.clean === true || config?.clean === true;
+    const { pages, stats } = buildSiteWithResult(
       {
         contentDir: dirs.contentDir,
         outputDir: dirs.outputDir,
@@ -185,10 +195,17 @@ export function main(argv: string[]): number {
         defaultTemplate: config?.defaultTemplate,
         defaultLayout: config?.defaultLayout,
         config: config ?? undefined,
+        incremental,
+        clean,
       },
       plugins
     );
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${opts.outputDir}`);
+    if (incremental || clean) {
+      console.log(
+        `Incremental build: ${stats.built} built, ${stats.skipped} skipped, ${stats.timeSavedMs}ms saved`
+      );
+    }
     return 0;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

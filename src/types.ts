@@ -8,6 +8,8 @@ export interface Page {
   template?: string;
   layout?: string;
   data?: Record<string, unknown>;
+  /** Final rendered HTML. Set by the template plugin; reused by incremental builds. */
+  renderedHtml?: string;
 }
 
 export interface ParsedMarkdown {
