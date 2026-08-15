@@ -10,8 +10,8 @@ from notification_server import NotificationServer, decode_message, encode_messa
 
 
 @pytest.fixture
-async def server():
-    srv = NotificationServer()
+async def server(tmp_path):
+    srv = NotificationServer(database_url=str(tmp_path / "messages.db"))
     await srv.start(port=0)
     yield srv
     await srv.stop()

@@ -1,16 +1,26 @@
 """
-WebSocket-based notification server.
+WebSocket-based notification server backed by Redis pub/sub and SQLite.
 
 Features
 --------
-- Accept WebSocket connections and assign each client a unique ID.
+- Accept WebSocket connections and assign each client a globally-unique ID.
+- Distribute messages through Redis pub/sub channels (the shared backbone):
+  the server publishes; a subscriber "worker" on every instance delivers.
 - Broadcast a message to all connected clients.
 - Deliver a "direct" message to a single client by ID.
 - Support named channels: clients subscribe/unsubscribe dynamically and
   messages carrying a ``channel`` field are delivered only to subscribers.
 - Remove clients cleanly on disconnect.
+- Persist every application message in SQLite for history.
 - Expose ``GET /health`` returning the number of connected clients.
 - Expose ``GET /channels`` and ``GET /channels/{name}/subscribers``.
+- Expose ``GET /messages?limit=50&offset=0`` returning persisted history.
+
+Configuration
+-------------
+- ``REDIS_URL``     — Redis broker connection string.  When unset, an
+  in-process fakeredis instance is used.
+- ``DATABASE_URL``  — SQLite path for message history (default ``messages.db``).
 
 Message format
 --------------
@@ -35,14 +45,25 @@ import asyncio
 import base64
 import itertools
 import json
+import os
 import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List
-from urllib.parse import unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
 from websockets.http11 import Request, Response
+
+from broker import (
+    BROADCAST_CHANNEL,
+    CHANNEL_PREFIX,
+    DIRECT_PREFIX,
+    SUBSCRIBE_PATTERN,
+    MessageBroker,
+)
+from store import MessageStore
 
 
 def utcnow() -> str:
@@ -70,9 +91,10 @@ class ClientRegistry:
         self._lock = threading.Lock()
         self._counter = itertools.count(1)
 
-    def register(self, websocket: ServerConnection) -> int:
+    def register(self, websocket: ServerConnection, client_id: int | None = None) -> int:
         with self._lock:
-            client_id = next(self._counter)
+            if client_id is None:
+                client_id = next(self._counter)
             self._clients[client_id] = websocket
             return client_id
 
@@ -122,11 +144,21 @@ class ClientRegistry:
 
 
 class NotificationServer:
-    """Asyncio WebSocket notification server."""
+    """Asyncio WebSocket notification server with a Redis pub/sub backbone."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        broker: MessageBroker | None = None,
+        store: MessageStore | None = None,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+    ) -> None:
         self.clients = ClientRegistry()
+        self.instance_id = uuid.uuid4().hex
+        self.broker = broker if broker is not None else MessageBroker(redis_url=redis_url)
+        self.store = store if store is not None else MessageStore(database_url)
         self._server = None
+        self._subscriber_task = None
 
     async def start(self, host: str = "127.0.0.1", port: int = 8765) -> None:
         self._server = await serve(
@@ -135,8 +167,16 @@ class NotificationServer:
             port,
             process_request=self._process_request,
         )
+        self._subscriber_task = asyncio.create_task(self._subscriber_loop())
 
     async def stop(self) -> None:
+        if self._subscriber_task is not None:
+            self._subscriber_task.cancel()
+            try:
+                await self._subscriber_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            self._subscriber_task = None
         if self._server is not None:
             self._server.close()
             await self._server.wait_closed()
@@ -148,12 +188,47 @@ class NotificationServer:
             return None
         return self._server.sockets[0].getsockname()[1]
 
+    # ── Redis worker (subscriber) ─────────────────────────────
+
+    async def _subscriber_loop(self) -> None:
+        ps = self.broker.pubsub()
+        await ps.psubscribe(SUBSCRIBE_PATTERN)
+        try:
+            async for message in ps.listen():
+                if message["type"] != "pmessage":
+                    continue
+                channel = message["channel"]
+                try:
+                    outgoing = json.loads(message["data"])
+                except (ValueError, TypeError):
+                    continue
+                await self._route(channel, outgoing)
+        finally:
+            try:
+                await ps.aclose()
+            except Exception:
+                pass
+
+    async def _route(self, channel: str, message: Dict[str, Any]) -> None:
+        if channel == BROADCAST_CHANNEL:
+            await self.broadcast(message)
+        elif channel.startswith(CHANNEL_PREFIX):
+            name = channel[len(CHANNEL_PREFIX):]
+            await self.send_to_channel(name, message)
+        elif channel.startswith(DIRECT_PREFIX):
+            try:
+                target = int(channel[len(DIRECT_PREFIX):])
+            except ValueError:
+                return
+            await self._deliver_to_client(target, message)
+
     # ── HTTP handler ──────────────────────────────────────────
 
     def _process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        path = request.path
+        parts = urlsplit(request.path)
+        path = parts.path
         json_headers = Headers([("Content-Type", "application/json")])
 
         if path == "/health":
@@ -171,12 +246,22 @@ class NotificationServer:
             ).encode("utf-8")
             return Response(200, "OK", json_headers, body)
 
+        if path == "/messages":
+            query = parse_qs(parts.query)
+            limit = query.get("limit", ["50"])[0]
+            offset = query.get("offset", ["0"])[0]
+            messages = self.store.query(limit=limit, offset=offset)
+            body = json.dumps({"messages": messages}).encode("utf-8")
+            return Response(200, "OK", json_headers, body)
+
         return None
 
     # ── WebSocket handler ──────────────────────────────────────
 
     async def _handle_connection(self, websocket: ServerConnection) -> None:
-        client_id = self.clients.register(websocket)
+        client_id = await self.broker.next_client_id()
+        self.clients.register(websocket, client_id)
+        await self.broker.register_client(client_id, self.instance_id)
         try:
             await websocket.send(
                 encode_message(
@@ -195,6 +280,7 @@ class NotificationServer:
                 await self._handle_message(client_id, message)
         finally:
             self.clients.unregister(client_id)
+            await self.broker.unregister_client(client_id)
 
     async def _handle_message(self, sender_id: int, message: Dict[str, Any]) -> None:
         mtype = message.get("type")
@@ -205,12 +291,14 @@ class NotificationServer:
             channel = payload.get("channel") or message.get("channel")
             if channel:
                 self.clients.subscribe(sender_id, channel)
+                await self.broker.subscribe_client(sender_id, channel)
             return
 
         if mtype == "unsubscribe":
             channel = payload.get("channel") or message.get("channel")
             if channel:
                 self.clients.unsubscribe(sender_id, channel)
+                await self.broker.unsubscribe_client(sender_id, channel)
             return
 
         if mtype == "broadcast":
@@ -219,18 +307,22 @@ class NotificationServer:
             channel = message.get("channel")
             if channel:
                 outgoing["channel"] = channel
-                await self.send_to_channel(channel, outgoing)
+                await self._publish_and_store(CHANNEL_PREFIX + channel, outgoing)
             else:
-                await self.broadcast(outgoing)
+                await self._publish_and_store(BROADCAST_CHANNEL, outgoing)
         elif mtype == "direct":
             target = payload.get("client_id")
-            connection = self.clients.get(target)
-            if connection is not None:
-                outgoing = {"type": "direct", "payload": payload, "timestamp": timestamp}
-                outgoing["payload"]["sender_id"] = sender_id
-                await connection.send(encode_message(outgoing))
+            if target is None:
+                return
+            outgoing = {"type": "direct", "payload": payload, "timestamp": timestamp}
+            outgoing["payload"]["sender_id"] = sender_id
+            await self._publish_and_store(DIRECT_PREFIX + str(target), outgoing)
 
-    # ── Public API ─────────────────────────────────────────────
+    async def _publish_and_store(self, redis_channel: str, message: Dict[str, Any]) -> None:
+        self.store.save(message)
+        await self.broker.publish(redis_channel, json.dumps(message))
+
+    # ── Local delivery (invoked by the worker) ────────────────
 
     async def broadcast(self, message: Dict[str, Any]) -> None:
         encoded = encode_message(message)
@@ -250,6 +342,15 @@ class NotificationServer:
                 await websocket.send(encoded)
             except Exception:
                 continue
+
+    async def _deliver_to_client(self, client_id: int, message: Dict[str, Any]) -> None:
+        websocket = self.clients.get(client_id)
+        if websocket is None:
+            return
+        try:
+            await websocket.send(encode_message(message))
+        except Exception:
+            pass
 
 
 async def main() -> None:
