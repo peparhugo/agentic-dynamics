@@ -13,6 +13,9 @@ def client():
     db_fd, db_path = tempfile.mkstemp()
     app_module.DATABASE = db_path
     app_module.app.config["TESTING"] = True
+    # Rate limiting is exercised in its own dedicated tests; disable it here
+    # so unrelated tests can't fail from crossing the shared Redis-backed limit.
+    app_module.limiter.enabled = False
     app_module.init_db()
     with app_module.app.test_client() as client:
         yield client
@@ -148,7 +151,10 @@ def test_create_and_list_tasks(client):
 
     resp = client.get("/tasks", headers=auth_header(token))
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    body = resp.get_json()
+    assert body["total"] == 1
+    assert body["next_cursor"] is None
+    tasks = body["data"]
     assert len(tasks) == 1
     assert tasks[0]["name"] == "Buy milk"
     assert tasks[0]["owner_id"] == 1
@@ -196,8 +202,8 @@ def test_users_only_see_their_own_tasks(client):
     client.post("/tasks", json={"name": "Alice task"}, headers=auth_header(alice_token))
     client.post("/tasks", json={"name": "Bob task"}, headers=auth_header(bob_token))
 
-    alice_tasks = client.get("/tasks", headers=auth_header(alice_token)).get_json()
-    bob_tasks = client.get("/tasks", headers=auth_header(bob_token)).get_json()
+    alice_tasks = client.get("/tasks", headers=auth_header(alice_token)).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=auth_header(bob_token)).get_json()["data"]
 
     assert len(alice_tasks) == 1
     assert alice_tasks[0]["name"] == "Alice task"

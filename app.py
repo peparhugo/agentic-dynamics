@@ -11,6 +11,8 @@ from flask import request, jsonify
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import hashlib
 import os
@@ -27,6 +29,7 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 DATABASE = os.environ.get("DATABASE", "auth_api.db")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
 JWT_ALGORITHM = "HS256"
+RATELIMIT_STORAGE_URI = os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/2")
 
 
 # ── Database ────────────────────────────────────────────────────
@@ -148,6 +151,32 @@ def get_user_from_token(token: str) -> dict | None:
     return user_repo.find_by_id(user_id)
 
 
+def rate_limit_key() -> str:
+    """Rate limit per authenticated user (from the bearer token) when present,
+    falling back to the client IP for unauthenticated requests (e.g. login,
+    register, or a missing/invalid token)."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        user = get_user_from_token(auth.split(" ", 1)[1])
+        if user is not None:
+            return f"user:{user['id']}"
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=RATELIMIT_STORAGE_URI,
+    default_limits=["100 per minute"],
+    headers_enabled=True,
+)
+
+
+@app.errorhandler(429)
+def ratelimit_exceeded(e):
+    return jsonify({"error": "rate limit exceeded"}), 429
+
+
 def require_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -218,7 +247,23 @@ tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 @tasks_bp.route("", methods=["GET"])
 @require_auth
 def list_tasks(user: dict):
-    return jsonify(task_repo.find_by_owner(user["id"]))
+    cursor_param = request.args.get("cursor")
+    cursor = None
+    if cursor_param is not None:
+        try:
+            cursor = int(cursor_param)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    limit_param = request.args.get("limit", "20")
+    try:
+        limit = int(limit_param)
+    except ValueError:
+        return jsonify({"error": "limit must be an integer"}), 400
+    limit = max(1, min(limit, 100))
+
+    tasks, total, next_cursor = task_repo.find_by_owner_paginated(user["id"], cursor, limit)
+    return jsonify({"data": tasks, "next_cursor": next_cursor, "total": total})
 
 
 @tasks_bp.route("", methods=["POST"])

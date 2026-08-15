@@ -65,14 +65,6 @@ class BaseRepository(ABC):
 class TaskRepository(BaseRepository):
     table_name = "tasks"
 
-    def find_by_owner(self, owner_id):
-        with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-                (owner_id,),
-            ).fetchall()
-        return [dict(row) for row in rows]
-
     def find_by_id_and_owner(self, task_id, owner_id):
         with self._connect() as conn:
             row = conn.execute(
@@ -80,6 +72,31 @@ class TaskRepository(BaseRepository):
                 (task_id, owner_id),
             ).fetchone()
         return dict(row) if row else None
+
+    def find_by_owner_paginated(self, owner_id, cursor, limit):
+        """Cursor-based pagination ordered by id descending (newest first).
+        `cursor` is the id of the last item from the previous page, or None
+        for the first page. Fetches one extra row to detect whether a next
+        page exists without a second query."""
+        with self._connect() as conn:
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            total = conn.execute(
+                "SELECT COUNT(*) FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()[0]
+
+        has_more = len(rows) > limit
+        page = [dict(row) for row in rows[:limit]]
+        next_cursor = page[-1]["id"] if has_more and page else None
+        return page, total, next_cursor
 
 
 class UserRepository(BaseRepository):
