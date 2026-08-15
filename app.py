@@ -12,6 +12,7 @@ import sqlite3
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 from notifications import send_notification_email
+from repositories import TaskRepository, UserRepository
 
 
 app = Flask(__name__)
@@ -20,38 +21,10 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "development-secret-change-me")
 TOKEN_LIFETIME = timedelta(hours=24)
 
 
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
 def init_db():
     """Create the schema and migrate databases created by older versions."""
-    with get_db() as conn:
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS users ("
-            "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-            "  username TEXT NOT NULL UNIQUE,"
-            "  password_hash TEXT NOT NULL"
-            ")"
-        )
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS tasks ("
-            "  id INTEGER PRIMARY KEY,"
-            "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending',"
-            "  created_at TEXT NOT NULL,"
-            "  owner_id INTEGER REFERENCES users(id)"
-            ")"
-        )
-        columns = {
-            row[1] for row in conn.execute("PRAGMA table_info(tasks)").fetchall()
-        }
-        if "owner_id" not in columns:
-            # Nullable preserves existing tasks while allowing new authenticated data.
-            conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER")
-        conn.commit()
+    UserRepository(DATABASE).create_table()
+    TaskRepository(DATABASE).create_table()
 
 
 def _encode_part(value: bytes) -> str:
@@ -99,8 +72,7 @@ def authenticated(view):
         user_id = decode_token(authorization[7:].strip())
         if user_id is None:
             return jsonify({"error": "invalid or expired token"}), 401
-        with get_db() as conn:
-            user = conn.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
+        user = UserRepository(DATABASE).find_by_id(user_id)
         if user is None:
             return jsonify({"error": "invalid or expired token"}), 401
         g.current_user = dict(user)
@@ -110,33 +82,15 @@ def authenticated(view):
 
 
 def create_task(title: str, owner_id: int | None = None) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        next_id = conn.execute("SELECT COALESCE(MAX(id) + 1, 0) FROM tasks").fetchone()[0]
-        cursor = conn.execute(
-            "INSERT INTO tasks (id, title, status, created_at, owner_id) VALUES (?, ?, 'pending', ?, ?)",
-            (next_id, title, now, owner_id),
-        )
-        conn.commit()
-        return dict(conn.execute("SELECT * FROM tasks WHERE id = ?", (cursor.lastrowid,)).fetchone())
+    return TaskRepository(DATABASE).create_task(title, datetime.utcnow().isoformat(), owner_id)
 
 
 def get_tasks(owner_id: int | None = None):
-    with get_db() as conn:
-        if owner_id is None:
-            rows = conn.execute("SELECT * FROM tasks ORDER BY created_at DESC").fetchall()
-        else:
-            rows = conn.execute("SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC", (owner_id,)).fetchall()
-        return [dict(r) for r in rows]
+    return TaskRepository(DATABASE).list_tasks(owner_id)
 
 
 def get_task(task_id: int, owner_id: int | None = None) -> dict | None:
-    with get_db() as conn:
-        if owner_id is None:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
-        else:
-            row = conn.execute("SELECT * FROM tasks WHERE id = ? AND owner_id = ?", (task_id, owner_id)).fetchone()
-        return dict(row) if row else None
+    return TaskRepository(DATABASE).get_task(task_id, owner_id)
 
 
 def fetch_task(task_id: int) -> dict | None:
@@ -145,23 +99,7 @@ def fetch_task(task_id: int) -> dict | None:
 
 
 def update_task(task_id: int, title: str | None = None, status: str | None = None, owner_id: int | None = None) -> dict | None:
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-    with get_db() as conn:
-        updates, params = [], []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.extend([task_id] if owner_id is None else [task_id, owner_id])
-            where = "id = ?" if owner_id is None else "id = ? AND owner_id = ?"
-            conn.execute(f"UPDATE tasks SET {', '.join(updates)} WHERE {where}", params)
-            conn.commit()
-    return get_task(task_id, owner_id)
+    return TaskRepository(DATABASE).update_task(task_id, title, status, owner_id)
 
 
 @app.post("/auth/register")
@@ -174,12 +112,13 @@ def register():
         return jsonify({"error": "username and password are required"}), 400
     username = username.strip()
     try:
-        with get_db() as conn:
-            cursor = conn.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, generate_password_hash(password)))
-            conn.commit()
+        user_id = UserRepository(DATABASE).create({
+            "username": username,
+            "password_hash": generate_password_hash(password),
+        })
     except sqlite3.IntegrityError:
         return jsonify({"error": "username already exists"}), 409
-    return jsonify({"id": cursor.lastrowid, "username": username}), 201
+    return jsonify({"id": user_id, "username": username}), 201
 
 
 @app.post("/auth/login")
@@ -187,8 +126,7 @@ def login():
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return jsonify({"error": "invalid credentials"}), 401
-    with get_db() as conn:
-        user = conn.execute("SELECT * FROM users WHERE username = ?", (data.get("username"),)).fetchone()
+    user = UserRepository(DATABASE).find_by_username(data.get("username"))
     if user is None or not isinstance(data.get("password"), str) or not check_password_hash(user["password_hash"], data["password"]):
         return jsonify({"error": "invalid credentials"}), 401
     return jsonify({"token": create_token(user["id"])})
