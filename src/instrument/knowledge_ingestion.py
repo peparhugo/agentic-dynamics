@@ -55,10 +55,12 @@ EXTRACTOR_VERSION = "measured-finding/v1"
 #: ``file://`` prefix and resolves relative to the checkout root).
 SOURCE_URI = "file://experiments/results/_results_summary.json"
 
-#: Canonical repository identity, derived from the git remote
-#: (``git@github.com:peparhugo/agentic-dynamics.git``). It is a stable component of
-#: ``entity_id`` so the same logical cell converges on one identity across call sites.
-REPOSITORY_ID = "github.com/peparhugo/agentic-dynamics"
+#: Canonical repository identity (the rebranded ``agentic-dynamics`` id, per
+#: ``docs/agentic_dynamics_rebrand_plan.md``). It is a stable component of ``entity_id`` so the
+#: same logical cell converges on one identity across call sites. Overridable per derivation
+#: via ``build_record``/``derive_records`` (the ``--repository-id`` producer flag) — the
+#: default matches the producer CLI's default so the two stay in lockstep.
+REPOSITORY_ID = "agentic-dynamics"
 
 #: ``source_type`` recorded on every measured-finding record — a *finding* is a derived
 #: conclusion over a measured vector, distinct from ``code``/``test``/``review``.
@@ -143,7 +145,12 @@ def _yields_finding(entry: dict[str, Any]) -> bool:
 
 # ── Record / event construction ─────────────────────────────────
 
-def build_record(entry: dict[str, Any], *, now: datetime | None = None) -> KnowledgeRecord:
+def build_record(
+    entry: dict[str, Any],
+    *,
+    repository_id: str = REPOSITORY_ID,
+    now: datetime | None = None,
+) -> KnowledgeRecord:
     """Derive ONE measured-finding :class:`KnowledgeRecord` from a results entry.
 
     The record's ``text`` is the evidence-card one-liner produced by
@@ -154,7 +161,8 @@ def build_record(entry: dict[str, Any], *, now: datetime | None = None) -> Knowl
     identity fields are derived from the canonical contract in :mod:`instrument.knowledge`:
 
     * ``entity_id`` — ``sha256(repository_id | source_uri | logical_locator)``; stable across
-      extractor generations and call sites.
+      extractor generations and call sites. ``repository_id`` defaults to
+      :data:`REPOSITORY_ID` but is overridable (the producer's ``--repository-id`` flag).
     * ``content_hash`` — ``sha256(text)``, recomputable from the record's own ``text``.
     * ``knowledge_id`` — ``sha256(entity_id | source_revision | content_hash | extractor_version)``;
       a new extractor version, revision, or text yields a new id while ``entity_id`` holds.
@@ -186,7 +194,7 @@ def build_record(entry: dict[str, Any], *, now: datetime | None = None) -> Knowl
 
     # Identity: the record's text is the authoritative payload, so the content hash is
     # computed from it — a consumer can re-derive text from the entry and compare hashes.
-    entity_id = compute_entity_id(REPOSITORY_ID, SOURCE_URI, run_id)
+    entity_id = compute_entity_id(repository_id, SOURCE_URI, run_id)
     content_hash = compute_content_hash(card.text)
     knowledge_id = compute_knowledge_id(
         entity_id, source_revision, content_hash, EXTRACTOR_VERSION
@@ -198,7 +206,7 @@ def build_record(entry: dict[str, Any], *, now: datetime | None = None) -> Knowl
         source_uri=SOURCE_URI,
         source_type=SOURCE_TYPE,
         logical_locator=run_id,
-        repository_id=REPOSITORY_ID,
+        repository_id=repository_id,
         branch="",  # the summary has no branch dimension; scoping is via repository_id + locator
         worktree_id=run_id,
         # commit_sha *is* the source_revision for repository-backed units (knowledge.py's
@@ -248,17 +256,23 @@ def record_to_event(
     )
 
 
-def derive_records(entries: list[dict[str, Any]]) -> list[KnowledgeRecord]:
+def derive_records(
+    entries: list[dict[str, Any]],
+    *,
+    repository_id: str = REPOSITORY_ID,
+) -> list[KnowledgeRecord]:
     """Derive one measured-finding record per valid entry, in input order.
 
     For each entry, ``build_record`` reuses ``build_evidence_cards``' rendering (and its
     skip rules); this function pre-filters with :func:`_yields_finding` so ``narration_failure``
     and unmeasured/negative-``correctness`` rows are skipped without an exception path. The
-    result is a list with one record per surviving row, preserving input order.
+    result is a list with one record per surviving row, preserving input order. ``repository_id``
+    (default :data:`REPOSITORY_ID`) is threaded to each ``build_record`` so a producer can
+    scope the whole batch to a different repository.
     """
     records: list[KnowledgeRecord] = []
     for entry in entries:
         if not _yields_finding(entry):
             continue
-        records.append(build_record(entry))
+        records.append(build_record(entry, repository_id=repository_id))
     return records

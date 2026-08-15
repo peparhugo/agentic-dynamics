@@ -3,11 +3,17 @@
 Covers the extractor contract constants, the identity derivation (ids stable across call
 sites, content hash recomputable from text, extractor-version bump → new knowledge_id), the
 ``MEASURED`` authority / ``[M]`` evidence class, that confidence/perturbation_strength/
-test_executed_success are carried through, that the event is pointer-only, and the batch
-``derive_records`` filtering.
+test_executed_success are carried through, that the event is pointer-only, the batch
+``derive_records`` filtering, and the batch producer's pure emission planning + dry-run smoke.
 """
 
+import importlib.util
+import json
+import os
+import subprocess
+import sys
 from dataclasses import fields
+from pathlib import Path
 
 import pytest
 
@@ -34,6 +40,18 @@ from instrument.knowledge_ingestion import (
 
 MODEL = "deepseek/deepseek-v4-pro"
 OPERATOR = "perturbed"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+KB_PRODUCE = REPO_ROOT / "scripts" / "kb_produce.py"
+
+
+def _load_kb_produce():
+    """Load ``scripts/kb_produce.py`` as a module for pure-logic tests (no subprocess)."""
+    spec = importlib.util.spec_from_file_location("kb_produce", KB_PRODUCE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
 
 
 def _entry(**overrides) -> dict:
@@ -268,3 +286,91 @@ def test_build_record_raises_on_skipped_entry():
         build_record(_entry(correctness=None))
     with pytest.raises(ValueError):
         build_record(_entry(correctness=-0.5))
+
+
+# ── build_record / derive_records repository override ───────────
+
+
+def test_build_record_repository_id_override_changes_identity():
+    default = build_record(_entry())
+    scoped = build_record(_entry(), repository_id="other-repo")
+    # A different repository id yields a different logical entity (and thus knowledge id) ...
+    assert scoped.repository_id == "other-repo"
+    assert scoped.entity_id != default.entity_id
+    # ... and the entity id is the sha256 over the *overridden* id.
+    assert scoped.entity_id == compute_entity_id("other-repo", SOURCE_URI, "exp_05ngi4l9")
+
+
+def test_derive_records_repository_id_threads_through():
+    records = derive_records([_entry()], repository_id="other-repo")
+    assert records[0].repository_id == "other-repo"
+
+
+# ── Batch producer pure logic (scripts/kb_produce.py) ───────────
+
+
+def test_plan_emissions_caps_and_dedupes_in_process():
+    kb = _load_kb_produce()
+    a = build_record(_entry(worktree_name="exp_a", run_id="exp_a"))
+    b = build_record(_entry(worktree_name="exp_b", run_id="exp_b"))
+    c = build_record(_entry(worktree_name="exp_c", run_id="exp_c"))
+    # Duplicate of `a` appears again in-process → first occurrence wins.
+    plan = kb.plan_emissions([a, b, a, c], limit=0)
+    assert [r.logical_locator for r in plan] == ["exp_a", "exp_b", "exp_c"]
+
+
+def test_plan_emissions_limit_caps_before_dedupe():
+    kb = _load_kb_produce()
+    a = build_record(_entry(worktree_name="exp_a", run_id="exp_a"))
+    b = build_record(_entry(worktree_name="exp_b", run_id="exp_b"))
+    c = build_record(_entry(worktree_name="exp_c", run_id="exp_c"))
+    assert [r.logical_locator for r in kb.plan_emissions([a, b, c], limit=2)] == ["exp_a", "exp_b"]
+    assert kb.plan_emissions([a, b, c], limit=0) == [a, b, c]
+
+
+def test_plan_emissions_known_ids_seed_the_dedupe():
+    kb = _load_kb_produce()
+    a = build_record(_entry(worktree_name="exp_a", run_id="exp_a"))
+    b = build_record(_entry(worktree_name="exp_b", run_id="exp_b"))
+    plan = kb.plan_emissions([a, b], known_ids={a.knowledge_id})
+    assert [r.logical_locator for r in plan] == ["exp_b"]
+
+
+# ── Dry-run smoke (no live Redis) ───────────────────────────────
+
+
+def test_kb_produce_dry_run_smoke(tmp_path):
+    """``--dry-run`` reports the would-emit count and samples without touching Redis.
+
+    A bogus ``FINOPS_REDIS_PORT`` proves the dry-run path never connects: a connection
+    attempt would raise (fail fast) and produce a non-zero exit.
+    """
+    results = tmp_path / "_results_summary.json"
+    results.write_text(json.dumps({
+        "entries": [
+            _entry(worktree_name="exp_good_a", run_id="exp_good_a"),
+            # Skipped upstream (narration failure) — must not count toward the emit total.
+            _entry(worktree_name="exp_narr", run_id="exp_narr", narration_failure=True),
+            _entry(worktree_name="exp_good_b", run_id="exp_good_b"),
+        ]
+    }))
+    proc = subprocess.run(
+        [
+            sys.executable, str(KB_PRODUCE),
+            "--dry-run",
+            "--results", str(results),
+            "--repository-id", "test-repo",
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "FINOPS_REDIS_PORT": "63999"},
+    )
+    assert proc.returncode == 0, proc.stderr
+    out = proc.stdout
+    # 2 valid entries → 2 would-be emitted records; the narration_failure row is skipped.
+    assert "would emit 2 record(s)" in out
+    assert "repository-id='test-repo'" in out
+    assert "exp_good_a" in out
+    assert "exp_good_b" in out
+    assert "exp_narr" not in out
+
