@@ -31,23 +31,50 @@ export function createCli(): Command {
     .option('--output <dir>', 'output directory to write the generated site to', './dist')
     .option('--templates <dir>', 'templates directory containing layouts/ and partials/', './templates')
     .option('--config <file>', 'path to a ssg.config.ts plugin config file (defaults to the built-in plugins)')
-    .action((opts: { content: string; output: string; templates: string; config?: string }) => {
-      const contentDir = path.resolve(process.cwd(), opts.content);
-      const outputDir = path.resolve(process.cwd(), opts.output);
-      const templatesDir = path.resolve(process.cwd(), opts.templates);
+    .option('--incremental', 'only rebuild pages whose source or templates changed since the last build', false)
+    .option('--clean', 'discard any existing build cache and force a full rebuild', false)
+    .action(
+      (opts: {
+        content: string;
+        output: string;
+        templates: string;
+        config?: string;
+        incremental: boolean;
+        clean: boolean;
+      }) => {
+        const contentDir = path.resolve(process.cwd(), opts.content);
+        const outputDir = path.resolve(process.cwd(), opts.output);
+        const templatesDir = path.resolve(process.cwd(), opts.templates);
 
-      const result = opts.config
-        ? new SsgEngine({
-            contentDir,
-            outputDir,
-            templatesDir,
-            plugins: resolvePlugins(opts.config),
-          }).build()
-        : build({ contentDir, outputDir, templatesDir });
+        const result = opts.config
+          ? new SsgEngine({
+              contentDir,
+              outputDir,
+              templatesDir,
+              plugins: resolvePlugins(opts.config),
+              incremental: opts.incremental,
+              clean: opts.clean,
+            }).build()
+          : build({
+              contentDir,
+              outputDir,
+              templatesDir,
+              incremental: opts.incremental,
+              clean: opts.clean,
+            });
 
-      // eslint-disable-next-line no-console
-      console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
-    });
+        // eslint-disable-next-line no-console
+        console.log(`Built ${result.pages.length} page(s) into ${result.outputDir}`);
+
+        if (opts.incremental) {
+          const { pagesBuilt, pagesSkipped, totalPages, durationMs, timeSavedMs } = result.stats;
+          // eslint-disable-next-line no-console
+          console.log(
+            `Incremental build: ${pagesBuilt} built, ${pagesSkipped} skipped (${totalPages} total) in ${durationMs}ms, ~${timeSavedMs}ms saved`
+          );
+        }
+      }
+    );
 
   program
     .command('serve')

@@ -23,11 +23,20 @@ export class TemplatePlugin implements Plugin {
 
   afterBuild(pages: Page[], ctx: PluginContext): void {
     const engine = this.requireEngine();
+    const unchangedSourcePaths = ctx.incremental?.unchangedSourcePaths;
 
     fs.mkdirSync(ctx.outputDir, { recursive: true });
 
     for (const page of pages) {
       const outPath = path.join(ctx.outputDir, page.outputFile);
+
+      // A page unchanged since the last cached build already has correct
+      // output on disk from that build, so re-rendering and rewriting it
+      // would just reproduce the same bytes.
+      if (unchangedSourcePaths?.has(page.sourcePath) && fs.existsSync(outPath)) {
+        continue;
+      }
+
       fs.mkdirSync(path.dirname(outPath), { recursive: true });
       const html = engine.render(page.layout, {
         title: page.title,

@@ -9,7 +9,17 @@ export { TemplateEngine, DEFAULT_LAYOUT_NAME } from './templates';
 export type { RenderContext } from './templates';
 export type { Page } from './types';
 export { SsgEngine } from './engine';
-export type { EngineOptions, EngineResult } from './engine';
+export type { EngineOptions, EngineResult, BuildStats } from './engine';
+export {
+  hashString,
+  hashFile,
+  hashDirectory,
+  loadCacheManifest,
+  saveCacheManifest,
+  deleteCacheManifest,
+  CACHE_VERSION,
+} from './cache';
+export type { CacheEntry, CacheManifest } from './cache';
 export type { Plugin, PluginContext, PluginConfig } from './plugin';
 export { loadConfig } from './config';
 export type { SsgConfig } from './config';

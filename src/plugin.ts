@@ -11,6 +11,18 @@ export interface PluginContext {
   outputDir: string;
   templatesDir: string;
   config: PluginConfig;
+  /**
+   * Present only when the engine ran with `incremental: true`. Lets plugins
+   * skip expensive re-work for pages the engine has already determined are
+   * unchanged (same source content and templates) since the last cached
+   * build; `onFile` is not called for these pages at all, so any skip a
+   * plugin performs here is an optional, additional optimization (e.g.
+   * avoiding a redundant disk write of already-correct output).
+   */
+  incremental?: {
+    /** Source paths (relative to contentDir) of pages reused from the cache this build. */
+    unchangedSourcePaths: Set<string>;
+  };
 }
 
 /**
