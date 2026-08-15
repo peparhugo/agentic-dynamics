@@ -2,6 +2,8 @@
  * Shared types for the static site generator.
  */
 
+import type { Plugin } from './plugin';
+
 /** Parsed metadata for a Markdown page. */
 export interface Frontmatter {
   title?: string;
@@ -50,4 +52,11 @@ export interface BuildOptions {
    * renderers are used instead.
    */
   templatesDir?: string;
+  /**
+   * Path to the SSG config file listing plugins
+   * (default: `./ssg.config.ts` in the working directory).
+   */
+  config?: string;
+  /** Extra plugins registered after the config file plugins. */
+  plugins?: Plugin[];
 }

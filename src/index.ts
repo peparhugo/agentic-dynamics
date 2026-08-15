@@ -3,6 +3,8 @@
  */
 
 export * from './types';
+export * from './plugin';
+export * from './config';
 export { parseFrontmatter, parseYamlBlock, extractYamlBlock, coerceScalar, normalizeTags } from './frontmatter';
 export { markdownToHtml } from './markdown';
 export { escapeHtml, pageTitle, renderIndex, renderPage } from './render';
@@ -19,7 +21,10 @@ export {
   renderTemplateFile,
   resolveTemplateName,
 } from './templates';
-export { buildSite, loadPages, listMarkdownFiles, readPage, slugify } from './site';
+export * from './plugins';
+export { SSGEngine, createEngine } from './engine';
+export type { EngineOptions } from './engine';
+export { buildSite, listMarkdownFiles, loadPages, readPage, slugify } from './site';
 export {
   DEFAULT_PORT,
   RELOAD_PATH,
