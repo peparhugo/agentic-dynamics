@@ -36,11 +36,35 @@ describe('CLI argument parser', () => {
 
   it('should handle options in any order', () => {
     const result = parseArgs(['--output', './dist', 'build', '--content', './content']);
-    expect(result.command).toBe('--output');
+    expect(result.command).toBe('build');
+    expect(result.outputDir).toBe('./dist');
+    expect(result.contentDir).toBe('./content');
   });
 
   it('should handle missing values for options', () => {
     const result = parseArgs(['build', '--content']);
     expect(result.contentDir).toBe('./content');
+  });
+
+  it('should parse --templates option', () => {
+    const result = parseArgs(['build', '--templates', './my-templates']);
+    expect(result.templatesDir).toBe('./my-templates');
+  });
+
+  it('should default templatesDir to ./templates', () => {
+    const result = parseArgs(['build']);
+    expect(result.templatesDir).toBe('./templates');
+  });
+
+  it('should parse --templates with other options', () => {
+    const result = parseArgs(['build', '--content', './src', '--output', './dist', '--templates', './tmpl']);
+    expect(result.contentDir).toBe('./src');
+    expect(result.outputDir).toBe('./dist');
+    expect(result.templatesDir).toBe('./tmpl');
+  });
+
+  it('should handle missing value for --templates option', () => {
+    const result = parseArgs(['build', '--templates']);
+    expect(result.templatesDir).toBe('./templates');
   });
 });

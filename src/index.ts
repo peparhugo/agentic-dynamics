@@ -12,9 +12,10 @@ Static Site Generator
 Usage: ssg build [options]
 
 Options:
-  --content <dir>   Content directory (default: ./content)
-  --output <dir>    Output directory (default: ./dist)
-  --help           Show this help message
+  --content <dir>      Content directory (default: ./content)
+  --output <dir>       Output directory (default: ./dist)
+  --templates <dir>    Templates directory (default: ./templates)
+  --help              Show this help message
   `);
   process.exit(0);
 }
@@ -24,10 +25,12 @@ if (args.command !== 'build') {
   process.exit(1);
 }
 
-try {
-  build(args.contentDir, args.outputDir);
-  console.log(`✓ Site built successfully to ${args.outputDir}`);
-} catch (err) {
-  console.error('Build failed:', err instanceof Error ? err.message : String(err));
-  process.exit(1);
-}
+(async () => {
+  try {
+    await build(args.contentDir, args.outputDir, args.templatesDir);
+    console.log(`✓ Site built successfully to ${args.outputDir}`);
+  } catch (err) {
+    console.error('Build failed:', err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  }
+})();

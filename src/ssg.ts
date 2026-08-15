@@ -2,12 +2,15 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { marked } from 'marked';
 import { parseFrontmatter, type Frontmatter } from './frontmatter.js';
+import { createTemplateEngine, renderIndexWithTemplate, renderEmptyIndex, type TemplateData } from './templates.js';
 
 export interface PageMetadata {
   slug: string;
   title: string;
   date?: string;
   tags?: string[];
+  template?: string;
+  layout?: string;
   [key: string]: unknown;
 }
 
@@ -43,10 +46,10 @@ function slugify(filename: string): string {
   return filename.replace(/\.md$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
 }
 
-function parseMarkdownFile(filePath: string): Page {
+async function parseMarkdownFile(filePath: string): Promise<Page> {
   const content = fs.readFileSync(filePath, 'utf-8');
   const { data, content: markdown } = parseFrontmatter(content);
-  const html = marked(markdown);
+  const html = await marked(markdown);
 
   const filename = path.basename(filePath);
   const slug = slugify(filename);
@@ -56,6 +59,8 @@ function parseMarkdownFile(filePath: string): Page {
     title: (data.title as string) || slug,
     ...(data.date && { date: data.date }),
     ...(data.tags && { tags: data.tags }),
+    ...(data.template && { template: data.template as string }),
+    ...(data.layout && { layout: data.layout as string }),
   };
 
   return {
@@ -64,96 +69,57 @@ function parseMarkdownFile(filePath: string): Page {
   };
 }
 
-function renderPageTemplate(page: Page): string {
+function renderPageTemplate(page: Page, templateEngine: ReturnType<typeof createTemplateEngine>): string {
   const { metadata, html } = page;
-  const dateStr = metadata.date ? `<meta name="date" content="${metadata.date}">` : '';
-  const tagsStr = metadata.tags
-    ? `<meta name="tags" content="${(metadata.tags as string[]).join(', ')}">`
-    : '';
+  const templateName = metadata.template || 'default';
+  const layoutName = metadata.layout || 'default';
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${metadata.title}</title>
-  ${dateStr}
-  ${tagsStr}
-</head>
-<body>
-  <header>
-    <a href="/index.html">← Home</a>
-  </header>
-  <article>
-    <h1>${metadata.title}</h1>
-    ${metadata.date ? `<p class="date">${metadata.date}</p>` : ''}
-    ${metadata.tags ? `<p class="tags">Tags: ${(metadata.tags as string[]).join(', ')}</p>` : ''}
-    ${html}
-  </article>
-</body>
-</html>`;
+  const pageData: TemplateData = {
+    title: metadata.title,
+    slug: metadata.slug,
+    body: html,
+    ...(metadata.date && { date: metadata.date }),
+    ...(metadata.tags && { tags: metadata.tags as string[] }),
+  };
+
+  const pageContent = templateEngine.renderPage(templateName, pageData);
+  const layoutData: TemplateData = {
+    title: metadata.title,
+    slug: metadata.slug,
+    body: pageContent,
+  };
+
+  return templateEngine.renderLayout(layoutName, layoutData);
 }
 
-function renderIndexTemplate(pages: Page[]): string {
-  const pageLinks = pages
-    .map(
-      (page) =>
-        `<li><a href="${page.metadata.slug}.html">${page.metadata.title}</a>${page.metadata.date ? ` (${page.metadata.date})` : ''}</li>`
-    )
-    .join('\n');
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home</title>
-</head>
-<body>
-  <header>
-    <h1>Welcome</h1>
-  </header>
-  <main>
-    <ul>
-      ${pageLinks}
-    </ul>
-  </main>
-</body>
-</html>`;
-}
-
-export function build(contentDir: string, outputDir: string): void {
+export async function build(contentDir: string, outputDir: string, templatesDir: string = './templates'): Promise<void> {
   ensureDirectoryExists(outputDir);
+  const templateEngine = createTemplateEngine(templatesDir);
 
   const markdownFiles = getMarkdownFiles(contentDir);
 
   if (markdownFiles.length === 0) {
-    fs.writeFileSync(
-      path.join(outputDir, 'index.html'),
-      `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Home</title>
-</head>
-<body>
-  <h1>Welcome</h1>
-  <p>No pages found.</p>
-</body>
-</html>`
-    );
+    const indexHtml = renderEmptyIndex(templatesDir);
+    fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml);
     return;
   }
 
-  const pages = markdownFiles.map((file) => parseMarkdownFile(file));
+  const pages = await Promise.all(markdownFiles.map((file) => parseMarkdownFile(file)));
 
   pages.forEach((page) => {
-    const htmlContent = renderPageTemplate(page);
+    const htmlContent = renderPageTemplate(page, templateEngine);
     const outputFile = path.join(outputDir, `${page.metadata.slug}.html`);
     fs.writeFileSync(outputFile, htmlContent);
   });
 
-  const indexHtml = renderIndexTemplate(pages);
+  const pageDataList: TemplateData[] = pages.map((page) => ({
+    title: page.metadata.title,
+    slug: page.metadata.slug,
+    body: '',
+    ...(page.metadata.date && { date: page.metadata.date }),
+    ...(page.metadata.tags && { tags: page.metadata.tags as string[] }),
+  }));
+
+  const indexHtml = renderIndexWithTemplate(templatesDir, pageDataList);
   fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml);
 }
