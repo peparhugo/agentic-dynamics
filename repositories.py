@@ -109,6 +109,33 @@ class TaskRepository(BaseRepository):
             ).fetchall()
             return [dict(r) for r in rows]
 
+    def find_page_by_owner(
+        self, owner_id: int, cursor: int | None = None, limit: int = 20
+    ) -> tuple[list[dict], int | None, int]:
+        """Return (page, next_cursor, total) ordered newest-first by id.
+
+        Fetches one extra row beyond `limit` to determine whether a next
+        page exists, so `next_cursor` is None exactly when this page is
+        the last one (rather than whenever a page happens to be full).
+        """
+        with self._get_db() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) AS c FROM tasks WHERE owner_id = ?", (owner_id,)
+            ).fetchone()["c"]
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+            page = [dict(r) for r in rows[:limit]]
+            next_cursor = page[-1]["id"] if len(rows) > limit else None
+            return page, next_cursor, total
+
     def update(self, task_id: int, title: str | None = None, status: str | None = None) -> dict | None:
         fields = {}
         if title is not None:

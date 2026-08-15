@@ -11,6 +11,8 @@ import jwt
 from flask import Flask, request, jsonify, g
 from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 import sqlite3
 import os
 
@@ -27,6 +29,48 @@ app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-i
 # without altering the meaning or behavior of the pre-existing 'done' status.
 VALID_STATUSES = {"pending", "done", "completed"}
 TOKEN_TTL = timedelta(hours=24)
+
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+
+
+# ── Rate limiting ────────────────────────────────────────────────
+
+def rate_limit_key() -> str:
+    """Key by authenticated user id when a valid token is present, else by IP.
+
+    This lets the same 100/minute budget apply per-user on authenticated
+    routes while still rate limiting anonymous callers of /auth/register
+    and /auth/login (which have no user id yet) by their remote address.
+    """
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[len("Bearer "):].strip()
+        try:
+            payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+            return f"user:{payload['user_id']}"
+        except jwt.InvalidTokenError:
+            pass
+    return get_remote_address()
+
+
+RATE_LIMIT = "100 per minute"
+
+# key_prefix namespaces this app's rate-limit keys in the (possibly shared)
+# Redis instance so its counters can't collide with other apps/deployments.
+RATE_LIMIT_KEY_PREFIX = "taskapi_0799a58de870_ratelimit"
+
+# application_limits (rather than default_limits) is used because it shares
+# a single bucket per key across every route (scope="global"); default_limits
+# would instead give each endpoint its own independent 100/minute bucket.
+limiter = Limiter(
+    key_func=rate_limit_key,
+    app=app,
+    storage_uri=os.environ.get("RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"),
+    key_prefix=RATE_LIMIT_KEY_PREFIX,
+    application_limits=[RATE_LIMIT],
+    headers_enabled=True,
+)
 
 
 def get_db():
@@ -96,8 +140,8 @@ def create_task(title: str, owner_id: int) -> dict:
     return task_repo.create(title, owner_id)
 
 
-def get_tasks(owner_id: int):
-    return task_repo.find_by_owner(owner_id)
+def get_tasks_page(owner_id: int, cursor: int | None, limit: int):
+    return task_repo.find_page_by_owner(owner_id, cursor=cursor, limit=limit)
 
 
 def get_task(task_id: int) -> dict | None:
@@ -172,7 +216,32 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks():
-    return jsonify(get_tasks(g.user_id))
+    cursor_param = request.args.get("cursor")
+    limit_param = request.args.get("limit")
+
+    cursor = None
+    if cursor_param is not None:
+        try:
+            cursor = int(cursor_param)
+        except ValueError:
+            return jsonify({"error": "cursor must be an integer"}), 400
+
+    limit = DEFAULT_PAGE_LIMIT
+    if limit_param is not None:
+        try:
+            limit = int(limit_param)
+        except ValueError:
+            return jsonify({"error": "limit must be an integer"}), 400
+        if limit < 1:
+            return jsonify({"error": "limit must be a positive integer"}), 400
+    limit = min(limit, MAX_PAGE_LIMIT)
+
+    data, next_cursor, total = get_tasks_page(g.user_id, cursor=cursor, limit=limit)
+    return jsonify({
+        "data": data,
+        "next_cursor": str(next_cursor) if next_cursor is not None else None,
+        "total": total,
+    })
 
 
 @app.route("/tasks", methods=["POST"])
@@ -227,6 +296,13 @@ def handle_404(e):
 @app.errorhandler(405)
 def handle_405(e):
     return jsonify({"error": "method not allowed"}), 405
+
+
+@app.errorhandler(429)
+def handle_429(e):
+    # flask-limiter injects the Retry-After header onto this response via
+    # an after_request hook, using the limit that was breached.
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 if __name__ == "__main__":

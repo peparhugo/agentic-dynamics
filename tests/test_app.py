@@ -141,8 +141,8 @@ def test_user_sees_only_own_tasks(client):
     client.post("/tasks", json={"title": "Alice task"}, headers=alice_headers)
     client.post("/tasks", json={"title": "Bob task"}, headers=bob_headers)
 
-    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()
-    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()
+    alice_tasks = client.get("/tasks", headers=alice_headers).get_json()["data"]
+    bob_tasks = client.get("/tasks", headers=bob_headers).get_json()["data"]
 
     assert [t["title"] for t in alice_tasks] == ["Alice task"]
     assert [t["title"] for t in bob_tasks] == ["Bob task"]
@@ -212,7 +212,8 @@ def test_list_tasks_empty(client):
     headers = auth_header(client)
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    assert resp.get_json() == []
+    body = resp.get_json()
+    assert body == {"data": [], "next_cursor": None, "total": 0}
 
 
 def test_list_tasks_ordered_desc(client):
@@ -223,8 +224,11 @@ def test_list_tasks_ordered_desc(client):
 
     resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
-    titles = [t["title"] for t in resp.get_json()]
+    body = resp.get_json()
+    titles = [t["title"] for t in body["data"]]
     assert titles == ["third", "second", "first"]
+    assert body["next_cursor"] is None
+    assert body["total"] == 3
 
 
 def test_get_task(client):
