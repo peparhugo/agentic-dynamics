@@ -78,3 +78,4 @@ export class TemplateEngine {
             .map((f) => f.replace('.hbs', ''));
     }
 }
+//# sourceMappingURL=template-engine.js.map

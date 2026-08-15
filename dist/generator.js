@@ -155,13 +155,7 @@ export class SiteGenerator {
             const outputPath = path.join(this.outputDir, slug);
             const templateName = parsed.frontmatter.template ? String(parsed.frontmatter.template) : undefined;
             const layoutName = parsed.frontmatter.layout ? String(parsed.frontmatter.layout) : undefined;
-            const pageHtml = this.renderPageWithTemplate(
-                title,
-                parsed.html,
-                templateName,
-                layoutName,
-                parsed.frontmatter
-            );
+            const pageHtml = this.renderPageWithTemplate(title, parsed.html, templateName, layoutName, parsed.frontmatter);
             fs.writeFileSync(outputPath, pageHtml);
             pages.push({
                 filename: file,
