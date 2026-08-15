@@ -13,6 +13,8 @@ import sqlite3
 
 import jwt
 from flask import Flask, jsonify, request
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from celery_app import send_notification_email
@@ -24,6 +26,41 @@ DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-me-in-production!")
 JWT_ALGORITHM = "HS256"
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+
+RATELIMIT_STORAGE_URI = os.environ.get(
+    "RATELIMIT_STORAGE_URI", "redis://localhost:6379/0"
+)
+RATE_LIMIT = os.environ.get("RATE_LIMIT", "100 per minute")
+
+
+def _rate_limit_key():
+    """Key rate limit buckets by authenticated user id, falling back to
+    the client IP for unauthenticated requests (e.g. auth endpoints)."""
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        token = auth.split(" ", 1)[1].strip()
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
+        except jwt.PyJWTError:
+            pass
+        else:
+            sub = payload.get("sub")
+            if sub is not None:
+                return f"user:{sub}"
+    return get_remote_address()
+
+
+def _rate_limit_value():
+    return RATE_LIMIT
+
+
+limiter = Limiter(
+    key_func=_rate_limit_key,
+    application_limits=[_rate_limit_value],
+    storage_uri=RATELIMIT_STORAGE_URI,
+    headers_enabled=True,
+    app=app,
+)
 
 
 def get_db():
@@ -189,8 +226,30 @@ def create_task(user):
 @app.route("/tasks", methods=["GET"])
 @require_auth
 def list_tasks(user):
-    tasks = TaskRepository(DATABASE).list_by_owner(user["id"])
-    return jsonify(tasks)
+    try:
+        limit = int(request.args.get("limit", 20))
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    raw_cursor = request.args.get("cursor")
+    cursor = None
+    if raw_cursor is not None:
+        try:
+            cursor = int(raw_cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
+    page, next_cursor, total = TaskRepository(DATABASE).paginate_by_owner(
+        user["id"], cursor=cursor, limit=limit
+    )
+    return jsonify(
+        {
+            "data": page,
+            "next_cursor": str(next_cursor) if next_cursor is not None else None,
+            "total": total,
+        }
+    )
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])

@@ -2,7 +2,12 @@ import os
 import tempfile
 from unittest import mock
 
+import fakeredis
+from fakeredis._connection import FakeRedisConnection
 import pytest
+import redis.connection
+from limits.storage import RedisStorage
+from limits.strategies import STRATEGIES as LIMIT_STRATEGIES
 
 import app as task_app
 
@@ -10,10 +15,20 @@ import app as task_app
 @pytest.fixture()
 def client():
     task_app.app.config["TESTING"] = True
+    task_app.RATE_LIMIT = "100 per minute"
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     task_app.DATABASE = db_path
     task_app.init_db()
+    pool = redis.connection.ConnectionPool(
+        connection_class=FakeRedisConnection,
+        server=fakeredis.FakeServer(),
+    )
+    storage = RedisStorage("redis://localhost:6379/0", connection_pool=pool)
+    strategy_cls = LIMIT_STRATEGIES[task_app.limiter._strategy]
+    task_app.limiter._storage = storage
+    task_app.limiter._limiter = strategy_cls(storage)
+    task_app.limiter._storage_dead = False
     with task_app.app.test_client() as c:
         yield c
     os.unlink(db_path)
@@ -119,7 +134,7 @@ def test_list_tasks_ordered_by_created_at_desc(client):
         client.post("/tasks", json={"title": title}, headers=auth(token))
     resp = client.get("/tasks", headers=auth(token))
     assert resp.status_code == 200
-    tasks = resp.get_json()
+    tasks = resp.get_json()["data"]
     assert [t["title"] for t in tasks] == ["third", "second", "first"]
 
 
@@ -263,10 +278,10 @@ def test_users_see_only_their_own_tasks(client):
         "/tasks", json={"title": "Bob's task"}, headers=auth(bob_token)
     )
 
-    alice_list = client.get("/tasks", headers=auth(alice_token)).get_json()
+    alice_list = client.get("/tasks", headers=auth(alice_token)).get_json()["data"]
     assert [t["title"] for t in alice_list] == ["Alice's task"]
 
-    bob_list = client.get("/tasks", headers=auth(bob_token)).get_json()
+    bob_list = client.get("/tasks", headers=auth(bob_token)).get_json()["data"]
     assert [t["title"] for t in bob_list] == ["Bob's task"]
 
     assert (
@@ -279,3 +294,160 @@ def test_users_see_only_their_own_tasks(client):
         headers=auth(bob_token),
     )
     assert resp.status_code == 404
+
+
+# ── Pagination ─────────────────────────────────────────────────
+
+
+def test_list_tasks_returns_paginated_shape(client):
+    token = register_and_login(client)
+    client.post("/tasks", json={"title": "solo"}, headers=auth(token))
+    resp = client.get("/tasks", headers=auth(token))
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert set(body) == {"data", "next_cursor", "total"}
+    assert isinstance(body["data"], list)
+    assert body["next_cursor"] is None
+    assert body["total"] == 1
+
+
+def test_list_tasks_cursor_pagination(client):
+    token = register_and_login(client)
+    for i in range(1, 6):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth(token))
+
+    seen_ids = []
+    cursor = None
+    while True:
+        query = "?limit=2"
+        if cursor is not None:
+            query += f"&cursor={cursor}"
+        resp = client.get(f"/tasks{query}", headers=auth(token))
+        assert resp.status_code == 200
+        body = resp.get_json()
+        assert len(body["data"]) <= 2
+        seen_ids.extend(t["id"] for t in body["data"])
+        if body["next_cursor"] is None:
+            break
+        cursor = body["next_cursor"]
+
+    assert len(seen_ids) == 5
+    assert len(set(seen_ids)) == 5
+    assert seen_ids == sorted(seen_ids, reverse=True)
+
+
+def test_list_tasks_default_limit_and_total(client):
+    token = register_and_login(client)
+    for i in range(1, 26):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth(token))
+    resp = client.get("/tasks", headers=auth(token))
+    body = resp.get_json()
+    assert body["total"] == 25
+    assert len(body["data"]) == 20
+    assert body["next_cursor"] is not None
+
+
+def test_list_tasks_limit_max_clamped_to_100(client):
+    task_app.RATE_LIMIT = "1000 per minute"
+    token = register_and_login(client)
+    for i in range(1, 121):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth(token))
+    resp = client.get("/tasks?limit=1000", headers=auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 100
+    assert body["next_cursor"] is not None
+    assert body["total"] == 120
+
+
+def test_list_tasks_next_cursor_null_on_last_page(client):
+    token = register_and_login(client)
+    for i in range(1, 4):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth(token))
+    resp = client.get("/tasks?limit=5", headers=auth(token))
+    body = resp.get_json()
+    assert len(body["data"]) == 3
+    assert body["next_cursor"] is None
+
+
+def test_list_tasks_cursor_respects_ownership(client):
+    alice_token = register_and_login(client, username="alice")
+    bob_token = register_and_login(client, username="bob")
+    for i in range(1, 5):
+        client.post("/tasks", json={"title": f"alice {i}"}, headers=auth(alice_token))
+    for i in range(1, 4):
+        client.post("/tasks", json={"title": f"bob {i}"}, headers=auth(bob_token))
+
+    resp = client.get("/tasks?limit=2", headers=auth(alice_token))
+    body = resp.get_json()
+    assert body["total"] == 4
+    assert all(t["title"].startswith("alice") for t in body["data"])
+
+    resp = client.get("/tasks?limit=2", headers=auth(bob_token))
+    body = resp.get_json()
+    assert body["total"] == 3
+    assert all(t["title"].startswith("bob") for t in body["data"])
+
+
+def test_list_tasks_invalid_cursor_returns_400(client):
+    token = register_and_login(client)
+    client.post("/tasks", json={"title": "a"}, headers=auth(token))
+    resp = client.get("/tasks?cursor=abc", headers=auth(token))
+    assert resp.status_code == 400
+    assert "error" in resp.get_json()
+
+
+def test_list_tasks_invalid_limit_defaults(client):
+    token = register_and_login(client)
+    for i in range(1, 4):
+        client.post("/tasks", json={"title": f"task {i}"}, headers=auth(token))
+    resp = client.get("/tasks?limit=banana", headers=auth(token))
+    assert resp.status_code == 200
+    assert len(resp.get_json()["data"]) == 3
+
+
+# ── Rate limiting ───────────────────────────────────────────────
+
+
+def test_rate_limit_exceeded_returns_429_with_retry_after(client):
+    task_app.RATE_LIMIT = "3 per minute"
+    token = register_and_login(client)
+    for _ in range(3):
+        resp = client.get("/tasks", headers=auth(token))
+        assert resp.status_code == 200
+    resp = client.get("/tasks", headers=auth(token))
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_is_per_user(client):
+    alice_token = register_and_login(client, username="alice")
+    bob_token = register_and_login(client, username="bob")
+    task_app.RATE_LIMIT = "2 per minute"
+
+    assert client.get("/tasks", headers=auth(alice_token)).status_code == 200
+    assert client.get("/tasks", headers=auth(alice_token)).status_code == 200
+    assert client.get("/tasks", headers=auth(alice_token)).status_code == 429
+    assert client.get("/tasks", headers=auth(bob_token)).status_code == 200
+
+
+def test_rate_limit_applies_to_auth_endpoints(client):
+    task_app.RATE_LIMIT = "2 per minute"
+    assert (
+        client.post("/auth/register", json={"username": "a", "password": "p"}).status_code
+        == 201
+    )
+    assert (
+        client.post("/auth/register", json={"username": "b", "password": "p"}).status_code
+        == 201
+    )
+    resp = client.post("/auth/register", json={"username": "c", "password": "p"})
+    assert resp.status_code == 429
+    assert "Retry-After" in resp.headers
+
+
+def test_rate_limit_applies_to_all_task_methods(client):
+    task_app.RATE_LIMIT = "2 per minute"
+    token = register_and_login(client)
+    assert client.get("/tasks", headers=auth(token)).status_code == 200
+    assert client.get("/tasks", headers=auth(token)).status_code == 200
+    assert client.post("/tasks", json={"title": "x"}, headers=auth(token)).status_code == 429

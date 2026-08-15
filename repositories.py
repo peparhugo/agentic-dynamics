@@ -87,6 +87,38 @@ class TaskRepository(BaseRepository):
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def paginate_by_owner(self, owner_id, cursor=None, limit=20):
+        """Return a page of the owner's tasks ordered by id DESC.
+
+        The cursor is the id of the last item in the previous page, so the
+        next page continues from ids strictly below it. Returns
+        (page, next_cursor, total) where next_cursor is None when there are
+        no more pages.
+        """
+        limit = max(1, min(int(limit), 100))
+        with self._connect() as conn:
+            total = conn.execute(
+                "SELECT COUNT(*) AS n FROM tasks WHERE owner_id = ?",
+                (owner_id,),
+            ).fetchone()["n"]
+            if cursor is None:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, limit + 1),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM tasks WHERE owner_id = ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (owner_id, cursor, limit + 1),
+                ).fetchall()
+        items = [dict(row) for row in rows]
+        has_more = len(items) > limit
+        page = items[:limit]
+        next_cursor = page[-1]["id"] if has_more else None
+        return page, next_cursor, total
+
     def find_by_owner(self, task_id, owner_id):
         with self._connect() as conn:
             row = conn.execute(
