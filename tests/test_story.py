@@ -254,7 +254,11 @@ class TestPerturbationCondition:
         assert cm is None
         assert sm == {}
 
-    def test_early_degrade_returns_session1_mutation(self):
+    def test_early_degrade_returns_session1_mutation(self, monkeypatch):
+        monkeypatch.setattr(
+            "instrument.story.compile_mutation",
+            lambda specification, operator, strength, model, cache_dir: None,
+        )
         cm, sm = condition_to_mutations(
             PerturbationCondition.EARLY_DEGRADE,
             Path("."),
