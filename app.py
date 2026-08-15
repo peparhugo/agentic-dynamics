@@ -16,13 +16,14 @@ import json
 import sqlite3
 import os
 from werkzeug.security import check_password_hash, generate_password_hash
+from tasks import send_notification_email
 
 app = Flask(__name__)
 
 DATABASE = os.environ.get("DATABASE", "todos.db")
 app.config["JWT_SECRET"] = os.environ.get("JWT_SECRET", "development-secret-change-me")
 JWT_LIFETIME_SECONDS = 3600
-VALID_STATUSES = {"pending", "done"}
+VALID_STATUSES = {"pending", "done", "completed"}
 
 
 def get_db():
@@ -44,7 +45,7 @@ def init_db():
             "CREATE TABLE IF NOT EXISTS tasks ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
             "  title TEXT NOT NULL,"
-            "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done')),"
+            "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'completed')),"
             "  created_at TEXT NOT NULL,"
             "  owner_id INTEGER REFERENCES users(id)"
             ")"
@@ -54,6 +55,27 @@ def init_db():
         columns = {row[1] for row in conn.execute("PRAGMA table_info(tasks)")}
         if "owner_id" not in columns:
             conn.execute("ALTER TABLE tasks ADD COLUMN owner_id INTEGER REFERENCES users(id)")
+        schema = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'tasks'"
+        ).fetchone()[0]
+        if "'completed'" not in schema:
+            # SQLite cannot alter a CHECK constraint, so rebuild old task tables.
+            conn.execute("DROP INDEX IF EXISTS idx_tasks_owner_id")
+            conn.execute("ALTER TABLE tasks RENAME TO tasks_old")
+            conn.execute(
+                "CREATE TABLE tasks ("
+                "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                "  title TEXT NOT NULL,"
+                "  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'done', 'completed')),"
+                "  created_at TEXT NOT NULL,"
+                "  owner_id INTEGER REFERENCES users(id)"
+                ")"
+            )
+            conn.execute(
+                "INSERT INTO tasks (id, title, status, created_at, owner_id) "
+                "SELECT id, title, status, created_at, owner_id FROM tasks_old"
+            )
+            conn.execute("DROP TABLE tasks_old")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_tasks_owner_id ON tasks(owner_id)")
 
 
@@ -242,7 +264,8 @@ def edit_task(task_id: int):
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):
         return jsonify({"error": "request body must be a JSON object"}), 400
-    if get_task(task_id, g.user["id"]) is None:
+    existing_task = get_task(task_id, g.user["id"])
+    if existing_task is None:
         return jsonify({"error": "task not found"}), 404
     if "status" in data and data["status"] not in VALID_STATUSES:
         return jsonify({"error": "invalid status"}), 422
@@ -253,6 +276,8 @@ def edit_task(task_id: int):
         title=data.get("title"),
         status=data.get("status"),
     )
+    if existing_task["status"] != "completed" and data.get("status") == "completed":
+        send_notification_email.delay(g.user["username"], task["title"])
     return jsonify(task)
 
 

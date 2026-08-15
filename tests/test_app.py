@@ -53,6 +53,45 @@ def test_users_only_see_and_modify_their_own_tasks(client):
     assert client.put(f"/tasks/{task_id}", headers=alice, json={"status": "done"}).json["status"] == "done"
 
 
+def test_completing_task_queues_notification(client, monkeypatch):
+    register(client, "owner@example.com")
+    owner = login(client, "owner@example.com")
+    task_id = client.post("/tasks", headers=owner, json={"title": "Ship feature"}).json["id"]
+    queued = []
+
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    response = client.put(
+        f"/tasks/{task_id}", headers=owner, json={"status": "completed"}
+    )
+
+    assert response.status_code == 200
+    assert response.json["status"] == "completed"
+    assert queued == [("owner@example.com", "Ship feature")]
+
+
+def test_notification_only_queues_on_transition_to_completed(client, monkeypatch):
+    register(client, "owner@example.com")
+    owner = login(client, "owner@example.com")
+    task_id = client.post("/tasks", headers=owner, json={"title": "Ship feature"}).json["id"]
+    queued = []
+    monkeypatch.setattr(
+        task_app.send_notification_email,
+        "delay",
+        lambda *args: queued.append(args),
+    )
+
+    client.put(f"/tasks/{task_id}", headers=owner, json={"title": "Ship it"})
+    client.put(f"/tasks/{task_id}", headers=owner, json={"status": "completed"})
+    client.put(f"/tasks/{task_id}", headers=owner, json={"status": "completed"})
+
+    assert queued == [("owner@example.com", "Ship it")]
+
+
 def test_migration_adds_owner_id_without_dropping_tasks(tmp_path):
     database = tmp_path / "legacy.db"
     original_database = task_app.DATABASE
