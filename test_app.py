@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import pytest
 
 import app as app_module
@@ -235,3 +237,57 @@ def test_cannot_access_other_users_task(client, auth_headers):
     bob_headers = {"Authorization": f"Bearer {bob_resp.get_json()['token']}"}
     resp = client.get("/tasks/1", headers=bob_headers)
     assert resp.status_code == 404
+
+
+# ── Notification tests ─────────────────────────────────────────
+
+def test_completed_status_triggers_email_notification(client, auth_headers):
+    create_task(client, auth_headers, "Finish report")
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        resp = client.put(
+            "/tasks/1", json={"status": "completed"}, headers=auth_headers
+        )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "completed"
+    mock_task.delay.assert_called_once_with("alice", "Finish report")
+
+
+def test_done_status_triggers_email_notification(client, auth_headers):
+    create_task(client, auth_headers, "Ship package")
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        resp = client.put(
+            "/tasks/1", json={"status": "done"}, headers=auth_headers
+        )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "done"
+    mock_task.delay.assert_called_once()
+
+
+def test_no_notification_when_status_unchanged(client, auth_headers):
+    create_task(client, auth_headers, "Already done", status="done")
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        resp = client.put(
+            "/tasks/1", json={"status": "done"}, headers=auth_headers
+        )
+    assert resp.status_code == 200
+    mock_task.delay.assert_not_called()
+
+
+def test_no_notification_when_only_title_changes(client, auth_headers):
+    create_task(client, auth_headers, "Pending task")
+    with patch.object(app_module, "send_notification_email") as mock_task:
+        resp = client.put(
+            "/tasks/1", json={"title": "Renamed task"}, headers=auth_headers
+        )
+    assert resp.status_code == 200
+    assert resp.get_json()["status"] == "pending"
+    mock_task.delay.assert_not_called()
+
+
+def test_send_notification_email_task_executes(capsys):
+    result = app_module.send_notification_email("alice@example.com", "Finish report")
+    captured = capsys.readouterr().out
+    assert "alice@example.com" in captured
+    assert "Finish report" in captured
+    assert result["email"] == "alice@example.com"
+    assert result["task_title"] == "Finish report"

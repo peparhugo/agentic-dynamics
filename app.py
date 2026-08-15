@@ -11,13 +11,16 @@ import jwt
 from flask import Flask, g, jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from tasks import send_notification_email
+
 app = Flask(__name__)
 app.config["DATABASE"] = os.environ.get("DATABASE", "tasks.db")
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "86400"))
 
-VALID_STATUSES = {"pending", "done"}
+VALID_STATUSES = {"pending", "done", "completed"}
+COMPLETED_STATUSES = {"done", "completed"}
 
 
 def get_db():
@@ -210,6 +213,7 @@ def update_task(task_id):
         status = data.get("status", row["status"])
         if status not in VALID_STATUSES:
             return jsonify({"error": "invalid status"}), 422
+        old_status = row["status"]
         conn.execute(
             "UPDATE tasks SET title = ?, status = ? WHERE id = ?",
             (title, status, task_id),
@@ -218,6 +222,15 @@ def update_task(task_id):
         row = conn.execute(
             "SELECT * FROM tasks WHERE id = ?", (task_id,)
         ).fetchone()
+
+    if status in COMPLETED_STATUSES and old_status != status:
+        with get_db() as conn:
+            user = conn.execute(
+                "SELECT username FROM users WHERE id = ?", (g.user_id,)
+            ).fetchone()
+        user_email = user["username"] if user else ""
+        send_notification_email.delay(user_email, title)
+
     return jsonify(task_to_dict(row))
 
 
