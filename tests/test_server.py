@@ -128,3 +128,143 @@ async def test_wire_frames_are_base64(server):
     message = json.loads(json_bytes.decode("utf-8"))
     assert message["type"] == "system"
     assert "client_id" in message["payload"]
+
+
+def channels_url(server, name=None):
+    if name is None:
+        return f"http://127.0.0.1:{server.port}/channels"
+    return f"http://127.0.0.1:{server.port}/channels/{name}/subscribers"
+
+
+async def _get_json(server, url):
+    body = await asyncio.to_thread(_get, url)
+    return json.loads(body)
+
+
+async def test_channel_message_only_reaches_subscribers(server):
+    async with websockets.connect(ws_url(server)) as ws1, websockets.connect(
+        ws_url(server)
+    ) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        await ws1.send(
+            encode_message({"type": "subscribe", "payload": {"channel": "alerts"}})
+        )
+
+        await ws1.send(
+            encode_message(
+                {
+                    "type": "broadcast",
+                    "payload": {"text": "siren"},
+                    "channel": "alerts",
+                }
+            )
+        )
+
+        got = decode_message(await ws1.recv())
+        assert got["type"] == "broadcast"
+        assert got["payload"]["text"] == "siren"
+        assert got["channel"] == "alerts"
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws2.recv(), timeout=0.5)
+
+
+async def test_unsubscribe_stops_delivery(server):
+    async with websockets.connect(ws_url(server)) as ws1, websockets.connect(
+        ws_url(server)
+    ) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        await ws1.send(
+            encode_message({"type": "subscribe", "payload": {"channel": "chat"}})
+        )
+        await ws1.send(
+            encode_message({"type": "unsubscribe", "payload": {"channel": "chat"}})
+        )
+
+        await ws2.send(
+            encode_message(
+                {"type": "broadcast", "payload": {"text": "hey"}, "channel": "chat"}
+            )
+        )
+
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(ws1.recv(), timeout=0.5)
+
+
+async def test_client_can_subscribe_to_multiple_channels(server):
+    async with websockets.connect(ws_url(server)) as ws1, websockets.connect(
+        ws_url(server)
+    ) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        for channel in ("alerts", "system", "chat"):
+            await ws1.send(
+                encode_message(
+                    {"type": "subscribe", "payload": {"channel": channel}}
+                )
+            )
+
+        for channel, text in (("alerts", "a"), ("chat", "c")):
+            await ws2.send(
+                encode_message(
+                    {"type": "broadcast", "payload": {"text": text}, "channel": channel}
+                )
+            )
+            got = decode_message(await ws1.recv())
+            assert got["channel"] == channel
+            assert got["payload"]["text"] == text
+
+
+async def test_message_without_channel_broadcasts_to_all(server):
+    async with websockets.connect(ws_url(server)) as ws1, websockets.connect(
+        ws_url(server)
+    ) as ws2:
+        await ws1.recv()
+        await ws2.recv()
+
+        await ws1.send(
+            encode_message(
+                {"type": "broadcast", "payload": {"text": "all"}, "timestamp": "t"}
+            )
+        )
+
+        for ws in (ws1, ws2):
+            got = decode_message(await ws.recv())
+            assert got["payload"]["text"] == "all"
+            assert "channel" not in got
+
+
+async def test_channels_rest_endpoints(server):
+    assert await _get_json(server, channels_url(server)) == {"channels": {}}
+
+    async with websockets.connect(ws_url(server)) as ws1, websockets.connect(
+        ws_url(server)
+    ) as ws2:
+        id1 = decode_message(await ws1.recv())["payload"]["client_id"]
+        id2 = decode_message(await ws2.recv())["payload"]["client_id"]
+
+        await ws1.send(
+            encode_message({"type": "subscribe", "payload": {"channel": "alerts"}})
+        )
+        await ws2.send(
+            encode_message({"type": "subscribe", "payload": {"channel": "alerts"}})
+        )
+        await ws2.send(
+            encode_message({"type": "subscribe", "payload": {"channel": "system"}})
+        )
+
+        channels = await _get_json(server, channels_url(server))
+        assert channels["channels"]["alerts"] == 2
+        assert channels["channels"]["system"] == 1
+
+        subs = await _get_json(server, channels_url(server, "alerts"))
+        assert subs["channel"] == "alerts"
+        assert sorted(subs["subscribers"]) == sorted([id1, id2])
+
+        subs = await _get_json(server, channels_url(server, "system"))
+        assert subs["subscribers"] == [id2]

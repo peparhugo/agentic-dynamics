@@ -6,8 +6,11 @@ Features
 - Accept WebSocket connections and assign each client a unique ID.
 - Broadcast a message to all connected clients.
 - Deliver a "direct" message to a single client by ID.
+- Support named channels: clients subscribe/unsubscribe dynamically and
+  messages carrying a ``channel`` field are delivered only to subscribers.
 - Remove clients cleanly on disconnect.
 - Expose ``GET /health`` returning the number of connected clients.
+- Expose ``GET /channels`` and ``GET /channels/{name}/subscribers``.
 
 Message format
 --------------
@@ -15,7 +18,8 @@ Every application message is a JSON object::
 
     {"type": str, "payload": dict, "timestamp": str}
 
-Supported ``type`` values: ``broadcast``, ``direct``, ``system``.
+Supported ``type`` values: ``broadcast``, ``direct``, ``system``,
+``subscribe``, ``unsubscribe``.
 
 Wire format
 -----------
@@ -33,7 +37,8 @@ import itertools
 import json
 import threading
 from datetime import datetime, timezone
-from typing import Any, Dict
+from typing import Any, Dict, List
+from urllib.parse import unquote
 
 from websockets.asyncio.server import ServerConnection, serve
 from websockets.datastructures import Headers
@@ -57,10 +62,11 @@ def decode_message(raw: str) -> Dict[str, Any]:
 
 
 class ClientRegistry:
-    """Thread-safe registry of connected clients."""
+    """Thread-safe registry of connected clients and their subscriptions."""
 
     def __init__(self) -> None:
         self._clients: Dict[int, ServerConnection] = {}
+        self._channels: Dict[str, set] = {}
         self._lock = threading.Lock()
         self._counter = itertools.count(1)
 
@@ -72,7 +78,12 @@ class ClientRegistry:
 
     def unregister(self, client_id: int) -> ServerConnection | None:
         with self._lock:
-            return self._clients.pop(client_id, None)
+            connection = self._clients.pop(client_id, None)
+            for members in self._channels.values():
+                members.discard(client_id)
+            for name in [n for n, m in self._channels.items() if not m]:
+                del self._channels[name]
+            return connection
 
     def get(self, client_id: int) -> ServerConnection | None:
         with self._lock:
@@ -85,6 +96,29 @@ class ClientRegistry:
     def snapshot(self) -> Dict[int, ServerConnection]:
         with self._lock:
             return dict(self._clients)
+
+    # ── Subscriptions ──────────────────────────────────────────
+
+    def subscribe(self, client_id: int, channel: str) -> None:
+        with self._lock:
+            if client_id in self._clients:
+                self._channels.setdefault(channel, set()).add(client_id)
+
+    def unsubscribe(self, client_id: int, channel: str) -> None:
+        with self._lock:
+            members = self._channels.get(channel)
+            if members is not None:
+                members.discard(client_id)
+                if not members:
+                    del self._channels[channel]
+
+    def subscribers(self, channel: str) -> List[int]:
+        with self._lock:
+            return sorted(self._channels.get(channel, set()))
+
+    def channels(self) -> Dict[str, int]:
+        with self._lock:
+            return {name: len(members) for name, members in self._channels.items()}
 
 
 class NotificationServer:
@@ -119,9 +153,24 @@ class NotificationServer:
     def _process_request(
         self, connection: ServerConnection, request: Request
     ) -> Response | None:
-        if request.path == "/health":
+        path = request.path
+        json_headers = Headers([("Content-Type", "application/json")])
+
+        if path == "/health":
             body = json.dumps({"connected_clients": self.clients.count()}).encode("utf-8")
-            return Response(200, "OK", Headers([("Content-Type", "application/json")]), body)
+            return Response(200, "OK", json_headers, body)
+
+        if path == "/channels":
+            body = json.dumps({"channels": self.clients.channels()}).encode("utf-8")
+            return Response(200, "OK", json_headers, body)
+
+        if path.startswith("/channels/") and path.endswith("/subscribers"):
+            name = unquote(path[len("/channels/"):-len("/subscribers")])
+            body = json.dumps(
+                {"channel": name, "subscribers": self.clients.subscribers(name)}
+            ).encode("utf-8")
+            return Response(200, "OK", json_headers, body)
+
         return None
 
     # ── WebSocket handler ──────────────────────────────────────
@@ -152,10 +201,27 @@ class NotificationServer:
         payload = message.get("payload") or {}
         timestamp = message.get("timestamp") or utcnow()
 
+        if mtype == "subscribe":
+            channel = payload.get("channel") or message.get("channel")
+            if channel:
+                self.clients.subscribe(sender_id, channel)
+            return
+
+        if mtype == "unsubscribe":
+            channel = payload.get("channel") or message.get("channel")
+            if channel:
+                self.clients.unsubscribe(sender_id, channel)
+            return
+
         if mtype == "broadcast":
             outgoing = {"type": "broadcast", "payload": payload, "timestamp": timestamp}
             outgoing["payload"]["sender_id"] = sender_id
-            await self.broadcast(outgoing)
+            channel = message.get("channel")
+            if channel:
+                outgoing["channel"] = channel
+                await self.send_to_channel(channel, outgoing)
+            else:
+                await self.broadcast(outgoing)
         elif mtype == "direct":
             target = payload.get("client_id")
             connection = self.clients.get(target)
@@ -169,6 +235,17 @@ class NotificationServer:
     async def broadcast(self, message: Dict[str, Any]) -> None:
         encoded = encode_message(message)
         for websocket in self.clients.snapshot().values():
+            try:
+                await websocket.send(encoded)
+            except Exception:
+                continue
+
+    async def send_to_channel(self, channel: str, message: Dict[str, Any]) -> None:
+        encoded = encode_message(message)
+        for client_id in self.clients.subscribers(channel):
+            websocket = self.clients.get(client_id)
+            if websocket is None:
+                continue
             try:
                 await websocket.send(encoded)
             except Exception:
