@@ -5,7 +5,7 @@
     "moduleResolution": "node",
     "lib": ["ES2020"],
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": true,
     "strict": true,
     "esModuleInterop": true,
@@ -13,6 +13,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "tests"]
+  "include": ["src", "plugins"],
+  "exclude": ["node_modules", "dist", "tests", "ssg.config.ts"]
 }
