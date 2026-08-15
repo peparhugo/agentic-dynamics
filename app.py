@@ -9,9 +9,12 @@ from flask import Flask, request, jsonify
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
+    decode_token,
     get_jwt_identity,
     jwt_required,
 )
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.security import check_password_hash
 import sqlite3
 import os
@@ -25,6 +28,41 @@ app.config["JWT_SECRET_KEY"] = os.environ.get(
 )
 
 jwt = JWTManager(app)
+
+RATE_LIMIT_STORAGE_URL = os.environ.get(
+    "RATE_LIMIT_STORAGE_URL", "redis://localhost:6379/0"
+)
+RATE_LIMIT_DEFAULT = os.environ.get("RATE_LIMIT_DEFAULT", "100 per minute")
+
+
+def rate_limit_key():
+    """Return a per-user key when authenticated, otherwise the remote address."""
+    auth = request.headers.get("Authorization", "")
+    if auth[:7].lower() == "bearer ":
+        token = auth[7:].strip()
+        if token:
+            try:
+                claims = decode_token(token)
+                identity = claims.get("sub")
+                if identity:
+                    return f"user:{identity}"
+            except Exception:
+                pass
+    return f"ip:{get_remote_address()}"
+
+
+limiter = Limiter(
+    key_func=rate_limit_key,
+    default_limits=[RATE_LIMIT_DEFAULT],
+    storage_uri=RATE_LIMIT_STORAGE_URL,
+    headers_enabled=True,
+    app=app,
+)
+
+
+@app.errorhandler(429)
+def _rate_limit_exceeded(_):
+    return jsonify({"error": "rate limit exceeded"}), 429
 
 
 @jwt.invalid_token_loader
@@ -149,7 +187,22 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @jwt_required()
 def list_tasks():
-    return jsonify(task_repo.list_by_owner(current_user_id()))
+    cursor = request.args.get("cursor")
+    if cursor is not None:
+        try:
+            cursor = int(cursor)
+        except (TypeError, ValueError):
+            return jsonify({"error": "invalid cursor"}), 400
+
+    limit = request.args.get("limit", "20")
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    result = task_repo.list_by_owner_paginated(current_user_id(), cursor, limit)
+    return jsonify(result)
 
 
 @app.route("/tasks", methods=["POST"])
