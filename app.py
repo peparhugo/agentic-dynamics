@@ -1,250 +1,137 @@
-"""
-Tier 2 Small seed — Multi-file Flask Auth API (Python, ~500 LOC)
+"""Async WebSocket notification server with a small HTTP health endpoint."""
 
-A modular Flask app with Blueprints, JWT authentication, SQLite persistence,
-and pytest tests. Designed as a baseline for tier 2 multi-session stories.
-"""
+import asyncio
+from datetime import datetime, timezone
+import json
+import threading
+from typing import Any
+from uuid import uuid4
 
-from flask import Flask
-from flask import Blueprint
-from flask import request, jsonify
-from datetime import datetime, timedelta
-from functools import wraps
-import sqlite3
-import hashlib
-import os
-import secrets
-import time
-
-app = Flask(__name__)
-app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
-
-DATABASE = os.environ.get("DATABASE", "auth_api.db")
-TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+from websockets.asyncio.server import Server, ServerConnection, serve
+from websockets.datastructures import Headers
+from websockets.http11 import Response
 
 
-# ── Database ────────────────────────────────────────────────────
-
-def get_db():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+MESSAGE_TYPES = frozenset({"broadcast", "direct", "system"})
 
 
-def init_db():
-    with get_db() as conn:
-        conn.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'user',
-                created_at TEXT NOT NULL
-            );
-            CREATE TABLE IF NOT EXISTS tokens (
-                token TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                expires_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-            CREATE TABLE IF NOT EXISTS items (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT DEFAULT '',
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-        """)
+class NotificationServer:
+    """Maintains WebSocket clients and delivers structured notifications."""
+
+    def __init__(self) -> None:
+        self._clients: dict[str, ServerConnection] = {}
+        # This also makes count and snapshot reads safe for monitoring threads.
+        self._clients_lock = threading.RLock()
+        self._server: Server | None = None
+
+    @property
+    def client_count(self) -> int:
+        with self._clients_lock:
+            return len(self._clients)
+
+    @property
+    def port(self) -> int:
+        if self._server is None or not self._server.sockets:
+            raise RuntimeError("server is not running")
+        return self._server.sockets[0].getsockname()[1]
+
+    async def start(self, host: str = "127.0.0.1", port: int = 8765) -> None:
+        if self._server is not None:
+            raise RuntimeError("server is already running")
+        self._server = await serve(self._handle_client, host, port, process_request=self._handle_http)
+
+    async def stop(self) -> None:
+        if self._server is not None:
+            self._server.close()
+            await self._server.wait_closed()
+            self._server = None
+        with self._clients_lock:
+            self._clients.clear()
+
+    async def broadcast(self, payload: dict[str, Any]) -> None:
+        """Send a broadcast message to every currently connected client."""
+        await self._send_to_connections(self._connections(), "broadcast", payload)
+
+    async def direct(self, client_id: str, payload: dict[str, Any]) -> bool:
+        """Send a direct message to one client, returning whether it existed."""
+        with self._clients_lock:
+            connection = self._clients.get(client_id)
+        if connection is None:
+            return False
+        await self._send_to_connections([connection], "direct", payload)
+        return True
+
+    async def system(self, payload: dict[str, Any]) -> None:
+        await self._send_to_connections(self._connections(), "system", payload)
+
+    async def _handle_client(self, connection: ServerConnection) -> None:
+        client_id = str(uuid4())
+        with self._clients_lock:
+            self._clients[client_id] = connection
+
+        try:
+            await self._send_to_connections([connection], "system", {"event": "connected", "client_id": client_id})
+            async for raw_message in connection:
+                await self._handle_message(connection, client_id, raw_message)
+        finally:
+            with self._clients_lock:
+                self._clients.pop(client_id, None)
+
+    async def _handle_message(
+        self, connection: ServerConnection, sender_id: str, raw_message: str | bytes
+    ) -> None:
+        if isinstance(raw_message, bytes):
+            await self._send_to_connections([connection], "system", {"event": "error", "message": "messages must be JSON text"})
+            return
+
+        try:
+            message = json.loads(raw_message)
+            message_type = message["type"]
+            payload = message["payload"]
+            if message_type not in MESSAGE_TYPES or not isinstance(payload, dict):
+                raise ValueError
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            await self._send_to_connections([connection], "system", {"event": "error", "message": "invalid message format"})
+            return
+
+        if message_type == "broadcast":
+            await self.broadcast({"sender_id": sender_id, **payload})
+        elif message_type == "direct":
+            recipient_id = payload.get("client_id")
+            if not isinstance(recipient_id, str) or not await self.direct(recipient_id, {"sender_id": sender_id, **payload}):
+                await self._send_to_connections([connection], "system", {"event": "error", "message": "unknown client_id"})
+        else:
+            await self.system({"sender_id": sender_id, **payload})
+
+    async def _handle_http(self, _connection: ServerConnection, request: Any) -> Response | None:
+        if request.path != "/health":
+            return None
+        body = json.dumps({"connected_clients": self.client_count}).encode("utf-8")
+        return Response(200, "OK", Headers({"Content-Type": "application/json", "Content-Length": str(len(body))}), body)
+
+    def _connections(self) -> list[ServerConnection]:
+        with self._clients_lock:
+            return list(self._clients.values())
+
+    async def _send_to_connections(
+        self, connections: list[ServerConnection], message_type: str, payload: dict[str, Any]
+    ) -> None:
+        message = json.dumps({"type": message_type, "payload": payload, "timestamp": datetime.now(timezone.utc).isoformat()})
+        results = await asyncio.gather(*(connection.send(message) for connection in connections), return_exceptions=True)
+        if any(isinstance(result, Exception) for result in results):
+            # A failed send is harmless here; the connection handler removes it on close.
+            return
 
 
-# ── Auth Utilities ──────────────────────────────────────────────
-
-def hash_password(password: str) -> str:
-    salt = app.config["SECRET_KEY"][:16]
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
-
-
-def create_token(user_id: int) -> str:
-    token = secrets.token_hex(32)
-    expires = (datetime.utcnow() + timedelta(seconds=TOKEN_TTL)).isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (token, user_id, expires),
-        )
-        conn.commit()
-    return token
-
-
-def get_user_from_token(token: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT u.* FROM users u JOIN tokens t ON u.id = t.user_id "
-            "WHERE t.token = ? AND t.expires_at > ?",
-            (token, datetime.utcnow().isoformat()),
-        ).fetchone()
-    return dict(row) if row else None
-
-
-def require_auth(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        auth = request.headers.get("Authorization", "")
-        if not auth.startswith("Bearer "):
-            return jsonify({"error": "missing authorization header"}), 401
-        token = auth.split(" ", 1)[1]
-        user = get_user_from_token(token)
-        if user is None:
-            return jsonify({"error": "invalid or expired token"}), 401
-        return f(user, *args, **kwargs)
-    return decorated
-
-
-# ── Auth Blueprint ──────────────────────────────────────────────
-
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
-
-
-@auth_bp.route("/register", methods=["POST"])
-def register():
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    if not username or not password:
-        return jsonify({"error": "username and password required"}), 400
-    if len(password) < 8:
-        return jsonify({"error": "password must be at least 8 characters"}), 400
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT id FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if existing:
-            return jsonify({"error": "username already taken"}), 409
-        now = datetime.utcnow().isoformat()
-        conn.execute(
-            "INSERT INTO users (username, password_hash, role, created_at) "
-            "VALUES (?, ?, 'user', ?)",
-            (username, hash_password(password), now),
-        )
-        conn.commit()
-    return jsonify({"message": "user registered", "username": username}), 201
-
-
-@auth_bp.route("/login", methods=["POST"])
-def login():
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-    if not username or not password:
-        return jsonify({"error": "username and password required"}), 400
-    with get_db() as conn:
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-            (username, hash_password(password)),
-        ).fetchone()
-    if user is None:
-        return jsonify({"error": "invalid credentials"}), 401
-    token = create_token(user["id"])
-    return jsonify({"token": token, "username": user["username"], "role": user["role"]})
-
-
-# ── Items Blueprint ─────────────────────────────────────────────
-
-items_bp = Blueprint("items", __name__, url_prefix="/items")
-
-
-@items_bp.route("", methods=["GET"])
-@require_auth
-def list_items(user: dict):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM items WHERE user_id = ? ORDER BY created_at DESC",
-            (user["id"],),
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
-
-
-@items_bp.route("", methods=["POST"])
-@require_auth
-def create_item(user: dict):
-    data = request.get_json(silent=True) or {}
-    name = data.get("name", "").strip()
-    if not name:
-        return jsonify({"error": "name is required"}), 400
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO items (user_id, name, description, created_at) "
-            "VALUES (?, ?, ?, ?)",
-            (user["id"], name, data.get("description", ""), now),
-        )
-        conn.commit()
-        return jsonify({
-            "id": cursor.lastrowid,
-            "name": name,
-            "description": data.get("description", ""),
-            "created_at": now,
-        }), 201
-
-
-@items_bp.route("/<int:item_id>", methods=["GET"])
-@require_auth
-def get_item(user: dict, item_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
-        ).fetchone()
-    if row is None:
-        return jsonify({"error": "item not found"}), 404
-    return jsonify(dict(row))
-
-
-@items_bp.route("/<int:item_id>", methods=["DELETE"])
-@require_auth
-def delete_item(user: dict, item_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT id FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
-        ).fetchone()
-        if row is None:
-            return jsonify({"error": "item not found"}), 404
-        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
-        conn.commit()
-    return jsonify({"message": "item deleted"})
-
-
-# ── Admin Blueprint ─────────────────────────────────────────────
-
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
-
-
-@admin_bp.route("/users", methods=["GET"])
-@require_auth
-def list_users(user: dict):
-    if user.get("role") != "admin":
-        return jsonify({"error": "admin access required"}), 403
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, username, role, created_at FROM users ORDER BY created_at"
-        ).fetchall()
-    return jsonify([dict(r) for r in rows])
-
-
-# ── Register Blueprints ─────────────────────────────────────────
-
-app.register_blueprint(auth_bp)
-app.register_blueprint(items_bp)
-app.register_blueprint(admin_bp)
-
-
-@app.route("/health", methods=["GET"])
-def health():
-    return jsonify({"status": "ok"})
+async def main() -> None:
+    server = NotificationServer()
+    await server.start(host="0.0.0.0", port=8765)
+    print("Notification server listening on ws://0.0.0.0:8765")
+    try:
+        await asyncio.Future()
+    finally:
+        await server.stop()
 
 
 if __name__ == "__main__":
-    init_db()
-    app.run(debug=True)
+    asyncio.run(main())
