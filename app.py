@@ -8,6 +8,7 @@ import os
 import sqlite3
 import threading
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -20,6 +21,90 @@ from websockets.legacy.server import WebSocketServerProtocol, serve
 
 MESSAGE_TYPES = frozenset({"broadcast", "direct", "system", "subscribe", "unsubscribe"})
 BROKER_CHANNEL = "notifications"
+
+
+class BaseTransport(ABC):
+    """Connection transport used by :class:`NotificationServer`."""
+
+    @property
+    @abstractmethod
+    def client_ids(self) -> tuple[str, ...]:
+        """Return the IDs of clients connected through this transport."""
+
+    @abstractmethod
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        """Register a newly connected client."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str) -> None:
+        """Remove a disconnected client."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict[str, Any]) -> bool:
+        """Send a message to one client, returning whether it was delivered."""
+
+    @abstractmethod
+    async def broadcast(
+        self, message: dict[str, Any], client_ids: tuple[str, ...] | None = None
+    ) -> tuple[str, ...]:
+        """Send a message to selected clients and return IDs that could not receive it."""
+
+
+class WebSocketTransport(BaseTransport):
+    """WebSocket implementation of the notification transport interface."""
+
+    def __init__(self) -> None:
+        self._clients: dict[str, WebSocketServerProtocol] = {}
+        self._clients_lock = threading.RLock()
+
+    @property
+    def client_ids(self) -> tuple[str, ...]:
+        with self._clients_lock:
+            return tuple(self._clients)
+
+    async def on_connect(self, client_id: str, connection: Any) -> None:
+        if not isinstance(connection, WebSocketServerProtocol):
+            raise TypeError("WebSocketTransport requires a WebSocket connection")
+        with self._clients_lock:
+            self._clients[client_id] = connection
+
+    async def on_disconnect(self, client_id: str) -> None:
+        with self._clients_lock:
+            self._clients.pop(client_id, None)
+
+    async def send_message(self, client_id: str, message: dict[str, Any]) -> bool:
+        with self._clients_lock:
+            websocket = self._clients.get(client_id)
+        if websocket is None:
+            return False
+        try:
+            await websocket.send(json.dumps(message))
+            return True
+        except ConnectionClosed:
+            return False
+
+    async def broadcast(
+        self, message: dict[str, Any], client_ids: tuple[str, ...] | None = None
+    ) -> tuple[str, ...]:
+        with self._clients_lock:
+            target_ids = self.client_ids if client_ids is None else client_ids
+        results = await asyncio.gather(
+            *(self.send_message(client_id, message) for client_id in target_ids), return_exceptions=True
+        )
+        return tuple(client_id for client_id, result in zip(target_ids, results) if result is not True)
+
+    async def handler(
+        self, server: "NotificationServer", websocket: WebSocketServerProtocol, _path: str
+    ) -> None:
+        client_id = str(uuid.uuid4())
+        await server._connected(client_id, websocket)
+        try:
+            async for raw_message in websocket:
+                await server._handle_message(client_id, raw_message)
+        except ConnectionClosed:
+            pass
+        finally:
+            await server._disconnected(client_id)
 
 
 class MessageStore:
@@ -204,16 +289,26 @@ class RedisBroker:
 class NotificationServer:
     """Manage connected clients and route JSON notification messages."""
 
-    def __init__(self, redis_url: str | None = None, database_url: str | None = None) -> None:
-        self._clients: dict[str, WebSocketServerProtocol] = {}
+    def __init__(
+        self,
+        redis_url: str | None = None,
+        database_url: str | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
         self._channels: dict[str, set[str]] = {}
-        # Asyncio protects one event loop, not callers from other threads.
         self._clients_lock = threading.RLock()
+        self._transport = transport or self._create_transport(os.getenv("TRANSPORT", "websocket"))
         self._instance_id = str(uuid.uuid4())
         self._broker = RedisBroker(redis_url or os.getenv("REDIS_URL", "redis://127.0.0.1:6379"))
         self._broker_started = False
         self._broker_lock = asyncio.Lock()
         self._store = MessageStore(database_url or os.getenv("DATABASE_URL", ":memory:"))
+
+    @staticmethod
+    def _create_transport(name: str) -> BaseTransport:
+        if name.lower() == "websocket":
+            return WebSocketTransport()
+        raise ValueError(f"unsupported transport: {name}")
 
     async def _start_broker(self) -> None:
         if not self._broker_started:
@@ -224,13 +319,11 @@ class NotificationServer:
 
     @property
     def client_count(self) -> int:
-        with self._clients_lock:
-            return len(self._clients)
+        return len(self._transport.client_ids)
 
     @property
     def client_ids(self) -> tuple[str, ...]:
-        with self._clients_lock:
-            return tuple(self._clients)
+        return self._transport.client_ids
 
     @property
     def channels(self) -> dict[str, int]:
@@ -245,25 +338,25 @@ class NotificationServer:
             return None if subscribers is None else tuple(subscribers)
 
     async def handler(self, websocket: WebSocketServerProtocol, _path: str) -> None:
-        await self._start_broker()
-        client_id = str(uuid.uuid4())
-        with self._clients_lock:
-            self._clients[client_id] = websocket
-        await self._broker.add_client(client_id, self._instance_id)
+        """Handle WebSocket connections; retained for the public server API."""
+        if not isinstance(self._transport, WebSocketTransport):
+            raise RuntimeError("the selected transport does not provide a WebSocket handler")
+        await self._transport.handler(self, websocket, _path)
 
+    async def _connected(self, client_id: str, connection: Any) -> None:
+        await self._start_broker()
+        await self._transport.on_connect(client_id, connection)
+        await self._broker.add_client(client_id, self._instance_id)
         await self.send_to_client(
             client_id,
             self._message("system", {"event": "connected", "client_id": client_id}),
         )
-        try:
-            async for raw_message in websocket:
-                await self._handle_message(client_id, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            with self._clients_lock:
-                self._remove_client(client_id)
-            await self._broker.remove_client(client_id)
+
+    async def _disconnected(self, client_id: str) -> None:
+        await self._transport.on_disconnect(client_id)
+        with self._clients_lock:
+            self._remove_client(client_id)
+        await self._broker.remove_client(client_id)
 
     async def _handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
         if isinstance(raw_message, bytes):
@@ -342,53 +435,25 @@ class NotificationServer:
 
     async def broadcast(self, message: dict[str, Any]) -> None:
         """Send a valid notification message to every currently connected client."""
-        encoded_message = json.dumps(message)
-        with self._clients_lock:
-            clients = list(self._clients.items())
-
-        results = await asyncio.gather(
-            *(self._send(client_id, websocket, encoded_message) for client_id, websocket in clients),
-            return_exceptions=True,
-        )
-        self._remove_stale_clients(clients, results)
+        await self._remove_stale_clients(await self._transport.broadcast(message))
 
     async def broadcast_to_channel(self, channel: str, message: dict[str, Any]) -> None:
         """Send a notification only to clients subscribed to ``channel``."""
-        encoded_message = json.dumps(message)
         with self._clients_lock:
-            clients = [
-                (client_id, self._clients[client_id])
-                for client_id in self._channels.get(channel, set())
-                if client_id in self._clients
-            ]
-
-        results = await asyncio.gather(
-            *(self._send(client_id, websocket, encoded_message) for client_id, websocket in clients),
-            return_exceptions=True,
-        )
-        self._remove_stale_clients(clients, results)
+            client_ids = tuple(
+                client_id for client_id in self._channels.get(channel, set()) if client_id in self.client_ids
+            )
+        await self._remove_stale_clients(await self._transport.broadcast(message, client_ids))
 
     async def send_to_client(self, client_id: str, message: dict[str, Any]) -> bool:
-        with self._clients_lock:
-            websocket = self._clients.get(client_id)
-        if websocket is None:
-            return False
-        return await self._send(client_id, websocket, json.dumps(message))
+        delivered = await self._transport.send_message(client_id, message)
+        if not delivered:
+            await self._remove_stale_clients((client_id,))
+        return delivered
 
-    async def _send(
-        self, client_id: str, websocket: WebSocketServerProtocol, encoded_message: str
-    ) -> bool:
-        try:
-            await websocket.send(encoded_message)
-            return True
-        except ConnectionClosed:
-            with self._clients_lock:
-                self._remove_client(client_id)
-            return False
-
-    def _remove_stale_clients(self, clients: list[tuple[str, WebSocketServerProtocol]], results: list[Any]) -> None:
-        stale_ids = [client_id for (client_id, _), result in zip(clients, results) if result is False]
+    async def _remove_stale_clients(self, stale_ids: tuple[str, ...]) -> None:
         if stale_ids:
+            await asyncio.gather(*(self._transport.on_disconnect(client_id) for client_id in stale_ids))
             with self._clients_lock:
                 for client_id in stale_ids:
                     self._remove_client(client_id)
