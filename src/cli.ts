@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { buildSite } from './generator';
 import { startDevServer } from './dev-server';
+import { loadConfig, pluginsFromConfig } from './load-plugins';
+import type { SSGConfig } from './plugins/types';
 
 const DEFAULT_CONTENT_DIR = './content';
 const DEFAULT_OUTPUT_DIR = './dist';
@@ -13,6 +15,10 @@ export interface CliOptions {
   outputDir: string;
   templateDir?: string;
   port: number;
+  contentDirSet?: boolean;
+  outputDirSet?: boolean;
+  templateDirSet?: boolean;
+  portSet?: boolean;
 }
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -35,16 +41,20 @@ export function parseArgs(argv: string[]): CliOptions {
     const arg = args[i];
     if (arg === '--content') {
       opts.contentDir = args[i + 1] ?? DEFAULT_CONTENT_DIR;
+      opts.contentDirSet = true;
       i += 1;
     } else if (arg === '--output') {
       opts.outputDir = args[i + 1] ?? DEFAULT_OUTPUT_DIR;
+      opts.outputDirSet = true;
       i += 1;
     } else if (arg === '--templates') {
       opts.templateDir = args[i + 1] ?? DEFAULT_TEMPLATE_DIR;
+      opts.templateDirSet = true;
       i += 1;
     } else if (arg === '--port') {
       const parsed = Number(args[i + 1]);
       opts.port = Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
+      opts.portSet = true;
       i += 1;
     }
   }
@@ -75,13 +85,48 @@ export function printHelp(): void {
   );
 }
 
+interface MergedDirs {
+  contentDir: string;
+  outputDir: string;
+  templateDir?: string;
+}
+
+/**
+ * Merge `ssg.config.ts` directory options with CLI flags. Explicit flags win;
+ * otherwise the config value is used, falling back to the CLI defaults.
+ */
+function applyConfig(opts: CliOptions, config: SSGConfig | null): MergedDirs {
+  return {
+    contentDir: opts.contentDirSet ? opts.contentDir : (config?.contentDir ?? opts.contentDir),
+    outputDir: opts.outputDirSet ? opts.outputDir : (config?.outputDir ?? opts.outputDir),
+    templateDir: opts.templateDirSet ? opts.templateDir : (config?.templateDir ?? opts.templateDir),
+  };
+}
+
 export function serveSite(opts: CliOptions): number {
+  let config: SSGConfig | null = null;
   try {
-    const pages = buildSite({
-      contentDir: opts.contentDir,
-      outputDir: opts.outputDir,
-      templateDir: opts.templateDir,
-    });
+    config = loadConfig();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Serve failed: ${message}`);
+    return 1;
+  }
+  const plugins = pluginsFromConfig(config);
+  const dirs = applyConfig(opts, config);
+
+  try {
+    const pages = buildSite(
+      {
+        contentDir: dirs.contentDir,
+        outputDir: dirs.outputDir,
+        templateDir: dirs.templateDir,
+        defaultTemplate: config?.defaultTemplate,
+        defaultLayout: config?.defaultLayout,
+        config: config ?? undefined,
+      },
+      plugins
+    );
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${opts.outputDir}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -89,14 +134,17 @@ export function serveSite(opts: CliOptions): number {
     return 1;
   }
 
-  startDevServer({
-    contentDir: opts.contentDir,
-    outputDir: opts.outputDir,
-    templateDir: opts.templateDir,
-    port: opts.port,
-  })
+  startDevServer(
+    {
+      contentDir: dirs.contentDir,
+      outputDir: dirs.outputDir,
+      templateDir: dirs.templateDir,
+      port: opts.port,
+    },
+    plugins
+  )
     .then((devServer) => {
-      console.log(`Serving ${opts.outputDir} at http://localhost:${devServer.port}`);
+      console.log(`Serving ${dirs.outputDir} at http://localhost:${devServer.port}`);
       console.log('Watching content/ and templates/ for changes...');
     })
     .catch((error: unknown) => {
@@ -126,11 +174,20 @@ export function main(argv: string[]): number {
   }
 
   try {
-    const pages = buildSite({
-      contentDir: opts.contentDir,
-      outputDir: opts.outputDir,
-      templateDir: opts.templateDir,
-    });
+    const config = loadConfig();
+    const plugins = pluginsFromConfig(config);
+    const dirs = applyConfig(opts, config);
+    const pages = buildSite(
+      {
+        contentDir: dirs.contentDir,
+        outputDir: dirs.outputDir,
+        templateDir: dirs.templateDir,
+        defaultTemplate: config?.defaultTemplate,
+        defaultLayout: config?.defaultLayout,
+        config: config ?? undefined,
+      },
+      plugins
+    );
     console.log(`Built ${pages.length} page${pages.length === 1 ? '' : 's'} into ${opts.outputDir}`);
     return 0;
   } catch (error) {

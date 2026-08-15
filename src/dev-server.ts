@@ -1,16 +1,24 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
-import type { AddressInfo } from 'net';
 import chokidar, { FSWatcher } from 'chokidar';
 import { WebSocket, WebSocketServer } from 'ws';
 import { buildSite } from './generator';
+import { SsgEngine } from './engine';
+import { defaultPlugins } from './plugins';
+import { DevServerPlugin } from './plugins/dev-server-plugin';
+import type { Plugin, PluginFactory } from './plugins/types';
 
 export interface DevServerOptions {
   contentDir: string;
   outputDir: string;
   templateDir?: string;
   port?: number;
+  /**
+   * Optional rebuild routine used instead of the default full-site build.
+   * Return `true` when the rebuild succeeded so clients are reloaded.
+   */
+  rebuild?: () => boolean | Promise<boolean>;
 }
 
 export const RELOAD_PATH = '/__ssg_live_reload';
@@ -124,12 +132,14 @@ export class LiveReloadDevServer implements DevServer {
   port: number;
 
   private readonly options: DevServerOptions;
+  private readonly rebuildFn: () => boolean | Promise<boolean>;
   private readonly clients = new Set<WebSocket>();
   private rebuildTimer: NodeJS.Timeout | null = null;
 
   constructor(options: DevServerOptions) {
     this.options = options;
     this.port = options.port ?? 3000;
+    this.rebuildFn = options.rebuild ?? (() => this.defaultRebuild());
 
     this.server = http.createServer((req, res) => this.handleRequest(req, res));
     this.wss = new WebSocketServer({ server: this.server, path: RELOAD_PATH });
@@ -224,11 +234,14 @@ export class LiveReloadDevServer implements DevServer {
    */
   rebuild(): boolean {
     try {
-      buildSite({
-        contentDir: this.options.contentDir,
-        outputDir: this.options.outputDir,
-        templateDir: this.options.templateDir,
-      });
+      const result = this.rebuildFn();
+      if (result && typeof (result as Promise<boolean>).then === 'function') {
+        void (result as Promise<boolean>).then(() => this.reload());
+        return true;
+      }
+      if (result === false) {
+        return false;
+      }
       this.reload();
       return true;
     } catch (error) {
@@ -236,6 +249,19 @@ export class LiveReloadDevServer implements DevServer {
       console.error(`Rebuild failed: ${message}`);
       return false;
     }
+  }
+
+  /**
+   * Default rebuild routine: run the full site build, mirroring the behaviour
+   * of the `build` command. Used when no custom `rebuild` is configured.
+   */
+  private defaultRebuild(): boolean {
+    buildSite({
+      contentDir: this.options.contentDir,
+      outputDir: this.options.outputDir,
+      templateDir: this.options.templateDir,
+    });
+    return true;
   }
 
   /**
@@ -274,49 +300,29 @@ export class LiveReloadDevServer implements DevServer {
  * Start the dev server and wait until it is listening. Uses an ephemeral
  * port when `port` is 0. An initial build is performed so the output
  * directory is up to date before the server starts serving.
+ *
+ * The server is driven by the SSG engine's plugin pipeline: the built-in
+ * dev-server plugin starts the HTTP/WebSocket server and rebuilds the site
+ * through the markdown/template plugins on every change.
  */
-export function startDevServer(options: DevServerOptions): Promise<LiveReloadDevServer> {
-  return new Promise((resolve, reject) => {
-    const devServer = new LiveReloadDevServer(options);
-
-    let initialBuildError: unknown;
-    try {
-      buildSite({
-        contentDir: options.contentDir,
-        outputDir: options.outputDir,
-        templateDir: options.templateDir,
-      });
-    } catch (error) {
-      initialBuildError = error;
-    }
-
-    if (initialBuildError !== undefined) {
-      devServer.watcher.close().catch(() => undefined);
-      reject(initialBuildError);
-      return;
-    }
-
-    const listening = new Promise<void>((resolveListen, rejectListen) => {
-      devServer.server.once('error', rejectListen);
-      devServer.server.once('listening', () => {
-        devServer.server.removeListener('error', rejectListen);
-        const address = devServer.server.address() as AddressInfo | null;
-        if (address && typeof address === 'object') {
-          devServer.port = address.port;
-        }
-        resolveListen();
-      });
-      devServer.server.listen(devServer.port);
-    });
-    const watcherReady = new Promise<void>((resolveReady) => {
-      devServer.watcher.once('ready', () => resolveReady());
-    });
-
-    Promise.all([listening, watcherReady])
-      .then(() => resolve(devServer))
-      .catch((error) => {
-        devServer.watcher.close().catch(() => undefined);
-        reject(error);
-      });
-  });
+export function startDevServer(
+  options: DevServerOptions,
+  extraPlugins: Array<Plugin | PluginFactory> = []
+): Promise<LiveReloadDevServer> {
+  const engine = new SsgEngine(
+    {
+      contentDir: options.contentDir,
+      outputDir: options.outputDir,
+      templateDir: options.templateDir,
+      command: 'serve',
+    },
+    [...defaultPlugins('serve'), ...extraPlugins]
+  );
+  const devPlugin = engine.plugins.find(
+    (plugin): plugin is DevServerPlugin => plugin instanceof DevServerPlugin
+  );
+  if (!devPlugin) {
+    return Promise.reject(new Error('DevServerPlugin is required to start the dev server'));
+  }
+  return devPlugin.start(engine, options);
 }
