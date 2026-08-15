@@ -45,6 +45,16 @@ describe('parseArgs', () => {
     expect(parseArgs(['-h']).help).toBe(true);
   });
 
+  it('parses the serve command and --port', () => {
+    const options = parseArgs(['serve', '--port', '4321']);
+    expect(options.command).toBe('serve');
+    expect(options.port).toBe(4321);
+  });
+
+  it('uses the default port when --port is absent', () => {
+    expect(parseArgs(['serve']).port).toBe(3000);
+  });
+
   it('does not require the command for flags', () => {
     const options = parseArgs(['--content', 'x', '--output', 'y', '--templates', 'z']);
     expect(options.contentDir).toBe(path.resolve('x'));
@@ -121,7 +131,7 @@ describe('main', () => {
   });
 
   it('returns 1 for an unknown command', () => {
-    const code = main(['node', 'ssg', 'serve']);
+    const code = main(['node', 'ssg', 'deploy']);
     expect(code).toBe(1);
   });
 

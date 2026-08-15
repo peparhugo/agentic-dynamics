@@ -20,3 +20,11 @@ export {
   resolveTemplateName,
 } from './templates';
 export { buildSite, loadPages, listMarkdownFiles, readPage, slugify } from './site';
+export {
+  DEFAULT_PORT,
+  RELOAD_PATH,
+  REBUILD_DELAY_MS,
+  injectLiveReloadScript,
+  startDevServer,
+} from './serve';
+export type { DevServer, ServeOptions } from './serve';
