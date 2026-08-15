@@ -10,9 +10,10 @@ from datetime import datetime, timedelta
 from functools import wraps
 import sqlite3
 import os
+import sys
 import jwt
-from werkzeug.security import generate_password_hash, check_password_hash
 from celery_tasks import send_notification_email
+from repositories import UserRepository, TaskRepository
 
 app = Flask(__name__)
 
@@ -20,15 +21,19 @@ DATABASE = os.environ.get("DATABASE", "tasks.db")
 SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 VALID_STATUSES = {"pending", "done"}
 
+_app_module = sys.modules[__name__]
+user_repo = UserRepository(_app_module)
+task_repo = TaskRepository(_app_module)
 
-def get_db():
+
+def _get_db():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db():
-    with get_db() as conn:
+    with _get_db() as conn:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS users ("
             "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -54,7 +59,7 @@ def init_db():
 
 def migrate_tasks_add_owner():
     """Migrate existing tasks without owner_id to have owner_id = NULL."""
-    with get_db() as conn:
+    with _get_db() as conn:
         cursor = conn.execute("PRAGMA table_info(tasks)")
         columns = [row[1] for row in cursor.fetchall()]
         if "owner_id" not in columns:
@@ -64,7 +69,7 @@ def migrate_tasks_add_owner():
 
 def migrate_users_add_email():
     """Migrate existing users without email to have email = NULL."""
-    with get_db() as conn:
+    with _get_db() as conn:
         cursor = conn.execute("PRAGMA table_info(users)")
         columns = [row[1] for row in cursor.fetchall()]
         if "email" not in columns:
@@ -101,110 +106,6 @@ def token_required(f):
     return decorated
 
 
-def create_user(username: str, password: str, email: str | None = None) -> dict | None:
-    password_hash = generate_password_hash(password)
-    try:
-        with get_db() as conn:
-            cursor = conn.execute(
-                "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)",
-                (username, password_hash, email),
-            )
-            conn.commit()
-            return {"id": cursor.lastrowid, "username": username, "email": email}
-    except sqlite3.IntegrityError:
-        return None
-
-
-def verify_user(username: str, password: str) -> dict | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
-        ).fetchone()
-        if row and check_password_hash(row["password_hash"], password):
-            return {"id": row["id"], "username": row["username"], "email": row["email"]}
-    return None
-
-
-def create_task(title: str, owner_id: int) -> dict:
-    with get_db() as conn:
-        now = datetime.utcnow().isoformat()
-        cursor = conn.execute(
-            "INSERT INTO tasks (title, status, created_at, owner_id) VALUES (?, ?, ?, ?)",
-            (title, "pending", now, owner_id),
-        )
-        conn.commit()
-        return {
-            "id": cursor.lastrowid,
-            "title": title,
-            "status": "pending",
-            "created_at": now,
-            "owner_id": owner_id,
-        }
-
-
-def get_tasks(owner_id: int):
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
-            (owner_id,),
-        ).fetchall()
-        return [dict(r) for r in rows]
-
-
-def get_task(task_id: int, owner_id: int):
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
-            (task_id, owner_id),
-        ).fetchone()
-        return dict(row) if row else None
-
-
-def get_user_email(user_id: int) -> str | None:
-    with get_db() as conn:
-        row = conn.execute(
-            "SELECT email FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-        return row["email"] if row else None
-
-
-def update_task(task_id: int, owner_id: int, title: str | None = None, status: str | None = None):
-    task = get_task(task_id, owner_id)
-    if task is None:
-        return None
-
-    if status is not None and status not in VALID_STATUSES:
-        raise ValueError(f"Invalid status: {status}")
-
-    # Check if status is changing to 'done' to trigger notification
-    old_status = task.get("status")
-    should_notify = status is not None and status == "done" and old_status != "done"
-
-    with get_db() as conn:
-        updates = []
-        params = []
-        if title is not None:
-            updates.append("title = ?")
-            params.append(title)
-        if status is not None:
-            updates.append("status = ?")
-            params.append(status)
-        if updates:
-            params.append(task_id)
-            conn.execute(
-                f"UPDATE tasks SET {', '.join(updates)} WHERE id = ?", params
-            )
-            conn.commit()
-
-    updated_task = get_task(task_id, owner_id)
-
-    # Trigger email notification asynchronously
-    if should_notify:
-        user_email = get_user_email(owner_id)
-        if user_email:
-            send_notification_email.delay(user_email, task["title"])
-
-    return updated_task
 
 
 @app.route("/auth/register", methods=["POST"])
@@ -217,7 +118,7 @@ def register():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = create_user(username, password, email)
+    user = user_repo.create(username, password, email)
     if user is None:
         return jsonify({"error": "username already exists"}), 409
     return jsonify(user), 201
@@ -232,7 +133,7 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password are required"}), 400
 
-    user = verify_user(username, password)
+    user = user_repo.verify(username, password)
     if user is None:
         return jsonify({"error": "invalid username or password"}), 401
 
@@ -251,7 +152,7 @@ def login():
 @app.route("/tasks", methods=["GET"])
 @token_required
 def list_tasks(user_id):
-    return jsonify(get_tasks(user_id))
+    return jsonify(task_repo.get_all(user_id))
 
 
 @app.route("/tasks", methods=["POST"])
@@ -261,14 +162,14 @@ def add_task(user_id):
     title = data.get("title", "").strip()
     if not title:
         return jsonify({"error": "title is required"}), 400
-    task = create_task(title, user_id)
+    task = task_repo.create(title, user_id)
     return jsonify(task), 201
 
 
 @app.route("/tasks/<int:task_id>", methods=["GET"])
 @token_required
 def show_task(user_id, task_id: int):
-    task = get_task(task_id, user_id)
+    task = task_repo.get_by_id(task_id, user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
     return jsonify(task)
@@ -277,7 +178,7 @@ def show_task(user_id, task_id: int):
 @app.route("/tasks/<int:task_id>", methods=["PUT"])
 @token_required
 def edit_task(user_id, task_id: int):
-    task = get_task(task_id, user_id)
+    task = task_repo.get_by_id(task_id, user_id)
     if task is None:
         return jsonify({"error": "task not found"}), 404
 
@@ -286,12 +187,21 @@ def edit_task(user_id, task_id: int):
     if "status" in data and data["status"] not in VALID_STATUSES:
         return jsonify({"error": f"Invalid status: {data['status']}"}), 422
 
-    updated_task = update_task(
+    old_status = task.get("status")
+    should_notify = "status" in data and data["status"] == "done" and old_status != "done"
+
+    updated_task = task_repo.update(
         task_id,
         user_id,
         title=data.get("title"),
         status=data.get("status"),
     )
+
+    if should_notify:
+        user_email = user_repo.get_email(user_id)
+        if user_email:
+            send_notification_email.delay(user_email, task["title"])
+
     return jsonify(updated_task)
 
 
