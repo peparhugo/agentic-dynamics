@@ -1,4 +1,4 @@
-"""WebSocket notification server backed by Redis pub/sub and SQLite."""
+"""Pluggable-transport notification server backed by Redis and SQLite."""
 
 from __future__ import annotations
 
@@ -15,10 +15,7 @@ from http import HTTPStatus
 from typing import Any, Protocol
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from websockets.asyncio.server import Server, ServerConnection, serve
-from websockets.datastructures import Headers
-from websockets.exceptions import ConnectionClosed
-from websockets.http11 import Request, Response
+from transports import BaseTransport, WebSocketTransport, create_transport
 
 
 SUPPORTED_TYPES = {"broadcast", "direct", "system", "subscribe", "unsubscribe"}
@@ -302,37 +299,37 @@ class RedisBroker:
 
 
 class ClientRegistry:
-    """Track sockets and subscriptions local to one server worker."""
+    """Track clients and subscriptions local to one server worker."""
 
     def __init__(self) -> None:
-        self._clients: dict[str, ServerConnection] = {}
+        self._clients: set[str] = set()
         self._subscriptions: dict[str, set[str]] = {}
         self._lock = threading.RLock()
 
-    def add(self, client_id: str, connection: ServerConnection, channels: list[str]) -> None:
+    def add(self, client_id: str, channels: list[str]) -> None:
         with self._lock:
-            self._clients[client_id] = connection
+            self._clients.add(client_id)
             for channel in channels:
                 self._subscriptions.setdefault(channel, set()).add(client_id)
 
     def remove(self, client_id: str) -> None:
         with self._lock:
-            self._clients.pop(client_id, None)
+            self._clients.discard(client_id)
             for channel in list(self._subscriptions):
                 self._subscriptions[channel].discard(client_id)
                 if not self._subscriptions[channel]:
                     del self._subscriptions[channel]
 
-    def get(self, client_id: str) -> ServerConnection | None:
+    def contains(self, client_id: str) -> bool:
         with self._lock:
-            return self._clients.get(client_id)
+            return client_id in self._clients
 
-    def snapshot(self, channel: str | None = None) -> list[tuple[str, ServerConnection]]:
+    def snapshot(self, channel: str | None = None) -> list[str]:
         with self._lock:
             if channel is None:
-                return list(self._clients.items())
+                return list(self._clients)
             subscribers = self._subscriptions.get(channel, set())
-            return [(key, value) for key, value in self._clients.items() if key in subscribers]
+            return [client_id for client_id in self._clients if client_id in subscribers]
 
     def subscribe(self, client_id: str, channel: str) -> None:
         with self._lock:
@@ -357,7 +354,7 @@ class ClientRegistry:
 
 
 class NotificationServer:
-    """Manage WebSocket clients and route messages through a shared backbone."""
+    """Manage notification clients and route messages through a shared backbone."""
 
     def __init__(
         self,
@@ -366,6 +363,7 @@ class NotificationServer:
         *,
         redis_client: Any | None = None,
         database_url: str | None = None,
+        transport: BaseTransport | None = None,
     ) -> None:
         self.host = host
         self.port = port
@@ -387,7 +385,19 @@ class NotificationServer:
             self.state = RedisConnectionState(redis_client)
             self.broker = RedisBroker(redis_client)
         self._redis = redis_client
-        self._server: Server | None = None
+        self.transport = transport or self._transport_from_config(host, port)
+        self.transport.bind(self)
+        self._running = False
+
+    @staticmethod
+    def _transport_from_config(host: str, port: int) -> BaseTransport:
+        transport_name = os.getenv("TRANSPORT", "websocket").strip().lower()
+        return create_transport(transport_name, host, port)
+
+    @property
+    def _server(self) -> Any | None:
+        """Retain access to the underlying WebSocket server for compatibility."""
+        return getattr(self.transport, "_server", None)
 
     @property
     def connected_count(self) -> int:
@@ -395,31 +405,24 @@ class NotificationServer:
 
     @property
     def bound_port(self) -> int:
-        if self._server is None or not self._server.sockets:
-            raise RuntimeError("server is not running")
-        return int(self._server.sockets[0].getsockname()[1])
+        return self.transport.bound_port
 
     async def start(self) -> None:
-        if self._server is not None:
+        if self._running:
             raise RuntimeError("server is already running")
         await self.broker.start(self._deliver)
         try:
-            self._server = await serve(
-                self.handle_connection,
-                self.host,
-                self.port,
-                process_request=self.process_request,
-            )
+            await self.transport.start()
         except BaseException:
             await self.broker.close()
             raise
+        self._running = True
 
     async def stop(self) -> None:
-        if self._server is None:
+        if not self._running:
             return
-        self._server.close()
-        await self._server.wait_closed()
-        self._server = None
+        await self.transport.stop()
+        self._running = False
         await self.broker.close()
         self.messages.close()
         if self._owns_redis and self._redis is not None:
@@ -432,25 +435,24 @@ class NotificationServer:
     async def __aexit__(self, *args: object) -> None:
         await self.stop()
 
-    async def process_request(
-        self, connection: ServerConnection, request: Request
-    ) -> Response | None:
-        """Serve HTTP API requests without a second framework or port."""
-        del connection
-        parsed = urlsplit(request.path)
+    async def handle_http_request(
+        self, request_path: str
+    ) -> tuple[dict[str, Any], HTTPStatus] | None:
+        """Return an HTTP API payload for transports that support HTTP."""
+        parsed = urlsplit(request_path)
         path = parsed.path
         if path == "/health":
-            return self._json_response({"connected_clients": self.connected_count})
+            return {"connected_clients": self.connected_count}, HTTPStatus.OK
         if path == "/messages":
             try:
                 query = parse_qs(parsed.query, keep_blank_values=True)
                 limit = self._query_integer(query, "limit", 50)
                 offset = self._query_integer(query, "offset", 0)
             except ValueError as exc:
-                return self._json_response({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
-            return self._json_response({"messages": self.messages.list(limit, offset)})
+                return {"error": str(exc)}, HTTPStatus.BAD_REQUEST
+            return {"messages": self.messages.list(limit, offset)}, HTTPStatus.OK
         if path == "/channels":
-            return self._json_response({"channels": await self.state.channels()})
+            return {"channels": await self.state.channels()}, HTTPStatus.OK
 
         prefix = "/channels/"
         suffix = "/subscribers"
@@ -458,10 +460,23 @@ class NotificationServer:
             encoded_name = path[len(prefix) : -len(suffix)]
             if encoded_name and "/" not in encoded_name:
                 channel = unquote(encoded_name)
-                return self._json_response(
-                    {"channel": channel, "subscribers": await self.state.subscribers(channel)}
-                )
+                return {
+                    "channel": channel,
+                    "subscribers": await self.state.subscribers(channel),
+                }, HTTPStatus.OK
         return None
+
+    async def process_request(self, connection: Any, request: Any) -> Any | None:
+        """Compatibility hook for callers that previously hosted WebSockets directly."""
+        if not isinstance(self.transport, WebSocketTransport):
+            return None
+        return await self.transport._process_request(connection, request)
+
+    async def handle_connection(self, connection: Any) -> None:
+        """Compatibility hook that delegates a WebSocket to its transport."""
+        if not isinstance(self.transport, WebSocketTransport):
+            raise RuntimeError("selected transport cannot handle WebSocket connections")
+        await self.transport._handle_connection(connection)
 
     @staticmethod
     def _query_integer(query: dict[str, list[str]], name: str, default: int) -> int:
@@ -478,55 +493,30 @@ class NotificationServer:
             raise ValueError(f"{name} must be a non-negative integer")
         return value
 
-    @staticmethod
-    def _json_response(
-        payload: dict[str, Any], status: HTTPStatus = HTTPStatus.OK
-    ) -> Response:
-        body = json.dumps(payload).encode("utf-8")
-        headers = Headers(
-            {
-                "Content-Type": "application/json",
-                "Content-Length": str(len(body)),
-                "Connection": "close",
-            }
-        )
-        return Response(status, status.phrase, headers, body)
-
-    async def handle_connection(self, connection: ServerConnection) -> None:
-        query = parse_qs(urlsplit(connection.request.path).query)
-        requested_ids = query.get("client_id", [])
-        client_id = requested_ids[0] if len(requested_ids) == 1 and requested_ids[0] else str(uuid.uuid4())
+    async def transport_connected(self, client_id: str) -> dict[str, Any]:
         channels = await self.state.connect(client_id, self.server_id)
-        self.clients.add(client_id, connection, channels)
-        try:
-            await self._send(
-                connection,
-                message("system", {"event": "connected", "client_id": client_id}),
-            )
-            async for raw_message in connection:
-                await self.handle_message(client_id, raw_message)
-        except ConnectionClosed:
-            pass
-        finally:
-            self.clients.remove(client_id)
-            await self.state.disconnect(client_id)
+        self.clients.add(client_id, channels)
+        return message("system", {"event": "connected", "client_id": client_id})
+
+    async def transport_disconnected(self, client_id: str) -> None:
+        self.clients.remove(client_id)
+        await self.state.disconnect(client_id)
 
     async def handle_message(self, sender_id: str, raw_message: str | bytes) -> None:
-        connection = self.clients.get(sender_id)
-        if connection is None:
+        if not self.clients.contains(sender_id):
             return
         try:
             incoming = self._parse_message(raw_message)
         except ValueError as exc:
-            await self._send(connection, message("system", {"error": str(exc)}))
+            await self.transport.send_message(sender_id, message("system", {"error": str(exc)}))
             return
 
         message_type = incoming["type"]
         if message_type in {"subscribe", "unsubscribe"}:
             channel = incoming.get("channel", incoming["payload"].get("channel"))
             if not isinstance(channel, str) or not channel:
-                await self._send(
-                    connection, message("system", {"error": f"{message_type} requires channel"})
+                await self.transport.send_message(
+                    sender_id, message("system", {"error": f"{message_type} requires channel"})
                 )
                 return
             if message_type == "subscribe":
@@ -541,13 +531,13 @@ class NotificationServer:
         if message_type == "direct":
             target_id = incoming["payload"].get("client_id")
             if not isinstance(target_id, str) or not target_id:
-                await self._send(
-                    connection, message("system", {"error": "direct payload requires client_id"})
+                await self.transport.send_message(
+                    sender_id, message("system", {"error": "direct payload requires client_id"})
                 )
                 return
             if not await self.state.is_connected(target_id):
-                await self._send(
-                    connection,
+                await self.transport.send_message(
+                    sender_id,
                     message("system", {"error": "client not connected", "client_id": target_id}),
                 )
                 return
@@ -571,22 +561,14 @@ class NotificationServer:
         target_id = envelope.get("target_id")
         channel = envelope.get("channel")
         if target_id is not None:
-            target = self.clients.get(target_id)
-            clients = [] if target is None else [(target_id, target)]
+            clients = [target_id] if self.clients.contains(target_id) else []
             if channel is not None and not self.clients.is_subscribed(target_id, channel):
                 clients = []
         else:
             clients = self.clients.snapshot(channel)
         if not clients:
             return
-        results = await asyncio.gather(
-            *(self._send(connection, notification) for _, connection in clients),
-            return_exceptions=True,
-        )
-        for (client_id, _), result in zip(clients, results):
-            if isinstance(result, ConnectionClosed):
-                self.clients.remove(client_id)
-                await self.state.disconnect(client_id)
+        await self.transport.broadcast(notification, clients)
 
     @staticmethod
     def _parse_message(raw_message: str | bytes) -> dict[str, Any]:
@@ -611,16 +593,10 @@ class NotificationServer:
             raise ValueError("channel must be a non-empty string")
         return decoded
 
-    @staticmethod
-    async def _send(connection: ServerConnection, notification: dict[str, Any]) -> None:
-        await connection.send(json.dumps(notification, separators=(",", ":")))
-
-
 async def run(host: str, port: int) -> None:
     server = NotificationServer(host, port)
     await server.start()
-    assert server._server is not None
-    await server._server.serve_forever()
+    await server.transport.serve_forever()
 
 
 def main() -> None:
