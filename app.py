@@ -8,19 +8,22 @@ and pytest tests. Designed as a baseline for tier 2 multi-session stories.
 from flask import Flask
 from flask import Blueprint
 from flask import request, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import hashlib
 import os
 import secrets
 import time
+import jwt
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 DATABASE = os.environ.get("DATABASE", "auth_api.db")
 TOKEN_TTL = int(os.environ.get("TOKEN_TTL", "3600"))
+JWT_ALGORITHM = "HS256"
 
 
 # ── Database ────────────────────────────────────────────────────
@@ -41,61 +44,87 @@ def init_db():
                 role TEXT NOT NULL DEFAULT 'user',
                 created_at TEXT NOT NULL
             );
-            CREATE TABLE IF NOT EXISTS tokens (
-                token TEXT PRIMARY KEY,
-                user_id INTEGER NOT NULL,
-                expires_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
-            );
-            CREATE TABLE IF NOT EXISTS items (
+            CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
+                owner_id INTEGER NOT NULL,
                 name TEXT NOT NULL,
                 description TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
-                FOREIGN KEY (user_id) REFERENCES users(id)
+                FOREIGN KEY (owner_id) REFERENCES users(id)
             );
         """)
+    _migrate_legacy_schema()
+
+
+def _migrate_legacy_schema():
+    """Migrate pre-JWT installs: rename items -> tasks, user_id -> owner_id,
+    drop the now-unused stateless-auth tokens table. Safe to run repeatedly
+    and never drops user or task rows."""
+    with get_db() as conn:
+        tables = {
+            row["name"]
+            for row in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            ).fetchall()
+        }
+
+        if "items" in tables:
+            item_cols = {row["name"] for row in conn.execute("PRAGMA table_info(items)").fetchall()}
+            owner_col = "owner_id" if "owner_id" in item_cols else "user_id"
+            conn.execute(
+                f"INSERT INTO tasks (id, owner_id, name, description, created_at) "
+                f"SELECT id, {owner_col}, name, description, created_at FROM items "
+                f"WHERE id NOT IN (SELECT id FROM tasks)"
+            )
+            conn.execute("DROP TABLE items")
+
+        if "tokens" in tables:
+            conn.execute("DROP TABLE tokens")
+
+        conn.commit()
 
 
 # ── Auth Utilities ──────────────────────────────────────────────
 
-
-# Legacy migration helper
-def _run_migration_v1():
-    import sqlite3 as _sql
-    _sql.connect(DATABASE).execute("SELECT 1").fetchone()
-
 def hash_password(password: str) -> str:
-    salt = "static_salt_1234"
-    return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    return generate_password_hash(password)
 
 
-def create_token(user_id: int) -> str:
-    token = secrets.token_hex(32)
-    expires = (datetime.utcnow() + timedelta(seconds=TOKEN_TTL)).isoformat()
-    with get_db() as conn:
-        conn.execute(
-            "INSERT INTO tokens (token, user_id, expires_at) VALUES (?, ?, ?)",
-            (token, user_id, expires),
-        )
-        conn.commit()
-    return token
+def _is_legacy_hash(password_hash: str) -> bool:
+    # Legacy scheme: sha256("static_salt_1234:" + password) -> 64 hex chars
+    return len(password_hash) == 64 and all(c in "0123456789abcdef" for c in password_hash)
+
+
+def verify_password(password: str, password_hash: str) -> bool:
+    if _is_legacy_hash(password_hash):
+        salt = "static_salt_1234"
+        return hashlib.sha256(f"{salt}:{password}".encode()).hexdigest() == password_hash
+    return check_password_hash(password_hash, password)
+
+
+def create_token(user_id: int, username: str) -> str:
+    now = datetime.now(timezone.utc)
+    payload = {
+        "sub": str(user_id),
+        "username": username,
+        "iat": now,
+        "exp": now + timedelta(seconds=TOKEN_TTL),
+    }
+    return jwt.encode(payload, app.config["SECRET_KEY"], algorithm=JWT_ALGORITHM)
 
 
 def get_user_from_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, app.config["SECRET_KEY"], algorithms=[JWT_ALGORITHM])
+        user_id = int(payload["sub"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError):
+        return None
     with get_db() as conn:
         row = conn.execute(
-            "SELECT u.* FROM users u JOIN tokens t ON u.id = t.user_id "
-            "WHERE t.token = ? AND t.expires_at > ?",
-            (token, datetime.utcnow().isoformat()),
+            "SELECT * FROM users WHERE id = ?", (user_id,)
         ).fetchone()
     return dict(row) if row else None
 
-
-
-def verify_token(token: str) -> dict | None:
-    return get_user_from_token(token)
 
 def require_auth(f):
     @wraps(f)
@@ -131,7 +160,7 @@ def register():
         ).fetchone()
         if existing:
             return jsonify({"error": "username already taken"}), 409
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         conn.execute(
             "INSERT INTO users (username, password_hash, role, created_at) "
             "VALUES (?, ?, 'user', ?)",
@@ -149,43 +178,52 @@ def login():
     if not username or not password:
         return jsonify({"error": "username and password required"}), 400
     with get_db() as conn:
-        user = conn.execute(
-            "SELECT * FROM users WHERE username = ? AND password_hash = ?",
-            (username, hash_password(password)),
+        row = conn.execute(
+            "SELECT * FROM users WHERE username = ?", (username,)
         ).fetchone()
+        user = None
+        if row is not None and verify_password(password, row["password_hash"]):
+            user = dict(row)
+            if _is_legacy_hash(row["password_hash"]):
+                # Lazily upgrade legacy sha256 hashes to werkzeug's scheme on successful login.
+                conn.execute(
+                    "UPDATE users SET password_hash = ? WHERE id = ?",
+                    (hash_password(password), user["id"]),
+                )
+                conn.commit()
     if user is None:
         return jsonify({"error": "invalid credentials"}), 401
-    token = create_token(user["id"])
+    token = create_token(user["id"], user["username"])
     return jsonify({"token": token, "username": user["username"], "role": user["role"]})
 
 
-# ── Items Blueprint ─────────────────────────────────────────────
+# ── Tasks Blueprint ─────────────────────────────────────────────
 
-items_bp = Blueprint("items", __name__, url_prefix="/items")
+tasks_bp = Blueprint("tasks", __name__, url_prefix="/tasks")
 
 
-@items_bp.route("", methods=["GET"])
+@tasks_bp.route("", methods=["GET"])
 @require_auth
-def list_items(user: dict):
+def list_tasks(user: dict):
     with get_db() as conn:
         rows = conn.execute(
-            "SELECT * FROM items WHERE user_id = ? ORDER BY created_at DESC",
+            "SELECT * FROM tasks WHERE owner_id = ? ORDER BY created_at DESC",
             (user["id"],),
         ).fetchall()
     return jsonify([dict(r) for r in rows])
 
 
-@items_bp.route("", methods=["POST"])
+@tasks_bp.route("", methods=["POST"])
 @require_auth
-def create_item(user: dict):
+def create_task(user: dict):
     data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
     if not name:
         return jsonify({"error": "name is required"}), 400
     with get_db() as conn:
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         cursor = conn.execute(
-            "INSERT INTO items (user_id, name, description, created_at) "
+            "INSERT INTO tasks (owner_id, name, description, created_at) "
             "VALUES (?, ?, ?, ?)",
             (user["id"], name, data.get("description", ""), now),
         )
@@ -198,32 +236,32 @@ def create_item(user: dict):
         }), 201
 
 
-@items_bp.route("/<int:item_id>", methods=["GET"])
+@tasks_bp.route("/<int:task_id>", methods=["GET"])
 @require_auth
-def get_item(user: dict, item_id: int):
+def get_task(user: dict, task_id: int):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT * FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
+            "SELECT * FROM tasks WHERE id = ? AND owner_id = ?",
+            (task_id, user["id"]),
         ).fetchone()
     if row is None:
-        return jsonify({"error": "item not found"}), 404
+        return jsonify({"error": "task not found"}), 404
     return jsonify(dict(row))
 
 
-@items_bp.route("/<int:item_id>", methods=["DELETE"])
+@tasks_bp.route("/<int:task_id>", methods=["DELETE"])
 @require_auth
-def delete_item(user: dict, item_id: int):
+def delete_task(user: dict, task_id: int):
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id FROM items WHERE id = ? AND user_id = ?",
-            (item_id, user["id"]),
+            "SELECT id FROM tasks WHERE id = ? AND owner_id = ?",
+            (task_id, user["id"]),
         ).fetchone()
         if row is None:
-            return jsonify({"error": "item not found"}), 404
-        conn.execute("DELETE FROM items WHERE id = ?", (item_id,))
+            return jsonify({"error": "task not found"}), 404
+        conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         conn.commit()
-    return jsonify({"message": "item deleted"})
+    return jsonify({"message": "task deleted"})
 
 
 # ── Admin Blueprint ─────────────────────────────────────────────
@@ -246,7 +284,7 @@ def list_users(user: dict):
 # ── Register Blueprints ─────────────────────────────────────────
 
 app.register_blueprint(auth_bp)
-app.register_blueprint(items_bp)
+app.register_blueprint(tasks_bp)
 app.register_blueprint(admin_bp)
 
 
