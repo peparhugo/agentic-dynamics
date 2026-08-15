@@ -1,16 +1,21 @@
 """
-WebSocket-based notification server built on the `websockets` library.
+Notification server built on a pluggable transport layer.
 
-Features:
-- Accepts WebSocket connections from clients.
-- Assigns each client a unique ID on connect.
-- Broadcasts a message to ALL connected clients.
-- Sends direct messages to a specific client.
-- Supports named channels: clients subscribe/unsubscribe dynamically
-  and channel-scoped messages are delivered only to subscribers.
-- Handles client disconnect with clean removal from the registry.
-- REST endpoints: GET /health, GET /channels, GET /channels/{name}/subscribers,
-  GET /messages.
+The core ``NotificationServer`` implements all notification logic: client
+registry, channel subscriptions, message routing, persistence and the message
+backbone. All client I/O happens through a ``BaseTransport`` so different
+transport mechanisms (WebSocket, SSE, polling, raw TCP, ...) can be plugged in
+without touching the core.
+
+Transports:
+- ``WebSocketTransport`` (the default) accepts WebSocket connections via the
+  ``websockets`` library, assigns each client a unique ID on connect,
+  broadcasts messages to ALL connected clients, sends direct messages to a
+  specific client and supports named channels.
+
+The transport is selected with the ``TRANSPORT`` environment variable
+(default: ``websocket``). Transport classes register themselves through the
+``@register_transport`` decorator.
 
 Message distribution runs over a configurable message backbone (see
 `broker.py`):
@@ -44,10 +49,14 @@ construction.
 
 import asyncio
 import json
+import os
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
 from websockets.asyncio.server import ServerConnection, serve
+from websockets.exceptions import ConnectionClosed
 from websockets.http11 import Headers, Response
 
 from broker import (
@@ -72,12 +81,171 @@ def make_message(msg_type: str, payload: dict) -> dict:
     }
 
 
-class NotificationServer:
-    """Async WebSocket notification server with a Redis-backed message backbone."""
+# ── Transport layer ─────────────────────────────────────────────
 
-    def __init__(self, backbone: Broker | None = None, store: MessageStore | None = None) -> None:
-        # client_id -> ServerConnection for connections owned by THIS instance.
-        self._clients: dict[str, ServerConnection] = {}
+
+class BaseTransport(ABC):
+    """Abstract transport interface for client connections.
+
+    Concrete transports implement the mechanics of accepting connections and
+    exchanging messages (WebSocket, SSE, polling, raw TCP, ...). The core
+    ``NotificationServer`` talks to clients only through this interface, so a
+    new transport can be added without modifying the notification logic.
+    """
+
+    #: transport name used to select it via the ``TRANSPORT`` env var.
+    name = "base"
+
+    def __init__(self, server: "NotificationServer | None" = None) -> None:
+        self.server = server
+        # client_id -> connection handle owned by THIS instance.
+        self.connections: dict[str, Any] = {}
+
+    @abstractmethod
+    async def start(self, host: str, port: int) -> None:
+        """Begin accepting client connections."""
+
+    @abstractmethod
+    async def stop(self) -> None:
+        """Stop accepting connections and release resources."""
+
+    @abstractmethod
+    async def on_connect(self, connection) -> str:
+        """Register a freshly accepted connection; return its client_id."""
+
+    @abstractmethod
+    async def on_disconnect(self, client_id: str, connection) -> None:
+        """Tear down a connection that is closing."""
+
+    @abstractmethod
+    async def receive(self, connection) -> str | None:
+        """Wait for the next raw message, or None when the client disconnects."""
+
+    @abstractmethod
+    async def send_message(self, client_id: str, message: dict) -> None:
+        """Deliver a JSON-serialisable message to a single client."""
+
+    @abstractmethod
+    async def broadcast(self, targets: list[str], message: dict) -> None:
+        """Deliver a JSON-serialisable message to every listed client."""
+
+
+TRANSPORTS: dict[str, type[BaseTransport]] = {}
+
+
+def register_transport(cls: type[BaseTransport]) -> type[BaseTransport]:
+    """Register a transport class so it can be selected by name."""
+    TRANSPORTS[cls.name] = cls
+    for alias in getattr(cls, "aliases", ()):
+        TRANSPORTS[alias] = cls
+    return cls
+
+
+@register_transport
+class WebSocketTransport(BaseTransport):
+    """Transport backed by the ``websockets`` library (the default)."""
+
+    name = "websocket"
+    aliases = ("ws",)
+
+    async def start(self, host: str, port: int) -> None:
+        self.server._server = await serve(
+            self.server.handle_connection,
+            host,
+            port,
+            process_request=self._process_request,
+        )
+
+    async def stop(self) -> None:
+        self.server._server.close()
+        await self.server._server.wait_closed()
+
+    async def on_connect(self, connection: ServerConnection) -> str:
+        client_id = await self.server._new_client_id()
+        self.connections[client_id] = connection
+        return client_id
+
+    async def on_disconnect(
+        self, client_id: str, connection: ServerConnection
+    ) -> None:
+        self.connections.pop(client_id, None)
+        try:
+            await connection.close()
+        except Exception:
+            pass
+
+    async def receive(self, connection: ServerConnection) -> str | None:
+        try:
+            return await connection.recv()
+        except ConnectionClosed:
+            return None
+
+    async def send_message(self, client_id: str, message: dict) -> None:
+        connection = self.connections.get(client_id)
+        if connection is None:
+            raise ConnectionError(
+                f"no connection registered for client {client_id!r}"
+            )
+        await connection.send(json.dumps(message))
+
+    async def broadcast(self, targets: list[str], message: dict) -> None:
+        for client_id in targets:
+            try:
+                await self.send_message(client_id, message)
+            except Exception:
+                self.server._drop_client(client_id)
+
+    # ── HTTP (REST) handling ────────────────────────────────────
+
+    async def _process_request(self, connection, request) -> Response | None:
+        """Handle plain HTTP requests (e.g. GET /health) before WS upgrade."""
+        if request.headers.get("Upgrade", "").lower() == "websocket":
+            return None
+
+        split = urlsplit(request.path)
+        result = await self.server._rest_handler(
+            split.path, parse_qs(split.query)
+        )
+        if result is None:
+            return None
+        status, data = result
+        return self._json_response(status, data)
+
+    @staticmethod
+    def _json_response(status: int, data: dict) -> Response:
+        body = json.dumps(data).encode("utf-8")
+        headers = Headers(
+            {
+                "Content-Type": "application/json",
+                "Content-Length": str(len(body)),
+            }
+        )
+        return Response(status, "OK" if status == 200 else "Not Found", headers, body)
+
+
+def default_transport() -> BaseTransport:
+    """Build the transport selected by the ``TRANSPORT`` env var."""
+    name = (os.environ.get("TRANSPORT") or "").strip().lower() or "websocket"
+    try:
+        cls = TRANSPORTS[name]
+    except KeyError:
+        raise ValueError(f"unknown transport: {name!r}") from None
+    return cls()
+
+
+class NotificationServer:
+    """Async notification server with a pluggable transport layer."""
+
+    def __init__(
+        self,
+        backbone: Broker | None = None,
+        store: MessageStore | None = None,
+        transport: BaseTransport | None = None,
+    ) -> None:
+        self._transport = transport or default_transport()
+        self._transport.server = self
+        # client_id -> connection handle for connections owned by THIS instance.
+        self._clients = self._transport.connections
         # channel name -> set of client_ids subscribed to that channel (local mirror).
         self._local_channels: dict[str, set[str]] = {}
         # client_id -> set of channel names the client is subscribed to (local mirror).
@@ -88,6 +256,7 @@ class NotificationServer:
         self._store = store or MessageStore()
         self._consumer_task: asyncio.Task | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
+        self._server = None
 
     @property
     def client_count(self) -> int:
@@ -167,8 +336,11 @@ class NotificationServer:
 
     # ── Outbound send helpers ───────────────────────────────────
 
-    async def _send(self, connection: ServerConnection, message: dict) -> None:
-        await connection.send(json.dumps(message))
+    async def _new_client_id(self) -> str:
+        return await self._backbone.next_client_id()
+
+    async def _send(self, client_id: str, message: dict) -> None:
+        await self._transport.send_message(client_id, message)
 
     async def _record(self, message: dict, channel: str | None = None) -> None:
         """Persist a distributed message to the SQLite history store."""
@@ -179,29 +351,28 @@ class NotificationServer:
 
     async def _system(
         self,
-        connection: ServerConnection,
+        client_id: str,
         event: str,
         error: str | None = None,
     ) -> None:
-        """Send (and record) a system message to a single connection."""
+        """Send (and record) a system message to a single client."""
         payload = {"event": event}
         if error is not None:
             payload["error"] = error
         message = make_message("system", payload)
         await self._record(message)
-        await self._send(connection, message)
+        await self._send(client_id, message)
 
     async def _deliver_event(self, event: dict) -> None:
         """Deliver a backbone event to the clients this instance owns."""
         message = event.get("message") or {}
-        for client_id in event.get("targets") or []:
-            connection = self._clients.get(client_id)
-            if connection is None:
-                continue
-            try:
-                await self._send(connection, message)
-            except Exception:
-                self._drop_client(client_id)
+        targets = [
+            client_id
+            for client_id in (event.get("targets") or [])
+            if client_id in self._clients
+        ]
+        if targets:
+            await self._transport.broadcast(targets, message)
 
     async def broadcast(self, payload: dict, channel: str | None = None) -> int:
         """Send a 'broadcast' message to clients.
@@ -227,12 +398,11 @@ class NotificationServer:
 
     async def send_direct(self, client_id: str, payload: dict) -> bool:
         """Send a 'direct' message to a single client. Returns success."""
-        connection = self._clients.get(client_id)
         message = make_message("direct", payload)
         await self._record(message)
-        if connection is not None:
+        if client_id in self._clients:
             try:
-                await self._send(connection, message)
+                await self._send(client_id, message)
                 return True
             except Exception:
                 self._clients.pop(client_id, None)
@@ -247,104 +417,92 @@ class NotificationServer:
 
     # ── Connection lifecycle ────────────────────────────────────
 
-    async def handle_connection(self, websocket: ServerConnection) -> None:
+    async def handle_connection(self, connection) -> None:
         """Per-connection coroutine: register, welcome, serve, clean up."""
-        client_id = await self._backbone.next_client_id()
-        self._clients[client_id] = websocket
-        if self._backbone.remote_state:
-            await self._backbone.register_client(client_id)
+        client_id = await self._transport.on_connect(connection)
         try:
-            welcome = make_message(
-                "system", {"event": "connected", "client_id": client_id}
-            )
-            await self._record(welcome)
-            await self._send(websocket, welcome)
-            async for raw in websocket:
-                try:
-                    data = json.loads(raw)
-                except (json.JSONDecodeError, TypeError):
-                    await self._system(websocket, "error", error="invalid JSON message")
-                    continue
-                if not isinstance(data, dict) or data.get("type") not in SUPPORTED_TYPES:
-                    await self._system(websocket, "error", error="unsupported message")
-                    continue
-                payload = data.get("payload") or {}
-                msg_type = data["type"]
-                if msg_type == "broadcast":
-                    channel = data.get("channel") or payload.get("channel")
-                    await self.broadcast(payload, channel=channel)
-                elif msg_type == "subscribe":
-                    channel = data.get("channel") or payload.get("channel")
-                    if not channel:
-                        await self._system(websocket, "error", error="subscribe missing channel")
-                    else:
-                        self.subscribe(client_id, channel)
-                elif msg_type == "unsubscribe":
-                    channel = data.get("channel") or payload.get("channel")
-                    if not channel:
-                        await self._system(websocket, "error", error="unsubscribe missing channel")
-                    else:
-                        self.unsubscribe(client_id, channel)
-                elif msg_type == "direct":
-                    target = payload.get("target_id")
-                    if target is None:
-                        await self._system(
-                            websocket, "error", error="direct message missing target_id"
-                        )
-                    elif not await self.send_direct(target, payload):
-                        await self._system(
-                            websocket, "error", error=f"unknown client {target!r}"
-                        )
+            await self._on_connected(client_id)
+            while True:
+                raw = await self._transport.receive(connection)
+                if raw is None:
+                    break
+                await self.handle_incoming(client_id, raw)
         finally:
             # Clean removal regardless of how the connection ended.
+            await self._transport.on_disconnect(client_id, connection)
             self._drop_client(client_id)
+
+    async def _on_connected(self, client_id: str) -> None:
+        """Run the connect-time logic for a freshly registered client."""
+        if self._backbone.remote_state:
+            await self._backbone.register_client(client_id)
+        welcome = make_message(
+            "system", {"event": "connected", "client_id": client_id}
+        )
+        await self._record(welcome)
+        await self._send(client_id, welcome)
+
+    async def handle_incoming(self, client_id: str, raw) -> None:
+        """Route a raw client message through the core notification logic."""
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            await self._system(client_id, "error", error="invalid JSON message")
+            return
+        if not isinstance(data, dict) or data.get("type") not in SUPPORTED_TYPES:
+            await self._system(client_id, "error", error="unsupported message")
+            return
+        payload = data.get("payload") or {}
+        msg_type = data["type"]
+        if msg_type == "broadcast":
+            channel = data.get("channel") or payload.get("channel")
+            await self.broadcast(payload, channel=channel)
+        elif msg_type == "subscribe":
+            channel = data.get("channel") or payload.get("channel")
+            if not channel:
+                await self._system(client_id, "error", error="subscribe missing channel")
+            else:
+                self.subscribe(client_id, channel)
+        elif msg_type == "unsubscribe":
+            channel = data.get("channel") or payload.get("channel")
+            if not channel:
+                await self._system(client_id, "error", error="unsubscribe missing channel")
+            else:
+                self.unsubscribe(client_id, channel)
+        elif msg_type == "direct":
+            target = payload.get("target_id")
+            if target is None:
+                await self._system(
+                    client_id, "error", error="direct message missing target_id"
+                )
+            elif not await self.send_direct(target, payload):
+                await self._system(
+                    client_id, "error", error=f"unknown client {target!r}"
+                )
 
     # ── HTTP (REST) handling ────────────────────────────────────
 
-    def _json_response(self, status: int, data: dict) -> Response:
-        body = json.dumps(data).encode("utf-8")
-        headers = Headers(
-            {
-                "Content-Type": "application/json",
-                "Content-Length": str(len(body)),
-            }
-        )
-        return Response(status, "OK" if status == 200 else "Not Found", headers, body)
-
-    async def process_request(self, connection: ServerConnection, request) -> Response | None:
-        """Handle plain HTTP requests (e.g. GET /health) before WS upgrade."""
-        if request.headers.get("Upgrade", "").lower() == "websocket":
-            return None
-
-        split = urlsplit(request.path)
-        path = split.path
+    async def _rest_handler(self, path: str, query: dict) -> tuple[int, dict] | None:
+        """Resolve a REST path to a ``(status, json_body)`` pair, if handled."""
         if path == "/health":
-            return self._json_response(
-                200, {"clients": self.client_count, "status": "ok"}
-            )
+            return 200, {"clients": self.client_count, "status": "ok"}
         if path == "/channels":
-            return self._json_response(
-                200, {"channels": self.channels_info()}
-            )
+            return 200, {"channels": self.channels_info()}
         if path.startswith("/channels/") and path.endswith("/subscribers"):
             name = path[len("/channels/"):-len("/subscribers")]
-            return self._json_response(
-                200,
-                {"channel": name, "subscribers": self.channel_subscribers(name)},
-            )
+            return 200, {
+                "channel": name,
+                "subscribers": self.channel_subscribers(name),
+            }
         if path == "/messages":
-            query = parse_qs(split.query)
             limit = self._int_query(query, "limit", 50)
             offset = self._int_query(query, "offset", 0)
             messages = await self._store.list(limit, offset)
-            return self._json_response(
-                200,
-                {
-                    "messages": messages,
-                    "limit": limit,
-                    "offset": offset,
-                },
-            )
+            return 200, {
+                "messages": messages,
+                "limit": limit,
+                "offset": offset,
+            }
         return None
 
     @staticmethod
@@ -374,12 +532,7 @@ class NotificationServer:
             self._consumer_task = asyncio.create_task(
                 self._backbone.consume(self._deliver_event)
             )
-        self._server = await serve(
-            self.handle_connection,
-            host,
-            port,
-            process_request=self.process_request,
-        )
+        await self._transport.start(host, port)
 
     async def stop(self) -> None:
         self._clients.clear()
@@ -390,10 +543,9 @@ class NotificationServer:
             except (asyncio.CancelledError, Exception):
                 pass
             self._consumer_task = None
+        await self._transport.stop()
         await self._backbone.close()
         await self._store.close()
-        self._server.close()
-        await self._server.wait_closed()
 
 
 async def run_server(host: str = "localhost", port: int = 8765) -> None:
