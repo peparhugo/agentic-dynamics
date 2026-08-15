@@ -100,19 +100,28 @@ def test_record_authority_measured_and_evidence_class_m():
 
 
 def test_ids_stable_across_call_sites():
-    # Two independent derivations of the same entry converge on one identity pair.
-    # content_hash now covers the durable artifact (which includes the observation
-    # timestamp), so pin `now` to make the derivation deterministic.
-    from datetime import datetime, timezone
-
-    pinned = datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc)
-    a = build_record(_entry(), now=pinned)
-    b = build_record(_entry(), now=pinned)
+    # Two independent derivations of the same entry converge on one identity pair — even
+    # with *different* wall-clock times, because content_hash covers only the entry's stable
+    # content (the volatile timestamps are blanked out of the artifact). No `now` pin needed.
+    a = build_record(_entry())
+    b = build_record(_entry())
     assert a.entity_id == b.entity_id
     assert a.knowledge_id == b.knowledge_id
     # And they are real sha256 digests.
     assert len(a.entity_id) == 64
     assert len(a.knowledge_id) == 64
+
+
+def test_ids_stable_across_runs_with_different_timestamps():
+    # The idempotence contract: the *same entry* derived at two different times yields the
+    # same knowledge_id (so a re-run's checkpoint HGET finds it and skips it).
+    from datetime import datetime, timezone
+
+    t1 = build_record(_entry(), now=datetime(2026, 8, 15, 12, 0, 0, tzinfo=timezone.utc))
+    t2 = build_record(_entry(), now=datetime(2026, 8, 16, 9, 30, 0, tzinfo=timezone.utc))
+    assert t1.valid_from != t2.valid_from  # timestamps DO differ ...
+    assert t1.content_hash == t2.content_hash  # ... but the artifact hash does not ...
+    assert t1.knowledge_id == t2.knowledge_id  # ... so the idempotence key is stable.
 
 
 def test_entity_id_uses_repository_source_and_locator():
@@ -125,9 +134,9 @@ def test_content_hash_is_artifact_hash():
     record = build_record(_entry())
     # content_hash is the sha256 of the durable per-record artifact — not of the finding text.
     assert record.content_hash == hashlib.sha256(record_to_artifact(record)).hexdigest()
-    # The artifact serialization excludes the two derived ids so the hash is not
-    # self-referential: re-serializing the *final* record (with its real ids) still hashes
-    # to the same bytes.
+    # The artifact serialization blanks the derived ids AND the volatile timestamps, so the
+    # hash is neither self-referential nor time-dependent: re-serializing the *final* record
+    # (with its real ids/timestamps) still hashes to the same bytes.
     assert record_to_artifact(record) == record_to_artifact(
         KnowledgeRecord.from_dict(record.to_dict())
     )
@@ -208,18 +217,26 @@ def test_non_finite_signals_coerce_to_none():
 
 def test_structured_signals_round_trip_to_dict_from_dict_and_artifact():
     record = build_record(_entry(confidence=0.82, perturbation_strength=0.5))
-    # to_dict / from_dict round-trips the two new fields.
+    # to_dict / from_dict round-trips the two new fields (a full, lossless round-trip).
     restored = KnowledgeRecord.from_dict(record.to_dict())
     assert restored.confidence == 0.82
     assert restored.perturbation_strength == 0.5
     assert restored == record
-    # The durable artifact carries them too, so extract_record reconstructs them.
+    # The durable artifact carries the stable content; extract_record reattaches the derived
+    # ids (from the event) and reconstructs the timestamps (transport metadata). The content,
+    # identity, and measured signals survive; only the observation/indexing timestamps differ
+    # (indexed_at is stamped at consumer time by design).
     event = record_to_event(record)
     artifact = record_to_artifact(record)
     extracted = extract_record(event, artifact)
     assert extracted.confidence == 0.82
     assert extracted.perturbation_strength == 0.5
-    assert extracted == record
+    assert extracted.authority is Authority.MEASURED
+    assert extracted.knowledge_id == record.knowledge_id
+    assert extracted.content_hash == record.content_hash
+    assert extracted.text == record.text
+    assert extracted.valid_from == event.occurred_at
+    assert extracted.observed_at == event.occurred_at
 
 
 def test_absent_signals_round_trip_stay_none_through_artifact():
@@ -416,10 +433,12 @@ def test_plan_emissions_known_ids_seed_the_dedupe():
 
 
 def test_kb_produce_dry_run_smoke(tmp_path):
-    """``--dry-run`` reports the would-emit count and samples without touching Redis.
+    """``--dry-run`` reports the would-emit count and samples without *requiring* Redis.
 
-    A bogus ``FINOPS_REDIS_PORT`` proves the dry-run path never connects: a connection
-    attempt would raise (fail fast) and produce a non-zero exit.
+    The preview reads the checkpoint idempotence hash best-effort; a bogus
+    ``FINOPS_REDIS_PORT`` makes that read fail, and the preview degrades to the raw derived
+    count (2 valid entries here) instead of raising — proving ``--dry-run`` is side-effect-free
+    and still works with the stream down.
     """
     results = tmp_path / "_results_summary.json"
     results.write_text(json.dumps({

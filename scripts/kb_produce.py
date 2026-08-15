@@ -86,6 +86,17 @@ def plan_emissions(
     return plan
 
 
+def load_checkpoint_ids(r) -> set[str]:
+    """Return the set of already-checkpointed ``knowledge_id``s (the idempotence keys).
+
+    The checkpoint hash's field names ARE the ``knowledge_id``s the producer has already
+    emitted (every emit does ``HSET knowledge_id -> indexed_at``). Reading them lets the
+    dry-run preview report the *honest* would-emit count — derived minus already-seen —
+    instead of the raw derived count, so a second ``--dry-run`` after a live run reports 0.
+    """
+    return set(r.hkeys(ks.CHECKPOINT_KEY))
+
+
 def emit_records(r, records: list[ki.KnowledgeRecord]) -> tuple[int, int]:
     """Publish one pointer event per record, skipping ids already checkpointed.
 
@@ -143,14 +154,24 @@ def main(argv: list[str] | None = None) -> None:
     #    describe, so each finding describes the *same* measured row.
     entries = load_results(Path(args.results))
     records = ki.derive_records(entries, repository_id=args.repository_id)
-    plan = plan_emissions(records, limit=args.limit)
 
-    # 2. Preview — dry-run reports the count and a few samples, never touching Redis.
+    # 2. Preview — dry-run reports the honest would-emit count: derived minus already
+    #    checkpointed. The checkpoint read is best-effort so a preview never *requires* the
+    #    stream — a downed Redis degrades to the raw derived count rather than failing.
+    known_ids: set[str] = set()
+    if args.dry_run:
+        try:
+            known_ids = load_checkpoint_ids(ks.connect(host=REDIS_HOST, port=REDIS_PORT))
+        except Exception:
+            known_ids = set()
+
+    plan = plan_emissions(records, limit=args.limit, known_ids=known_ids)
+
     if args.dry_run:
         log(
             f"dry-run: would emit {len(plan)} record(s) "
-            f"(from {len(entries)} entries, repository-id={args.repository_id!r}, "
-            f"limit={args.limit or 'none'})"
+            f"(from {len(entries)} entries, {len(known_ids)} already checkpointed, "
+            f"repository-id={args.repository_id!r}, limit={args.limit or 'none'})"
         )
         for record in plan[:SAMPLE_COUNT]:
             log(f"  {record.knowledge_id[:12]}  {record.logical_locator:16}  {record.text}")

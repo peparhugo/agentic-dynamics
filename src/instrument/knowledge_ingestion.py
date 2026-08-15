@@ -208,16 +208,26 @@ def record_to_artifact(record: KnowledgeRecord) -> bytes:
     """Serialize ``record`` to its durable per-record artifact bytes.
 
     This is the JSON serialization of ``record.to_dict()`` with stable (sorted) key ordering.
-    The two *derived* identities — ``knowledge_id`` and ``content_hash`` — are written as
-    empty strings so the artifact bytes are **hash-independent**: ``content_hash`` is
-    ``sha256(artifact)`` (must not be self-referential) and ``knowledge_id`` folds
-    ``content_hash`` (so it too cannot be hashed back in). The real values travel in the
-    pointer event and are reattached by :func:`extract_record`; every other field survives
-    the round trip byte-for-byte.
+    Five *non-content* fields are blanked so the artifact is a pure function of the **stable**
+    finding content, and ``content_hash = sha256(artifact)`` is therefore reproducible:
+
+    * ``knowledge_id`` / ``content_hash`` — the two derived identities. Blanking them avoids
+      a self-referential hash (``content_hash`` covers the artifact; ``knowledge_id`` folds
+      ``content_hash``).
+    * ``valid_from`` / ``observed_at`` / ``indexed_at`` — the volatile observation/indexing
+      timestamps (producer wall-clock). Excluding them makes ``content_hash`` — and thus
+      ``knowledge_id`` — **stable across re-derivations**, which is exactly what makes the
+      producer idempotent: the same entry always yields the same id, so a re-run skips it.
+
+    The real values travel in the pointer event (ids) or are reconstructed from it
+    (timestamps) by :func:`extract_record`; every *stable* field survives the round trip.
     """
     data = record.to_dict()
     data["knowledge_id"] = ""
     data["content_hash"] = ""
+    data["valid_from"] = ""
+    data["observed_at"] = ""
+    data["indexed_at"] = ""
     return json.dumps(data, sort_keys=True).encode("utf-8")
 
 
@@ -276,8 +286,11 @@ def build_record(
     # Identity: entity_id is the stable logical identity (aggregate origin + locator). The
     # record is built with placeholder derived ids, then the durable artifact is serialized
     # and hashed, and only then are content_hash (sha256 of the artifact) and knowledge_id
-    # (which folds content_hash) back-filled. Ordering matters: both derived ids must not be
-    # part of the bytes that content_hash covers, or the hash would be self-referential.
+    # (which folds content_hash) back-filled. Ordering matters: the derived ids AND the
+    # volatile timestamps must not be part of the bytes content_hash covers — the ids would
+    # make the hash self-referential, and the timestamps would make it re-derivation-dependent
+    # (breaking producer idempotence). record_to_artifact blanks all five, so content_hash is a
+    # pure function of the entry's stable content.
     entity_id = compute_entity_id(repository_id, SOURCE_URI, run_id)
 
     record = KnowledgeRecord(
@@ -359,10 +372,12 @@ def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRec
     This is the domain-specific extractor for the measured-result path — it supersedes
     ``knowledge_stream.default_extract`` for producer-emitted events and is wired in as the
     ``extractor`` arg of ``process_entry`` (see ``scripts/kb_worker.py``). The artifact is the
-    JSON from :func:`record_to_artifact`, which serializes the two derived identities
-    (``knowledge_id`` and ``content_hash``) as empty strings so the artifact bytes are
-    hash-independent. Their real values travel in the pointer event and are reattached here;
-    every other field — including ``authority=MEASURED`` and the structured ledger signals
+    JSON from :func:`record_to_artifact`, which blanked the two derived identities
+    (``knowledge_id`` and ``content_hash``) and the three volatile timestamps (``valid_from``,
+    ``observed_at``, ``indexed_at``). The ids are reattached from the pointer event; the
+    timestamps are reconstructed from the event's ``occurred_at`` (producer wall-clock) and the
+    consumer clock (``indexed_at``) — mirroring ``default_extract``'s convention. Every stable
+    field — including ``authority=MEASURED`` and the structured ledger signals
     ``confidence``/``perturbation_strength``/``test_executed_success`` — is restored via
     ``KnowledgeRecord.from_dict`` (those three are measured-or-``None``, never a fabricated 0.0).
     """
@@ -372,6 +387,9 @@ def extract_record(event: KnowledgeEvent, artifact_bytes: bytes) -> KnowledgeRec
         record,
         knowledge_id=event.knowledge_id,
         content_hash=event.content_hash,
+        valid_from=event.occurred_at,
+        observed_at=event.occurred_at,
+        indexed_at=_now_iso(),
     )
 
 
