@@ -10,7 +10,7 @@ from app import NotificationServer
 
 @pytest.fixture
 async def notification_server():
-    server = NotificationServer()
+    server = NotificationServer(redis_url="memory://")
     async with serve(server.handler, "127.0.0.1", 0, process_request=server.health_response) as listener:
         port = listener.sockets[0].getsockname()[1]
         yield server, f"ws://127.0.0.1:{port}"
@@ -135,3 +135,42 @@ async def test_unsubscribe_stops_channel_delivery_and_channels_endpoints(notific
         assert (await receive_json(first))["payload"]["text"] == "warning"
         with pytest.raises(asyncio.TimeoutError):
             await asyncio.wait_for(second.recv(), timeout=0.05)
+
+
+async def test_pubsub_delivers_channel_messages_between_server_instances():
+    first_server = NotificationServer(redis_url="memory://")
+    second_server = NotificationServer(redis_url="memory://")
+    async with serve(first_server.handler, "127.0.0.1", 0) as first_listener, serve(
+        second_server.handler, "127.0.0.1", 0
+    ) as second_listener:
+        first_port = first_listener.sockets[0].getsockname()[1]
+        second_port = second_listener.sockets[0].getsockname()[1]
+        async with connect(f"ws://127.0.0.1:{first_port}") as subscriber, connect(
+            f"ws://127.0.0.1:{second_port}"
+        ) as publisher:
+            await asyncio.gather(receive_json(subscriber), receive_json(publisher))
+            await subscriber.send(json.dumps({"type": "subscribe", "payload": {"channel": "shared"}}))
+            await wait_for_channel_subscriber_count(first_server, "shared", 1)
+            await publisher.send(
+                json.dumps({"type": "broadcast", "channel": "shared", "payload": {"text": "across servers"}})
+            )
+            assert (await receive_json(subscriber))["payload"] == {"text": "across servers"}
+
+
+async def test_messages_endpoint_returns_sqlite_history(tmp_path):
+    database = tmp_path / "messages.db"
+    server = NotificationServer(redis_url="memory://", database_url=str(database))
+    async with serve(server.handler, "127.0.0.1", 0, process_request=server.health_response) as listener:
+        port = listener.sockets[0].getsockname()[1]
+        uri = f"ws://127.0.0.1:{port}"
+        async with connect(uri) as client:
+            await receive_json(client)
+            await client.send(json.dumps({"type": "broadcast", "payload": {"text": "saved"}}))
+            await receive_json(client)
+
+        response = await get_json(uri, "/messages?limit=1&offset=0")
+
+    history = json.loads(response.split(b"\r\n\r\n", 1)[1])
+    assert history["messages"][0]["type"] == "broadcast"
+    assert history["messages"][0]["payload"] == {"text": "saved"}
+    assert history["messages"][0]["channel"] is None
