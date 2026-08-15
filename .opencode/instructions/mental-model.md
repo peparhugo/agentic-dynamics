@@ -195,7 +195,12 @@ connect(), publish_event(), process_entry(), reconcile_missing()
 EXTRACTOR_VERSION = "measured-finding/v1"
 derive_records(entries, *, repository_id=REPOSITORY_ID) -> list[KnowledgeRecord]
 build_record(entry, *, repository_id=REPOSITORY_ID, now=None) -> KnowledgeRecord
+record_to_artifact(record) -> bytes          # durable per-record JSON (stable content; ids+timestamps blanked)
 record_to_event(record, *, now=None) -> KnowledgeEvent
+  # POINTER contract: source_uri = file://experiments/results/kb/<knowledge_id>.json,
+  #   content_hash = sha256(record_to_artifact(record)); event_id = knowledge_id (tracing, not the key)
+extract_record(event, artifact_bytes) -> KnowledgeRecord
+  # measured-result extractor — supersedes default_extract; wired in kb_worker.py
 
 # workflow_runner.py — the rag_augment seam (default OFF)
 run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=None,
@@ -205,7 +210,8 @@ run_workflow(spec, *, goal, model, workdir, ..., rag_augment=None, retrieve_fn=N
 route_step ──▶ retrieve ──▶ construct ──▶ render ──▶ run_agent
 
 # producer data flow (batch ingestion): measured result ──▶ derive_records ──▶
-#   record_to_event ──▶ KnowledgeEvent ──▶ publish_event ──▶ stream ──▶ consumers
+#   record_to_artifact (write kb/<id>.json) ──▶ record_to_event ──▶ publish_event ──▶
+#   stream ──▶ process_entry (read → verify sha256(artifact) → extract_record → upsert)
 ```
 
 ### Ledger (the data model rules consume) — schema WRITTEN; the four formerly-missing fields are now MEASURED
