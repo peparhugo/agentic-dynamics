@@ -1,4 +1,5 @@
 export { build } from './build';
+export type { BuildInput } from './build';
 export { serve, injectLiveReload, liveReloadScript } from './serve';
 export type { ServeOptions, DevServer } from './serve';
 export { parseFrontmatter, normalizeTags } from './frontmatter';
@@ -8,3 +9,12 @@ export { TemplateEngine } from './templates';
 export type { TemplateContext } from './templates';
 export type { Frontmatter, ParsedMarkdown } from './frontmatter';
 export type { BuildOptions, Page } from './types';
+export type { Plugin, PluginContext } from './plugin';
+export { isPlugin } from './plugin';
+export type { SsgConfig } from './config';
+export { defineConfig, loadConfig } from './config';
+export { SsgEngine } from './engine';
+export type { EngineOptions } from './engine';
+export { MarkdownPlugin } from './plugins/markdown';
+export { TemplatePlugin } from './plugins/template';
+export { DevServerPlugin } from './plugins/devServer';

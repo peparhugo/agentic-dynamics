@@ -1,86 +1,33 @@
-import { promises as fs } from 'fs';
 import path from 'path';
-import { parseFrontmatter, normalizeTags } from './frontmatter';
-import { markdownToHtml } from './markdown';
-import { renderIndex, renderPage } from './render';
-import { TemplateEngine } from './templates';
 import type { BuildOptions, Page } from './types';
+import type { Plugin } from './plugin';
+import type { SsgConfig } from './config';
+import { loadConfig, loadConfigFile, resolvePlugins } from './config';
+import { SsgEngine } from './engine';
 
-const MARKDOWN_EXT = /\.(md|markdown)$/i;
-
-async function findMarkdownFiles(dir: string): Promise<string[]> {
-  const results: string[] = [];
-  let entries;
-  try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
-    return results;
-  }
-
-  for (const entry of entries) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...(await findMarkdownFiles(full)));
-    } else if (entry.isFile() && MARKDOWN_EXT.test(entry.name)) {
-      results.push(full);
-    }
-  }
-  return results;
+export interface BuildInput extends BuildOptions {
+  plugins?: Plugin[];
 }
 
-function slugFor(contentDir: string, filePath: string): string {
-  const relative = path.relative(contentDir, filePath);
-  const withoutExt = relative.replace(MARKDOWN_EXT, '');
-  return withoutExt.split(path.sep).join('/');
+async function resolveBuildConfig(
+  options: BuildInput
+): Promise<{ config: SsgConfig; baseDir: string }> {
+  if (options.config === false) {
+    return { config: {}, baseDir: process.cwd() };
+  }
+  if (typeof options.config === 'string') {
+    const filePath = path.resolve(options.config);
+    return { config: await loadConfigFile(filePath), baseDir: path.dirname(filePath) };
+  }
+  const cwd = process.cwd();
+  return { config: await loadConfig(cwd), baseDir: cwd };
 }
 
-function titleFor(slug: string, data: { title?: string }): string {
-  if (data.title && data.title.trim()) {
-    return data.title.trim();
-  }
-  const segments = slug.split('/').filter(Boolean);
-  return segments[segments.length - 1] ?? slug;
-}
+export async function build(options: BuildInput): Promise<Page[]> {
+  const { config, baseDir } = await resolveBuildConfig(options);
+  const configPlugins = await resolvePlugins(config.plugins, baseDir);
+  const plugins = [...configPlugins, ...(options.plugins ?? [])];
 
-export async function build(options: BuildOptions): Promise<Page[]> {
-  const contentDir = path.resolve(options.content);
-  const outputDir = path.resolve(options.output);
-  const templatesDir = options.templates ?? './templates';
-
-  const engine = new TemplateEngine(templatesDir);
-  await engine.load();
-
-  const files = (await findMarkdownFiles(contentDir)).sort();
-
-  const pages: Page[] = [];
-  for (const file of files) {
-    const raw = await fs.readFile(file, 'utf8');
-    const { data, body } = parseFrontmatter(raw);
-    const contentHtml = markdownToHtml(body);
-    const slug = slugFor(contentDir, file);
-
-    pages.push({
-      slug,
-      title: titleFor(slug, data),
-      date: data.date,
-      tags: normalizeTags(data.tags),
-      contentHtml,
-      sourcePath: file,
-      outputPath: path.join(outputDir, `${slug}.html`),
-      template: data.template,
-      layout: data.layout,
-      data,
-    });
-  }
-
-  await fs.mkdir(outputDir, { recursive: true });
-
-  for (const page of pages) {
-    await fs.mkdir(path.dirname(page.outputPath), { recursive: true });
-    await fs.writeFile(page.outputPath, renderPage(page, engine), 'utf8');
-  }
-
-  await fs.writeFile(path.join(outputDir, 'index.html'), renderIndex(pages, engine), 'utf8');
-
-  return pages;
+  const engine = new SsgEngine(options, config, plugins);
+  return engine.run();
 }

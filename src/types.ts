@@ -11,10 +11,13 @@ export interface Page {
   template?: string;
   layout?: string;
   data: Frontmatter;
+  content?: string;
+  html?: string;
 }
 
 export interface BuildOptions {
   content: string;
   output: string;
   templates?: string;
+  config?: string | false;
 }
