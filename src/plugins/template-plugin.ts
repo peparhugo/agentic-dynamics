@@ -1,0 +1,1 @@
+export { TemplatePlugin } from './template';
