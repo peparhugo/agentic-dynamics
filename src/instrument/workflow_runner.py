@@ -17,6 +17,7 @@ later phases read them from the repo. Fails fast by default (``stop_on_error``).
 
 from __future__ import annotations
 
+import functools
 import hashlib
 import os
 import re
@@ -329,10 +330,43 @@ def _augment_prompt(
 
 
 def _default_retrieve_fn() -> Callable[..., Any]:
-    """Lazily resolve the real ``retrieve`` (graceful no-RAG when no stores are wired)."""
+    """Lazily construct the dense + graph stores and bind them to ``retrieve``.
+
+    Called only on the ``rag_augment`` path (never at import time), so the optional
+    deps (chromadb / neo4j) stay optional and core startup never constructs a store.
+    Each store is built independently and bound via ``functools.partial``; a store
+    that cannot be constructed (missing optional dep or unreachable client) is bound
+    as ``None`` so :func:`retrieve` marks that leg down. A store that constructs but
+    is unreachable at query time is handled by ``retrieve``'s existing per-leg
+    try/except — augmentation never blocks the phase.
+
+    Endpoint conventions: ``ChromaStore`` reads ``CHROMA_HOST``/``CHROMA_PORT``;
+    ``Neo4jClient`` uses its own URI/auth constructor defaults (env-overridable per
+    ``graph.py``).
+    """
+    from .embeddings import ChromaStore
+    from .graph import Neo4jClient
     from .retrieval import retrieve as _retrieve
 
-    return _retrieve
+    # Dense leg: runtime-RAG knowledge chunks live in their own collection, isolated
+    # from the historical ``session_embeddings`` collection.
+    dense_store = None
+    try:
+        dense_store = ChromaStore(collection_name="knowledge_chunks_v1")
+    except Exception:
+        dense_store = None
+
+    # Graph leg: lexical (full-text) search + bounded expansion over the knowledge graph.
+    graph_client = None
+    try:
+        graph_client = Neo4jClient()
+    except Exception:
+        graph_client = None
+
+    # Bind whichever stores survived construction. ``retrieve`` already runs each leg
+    # behind its own try/except, so a down store degrades to the surviving legs (and to
+    # ``no_rag`` when both are down) rather than raising out of ``_augment_prompt``.
+    return functools.partial(_retrieve, dense_store=dense_store, graph_client=graph_client)
 
 
 def _default_construct_fn(rag_params: dict[str, Any], run_agent: Callable[..., Any]) -> Callable[..., Any]:

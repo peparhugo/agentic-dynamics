@@ -5,7 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from instrument.experiment_spec import load_spec, validate_spec
-from instrument.workflow_runner import _build_phase_prompt, run_workflow
+from instrument.workflow_runner import _build_phase_prompt, _default_retrieve_fn, run_workflow
 
 SPEC = Path(__file__).resolve().parent.parent / "experiments" / "specs" / "control_room_portal.yaml"
 
@@ -319,6 +319,77 @@ def test_rag_fallback_on_construct_failure(tmp_path):
 
     result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
                           rag_augment=True, retrieve_fn=retrieve_fn, construct_fn=construct_fn,
+                          run_agentic_fn=lambda *a, **k: _fake_agent())
+
+    assert result.phases[0].fallback_mode == "no_rag"
+    assert result.phases[0].status == "ok"
+
+
+def test_default_retrieve_fn_binds_dense_and_graph_stores(monkeypatch):
+    """The default retrieval wiring builds both stores and binds them to ``retrieve``.
+
+    ``_default_retrieve_fn`` constructs ``ChromaStore`` with the dedicated
+    ``knowledge_chunks_v1`` collection and ``Neo4jClient`` with its own defaults,
+    then returns a ``functools.partial`` carrying both as keyword args.
+    """
+    import instrument.embeddings as embeddings
+    import instrument.graph as graph
+
+    constructed = {}
+
+    class _FakeChroma:
+        def __init__(self, **kwargs):
+            constructed["chroma_kwargs"] = kwargs
+
+    class _FakeNeo4j:
+        def __init__(self, **kwargs):
+            constructed["neo4j_kwargs"] = kwargs
+
+    monkeypatch.setattr(embeddings, "ChromaStore", _FakeChroma)
+    monkeypatch.setattr(graph, "Neo4jClient", _FakeNeo4j)
+
+    fn = _default_retrieve_fn()
+
+    assert isinstance(fn.keywords["dense_store"], _FakeChroma)
+    assert isinstance(fn.keywords["graph_client"], _FakeNeo4j)
+    assert constructed["chroma_kwargs"]["collection_name"] == "knowledge_chunks_v1"
+    assert constructed["neo4j_kwargs"] == {}
+
+
+def test_default_retrieve_fn_degrades_to_no_rag_when_stores_down(tmp_path, monkeypatch):
+    """A store that cannot connect degrades to ``no_rag`` without raising.
+
+    Both store classes are swapped for fakes that construct fine but raise at query
+    time (a lazy driver whose infra is down). ``retrieve``'s per-leg try/except marks
+    each leg down, so the phase falls back to the base prompt and stays ``ok``.
+    """
+    import instrument.embeddings as embeddings
+    import instrument.graph as graph
+
+    class _DownChroma:
+        def __init__(self, **kwargs):
+            pass
+
+        def search(self, *args, **kwargs):
+            raise RuntimeError("chroma unreachable")
+
+    class _DownNeo4j:
+        def __init__(self, **kwargs):
+            pass
+
+        def search_fulltext(self, *args, **kwargs):
+            raise RuntimeError("neo4j unreachable")
+
+    monkeypatch.setattr(embeddings, "ChromaStore", _DownChroma)
+    monkeypatch.setattr(graph, "Neo4jClient", _DownNeo4j)
+
+    spec = load_spec(SPEC)
+
+    def construct_fn(request):
+        return _FakeAugmented("AUGMENTED: " + request.raw_work_item)
+
+    result = run_workflow(spec, goal="g", model="m", workdir=tmp_path, commit=False,
+                          rag_augment=True, construct_fn=construct_fn,
                           run_agentic_fn=lambda *a, **k: _fake_agent())
 
     assert result.phases[0].fallback_mode == "no_rag"
