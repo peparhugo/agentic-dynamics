@@ -14,6 +14,7 @@ def client():
     os.close(db_fd)
     app_module.DATABASE = db_path
     app_module.app.config["TESTING"] = True
+    app_module.app.config["JWT_SECRET_KEY"] = "test-secret-0123456789abcdef-0123456789"
     with app_module.app.app_context():
         app_module.init_db()
     with app_module.app.test_client() as client:
@@ -21,8 +22,77 @@ def client():
     os.unlink(db_path)
 
 
+def register(client, username="alice", password="secret"):
+    return client.post("/auth/register", json={"username": username, "password": password})
+
+
+def auth_headers(client, username="alice", password="secret"):
+    register(client, username=username, password=password)
+    resp = client.post("/auth/login", json={"username": username, "password": password})
+    token = resp.get_json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+# ── Auth tests ────────────────────────────────────────────────
+
+
+def test_register_success(client):
+    resp = register(client)
+    assert resp.status_code == 201
+    data = resp.get_json()
+    assert data["username"] == "alice"
+    assert data["id"] is not None
+
+
+def test_register_duplicate_username(client):
+    assert register(client).status_code == 201
+    resp = register(client)
+    assert resp.status_code == 409
+    assert "exists" in resp.get_json()["error"].lower()
+
+
+def test_register_missing_fields(client):
+    assert client.post("/auth/register", json={}).status_code == 400
+    assert client.post("/auth/register", json={"username": "bob"}).status_code == 400
+    assert client.post("/auth/register", json={"password": "x"}).status_code == 400
+
+
+def test_login_success(client):
+    register(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "secret"})
+    assert resp.status_code == 200
+    assert "access_token" in resp.get_json()
+
+
+def test_login_wrong_password(client):
+    register(client)
+    resp = client.post("/auth/login", json={"username": "alice", "password": "wrong"})
+    assert resp.status_code == 401
+
+
+def test_login_unknown_user(client):
+    resp = client.post("/auth/login", json={"username": "nobody", "password": "x"})
+    assert resp.status_code == 401
+
+
+# ── Task tests ────────────────────────────────────────────────
+
+
+def test_tasks_require_auth(client):
+    assert client.get("/tasks").status_code == 401
+    assert client.post("/tasks", json={"title": "x"}).status_code == 401
+    assert client.get("/tasks/1").status_code == 401
+    assert client.put("/tasks/1", json={"title": "x"}).status_code == 401
+
+
+def test_tasks_reject_invalid_token(client):
+    headers = {"Authorization": "Bearer not-a-valid-token"}
+    assert client.get("/tasks", headers=headers).status_code == 401
+
+
 def test_create_task_success(client):
-    resp = client.post("/tasks", json={"title": "Buy groceries"})
+    headers = auth_headers(client)
+    resp = client.post("/tasks", json={"title": "Buy groceries"}, headers=headers)
     assert resp.status_code == 201
     data = resp.get_json()
     assert data["title"] == "Buy groceries"
@@ -32,7 +102,8 @@ def test_create_task_success(client):
 
 
 def test_create_task_missing_title(client):
-    resp = client.post("/tasks", json={})
+    headers = auth_headers(client)
+    resp = client.post("/tasks", json={}, headers=headers)
     assert resp.status_code == 400
     data = resp.get_json()
     assert "title" in data["error"].lower()
@@ -40,29 +111,33 @@ def test_create_task_missing_title(client):
 
 
 def test_create_task_empty_title(client):
-    resp = client.post("/tasks", json={"title": "   "})
+    headers = auth_headers(client)
+    resp = client.post("/tasks", json={"title": "   "}, headers=headers)
     assert resp.status_code == 400
     data = resp.get_json()
     assert "title" in data["error"].lower()
 
 
 def test_create_task_no_json(client):
-    resp = client.post("/tasks")
+    headers = auth_headers(client)
+    resp = client.post("/tasks", headers=headers)
     assert resp.status_code == 400
     data = resp.get_json()
     assert "title" in data["error"].lower()
 
 
 def test_list_tasks_empty(client):
-    resp = client.get("/tasks")
+    headers = auth_headers(client)
+    resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
     assert resp.get_json() == []
 
 
 def test_list_tasks(client):
-    client.post("/tasks", json={"title": "Task A"})
-    client.post("/tasks", json={"title": "Task B"})
-    resp = client.get("/tasks")
+    headers = auth_headers(client)
+    client.post("/tasks", json={"title": "Task A"}, headers=headers)
+    client.post("/tasks", json={"title": "Task B"}, headers=headers)
+    resp = client.get("/tasks", headers=headers)
     assert resp.status_code == 200
     tasks = resp.get_json()
     assert len(tasks) == 2
@@ -71,10 +146,11 @@ def test_list_tasks(client):
 
 
 def test_get_task_found(client):
-    create_resp = client.post("/tasks", json={"title": "Read book"})
+    headers = auth_headers(client)
+    create_resp = client.post("/tasks", json={"title": "Read book"}, headers=headers)
     task_id = create_resp.get_json()["id"]
 
-    resp = client.get(f"/tasks/{task_id}")
+    resp = client.get(f"/tasks/{task_id}", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["id"] == task_id
@@ -83,17 +159,19 @@ def test_get_task_found(client):
 
 
 def test_get_task_not_found(client):
-    resp = client.get("/tasks/9999")
+    headers = auth_headers(client)
+    resp = client.get("/tasks/9999", headers=headers)
     assert resp.status_code == 404
     data = resp.get_json()
     assert "not found" in data["error"].lower()
 
 
 def test_update_task_title(client):
-    create_resp = client.post("/tasks", json={"title": "Old title"})
+    headers = auth_headers(client)
+    create_resp = client.post("/tasks", json={"title": "Old title"}, headers=headers)
     task_id = create_resp.get_json()["id"]
 
-    resp = client.put(f"/tasks/{task_id}", json={"title": "New title"})
+    resp = client.put(f"/tasks/{task_id}", json={"title": "New title"}, headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["title"] == "New title"
@@ -101,10 +179,11 @@ def test_update_task_title(client):
 
 
 def test_update_task_status(client):
-    create_resp = client.post("/tasks", json={"title": "Status test"})
+    headers = auth_headers(client)
+    create_resp = client.post("/tasks", json={"title": "Status test"}, headers=headers)
     task_id = create_resp.get_json()["id"]
 
-    resp = client.put(f"/tasks/{task_id}", json={"status": "completed"})
+    resp = client.put(f"/tasks/{task_id}", json={"status": "completed"}, headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["status"] == "completed"
@@ -112,10 +191,11 @@ def test_update_task_status(client):
 
 
 def test_update_task_both(client):
-    create_resp = client.post("/tasks", json={"title": "Both test"})
+    headers = auth_headers(client)
+    create_resp = client.post("/tasks", json={"title": "Both test"}, headers=headers)
     task_id = create_resp.get_json()["id"]
 
-    resp = client.put(f"/tasks/{task_id}", json={"title": "Updated", "status": "done"})
+    resp = client.put(f"/tasks/{task_id}", json={"title": "Updated", "status": "done"}, headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["title"] == "Updated"
@@ -123,18 +203,46 @@ def test_update_task_both(client):
 
 
 def test_update_task_not_found(client):
-    resp = client.put("/tasks/9999", json={"title": "Nope"})
+    headers = auth_headers(client)
+    resp = client.put("/tasks/9999", json={"title": "Nope"}, headers=headers)
     assert resp.status_code == 404
     data = resp.get_json()
     assert "not found" in data["error"].lower()
 
 
 def test_update_task_no_body(client):
-    create_resp = client.post("/tasks", json={"title": "No body test"})
+    headers = auth_headers(client)
+    create_resp = client.post("/tasks", json={"title": "No body test"}, headers=headers)
     task_id = create_resp.get_json()["id"]
 
-    resp = client.put(f"/tasks/{task_id}")
+    resp = client.put(f"/tasks/{task_id}", headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["title"] == "No body test"
     assert data["status"] == "pending"
+
+
+# ── Ownership isolation tests ─────────────────────────────────
+
+
+def test_users_only_see_own_tasks(client):
+    alice = auth_headers(client, "alice", "secret")
+    bob = auth_headers(client, "bob", "secret")
+
+    client.post("/tasks", json={"title": "Alice task"}, headers=alice)
+    client.post("/tasks", json={"title": "Bob task"}, headers=bob)
+
+    alice_tasks = client.get("/tasks", headers=alice).get_json()
+    bob_tasks = client.get("/tasks", headers=bob).get_json()
+    assert [t["title"] for t in alice_tasks] == ["Alice task"]
+    assert [t["title"] for t in bob_tasks] == ["Bob task"]
+
+
+def test_user_cannot_access_other_users_task(client):
+    alice = auth_headers(client, "alice", "secret")
+    bob = auth_headers(client, "bob", "secret")
+
+    task_id = client.post("/tasks", json={"title": "Alice task"}, headers=alice).get_json()["id"]
+
+    assert client.get(f"/tasks/{task_id}", headers=bob).status_code == 404
+    assert client.put(f"/tasks/{task_id}", json={"title": "hijack"}, headers=bob).status_code == 404
